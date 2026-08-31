@@ -96,3 +96,31 @@ def test_running_script_is_terminated_when_persistent_output_exceeds_bound(
         )
 
     assert (workspace / "output.bin").stat().st_size == 4096
+
+
+def test_direct_runner_and_workspace_creation_paths_refuse_before_writing(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "run"
+    workspace.mkdir()
+    script = tmp_path / "writer.py"
+    script.write_text(
+        "from pathlib import Path\n"
+        "Path('should-not-exist').write_text('unexpected')\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(HostResourceRefused):
+        script_exec.run_script(
+            script,
+            workspace,
+            resource_admission=_admission(102),
+        )
+    with pytest.raises(HostResourceRefused):
+        script_exec.create_run_workspace(
+            tmp_path / "menu-workspaces",
+            resource_admission=_admission(102),
+        )
+
+    assert not (workspace / "should-not-exist").exists()
+    assert not (tmp_path / "menu-workspaces").exists()

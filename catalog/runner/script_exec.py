@@ -122,13 +122,22 @@ def _reserve_script_workspace(
         yield
 
 
-def create_run_workspace(output_base_dir: Path) -> Path:
+def create_run_workspace(
+    output_base_dir: Path,
+    *,
+    resource_admission: ProcessResourceAdmission | None = None,
+) -> Path:
     """Create a temporary workspace directory for one runner execution."""
     from tempfile import mkdtemp
 
-    output_base_dir.mkdir(parents=True, exist_ok=True)
-    path = Path(mkdtemp(prefix="menu_run_", dir=output_base_dir))
-    return path
+    controller = resource_admission or PROCESS_RESOURCE_ADMISSION
+    with reserve_analysis_requirements(
+        controller,
+        [(output_base_dir, 0, 2)],
+    ):
+        output_base_dir.mkdir(parents=True, exist_ok=True)
+        path = Path(mkdtemp(prefix="menu_run_", dir=output_base_dir))
+        return path
 
 
 def execute_script_for_session(
@@ -322,6 +331,7 @@ def _execute_script_for_session_unadmitted(
             script_to_run,
             run_dir,
             runtime_env=runtime_env,
+            admission_held=True,
             max_workspace_bytes=max_workspace_bytes,
             max_workspace_inodes=max_workspace_inodes,
         )
@@ -330,6 +340,7 @@ def _execute_script_for_session_unadmitted(
             script_to_run,
             run_dir,
             runtime_env=runtime_env,
+            admission_held=True,
             max_workspace_bytes=max_workspace_bytes,
             max_workspace_inodes=max_workspace_inodes,
         )
@@ -366,14 +377,18 @@ def run_script(
     workspace_dir: Path,
     *,
     runtime_env: dict[str, str] | None = None,
+    resource_admission: ProcessResourceAdmission | None = None,
+    admission_held: bool = False,
     max_workspace_bytes: int | None = None,
     max_workspace_inodes: int | None = None,
 ) -> int:
     """Execute a selected catalog script inside a workspace directory."""
-    completed = _run_script_subprocess(
+    completed = _run_script_with_admission(
         script_path,
         workspace_dir,
         runtime_env=runtime_env,
+        resource_admission=resource_admission,
+        admission_held=admission_held,
         max_workspace_bytes=max_workspace_bytes,
         max_workspace_inodes=max_workspace_inodes,
     )
@@ -391,14 +406,18 @@ def run_script_with_output(
     workspace_dir: Path,
     *,
     runtime_env: dict[str, str] | None = None,
+    resource_admission: ProcessResourceAdmission | None = None,
+    admission_held: bool = False,
     max_workspace_bytes: int | None = None,
     max_workspace_inodes: int | None = None,
 ) -> tuple[int, str | None, str | None]:
     """Execute script and return full stdout/stderr (still echoed to parent logs)."""
-    completed = _run_script_subprocess(
+    completed = _run_script_with_admission(
         script_path,
         workspace_dir,
         runtime_env=runtime_env,
+        resource_admission=resource_admission,
+        admission_held=admission_held,
         max_workspace_bytes=max_workspace_bytes,
         max_workspace_inodes=max_workspace_inodes,
     )
@@ -409,6 +428,50 @@ def run_script_with_output(
         print("[script stderr]", flush=True)
         print(completed.stderr, end="" if completed.stderr.endswith("\n") else "\n", flush=True)
     return completed.returncode, completed.stdout or None, completed.stderr or None
+
+
+def _run_script_with_admission(
+    script_path: Path,
+    workspace_dir: Path,
+    *,
+    runtime_env: dict[str, str] | None,
+    resource_admission: ProcessResourceAdmission | None,
+    admission_held: bool,
+    max_workspace_bytes: int | None,
+    max_workspace_inodes: int | None,
+) -> subprocess.CompletedProcess[str]:
+    bounded_bytes = (
+        _DEFAULT_SCRIPT_WORKSPACE_BYTES
+        if max_workspace_bytes is None
+        else max(int(max_workspace_bytes), 0)
+    )
+    bounded_inodes = (
+        _DEFAULT_SCRIPT_WORKSPACE_INODES
+        if max_workspace_inodes is None
+        else max(int(max_workspace_inodes), 0)
+    )
+    if admission_held:
+        return _run_script_subprocess(
+            script_path,
+            workspace_dir,
+            runtime_env=runtime_env,
+            max_workspace_bytes=bounded_bytes,
+            max_workspace_inodes=bounded_inodes,
+        )
+    controller = resource_admission or PROCESS_RESOURCE_ADMISSION
+    with _reserve_script_workspace(
+        controller,
+        workspace_dir,
+        max_bytes=bounded_bytes,
+        max_inodes=bounded_inodes,
+    ):
+        return _run_script_subprocess(
+            script_path,
+            workspace_dir,
+            runtime_env=runtime_env,
+            max_workspace_bytes=bounded_bytes,
+            max_workspace_inodes=bounded_inodes,
+        )
 
 
 def _run_script_subprocess(
