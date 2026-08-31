@@ -11,13 +11,19 @@ import hashlib
 import json
 import sqlite3
 from collections.abc import Awaitable, Callable
+from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any, ClassVar, Protocol, Self
 
-from catalog.federation.errors import FederationValidationError, ProtocolCompatibilityError
+from catalog.federation.errors import (
+    FederationValidationError,
+    ProtocolCompatibilityError,
+)
+from catalog.federation.host_resources import ProcessResourceAdmission
+from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
 
 from .job_store import DurableJobSnapshot, SQLiteJobStore
 from .jobs import AttemptStatus, JobAttempt, JobContract, JobStatus, protocol_major
@@ -643,13 +649,26 @@ class DispatchTransport(Protocol):
 class SQLiteDispatchInbox:
     """Durable duplicate suppression; a reserved dispatch never starts twice."""
 
-    def __init__(self, database: Path | str) -> None:
+    def __init__(
+        self,
+        database: Path | str,
+        *,
+        resource_admission: ProcessResourceAdmission | None = None,
+    ) -> None:
         self.database = str(database)
-        Path(self.database).parent.mkdir(parents=True, exist_ok=True)
-        with self._connect() as connection:
-            connection.execute("PRAGMA journal_mode=WAL")
-            connection.executescript(
-                """
+        self.resource_admission = resource_admission or PROCESS_RESOURCE_ADMISSION
+        with self.resource_admission.reserve(
+            self.database,
+            bytes_required=4 * 1024 * 1024,
+            inodes_required=4,
+        ):
+            Path(self.database).parent.mkdir(parents=True, exist_ok=True)
+            with self._connect() as connection:
+                connection.execute("PRAGMA journal_mode=WAL")
+                connection.execute("PRAGMA wal_autocheckpoint=1000")
+                connection.execute("PRAGMA journal_size_limit=8388608")
+                connection.executescript(
+                    """
                 CREATE TABLE IF NOT EXISTS capability_dispatch_receipts (
                     session_id TEXT NOT NULL,
                     dispatch_id TEXT NOT NULL,
@@ -664,15 +683,26 @@ class SQLiteDispatchInbox:
                     updated_at TEXT NOT NULL,
                     PRIMARY KEY(session_id, dispatch_id)
                 );
-                """
-            )
+                    """
+                )
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database, timeout=30)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA busy_timeout=30000")
         connection.execute("PRAGMA synchronous=FULL")
+        connection.execute("PRAGMA wal_autocheckpoint=1000")
+        connection.execute("PRAGMA journal_size_limit=8388608")
         return connection
+
+    @contextmanager
+    def _admitted_connection(self):
+        with self.resource_admission.reserve(
+            self.database,
+            bytes_required=4 * 1024 * 1024,
+            inodes_required=4,
+        ), self._connect() as connection:
+            yield connection
 
     @staticmethod
     def _decode(row: sqlite3.Row) -> DispatchResponse:
@@ -706,7 +736,7 @@ class SQLiteDispatchInbox:
         self, request: DispatchRequest, response: DispatchResponse, *, now: datetime
     ) -> DispatchResponse | None:
         now = _utc(now, "now")
-        with self._connect() as connection:
+        with self._admitted_connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
                 row = connection.execute(
@@ -751,7 +781,7 @@ class SQLiteDispatchInbox:
     ) -> DispatchResponse:
         now = _utc(now, "now")
         response.validate_for(request)
-        with self._connect() as connection:
+        with self._admitted_connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
                 row = connection.execute(

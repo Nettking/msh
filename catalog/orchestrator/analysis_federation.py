@@ -62,6 +62,8 @@ from catalog.federation.errors import (
     FederationOperationError,
     FederationValidationError,
 )
+from catalog.federation.host_resources import ProcessResourceAdmission
+from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
 from catalog.node.identity import IdentityStore
 
 
@@ -577,17 +579,23 @@ class DeviceFederationAuthority:
         node_id: str,
         clock: Callable[[], datetime],
         relay_client: Any | None = None,
-    ) -> "DeviceFederationAuthority":
+        resource_admission: ProcessResourceAdmission | None = None,
+    ) -> DeviceFederationAuthority:
+        controller = resource_admission or PROCESS_RESOURCE_ADMISSION
         enrollments = FederatedProviderEnrollmentService(
             coordinator,
             SQLiteProviderEnrollmentStore(
-                capability_root / "provider_enrollment.sqlite3"
+                capability_root / "provider_enrollment.sqlite3",
+                resource_admission=controller,
             ),
             clock=clock,
         )
         health = FederatedProviderHealthService(
             enrollments,
-            SQLiteProviderHealthStore(capability_root / "provider_health.sqlite3"),
+            SQLiteProviderHealthStore(
+                capability_root / "provider_health.sqlite3",
+                resource_admission=controller,
+            ),
             clock=clock,
         )
         inventory = LocalComputeHandlerInventory()
@@ -601,7 +609,8 @@ class DeviceFederationAuthority:
         binder = TrustedComputeWorkerBinder(
             authority,
             lambda provider_id: SQLiteLifecycleDispatchInbox(
-                capability_root / f"dispatch_inbox_{provider_id}.sqlite3"
+                capability_root / f"dispatch_inbox_{provider_id}.sqlite3",
+                resource_admission=controller,
             ),
             clock=clock,
             worker_factory=lifecycle_worker_factory,
@@ -631,7 +640,7 @@ class DeviceFederationAuthority:
         event_loop: asyncio.AbstractEventLoop,
         upstream_message_source: Any,
         local_leader: bool,
-    ) -> "DeviceFederationAuthority":
+    ) -> DeviceFederationAuthority:
         """Bind to the product's one authenticated relay connection."""
 
         runtime.ensure_connected(runtime_state)
@@ -725,7 +734,7 @@ class DeviceFederationAuthority:
         capability_root: Path,
         node_id: str,
         clock: Callable[[], datetime],
-    ) -> "DeviceFederationAuthority":
+    ) -> DeviceFederationAuthority:
         """Return an authority that can host nothing and offers no provider."""
 
         return cls(
@@ -748,7 +757,8 @@ class DeviceFederationAuthority:
         clock: Callable[[], datetime],
         coordinator: SessionCoordinator | None = None,
         relay_client: Any | None = None,
-    ) -> "DeviceFederationAuthority":
+        resource_admission: ProcessResourceAdmission | None = None,
+    ) -> DeviceFederationAuthority:
         """Build the authority chain, bootstrapping a single-node session if needed."""
 
         if coordinator is None:
@@ -757,6 +767,7 @@ class DeviceFederationAuthority:
                 session_id=identity.session_id,
                 node_id=identity.node_id,
                 clock=clock,
+                resource_admission=resource_admission,
             )
         return cls.build(
             coordinator=coordinator,
@@ -765,6 +776,7 @@ class DeviceFederationAuthority:
             node_id=identity.node_id,
             clock=clock,
             relay_client=relay_client,
+            resource_admission=resource_admission,
         )
 
 
@@ -774,12 +786,21 @@ def _standalone_coordinator(
     session_id: str,
     node_id: str,
     clock: Callable[[], datetime],
+    resource_admission: ProcessResourceAdmission | None = None,
 ) -> SessionCoordinator:
     """Return a device-local coordinator holding this device's own session."""
 
-    capability_root.mkdir(parents=True, exist_ok=True)
+    controller = resource_admission or PROCESS_RESOURCE_ADMISSION
+    with controller.reserve(
+        capability_root,
+        bytes_required=8 * 1024 * 1024,
+        inodes_required=8,
+    ):
+        capability_root.mkdir(parents=True, exist_ok=True)
     coordinator = SessionCoordinator(
-        capability_root / "standalone_control.sqlite3", clock=clock
+        capability_root / "standalone_control.sqlite3",
+        clock=clock,
+        resource_admission=controller,
     )
     try:
         coordinator.require_active_node(node_id)

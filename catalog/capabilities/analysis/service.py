@@ -22,6 +22,8 @@ from catalog.federation.errors import (
     FederationValidationError,
     ProtocolCompatibilityError,
 )
+from catalog.federation.host_resources import ProcessResourceAdmission
+from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
 
 from ..job_store import DurableJobSnapshot
 from ..jobs import JobStatus
@@ -34,6 +36,9 @@ from .scheduler import (
 
 DECISION_SCHEDULING_FAILED = "scheduling-failed"
 DEFAULT_SCHEDULER_POLL_SECONDS = 5.0
+_REGISTRY_INITIALIZATION_BYTES = 2 * 1024 * 1024
+_REGISTRY_MUTATION_BYTES = 2 * 1024 * 1024
+_REGISTRY_MUTATION_INODES = 3
 
 _SCHEDULING_ERRORS = (
     FederationValidationError,
@@ -103,71 +108,90 @@ class AnalysisJobRecord:
 class AnalysisJobRegistry:
     """Durable index of analysis jobs submitted from this device."""
 
-    def __init__(self, database: Path | str) -> None:
+    def __init__(
+        self,
+        database: Path | str,
+        *,
+        resource_admission: ProcessResourceAdmission | None = None,
+    ) -> None:
         self.database = Path(database)
-        self.database.parent.mkdir(parents=True, exist_ok=True)
-        with self._connect() as connection:
-            connection.execute("PRAGMA journal_mode=WAL")
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS federated_analysis_jobs (
-                    job_id TEXT PRIMARY KEY,
-                    session_id TEXT NOT NULL,
-                    slice_kind TEXT NOT NULL,
-                    slice_key TEXT NOT NULL,
-                    origin TEXT NOT NULL,
-                    identity_digest TEXT NOT NULL,
-                    source_signature TEXT NOT NULL,
-                    target_dates TEXT NOT NULL,
-                    created_at TEXT NOT NULL
-                )
-                """
-            )
-            connection.execute(
-                """
-                CREATE INDEX IF NOT EXISTS idx_federated_analysis_jobs_session
-                    ON federated_analysis_jobs(session_id, created_at DESC)
-                """
-            )
-            columns = {
-                str(row["name"])
-                for row in connection.execute(
-                    "PRAGMA table_info(federated_analysis_jobs)"
-                ).fetchall()
-            }
-            if "settled_at" not in columns:
+        self.resource_admission = resource_admission or PROCESS_RESOURCE_ADMISSION
+        with self.resource_admission.reserve(
+            self.database,
+            bytes_required=_REGISTRY_INITIALIZATION_BYTES,
+            inodes_required=_REGISTRY_MUTATION_INODES,
+        ):
+            self.database.parent.mkdir(parents=True, exist_ok=True)
+            with self._connect() as connection:
+                connection.execute("PRAGMA journal_mode=WAL")
+                connection.execute("PRAGMA wal_autocheckpoint=1000")
+                connection.execute("PRAGMA journal_size_limit=8388608")
                 connection.execute(
-                    "ALTER TABLE federated_analysis_jobs ADD COLUMN settled_at TEXT"
+                    """
+                    CREATE TABLE IF NOT EXISTS federated_analysis_jobs (
+                        job_id TEXT PRIMARY KEY,
+                        session_id TEXT NOT NULL,
+                        slice_kind TEXT NOT NULL,
+                        slice_key TEXT NOT NULL,
+                        origin TEXT NOT NULL,
+                        identity_digest TEXT NOT NULL,
+                        source_signature TEXT NOT NULL,
+                        target_dates TEXT NOT NULL,
+                        created_at TEXT NOT NULL
+                    )
+                    """
                 )
-            # Lifecycle scanning only cares about work that has not finished, and
-            # on a device that keeps discovering data the finished rows dominate.
-            # A partial index keeps that scan proportional to unsettled work
-            # rather than to the whole history.
-            connection.execute(
-                """
-                CREATE INDEX IF NOT EXISTS idx_federated_analysis_jobs_unsettled
-                    ON federated_analysis_jobs(session_id, created_at)
-                    WHERE settled_at IS NULL
-                """
-            )
+                connection.execute(
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_federated_analysis_jobs_session
+                        ON federated_analysis_jobs(session_id, created_at DESC)
+                    """
+                )
+                columns = {
+                    str(row["name"])
+                    for row in connection.execute(
+                        "PRAGMA table_info(federated_analysis_jobs)"
+                    ).fetchall()
+                }
+                if "settled_at" not in columns:
+                    connection.execute(
+                        "ALTER TABLE federated_analysis_jobs ADD COLUMN settled_at TEXT"
+                    )
+                # Lifecycle scanning only cares about work that has not finished, and
+                # on a device that keeps discovering data the finished rows dominate.
+                # A partial index keeps that scan proportional to unsettled work
+                # rather than to the whole history.
+                connection.execute(
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_federated_analysis_jobs_unsettled
+                        ON federated_analysis_jobs(session_id, created_at)
+                        WHERE settled_at IS NULL
+                    """
+                )
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database, timeout=30)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA busy_timeout=30000")
         connection.execute("PRAGMA synchronous=FULL")
+        connection.execute("PRAGMA wal_autocheckpoint=1000")
+        connection.execute("PRAGMA journal_size_limit=8388608")
         return connection
 
     def record(self, work: AnalysisWorkSlice, *, created_at: datetime) -> None:
-        with self._connect() as connection:
+        with self.resource_admission.reserve(
+            self.database,
+            bytes_required=_REGISTRY_MUTATION_BYTES,
+            inodes_required=_REGISTRY_MUTATION_INODES,
+        ), self._connect() as connection:
             connection.execute(
                 """
-                INSERT INTO federated_analysis_jobs(
-                    job_id, session_id, slice_kind, slice_key, origin,
-                    identity_digest, source_signature, target_dates, created_at
-                ) VALUES(?,?,?,?,?,?,?,?,?)
-                ON CONFLICT(job_id) DO NOTHING
-                """,
+                    INSERT INTO federated_analysis_jobs(
+                        job_id, session_id, slice_kind, slice_key, origin,
+                        identity_digest, source_signature, target_dates, created_at
+                    ) VALUES(?,?,?,?,?,?,?,?,?)
+                    ON CONFLICT(job_id) DO NOTHING
+                    """,
                 (
                     work.job_id,
                     work.session_id,
@@ -244,7 +268,11 @@ class AnalysisJobRegistry:
         if not job_ids:
             return
         stamp = _stamp(settled_at)
-        with self._connect() as connection:
+        with self.resource_admission.reserve(
+            self.database,
+            bytes_required=_REGISTRY_MUTATION_BYTES,
+            inodes_required=_REGISTRY_MUTATION_INODES,
+        ), self._connect() as connection:
             connection.executemany(
                 """
                 UPDATE federated_analysis_jobs SET settled_at=?

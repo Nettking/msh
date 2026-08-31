@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from catalog.federation.host_resources import ProcessResourceAdmission
 from catalog.node.identity import derive_node_id_from_public_key
 
 from .errors import AuthenticationError, AuthorizationError
@@ -28,9 +29,12 @@ class SessionCoordinator:
         database: Path | str | CoordinatorStore,
         *,
         clock: Callable[[], datetime] = _utc_now,
+        resource_admission: ProcessResourceAdmission | None = None,
     ) -> None:
         self.store = (
-            database if isinstance(database, CoordinatorStore) else CoordinatorStore(database)
+            database
+            if isinstance(database, CoordinatorStore)
+            else CoordinatorStore(database, resource_admission=resource_admission)
         )
         self.event_log = AuthoritativeSessionEventLog(self.store)
         self.leadership = SessionLeadershipService(self.store)

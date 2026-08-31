@@ -11,17 +11,23 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, ClassVar, Self
 
 from catalog.federation.errors import FederationValidationError
+from catalog.federation.host_resources import ProcessResourceAdmission
+from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
 
 from .jobs import AttemptStatus, JobAttempt, JobContract, JobStatus
 
 JOB_STORE_SCHEMA_VERSION = 1
 MAX_OWNERSHIP_LEASE_SECONDS = 60 * 60
+JOB_STORE_INITIALIZATION_BYTES = 8 * 1024 * 1024
+JOB_STORE_MUTATION_BYTES = 8 * 1024 * 1024
+JOB_STORE_MUTATION_INODES = 4
 _TERMINAL_ATTEMPT_STATUSES = frozenset(
     {
         AttemptStatus.SUCCEEDED,
@@ -443,13 +449,23 @@ class JobAuditEvent:
 class SQLiteJobStore:
     """Coordinator-owned SQLite state for jobs, attempts, leases, and audit."""
 
-    def __init__(self, database: Path | str) -> None:
+    def __init__(
+        self,
+        database: Path | str,
+        *,
+        resource_admission: ProcessResourceAdmission | None = None,
+    ) -> None:
         self.database = str(database)
-        Path(self.database).parent.mkdir(parents=True, exist_ok=True)
-        with self._connect() as connection:
-            connection.execute("PRAGMA journal_mode=WAL")
-            connection.executescript(
-                """
+        self.resource_admission = resource_admission or PROCESS_RESOURCE_ADMISSION
+        with self._resource_reservation(
+            bytes_required=JOB_STORE_INITIALIZATION_BYTES,
+            inodes_required=JOB_STORE_MUTATION_INODES,
+        ):
+            Path(self.database).parent.mkdir(parents=True, exist_ok=True)
+            with self._connect() as connection:
+                connection.execute("PRAGMA journal_mode=WAL")
+                connection.executescript(
+                    """
                 CREATE TABLE IF NOT EXISTS capability_job_store_meta (
                     key TEXT PRIMARY KEY,
                     value TEXT NOT NULL
@@ -543,21 +559,42 @@ class SQLiteJobStore:
                     WHERE active_attempt_id IS NOT NULL;
                 CREATE INDEX IF NOT EXISTS capability_job_audit_order
                     ON capability_job_audit(job_id, sequence);
-                """
-            )
-            version = connection.execute(
-                """SELECT value FROM capability_job_store_meta
-                   WHERE key='schema_version'"""
-            ).fetchone()
-            if (
-                version is None
-                or int(version["value"]) != JOB_STORE_SCHEMA_VERSION
-            ):
-                raise FederationValidationError(
-                    "unsupported-job-store-schema",
-                    "schema_version",
-                    f"expected {JOB_STORE_SCHEMA_VERSION}",
+                    """
                 )
+                version = connection.execute(
+                    """SELECT value FROM capability_job_store_meta
+                       WHERE key='schema_version'"""
+                ).fetchone()
+                if (
+                    version is None
+                    or int(version["value"]) != JOB_STORE_SCHEMA_VERSION
+                ):
+                    raise FederationValidationError(
+                        "unsupported-job-store-schema",
+                        "schema_version",
+                        f"expected {JOB_STORE_SCHEMA_VERSION}",
+                    )
+
+    @contextmanager
+    def _resource_reservation(
+        self,
+        *,
+        bytes_required: int = JOB_STORE_MUTATION_BYTES,
+        inodes_required: int = JOB_STORE_MUTATION_INODES,
+    ):
+        """Hold one bounded SQLite/WAL mutation reservation through commit."""
+
+        with self.resource_admission.reserve(
+            self.database,
+            bytes_required=bytes_required,
+            inodes_required=inodes_required,
+        ):
+            yield
+
+    @contextmanager
+    def _admitted_connection(self):
+        with self._resource_reservation(), self._connect() as connection:
+            yield connection
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database, timeout=30)
@@ -834,7 +871,7 @@ class SQLiteJobStore:
                 "coordinator_id": coordinator_id,
             },
         )
-        with self._connect() as connection:
+        with self._admitted_connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
                 replay = self._command_replay(
@@ -956,7 +993,7 @@ class SQLiteJobStore:
                 "expected_revision": expected_revision,
             },
         )
-        with self._connect() as connection:
+        with self._admitted_connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
                 row = self._row(connection, job_id)
@@ -1086,7 +1123,7 @@ class SQLiteJobStore:
                 "lease_expires_at": _timestamp(lease_expires_at),
             },
         )
-        with self._connect() as connection:
+        with self._admitted_connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
                 row = self._row(connection, job_id)
@@ -1311,7 +1348,7 @@ class SQLiteJobStore:
                 "lease_expires_at": _timestamp(lease_expires_at),
             },
         )
-        with self._connect() as connection:
+        with self._admitted_connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
                 row = self._row(connection, job_id)
@@ -1568,7 +1605,7 @@ class SQLiteJobStore:
                 "error_code": error_code,
             },
         )
-        with self._connect() as connection:
+        with self._admitted_connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
                 row = self._row(connection, job_id)
@@ -1751,7 +1788,7 @@ class SQLiteJobStore:
                 "now": _timestamp(now),
             },
         )
-        with self._connect() as connection:
+        with self._admitted_connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
                 row = self._row(connection, job_id)

@@ -41,7 +41,10 @@ from catalog.capabilities.analysis.contracts import (
     SLICE_KIND_DATE,
 )
 from catalog.capabilities.analysis.provisioning import dispatched_data_owner_node_id
-from catalog.capabilities.analysis.resource_admission import ProcessResourceAdmission
+from catalog.capabilities.analysis.resource_admission import (
+    MAX_ANALYSIS_METADATA_BYTES,
+    ProcessResourceAdmission,
+)
 from catalog.capabilities.analysis.scheduler import SubmissionOutcome
 from catalog.capabilities.artifact_secure_runtime import (
     SQLiteCapabilityArtifactAuthority,
@@ -125,37 +128,51 @@ def _provider_id(node_id: str) -> str:
     return analysis_capability_id(node_id)
 
 
-def _standalone_identity(state_path: Path) -> tuple[str, str]:
+def _standalone_identity(
+    state_path: Path,
+    *,
+    resource_admission: ProcessResourceAdmission | None = None,
+) -> tuple[str, str]:
     """Return the persisted single-node federation identity, creating it once."""
 
-    credentials = IdentityStore(
-        state_path.parent / "standalone_identity",
-        display_name="This device",
-    ).load_or_create()
-    node_id = credentials.identity.node_id
-    if state_path.exists():
-        try:
-            payload = json.loads(state_path.read_text(encoding="utf-8"))
-            session_id = str(payload["session_id"])
-            if session_id and str(payload.get("node_id")) == node_id:
-                return session_id, node_id
-        except (OSError, ValueError, KeyError):
-            pass
-    session_id = f"session-standalone-{uuid.uuid4().hex}"
-    state_path.parent.mkdir(parents=True, exist_ok=True)
-    state_path.write_text(
-        json.dumps(
-            {"session_id": session_id, "node_id": node_id, "mode": "standalone"},
-            indent=2,
-            sort_keys=True,
+    controller = resource_admission or PROCESS_RESOURCE_ADMISSION
+    with controller.reserve(
+        state_path.parent,
+        bytes_required=MAX_ANALYSIS_METADATA_BYTES,
+        inodes_required=8,
+    ):
+        credentials = IdentityStore(
+            state_path.parent / "standalone_identity",
+            display_name="This device",
+        ).load_or_create()
+        node_id = credentials.identity.node_id
+        if state_path.exists():
+            try:
+                payload = json.loads(state_path.read_text(encoding="utf-8"))
+                session_id = str(payload["session_id"])
+                if session_id and str(payload.get("node_id")) == node_id:
+                    return session_id, node_id
+            except (OSError, ValueError, KeyError):
+                pass
+        session_id = f"session-standalone-{uuid.uuid4().hex}"
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        state_path.write_text(
+            json.dumps(
+                {"session_id": session_id, "node_id": node_id, "mode": "standalone"},
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
         )
-        + "\n",
-        encoding="utf-8",
-    )
-    return session_id, node_id
+        return session_id, node_id
 
 
-def resolve_analysis_identity(state_path: Path) -> AnalysisIdentity:
+def resolve_analysis_identity(
+    state_path: Path,
+    *,
+    resource_admission: ProcessResourceAdmission | None = None,
+) -> AnalysisIdentity:
     """Resolve the federation identity this runtime binds to."""
 
     session_id = str(os.getenv("FCP_ANALYSIS_SESSION_ID", "")).strip()
@@ -173,7 +190,10 @@ def resolve_analysis_identity(state_path: Path) -> AnalysisIdentity:
             session_id, node_id = (str(item).strip() for item in resolved)
             if session_id and node_id:
                 return AnalysisIdentity(session_id, node_id, _provider_id(node_id), False)
-    session_id, node_id = _standalone_identity(state_path)
+    session_id, node_id = _standalone_identity(
+        state_path,
+        resource_admission=resource_admission,
+    )
     return AnalysisIdentity(session_id, node_id, _provider_id(node_id), True)
 
 
@@ -281,12 +301,20 @@ class AnalysisRuntime:
         enable_local_provider: bool = True,
         max_slice_bytes: int | None = None,
         federation: DeviceFederationAuthority | None = None,
+        resource_admission: ProcessResourceAdmission | None = None,
     ) -> None:
+        self.resource_admission = resource_admission or PROCESS_RESOURCE_ADMISSION
         self.root = Path(root) if root is not None else repo_root()
         self.capability_root = self.root / "results" / "capabilities"
-        self.capability_root.mkdir(parents=True, exist_ok=True)
+        with self.resource_admission.reserve(
+            self.capability_root,
+            bytes_required=MAX_ANALYSIS_METADATA_BYTES,
+            inodes_required=8,
+        ):
+            self.capability_root.mkdir(parents=True, exist_ok=True)
         self.identity = identity or resolve_analysis_identity(
-            self.capability_root / "analysis_identity.json"
+            self.capability_root / "analysis_identity.json",
+            resource_admission=self.resource_admission,
         )
         self.clock = clock
         self.max_slice_bytes = int(
@@ -295,10 +323,15 @@ class AnalysisRuntime:
             else os.getenv("FCP_ANALYSIS_MAX_SLICE_BYTES", DEFAULT_MAX_SLICE_BYTES)
         )
 
-        self.store = SQLiteJobLifecycleStore(self.capability_root / "analysis_jobs.sqlite3")
+        self.store = SQLiteJobLifecycleStore(
+            self.capability_root / "analysis_jobs.sqlite3",
+            resource_admission=self.resource_admission,
+        )
         self.artifact_authority = SQLiteCapabilityArtifactAuthority(self.store)
         self.content_store = LocalArtifactContentStore(
-            self.capability_root / "artifacts", max_bytes=self.max_slice_bytes
+            self.capability_root / "artifacts",
+            max_bytes=self.max_slice_bytes,
+            resource_admission=self.resource_admission,
         )
         self.gateway = AnalysisArtifactGateway(self.artifact_authority, self.content_store)
         self.max_concurrent_jobs = max(
@@ -328,6 +361,7 @@ class AnalysisRuntime:
                     capability_root=self.capability_root,
                     identity=self.identity,
                     clock=self.clock,
+                    resource_admission=self.resource_admission,
                 )
             except Exception as exc:  # noqa: BLE001 - startup stays available
                 self.provisioning_reason = str(
@@ -354,6 +388,7 @@ class AnalysisRuntime:
         self.efficiency = ExecutionEfficiencyRuntime(
             _efficiency_database(self.capability_root, self.identity.session_id),
             node_id=self.identity.node_id,
+            resource_admission=self.resource_admission,
         )
         self.scheduler_transport = self.efficiency.wrap_transport(
             self.transport,
@@ -371,10 +406,14 @@ class AnalysisRuntime:
             coordinator_node_id=self.identity.coordinator_node_id,
             clock=self.clock,
             ranker=self.efficiency.ranker,
+            resource_admission=self.resource_admission,
         )
         self.service = AnalysisWorkService(
             scheduler=self.scheduler,
-            registry=AnalysisJobRegistry(self.capability_root / "analysis_jobs.sqlite3"),
+            registry=AnalysisJobRegistry(
+                self.capability_root / "analysis_jobs.sqlite3",
+                resource_admission=self.resource_admission,
+            ),
             session_id=self.identity.session_id,
         )
         self.federation_generation = _federation_generation(self.identity)
@@ -407,7 +446,7 @@ class AnalysisRuntime:
             executor=RunnerSliceAnalysisExecutor(
                 workflows_root=self.root / "results" / "workflows",
                 catalog_root=self.root / "catalog",
-                resource_admission=PROCESS_RESOURCE_ADMISSION,
+                resource_admission=self.resource_admission,
                 max_slice_bytes=self.max_slice_bytes,
             ),
             workspace_root=self.capability_root / "workspaces",
@@ -415,6 +454,7 @@ class AnalysisRuntime:
             clock=self.clock,
             data_owner_node_id=dispatched_data_owner_node_id,
             max_slice_bytes=self.max_slice_bytes,
+            resource_admission=self.resource_admission,
         )
         self.provisioner = AnalysisProviderProvisioner(
             coordinator=self.federation.coordinator,

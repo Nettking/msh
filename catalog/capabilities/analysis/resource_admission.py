@@ -191,8 +191,20 @@ class FederatedAnalysisHandler(_FederatedAnalysisHandler):
         resource_admission: ProcessResourceAdmission | None = None,
         **kwargs: Any,
     ) -> None:
-        super().__init__(*args, **kwargs)
         self.resource_admission = resource_admission or PROCESS_RESOURCE_ADMISSION
+        workspace_root = kwargs.get("workspace_root")
+        if workspace_root is None:
+            raise TypeError("workspace_root is required for admitted analysis workers")
+        # The base worker performs marker-safe startup reconciliation in its
+        # constructor, including creation of the FCP-owned root. Hold the
+        # reservation across that call so the first worker startup cannot create
+        # a workspace tree while the host is already at PRESSURE.
+        with self.resource_admission.reserve(
+            Path(workspace_root),
+            bytes_required=MAX_ANALYSIS_METADATA_BYTES,
+            inodes_required=16,
+        ):
+            super().__init__(*args, **kwargs)
 
     async def execute(self, job: JobContract) -> ExecutionResult:
         try:

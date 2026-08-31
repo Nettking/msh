@@ -9,6 +9,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from catalog.federation.errors import FederationValidationError
+from catalog.federation.host_resources import ProcessResourceAdmission
+from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
 
 from .job_store import (
     DurableJobSnapshot,
@@ -41,9 +43,15 @@ class ResultMutation:
 class SQLiteJobLifecycleStore(SQLiteJobStore):
     """Additive durable cancellation, retry, heartbeat, and result state."""
 
-    def __init__(self, database: Path | str) -> None:
-        super().__init__(database)
-        with self._connect() as connection:
+    def __init__(
+        self,
+        database: Path | str,
+        *,
+        resource_admission: ProcessResourceAdmission | None = None,
+    ) -> None:
+        self.resource_admission = resource_admission or PROCESS_RESOURCE_ADMISSION
+        super().__init__(database, resource_admission=self.resource_admission)
+        with self._admitted_connection() as connection:
             connection.executescript(
                 """
                 CREATE TABLE IF NOT EXISTS capability_job_retry_state (
@@ -284,7 +292,7 @@ class SQLiteJobLifecycleStore(SQLiteJobStore):
                 "reason": reason,
             },
         )
-        with self._connect() as connection:
+        with self._admitted_connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
                 row = self._row(connection, job_id)
@@ -578,7 +586,7 @@ class SQLiteJobLifecycleStore(SQLiteJobStore):
                 "expected_revision": expected_revision,
             },
         )
-        with self._connect() as connection:
+        with self._admitted_connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
                 row = self._row(connection, job_id)
@@ -812,7 +820,7 @@ class SQLiteJobLifecycleStore(SQLiteJobStore):
                 "permit_retry": permit_retry,
             },
         )
-        with self._connect() as connection:
+        with self._admitted_connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
                 row = self._row(connection, job_id)
@@ -1003,7 +1011,7 @@ class SQLiteJobLifecycleStore(SQLiteJobStore):
                 "now": _timestamp(now),
             },
         )
-        with self._connect() as connection:
+        with self._admitted_connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
                 row = self._row(connection, job_id)
@@ -1114,7 +1122,7 @@ class SQLiteJobLifecycleStore(SQLiteJobStore):
                 "session_id",
                 "heartbeat differs from the authenticated relay session",
             )
-        with self._connect() as connection:
+        with self._admitted_connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
                 row = self._row(connection, heartbeat.job_id)
@@ -1258,7 +1266,7 @@ class SQLiteJobLifecycleStore(SQLiteJobStore):
                 "reason_code": reason_code,
             },
         )
-        with self._connect() as connection:
+        with self._admitted_connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
                 row = self._row(connection, job_id)
@@ -1369,7 +1377,7 @@ class SQLiteJobLifecycleStore(SQLiteJobStore):
                 "reference": reference.to_dict(),
             },
         )
-        with self._connect() as connection:
+        with self._admitted_connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
                 row = self._row(connection, job_id)
