@@ -10,51 +10,66 @@ def _text(path: str) -> str:
 
 
 def test_posix_resume_failure_restores_previous_flask_before_reporting_failure() -> None:
-    text = _text("scripts/posix/fcp_update_engine.py")
-    stop = text.index('["docker", "compose", "stop", "flask"]')
-    resume = text.index('"catalog.flask_app.services.existing_setup_resume"', stop)
-    failure = text.index('raise RuntimeError(f"resume_failed:{resume.returncode}")', resume)
-    recovery_window = text[resume:failure]
+    text = _text("scripts/posix/fcp_update_agent_runner.py")
 
-    assert "restore_previous_flask_runtime" in recovery_window, (
-        "after the update agent stops the previously usable Flask runtime, a failed "
-        "target resume currently falls straight into host_update_failed without "
-        "restarting the previous runtime"
+    assert 'FLASK_STOP_COMMAND = ["docker", "compose", "stop", "flask"]' in text
+    assert "self.flask_stopped = True" in text
+    assert "restore_previous_flask_runtime" in text
+    assert 'state="error"' in text
+    assert 'code="activation_recovered"' in text
+    assert text.index("restore_previous_flask_runtime") < text.index(
+        'code="activation_recovered"'
     )
 
 
 def test_windows_resume_failure_restores_previous_flask_before_reporting_failure() -> None:
-    text = _text("scripts/windows/fcp_update_engine.ps1")
-    stop = text.index("Invoke-External 'docker' @('compose', 'stop', 'flask')")
-    resume = text.index("'catalog.flask_app.services.existing_setup_resume'", stop)
-    failure = text.index('throw "resume_failed:$($resume.ExitCode)"', resume)
-    recovery_window = text[resume:failure]
+    runner = _text("scripts/windows/fcp_update_agent_runner.ps1")
+    proxy = _text("scripts/windows/fcp_docker_build_proxy.cmd")
 
-    assert "Restore-PreviousFlaskRuntime" in recovery_window, (
-        "the Windows activation path has the same post-stop resume-failure window: "
-        "the old Flask runtime is stopped but no restoration is attempted"
+    assert "FCP_ACTIVATION_PHASE_FILE" in runner
+    assert "Restore-PreviousFlaskRuntime" in runner
+    assert "activation_recovered" in runner
+    assert "flask-stopped" in proxy
+    assert 'compose" if /I "%~2"=="stop"' in proxy
+    assert runner.index("Restore-PreviousFlaskRuntime") < runner.index(
+        "-Code 'activation_recovered'"
     )
 
 
 def test_posix_runtime_verification_failure_has_bounded_activation_recovery_state() -> None:
-    text = _text("scripts/posix/fcp_update_engine.py")
-    start = text.index('["docker", "compose", "up", "-d", "flask"]')
-    verify = text.index("running = wait_runtime(root, target)", start)
-    tail = text[verify : text.index("return True", verify)]
+    text = _text("scripts/posix/fcp_update_agent_runner.py")
 
-    assert "activation_required" in tail and "record_activation_recovery" in tail, (
-        "once target Flask has replaced the previous container, runtime verification "
-        "failure currently has no explicit bounded activation-recovery state"
-    )
+    assert "self.target_flask_started = True" in text
+    assert "record_activation_recovery" in text
+    assert 'state="activation_required"' in text
+    assert 'code="activation_required"' in text
+    assert "retry the same apply" in text
 
 
 def test_windows_runtime_verification_failure_has_bounded_activation_recovery_state() -> None:
-    text = _text("scripts/windows/fcp_update_engine.ps1")
-    start = text.index("Invoke-External 'docker' @('compose', 'up', '-d', 'flask')")
-    verify = text.index("$running = Wait-RuntimeVerified $target", start)
-    tail = text[verify : text.index("return $true", verify)]
+    runner = _text("scripts/windows/fcp_update_agent_runner.ps1")
+    proxy = _text("scripts/windows/fcp_docker_build_proxy.cmd")
 
-    assert "activation_required" in tail and "Write-ActivationRecovery" in tail, (
-        "Windows likewise collapses a post-replacement verification failure into "
-        "generic host_update_failed instead of a deterministic recovery state"
+    assert "Write-ActivationRecovery" in runner
+    assert "-State 'activation_required'" in runner
+    assert "-Code 'activation_required'" in runner
+    assert "retry the same apply" in runner
+    assert "target-started" in proxy
+    # The marker is written before forwarding `compose up -d flask`, because a
+    # failed Compose invocation may already have replaced the old container.
+    assert proxy.index("echo target-started") < proxy.index(
+        '"%FCP_REAL_DOCKER_EXE%" %*', proxy.index(":flask_start")
     )
+
+
+def test_activation_recovery_never_introduces_source_rollback() -> None:
+    texts = (
+        _text("scripts/posix/fcp_update_agent_runner.py"),
+        _text("scripts/windows/fcp_update_agent_runner.ps1"),
+    )
+    for text in texts:
+        lowered = text.lower()
+        assert "reset --hard" not in lowered
+        assert "git clean" not in lowered
+        assert "git stash" not in lowered
+        assert "checkout --" not in lowered
