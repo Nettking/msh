@@ -87,6 +87,13 @@ def _read_result(path: Path) -> dict[str, object] | None:
     return value if isinstance(value, dict) else None
 
 
+def _running_commit(engine: ModuleType, root: Path) -> str | None:
+    """Probe runtime identity when the engine exposes that production seam."""
+
+    probe = getattr(engine, "running_commit", None)
+    return probe(root) if callable(probe) else None
+
+
 class _ControlledSubprocess:
     """Module-shaped subprocess proxy for the controlled build and activation phase."""
 
@@ -137,7 +144,7 @@ def restore_previous_flask_runtime(
         )
     except (OSError, subprocess.SubprocessError):
         return False
-    return completed.returncode == 0 and engine.running_commit(root) == previous_commit
+    return completed.returncode == 0 and _running_commit(engine, root) == previous_commit
 
 
 def record_activation_recovery(
@@ -208,7 +215,7 @@ def _recover_failed_activation(
             result_file,
             result,
             state="activation_required",
-            running=engine.running_commit(root),
+            running=_running_commit(engine, root),
             code="activation_required",
             message=(
                 "Target activation began but runtime verification did not complete. "
@@ -233,7 +240,7 @@ def _serialized_apply(
     original_preflight = engine.preflight_disk
     original_prune = engine.prune_build_cache
     original_subprocess = engine.subprocess
-    previous_commit = engine.running_commit(root)
+    previous_commit = _running_commit(engine, root)
     controlled_subprocess = _ControlledSubprocess(root, original_subprocess.run)
 
     def release_after_build() -> None:
