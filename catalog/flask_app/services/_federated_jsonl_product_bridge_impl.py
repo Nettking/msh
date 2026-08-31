@@ -55,6 +55,7 @@ from catalog.federation.shared_file_storage import (
 from catalog.federation.stable_filesystem import (
     StableDirectory,
     StableFilesystemError,
+    TEMPORARY_OWNER_SUFFIX,
     stable_directory,
 )
 from catalog.federation.storage_catalog import (
@@ -88,10 +89,20 @@ _SQLITE_WRITE_RESERVE_BYTES = 2 * 1024 * 1024
 _SQLITE_WRITE_INODES = 3
 _SQLITE_BOOTSTRAP_RESERVE_BYTES = 4 * 1024 * 1024
 _SQLITE_WAL_AUTOCHECKPOINT_PAGES = 64
-_JSONL_CACHE_INODES = 2
-_JSONL_CHUNK_INODES = 2
-_JSONL_MATERIALIZATION_INODES = 2
+# Each managed temporary now has a durable owner record. The first use of a
+# directory also creates its authenticated temporary-root marker, so reserve
+# temp + owner + marker rather than pretending the owner metadata is free.
+_JSONL_CACHE_INODES = 3
+_JSONL_CHUNK_INODES = 3
+_JSONL_MATERIALIZATION_INODES = 3
 _STAGED_CACHE_LOCK = threading.RLock()
+_TEMPORARY_SCAVENGE_MAX_ENTRIES = 4096
+_OWNED_TEMPORARY_PREFIXES = (
+    "fcp-chunk-",
+    "fcp-encoded-",
+    "fcp-raw-",
+    "fcp-jsonl-",
+)
 _STORAGE_GROUP_CONFIG_KEYS = (
     "FEDERATED_JSONL_STORAGE_GROUP_ID",
     "FEDERATED_TELEMETRY_STORAGE_GROUP_ID",
@@ -417,12 +428,54 @@ class FederatedJsonlProductBridge:
             requirements = tuple(
                 (directory, 0, _missing_directory_count(directory))
                 for directory in bootstrap_dirs
-            ) + ((self.database.parent, _SQLITE_BOOTSTRAP_RESERVE_BYTES, _SQLITE_WRITE_INODES),)
+            ) + (
+                (self.cache_root, 0, 1),
+                (self.mirror_root, 0, 1),
+                (
+                    self.database.parent,
+                    _SQLITE_BOOTSTRAP_RESERVE_BYTES,
+                    _SQLITE_WRITE_INODES,
+                ),
+            )
             with self._reserve_many(requirements):
                 for directory in bootstrap_dirs:
                     directory.mkdir(parents=True, exist_ok=True)
                 self._initialize_database()
+                self._scavenge_owned_temporaries()
             self._initialized = True
+
+    def _scavenge_owned_temporaries(self) -> None:
+        """Reclaim authenticated, unlocked FCP temp files on re-entry.
+
+        Lexical traversal only discovers candidate owner records. Each candidate
+        is reopened through the pinned stable directory boundary, where the
+        durable root token, owner proof, exact file identity, and cross-process
+        lock are checked before deletion. Prefixes are only a traversal filter.
+        """
+
+        scanned = 0
+        for root in (self.cache_root, self.mirror_root):
+            if not root.is_dir():
+                continue
+            for owner_path in root.rglob(f".*{TEMPORARY_OWNER_SUFFIX}"):
+                scanned += 1
+                if scanned > _TEMPORARY_SCAVENGE_MAX_ENTRIES:
+                    raise FederationOperationError(
+                        "federated-jsonl-temporary-scan-bounded",
+                        "owned temporary cleanup traversal exceeded its bound",
+                    )
+                try:
+                    relative_parent = owner_path.parent.relative_to(root)
+                except ValueError:
+                    continue
+                try:
+                    with self._stable_directory(root, relative_parent) as directory:
+                        directory.scavenge_temporary_files(
+                            prefixes=_OWNED_TEMPORARY_PREFIXES,
+                            max_entries=_TEMPORARY_SCAVENGE_MAX_ENTRIES,
+                        )
+                except FileNotFoundError:
+                    continue
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database, timeout=30)

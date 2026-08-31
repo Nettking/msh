@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
@@ -29,6 +30,9 @@ from .job_store import DurableJobSnapshot
 from .lifecycle_store import SQLiteJobLifecycleStore
 
 ARTIFACT_AUTHORITY_SCHEMA_VERSION = 1
+ARTIFACT_AUTHORITY_INITIALIZATION_BYTES = 4 * 1024 * 1024
+ARTIFACT_AUTHORITY_MUTATION_BYTES = 2 * 1024 * 1024
+ARTIFACT_AUTHORITY_MUTATION_INODES = 4
 
 
 @dataclass(frozen=True)
@@ -67,7 +71,34 @@ class SQLiteArtifactAuthority:
         self.database_path = Path(
             database_path if database_path is not None else job_store.database_path
         )
-        self._initialize()
+        with self._resource_reservation(
+            bytes_required=ARTIFACT_AUTHORITY_INITIALIZATION_BYTES,
+        ):
+            self._initialize()
+
+    @contextmanager
+    def _resource_reservation(
+        self,
+        *,
+        admission_held: bool = False,
+        bytes_required: int = ARTIFACT_AUTHORITY_MUTATION_BYTES,
+        inodes_required: int = ARTIFACT_AUTHORITY_MUTATION_INODES,
+    ):
+        if admission_held:
+            yield
+            return
+        with self.job_store.resource_admission.reserve(
+            self.database_path,
+            bytes_required=bytes_required,
+            inodes_required=inodes_required,
+        ):
+            yield
+
+    @contextmanager
+    def _admitted_connection(self, *, admission_held: bool = False):
+        with self._resource_reservation(admission_held=admission_held):
+            with self._connect() as connection:
+                yield connection
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(
@@ -225,7 +256,7 @@ class SQLiteArtifactAuthority:
         grant_id: str | None = None,
         artifact_id: str | None = None,
     ) -> None:
-        with self._connect() as connection:
+        with self._admitted_connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             self._audit(
                 connection,
@@ -247,12 +278,13 @@ class SQLiteArtifactAuthority:
         *,
         authority_node_id: str,
         now: datetime,
+        admission_held: bool = False,
     ) -> ArtifactDescriptor:
         authority_node_id = _text(authority_node_id, "authority_node_id")
         now = _utc(now, "now")
         payload = descriptor.to_dict()
         fingerprint = self._fingerprint(payload)
-        with self._connect() as connection:
+        with self._admitted_connection(admission_held=admission_held) as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing = connection.execute(
                 "SELECT descriptor_json, fingerprint FROM capability_artifacts WHERE artifact_id=?",
@@ -467,7 +499,7 @@ class SQLiteArtifactAuthority:
         )
         payload = grant.to_dict()
         fingerprint = self._fingerprint(payload)
-        with self._connect() as connection:
+        with self._admitted_connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing = connection.execute(
                 "SELECT grant_json, fingerprint FROM capability_artifact_grants WHERE grant_id=?",
@@ -693,7 +725,7 @@ class SQLiteArtifactAuthority:
                 grant_id=grant.grant_id,
                 artifact_id=reference.artifact_id,
             )
-        with self._connect() as connection:
+        with self._admitted_connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             self._audit(
                 connection,
@@ -748,7 +780,7 @@ class SQLiteArtifactAuthority:
                 grant_id=grant.grant_id,
                 artifact_id=descriptor.artifact_id,
             )
-        with self._connect() as connection:
+        with self._admitted_connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             count = connection.execute(
                 "SELECT COUNT(*) AS count FROM capability_artifact_publications WHERE grant_id=?",
@@ -847,7 +879,7 @@ class SQLiteArtifactAuthority:
         fingerprint = self._fingerprint(payload)
         descriptor_payload = publication.descriptor.to_dict()
         descriptor_fingerprint = self._fingerprint(descriptor_payload)
-        with self._connect() as connection:
+        with self._admitted_connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing = connection.execute(
                 """SELECT publication_json, fingerprint
@@ -957,7 +989,7 @@ class SQLiteArtifactAuthority:
         if grant.revoked_at is not None:
             return grant
         revoked = replace(grant, revoked_at=now)
-        with self._connect() as connection:
+        with self._admitted_connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             connection.execute(
                 "UPDATE capability_artifact_grants SET revoked_at=? WHERE grant_id=?",
@@ -980,7 +1012,7 @@ class SQLiteArtifactAuthority:
         now = _utc(now, "now")
         actor_node_id = _text(actor_node_id, "actor_node_id")
         expired: list[str] = []
-        with self._connect() as connection:
+        with self._admitted_connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             rows = connection.execute(
                 """SELECT grant_id, session_id, job_id FROM capability_artifact_grants

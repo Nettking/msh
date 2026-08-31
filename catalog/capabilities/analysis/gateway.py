@@ -100,6 +100,7 @@ class AnalysisArtifactGateway:
         authority_node_id: str,
         now: datetime,
         transfer_id: str | None = None,
+        admission_held: bool = False,
     ) -> ArtifactDescriptor:
         descriptor = ArtifactDescriptor(
             artifact_id=artifact_id,
@@ -118,6 +119,7 @@ class AnalysisArtifactGateway:
             descriptor,
             authority_node_id=authority_node_id,
             now=now,
+            admission_held=admission_held,
         )
 
     def input_reference(self, descriptor: ArtifactDescriptor) -> ArtifactInputReference:

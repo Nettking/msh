@@ -10,7 +10,6 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import tempfile
 import threading
 import time
 from collections.abc import Iterable, Sequence
@@ -25,6 +24,11 @@ from catalog.capabilities.analysis.resource_admission import (
     reserve_analysis_requirements,
 )
 from catalog.common.data_loading import iter_jsonl_files, iter_jsonl_records
+from catalog.common.managed_temporary import (
+    ManagedTemporaryDirectory,
+    ManagedTemporaryRoot,
+    scavenge_managed_temporary_root,
+)
 from catalog.federation.host_resources import ProcessResourceAdmission
 from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
 
@@ -71,6 +75,9 @@ MAX_CACHE_SOURCE_BYTES = 2 * 1024 * 1024 * 1024
 MAX_CACHE_REBUILD_BYTES = 8 * 1024 * 1024 * 1024
 MAX_CACHE_REBUILD_INODES = 250_000
 _CACHE_REBUILD_FIXED_BYTES = 64 * 1024 * 1024
+_CACHE_TEMP_NAMESPACE = "telemetry-parquet-cache-rebuild"
+_CACHE_TEMP_ROOT_NAME = ".fcp-telemetry-cache-temp"
+_CACHE_TEMP_TRAVERSAL_LIMIT = 4096
 _CACHE_STATUS_LOCK = threading.Lock()
 _CACHE_STATUS_CACHE: dict[tuple[str, str | None], tuple[float, CacheStatus]] = {}
 
@@ -213,7 +220,10 @@ def rebuild_cache(
         (2 * source_bytes) + _CACHE_REBUILD_FIXED_BYTES,
     )
     required_bytes = existing_bytes + estimated_output_bytes
-    required_inodes = existing_inodes + MAX_CACHE_REBUILD_INODES
+    # The disposable rebuild tree is an authenticated managed root. Reserve
+    # room for its root/marker and one directory owner record in addition to
+    # the bounded Parquet output tree.
+    required_inodes = existing_inodes + MAX_CACHE_REBUILD_INODES + 8
     if required_bytes > MAX_CACHE_REBUILD_BYTES:
         raise TelemetryCacheBuildError("telemetry cache rebuild exceeds its bounded output envelope")
     if required_inodes > MAX_CACHE_REBUILD_INODES * 2:
@@ -226,8 +236,20 @@ def rebuild_cache(
     ):
         frame = load_jsonl_records(files, data_dir=root)
         output.parent.mkdir(parents=True, exist_ok=True)
-        temp_dir = Path(tempfile.mkdtemp(prefix=f".{output.name}-", dir=output.parent))
+        temporary_root = ManagedTemporaryRoot(
+            output.parent / _CACHE_TEMP_ROOT_NAME,
+            namespace=_CACHE_TEMP_NAMESPACE,
+        )
+        scavenge_managed_temporary_root(
+            temporary_root.root,
+            namespace=_CACHE_TEMP_NAMESPACE,
+            max_entries=_CACHE_TEMP_TRAVERSAL_LIMIT,
+        )
+        temporary: ManagedTemporaryDirectory | None = None
+        temp_dir: Path | None = None
         try:
+            temporary = temporary_root.allocate_directory(prefix="parquet-rebuild-")
+            temp_dir = temporary.path
             _write_partitioned_parquet(frame, temp_dir)
             _write_manifest(temp_dir, data_dir=root, sources=files, row_count=len(frame))
             built_bytes, built_inodes = _tree_usage(temp_dir)
@@ -236,9 +258,9 @@ def rebuild_cache(
             if output.exists():
                 shutil.rmtree(output)
             temp_dir.replace(output)
-        except Exception:
-            shutil.rmtree(temp_dir, ignore_errors=True)
-            raise
+        finally:
+            if temporary is not None:
+                temporary.close()
 
     invalidate_cache_status(root, output)
     return CacheBuildResult(row_count=len(frame), source_file_count=len(files), cache_path=output)

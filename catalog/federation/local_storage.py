@@ -10,13 +10,18 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
-import tempfile
 from collections.abc import Iterable, Iterator
 from contextlib import AbstractContextManager, ExitStack, contextmanager, nullcontext
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
 from typing import Protocol
+
+from catalog.common.managed_temporary import (
+    ManagedTemporaryFile,
+    ManagedTemporaryRoot,
+    scavenge_managed_temporary_root,
+)
 
 from .errors import FederationValidationError
 from .host_resources import HostResourceRefused, ProcessResourceAdmission
@@ -91,7 +96,10 @@ _STORAGE_INDEX_SCHEMA_COLUMNS = frozenset(
 )
 _STORAGE_SQLITE_RESERVE_BYTES = 2 * 1024 * 1024
 _STORAGE_SQLITE_RESERVE_INODES = 4
-_STORAGE_PUBLICATION_RESERVE_INODES = 3
+_STORAGE_PUBLICATION_RESERVE_INODES = 8
+_STORAGE_TEMP_NAMESPACE = "logical-storage-publication"
+_STORAGE_TEMP_ROOT_NAME = ".fcp-storage-publication-tmp"
+_STORAGE_TEMP_TRAVERSAL_LIMIT = 128
 
 
 def _storage_index_table_exists(connection: sqlite3.Connection) -> bool:
@@ -485,24 +493,44 @@ class FilesystemBatchStorageProvider:
                 sort_keys=True,
                 separators=(",", ":"),
                 ensure_ascii=False,
-            )
+            ).encode("utf-8")
             # Claimed before the temporary file exists, so a refusal leaves no
             # partial batch, no catalogue row and no consumed bytes. Both
             # idempotent returns above have already happened, so re-delivering
             # a batch this device already holds is never charged twice.
-            with self._claim(len(payload.encode("utf-8"))):
-                fd, temporary_name = tempfile.mkstemp(
-                    prefix=f".{final_path.stem}-",
-                    suffix=".tmp",
-                    dir=final_path.parent,
+            with self._claim(len(payload)):
+                temporary_root = ManagedTemporaryRoot(
+                    self.root / _STORAGE_TEMP_ROOT_NAME,
+                    namespace=_STORAGE_TEMP_NAMESPACE,
                 )
-                temporary_path = Path(temporary_name)
+                scavenge_managed_temporary_root(
+                    temporary_root.root,
+                    namespace=_STORAGE_TEMP_NAMESPACE,
+                    max_entries=_STORAGE_TEMP_TRAVERSAL_LIMIT,
+                )
+                temporary: ManagedTemporaryFile | None = None
+                published_identity: tuple[int, int] | None = None
                 try:
-                    with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
-                        handle.write(payload)
-                        handle.flush()
-                        os.fsync(handle.fileno())
-                    os.replace(temporary_path, final_path)
+                    temporary = temporary_root.allocate(
+                        prefix="fcp-storage-publication-",
+                        suffix=".partial",
+                    )
+                    temporary.write(payload)
+                    temporary.flush()
+                    os.fsync(temporary.fileno())
+                    if temporary.path.stat().st_dev != final_path.parent.stat().st_dev:
+                        raise FederationValidationError(
+                            "storage-backing-resource-changed",
+                            "path",
+                            "storage temporary and destination paths cross filesystems",
+                        )
+                    temporary.prepare_for_replace()
+                    temporary.path.replace(final_path)
+                    published_stat = final_path.lstat()
+                    published_identity = (
+                        int(published_stat.st_dev),
+                        int(published_stat.st_ino),
+                    )
                     self._assert_resource_identity(
                         reservations,
                         final_path.parent,
@@ -536,11 +564,20 @@ class FilesystemBatchStorageProvider:
                         # autochekpoint and journal-size limit remain active.
                         pass
                 except Exception:
-                    temporary_path.unlink(missing_ok=True)
-                    if final_path.exists():
-                        final_path.unlink(missing_ok=True)
+                    if published_identity is not None:
+                        try:
+                            current = final_path.lstat()
+                        except FileNotFoundError:
+                            current = None
+                        if current is not None and (
+                            int(current.st_dev), int(current.st_ino)
+                        ) == published_identity:
+                            final_path.unlink()
                     connection.rollback()
                     raise
+                finally:
+                    if temporary is not None:
+                        temporary.close()
 
         return BatchIngestResult(
             request.batch_id,

@@ -41,6 +41,7 @@ from catalog.capabilities.artifact_secure_runtime import (
 from catalog.capabilities.lifecycle_store import SQLiteJobLifecycleStore
 from catalog.capabilities.local_lifecycle import LocalLifecycleTransport
 from catalog.capabilities.provider_reports import ProviderResourceReport, ProviderStatus
+from catalog.federation.host_resources import ProcessResourceAdmission
 from catalog.node.identity import IdentityStore
 from catalog.orchestrator.analysis_federation import DeviceFederationAuthority
 
@@ -251,6 +252,7 @@ def build_stack(
     clock: Clock | None = None,
     succeed: bool = True,
     activate_provider: bool = True,
+    resource_admission: ProcessResourceAdmission | None = None,
 ) -> AnalysisStack:
     """Build a device with the real F8 trust chain and F7.5 lifecycle stack."""
 
@@ -273,9 +275,15 @@ def build_stack(
         identity=_Identity(session_id, node_id),
         clock=clock,
     )
-    store = SQLiteJobLifecycleStore(capability_root / "analysis_jobs.sqlite3")
+    store = SQLiteJobLifecycleStore(
+        capability_root / "analysis_jobs.sqlite3",
+        resource_admission=resource_admission,
+    )
     authority = SQLiteCapabilityArtifactAuthority(store)
-    content_store = LocalArtifactContentStore(capability_root / "artifacts")
+    content_store = LocalArtifactContentStore(
+        capability_root / "artifacts",
+        resource_admission=resource_admission,
+    )
     gateway = AnalysisArtifactGateway(authority, content_store)
     transport = federation.lifecycle_transport()
     carrier = LocalAnalysisArtifactCarrier(gateway, local_node_id=node_id, clock=clock)
@@ -292,6 +300,7 @@ def build_stack(
         content_store=content_store,
         clock=clock,
         data_owner_node_id=lambda _job: node_id,
+        resource_admission=resource_admission,
     )
     provisioner = AnalysisProviderProvisioner(
         coordinator=federation.coordinator,
@@ -317,10 +326,14 @@ def build_stack(
         ),
         coordinator_node_id=node_id,
         clock=clock,
+        resource_admission=resource_admission,
     )
     service = AnalysisWorkService(
         scheduler=scheduler,
-        registry=AnalysisJobRegistry(capability_root / "analysis_jobs.sqlite3"),
+        registry=AnalysisJobRegistry(
+            capability_root / "analysis_jobs.sqlite3",
+            resource_admission=resource_admission,
+        ),
         session_id=session_id,
     )
     data_dir = tmp_path / "data"

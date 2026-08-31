@@ -11,7 +11,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import tempfile
 from collections import defaultdict
 from collections.abc import Iterable
 from datetime import timedelta
@@ -20,6 +19,11 @@ from typing import Any
 
 from catalog.capabilities.analysis.resource_admission import (
     reserve_analysis_requirements,
+)
+from catalog.common.managed_temporary import (
+    ManagedTemporaryFile,
+    ManagedTemporaryRoot,
+    scavenge_managed_temporary_root,
 )
 from catalog.common.source_sync import (
     format_utc,
@@ -40,7 +44,10 @@ MAX_OBSERVER_RECORD_BYTES = 256 * 1024
 MAX_OBSERVER_EXPORT_BYTES = 512 * 1024 * 1024
 MAX_OBSERVER_FILE_BYTES = 256 * 1024 * 1024
 MAX_OBSERVER_EXPORT_RECORDS = 250_000
-_OBSERVER_WRITE_INODES = 3
+_OBSERVER_WRITE_INODES = 8
+_OBSERVER_TEMP_NAMESPACE = "observer-jsonl-export"
+_OBSERVER_TEMP_ROOT_NAME = ".fcp-observer-jsonl-tmp"
+_OBSERVER_TEMP_TRAVERSAL_LIMIT = 128
 
 
 def parse_args() -> argparse.Namespace:
@@ -247,21 +254,35 @@ def append_unique_jsonl(
     controller = resource_admission or PROCESS_RESOURCE_ADMISSION
     with reserve_analysis_requirements(controller, requirements):
         root.mkdir(parents=True, exist_ok=True)
+        temporary_root = ManagedTemporaryRoot(
+            root / _OBSERVER_TEMP_ROOT_NAME,
+            namespace=_OBSERVER_TEMP_NAMESPACE,
+        )
+        scavenge_managed_temporary_root(
+            temporary_root.root,
+            namespace=_OBSERVER_TEMP_NAMESPACE,
+            max_entries=_OBSERVER_TEMP_TRAVERSAL_LIMIT,
+        )
         for path, prefix, new_bytes, count in plans:
-            descriptor, temporary_name = tempfile.mkstemp(
-                prefix=f".{path.name}.", suffix=".partial", dir=root
-            )
-            temporary = Path(temporary_name)
+            temporary: ManagedTemporaryFile | None = None
             try:
-                with os.fdopen(descriptor, "wb") as handle:
-                    handle.write(prefix)
-                    handle.write(new_bytes)
-                    handle.flush()
-                    os.fsync(handle.fileno())
-                os.replace(temporary, path)
-            except BaseException:
-                temporary.unlink(missing_ok=True)
-                raise
+                temporary = temporary_root.allocate(
+                    prefix="fcp-observer-jsonl-",
+                    suffix=".partial",
+                )
+                temporary.write(prefix)
+                temporary.write(new_bytes)
+                temporary.flush()
+                os.fsync(temporary.fileno())
+                if temporary.path.stat().st_dev != path.parent.stat().st_dev:
+                    raise OSError(
+                        "observer temporary and destination paths cross filesystems"
+                    )
+                temporary.prepare_for_replace()
+                temporary.path.replace(path)
+            finally:
+                if temporary is not None:
+                    temporary.close()
             written += count
             written_by_file[path.as_posix()] = count
     return written, written_by_file

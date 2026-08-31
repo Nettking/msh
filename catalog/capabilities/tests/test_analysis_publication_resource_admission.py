@@ -7,16 +7,20 @@ from types import SimpleNamespace
 
 import pytest
 
+from catalog.capabilities.analysis.content_store import ContentIdentity
+from catalog.capabilities.analysis.contracts import ANALYSIS_PLAN_SCHEMA
 from catalog.capabilities.analysis.resource_admission import (
     FederatedAnalysisScheduler,
     analysis_publication_resource_requirement,
 )
+from catalog.capabilities.tests.analysis_harness import build_stack, work_slice
 from catalog.capabilities.analysis.scheduler import (
     FederatedAnalysisScheduler as BaseFederatedAnalysisScheduler,
 )
 from catalog.federation.errors import FederationOperationError, FederationValidationError
 from catalog.federation.host_resources import (
     FilesystemMeasurement,
+    HostResourceRefused,
     PressureThresholds,
     ProcessResourceAdmission,
 )
@@ -292,3 +296,92 @@ def test_existing_registered_slice_validation_error_is_preserved(
         scheduler.submit(_Work(), slice_files=(), slice_root=tmp_path)
 
     assert captured.value.code == "analysis-slice-registered-content-invalid"
+
+
+def test_real_stack_pressure_refuses_before_input_or_job_publication(
+    tmp_path: Path,
+) -> None:
+    state = {"free_bytes": 1_900_000_000}
+
+    def measure(_path: Path | str) -> FilesystemMeasurement:
+        return FilesystemMeasurement(
+            resource_id="analysis-disk",
+            observed_at=NOW,
+            total_bytes=2_000_000_000,
+            free_bytes=state["free_bytes"],
+            total_inodes=10_000,
+            free_inodes=10_000,
+            available=True,
+        )
+
+    admission = _admission(measure)
+    stack = build_stack(
+        tmp_path,
+        activate_provider=False,
+        resource_admission=admission,
+    )
+    first_work = work_slice(session_id=stack.session_id, target_date="2026-08-14")
+    first = stack.submit(first_work)
+    assert first.created is True
+    assert stack.service.registry.record_for(first_work.job_id) is not None
+    assert (
+        stack.content_store.root / first_work.object_key_prefix / "plan.json"
+    ).is_file()
+
+    work = work_slice(session_id=stack.session_id, target_date="2026-08-15")
+    state["free_bytes"] = 102
+
+    with pytest.raises(FederationOperationError) as captured:
+        stack.submit(work)
+
+    assert captured.value.code == "analysis-resource-pressure"
+    assert len(stack.service.registry.records(session_id=stack.session_id)) == 1
+    assert not (
+        stack.content_store.root / work.object_key_prefix / "plan.json"
+    ).exists()
+    with pytest.raises(FederationValidationError) as missing:
+        stack.store.snapshot(work.job_id)
+    assert missing.value.code == "job-not-found"
+
+
+def test_direct_artifact_registration_is_admitted_and_refused_under_pressure(
+    tmp_path: Path,
+) -> None:
+    state = {"free_bytes": 1_900_000_000}
+
+    def measure(_path: Path | str) -> FilesystemMeasurement:
+        return FilesystemMeasurement(
+            resource_id="analysis-disk",
+            observed_at=NOW,
+            total_bytes=2_000_000_000,
+            free_bytes=state["free_bytes"],
+            total_inodes=10_000,
+            free_inodes=10_000,
+            available=True,
+        )
+
+    admission = _admission(measure)
+    stack = build_stack(
+        tmp_path,
+        activate_provider=False,
+        resource_admission=admission,
+    )
+    work = work_slice(session_id=stack.session_id, target_date="2026-08-16")
+    state["free_bytes"] = 102
+
+    with pytest.raises(HostResourceRefused):
+        stack.gateway.register_input(
+            artifact_id=f"{work.job_id}-plan",
+            session_id=stack.session_id,
+            job_id=work.job_id,
+            schema_id=ANALYSIS_PLAN_SCHEMA,
+            media_type="application/json",
+            object_key=f"{work.object_key_prefix}/plan.json",
+            identity=ContentIdentity("sha256:" + ("1" * 64), 1),
+            authority_node_id=stack.node_id,
+            now=NOW,
+        )
+
+    with pytest.raises(FederationValidationError) as missing:
+        stack.authority.artifact(f"{work.job_id}-plan")
+    assert missing.value.code == "artifact-not-found"

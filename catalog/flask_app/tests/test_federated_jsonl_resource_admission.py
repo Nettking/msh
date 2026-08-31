@@ -259,7 +259,7 @@ def test_remote_chunk_staging_refuses_before_temp_write(tmp_path: Path) -> None:
 
     assert captured.value.code == "federated-jsonl-resource-pressure"
     # Stable managed traversal may create both remote/hash directories.
-    assert admission.calls == [(target.parent, len(b"bounded chunk"), 4)]
+    assert admission.calls == [(target.parent, len(b"bounded chunk"), 5)]
     assert list(target.parent.iterdir()) == []
 
 

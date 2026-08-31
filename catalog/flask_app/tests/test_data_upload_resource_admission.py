@@ -8,10 +8,13 @@ from typing import Any
 
 import pytest
 from flask import Flask
+from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.datastructures import FileStorage
+from werkzeug.test import EnvironBuilder
 
 from catalog.federation.host_resources import (
     FilesystemMeasurement,
+    HostResourceRefused,
     PressureThresholds,
     ProcessResourceAdmission,
 )
@@ -19,6 +22,7 @@ from catalog.federation.process_resource_admission import (
     SerializedProcessResourceAdmission,
 )
 from catalog.flask_app import data_upload_routes
+from catalog.flask_app.request_resource_admission import FCPRequest
 from catalog.flask_app.services.data_upload_resource_admission import (
     enqueue_with_resource_admission,
 )
@@ -272,3 +276,135 @@ def test_declared_multipart_limit_is_checked_before_request_files_access() -> No
             )
 
     assert raised.value.code == "upload-request-too-large"
+
+
+def _request_app(
+    tmp_path: Path,
+    admission: ProcessResourceAdmission,
+    *,
+    max_total_bytes: int = 4096,
+    max_file_bytes: int = 2048,
+) -> Flask:
+    app = Flask(__name__)
+    app.config.update(
+        TESTING=True,
+        MAX_CONTENT_LENGTH=1024 * 1024,
+        DATA_UPLOAD_MAX_TOTAL_BYTES=max_total_bytes,
+        DATA_UPLOAD_MAX_FILE_BYTES=max_file_bytes,
+        DATA_UPLOAD_MAX_FILES=2,
+        DATA_UPLOAD_REQUEST_SPOOL_DIRECTORY=str(tmp_path / "request-spool"),
+    )
+    app.request_class = FCPRequest
+    app.extensions["process_resource_admission"] = admission
+    return app
+
+
+def _multipart_environ(body: bytes, *, content_length: int | None, terminated: bool) -> dict:
+    builder = EnvironBuilder(
+        path="/data-upload/",
+        method="POST",
+        input_stream=io.BytesIO(body),
+        content_type="multipart/form-data; boundary=boundary",
+        content_length=content_length,
+    )
+    environ = builder.get_environ()
+    if content_length is None:
+        environ.pop("CONTENT_LENGTH", None)
+    if terminated:
+        environ["wsgi.input_terminated"] = True
+    return environ
+
+
+def _multipart_file_body(payload: bytes) -> bytes:
+    return (
+        b"--boundary\r\n"
+        b'Content-Disposition: form-data; name="files"; filename="data.jsonl"\r\n'
+        b"Content-Type: application/jsonl\r\n\r\n"
+        + payload
+        + b"\r\n--boundary--\r\n"
+    )
+
+
+def test_supported_upload_uses_admitted_fcp_owned_request_spool(tmp_path: Path) -> None:
+    admission = _admission(lambda _path: _measurement("request", free_bytes=10_000_000))
+    app = _request_app(tmp_path, admission)
+    body = _multipart_file_body(b'{"ok":true}\n')
+
+    with app.request_context(
+        _multipart_environ(body, content_length=len(body), terminated=False)
+    ):
+        from flask import request
+
+        files = request.files.getlist("files")
+        assert len(files) == 1
+        stream_path = Path(files[0].stream.path)
+        assert stream_path.parent == tmp_path / "request-spool"
+        assert stream_path.name.startswith("fcp-upload-body-")
+        assert stream_path.exists()
+
+    assert not any((tmp_path / "request-spool").glob("fcp-upload-body-*"))
+    assert not any((tmp_path / "request-spool").glob(".*.fcp-owner.json"))
+
+
+def test_streaming_equivalent_body_is_bounded_before_uncontrolled_spool(
+    tmp_path: Path,
+) -> None:
+    admission = _admission(lambda _path: _measurement("request", free_bytes=10_000_000))
+    app = _request_app(
+        tmp_path,
+        admission,
+        max_total_bytes=32,
+        max_file_bytes=400_000,
+    )
+    # The request has no Content-Length and relies on the WSGI terminated-stream
+    # signal. The body exceeds the FCP total-body ceiling (including framing),
+    # so Werkzeug's LimitedStream must stop it before parser materialization can
+    # continue indefinitely.
+    body = _multipart_file_body(b"x" * 300_000)
+
+    with app.request_context(
+        _multipart_environ(body, content_length=None, terminated=True)
+    ):
+        from flask import request
+
+        with pytest.raises(RequestEntityTooLarge):
+            request.files.getlist("files")
+
+    spool_root = tmp_path / "request-spool"
+    assert not any(spool_root.glob("fcp-upload-body-*"))
+    assert not any(spool_root.glob(".*.fcp-owner.json"))
+
+
+def test_unknown_length_without_wsgi_termination_fails_closed_without_spooling(
+    tmp_path: Path,
+) -> None:
+    admission = _admission(lambda _path: _measurement("request", free_bytes=10_000_000))
+    app = _request_app(tmp_path, admission)
+    body = _multipart_file_body(b'{"ok":true}\n')
+
+    with app.request_context(
+        _multipart_environ(body, content_length=None, terminated=False)
+    ):
+        from flask import request
+
+        assert request.files.getlist("files") == []
+
+    assert not (tmp_path / "request-spool").exists()
+
+
+def test_request_spool_pressure_refuses_before_root_or_body_creation(
+    tmp_path: Path,
+) -> None:
+    admission = _admission(lambda _path: _measurement("request", free_bytes=200))
+    app = _request_app(tmp_path, admission)
+    body = _multipart_file_body(b'{"ok":true}\n')
+
+    with app.request_context(
+        _multipart_environ(body, content_length=len(body), terminated=False)
+    ):
+        from flask import request
+
+        with pytest.raises(HostResourceRefused):
+            request.files.getlist("files")
+
+    assert not (tmp_path / "request-spool").exists()

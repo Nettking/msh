@@ -187,6 +187,7 @@ class FederatedAnalysisScheduler:
             identity=plan_identity,
             authority_node_id=self.coordinator_node_id,
             now=now,
+            admission_held=admission_held,
         )
         self.gateway.register_input(
             artifact_id=slice_artifact_id(work),
@@ -198,6 +199,7 @@ class FederatedAnalysisScheduler:
             identity=slice_identity,
             authority_node_id=self.coordinator_node_id,
             now=now,
+            admission_held=admission_held,
         )
 
         snapshot = self.store.snapshot(work.job_id)

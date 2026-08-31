@@ -10,17 +10,24 @@ from __future__ import annotations
 
 import json
 import os
-import tempfile
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from catalog.common.managed_temporary import (
+    ManagedTemporaryFile,
+    ManagedTemporaryRoot,
+    scavenge_managed_temporary_root,
+)
 from catalog.federation.host_resources import ProcessResourceAdmission
 from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
 
 UTC_SUFFIX = "Z"
 MAX_SOURCE_SYNC_STATE_BYTES = 1024 * 1024
+_SOURCE_SYNC_WRITE_INODES = 8
+_SOURCE_SYNC_TEMP_NAMESPACE = "source-sync-state"
+_SOURCE_SYNC_TEMP_ROOT_NAME = ".fcp-source-sync-tmp"
 
 
 class SourceSyncError(RuntimeError):
@@ -137,20 +144,34 @@ def save_state(
         # Atomic replacement retains the old state until the new file is
         # durable, so both identities must fit at the same time.
         bytes_required=existing_bytes + len(payload),
-        inodes_required=3,
+        inodes_required=_SOURCE_SYNC_WRITE_INODES,
     ):
         path.parent.mkdir(parents=True, exist_ok=True)
-        descriptor, temporary_name = tempfile.mkstemp(
-            prefix=f".{path.name}.", suffix=".partial", dir=path.parent
+        temporary_root = ManagedTemporaryRoot(
+            path.parent / _SOURCE_SYNC_TEMP_ROOT_NAME,
+            namespace=_SOURCE_SYNC_TEMP_NAMESPACE,
         )
-        temporary = Path(temporary_name)
+        scavenge_managed_temporary_root(
+            temporary_root.root,
+            namespace=_SOURCE_SYNC_TEMP_NAMESPACE,
+            max_entries=32,
+        )
+        temporary: ManagedTemporaryFile | None = None
         try:
-            with os.fdopen(descriptor, "wb") as handle:
-                handle.write(payload)
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.replace(temporary, path)
-        except BaseException:
-            temporary.unlink(missing_ok=True)
-            raise
+            temporary = temporary_root.allocate(
+                prefix="fcp-source-sync-",
+                suffix=".partial",
+            )
+            temporary.write(payload)
+            temporary.flush()
+            os.fsync(temporary.fileno())
+            if temporary.path.stat().st_dev != path.parent.stat().st_dev:
+                raise SourceSyncError(
+                    "Source synchronization temporary and destination paths cross filesystems."
+                )
+            temporary.prepare_for_replace()
+            temporary.path.replace(path)
+        finally:
+            if temporary is not None:
+                temporary.close()
     return path
