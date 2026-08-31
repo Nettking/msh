@@ -9,7 +9,7 @@ itself:
   degraded?
 
 The probes in this module never mutate authority, launch processes, inspect the
-Docker socket, or persist health history.  They deliberately reuse existing
+Docker socket, or persist health history. They deliberately reuse existing
 runtime evidence and keep every active probe bounded.
 """
 
@@ -18,10 +18,10 @@ from __future__ import annotations
 import os
 import socket
 import sqlite3
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable
 
 from catalog.mtconnect_recorder.native_update import (
     RecorderRuntimeStatus,
@@ -91,7 +91,11 @@ def _recorder_heartbeat_fresh(
     if heartbeat is None:
         return False
     age = (now - heartbeat).total_seconds()
-    return -RECORDER_HEARTBEAT_MAX_AGE_SECONDS <= age <= RECORDER_HEARTBEAT_MAX_AGE_SECONDS
+    return (
+        -RECORDER_HEARTBEAT_MAX_AGE_SECONDS
+        <= age
+        <= RECORDER_HEARTBEAT_MAX_AGE_SECONDS
+    )
 
 
 def relay_health(
@@ -141,7 +145,7 @@ def recorder_health(
     now: datetime | None = None,
     reader: Callable[[Path], RecorderRuntimeStatus] = read_recorder_status,
 ) -> CoreServiceHealth:
-    """Use the recorder's existing heartbeat; do not infer another-container PID state."""
+    """Use the existing heartbeat, not another-container PID inference."""
 
     moment = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     status = reader(status_file)
@@ -186,7 +190,9 @@ def recorder_health(
         readiness="ready",
         dependency="healthy",
         code="recorder-ready",
-        message="The managed recorder heartbeat is fresh and its Federation is connected.",
+        message=(
+            "The managed recorder heartbeat is fresh and its Federation is connected."
+        ),
     )
 
 
@@ -236,9 +242,10 @@ def core_service_health_snapshot(
     database_probe: Callable[[Path], bool] = _bounded_sqlite_read_probe,
     recorder_reader: Callable[[Path], RecorderRuntimeStatus] = read_recorder_status,
 ) -> dict[str, object]:
-    """Return one bounded, public-safe semantic snapshot for the three core services."""
+    """Return bounded, public-safe semantic health for the three core services."""
 
-    host = (relay_host or os.getenv("FCP_RELAY_HEALTH_HOST", "relay")).strip() or "relay"
+    host = (relay_host or os.getenv("FCP_RELAY_HEALTH_HOST", "relay")).strip()
+    host = host or "relay"
     port = relay_port
     if port is None:
         try:
@@ -262,12 +269,12 @@ def core_service_health_snapshot(
     )
     flask = flask_health(relay=relay, recorder=recorder)
     services = (flask, relay, recorder)
+    all_ready = all(
+        item.readiness == "ready" and item.dependency == "healthy"
+        for item in services
+    )
     return {
-        "status": (
-            "ready"
-            if all(item.readiness == "ready" and item.dependency == "healthy" for item in services)
-            else "degraded"
-        ),
+        "status": "ready" if all_ready else "degraded",
         "services": [item.to_dict() for item in services],
     }
 
