@@ -30,13 +30,15 @@ The Docker Compose services are:
 
 ```text
 ollama       persistent local model server
-ollama-pull  one-shot installer that pulls FCP_AI_MODEL
+catalog.federation.model_resource_pull  pressure-aware model installer
 ```
 
 Manual retry:
 
 ```bash
-docker compose run --rm ollama-pull
+docker compose up -d ollama
+python3 -m catalog.federation.model_resource_pull \
+  --target ollama --model "${FCP_AI_MODEL:-llama3.2:3b}"
 ```
 
 ## Operating mode

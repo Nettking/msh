@@ -418,8 +418,9 @@ Then start the normal services. This is intended for inspection and debugging.
 A Docker-capable laptop can provision a separate Ollama endpoint:
 
 ```bash
-docker compose --profile provider run --rm model-provider-install
 docker compose --profile provider up -d model-provider
+python3 -m catalog.federation.model_resource_pull \
+  --target model-provider --model "${FCP_PROVIDER_MODEL:-smollm2:360m}"
 ```
 
 Port `11434` is published for the provider profile. Restrict it to a trusted LAN or VPN. The process selection alone does not grant Federation contribution authority.
@@ -453,7 +454,8 @@ Install or retry the configured local model with:
 
 ```bash
 docker compose up -d ollama
-docker compose --profile model-install run --rm ollama-pull
+python3 -m catalog.federation.model_resource_pull \
+  --target ollama --model "${FCP_AI_MODEL:-llama3.2:3b}"
 ```
 
 The local Ollama service and the headless provider use separate persistent model volumes.
