@@ -26,6 +26,14 @@ from typing import Any
 from catalog.common.artifact_registry import configured_scan_dirs, scan_artifacts
 from catalog.common.basic_metrics import basic_metrics_path, build_basic_metrics_dataset
 from catalog.common.data_loading import iter_jsonl_files
+from catalog.capabilities.analysis.contracts import DEFAULT_MAX_SLICE_BYTES
+from catalog.capabilities.analysis.resource_admission import (
+    MAX_DATA_INDEX_BYTES,
+    ProcessResourceAdmission,
+    analysis_script_workspace_resource_requirement,
+    reserve_analysis_requirements,
+)
+from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
 from catalog.runner.data_filtering import (
     date_range_source_signature,
     discover_available_dates,
@@ -354,6 +362,57 @@ def _run_for_date_slice(
     runtime_namespace: str,
     active_slice: date | str | None = None,
     remaining_slices: int | None = None,
+    resource_admission: ProcessResourceAdmission | None = None,
+    max_slice_bytes: int = DEFAULT_MAX_SLICE_BYTES,
+) -> OrchestrationResult:
+    """Admit the complete persistent analysis slice before any writer runs."""
+    controller = resource_admission or PROCESS_RESOURCE_ADMISSION
+    workspace_bytes, workspace_inodes = analysis_script_workspace_resource_requirement(
+        max_slice_bytes
+    )
+    requirements = [
+        (workflows_root, workspace_bytes, workspace_inodes),
+        # Date discovery/filtering refreshes this process-wide index even when
+        # the slice itself lives in an isolated worker workspace.
+        (
+            Path(__file__).resolve().parents[2] / "results" / "runner",
+            MAX_DATA_INDEX_BYTES,
+            2,
+        ),
+    ]
+    with reserve_analysis_requirements(controller, requirements):
+        return _run_for_date_slice_unadmitted(
+            status=status,
+            workflows_root=workflows_root,
+            data_dir=data_dir,
+            script_options=script_options,
+            target_day=target_day,
+            script_keys=script_keys,
+            run_label=run_label,
+            mark_bootstrap_full_analysis_complete=mark_bootstrap_full_analysis_complete,
+            runtime_namespace=runtime_namespace,
+            active_slice=active_slice,
+            remaining_slices=remaining_slices,
+            resource_admission=controller,
+            max_slice_bytes=max_slice_bytes,
+        )
+
+
+def _run_for_date_slice_unadmitted(
+    *,
+    status: StatusPrinter,
+    workflows_root: Path,
+    data_dir: Path,
+    script_options,
+    target_day: date,
+    script_keys: tuple[str, ...],
+    run_label: str,
+    mark_bootstrap_full_analysis_complete: bool = False,
+    runtime_namespace: str,
+    active_slice: date | str | None = None,
+    remaining_slices: int | None = None,
+    resource_admission: ProcessResourceAdmission | None = None,
+    max_slice_bytes: int = DEFAULT_MAX_SLICE_BYTES,
 ) -> OrchestrationResult:
     """Prepare one single-day automatic session and run the requested script contract.
 
@@ -430,6 +489,14 @@ def _run_for_date_slice(
                 # previous source signature. Preserve normal cache reuse only
                 # when the filtered input itself was reused.
                 force_rerun=filter_status == "created",
+                resource_admission=resource_admission,
+                admission_held=resource_admission is not None,
+                max_workspace_bytes=analysis_script_workspace_resource_requirement(
+                    max_slice_bytes
+                )[0],
+                max_workspace_inodes=analysis_script_workspace_resource_requirement(
+                    max_slice_bytes
+                )[1],
             )
         except Exception as exc:  # pragma: no cover - defensive logging path
             failed_scripts.append(script_key)

@@ -41,6 +41,7 @@ from catalog.capabilities.analysis.contracts import (
     SLICE_KIND_DATE,
 )
 from catalog.capabilities.analysis.provisioning import dispatched_data_owner_node_id
+from catalog.capabilities.analysis.resource_admission import ProcessResourceAdmission
 from catalog.capabilities.analysis.scheduler import SubmissionOutcome
 from catalog.capabilities.artifact_secure_runtime import SQLiteCapabilityArtifactAuthority
 from catalog.capabilities.efficiency import ExecutionEfficiencyRuntime
@@ -51,6 +52,7 @@ from catalog.node.identity import IdentityStore
 from catalog.orchestrator.analysis_federation import DeviceFederationAuthority
 from catalog.runner.data_filtering import source_files_for_dates
 from catalog.runner.script_catalog import discover_runnable_scripts, repo_root
+from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
 
 from .pipeline import StatusPrinter, _run_for_date_slice
 
@@ -207,10 +209,14 @@ class RunnerSliceAnalysisExecutor:
         workflows_root: Path,
         catalog_root: Path,
         status: StatusPrinter | None = None,
+        resource_admission: ProcessResourceAdmission | None = None,
+        max_slice_bytes: int = DEFAULT_MAX_SLICE_BYTES,
     ) -> None:
         self.workflows_root = Path(workflows_root)
         self.catalog_root = Path(catalog_root)
         self.status = status or StatusPrinter()
+        self.resource_admission = resource_admission or PROCESS_RESOURCE_ADMISSION
+        self.max_slice_bytes = int(max_slice_bytes)
 
     def execute(
         self,
@@ -226,7 +232,6 @@ class RunnerSliceAnalysisExecutor:
             return AnalysisExecutionReport(
                 succeeded=False, reason_code="analysis-scripts-unavailable"
             )
-        self.workflows_root.mkdir(parents=True, exist_ok=True)
         sessions: list[str] = []
         processed: list[str] = []
         failed: list[str] = []
@@ -244,6 +249,8 @@ class RunnerSliceAnalysisExecutor:
                 runtime_namespace=plan.runtime_namespace,
                 active_slice=iso_date,
                 remaining_slices=max(0, total - index - 1),
+                resource_admission=self.resource_admission,
+                max_slice_bytes=self.max_slice_bytes,
             )
             sessions.append(outcome.session_id)
             processed.append(iso_date)
@@ -398,6 +405,8 @@ class AnalysisRuntime:
             executor=RunnerSliceAnalysisExecutor(
                 workflows_root=self.root / "results" / "workflows",
                 catalog_root=self.root / "catalog",
+                resource_admission=PROCESS_RESOURCE_ADMISSION,
+                max_slice_bytes=self.max_slice_bytes,
             ),
             workspace_root=self.capability_root / "workspaces",
             content_store=self.content_store,

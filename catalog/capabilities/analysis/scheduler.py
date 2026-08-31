@@ -149,7 +149,9 @@ class FederatedAnalysisScheduler:
         slice_key = f"{prefix}/slice.tar.gz"
 
         plan_identity = self.gateway.content_store.write_bytes(
-            plan_key, work.plan_bytes()
+            plan_key,
+            work.plan_bytes(),
+            admission_held=True,
         )
         slice_identity = self._ensure_slice_archive(
             slice_key,

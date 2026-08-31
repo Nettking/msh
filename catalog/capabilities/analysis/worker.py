@@ -41,6 +41,7 @@ from .contracts import (
     ANALYSIS_PROTOCOL_VERSION,
     ANALYSIS_RESULT_SCHEMA,
     DEFAULT_MAX_SLICE_BYTES,
+    MAX_ANALYSIS_RESULT_BYTES,
     MAX_PLAN_BYTES,
     AnalysisPlan,
     analysis_grant_id,
@@ -54,6 +55,7 @@ from .workspace_reconciliation import (
 
 MAX_REPORTED_SCRIPTS = 32
 MAX_REPORTED_TEXT = 96
+MAX_REPORTED_FIELDS = 16
 
 
 @dataclass(frozen=True)
@@ -330,7 +332,10 @@ class FederatedAnalysisHandler:
                 _short(item) for item in report.failed_scripts[:MAX_REPORTED_SCRIPTS]
             ],
             "script_results": [
-                {key: _short(value) for key, value in dict(item).items()}
+                {
+                    _short(key): _short(value)
+                    for key, value in list(dict(item).items())[:MAX_REPORTED_FIELDS]
+                }
                 for item in report.script_results[:MAX_REPORTED_SCRIPTS]
             ],
             "completed_at": _stamp(self.clock()),
@@ -338,8 +343,20 @@ class FederatedAnalysisHandler:
         payload = json.dumps(
             document, sort_keys=True, separators=(",", ":"), ensure_ascii=True
         ).encode("utf-8")
+        if len(payload) > MAX_ANALYSIS_RESULT_BYTES:
+            raise FederationValidationError(
+                "analysis-result-too-large",
+                "result",
+                f"serialized analysis result exceeds {MAX_ANALYSIS_RESULT_BYTES} bytes",
+            )
         object_key = f"analysis/results/{job.job_id}/{attempt_id}/result.json"
-        identity = self.content_store.write_bytes(object_key, payload)
+        # The handler already holds one atomic workspace + result reservation;
+        # do not re-admit the completion write as a nested transaction.
+        identity = self.content_store.write_bytes(
+            object_key,
+            payload,
+            admission_held=True,
+        )
         result_reference = ArtifactReference(
             reference_id=declared.reference_id,
             session_id=declared.session_id,

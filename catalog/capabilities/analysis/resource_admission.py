@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,7 @@ from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMIS
 from .contracts import (
     ANALYSIS_DATA_SLICE_SCHEMA,
     ANALYSIS_PLAN_SCHEMA,
+    MAX_ANALYSIS_RESULT_BYTES,
     MAX_PLAN_BYTES,
     AnalysisWorkSlice,
 )
@@ -34,6 +36,23 @@ _ANALYSIS_WORKSPACE_FIXED_INODES = 16
 # for publication directories and filesystem bookkeeping. Archive members are
 # inputs to one tar.gz and therefore do not consume one destination inode each.
 _ANALYSIS_PUBLICATION_FIXED_INODES = 8
+
+# Result JSON is deliberately a bounded summary rather than an arbitrary copy of
+# executor state.  The worker enforces the same limit after serialization, so the
+# reservation below is a real upper bound rather than a hopeful estimate.
+_ANALYSIS_RESULT_INODES = 2  # result partial + result identity/directory margin
+
+# A selected catalog script is allowed to write only inside its owned run tree.
+# The subprocess boundary enforces these limits after each materialization step
+# and while the child is running.  The values are intentionally independent of
+# the host's free space: admission protects the host, while the workspace limit
+# protects the process from an unexpectedly prolific script.
+MAX_CATALOG_COPY_BYTES = 64 * 1024 * 1024
+MAX_CATALOG_COPY_INODES = 4096
+MAX_SCRIPT_OUTPUT_BYTES = 256 * 1024 * 1024
+MAX_SCRIPT_OUTPUT_INODES = 4096
+MAX_ANALYSIS_METADATA_BYTES = 2 * 1024 * 1024
+MAX_DATA_INDEX_BYTES = 16 * 1024 * 1024
 
 
 def analysis_workspace_resource_requirement(
@@ -87,6 +106,74 @@ def analysis_publication_resource_requirement(
         bounded_plan + (2 * bounded_slice),
     )
     return bytes_required, _ANALYSIS_PUBLICATION_FIXED_INODES
+
+
+def analysis_result_resource_requirement() -> tuple[int, int]:
+    """Return the bounded result-file reservation for one worker attempt."""
+
+    return MAX_ANALYSIS_RESULT_BYTES, _ANALYSIS_RESULT_INODES
+
+
+def analysis_script_workspace_resource_requirement(
+    max_slice_bytes: int,
+    *,
+    catalog_bytes: int = MAX_CATALOG_COPY_BYTES,
+    catalog_inodes: int = MAX_CATALOG_COPY_INODES,
+) -> tuple[int, int]:
+    """Return the peak persistent workspace envelope for one date slice.
+
+    A run may retain the filtered JSONL, the derived metrics CSV, a playback
+    export, the copied catalog, and script-owned outputs at the same time.  The
+    input archive itself is already admitted by the worker; this envelope covers
+    the durable workflow tree and the fallback data copy when symlinks are not
+    available.  All terms are hard-bounded by the executor before it starts.
+    """
+
+    bounded_slice = max(int(max_slice_bytes), 0)
+    bounded_catalog_bytes = min(max(int(catalog_bytes), 0), MAX_CATALOG_COPY_BYTES)
+    bounded_catalog_inodes = min(max(int(catalog_inodes), 0), MAX_CATALOG_COPY_INODES)
+    bytes_required = (
+        (3 * bounded_slice)
+        + bounded_catalog_bytes
+        + MAX_SCRIPT_OUTPUT_BYTES
+        + MAX_ANALYSIS_METADATA_BYTES
+    )
+    inodes_required = (
+        (2 * MAX_SLICE_ENTRIES)
+        + bounded_catalog_inodes
+        + MAX_SCRIPT_OUTPUT_INODES
+        + 24
+    )
+    return bytes_required, inodes_required
+
+
+@contextmanager
+def reserve_analysis_requirements(
+    controller: ProcessResourceAdmission,
+    requirements: Sequence[tuple[Path | str, int, int]],
+) -> Iterator[None]:
+    """Reserve a logical analysis transaction atomically when supported.
+
+    The production controller is the serialized process-wide implementation and
+    exposes ``reserve_many``.  The sequential fallback keeps older injected test
+    doubles import-compatible; production never takes it.
+    """
+
+    reserve_many = getattr(controller, "reserve_many", None)
+    if callable(reserve_many):
+        with reserve_many(requirements):
+            yield
+        return
+    with ExitStack() as stack:
+        for path, bytes_required, inodes_required in requirements:
+            stack.enter_context(
+                controller.reserve(
+                    path,
+                    bytes_required=bytes_required,
+                    inodes_required=inodes_required,
+                )
+            )
+        yield
 
 
 class FederatedAnalysisHandler(_FederatedAnalysisHandler):
@@ -143,11 +230,15 @@ class FederatedAnalysisHandler(_FederatedAnalysisHandler):
         # capacity is measured. The base implementation intentionally repeats the
         # same checks after admission before any workspace write occurs.
         bytes_required, inodes_required = self._resource_requirement(job)
-        with self.resource_admission.reserve(
-            self.workspace_root,
-            bytes_required=bytes_required,
-            inodes_required=inodes_required,
-        ):
+        requirements: list[tuple[Path | str, int, int]] = [
+            (self.workspace_root, bytes_required, inodes_required)
+        ]
+        if self.content_store is not None:
+            result_bytes, result_inodes = analysis_result_resource_requirement()
+            requirements.append(
+                (self.content_store.root, result_bytes, result_inodes)
+            )
+        with reserve_analysis_requirements(self.resource_admission, requirements):
             return await super()._execute(job)
 
 
@@ -200,6 +291,16 @@ class FederatedAnalysisScheduler(_FederatedAnalysisScheduler):
 __all__ = [
     "FederatedAnalysisHandler",
     "FederatedAnalysisScheduler",
+    "MAX_ANALYSIS_RESULT_BYTES",
+    "MAX_ANALYSIS_METADATA_BYTES",
+    "MAX_CATALOG_COPY_BYTES",
+    "MAX_CATALOG_COPY_INODES",
+    "MAX_DATA_INDEX_BYTES",
+    "MAX_SCRIPT_OUTPUT_BYTES",
+    "MAX_SCRIPT_OUTPUT_INODES",
     "analysis_publication_resource_requirement",
+    "analysis_result_resource_requirement",
+    "analysis_script_workspace_resource_requirement",
     "analysis_workspace_resource_requirement",
+    "reserve_analysis_requirements",
 ]
