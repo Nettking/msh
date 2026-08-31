@@ -55,7 +55,9 @@ def test_windows_runtime_verification_failure_has_bounded_activation_recovery_st
     assert "-Code 'activation_required'" in runner
     assert "retry the same apply" in runner
     assert "target-started" in proxy
-    flask_start = proxy[proxy.index(":flask_start") : proxy.index(":controlled_build")]
+    flask_start = proxy[
+        proxy.index("\n:flask_start\n") : proxy.index("\n:controlled_build\n")
+    ]
     assert flask_start.index("echo target-started") < flask_start.index(
         '"%FCP_REAL_DOCKER_EXE%" %*'
     )
