@@ -363,6 +363,46 @@ def test_materialization_completes_sqlite_bookkeeping_at_pressure(
     assert controller.assessment(consumer.database.parent).level.name == "NORMAL"
 
 
+def test_local_cache_completes_sqlite_bookkeeping_at_pressure(tmp_path: Path) -> None:
+    """Local gzip publication carries its local-files mutation in one admission."""
+
+    bridge = _bridge(tmp_path, "local-pressure-completion", admission=_RecordingAdmission())
+    source = bridge.data_root / "sources" / "demo" / "day.jsonl"
+    source.parent.mkdir(parents=True, exist_ok=True)
+    source.write_bytes(b'{"machine_id":"m","value":1}\n')
+
+    resource_id = measure_filesystem(bridge.cache_root).resource_id
+    now = datetime.now(timezone.utc)
+    measurement = FilesystemMeasurement(
+        resource_id=resource_id,
+        observed_at=now,
+        total_bytes=10_000_000,
+        free_bytes=5_000_000,
+        total_inodes=None,
+        free_inodes=None,
+        available=True,
+    )
+    controller = SerializedProcessResourceAdmission(
+        thresholds=PressureThresholds(
+            critical_free_bytes=1_000_000,
+            pressure_free_bytes=3_000_000,
+            warning_free_bytes=4_000_000,
+            critical_free_inodes=0,
+            pressure_free_inodes=0,
+            warning_free_inodes=0,
+        ),
+        measurer=lambda _path: measurement,
+        clock=lambda: now,
+    )
+    bridge.resource_admission = controller
+
+    row = bridge._prepare_local_file("node-local", "sources/demo/day.jsonl", source)
+
+    assert row["file_sha256"]
+    assert Path(str(row["cache_path"])).is_file()
+    assert controller.assessment(bridge.database.parent).level.name == "NORMAL"
+
+
 def test_materialization_rejects_redirect_component_without_outside_write(
     tmp_path: Path,
 ) -> None:
