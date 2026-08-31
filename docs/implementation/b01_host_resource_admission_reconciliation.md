@@ -1,141 +1,190 @@
 # B01 host-resource-admission reconciliation
 
-Status: **in progress; draft evidence ledger**
+Status: **draft; not merge-ready**
 
 Reviewed: **2026-08-31 Europe/Oslo**
 
-Exact baseline: `main` at `17e279c01ae6d48ca9c0f4a0b3eaddbb5922d0ef`
+## Branch and baseline validation
 
-This is a fresh reconciliation of B01 against production code and tests. It does
-not treat the historical checklist, merged pull-request titles, or green CI as
-proof that a writer is protected.
+The continuation started from the verified branch head
+`08a89420d6610520698566af7a47caa0a85465f4`. The handoff named
+`51d09b573d23909305662c911c9a051a828b758b` as current `main` after B05. During
+this continuation, `origin/main` advanced again through the B06 merge (#387) to
+`ba46294ee47208c21eebad893c40da54b0c76833`. The final review therefore uses
+`ba46294ee47208c21eebad893c40da54b0c76833` as the current-main baseline and
+records `51d09b573d23909305662c911c9a051a828b758b` as the supplied B05
+checkpoint.
+
+The branch was validated without merging or rebasing:
+
+- branch: `codex/b01-host-resource-reconciliation-20260831`;
+- initial verified branch head: `08a89420d6610520698566af7a47caa0a85465f4`;
+- final head is recorded in the handoff section below;
+- current-main baseline: `ba46294ee47208c21eebad893c40da54b0c76833`;
+- merge-base: `17e279c01ae6d48ca9c0f4a0b3eaddbb5922d0ef`;
+- the B06 files introduced by #387 are in `main`, not in this branch diff;
+- no B06 health files, ICSE demo files, physical Federation machines, physical
+  evidence, merge action, or release state were accessed.
+
+The parallel-work boundary was respected. No continuation change touches
+`catalog/federation/recorder_publication.py`, recorder publication discovery or
+frontier design, or the B03 incremental publication seam. Those remain PR #384
+work.
 
 ## Classification contract
 
-Every supported persistent writer found by the review will receive exactly one
-of these final classifications:
+Every writer boundary in the scorecard receives exactly one of these statuses:
 
-- `PROVEN`: the current production path and focused tests prove the applicable
-  B01 properties.
-- `PARTIAL`: some applicable properties are implemented, but at least one real
-  safety property is not proved.
-- `MISSING`: the supported writer has no effective B01 admission at its actual
+- `PROVEN`: production code and consequence tests prove the applicable B01
+  admission/refusal/unwind properties for the stated supported boundary.
+- `PARTIAL`: a meaningful bounded admission exists, but a real applicable
+  property remains unproved or is an explicit architectural boundary.
+- `MISSING`: a supported writer still has no effective admission at its actual
   write boundary.
-- `NOT_V1_SUPPORTED`: code exists, but the current v1 installed-product path
-  does not expose or instantiate it.
-- `OBSOLETE_REQUIREMENT`: the presumed writer/path no longer exists or no
-  longer performs the write the old checklist attributed to it.
+- `OUT-OF-SCOPE`: the path is not an instantiated/supported v1 writer for this
+  B01 product contract, or is explicitly owned by another PR.
 
-For each candidate the final ledger records what it writes, the backing
-resource, its finite or streaming bound, byte/inode reservation, controller
-sharing and atomicity, emergency completion reserve, refusal behavior,
-temporary/reconstruction writes, unwind behavior, destination-identity risk,
-and restart/crash consequences.
+`PROVEN` is deliberately scoped to the named boundary. It is not a claim that
+manual Docker commands, unrelated host processes, physical acceptance, or
+unbounded historical retention are safe.
 
-## Exact-main foundation already proved
+## Exact-main foundation
 
-The shared resource vocabulary and process-local reservation primitive are real
-current production code, not merely a plan:
+The shared resource authority is real production code:
 
 - `catalog/federation/host_resources.py` measures the nearest existing ancestor
-  of the requested destination, identifies the mounted resource, measures free
-  bytes and inodes where exposed, and classifies unavailable, invalid, stale, or
-  implausibly future measurements as `CRITICAL`.
-- The same module defines ordered `NORMAL`, `WARNING`, `PRESSURE`, and
-  `CRITICAL` thresholds. New bounded work is refused at `PRESSURE` or worse and
-  is also refused when its declared maximum would consume the `CRITICAL`
-  byte/inode reserve.
-- `catalog/federation/process_resource_admission.py` supplies the production
-  process-wide singleton `PROCESS_RESOURCE_ADMISSION`. It serializes measurement
-  with accounting, coalesces requirements sharing one resource, and publishes
-  multi-resource reservations atomically through `reserve_many()`.
-- Context-manager unwind releases reservations on both success and exceptions.
-  Focused tests cover all four byte states, inode-only exhaustion, unavailable
-  and stale measurements, same-resource aggregation, distinct resources,
-  exception unwind, measurement/accounting serialization, same-resource
-  coalescing, and cross-resource all-or-nothing refusal.
+  of a requested destination, identifies its backing resource, and measures
+  free bytes and free inodes where the platform exposes them.
+- `NORMAL`, `WARNING`, `PRESSURE`, and `CRITICAL` are shared states. New work is
+  refused at `PRESSURE` or worse and when its bounded reservation would consume
+  the critical byte/inode floor.
+- `catalog/federation/process_resource_admission.py` provides the process-wide
+  `PROCESS_RESOURCE_ADMISSION`, serialized measurement/accounting, same-resource
+  coalescing, atomic `reserve_many`, and exception-safe release.
+- Focused tests cover byte pressure, inode-only exhaustion, unavailable/stale
+  measurements, same-resource aggregation, distinct resources, serialization,
+  cross-resource all-or-nothing refusal, and exception unwind.
 
-These primitives provide process-local accounting only. They do not reserve
-space against unrelated host processes, and measuring a missing destination via
-its current ancestor does not by itself prove that a later-created or substituted
-destination remains on that resource. Each writer must therefore still be
-proved at its real host/process boundary, including any destination-identity
-check appropriate to that path.
+This is process-local accounting. It does not reserve space against an
+unrelated process, and measuring a missing leaf through its current ancestor is
+not by itself a proof that a later-created or substituted destination remains on
+that resource. The scorecard calls out the boundaries where that distinction
+still matters.
 
-## Classified writer ledger
+## B01 writer scorecard
 
-The following ledger is based on the exact baseline above and names the actual
-write boundary rather than the caller that requested it. `PROVEN` means proven
-for the stated supported boundary only; it is not a claim that every manually
-invoked Docker or host command is safe.
-
-| Writer and evidence | Persistent write, bound, and backing resource | Admission, completion, crash/identity evidence | Classification |
-|---|---|---|---|
-| Shared primitive (`host_resources.py`, `process_resource_admission.py`) | Measures the nearest existing ancestor and accounts bytes plus inodes per mounted resource. | Serialized decision/accounting, same-resource coalescing, atomic `reserve_many`, and unwind are directly tested. Process-local only; no protection from unrelated processes. | **PROVEN foundation** |
-| Recorder capture/recovery/publication (`mtconnect_recorder/resource_pressure.py`, `_resource_pressure_impl.py`) | Sequence-bounded raw XML, manifest, observation NDJSON, normalized JSONL, probe and checkpoint files. `RecorderResourceBudget` supplies finite byte/inode envelopes. | One aggregate controller is shared by recorder transaction writers; completion admission permits only already-durable recovery work while preserving the critical floor. Atomic replacement and focused refusal/unwind tests exist. Destination confinement and the recorder's own outbox are separate boundaries. | **PARTIAL** |
-| Recorder Federation outbox (`catalog/federation/outbox.py`) | SQLite rows carry JSON payloads up to `MAX_PAYLOAD_BYTES` (1 MiB), but offline history is cumulative and SQLite/WAL growth is not globally bounded. | `BEGIN IMMEDIATE` gives transaction serialization, but this writer never calls `PROCESS_RESOURCE_ADMISSION`; no byte/inode admission or completion envelope exists. | **MISSING** |
-| Federated JSONL local gzip cache (`_prepare_local_file`) | Source is capped by `FEDERATED_JSONL_MAX_FILE_BYTES`; gzip output is capped by `FEDERATED_JSONL_MAX_ENCODED_BYTES`; cache temp/final files share the configured cache resource. | Stable-directory handles, source re-stat/hash, bounded writer, and cache reservation are present. Commits `11c60cd`/`24ea125` add the SQLite `local_files` envelope to the same atomic reservation and use its identity-matched reservation for completion. Hard-kill temp cleanup and cumulative SQLite/WAL growth remain unproven. | **PARTIAL** |
-| Federated JSONL remote chunk staging (`_write_chunk`, `_record_remote_chunk`) | Each decoded chunk is bounded by the protocol/chunk limit and staged as a content-addressed `.chunk`; staged-cache byte/file quotas exist. | `reserve_many` now keeps the chunk bytes/inodes and `seen_batches` SQLite mutation in one atomic envelope, with stable-directory identity checks and a real completion-at-`PRESSURE` regression. Hard-killed `fcp-chunk-*`/other temporary names are not covered by the restart scan, and the SQLite/WAL envelope is not proven for all batch histories. | **PARTIAL** |
-| Federated JSONL reconstruction/materialization (`_try_materialize`) | Declared encoded and raw file sizes are bounded; one encoded gzip and one raw JSONL temp coexist before atomic publication. Mirror quota bounds retained remote bytes. | `reserve_many` now covers encoded, raw, and SQLite completion peaks; stable-directory identity checks, exact size/hash validation, atomic replacement, and the admitted `materialized_files`/staged-row mutation are tested, including a real `PRESSURE` regression. Temporary reconstruction cleanup is only context-manager based, hard-kill names can strand, and cumulative SQLite/WAL growth remains unproven. | **PARTIAL** |
-| Browser multipart parser (`flask_app/data_upload_routes.py` request parsing) | Werkzeug/WSGI may spool the request body to the OS temporary filesystem before the route's admission guard; app `MAX_CONTENT_LENGTH` is 1.1 GiB by default. | No shared byte/inode reservation can run before `request.form`/`request.files` parsing, and the parser temp resource is not pinned to the configured upload roots. | **MISSING** |
-| Browser upload staging/publication (`data_upload_resource_admission.py`, `data_upload_service.py`) | Staging reserves configured total bytes and files/inodes; final uploaded data is intentionally cumulative and user-visible. | Shared admission and exception unwind cover staging. Reservation ends when enqueue returns, before asynchronous final-directory/marker and metadata writes; roots are independently configurable and only lexical checks/revalidation are used. SQLite metadata is cumulative without a lifetime admission budget. | **PARTIAL** |
-| Analysis input workspace/data-owner publication (`capabilities/analysis/resource_admission.py`) | Input plan/slice and data-owner publication use bounded workspace/atomic-replacement envelopes. | Shared admission and worker/scheduler wrappers exist, but the stable destination boundary, all metadata writes, and result-output lifecycle are not covered by the same proof. | **PARTIAL** |
-| Analysis result artifact store (`capabilities/analysis/content_store.py:LocalArtifactContentStore.write_bytes`, `worker.py:_result`) | Atomic `.partial` file is written under the artifact root; payload is not given a finite schema-wide cardinality bound before serialization (store has only a per-object byte ceiling). | No `PROCESS_RESOURCE_ADMISSION` reservation or pinned stable-directory identity at this write boundary; a failed write cleans its temp, but restart/quota accounting is not host-resource admission. | **MISSING** |
-| Analysis executor/script workspaces (`orchestrator/analysis_runtime.py`, `runner/script_exec.py`) | Copies catalog/data and permits selected scripts to create arbitrary run outputs below `results/workflows`; no durable aggregate ceiling is enforced. | Directory creation and `copytree` are direct writes without admission. Arbitrary script output makes a safe finite envelope unproven. | **MISSING** |
-| Logical Federation storage provider (`federation/storage_allocation.py`, `FilesystemBatchStorageProvider.ingest`) | One JSON batch is relay-bounded (65,536 bytes at the protocol), and a preallocated allocation file/floor limits the provider's own byte budget. | SQLite transaction serialization, temp/replace and byte claims exist, but this is not the shared process controller, does not account inodes/WAL, and does not prove destination identity across allocation/provider roots. | **PARTIAL** |
-| Observer Phoenix JSONL export (`observer_phoenix/export_jsonl.py`, Compose `observer-sync`) | Appends deduplicated records to date-partitioned JSONL; record count and cumulative files are not bounded by admission. | No host-resource controller, atomic aggregate reservation, or restart cleanup for append growth. This is a supported Compose profile, not merely a test helper. | **MISSING** |
-| Telemetry Parquet cache rebuild (`common/telemetry_cache.py:rebuild_cache`) | Rebuild writes a temporary cache tree and swaps it into place; temporary and retained cache can coexist and size is data-dependent. | No shared admission or inode accounting around the duplicate tree; swap is atomic at the directory-name level but not a host-space proof. | **MISSING** |
-| Host Docker image builds/cache retirement (controlled build/update launchers) | Docker backing path is resolved, build context and image/tag lifecycles are bounded by the host build policy; cache/image writes occur in Docker's own resource. | Controlled launchers use host-resource preflight, pressure monitoring, writer stop/quiescence and post-build identity checks. Manual `docker build` or arbitrary Docker configuration is outside this supported boundary. | **PROVEN for controlled path; NOT_V1_SUPPORTED otherwise** |
-| Model/provider download (`model_resource_pull.py`, `start.sh`, Windows update/setup handoff) | Model size is intentionally unknown; the pull is an optional writer into the Docker model volume. | Host-owned backing-resource resolution, NORMAL/WARNING preflight, continuous pressure polling, verified stop and model verification are implemented. Supported setup documentation now invokes this helper after starting the target service; the raw installer services remain Compose implementation details. | **PROVEN for supported helper path; raw Compose service outside the supported contract** |
-| Agent log and Docker json-file logs (`federation/agent_log.py`, `docker-compose.yml`) | Agent log is capped at 10 MiB plus bounded tail; Compose services use 10m/3-file rotation. | Rotation/copy/truncate behavior and tests are already in-tree. This is prior B07 hardening, not an unresolved B01 writer. | **PROVEN / outside remaining B01 scope** |
-| Legacy upload payload duplication (`data_upload_records`) | Current import path streams and validates without persisting the old full payload column. | Existing regression asserts zero legacy payload rows. | **OBSOLETE_REQUIREMENT** |
-| Durable resumable transfer, backup/export/import/migration paths not instantiated by the v1 product | Code/search finds helpers and migration tooling, but no supported installed-product runtime boundary with a current admission contract. | Until a supported invocation is identified, claiming either protection or a new fix would be speculation. | **NOT_V1_SUPPORTED pending evidence** |
+| Writer boundary | Consequence and remaining proof | Status |
+|---|---|---|
+| Shared process-wide admission (`host_resources.py`, `process_resource_admission.py`) | Measures bytes/inodes by backing-resource identity; serializes the decision; coalesces requirements; supports atomic multi-resource reservations and unwind. | **PROVEN** |
+| Recorder capture/recovery/publication (`mtconnect_recorder/resource_pressure.py`, `_resource_pressure_impl.py`) | Sequence-bounded raw XML, manifests, observation NDJSON, normalized JSONL, probes, and checkpoints retain the inherited recorder budget/controller behavior. Recorder publication/outbox ownership and the excluded B03 seam are not re-opened here. | **PARTIAL** |
+| Recorder Federation durable outbox (`catalog/federation/outbox.py`) | Initialization/migration and every state-changing transaction now use the shared controller with bounded byte/inode estimates, WAL autocheckpoint/journal-size limits, rollback, and backing-resource identity checks. Completed/retired payload compaction is bounded. Pending rows and the durable idempotency/tombstone history cannot be automatically deleted without changing at-least-once delivery or re-enqueue suppression. | **PARTIAL** |
+| Federated JSONL local gzip cache (`_prepare_local_file`) | Inherited source/output bounds, stable-directory handling, source re-stat/hash validation, atomic publication, and SQLite transaction envelopes remain. Hard-kill temporary cleanup and cumulative `local_files`/WAL growth are not closed in this PR. | **PARTIAL** |
+| Federated JSONL remote chunk staging (`_write_chunk`, `_record_remote_chunk`) | Inherited completion-at-`PRESSURE` fix admits chunk bytes/inodes and `seen_batches` mutation atomically and preserves identity checks. Hard-kill `fcp-chunk-*` cleanup and cumulative SQLite history remain unresolved. | **PARTIAL** |
+| Federated JSONL reconstruction/materialization (`_try_materialize`) | Inherited encoded/raw bounds, mirror quota, atomic replacement, exact size/hash checks, and completion-at-`PRESSURE` transaction envelope remain. Hard-kill temporary cleanup and cumulative SQLite/WAL growth remain unresolved. | **PARTIAL** |
+| Browser multipart parser (`flask_app/data_upload_routes.py`) | A declared `Content-Length` is rejected before Flask form/file parsing using the configured total-file ceiling plus bounded multipart overhead. Unknown-length/chunked requests can still be spooled by WSGI/Werkzeug before the route runs; that framework-controlled resource is not safely attributable to the configured upload roots. | **PARTIAL** |
+| Browser upload staging/publication (`data_upload_service.py`, `data_upload_resource_admission.py`) | Staging, final publication, marker/metadata writes, and asynchronous import now reserve through the shared controller with byte/inode estimates; async pressure leaves durable work queued/hidden and retries after pressure clears. Multi-root requirements are coalesced atomically and existing durability ordering is retained. User-visible retained uploads and lifetime metadata have no product retention policy, and service paths do not yet have the storage-provider-level identity proof. | **PARTIAL** |
+| Upload analysis-job metadata links (`upload_analysis_job_service.py`) | Database directory initialization and link insertion/WAL headroom are admitted and exception-safe through the shared controller. The link table is durable cumulative job history without an independent retention policy, so this boundary is not a full aggregate-growth proof. | **PARTIAL** |
+| Analysis input workspace/data-owner publication (`capabilities/analysis/resource_admission.py`, scheduler) | Existing plan/slice publication is covered by bounded reservations and scheduler completion bookkeeping avoids nested re-admission. The complete data-owner metadata/result lifecycle and a destination identity proof across every publication root remain outside the consequence tests. | **PARTIAL** |
+| Analysis result artifact store (`capabilities/analysis/content_store.py`, worker result publication) | Direct artifact writes and worker result serialization have finite bounds, shared byte/inode reservations, atomic partial-to-final replacement, cleanup, and nested `admission_held` handling. Consequence tests cover refusal before publication and reservation release; the score is scoped to the managed artifact-root boundary. | **PROVEN** |
+| Analysis executor/script workspaces (`orchestrator/analysis_runtime.py`, `runner/script_exec.py`) | Managed run directories and catalog copies use shared byte/inode admission; subprocess output is drained, checked live, terminated on workspace overflow, and cleaned. Tests prove pressure refusal and real output-over-limit refusal. This does not constrain a malicious/unsupported script that intentionally writes outside its managed workspace. | **PROVEN** |
+| Logical Federation storage provider (`federation/local_storage.py`) | Provider initialization and ingest now use the shared controller plus the existing `StorageAllocation`; bytes/inodes cover publication and SQLite/WAL headroom, identity is checked after mkdir and replacement, and checkpoint/WAL limits are configured without weakening immutable ingest/failover semantics. Durable batch files and the identity catalogue are intentionally cumulative, so a retention/compaction policy is still needed for a full lifetime aggregate proof. | **PARTIAL** |
+| Observer Phoenix JSONL export (`observer_phoenix/export_jsonl.py`) | Each export and date-partitioned replacement has bounded record/byte/file limits, inode margins, atomic temporary replacement, shared admission, and cleanup/unwind tests. The export can still accumulate bounded date files indefinitely because no source-of-truth retention contract authorizes deletion. | **PARTIAL** |
+| Telemetry Parquet cache rebuild (`common/telemetry_cache.py`) | Disposable rebuilds cap source bytes, duplicate-tree output bytes, and inodes; old and new trees are admitted together; temporary trees are cleaned on failure; source JSONL remains authoritative. Failure tests preserve an existing cache and no partial tree. | **PROVEN** |
+| Controlled Docker image build/cache retirement | Supported launchers have host-resource preflight, pressure monitoring, writer stop/quiescence, post-build identity checks, and bounded cache/image policy. | **PROVEN** |
+| Manual/arbitrary Docker build or arbitrary Docker storage configuration | No supported v1 boundary gives this process authority over arbitrary operator-invoked Docker writes. | **OUT-OF-SCOPE** |
+| Supported model/provider download helper (`model_resource_pull.py`, setup handoff) | Host-owned backing-resource resolution, preflight, continuous polling, verified stop, and model verification are implemented for the supported helper path. | **PROVEN** |
+| Raw Compose model-pull/service invocation outside the supported helper | The raw service is an implementation detail and does not expose the supported B01 admission contract. | **OUT-OF-SCOPE** |
+| Agent and Docker json-file logs | Prior B07 rotation/copy/truncate boundaries are already bounded and are not an unresolved B01 writer in this continuation. | **OUT-OF-SCOPE** |
+| Legacy `data_upload_records` full-payload duplication | The current import path does not persist the obsolete full payload column; this is no longer a supported writer boundary. | **OUT-OF-SCOPE** |
+| Durable resumable transfer, backup/export/import, and migration helpers not instantiated by v1 | No supported installed-product invocation was identified. Claiming admission here would be speculation; adding one would be a separate product boundary. | **OUT-OF-SCOPE** |
+| Crash-stranded `fcp-chunk-*`, `fcp-encoded-*`, `fcp-raw-*`, and cache temporary files | Normal context-manager unwinding is covered, but the generic temporary-file helper has no durable transaction ownership marker. Prefix/age deletion could remove ambiguous user or recovery data, so startup scavenging is intentionally not implemented. | **PARTIAL** |
+| Cross-writer SQLite/WAL aggregate growth | Per-transaction WAL/journal headroom and admission now exist for the outbox, upload metadata, storage provider, and the newly admitted analysis/observer/cache paths. SQLite main files, durable pending outbox rows, JSONL history indexes, storage idempotency rows, upload metadata, and user-visible data can grow across successful transactions. Safe deletion is constrained by delivery identity, ordering gaps, idempotency, or source-of-truth semantics. | **PARTIAL** |
 
 ## Implemented in this continuation
 
-Commits `11c60cd`, `24ea125`, and `1ef6304` target concrete Federated JSONL
-completion bugs above:
-local-cache and materialization transactions now admit their bounded SQLite
-bookkeeping in the same atomic reservation as the large filesystem peak, and
-their inner bookkeeping path uses that already-held reservation instead of
-re-admitting at `PRESSURE`. Both implementation variants (the stable-filesystem
-public class and its implementation base) use the same identity-matched
-reservation selection. Remote chunk staging now applies the same envelope to
-the chunk file and its `seen_batches` row; the reservation remains held through
-the atomic temp-to-final write and SQLite commit. Regressions exercise the real
-serialized controller at both pressure boundaries. This scoped change cannot
-close hard-kill temporary cleanup, cumulative SQLite/WAL growth, uploads,
-analysis outputs, or cumulative outboxes.
+The coherent implementation slices pushed to the branch are:
 
-Focused verification at this head:
+- `214277e` — analysis result artifact and script-workspace admission, bounded
+  serialization/copy/output handling, live subprocess refusal, and unwind tests;
+- `44055b7` — upload staging/publication and asynchronous metadata admission,
+  earliest enforceable multipart limit, logical storage provider shared
+  admission/inode/identity/WAL handling, and observer/cache implementation/tests;
+- `d507ec5` — shared admission around durable outbox initialization/migration and
+  all state-changing SQLite transactions, with pressure/refusal/unwind tests;
+- `b36799b` — mechanical normalization of the touched Python files plus the
+  observer enumeration fix.
 
-- `python -m pytest -q --basetemp=.pytest-tmp catalog/flask_app/tests/test_federated_jsonl_resource_admission.py`
-  — **17 passed, 1 skipped** (including local-cache, remote-chunk, and
-  remote-materialization completion-at-pressure regressions);
-- the combined Federated JSONL/model admission subset — **33 passed, 3
-  skipped**; and
-- `ruff check` on both bridge implementations and the focused test — **passed**.
+The earlier Federated JSONL completion-at-`PRESSURE` work is inherited by this
+branch and was not reworked as a writer-ledger refinement.
 
-The repository-wide collection was also attempted. It is not a valid green
-signal in this checkout because 36 Flask/acceptance modules cannot import the
-uninstalled `email_validator`/`flask_security` dependencies; no acceptance
-machine or acceptance state was accessed.
+## Verification evidence
 
-## Open blockers and assumptions
+The final focused consequence set collected **206 tests** and passed all 206:
 
-- The ledger is intentionally conservative where a writer can be entered from
-  a supported command but has no finite aggregate lifetime bound (outbox,
-  observer export, telemetry cache, analysis scripts).
-- A reservation against an ancestor is not treated as a destination identity
-  proof. The JSONL paths that use `StableDirectory` are stronger; upload,
-  analysis, storage-provider, and SQLite boundaries still need independent
-  identity/restart work.
-- The JSONL SQLite reserve is a bounded transaction envelope, not a proof that
-  arbitrary historical SQLite/WAL growth fits that envelope. Hard-kill
-  temporary cleanup remains unresolved.
-- No physical Federation machine, acceptance state, merge action, or release
-  state was touched. Draft PR #383 remains the only publication target.
+```text
+pytest --basetemp .pytest-b01-final-focus -q \
+  catalog/capabilities/tests/test_analysis_resource_admission.py \
+  catalog/capabilities/tests/test_analysis_publication_resource_admission.py \
+  catalog/orchestrator/tests/test_analysis_runtime_integration.py \
+  catalog/orchestrator/tests/test_pipeline_bootstrap.py \
+  catalog/runner/tests/test_script_workspace_admission.py \
+  catalog/flask_app/tests/test_data_upload_resource_admission.py \
+  catalog/flask_app/tests/test_data_upload.py \
+  catalog/flask_app/tests/test_upload_analysis_jobs.py \
+  catalog/federation/tests/test_local_storage.py \
+  catalog/federation/tests/test_storage_allocation.py \
+  catalog/federation/tests/test_storage_discovery_regressions.py \
+  catalog/federation/tests/test_storage_exhaustion_acceptance.py \
+  catalog/federation/tests/test_outbox_resource_admission.py \
+  catalog/federation/tests/test_outbox_compaction.py \
+  catalog/federation/tests/test_outbox_retirement.py \
+  catalog/federation/tests/test_phase1.py \
+  catalog/common/tests/test_observer_and_cache_resource_admission.py \
+  catalog/common/tests/test_telemetry_cache.py
+```
 
-The exact head SHA, focused/full test commands, CI run identifiers, findings
-from the adversarial pass, and any new unresolved issue are recorded below as
-each incremental commit lands.
+Additional focused results were 10 analysis/script-admission tests, 8 upload
+resource-admission tests, 13 local-storage tests, 33 storage regression and
+exhaustion tests, 4 observer/cache consequence tests, 5 upload-analysis-job
+tests, and 63 outbox/phase-1/compaction/retirement tests. These subsets overlap
+the 206-test final set.
+
+`python -m compileall -q catalog` passed. Ruff passed for the changed Python
+files when the repository's existing baseline rules (`B008`, `S110`, `DTZ003`,
+`BLE001`, and `RUF100`) were excluded; no new import/format/lint findings
+remain. A repository-wide collection was attempted but cannot be a green
+signal in this checkout because acceptance/Flask modules require uninstalled
+`email_validator`/`flask_security` dependencies. No physical acceptance path
+was accessed.
+
+## Architectural blockers and exact residual work
+
+1. **Pre-route multipart spooling:** only a declared request length can be
+   rejected before Werkzeug/WSGI parsing. Proving control of unknown-length
+   framework spooling requires a deployment-level bounded stream/temp-root
+   contract. The smallest safe follow-up is to configure and verify that
+   boundary in the supported WSGI deployment, then add an unknown-length
+   consequence test; application-route admission alone cannot close it.
+2. **Cumulative SQLite and durable retention:** checkpointing bounds transient
+   WAL behavior, not the main database or durable history. The outbox cannot
+   delete pending/terminal rows without changing at-least-once delivery,
+   idempotency, or retirement-gap semantics; JSONL and storage indexes likewise
+   need an explicit source-of-truth retention/archive contract. The smallest
+   coherent follow-up is one product-level retention design that names the
+   archive/identity replacement, then implements bounded compaction/retention
+   for outbox, JSONL indexes, storage catalogue, and upload metadata together.
+3. **Crash-stranded temporary files:** the generic helper creates names but no
+   durable owner marker. A safe scavenger needs either a dedicated managed temp
+   root with authenticated transaction markers or a durable ownership table,
+   plus strict age/path/marker checks and crash/re-entry tests for all prefixes.
+   Prefix/age deletion alone is explicitly unsafe.
+4. **Recorder publication/B03 seam:** discovery/frontier and incremental
+   publication remain owned by PR #384 and are not residual work to fold into
+   this PR.
+
+## Handoff facts
+
+The exact final head SHA, current-main SHA, complete tracked changed-file list,
+workflow/run identifiers, and adversarial findings are maintained in the final
+PR #383 handoff after the ledger commit. This document does not accept physical
+evidence, declare B01 complete, or authorize a merge.
