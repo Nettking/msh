@@ -25,6 +25,7 @@ from typing import Any
 
 from catalog.capabilities.analysis.contracts import DEFAULT_MAX_SLICE_BYTES
 from catalog.capabilities.analysis.resource_admission import (
+    MAX_ANALYSIS_METADATA_BYTES,
     MAX_DATA_INDEX_BYTES,
     ProcessResourceAdmission,
     analysis_script_workspace_resource_requirement,
@@ -52,6 +53,8 @@ from catalog.runner.session_store import (
     script_output_exists,
     write_session_metadata,
 )
+
+_RUNTIME_STATE_INODES = 4
 
 
 @dataclass
@@ -577,6 +580,7 @@ class RuntimeOrchestrator:
         *,
         poll_interval_seconds: int = DEFAULT_POLL_INTERVAL_SECONDS,
         analysis_gateway: Any | None = None,
+        resource_admission: ProcessResourceAdmission | None = None,
     ) -> None:
         self.status = StatusPrinter()
         # Discovery only creates work. The gateway turns a discovered slice into a
@@ -586,7 +590,12 @@ class RuntimeOrchestrator:
         self.root = repo_root()
         self.data_dir = self.root / "data"
         self.workflows_root = self.root / "results" / "workflows"
-        self.workflows_root.mkdir(parents=True, exist_ok=True)
+        self.resource_admission = resource_admission or PROCESS_RESOURCE_ADMISSION
+        with reserve_analysis_requirements(
+            self.resource_admission,
+            [(self.workflows_root, MAX_ANALYSIS_METADATA_BYTES, _RUNTIME_STATE_INODES)],
+        ):
+            self.workflows_root.mkdir(parents=True, exist_ok=True)
         self.state_path = self.workflows_root / "runtime_state.json"
         self.startup_state_path = self.workflows_root / "startup_state.json"
         self.poll_interval_seconds = max(int(poll_interval_seconds), 10)
@@ -777,10 +786,20 @@ class RuntimeOrchestrator:
             "source": source,
             "active_runtime_namespace": self._state.active_runtime_namespace,
         }
-        self.startup_state_path.write_text(
-            json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
-        self._persist_state()
+        with reserve_analysis_requirements(
+            self.resource_admission,
+            [
+                (
+                    self.workflows_root,
+                    2 * MAX_ANALYSIS_METADATA_BYTES,
+                    _RUNTIME_STATE_INODES,
+                )
+            ],
+        ):
+            self.startup_state_path.write_text(
+                json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
+            self._persist_state(admission_held=True)
 
     def startup_decision_snapshot(self) -> dict[str, Any]:
         context = self._startup_decision_context()
@@ -811,11 +830,21 @@ class RuntimeOrchestrator:
         self.start_background_updates()
         return True, f"Startup mode set to {mapped.replace('_', ' ')}."
 
-    def _persist_state(self) -> None:
-        self.state_path.write_text(
-            json.dumps(self._state.__dict__, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
+    def _persist_state(self, *, admission_held: bool = False) -> None:
+        def write() -> None:
+            self.state_path.write_text(
+                json.dumps(self._state.__dict__, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+
+        if admission_held:
+            write()
+            return
+        with reserve_analysis_requirements(
+            self.resource_admission,
+            [(self.workflows_root, MAX_ANALYSIS_METADATA_BYTES, _RUNTIME_STATE_INODES)],
+        ):
+            write()
 
     def state_snapshot(self) -> dict[str, Any]:
         with self._lock:

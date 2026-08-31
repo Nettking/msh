@@ -1,11 +1,17 @@
 from __future__ import annotations
 
 import threading
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import pytest
 
+from catalog.federation.host_resources import (
+    FilesystemMeasurement,
+    HostResourceRefused,
+    PressureThresholds,
+    ProcessResourceAdmission,
+)
 from catalog.orchestrator import pipeline
 from catalog.runner.script_catalog import ScriptOption
 from catalog.runner.session_store import AUTOMATIC_RUNTIME_SCRIPT_KEYS, WORKFLOW_STEPS
@@ -50,6 +56,42 @@ def test_bootstrap_analysis_uses_automatic_playback_ready_contract_in_contract_o
         _option(10, "data_analysis"),
     ]
     assert orchestrator._bootstrap_full_analysis_script_keys(script_options) == pipeline.AUTO_COVERAGE_SCRIPT_KEYS
+
+
+def test_runtime_workflow_root_refuses_before_creation_under_pressure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "repo"
+    admission = ProcessResourceAdmission(
+        thresholds=PressureThresholds(
+            critical_free_bytes=100,
+            pressure_free_bytes=200,
+            warning_free_bytes=300,
+            critical_free_inodes=0,
+            pressure_free_inodes=0,
+            warning_free_inodes=0,
+            max_measurement_age_seconds=60,
+        ),
+        measurer=lambda _path: FilesystemMeasurement(
+            resource_id="runtime-resource",
+            observed_at=datetime(2026, 8, 31, tzinfo=timezone.utc),
+            total_bytes=10_000_000,
+            free_bytes=102,
+            total_inodes=None,
+            free_inodes=None,
+            available=True,
+        ),
+        clock=lambda: datetime(2026, 8, 31, tzinfo=timezone.utc),
+    )
+    monkeypatch.setattr(pipeline, "repo_root", lambda: root)
+
+    with pytest.raises(HostResourceRefused):
+        pipeline.RuntimeOrchestrator(
+            poll_interval_seconds=60,
+            resource_admission=admission,
+        )
+
+    assert not (root / "results" / "workflows").exists()
 
 
 def test_reused_auto_session_metadata_is_updated_to_active_runtime_namespace(tmp_path: Path):
