@@ -62,26 +62,61 @@ destination remains on that resource. Each writer must therefore still be
 proved at its real host/process boundary, including any destination-identity
 check appropriate to that path.
 
-## Inventory scope now under review
+## Classified writer ledger
 
-The production-path inventory is covering at least:
+The following ledger is based on the exact baseline above and names the actual
+write boundary rather than the caller that requested it. `PROVEN` means proven
+for the stated supported boundary only; it is not a claim that every manually
+invoked Docker or host command is safe.
 
-- recorder capture, recovery, status/checkpoint completion, and publication;
-- Federated JSONL cache, SQLite state, staging, reconstruction, and
-  materialization;
-- browser upload staging and publication;
-- analysis workspaces, slices, input publication, and durable outputs;
-- host Docker image builds, BuildKit cache, and image retirement;
-- model/provider downloads and persistent model storage;
-- supported backup, export, import, and migration paths; and
-- additional large or cumulatively unbounded writers discovered by code search.
+| Writer and evidence | Persistent write, bound, and backing resource | Admission, completion, crash/identity evidence | Classification |
+|---|---|---|---|
+| Shared primitive (`host_resources.py`, `process_resource_admission.py`) | Measures the nearest existing ancestor and accounts bytes plus inodes per mounted resource. | Serialized decision/accounting, same-resource coalescing, atomic `reserve_many`, and unwind are directly tested. Process-local only; no protection from unrelated processes. | **PROVEN foundation** |
+| Recorder capture/recovery/publication (`mtconnect_recorder/resource_pressure.py`, `_resource_pressure_impl.py`) | Sequence-bounded raw XML, manifest, observation NDJSON, normalized JSONL, probe and checkpoint files. `RecorderResourceBudget` supplies finite byte/inode envelopes. | One aggregate controller is shared by recorder transaction writers; completion admission permits only already-durable recovery work while preserving the critical floor. Atomic replacement and focused refusal/unwind tests exist. Destination confinement and the recorder's own outbox are separate boundaries. | **PARTIAL** |
+| Recorder Federation outbox (`catalog/federation/outbox.py`) | SQLite rows carry JSON payloads up to `MAX_PAYLOAD_BYTES` (1 MiB), but offline history is cumulative and SQLite/WAL growth is not globally bounded. | `BEGIN IMMEDIATE` gives transaction serialization, but this writer never calls `PROCESS_RESOURCE_ADMISSION`; no byte/inode admission or completion envelope exists. | **MISSING** |
+| Federated JSONL local gzip cache (`_prepare_local_file`) | Source is capped by `FEDERATED_JSONL_MAX_FILE_BYTES`; gzip output is capped by `FEDERATED_JSONL_MAX_ENCODED_BYTES`; cache temp/final files share the configured cache resource. | Stable-directory handles, source re-stat/hash, bounded writer, and cache reservation are present. The SQLite `local_files` mutation is attempted through a nested normal reservation while the outer cache reservation is active; at `PRESSURE` that nested reservation refuses an operation that has already been admitted. | **PARTIAL** |
+| Federated JSONL remote chunk staging (`_write_chunk`, `_record_remote_chunk`) | Each decoded chunk is bounded by the protocol/chunk limit and staged as a content-addressed `.chunk`; staged-cache byte/file quotas exist. | Stable boundary and atomic temp-to-final rename are present, but the chunk reservation ends before `seen_batches` SQLite bookkeeping is reserved. Hard-killed `fcp-chunk-*`/other temporary names are not covered by the restart scan, and the SQLite/WAL envelope is not proven for all batch histories. | **PARTIAL** |
+| Federated JSONL reconstruction/materialization (`_try_materialize`) | Declared encoded and raw file sizes are bounded; one encoded gzip and one raw JSONL temp coexist before atomic publication. Mirror quota bounds retained remote bytes. | `reserve_many` covers encoded plus raw peaks, stable-directory identity checks, exact size/hash validation, and atomic replacement exist. The subsequent `materialized_files`/staged-row SQLite mutation uses a nested normal reservation and can be refused at `PRESSURE`; temporary reconstruction cleanup is only context-manager based, so a hard kill can strand names. | **PARTIAL; current implementation target** |
+| Browser multipart parser (`flask_app/data_upload_routes.py` request parsing) | Werkzeug/WSGI may spool the request body to the OS temporary filesystem before the route's admission guard; app `MAX_CONTENT_LENGTH` is 1.1 GiB by default. | No shared byte/inode reservation can run before `request.form`/`request.files` parsing, and the parser temp resource is not pinned to the configured upload roots. | **MISSING** |
+| Browser upload staging/publication (`data_upload_resource_admission.py`, `data_upload_service.py`) | Staging reserves configured total bytes and files/inodes; final uploaded data is intentionally cumulative and user-visible. | Shared admission and exception unwind cover staging. Reservation ends when enqueue returns, before asynchronous final-directory/marker and metadata writes; roots are independently configurable and only lexical checks/revalidation are used. SQLite metadata is cumulative without a lifetime admission budget. | **PARTIAL** |
+| Analysis input workspace/data-owner publication (`capabilities/analysis/resource_admission.py`) | Input plan/slice and data-owner publication use bounded workspace/atomic-replacement envelopes. | Shared admission and worker/scheduler wrappers exist, but the stable destination boundary, all metadata writes, and result-output lifecycle are not covered by the same proof. | **PARTIAL** |
+| Analysis result artifact store (`capabilities/analysis/content_store.py:LocalArtifactContentStore.write_bytes`, `worker.py:_result`) | Atomic `.partial` file is written under the artifact root; payload is not given a finite schema-wide cardinality bound before serialization (store has only a per-object byte ceiling). | No `PROCESS_RESOURCE_ADMISSION` reservation or pinned stable-directory identity at this write boundary; a failed write cleans its temp, but restart/quota accounting is not host-resource admission. | **MISSING** |
+| Analysis executor/script workspaces (`orchestrator/analysis_runtime.py`, `runner/script_exec.py`) | Copies catalog/data and permits selected scripts to create arbitrary run outputs below `results/workflows`; no durable aggregate ceiling is enforced. | Directory creation and `copytree` are direct writes without admission. Arbitrary script output makes a safe finite envelope unproven. | **MISSING** |
+| Logical Federation storage provider (`federation/storage_allocation.py`, `FilesystemBatchStorageProvider.ingest`) | One JSON batch is relay-bounded (65,536 bytes at the protocol), and a preallocated allocation file/floor limits the provider's own byte budget. | SQLite transaction serialization, temp/replace and byte claims exist, but this is not the shared process controller, does not account inodes/WAL, and does not prove destination identity across allocation/provider roots. | **PARTIAL** |
+| Observer Phoenix JSONL export (`observer_phoenix/export_jsonl.py`, Compose `observer-sync`) | Appends deduplicated records to date-partitioned JSONL; record count and cumulative files are not bounded by admission. | No host-resource controller, atomic aggregate reservation, or restart cleanup for append growth. This is a supported Compose profile, not merely a test helper. | **MISSING** |
+| Telemetry Parquet cache rebuild (`common/telemetry_cache.py:rebuild_cache`) | Rebuild writes a temporary cache tree and swaps it into place; temporary and retained cache can coexist and size is data-dependent. | No shared admission or inode accounting around the duplicate tree; swap is atomic at the directory-name level but not a host-space proof. | **MISSING** |
+| Host Docker image builds/cache retirement (controlled build/update launchers) | Docker backing path is resolved, build context and image/tag lifecycles are bounded by the host build policy; cache/image writes occur in Docker's own resource. | Controlled launchers use host-resource preflight, pressure monitoring, writer stop/quiescence and post-build identity checks. Manual `docker build` or arbitrary Docker configuration is outside this supported boundary. | **PROVEN for controlled path; NOT_V1_SUPPORTED otherwise** |
+| Model/provider download (`model_resource_pull.py`, `start.sh`, Windows update/setup handoff) | Model size is intentionally unknown; the pull is an optional writer into the Docker model volume. | Host-owned backing-resource resolution, NORMAL/WARNING preflight, continuous pressure polling, verified stop and model verification are implemented. The documentation still advertises direct `docker compose ... model-provider-install`/`ollama-pull` commands that bypass this helper. | **PARTIAL for documented direct commands; PROVEN for helper path** |
+| Agent log and Docker json-file logs (`federation/agent_log.py`, `docker-compose.yml`) | Agent log is capped at 10 MiB plus bounded tail; Compose services use 10m/3-file rotation. | Rotation/copy/truncate behavior and tests are already in-tree. This is prior B07 hardening, not an unresolved B01 writer. | **PROVEN / outside remaining B01 scope** |
+| Legacy upload payload duplication (`data_upload_records`) | Current import path streams and validates without persisting the old full payload column. | Existing regression asserts zero legacy payload rows. | **OBSOLETE_REQUIREMENT** |
+| Durable resumable transfer, backup/export/import/migration paths not instantiated by the v1 product | Code/search finds helpers and migration tooling, but no supported installed-product runtime boundary with a current admission contract. | Until a supported invocation is identified, claiming either protection or a new fix would be speculation. | **NOT_V1_SUPPORTED pending evidence** |
 
-The classified writer ledger, smallest remaining blocker set, chosen
-implementation scope, adversarial review, and exact-head test/CI evidence will
-replace this in-progress section before the draft is ready for review.
+## Selected implementation scope
 
-## Current limitations of this checkpoint
+The first implementation checkpoint targets the concrete Federated JSONL
+completion bug above: local-cache and materialization transactions will admit
+their bounded SQLite bookkeeping in the same atomic reservation as the large
+filesystem peak, and their inner bookkeeping path will use that already-held
+reservation instead of re-admitting at `PRESSURE`. A regression test will
+exercise the real serialized controller at the pressure boundary. This scoped
+change cannot close chunk-ingest, uploads, analysis outputs, or cumulative
+outboxes.
 
-No writer is declared fully reconciled by this initial checkpoint. No new B01
-fix has been selected or implemented yet. The next checkpoint will publish the
-complete code-backed writer ledger before substantial implementation begins.
+## Open blockers and assumptions
+
+- The ledger is intentionally conservative where a writer can be entered from
+  a supported command but has no finite aggregate lifetime bound (outbox,
+  observer export, telemetry cache, analysis scripts).
+- A reservation against an ancestor is not treated as a destination identity
+  proof. The JSONL paths that use `StableDirectory` are stronger; upload,
+  analysis, storage-provider, and SQLite boundaries still need independent
+  identity/restart work.
+- The JSONL SQLite reserve is a bounded transaction envelope, not a proof that
+  arbitrary historical SQLite/WAL growth fits that envelope. Chunk bookkeeping
+  and hard-kill temporary cleanup remain unresolved.
+- No physical Federation machine, acceptance state, merge action, or release
+  state was touched. Draft PR #383 remains the only publication target.
+
+The exact head SHA, focused/full test commands, CI run identifiers, findings
+from the adversarial pass, and any new unresolved issue are recorded below as
+each incremental commit lands.
