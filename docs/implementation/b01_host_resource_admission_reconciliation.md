@@ -22,7 +22,8 @@ The branch was validated without merging or rebasing:
 - branch: `codex/b01-host-resource-reconciliation-20260831`;
 - prior-phase verified branch head: `08a89420d6610520698566af7a47caa0a85465f4`;
 - continuation starting head: `0341166d5611d7bbd59616af8e6614a49a1aa26c`;
-- final head is recorded in the handoff section below;
+- final implementation head before the documentation-only handoff correction:
+  `47fae81f4bc05a8b5ad78cc4927b61db78e53d56`;
 - current-main baseline: `954faa357638b13d7291e69ea98fa620c0c3d637`;
 - merge-base: `17e279c01ae6d48ca9c0f4a0b3eaddbb5922d0ef`;
 - the B06 files introduced by #387 and ICSE demo files introduced by #381 are
@@ -202,6 +203,10 @@ The coherent implementation slices pushed to the branch are:
   bounded scavenging for supported B01 temporary roots, managed temporaries for
   observer/source-sync/storage/cache/JSONL paths, logical-storage identity-safe
   cleanup, and admission-aware artifact-authority registration/audit writes.
+- `82e46d2` — normalized the touched B01 admission code to the repository lint
+  baseline.
+- `47fae81` — refreshed the scorecard, retention/archive decision table,
+  live-main baseline, adversarial findings, and handoff language.
 
 The earlier Federated JSONL completion-at-`PRESSURE` work is inherited by this
 branch and was not reworked as a writer-ledger refinement.
@@ -211,8 +216,9 @@ branch and was not reworked as a writer-ledger refinement.
 The pre-ledger focused consequence run after `82e46d2` collected **308 tests**
 and passed all 308. It covers the directly affected analysis,
 artifact-authority, upload, temporary-root, observer/cache, JSONL, storage, and
-outbox regression files. The same set is rerun against the final documentation
-head before CI verification:
+outbox regression files. That same set passed against the final implementation
+head immediately before the documentation-only ledger/handoff commit; the
+documentation-only commit does not change production or test code:
 
 ```text
 pytest --basetemp .pytest-b01-final-focus9 -q \
@@ -292,7 +298,10 @@ acceptance path was accessed.
 
 ## Handoff facts
 
-The exact final head SHA, current-main SHA, complete tracked changed-file list,
-workflow/run identifiers, and adversarial findings are maintained in the final
-PR #383 handoff after the ledger commit. This document does not accept physical
-evidence, declare B01 complete, or authorize a merge.
+After the documentation-only correction is pushed, the exact final head SHA,
+current-main SHA, complete tracked changed-file list, and exact-head workflow
+identifiers will be recorded in this section. The prior implementation head is
+`47fae81f4bc05a8b5ad78cc4927b61db78e53d56`; current main is
+`954faa357638b13d7291e69ea98fa620c0c3d637`; the PR base and merge-base are
+`17e279c01ae6d48ca9c0f4a0b3eaddbb5922d0ef`. This document does not accept
+physical evidence, declare B01 complete, or authorize a merge.
