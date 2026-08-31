@@ -10,7 +10,7 @@ retains approval and the health service retains live-report validation.
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -29,6 +29,7 @@ from .provider_enrollment import (
 )
 from .provider_health import FederatedProviderHealthService, ProviderHealthRecord
 from .provider_reports import ProviderResourceReport, ProviderStatus
+from .worker_activation import LocalComputeHandlerDescriptor
 
 
 def _utc_now() -> datetime:
@@ -52,6 +53,8 @@ class RegisteredComputeProviderBinding:
     protocol_version: str
     handler_id: str
     descriptor_fingerprint: str
+    inspection_revision: int
+    attributes: dict[str, Any]
 
 
 class RegisteredComputeProviderRuntime:
@@ -133,22 +136,44 @@ class RegisteredComputeProviderRuntime:
                     f"candidate.capacity_envelope.{field}",
                     "must be non-empty text",
                 )
+        attributes = envelope.get("handler_attributes")
+        if not isinstance(attributes, dict):
+            raise FederationValidationError(
+                "invalid-registered-compute-metadata",
+                "candidate.capacity_envelope.handler_attributes",
+                "must be the registered handler attribute object",
+            )
+        descriptor = LocalComputeHandlerDescriptor(
+            handler_id=values["handler_id"],
+            capability_type=values["capability_type"],
+            protocol=candidate.capability_protocol,
+            protocol_version=values["protocol_version"],
+            attributes=attributes,
+        )
+        if descriptor.descriptor_fingerprint != values["descriptor_fingerprint"]:
+            raise FederationValidationError(
+                "compute-handler-fingerprint-mismatch",
+                "candidate.capacity_envelope.descriptor_fingerprint",
+                "does not match the registered handler metadata",
+            )
         capability_id = _identifier(
             session_id,
             node_id,
-            values["handler_id"],
-            values["descriptor_fingerprint"],
+            descriptor.handler_id,
+            descriptor.descriptor_fingerprint,
             prefix="compute-provider",
         )
         return RegisteredComputeProviderBinding(
             session_id=session_id,
             node_id=node_id,
             capability_id=capability_id,
-            capability_type=values["capability_type"],
-            protocol=candidate.capability_protocol,
-            protocol_version=values["protocol_version"],
-            handler_id=values["handler_id"],
-            descriptor_fingerprint=values["descriptor_fingerprint"],
+            capability_type=descriptor.capability_type,
+            protocol=descriptor.protocol,
+            protocol_version=descriptor.protocol_version,
+            handler_id=descriptor.handler_id,
+            descriptor_fingerprint=descriptor.descriptor_fingerprint,
+            inspection_revision=candidate.inspection_revision,
+            attributes=descriptor.attributes,
         )
 
     def _fence_superseded_bindings(
@@ -160,12 +185,10 @@ class RegisteredComputeProviderRuntime:
     ) -> None:
         """Disable older public identities for the same registered handler.
 
-        The descriptor fingerprint participates in ``capability_id``. If a handler
-        descriptor changes, leaving the old capability READY would allow an old
-        approved enrollment and still-fresh health report to remain scheduler
-        eligible until expiry. Fence such identities before publishing the new
-        binding. Existing enrollment records are reconciled through the production
-        enrollment service so approved records become suspended as well.
+        The inspection revision is the monotonic ordering authority for descriptor
+        replacement. An out-of-order older candidate must never fence or resurrect
+        a newer binding. Equal revisions with different descriptor identities are
+        rejected as inconsistent state rather than guessed through.
         """
 
         announcements = self.coordinator.store.list_capabilities(
@@ -179,6 +202,29 @@ class RegisteredComputeProviderRuntime:
                 or previous.properties.get("handler_id") != binding.handler_id
             ):
                 continue
+            previous_revision = previous.properties.get("inspection_revision")
+            if (
+                isinstance(previous_revision, bool)
+                or not isinstance(previous_revision, int)
+                or previous_revision <= 0
+            ):
+                raise FederationValidationError(
+                    "unversioned-registered-compute-binding",
+                    "announcement.properties.inspection_revision",
+                    "cannot safely order a previous registered-compute binding",
+                )
+            if previous_revision > binding.inspection_revision:
+                raise FederationValidationError(
+                    "stale-registered-compute-binding",
+                    "candidate.inspection_revision",
+                    "an older compute descriptor cannot replace a newer binding",
+                )
+            if previous_revision == binding.inspection_revision:
+                raise FederationValidationError(
+                    "conflicting-registered-compute-binding",
+                    "candidate.inspection_revision",
+                    "one inspection revision cannot name two descriptor identities",
+                )
             retirement_time = max(
                 decision_time,
                 previous.announced_at.astimezone(timezone.utc),
@@ -269,6 +315,8 @@ class RegisteredComputeProviderRuntime:
             properties={
                 "kind": "registered-compute-handler",
                 "handler_id": binding.handler_id,
+                "descriptor_fingerprint": binding.descriptor_fingerprint,
+                "inspection_revision": binding.inspection_revision,
             },
             announced_at=decision_time,
         )
@@ -301,7 +349,6 @@ class RegisteredComputeProviderRuntime:
         self,
         binding: RegisteredComputeProviderBinding,
         *,
-        attributes: Mapping[str, Any],
         status: ProviderStatus = ProviderStatus.READY,
         report_revision: int = 0,
         provider_generation: int = 1,
@@ -310,7 +357,12 @@ class RegisteredComputeProviderRuntime:
         queue_depth: int = 0,
         utilization_millis: int = 0,
     ) -> ProviderHealthRecord:
-        """Publish one validated short-lived report for an approved binding."""
+        """Publish one validated short-lived report for an approved binding.
+
+        Scheduler-visible capability attributes come only from the immutable local
+        handler descriptor that produced the contribution candidate. Callers may
+        report live capacity/status but cannot claim a different logical contract.
+        """
 
         now = self._clock().astimezone(timezone.utc)
         report = ProviderResourceReport(
@@ -326,7 +378,7 @@ class RegisteredComputeProviderRuntime:
             active_jobs=active_jobs,
             queue_depth=queue_depth,
             utilization_millis=utilization_millis,
-            attributes=dict(attributes),
+            attributes=dict(binding.attributes),
             reported_at=now,
             expires_at=now + timedelta(seconds=self._report_ttl_seconds),
         )
