@@ -2,8 +2,9 @@
 
 The implementation is kept in ``_stable_filesystem_impl``. On Windows,
 CPython 3.12 may expose a 64-bit volume serial through ``st_dev``. The managed
-boundary must compare against the same 64-bit identity from the already-open
-handle rather than the legacy 32-bit ``BY_HANDLE_FILE_INFORMATION`` value.
+boundary compares against the same identity from the already-open handle and
+uses native handle-relative rename so lexical path rebinding cannot redirect a
+managed replacement.
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ if os.name == "nt":
     from ctypes import wintypes
 
     _FILE_ID_INFO_CLASS = 18
+    _FILE_RENAME_INFORMATION_CLASS = 10
 
     class _FileId128(ctypes.Structure):
         _fields_ = [("Identifier", ctypes.c_ubyte * 16)]
@@ -30,11 +32,11 @@ if os.name == "nt":
             ("FileId", _FileId128),
         ]
 
-    class _FileRenameInfo(ctypes.Structure):
+    class _FileRenameInformation(ctypes.Structure):
         _fields_ = [
             ("ReplaceIfExists", ctypes.c_ubyte),
             ("RootDirectory", wintypes.HANDLE),
-            ("FileNameLength", wintypes.DWORD),
+            ("FileNameLength", wintypes.ULONG),
             ("FileName", wintypes.WCHAR * 1),
         ]
 
@@ -47,6 +49,16 @@ if os.name == "nt":
         wintypes.DWORD,
     ]
     _GetFileInformationByHandleEx.restype = wintypes.BOOL
+
+    _NtSetInformationFile = _impl._ntdll.NtSetInformationFile
+    _NtSetInformationFile.argtypes = [
+        wintypes.HANDLE,
+        ctypes.POINTER(_impl._IoStatusBlock),
+        wintypes.LPVOID,
+        wintypes.ULONG,
+        ctypes.c_int,
+    ]
+    _NtSetInformationFile.restype = wintypes.LONG
 
     def _pinned_windows_resource_id(directory: _impl.StableDirectory) -> str:
         handle = directory._handle
@@ -80,21 +92,27 @@ if os.name == "nt":
         )
         try:
             encoded = destination_name.encode("utf-16-le")
-            offset = _FileRenameInfo.FileName.offset
+            offset = _FileRenameInformation.FileName.offset
             buffer = ctypes.create_string_buffer(offset + len(encoded))
-            info = _FileRenameInfo.from_buffer(buffer)
+            info = _FileRenameInformation.from_buffer(buffer)
             info.ReplaceIfExists = 1
             info.RootDirectory = wintypes.HANDLE(parent_handle)
             info.FileNameLength = len(encoded)
             ctypes.memmove(ctypes.addressof(buffer) + offset, encoded, len(encoded))
-            if not _impl._SetFileInformationByHandle(
-                wintypes.HANDLE(source),
-                _impl._FILE_RENAME_INFO_CLASS,
-                buffer,
-                len(buffer),
-            ):
-                _impl._raise_windows_last_error(
-                    f"cannot replace managed file {source_name} with {destination_name}"
+            iosb = _impl._IoStatusBlock()
+            status = int(
+                _NtSetInformationFile(
+                    wintypes.HANDLE(source),
+                    ctypes.byref(iosb),
+                    buffer,
+                    len(buffer),
+                    _FILE_RENAME_INFORMATION_CLASS,
+                )
+            )
+            if status < 0:
+                _impl._raise_ntstatus(
+                    status,
+                    f"cannot replace managed file {source_name} with {destination_name}",
                 )
         finally:
             _impl._CloseHandle(wintypes.HANDLE(source))
