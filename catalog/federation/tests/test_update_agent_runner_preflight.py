@@ -32,6 +32,7 @@ def test_low_disk_preflight_prune_keeps_lock_until_post_build_prune(
         json.dumps(
             {
                 "schema": "fcp.host-update-request.v1",
+                "request_id": "test-preflight-request",
                 "action": "apply",
                 "target_commit": target,
             }
@@ -41,6 +42,7 @@ def test_low_disk_preflight_prune_keeps_lock_until_post_build_prune(
     events: list[str] = []
     engine = SimpleNamespace(
         REQUEST_SCHEMA="fcp.host-update-request.v1",
+        REQUEST_ID_RE=re.compile(r"^[A-Za-z0-9._:-]{1,128}$"),
         OID_RE=re.compile(r"^[0-9a-f]{40}$"),
         subprocess=subprocess,
     )
