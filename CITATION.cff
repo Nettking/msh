@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "If you use the FCP ICSE tool artifact, cite the immutable archived release identified by the paper."
+title: "FCP: Capability-Oriented Federation Tool Artifact"
+type: software
+authors:
+  - alias: "Nettking"
+version: "0.1.0"
+repository-code: "https://github.com/Nettking/msh"
+url: "https://github.com/Nettking/msh/tree/main/demo/icse"
+abstract: >-
+  Reviewer artifact for the FCP capability-oriented federation tool demonstration.
+  It evaluates selective contribution, capability-specific authority, runtime
+  provider eligibility, and durable ownership boundaries using production FCP
+  control-plane components with deterministic stand-ins for external physical
+  services and observations.
+keywords:
+  - federation
+  - capability-oriented systems
+  - digital twins
+  - software engineering
+  - research software
+  - reproducibility

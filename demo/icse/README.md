@@ -1,8 +1,13 @@
 # FCP ICSE Tool Demonstration
 
-This directory is the paper-specific, self-contained reviewer entrypoint for the
-FCP tool demonstration. It is intentionally separate from the normal product
-deployment and from physical Federation-v1 acceptance.
+This directory is the paper-specific reviewer entrypoint for the FCP tool
+demonstration. It is intentionally separate from normal product deployment and
+from physical Federation-v1 acceptance.
+
+For the reviewer-oriented instructions, expected output, and limitations, see
+[`ARTIFACT.md`](ARTIFACT.md). Maintainer freeze/release instructions are in
+[`RELEASE.md`](RELEASE.md). Repository-level citation metadata is in
+[`CITATION.cff`](../../CITATION.cff).
 
 ## Current scope
 
@@ -37,29 +42,48 @@ lifetime of a service instance.
 
 ## Run
 
-From the repository root:
+From the repository root, the shortest reviewer command is:
 
 ```bash
 docker compose -f demo/icse/docker-compose.yml run --rm demo
 ```
 
 The process prints deterministic JSON and exits non-zero if a scenario fails.
-The current schema is `fcp.icse-demo-summary.v1`.
+The current summary schema is `fcp.icse-demo-summary.v1`.
 
-For a commit-bound evidence file:
+To retain commit-bound evidence on the host as well as print it:
 
 ```bash
 FCP_BUILD_COMMIT=$(git rev-parse HEAD) \
   docker compose -f demo/icse/docker-compose.yml run --rm demo \
-  --output /tmp/icse-summary.json
+  --output /evidence/icse-summary.json
 ```
 
-The resulting `icse-summary.json` is the machine-readable evidence record for
-the four scenarios. The dedicated `ICSE tool demonstration` GitHub Actions
-workflow runs the Python entrypoint on clean Ubuntu and Windows runners and
-separately executes the exact Docker Compose reviewer path on Ubuntu. The final
-paper must cite an immutable merged/tagged or archived revision and evidence
-rerun against that exact version, not a moving draft branch.
+The Compose file bind-mounts `demo/icse/evidence/` to `/evidence` by default, so
+the retained file is `demo/icse/evidence/icse-summary.json`. The evidence
+directory is intentionally ignored by Git.
+
+## CI and publication bundle
+
+The dedicated `ICSE tool demonstration` workflow executes:
+
+1. the direct Python entrypoint on clean Ubuntu and Windows runners;
+2. the Docker Compose reviewer path on Ubuntu, retaining its JSON evidence; and
+3. a publication-bundle job that refuses to package the run unless all three
+   summaries report the same source revision and the same four passing
+   scenarios.
+
+The resulting publication bundle contains:
+
+- a Git-generated source archive for the exact tested revision;
+- Ubuntu, Windows, and Docker Compose `icse-summary.json` evidence;
+- `artifact-manifest.json` binding those records to the source revision;
+- `CITATION.cff`, this README, and the reviewer guide; and
+- `SHA256SUMS` covering every file in the bundle.
+
+Tags matching `fcp-icse-tool-demo-v*` trigger the same workflow. The paper must
+cite the immutable release/tag or archival DOI whose tag-triggered run is green,
+not a moving draft branch or a pre-tag CI result.
 
 ## Evidence emitted
 

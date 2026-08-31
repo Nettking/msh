@@ -10,3 +10,5 @@ services:
     environment:
       PYTHONUNBUFFERED: "1"
       FCP_BUILD_COMMIT: ${FCP_BUILD_COMMIT:-unknown}
+    volumes:
+      - "${FCP_ICSE_OUTPUT_DIR:-./evidence}:/evidence"

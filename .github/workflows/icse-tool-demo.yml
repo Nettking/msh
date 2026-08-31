@@ -3,6 +3,7 @@ name: ICSE tool demonstration
 on:
   pull_request:
     paths:
+      - "CITATION.cff"
       - ".github/workflows/icse-tool-demo.yml"
       - "demo/icse/**"
       - "Dockerfile.cli"
@@ -15,7 +16,10 @@ on:
     branches:
       - main
       - "chatgpt/icse-tool-demo"
+    tags:
+      - "fcp-icse-tool-demo-v*"
     paths:
+      - "CITATION.cff"
       - ".github/workflows/icse-tool-demo.yml"
       - "demo/icse/**"
       - "Dockerfile.cli"
@@ -72,4 +76,40 @@ jobs:
       - name: Run documented reviewer command
         env:
           FCP_BUILD_COMMIT: ${{ github.sha }}
-        run: docker compose -f demo/icse/docker-compose.yml run --rm demo --output /tmp/icse-summary.json
+          FCP_ICSE_OUTPUT_DIR: ${{ github.workspace }}/demo/icse/evidence
+        run: docker compose -f demo/icse/docker-compose.yml run --rm demo --output /evidence/icse-summary.json
+      - name: Validate retained Compose evidence
+        run: python3 -m json.tool demo/icse/evidence/icse-summary.json > /dev/null
+      - uses: actions/upload-artifact@v4
+        with:
+          name: icse-summary-compose
+          path: demo/icse/evidence/icse-summary.json
+
+  publication-bundle:
+    needs: [reviewer-entrypoint, reviewer-compose]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: icse-summary-*
+          path: downloaded-evidence
+      - name: Build publication bundle
+        env:
+          ARTIFACT_VERSION: ${{ startsWith(github.ref, 'refs/tags/fcp-icse-tool-demo-v') && github.ref_name || 'candidate' }}
+        run: |
+          python -m demo.icse.bundle \
+            --source-revision "$GITHUB_SHA" \
+            --source-ref "$GITHUB_REF" \
+            --workflow-run "$GITHUB_RUN_ID" \
+            --version "$ARTIFACT_VERSION" \
+            --evidence-root downloaded-evidence \
+            --output publication-bundle
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fcp-icse-tool-demo-bundle-${{ github.sha }}
+          path: publication-bundle
