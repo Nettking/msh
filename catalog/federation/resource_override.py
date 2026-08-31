@@ -15,14 +15,16 @@ store that still needs a product decision.
 
 from __future__ import annotations
 
+import copy
 import json
+import math
 import os
 import stat
 import tempfile
 import uuid
 from collections.abc import Iterable
-from dataclasses import dataclass
-from datetime import datetime, timezone
+from dataclasses import dataclass, replace
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from threading import RLock
 from typing import Any
@@ -47,6 +49,7 @@ _MAX_SCOPE_LENGTH = 512
 _MAX_REASON_LENGTH = 4096
 _MAX_POLICY_NAME_LENGTH = 256
 _MAX_POLICY_VALUE_BYTES = 16 * 1024
+_MAX_AUDIT_BYTES = _MAX_POLICY_VALUE_BYTES * 4
 _DEFAULT_MAX_EMERGENCY_LEASE_SECONDS = 15 * 60
 
 
@@ -95,7 +98,7 @@ class OverrideAuditRecord:
             "max_bytes": self.max_bytes,
             "max_inodes": self.max_inodes,
             "resource_ids": list(self.resource_ids),
-            "value": self.value,
+            "value": copy.deepcopy(self.value),
             "revoked_at": (
                 self.revoked_at.astimezone(timezone.utc).isoformat()
                 if self.revoked_at is not None
@@ -254,6 +257,7 @@ class ResourceOverrideAuthority:
         if (
             isinstance(max_emergency_lease_seconds, bool)
             or not isinstance(max_emergency_lease_seconds, int | float)
+            or not math.isfinite(max_emergency_lease_seconds)
             or max_emergency_lease_seconds <= 0
         ):
             raise ValueError("emergency lease duration must be positive")
@@ -274,6 +278,11 @@ class ResourceOverrideAuthority:
             raise ValueError("resource override audit path could not be inspected") from exc
         if not _plain_file(self.audit_path):
             raise ValueError("resource override audit path is not a plain file")
+        try:
+            if self.audit_path.stat().st_size > _MAX_AUDIT_BYTES:
+                raise ValueError("resource override audit file exceeds its load bound")
+        except OSError as exc:
+            raise ValueError("resource override audit file could not be sized") from exc
         try:
             payload = json.loads(self.audit_path.read_text(encoding="utf-8"))
         except (OSError, ValueError) as exc:
@@ -311,7 +320,7 @@ class ResourceOverrideAuthority:
         encoded = (json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n").encode(
             "utf-8"
         )
-        if len(encoded) > _MAX_POLICY_VALUE_BYTES * 4:
+        if len(encoded) > _MAX_AUDIT_BYTES:
             raise ValueError("resource override audit is too large")
 
         # The reservation precedes creation of the replacement inode. The
@@ -324,16 +333,35 @@ class ResourceOverrideAuthority:
             operation="resource-override-audit",
         ):
             parent_identity = _identity(parent)
-            if self.audit_path.is_symlink():
-                raise OSError("resource override audit path cannot be a symlink")
-            descriptor, temporary_name = tempfile.mkstemp(
-                prefix=f".{self.audit_path.name}.",
-                suffix=".tmp",
-                dir=str(parent),
-            )
-            temporary = Path(temporary_name)
-            temporary_identity = _identity(temporary)
+            parent_descriptor: int | None = None
+            descriptor = -1
+            temporary: Path | None = None
+            temporary_identity: tuple[int, int] | None = None
             try:
+                if os.name != "nt":
+                    parent_descriptor = os.open(
+                        parent,
+                        os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
+                    )
+                    descriptor_metadata = os.fstat(parent_descriptor)
+                    if (
+                        int(getattr(descriptor_metadata, "st_dev", 0)),
+                        int(getattr(descriptor_metadata, "st_ino", 0)),
+                    ) != parent_identity:
+                        raise OSError("resource override audit parent identity changed")
+                if self.audit_path.is_symlink():
+                    raise OSError("resource override audit path cannot be a symlink")
+                try:
+                    target_identity: tuple[int, int] | None = _identity(self.audit_path)
+                except FileNotFoundError:
+                    target_identity = None
+                descriptor, temporary_name = tempfile.mkstemp(
+                    prefix=f".{self.audit_path.name}.",
+                    suffix=".tmp",
+                    dir=str(parent),
+                )
+                temporary = Path(temporary_name)
+                temporary_identity = _identity(temporary)
                 if _identity(parent) != parent_identity:
                     raise OSError("resource override audit parent identity changed")
                 if not _plain_file(temporary):
@@ -353,20 +381,44 @@ class ResourceOverrideAuthority:
                     os.fsync(handle.fileno())
                 if _identity(parent) != parent_identity or self.audit_path.is_symlink():
                     raise OSError("resource override audit publication identity changed")
-                os.replace(temporary, self.audit_path)
+                try:
+                    current_target_identity = _identity(self.audit_path)
+                except FileNotFoundError:
+                    current_target_identity = None
+                if current_target_identity != target_identity:
+                    raise OSError("resource override audit target identity changed")
+                if parent_descriptor is not None:
+                    os.replace(
+                        temporary.name,
+                        self.audit_path.name,
+                        src_dir_fd=parent_descriptor,
+                        dst_dir_fd=parent_descriptor,
+                    )
+                else:
+                    os.replace(temporary, self.audit_path)
                 _fsync_directory(parent)
             finally:
                 if descriptor >= 0:
                     os.close(descriptor)
                 try:
-                    if _plain_file(temporary) and _identity(temporary) == temporary_identity:
+                    if (
+                        temporary is not None
+                        and temporary_identity is not None
+                        and _plain_file(temporary)
+                        and _identity(temporary) == temporary_identity
+                    ):
                         temporary.unlink()
                 except OSError:
                     pass
+                if parent_descriptor is not None:
+                    os.close(parent_descriptor)
 
     def _append(self, record: OverrideAuditRecord) -> None:
         previous = self._records
-        self._records = [*previous, record]
+        self._records = [
+            *previous,
+            replace(record, value=copy.deepcopy(record.value)),
+        ]
         try:
             self._persist(self._records)
         except BaseException:
@@ -405,10 +457,7 @@ class ResourceOverrideAuthority:
         expires_at = _aware_utc(expires_at, field="expires_at")
         if expires_at <= issued_at:
             raise ValueError("emergency admission expiry must be in the future")
-        if (
-            expires_at.timestamp() - issued_at.timestamp()
-            > self.max_emergency_lease_seconds
-        ):
+        if expires_at - issued_at > timedelta(seconds=self.max_emergency_lease_seconds):
             raise ValueError("emergency admission expiry exceeds the configured lease bound")
         override_id = uuid.uuid4().hex
         record = OverrideAuditRecord(
@@ -515,7 +564,7 @@ class ResourceOverrideAuthority:
                 max_bytes=current.max_bytes,
                 max_inodes=current.max_inodes,
                 resource_ids=current.resource_ids,
-                value=current.value,
+                value=copy.deepcopy(current.value),
                 revoked_at=now,
                 revoked_by=actor_id,
             )
@@ -566,7 +615,7 @@ class ResourceOverrideAuthority:
             if not matches:
                 return dict(default) if default is not None else None
             selected = max(matches, key=lambda record: (record.issued_at, record.override_id))
-            return dict(selected.value or {})
+            return copy.deepcopy(selected.value or {})
 
     def audit_records(self) -> tuple[OverrideAuditRecord, ...]:
         with self._lock:
