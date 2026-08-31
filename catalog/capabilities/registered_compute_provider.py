@@ -54,7 +54,7 @@ class RegisteredComputeProviderBinding:
     handler_id: str
     descriptor_fingerprint: str
     inspection_revision: int
-    attributes: dict[str, Any]
+    descriptor: LocalComputeHandlerDescriptor
 
 
 class RegisteredComputeProviderRuntime:
@@ -173,7 +173,7 @@ class RegisteredComputeProviderRuntime:
             handler_id=descriptor.handler_id,
             descriptor_fingerprint=descriptor.descriptor_fingerprint,
             inspection_revision=candidate.inspection_revision,
-            attributes=descriptor.attributes,
+            descriptor=descriptor,
         )
 
     def _fence_superseded_bindings(
@@ -378,7 +378,7 @@ class RegisteredComputeProviderRuntime:
             active_jobs=active_jobs,
             queue_depth=queue_depth,
             utilization_millis=utilization_millis,
-            attributes=dict(binding.attributes),
+            attributes=binding.descriptor.attributes,
             reported_at=now,
             expires_at=now + timedelta(seconds=self._report_ttl_seconds),
         )
