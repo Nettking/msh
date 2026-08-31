@@ -14,6 +14,9 @@ from catalog.federation.host_resources import (
 )
 from catalog.mtconnect_recorder import runtime as recorder_runtime
 from catalog.mtconnect_recorder.model import ProbeModel, SourceCheckpoint
+from catalog.mtconnect_recorder.publication_frontier_runtime import (
+    install_publication_frontier_runtime,
+)
 from catalog.mtconnect_recorder.recovery_frontier import RecorderRecoveryFrontier
 from catalog.mtconnect_recorder.resource_pressure import (
     RecorderAdmissionController,
@@ -26,11 +29,11 @@ from catalog.mtconnect_recorder.schema_compat import CHECKPOINT_SCHEMA
 from catalog.mtconnect_recorder.storage import DurableRecorderStore
 
 # Production startup reaches runtime through catalog.mtconnect_recorder.run(),
-# which installs the boundary after launcher configuration is established. The
-# full suite may have imported the runtime submodule directly earlier, so make
-# this test module explicitly exercise the same installed production boundary
-# instead of depending on collection/import order.
+# which composes B01 admission before the B03 frontier. The full suite may have
+# imported the runtime submodule directly earlier, so explicitly install both
+# boundaries in production order instead of depending on package import order.
 install_runtime_resource_pressure(recorder_runtime)
+install_publication_frontier_runtime(recorder_runtime)
 
 NOW = datetime(2026, 8, 25, 16, 0, tzinfo=timezone.utc)
 SOURCE = "machine"
