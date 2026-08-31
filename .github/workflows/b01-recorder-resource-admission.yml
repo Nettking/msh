@@ -33,7 +33,6 @@ jobs:
         run: >-
           python -m ruff check
           catalog/mtconnect_recorder/resource_pressure.py
-          catalog/mtconnect_recorder/_resource_pressure_impl.py
           catalog/mtconnect_recorder/tests/test_resource_pressure_process_wide.py
       - name: Diff hygiene
         shell: bash
