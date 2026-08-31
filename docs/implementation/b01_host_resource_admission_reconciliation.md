@@ -9,20 +9,21 @@ Reviewed: **2026-08-31 Europe/Oslo**
 The continuation started from the verified branch head
 `08a89420d6610520698566af7a47caa0a85465f4`. The handoff named
 `51d09b573d23909305662c911c9a051a828b758b` as current `main` after B05. During
-this continuation, `origin/main` advanced again through the B06 merge (#387) to
-`ba46294ee47208c21eebad893c40da54b0c76833`. The final review therefore uses
-`ba46294ee47208c21eebad893c40da54b0c76833` as the current-main baseline and
-records `51d09b573d23909305662c911c9a051a828b758b` as the supplied B05
-checkpoint.
+this continuation, `origin/main` advanced through the B06 merge (#387) and the
+ICSE demo merge (#381) to `954faa357638b13d7291e69ea98fa620c0c3d637`. The final
+review therefore uses `954faa357638b13d7291e69ea98fa620c0c3d637` as the
+current-main baseline and records `51d09b573d23909305662c911c9a051a828b758b`
+as the supplied B05 checkpoint.
 
 The branch was validated without merging or rebasing:
 
 - branch: `codex/b01-host-resource-reconciliation-20260831`;
 - initial verified branch head: `08a89420d6610520698566af7a47caa0a85465f4`;
 - final head is recorded in the handoff section below;
-- current-main baseline: `ba46294ee47208c21eebad893c40da54b0c76833`;
+- current-main baseline: `954faa357638b13d7291e69ea98fa620c0c3d637`;
 - merge-base: `17e279c01ae6d48ca9c0f4a0b3eaddbb5922d0ef`;
-- the B06 files introduced by #387 are in `main`, not in this branch diff;
+- the B06 files introduced by #387 and ICSE demo files introduced by #381 are
+  in `main`, not in this branch diff;
 - no B06 health files, ICSE demo files, physical Federation machines, physical
   evidence, merge action, or release state were accessed.
 
@@ -130,7 +131,7 @@ branch and was not reworked as a writer-ledger refinement.
 
 ## Verification evidence
 
-The final focused consequence set collected **217 tests** and passed all 217:
+The final focused consequence set collected **213 tests** and passed all 213:
 
 ```text
 pytest --basetemp .pytest-b01-final-focus -q \
@@ -159,7 +160,7 @@ Additional focused results were 10 analysis/script-admission tests, 8 upload
 resource-admission tests, 13 local-storage tests, 33 storage regression and
 exhaustion tests, 4 observer/cache consequence tests, 5 upload-analysis-job
 tests, and 63 outbox/phase-1/compaction/retirement tests. These subsets overlap
-the 217-test final set.
+the 213-test final set.
 
 `python -m compileall -q catalog` passed. Ruff passed for the changed Python
 files when the repository's existing baseline rules (`B008`, `S110`, `DTZ003`,

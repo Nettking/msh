@@ -3,6 +3,7 @@ from __future__ import annotations
 import threading
 from datetime import date, datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -92,6 +93,62 @@ def test_runtime_workflow_root_refuses_before_creation_under_pressure(
         )
 
     assert not (root / "results" / "workflows").exists()
+
+
+def test_session_metadata_reconciliation_refuses_before_rewrite_under_pressure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "workflows"
+    session_dir = root / "session-1"
+    root.mkdir(parents=True)
+    admission = ProcessResourceAdmission(
+        thresholds=PressureThresholds(
+            critical_free_bytes=100,
+            pressure_free_bytes=200,
+            warning_free_bytes=300,
+            critical_free_inodes=0,
+            pressure_free_inodes=0,
+            warning_free_inodes=0,
+            max_measurement_age_seconds=60,
+        ),
+        measurer=lambda _path: FilesystemMeasurement(
+            resource_id="runtime-session-resource",
+            observed_at=datetime(2026, 8, 31, tzinfo=timezone.utc),
+            total_bytes=10_000_000,
+            free_bytes=102,
+            total_inodes=None,
+            free_inodes=None,
+            available=True,
+        ),
+        clock=lambda: datetime(2026, 8, 31, tzinfo=timezone.utc),
+    )
+    orchestrator = pipeline.RuntimeOrchestrator.__new__(pipeline.RuntimeOrchestrator)
+    orchestrator.workflows_root = root
+    orchestrator.resource_admission = admission
+    orchestrator._state = pipeline.RuntimeOrchestrator._default_state(orchestrator)
+    writes: list[Path] = []
+
+    monkeypatch.setattr(
+        pipeline,
+        "list_sessions",
+        lambda _root: (SimpleNamespace(session_dir=session_dir, metadata={}),),
+    )
+    monkeypatch.setattr(
+        pipeline,
+        "normalize_session_metadata",
+        lambda _session_dir, _metadata, _options: ({"runtime": {}}, True),
+    )
+    monkeypatch.setattr(
+        pipeline,
+        "write_session_metadata",
+        lambda session, _metadata: writes.append(session),
+    )
+
+    with pytest.raises(HostResourceRefused):
+        orchestrator._verified_processed_dates(script_options=[])
+
+    assert writes == []
+    assert not session_dir.exists()
 
 
 def test_reused_auto_session_metadata_is_updated_to_active_runtime_namespace(tmp_path: Path):

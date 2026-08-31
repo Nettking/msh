@@ -1075,7 +1075,15 @@ class RuntimeOrchestrator:
                 session.session_dir, dict(session.metadata), script_options
             )
             if changed:
-                write_session_metadata(session.session_dir, metadata)
+                controller = getattr(
+                    self, "resource_admission", PROCESS_RESOURCE_ADMISSION
+                )
+                with controller.reserve(
+                    session.session_dir,
+                    bytes_required=MAX_ANALYSIS_METADATA_BYTES,
+                    inodes_required=_RUNTIME_STATE_INODES,
+                ):
+                    write_session_metadata(session.session_dir, metadata)
             runtime_payload = (
                 metadata.get("runtime")
                 if isinstance(metadata.get("runtime"), dict)
