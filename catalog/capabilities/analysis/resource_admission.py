@@ -31,6 +31,7 @@ from .packaging import MAX_SLICE_ENTRIES
 from .scheduler import FederatedAnalysisScheduler as _FederatedAnalysisScheduler
 from .scheduler import SubmissionOutcome
 from .worker import FederatedAnalysisHandler as _FederatedAnalysisHandler
+from .workspace_reconciliation import reconcile_stale_workspaces
 
 # Fixed workspace entries cover the ownership marker, plan/slice publication
 # files, staging/publication directories and a small margin for atomic temp files.
@@ -195,16 +196,12 @@ class FederatedAnalysisHandler(_FederatedAnalysisHandler):
         workspace_root = kwargs.get("workspace_root")
         if workspace_root is None:
             raise TypeError("workspace_root is required for admitted analysis workers")
-        # The base worker performs marker-safe startup reconciliation in its
-        # constructor, including creation of the FCP-owned root. Hold the
-        # reservation across that call so the first worker startup cannot create
-        # a workspace tree while the host is already at PRESSURE.
-        with self.resource_admission.reserve(
-            Path(workspace_root),
-            bytes_required=MAX_ANALYSIS_METADATA_BYTES,
-            inodes_required=16,
-        ):
-            super().__init__(*args, **kwargs)
+        # Defer marker-safe reconciliation until the first validated execution.
+        # Construction must remain side-effect free so malformed jobs are still
+        # rejected before host measurement, while the actual root/workspace
+        # creation stays inside the execution reservation below.
+        kwargs["initialize_workspace"] = False
+        super().__init__(*args, **kwargs)
 
     async def execute(self, job: JobContract) -> ExecutionResult:
         try:
@@ -257,6 +254,10 @@ class FederatedAnalysisHandler(_FederatedAnalysisHandler):
                 (self.content_store.root, result_bytes, result_inodes)
             )
         with reserve_analysis_requirements(self.resource_admission, requirements):
+            self.workspace_reconciliation = reconcile_stale_workspaces(
+                self.workspace_root,
+                now=self.clock(),
+            )
             return await super()._execute(job)
 
 

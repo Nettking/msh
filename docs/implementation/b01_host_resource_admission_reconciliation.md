@@ -85,11 +85,12 @@ still matters.
 | Browser upload staging/publication (`data_upload_service.py`, `data_upload_resource_admission.py`) | Staging, final publication, marker/metadata writes, and asynchronous import now reserve through the shared controller with byte/inode estimates; async pressure leaves durable work queued/hidden and retries after pressure clears. Multi-root requirements are coalesced atomically and existing durability ordering is retained. User-visible retained uploads and lifetime metadata have no product retention policy, and service paths do not yet have the storage-provider-level identity proof. | **PARTIAL** |
 | Upload analysis-job metadata links (`upload_analysis_job_service.py`) | Database directory initialization and link insertion/WAL headroom are admitted and exception-safe through the shared controller. The link table is durable cumulative job history without an independent retention policy, so this boundary is not a full aggregate-growth proof. | **PARTIAL** |
 | Analysis input workspace/data-owner publication (`capabilities/analysis/resource_admission.py`, scheduler) | Existing plan/slice publication is covered by bounded reservations and scheduler completion bookkeeping avoids nested re-admission. The complete data-owner metadata/result lifecycle and a destination identity proof across every publication root remain outside the consequence tests. | **PARTIAL** |
-| Analysis runtime/session state (`orchestrator/pipeline.py`, managed session metadata) | Runtime workflow-root creation and runtime/startup state JSON writes now use bounded shared admission; the pressure test proves startup refuses before root creation. Session metadata writes are covered when entered through the admitted date-slice worker. | **PROVEN** |
+| Analysis runtime/session state (`orchestrator/pipeline.py`, `orchestrator/analysis_runtime.py`, managed session metadata) | Runtime workflow-root creation, runtime/startup state JSON, standalone identity, and the analysis capability root now use bounded shared admission; the pressure tests prove refusal before root/state creation. Session metadata writes are covered when entered through the admitted date-slice worker. Durable SQLite histories are scored separately below. | **PROVEN** |
 | Analysis result artifact store (`capabilities/analysis/content_store.py`, worker result publication) | Direct artifact writes and worker result serialization have finite bounds, shared byte/inode reservations, atomic partial-to-final replacement, cleanup, and nested `admission_held` handling. Consequence tests cover refusal before publication and reservation release; the score is scoped to the managed artifact-root boundary. | **PROVEN** |
 | Analysis executor/script workspaces (`orchestrator/analysis_runtime.py`, `runner/script_exec.py`) | Managed run directories and catalog copies use shared byte/inode admission; subprocess output is drained, checked live, terminated on workspace overflow, and cleaned. Tests prove pressure refusal and real output-over-limit refusal. This does not constrain a malicious/unsupported script that intentionally writes outside its managed workspace. | **PROVEN** |
-| Analysis job/lifecycle SQLite stores (`capabilities/job_store.py`, `capabilities/lifecycle_store.py`) | These supported job, attempt, command, audit, heartbeat, cancellation, and result-reference writes remain direct SQLite transactions without `PROCESS_RESOURCE_ADMISSION`. Their durability/retention semantics require a separate store-level design before they can be called bounded host-resource writers. | **MISSING** |
-| Execution-efficiency SQLite learning store (`capabilities/efficiency/store.py`) | Observation/decision retention has row-count bounds, but database initialization and transactions still lack shared byte/inode admission and WAL aggregate accounting. | **MISSING** |
+| Analysis job/lifecycle SQLite stores (`capabilities/job_store.py`, `capabilities/lifecycle_store.py`) | Job, attempt, command, audit, heartbeat, cancellation, retry, and result-reference transactions now hold one shared bounded byte/inode reservation through commit, with rollback-safe unwind and WAL checkpoint/journal limits. The consequence suite proves startup/mutation refusal and exception unwind; durable job/audit history has no authorized aggregate retention/compaction policy, so main-file high-water growth remains unresolved. | **PARTIAL** |
+| Analysis runtime authority SQLite stores (`capabilities/analysis/service.py`, `capabilities/provider_enrollment.py`, `capabilities/provider_health.py`, `capabilities/dispatch.py`, `capabilities/lifecycle_worker.py`, `federation/coordinator.py`, `federation/persistence.py`) | The analysis job index, standalone coordinator, provider enrollment/health stores, dispatch receipts, and cancellation tombstones now use the shared controller at initialization and their real mutation transactions, with bounded byte/inode estimates and WAL checkpoint/journal limits. Startup refusal and runtime integration tests cover the instantiated path; durable job/authority/audit histories still require a product retention/archive policy for a lifetime aggregate proof. | **PARTIAL** |
+| Execution-efficiency SQLite learning store (`capabilities/efficiency/store.py`) | Initialization and every observation/profile/decision transaction now use shared bounded byte/inode admission; observation/decision rows have existing retention limits, oversized decisions are rejected, and WAL checkpoint/journal limits are explicit. SQLite high-water pages are not safely reclaimed by row pruning alone, so a bounded VACUUM/retention policy remains an architectural follow-up. | **PARTIAL** |
 | Logical Federation storage provider (`federation/local_storage.py`) | Provider initialization and ingest now use the shared controller plus the existing `StorageAllocation`; bytes/inodes cover publication and SQLite/WAL headroom, identity is checked after mkdir and replacement, and checkpoint/WAL limits are configured without weakening immutable ingest/failover semantics. Durable batch files and the identity catalogue are intentionally cumulative, so a retention/compaction policy is still needed for a full lifetime aggregate proof. | **PARTIAL** |
 | Observer Phoenix JSONL export (`observer_phoenix/export_jsonl.py`) | Each export and date-partitioned replacement has bounded record/byte/file limits, inode margins, atomic temporary replacement, shared admission, and cleanup/unwind tests. The export can still accumulate bounded date files indefinitely because no source-of-truth retention contract authorizes deletion. | **PARTIAL** |
 | Telemetry Parquet cache rebuild (`common/telemetry_cache.py`) | Disposable rebuilds cap source bytes, duplicate-tree output bytes, and inodes; old and new trees are admitted together; temporary trees are cleaned on failure; source JSONL remains authoritative. Failure tests preserve an existing cache and no partial tree. | **PROVEN** |
@@ -101,7 +102,7 @@ still matters.
 | Legacy `data_upload_records` full-payload duplication | The current import path does not persist the obsolete full payload column; this is no longer a supported writer boundary. | **OUT-OF-SCOPE** |
 | Durable resumable transfer, backup/export/import, and migration helpers not instantiated by v1 | No supported installed-product invocation was identified. Claiming admission here would be speculation; adding one would be a separate product boundary. | **OUT-OF-SCOPE** |
 | Crash-stranded `fcp-chunk-*`, `fcp-encoded-*`, `fcp-raw-*`, and cache temporary files | Normal context-manager unwinding is covered, but the generic temporary-file helper has no durable transaction ownership marker. Prefix/age deletion could remove ambiguous user or recovery data, so startup scavenging is intentionally not implemented. | **PARTIAL** |
-| Cross-writer SQLite/WAL aggregate growth | Per-transaction WAL/journal headroom and admission now exist for the outbox, upload metadata, storage provider, and the newly admitted analysis/observer/cache paths. The analysis job/lifecycle and efficiency stores remain **MISSING** at their actual SQLite boundaries. SQLite main files, durable pending outbox rows, JSONL history indexes, storage idempotency rows, upload metadata, and user-visible data can grow across successful transactions. Safe deletion is constrained by delivery identity, ordering gaps, idempotency, or source-of-truth semantics. | **PARTIAL** |
+| Cross-writer SQLite/WAL aggregate growth | Per-transaction shared admission and WAL/journal headroom now cover the outbox, upload metadata, storage provider, analysis job/lifecycle, analysis authority, dispatch, coordinator, provider enrollment/health, and efficiency stores, plus the admitted JSONL/cache paths. The remaining gap is aggregate growth after successful transactions: SQLite main files, durable pending/terminal history, JSONL indexes, storage idempotency rows, upload metadata, and user-visible data still need an authorized retention/archive contract. Safe deletion is constrained by delivery identity, ordering gaps, idempotency, tombstones, or source-of-truth semantics. | **PARTIAL** |
 
 ## Implemented in this continuation
 
@@ -116,6 +117,11 @@ The coherent implementation slices pushed to the branch are:
   all state-changing SQLite transactions, with pressure/refusal/unwind tests;
 - `a0e9f04` — shared admission for analysis runtime workflow-root and
   runtime/startup state writes, with startup pressure refusal coverage;
+- `a2dc64f` — shared admission for direct script-workspace helper entry points,
+  closing the public-helper bypass found by adversarial scanning;
+- `5dcca17` — shared admission for analysis runtime identity, job/lifecycle,
+  provider-authority, dispatch-inbox, job-index, and efficiency SQLite writers,
+  with startup/refusal/unwind consequence tests;
 - `b36799b` — mechanical normalization of the touched Python files plus the
   observer enumeration fix.
 
@@ -124,11 +130,12 @@ branch and was not reworked as a writer-ledger refinement.
 
 ## Verification evidence
 
-The final focused consequence set collected **206 tests** and passed all 206:
+The final focused consequence set collected **217 tests** and passed all 217:
 
 ```text
 pytest --basetemp .pytest-b01-final-focus -q \
   catalog/capabilities/tests/test_analysis_resource_admission.py \
+  catalog/capabilities/tests/test_durable_sqlite_resource_admission.py \
   catalog/capabilities/tests/test_analysis_publication_resource_admission.py \
   catalog/orchestrator/tests/test_analysis_runtime_integration.py \
   catalog/orchestrator/tests/test_pipeline_bootstrap.py \
@@ -152,7 +159,7 @@ Additional focused results were 10 analysis/script-admission tests, 8 upload
 resource-admission tests, 13 local-storage tests, 33 storage regression and
 exhaustion tests, 4 observer/cache consequence tests, 5 upload-analysis-job
 tests, and 63 outbox/phase-1/compaction/retirement tests. These subsets overlap
-the 206-test final set.
+the 217-test final set.
 
 `python -m compileall -q catalog` passed. Ruff passed for the changed Python
 files when the repository's existing baseline rules (`B008`, `S110`, `DTZ003`,

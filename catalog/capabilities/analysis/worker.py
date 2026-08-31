@@ -49,6 +49,7 @@ from .contracts import (
 from .gateway import AnalysisArtifactTransport, retrieve_authorized_artifact
 from .packaging import extract_slice_archive
 from .workspace_reconciliation import (
+    WorkspaceReconciliationReport,
     prepare_owned_workspace,
     reconcile_stale_workspaces,
 )
@@ -109,6 +110,7 @@ class FederatedAnalysisHandler:
         data_owner_node_id: Callable[[JobContract], str],
         endpoint_id: str = ANALYSIS_ENDPOINT_ID,
         max_slice_bytes: int = DEFAULT_MAX_SLICE_BYTES,
+        initialize_workspace: bool = True,
     ) -> None:
         self.session_id = session_id
         self.node_id = node_id
@@ -121,10 +123,12 @@ class FederatedAnalysisHandler:
         self.data_owner_node_id = data_owner_node_id
         self.endpoint_id = endpoint_id
         self.max_slice_bytes = int(max_slice_bytes)
-        self.workspace_reconciliation = reconcile_stale_workspaces(
-            self.workspace_root,
-            now=self.clock(),
-        )
+        self.workspace_reconciliation = WorkspaceReconciliationReport()
+        if initialize_workspace:
+            self.workspace_reconciliation = reconcile_stale_workspaces(
+                self.workspace_root,
+                now=self.clock(),
+            )
 
     async def execute(self, job: JobContract) -> ExecutionResult:
         try:
