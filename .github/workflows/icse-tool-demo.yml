@@ -1,0 +1,75 @@
+name: ICSE tool demonstration
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/icse-tool-demo.yml"
+      - "demo/icse/**"
+      - "Dockerfile.cli"
+      - "requirements.txt"
+      - "constraints-phase2.txt"
+      - "catalog/capabilities/**"
+      - "catalog/federation/**"
+      - "catalog/flask_app/**"
+  push:
+    branches:
+      - main
+      - "chatgpt/icse-tool-demo"
+    paths:
+      - ".github/workflows/icse-tool-demo.yml"
+      - "demo/icse/**"
+      - "Dockerfile.cli"
+      - "requirements.txt"
+      - "constraints-phase2.txt"
+      - "catalog/capabilities/**"
+      - "catalog/federation/**"
+      - "catalog/flask_app/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: icse-tool-demo-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reviewer-entrypoint:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install runtime dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install ruff
+      - name: Compile reviewer artifact
+        run: python -m compileall -q demo/icse
+      - name: Lint reviewer artifact
+        run: python -m ruff check demo/icse
+      - name: Run E1-E4 directly
+        env:
+          FCP_BUILD_COMMIT: ${{ github.sha }}
+        run: python -m demo.icse.run --output icse-summary.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: icse-summary-${{ matrix.os }}
+          path: icse-summary.json
+
+  reviewer-compose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run documented reviewer command
+        env:
+          FCP_BUILD_COMMIT: ${{ github.sha }}
+        run: docker compose -f demo/icse/docker-compose.yml run --rm demo --output /tmp/icse-summary.json
