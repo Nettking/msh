@@ -38,7 +38,7 @@ def _load_summary(path: Path, source_revision: str) -> dict[str, object]:
 
     scenarios = payload.get("scenarios")
     if not isinstance(scenarios, list):
-        raise ValueError(f"{path}: scenarios must be a list")
+        raise TypeError(f"{path}: scenarios must be a list")
     names = tuple(item.get("scenario") for item in scenarios if isinstance(item, dict))
     if names != EXPECTED_SCENARIOS:
         raise ValueError(f"{path}: unexpected scenario set or ordering")
