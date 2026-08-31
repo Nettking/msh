@@ -65,7 +65,7 @@ class BoundedRelayListenerProbe:
                     type=socket.SOCK_STREAM,
                 )
                 endpoints = tuple(values[:MAX_RESOLVED_ENDPOINTS])
-            except (OSError, socket.gaierror):
+            except OSError:
                 endpoints = ()
             try:
                 response.put_nowait(endpoints)
@@ -116,7 +116,7 @@ class BoundedRelayListenerProbe:
                 candidate.settimeout(remaining)
                 candidate.connect(sockaddr)
                 return True
-            except (OSError, TimeoutError):
+            except OSError:
                 continue
             finally:
                 candidate.close()
