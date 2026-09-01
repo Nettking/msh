@@ -176,6 +176,76 @@ class RegisteredComputeProviderRuntime:
             descriptor=descriptor,
         )
 
+    @staticmethod
+    def _positive_revision(value: object, *, field: str) -> int:
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            raise FederationValidationError(
+                "unversioned-registered-compute-decision",
+                field,
+                "registered-compute provider state must carry a positive decision revision",
+            )
+        return value
+
+    def _guard_current_binding_decision(
+        self,
+        binding: RegisteredComputeProviderBinding,
+        *,
+        intent: ContributionIntent,
+        decision_time: datetime,
+    ) -> None:
+        """Reject delayed decisions for the current descriptor identity.
+
+        ``inspection_revision`` orders descriptor replacement, while the durable
+        contribution ``decision_revision`` orders READY/DISABLED changes for one
+        unchanged descriptor. Both fences are needed: otherwise a delayed older
+        ACTIVE decision can resurrect an already-disabled approved provider.
+        """
+
+        expected_status = (
+            CapabilityStatus.READY
+            if intent.activation_state is ContributionActivationState.ACTIVE
+            else CapabilityStatus.DISABLED
+        )
+        for previous in self.coordinator.store.list_capabilities(
+            session_id=binding.session_id,
+        ):
+            if previous.capability_id != binding.capability_id:
+                continue
+            if (
+                previous.node_id != binding.node_id
+                or previous.properties.get("kind") != "registered-compute-handler"
+                or previous.properties.get("handler_id") != binding.handler_id
+                or previous.properties.get("descriptor_fingerprint")
+                != binding.descriptor_fingerprint
+                or previous.properties.get("inspection_revision")
+                != binding.inspection_revision
+            ):
+                raise FederationValidationError(
+                    "conflicting-registered-compute-binding",
+                    "capability_id",
+                    "current registered-compute identity has conflicting metadata",
+                )
+            previous_revision = self._positive_revision(
+                previous.properties.get("decision_revision"),
+                field="announcement.properties.decision_revision",
+            )
+            if previous_revision > intent.decision_revision:
+                raise FederationValidationError(
+                    "stale-registered-compute-decision",
+                    "intent.decision_revision",
+                    "an older contribution decision cannot replace newer provider state",
+                )
+            if previous_revision == intent.decision_revision and (
+                previous.status is not expected_status
+                or previous.announced_at.astimezone(timezone.utc) != decision_time
+            ):
+                raise FederationValidationError(
+                    "conflicting-registered-compute-decision",
+                    "intent.decision_revision",
+                    "one contribution decision revision cannot describe two provider states",
+                )
+            return
+
     def _fence_superseded_bindings(
         self,
         binding: RegisteredComputeProviderBinding,
@@ -299,6 +369,11 @@ class RegisteredComputeProviderRuntime:
         )
         active = intent.activation_state is ContributionActivationState.ACTIVE
         decision_time = intent.decided_at.astimezone(timezone.utc)
+        self._guard_current_binding_decision(
+            binding,
+            intent=intent,
+            decision_time=decision_time,
+        )
         self._fence_superseded_bindings(
             binding,
             decision_revision=intent.decision_revision,
@@ -317,6 +392,7 @@ class RegisteredComputeProviderRuntime:
                 "handler_id": binding.handler_id,
                 "descriptor_fingerprint": binding.descriptor_fingerprint,
                 "inspection_revision": binding.inspection_revision,
+                "decision_revision": intent.decision_revision,
             },
             announced_at=decision_time,
         )
