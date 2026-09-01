@@ -128,14 +128,32 @@ B06 recorder status-I/O delivery refused for the heartbeat, on the capture path.
 
 An observable out-of-room refusal raised inside an admitted transaction is now
 reclassified into the existing pause path, carrying a fresh measurement of the
-resource that refused. The boundary is deliberately narrow in three ways, each
+resource that refused. The boundary is deliberately narrow, and each limit is
 pinned by test: only `ENOSPC`/`EDQUOT` are reclassified, so a permission or I/O
 fault keeps its own failure semantics rather than being presented as a healthy
-pause; only writes inside an admitted transaction are reclassified, so a
-`save_state` outside one -- checkpoint alias reconciliation, for instance --
-keeps an ordinary `OSError` rather than raising a control signal nothing there
-would catch; and if the refusing resource cannot be measured at all, the
-original `OSError` is preserved rather than a pressure state being invented.
+pause; and only writes admitted by the recorder's own reservation are
+reclassified, so a `save_state` outside one -- checkpoint alias reconciliation,
+for instance -- keeps an ordinary `OSError` rather than raising a control signal
+nothing there would catch. If the refusing resource cannot then be measured, the
+condition still pauses -- the refusal is itself first-hand evidence that the host
+had no room, and deferring to the source error path would blame the Agent for
+exactly what this boundary exists to attribute correctly -- but it pauses without
+inventing anything: the assessment carries `measurement_unavailable` and no
+capacity figures.
+
+Coverage follows the reservation rather than a list of writers, because the two
+are not the same set. New capture publishes its three derived representations
+through one store call, but recovery publishes them one at a time and writes the
+compatibility view directly, and the composed runtime store writes its
+publication-discovery record after the wrapped observation writer has already
+returned. The recovery frontier's own pending and clear markers are the first and
+last durable writes of the transaction, and each ends the transaction while
+unwinding, so a refusal there is unrecognisable by the time it reaches the
+capture wrapper unless it is reclassified at the marker itself. All of these are
+inside the reservation and all are now reclassified. Writes that carry no
+reservation -- the legacy migration clear, `record_event`, `record_gap` -- are
+deliberately not, and keep their ordinary failure semantics. The pause also
+measures the archive that refused rather than a neighbouring root.
 
 The ordering invariant was audited rather than assumed. Where the raw batch
 lands and only the checkpoint write is refused, the raw evidence is retained and
@@ -146,9 +164,11 @@ the durable checkpoint, and the content-addressed batch is idempotent. Nothing
 is deleted to make room on any path.
 
 Consequence tests drive real refusals through the installed boundary rather than
-replacing the methods that carry it. P04/P05/P09 physical evidence remains open,
-and B01 still owns aggregate host-resource admission across concurrent writers.
-No physical evidence or acceptance state changed.
+replacing the methods that carry it, and one of them runs against the store class
+startup actually composes rather than the narrower one the fixtures build.
+P04/P05/P09 physical evidence remains open, and B01 still owns aggregate
+host-resource admission across concurrent writers. No physical evidence or
+acceptance state changed.
 
 ### B03 — recorder publication progress and durable outbox lifecycle
 

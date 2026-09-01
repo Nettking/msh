@@ -483,9 +483,16 @@ class RecorderResourceGuard:
         off for the host's disk being full.
 
         Nothing is fabricated: the pause carries a fresh measurement of the
-        resource that just refused. If that resource cannot be measured at all
-        the caller keeps the original ``OSError``, because this boundary may
-        only reclassify a condition it can actually observe.
+        resource that just refused. When that resource cannot be measured, the
+        shared controller returns an explicitly unavailable assessment rather
+        than a healthy-looking one, so the pause reports
+        ``measurement_unavailable`` with no capacity figures at all. It stays a
+        pause: the refusal is itself first-hand evidence that the host had no
+        room, and falling back to the source error path because the follow-up
+        measurement failed would blame the Agent for exactly the condition this
+        boundary exists to attribute correctly. ``False`` is returned only if no
+        assessment can be produced at all, which the shared controller does not
+        do; the caller then keeps the original ``OSError``.
         """
 
         try:
@@ -788,24 +795,44 @@ def _runtime_module_value(runtime: Any, name: str, default: Any) -> Any:
     return getattr(module, name, default) if module is not None else default
 
 
-def _admitted_storage_write(guard: Any, path: Any) -> Any:
+def _admitted_storage_write(
+    guard: Any,
+    path: Any,
+    *,
+    require_transaction: bool = False,
+) -> Any:
     """Reclassify a host-storage refusal raised inside an admitted write.
 
-    Only an admitted transaction may be reclassified. A ``save_state`` outside
-    one -- checkpoint alias reconciliation, for example -- keeps its ordinary
-    failure, because the pause signal is a control flow the capture and
-    recovery wrappers own and nothing else is prepared to catch.
+    Admission is tested where the refusal actually surfaces rather than where
+    the scope is entered. A wrapper that spans a whole admitted region only
+    learns of the refusal on the way out, and entering it before the
+    transaction exists would answer the wrong question.
+
+    Only an admitted write may be reclassified. ``require_transaction`` demands
+    a registered transaction; the default also accepts a capture, which is the
+    scope holding the probe reservation -- that reservation is admitted without
+    registering a transaction of its own. A ``save_state`` outside either --
+    checkpoint alias reconciliation, for example -- keeps its ordinary failure,
+    because the pause signal is a control flow the capture and recovery
+    wrappers own and nothing else is prepared to catch.
     """
 
     @contextmanager
     def _scope() -> Iterator[None]:
-        if guard is None or not (guard.in_capture() or guard.in_transaction()):
+        if guard is None:
             yield
             return
         try:
             yield
         except OSError as exc:
             if not _is_storage_exhaustion(exc):
+                raise
+            admitted = (
+                guard.in_transaction()
+                if require_transaction
+                else (guard.in_capture() or guard.in_transaction())
+            )
+            if not admitted:
                 raise
             target = getattr(exc, "filename", None) or path
             if not guard.record_storage_exhaustion(target):
@@ -915,7 +942,7 @@ def install_runtime_resource_pressure(runtime_module: ModuleType) -> None:
             source_name=source_name,
             instance_id=instance_id,
             probe=probe,
-        ), _admitted_storage_write(guard, self.raw_root):
+        ), _admitted_storage_write(guard, self.probe_root):
             return original_store_probe(
                 self,
                 source_name=source_name,
@@ -964,12 +991,21 @@ def install_runtime_resource_pressure(runtime_module: ModuleType) -> None:
                     batch=batch,
                 )
             try:
-                return super().mark_pending(
-                    source_name=source_name,
-                    requested_from=requested_from,
-                    xml_text=xml_text,
-                    batch=batch,
-                )
+                # The pending marker is the transaction's first durable write,
+                # so it is also the first thing a full host refuses. Its own
+                # unwind ends the transaction before the refusal reaches the
+                # capture wrapper, so the reclassification has to happen here.
+                with _admitted_storage_write(
+                    guard,
+                    self.store.raw_root,
+                    require_transaction=True,
+                ):
+                    return super().mark_pending(
+                        source_name=source_name,
+                        requested_from=requested_from,
+                        xml_text=xml_text,
+                        batch=batch,
+                    )
             except BaseException:
                 if guard is not None:
                     guard.end_transaction()
@@ -984,11 +1020,19 @@ def install_runtime_resource_pressure(runtime_module: ModuleType) -> None:
         ) -> Path:
             guard = getattr(self.store, "_recorder_resource_guard", None)
             try:
-                return super().mark_clear(
-                    source_name=source_name,
-                    instance_id=instance_id,
-                    next_sequence=next_sequence,
-                )
+                # ``mark_clear`` also closes the transaction on the way out, and
+                # a legacy migration clear runs with no transaction at all --
+                # that one is not an admitted write and keeps its own failure.
+                with _admitted_storage_write(
+                    guard,
+                    self.store.raw_root,
+                    require_transaction=True,
+                ):
+                    return super().mark_clear(
+                        source_name=source_name,
+                        instance_id=instance_id,
+                        next_sequence=next_sequence,
+                    )
             finally:
                 if guard is not None:
                     guard.end_transaction()
@@ -1030,7 +1074,18 @@ def install_runtime_resource_pressure(runtime_module: ModuleType) -> None:
         if guard is None or not guard.attached_to(self.store):
             return original_recover(self, *args, **kwargs)
         try:
-            return original_recover(self, *args, **kwargs)
+            # Recovery publishes through writers that compose more than the two
+            # wrapped store methods -- the normalized view is written directly,
+            # and the publication-discovery record is written by the derived
+            # store after the wrapped observation writer has returned. This
+            # catch covers the whole admitted region rather than enumerating
+            # them, and reclassifies only while the reservation is still held.
+            with _admitted_storage_write(
+                guard,
+                self.store.data_dir,
+                require_transaction=True,
+            ):
+                return original_recover(self, *args, **kwargs)
         except _RecorderPauseSignal:
             if guard.in_capture():
                 raise
