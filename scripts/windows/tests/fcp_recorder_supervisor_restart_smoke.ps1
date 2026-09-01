@@ -53,7 +53,7 @@ public static class FakeRecorder
     // opens with FileShare.Read, so the second writer takes a sharing violation
     // and the process dies with an unhandled IOException. The supervisor then
     // reads that as a failed agent call and the scenario's assertions collapse.
-    // Share the handle and retry instead.
+    // Serialize each append with an exclusive handle and retry instead.
     private const int ShareRetryMilliseconds = 5000;
     private const int ShareRetryStepMilliseconds = 25;
 
@@ -81,7 +81,7 @@ public static class FakeRecorder
         WithRetry(delegate
         {
             using (FileStream stream = new FileStream(
-                path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
+                path, FileMode.Append, FileAccess.Write, FileShare.None))
             using (StreamWriter writer = new StreamWriter(stream))
             {
                 writer.Write(text);
