@@ -26,7 +26,7 @@ from catalog.flask_app.services.federation_pairing_service import (
     RemotePairingStore,
 )
 from catalog.node.identity import IdentityStore
-from reset_fcp import reset_repository_state
+from scripts.admin.reset_fcp import reset_repository_state
 
 NOW = datetime(2026, 8, 3, 18, 0, tzinfo=timezone.utc)
 SESSION_ID = "session-pairing-one"
