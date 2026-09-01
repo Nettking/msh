@@ -106,6 +106,70 @@ Required properties:
 
 The current eight-worker concurrency is not itself a defect. It becomes safe only once individual work is finite and aggregate resource use is admitted.
 
+Robustness progress: **B02 9/9 software properties automated-proven; B02 remains
+`OPEN`** for the exact-candidate physical P04/P05/P09 evidence.
+
+The final property closed the gap between what admission *reserves* and what the
+filesystem *does*. Admission reserves against an estimate of a capture
+transaction; a concurrent writer, another process, or an underestimate can still
+leave the host with no room by the time the admitted write runs, and the
+filesystem then refuses it directly with `ENOSPC`. That refusal is not an
+admission refusal, so it did not carry the pause signal and reached
+`RecorderRuntime.capture_source`'s remote-source `except Exception` instead.
+
+Every consequence was misattribution. A healthy MTConnect Agent was recorded as
+the failing party, its `last_error` carried a host disk message, and its backoff
+doubled toward `BACKOFF_MAX` on each retry, so the recorder walked away from a
+source that was never at fault. Meanwhile `resource_admission` was never set, so
+the harvest could not publish the degraded "paused by local host resource
+pressure; primary evidence is retained" state, and the only local condition that
+actually stopped capture was invisible. This is the same amplification shape the
+B06 recorder status-I/O delivery refused for the heartbeat, on the capture path.
+
+An observable out-of-room refusal raised inside an admitted transaction is now
+reclassified into the existing pause path, carrying a fresh measurement of the
+resource that refused. The boundary is deliberately narrow, and each limit is
+pinned by test: only `ENOSPC`/`EDQUOT` are reclassified, so a permission or I/O
+fault keeps its own failure semantics rather than being presented as a healthy
+pause; and only writes admitted by the recorder's own reservation are
+reclassified, so a `save_state` outside one -- checkpoint alias reconciliation,
+for instance -- keeps an ordinary `OSError` rather than raising a control signal
+nothing there would catch. If the refusing resource cannot then be measured, the
+condition still pauses -- the refusal is itself first-hand evidence that the host
+had no room, and deferring to the source error path would blame the Agent for
+exactly what this boundary exists to attribute correctly -- but it pauses without
+inventing anything: the assessment carries `measurement_unavailable` and no
+capacity figures.
+
+Coverage follows the reservation rather than a list of writers, because the two
+are not the same set. New capture publishes its three derived representations
+through one store call, but recovery publishes them one at a time and writes the
+compatibility view directly, and the composed runtime store writes its
+publication-discovery record after the wrapped observation writer has already
+returned. The recovery frontier's own pending and clear markers are the first and
+last durable writes of the transaction, and each ends the transaction while
+unwinding, so a refusal there is unrecognisable by the time it reaches the
+capture wrapper unless it is reclassified at the marker itself. All of these are
+inside the reservation and all are now reclassified. Writes that carry no
+reservation -- the legacy migration clear, `record_event`, `record_gap` -- are
+deliberately not, and keep their ordinary failure semantics. The pause also
+measures the archive that refused rather than a neighbouring root.
+
+The ordering invariant was audited rather than assumed. Where the raw batch
+lands and only the checkpoint write is refused, the raw evidence is retained and
+no durable checkpoint moves past it. The in-memory checkpoint does lead in that
+window, and legitimately: raw, observation and normalized all landed, so the
+batch really was stored and only its record was refused; recovery replays from
+the durable checkpoint, and the content-addressed batch is idempotent. Nothing
+is deleted to make room on any path.
+
+Consequence tests drive real refusals through the installed boundary rather than
+replacing the methods that carry it, and one of them runs against the store class
+startup actually composes rather than the narrower one the fixtures build.
+P04/P05/P09 physical evidence remains open, and B01 still owns aggregate
+host-resource admission across concurrent writers. No physical evidence or
+acceptance state changed.
+
 ### B03 — recorder publication progress and durable outbox lifecycle
 
 **State:** `OPEN`  

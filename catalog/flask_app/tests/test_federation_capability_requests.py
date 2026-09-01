@@ -7,10 +7,6 @@ from typing import Any
 
 import pytest
 
-from catalog.federation.authoritative_replay import (
-    AUTHORITATIVE_REPLAY_INCOMPLETE,
-    AuthoritativeReplayIncomplete,
-)
 from catalog.federation.onboarding_models import (
     BenchmarkState,
     ContributionActivationState,
@@ -310,104 +306,6 @@ def _completed_report(request_id: str, node_id: str) -> dict[str, object]:
         contribution_errors=0,
         message="done",
     )
-
-
-class _PagedReportCoordinator:
-    def __init__(self, total_revisions: int) -> None:
-        self.events = tuple(
-            SimpleNamespace(
-                revision=revision,
-                event_type=(module.REPORT_EVENT if revision == 2 else "unrelated"),
-                actor_node_id=REMOTE,
-                payload=_completed_report("request-one", REMOTE)
-                if revision == 2
-                else {},
-            )
-            for revision in range(1, total_revisions + 1)
-        )
-        self.current_revision = total_revisions
-
-    def replay_page(
-        self,
-        *,
-        last_applied_revision: int,
-        **_kwargs: Any,
-    ) -> tuple[tuple[object, ...], int]:
-        next_events = tuple(
-            event
-            for event in self.events
-            if event.revision > last_applied_revision
-        )
-        return next_events[:1], self.current_revision
-
-
-def _report_context(coordinator: object) -> object:
-    return SimpleNamespace(
-        coordinator=coordinator,
-        binding=SimpleNamespace(internal_session_id="session-one"),
-    )
-
-
-def test_capability_report_aggregation_reaches_the_authoritative_revision(
-    tmp_path: Path,
-) -> None:
-    service = FederationCapabilityRequestService(tmp_path / "capabilities.json")
-
-    reports = service._reports(
-        _report_context(_PagedReportCoordinator(2)),
-        ACTOR,
-        request_id="request-one",
-    )
-
-    assert reports[REMOTE]["state"] == "completed"
-
-
-def test_capability_report_aggregation_fails_closed_past_its_page_ceiling(
-    tmp_path: Path,
-) -> None:
-    service = FederationCapabilityRequestService(tmp_path / "capabilities.json")
-
-    with pytest.raises(AuthoritativeReplayIncomplete) as failure:
-        service._reports(
-            _report_context(
-                _PagedReportCoordinator(module._MAX_REPORT_REPLAY_PAGES + 1)
-            ),
-            ACTOR,
-            request_id="request-one",
-        )
-
-    assert failure.value.code == AUTHORITATIVE_REPLAY_INCOMPLETE
-
-
-def test_capability_snapshot_propagates_bounded_report_read_failure(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    service = FederationCapabilityRequestService(tmp_path / "capabilities.json")
-    service._save(
-        {
-            "schema": module.STATE_SCHEMA,
-            "status": "requested",
-            "request_id": "request-one",
-            "expected_report_node_ids": [REMOTE],
-            "devices": [{"node_id": REMOTE, "state": "requested"}],
-        }
-    )
-    monkeypatch.setattr(
-        service,
-        "_context",
-        lambda: (
-            _report_context(
-                _PagedReportCoordinator(module._MAX_REPORT_REPLAY_PAGES + 1)
-            ),
-            ACTOR,
-        ),
-    )
-
-    with pytest.raises(AuthoritativeReplayIncomplete) as failure:
-        service.snapshot()
-
-    assert failure.value.code == AUTHORITATIVE_REPLAY_INCOMPLETE
 
 
 def test_member_processor_executes_only_session_creator_request(

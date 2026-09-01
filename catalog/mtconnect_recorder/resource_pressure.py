@@ -249,6 +249,7 @@ _impl.RecorderResourceGuard = RecorderResourceGuard
 _impl.attach_runtime_resource_pressure = attach_runtime_resource_pressure
 
 RESOURCE_PRESSURE_RETRY_SECONDS = _impl.RESOURCE_PRESSURE_RETRY_SECONDS
+STORAGE_EXHAUSTED = _impl.STORAGE_EXHAUSTED
 RecorderResourceBudget = _impl.RecorderResourceBudget
 RecorderResourcePause = _impl.RecorderResourcePause
 RecorderResourcePaused = _impl.RecorderResourcePaused
@@ -256,6 +257,7 @@ install_runtime_resource_pressure = _impl.install_runtime_resource_pressure
 
 __all__ = [
     "RESOURCE_PRESSURE_RETRY_SECONDS",
+    "STORAGE_EXHAUSTED",
     "RecorderAdmissionController",
     "RecorderResourceBudget",
     "RecorderResourceGuard",

@@ -216,10 +216,32 @@ source/event type: repeated identical evidence and rapidly changing source paylo
 values cannot create durable event files at poll rate, while first/latest payload
 samples and occurrence/change counters remain bounded operational evidence. The
 summary writer uses `fcp.mtconnect.recorder_event.v2`; historical v1 event files
-remain untouched and have no authoritative reader. B02 remains open only for
-pressure/critical behavior preserving raw-first/checkpoint-last semantics.
-P04/P05/P09 physical evidence remains open; B01 still owns aggregate host-resource
-admission across concurrent writers. No physical acceptance state changed.
+remain untouched and have no authoritative reader.
+
+The host-storage-refusal delivery closes the last B02 software property, taking
+**B02 to 9/9 software properties automated-proven; B02 remains open** for
+exact-candidate physical evidence only. Admission reserves against an estimate,
+so a concurrent writer or an underestimate could still leave the host with no
+room when the admitted write ran; the filesystem then refused it with `ENOSPC`,
+which carried no pause signal and reached the remote-source error boundary. A
+healthy Agent was recorded as the failing party and backed off toward
+`BACKOFF_MAX`, while the local condition that actually stopped capture was never
+published. An observable out-of-room refusal inside an admitted transaction now
+reaches the existing pause path with a fresh measurement of the resource that
+refused. The boundary stays narrow: only `ENOSPC`/`EDQUOT`, and only for writes
+the recorder's own reservation admitted -- a `save_state` outside one, or the
+unreserved legacy migration clear, keeps its ordinary `OSError`. Coverage tracks
+that reservation rather than a list of writers: recovery publishes the
+compatibility view directly, the composed runtime store writes its
+publication-discovery record after the wrapped observation writer returns, and
+the recovery frontier's pending and clear markers each end the transaction while
+unwinding, so all of those are reclassified at the write itself. A resource that
+cannot be measured after refusing still pauses, but reports
+`measurement_unavailable` and no capacity rather than inventing one. Raw evidence
+is retained and no durable checkpoint advances past it on any refusal path, and
+nothing is deleted to make room. P04/P05/P09 physical evidence remains open; B01
+still owns aggregate host-resource admission across concurrent writers. No
+physical acceptance state changed.
 
 The analysis-slice, upload crash-correctness, and analysis-workspace
 reconciliation deliveries together provide **B08 5/5 properties

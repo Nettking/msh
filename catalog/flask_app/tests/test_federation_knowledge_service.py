@@ -580,9 +580,4 @@ def test_an_incomplete_read_is_reported_above_ordinary_unreachability(
         "Shared knowledge read for operator-strategies degraded to the local "
         f"cache ({AUTHORITATIVE_REPLAY_INCOMPLETE})"
     )
-    messages = [
-        record.getMessage()
-        for record in caplog.records
-        if record.name == application.logger.name
-    ]
-    assert messages == [expected]
+    assert [record.getMessage() for record in caplog.records] == [expected]

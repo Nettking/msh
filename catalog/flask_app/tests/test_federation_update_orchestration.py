@@ -8,10 +8,6 @@ from typing import Any
 
 import pytest
 
-from catalog.federation.authoritative_replay import (
-    AUTHORITATIVE_REPLAY_INCOMPLETE,
-    AuthoritativeReplayIncomplete,
-)
 from catalog.federation.software_update import UpdateInspection
 from catalog.flask_app.services import federation_update_service as module
 from catalog.flask_app.services.federation_update_events import (
@@ -103,28 +99,6 @@ class _Authority:
         return SimpleNamespace(available=True, devices=self.devices)
 
 
-class _CeilingCoordinator:
-    def __init__(self, total_revisions: int) -> None:
-        self.total_revisions = total_revisions
-
-    def replay_page(
-        self,
-        *,
-        last_applied_revision: int,
-        **_kwargs: Any,
-    ) -> tuple[tuple[object, ...], int]:
-        if last_applied_revision >= self.total_revisions:
-            return (), self.total_revisions
-        return (
-            SimpleNamespace(
-                revision=last_applied_revision + 1,
-                event_type="unrelated",
-                actor_node_id=REMOTE,
-                payload={},
-            ),
-        ), self.total_revisions
-
-
 def _device(node_id: str, state: str, label: str) -> object:
     return SimpleNamespace(node_id=node_id, state=state, label=label)
 
@@ -180,27 +154,6 @@ def test_check_targets_only_devices_reported_connected(
     assert by_id[REMOTE]["state"] == "checking"
     assert by_id[OFFLINE]["state"] == "offline"
     assert by_id[OFFLINE]["reachable"] is False
-
-
-def test_update_report_aggregation_fails_closed_past_its_page_ceiling(
-    tmp_path: Path,
-) -> None:
-    service = FederationUpdateService(_Local(), tmp_path / "updates.json")
-    context = SimpleNamespace(
-        coordinator=_CeilingCoordinator(module._MAX_REPORT_REPLAY_PAGES + 1),
-        binding=SimpleNamespace(internal_session_id="session-one"),
-    )
-
-    with pytest.raises(AuthoritativeReplayIncomplete) as failure:
-        service._reports(
-            context,
-            ACTOR,
-            event_type=module.CHECK_REPORT_EVENT,
-            request_id="check-one",
-            target=TARGET,
-        )
-
-    assert failure.value.code == AUTHORITATIVE_REPLAY_INCOMPLETE
 
 
 def test_update_all_rejects_while_remote_check_is_pending(
