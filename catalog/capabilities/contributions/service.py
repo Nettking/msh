@@ -81,6 +81,26 @@ class ContributionService:
             )
         return tuple(candidates)
 
+    @staticmethod
+    def _reconcile_persisted(
+        adapter: ContributionActivationAdapter,
+        candidate: ContributionCandidate,
+        intent: ContributionIntent,
+    ) -> ContributionIntent:
+        """Run an optional authority projection only after intent is durable.
+
+        Adapters may expose ``reconcile_persisted(candidate, intent)`` when a
+        downstream authority needs the store-assigned decision revision. A failure
+        propagates to the caller after local intent is durable; the normal
+        reconciliation path can therefore retry the exact same decision instead
+        of inventing a second transition.
+        """
+
+        reconcile = getattr(adapter, "reconcile_persisted", None)
+        if callable(reconcile):
+            reconcile(candidate, intent)
+        return intent
+
     def enable(self, candidate_id: str) -> ContributionIntent:
         recommendation = self._recommendation(candidate_id)
         candidate = recommendation.candidate
@@ -108,6 +128,7 @@ class ContributionService:
             desired=ContributionDesiredState.ENABLED,
             evaluation=evaluation,
             outcome=outcome,
+            adapter=adapter,
         )
 
     def disable(self, candidate_id: str) -> ContributionIntent:
@@ -115,7 +136,7 @@ class ContributionService:
         candidate = recommendation.candidate
         adapter = self._adapter(candidate)
         outcome = adapter.disable(candidate)
-        return self._store.transition(
+        intent = self._store.transition(
             candidate=candidate,
             desired_state=ContributionDesiredState.DISABLED,
             policy_state=ContributionPolicyState.ALLOWED,
@@ -123,12 +144,14 @@ class ContributionService:
             reason=outcome.reason,
             decided_at=self._now(),
         )
+        return self._reconcile_persisted(adapter, candidate, intent)
 
     def ask_later(self, candidate_id: str) -> ContributionIntent:
         recommendation = self._recommendation(candidate_id, require_current=False)
         candidate = recommendation.candidate
-        outcome = self._adapter(candidate).disable(candidate)
-        return self._store.transition(
+        adapter = self._adapter(candidate)
+        outcome = adapter.disable(candidate)
+        intent = self._store.transition(
             candidate=candidate,
             desired_state=ContributionDesiredState.ASK_LATER,
             policy_state=ContributionPolicyState.ALLOWED,
@@ -136,6 +159,7 @@ class ContributionService:
             reason=outcome.reason,
             decided_at=self._now(),
         )
+        return self._reconcile_persisted(adapter, candidate, intent)
 
     def suspend(self, candidate_id: str, *, reason: str) -> ContributionIntent:
         recommendation = self._recommendation(candidate_id, require_current=False)
@@ -151,8 +175,9 @@ class ContributionService:
             if current is None
             else current.policy_state
         )
-        outcome = self._adapter(candidate).suspend(candidate, reason=reason)
-        return self._store.transition(
+        adapter = self._adapter(candidate)
+        outcome = adapter.suspend(candidate, reason=reason)
+        intent = self._store.transition(
             candidate=candidate,
             desired_state=desired,
             policy_state=policy_state,
@@ -160,6 +185,7 @@ class ContributionService:
             reason=outcome.reason or reason,
             decided_at=self._now(),
         )
+        return self._reconcile_persisted(adapter, candidate, intent)
 
     def reconcile(self) -> tuple[ContributionIntent, ...]:
         reconciled: list[ContributionIntent] = []
@@ -185,6 +211,7 @@ class ContributionService:
                         desired=current.desired_state,
                         evaluation=PolicyEvaluation(current.policy_state),
                         outcome=outcome,
+                        adapter=adapter,
                     )
                 )
                 continue
@@ -231,6 +258,7 @@ class ContributionService:
                     desired=current.desired_state,
                     evaluation=evaluation,
                     outcome=outcome,
+                    adapter=adapter,
                 )
             )
         return tuple(reconciled)
@@ -242,11 +270,12 @@ class ContributionService:
         desired: ContributionDesiredState,
         evaluation: PolicyEvaluation,
         outcome: AdapterOutcome,
+        adapter: ContributionActivationAdapter,
     ) -> ContributionIntent:
         reason = outcome.reason or evaluation.reason
         if outcome.activation_state is ContributionActivationState.BLOCKED and not reason:
             reason = "Activation was blocked by policy."
-        return self._store.transition(
+        intent = self._store.transition(
             candidate=candidate,
             desired_state=desired,
             policy_state=evaluation.state,
@@ -254,6 +283,7 @@ class ContributionService:
             reason=reason,
             decided_at=self._now(),
         )
+        return self._reconcile_persisted(adapter, candidate, intent)
 
     def _recommendation(
         self,
