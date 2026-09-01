@@ -129,7 +129,7 @@ def test_frontier_rejects_archive_day_symlink_substitution(tmp_path):
     )
 
     archive_day = ref.manifest_path.parent
-    moved_day = tmp_path / "moved-day"
+    moved_day = store.root / "moved-day"
     archive_day.rename(moved_day)
     try:
         archive_day.symlink_to(moved_day, target_is_directory=True)
