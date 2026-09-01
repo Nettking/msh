@@ -8,7 +8,10 @@ import pytest
 from catalog.capabilities.contributions.policy import ContributionPolicyEvaluator
 from catalog.capabilities.contributions.service import ContributionService
 from catalog.capabilities.contributions.store import SQLiteContributionIntentStore
-from catalog.capabilities.contributions.types import AdapterOutcome, CandidateRecommendation
+from catalog.capabilities.contributions.types import (
+    AdapterOutcome,
+    CandidateRecommendation,
+)
 from catalog.federation.onboarding_models import (
     ContributionActivationState,
     ContributionCandidate,
