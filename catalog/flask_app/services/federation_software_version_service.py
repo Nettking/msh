@@ -470,7 +470,19 @@ class FederationSoftwareVersionService:
                 "expected_report_node_ids": targets,
                 "devices": [],
             }
-            refreshed = self._refresh(value, context, actor)
+            # The command is already authoritative once append succeeds. Persist
+            # that intent before any optional report aggregation so an exhausted
+            # replay budget cannot turn an accepted command into an apparent
+            # request failure that invites an unsafe duplicate retry.
+            self._save(value)
+            try:
+                refreshed = self._refresh(value, context, actor)
+            except AuthoritativeReplayIncomplete:
+                # Report truth is unavailable, but command issuance did not
+                # depend on it. Return only the durable request envelope; the
+                # next passive snapshot will fail closed until complete report
+                # history is readable again.
+                return value
             self._save(refreshed)
             return refreshed
 
