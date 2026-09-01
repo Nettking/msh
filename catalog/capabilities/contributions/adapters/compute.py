@@ -37,19 +37,23 @@ class ComputeCandidateSource:
             descriptor = binding.descriptor
             if descriptor.handler_id not in inspected:
                 continue
+            capacity_envelope = {
+                "kind": "registered-compute-handler",
+                "handler_id": descriptor.handler_id,
+                "handler_capability_type": descriptor.capability_type,
+                "protocol_version": descriptor.protocol_version,
+                "descriptor_fingerprint": descriptor.descriptor_fingerprint,
+            }
+            attributes = getattr(descriptor, "attributes", None)
+            if isinstance(attributes, dict):
+                capacity_envelope["handler_attributes"] = attributes
             descriptors.append(
                 LocalContributionDescriptor(
                     logical_service_id=descriptor.handler_id,
                     capability_type="compute",
                     capability_protocol=descriptor.protocol,
                     display_label=f"Compute {descriptor.handler_id}",
-                    capacity_envelope={
-                        "kind": "registered-compute-handler",
-                        "handler_id": descriptor.handler_id,
-                        "handler_capability_type": descriptor.capability_type,
-                        "protocol_version": descriptor.protocol_version,
-                        "descriptor_fingerprint": descriptor.descriptor_fingerprint,
-                    },
+                    capacity_envelope=capacity_envelope,
                 )
             )
         return tuple(sorted(descriptors, key=lambda item: item.logical_service_id))
