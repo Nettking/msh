@@ -33,6 +33,10 @@ from typing import Any
 
 from flask import current_app
 
+from catalog.federation.authoritative_replay import (
+    AuthoritativeReplayIncomplete,
+    replay_authoritative_history,
+)
 from catalog.federation.projections.authority_adapter import FederationAuthorityAdapter
 from catalog.federation.software_trial import (
     TRIAL_FAILED,
@@ -69,6 +73,7 @@ COMMAND_TTL = timedelta(seconds=TRIAL_REQUEST_TTL_SECONDS)
 REPORT_WINDOW = timedelta(minutes=10)
 CONNECTED_STATES = frozenset({"connected", "online", "ready", "active"})
 MAX_STATE_BYTES = 256 * 1024
+_MAX_REPORT_REPLAY_PAGES = 128
 
 #: Device software states the UI renders, mapped from what a device reported.
 PENDING_TRIAL_STATES = frozenset(
@@ -209,6 +214,8 @@ class FederationSoftwareVersionService:
 
         try:
             snapshot = get_active_update_service().snapshot()
+        except AuthoritativeReplayIncomplete:
+            raise
         except Exception:  # noqa: BLE001 - a passive view never fails a page
             return {}
         rows = snapshot.get("devices")
@@ -294,16 +301,16 @@ class FederationSoftwareVersionService:
         request_id: str,
     ) -> dict[str, dict[str, Any]]:
         reports: dict[str, dict[str, Any]] = {}
-        last_revision = 0
-        for _ in range(128):
-            events, current_revision = context.coordinator.replay_page(
+        def read_page(last_revision: int) -> tuple[object, object]:
+            return context.coordinator.replay_page(
                 session_id=context.binding.internal_session_id,
                 actor_node_id=actor,
                 last_applied_revision=last_revision,
                 limit=1000,
             )
+
+        def apply_page(events: tuple[Any, ...]) -> None:
             for event in events:
-                last_revision = int(event.revision)
                 if event.event_type != TRIAL_REPORT_EVENT:
                     continue
                 parsed = trial_from_report(event.payload)
@@ -313,8 +320,12 @@ class FederationSoftwareVersionService:
                 if reported_request != request_id or node_id != event.actor_node_id:
                     continue
                 reports[node_id] = document
-            if not events or last_revision >= current_revision:
-                break
+
+        replay_authoritative_history(
+            read_page,
+            apply_page=apply_page,
+            max_pages=_MAX_REPORT_REPLAY_PAGES,
+        )
         return reports
 
     def _refresh(
@@ -380,10 +391,14 @@ class FederationSoftwareVersionService:
             value = self._load()
             try:
                 context, actor = self._context()
+            except AuthoritativeReplayIncomplete:
+                raise
             except Exception:  # noqa: BLE001 - a passive view stays available
                 return {**value, "branches": [], "can_manage": False}
             try:
                 refreshed = self._refresh(value, context, actor)
+            except AuthoritativeReplayIncomplete:
+                raise
             except Exception:  # noqa: BLE001 - a passive view stays available
                 return {**value, "branches": [], "can_manage": True}
             if {k: v for k, v in refreshed.items() if k != "branches"} != value:

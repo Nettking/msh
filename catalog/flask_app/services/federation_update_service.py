@@ -14,6 +14,10 @@ from typing import Any, Protocol
 
 from flask import current_app
 
+from catalog.federation.authoritative_replay import (
+    AuthoritativeReplayIncomplete,
+    replay_authoritative_history,
+)
 from catalog.federation.projections.authority_adapter import FederationAuthorityAdapter
 from catalog.federation.software_update import (
     APPROVED_BRANCH,
@@ -42,6 +46,7 @@ COMMAND_TTL = timedelta(minutes=10)
 ELIGIBLE_STATES = frozenset({"update_available", "activation_required"})
 PENDING_APPLY_STATES = frozenset({"activation_queued", "updating", "requested"})
 CONNECTED_STATES = frozenset({"connected", "online", "ready", "active"})
+_MAX_REPORT_REPLAY_PAGES = 128
 
 
 class LocalUpdateAdapter(Protocol):
@@ -305,16 +310,16 @@ class FederationUpdateService:
         target: str,
     ) -> dict[str, UpdateInspection]:
         reports: dict[str, UpdateInspection] = {}
-        last_revision = 0
-        for _ in range(128):
-            events, current_revision = context.coordinator.replay_page(
+        def read_page(last_revision: int) -> tuple[object, object]:
+            return context.coordinator.replay_page(
                 session_id=context.binding.internal_session_id,
                 actor_node_id=actor,
                 last_applied_revision=last_revision,
                 limit=1000,
             )
+
+        def apply_page(events: tuple[Any, ...]) -> None:
             for event in events:
-                last_revision = int(event.revision)
                 if event.event_type != event_type:
                     continue
                 parsed = inspection_from_report(event.payload)
@@ -328,8 +333,12 @@ class FederationUpdateService:
                 ):
                     continue
                 reports[node_id] = self._normalize_runtime(result)
-            if not events or last_revision >= current_revision:
-                break
+
+        replay_authoritative_history(
+            read_page,
+            apply_page=apply_page,
+            max_pages=_MAX_REPORT_REPLAY_PAGES,
+        )
         return reports
 
     @staticmethod
@@ -532,7 +541,9 @@ class FederationUpdateService:
             try:
                 context, actor = self._context()
                 refreshed = self._refresh(value, context, actor)
-            except Exception:  # passive status must remain available
+            except AuthoritativeReplayIncomplete:
+                raise
+            except Exception:  # noqa: BLE001 - passive status must remain available
                 return value
             if refreshed != value:
                 self._save(refreshed)

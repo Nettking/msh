@@ -15,6 +15,10 @@ from typing import Any
 
 import pytest
 
+from catalog.federation.authoritative_replay import (
+    AUTHORITATIVE_REPLAY_INCOMPLETE,
+    AuthoritativeReplayIncomplete,
+)
 from catalog.federation.software_trial import (
     TRIAL_RUNNING,
     TrialSelection,
@@ -82,6 +86,28 @@ class _Authority:
 
     def snapshot(self) -> object:
         return SimpleNamespace(available=True, devices=self.devices)
+
+
+class _CeilingCoordinator:
+    def __init__(self, total_revisions: int) -> None:
+        self.total_revisions = total_revisions
+
+    def replay_page(
+        self,
+        *,
+        last_applied_revision: int,
+        **_kwargs: Any,
+    ) -> tuple[tuple[object, ...], int]:
+        if last_applied_revision >= self.total_revisions:
+            return (), self.total_revisions
+        return (
+            SimpleNamespace(
+                revision=last_applied_revision + 1,
+                event_type="unrelated",
+                actor_node_id=RECORDER,
+                payload={},
+            ),
+        ), self.total_revisions
 
 
 def _device(node_id: str, state: str, label: str) -> object:
@@ -342,6 +368,21 @@ def test_a_device_on_main_shows_its_branch_and_exact_commit(
     assert row["branch"] == "main"
     assert row["commit"] == SAFE
     assert row["on_test_branch"] is False
+
+
+def test_software_version_report_aggregation_fails_closed_past_its_page_ceiling(
+    tmp_path: Path,
+) -> None:
+    service = _service(tmp_path)
+    context = SimpleNamespace(
+        coordinator=_CeilingCoordinator(module._MAX_REPORT_REPLAY_PAGES + 1),
+        binding=SimpleNamespace(internal_session_id="session-one"),
+    )
+
+    with pytest.raises(AuthoritativeReplayIncomplete) as failure:
+        service._reports(context, ACTOR, request_id="trial-one")
+
+    assert failure.value.code == AUTHORITATIVE_REPLAY_INCOMPLETE
 
 
 def test_a_device_on_a_test_branch_shows_the_branch_commit_and_fallback(
