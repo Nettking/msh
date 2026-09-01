@@ -145,7 +145,7 @@ def _install(monkeypatch: pytest.MonkeyPatch, docker: _Docker, root: Path) -> No
                 PressureLevel.CRITICAL if docker.pressured() else PressureLevel.NORMAL
             )
 
-    monkeypatch.setattr(host_build, "ProcessResourceAdmission", _Admission)
+    monkeypatch.setattr(host_build, "PROCESS_RESOURCE_ADMISSION", _Admission())
     monkeypatch.setattr(
         host_build,
         "docker_resource_assessment",

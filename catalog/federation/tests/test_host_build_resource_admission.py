@@ -46,7 +46,7 @@ def _install_admission(
         "docker_backing_resource_path",
         lambda *_args, **_kwargs: backing,
     )
-    monkeypatch.setattr(host_build, "ProcessResourceAdmission", lambda: admission)
+    monkeypatch.setattr(host_build, "PROCESS_RESOURCE_ADMISSION", admission)
     return admission
 
 
