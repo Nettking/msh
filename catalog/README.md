@@ -62,7 +62,6 @@ Run source connectors directly from the command line, then rebuild the telemetry
 The following folders are intentionally excluded from runner discovery:
 
 - `runner` — runner/session implementation internals.
-- `data_simulator` — Streamlit/simulation tool, not a one-shot session script.
 - `interventions` — environment-specific helper.
 - `observer_phoenix` — source synchronization connector, not an analysis script.
 - `standalone_recorder` — legacy ingestion tool.
