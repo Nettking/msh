@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import threading
 from pathlib import Path
 
@@ -228,3 +229,61 @@ def test_first_use_from_several_threads_agrees_on_one_root_marker(
     assert len(set(identities)) == 1
     # One marker won the race; no staging file is left behind.
     assert sorted(entry.name for entry in root.iterdir()) == [".fcp-managed-root.json"]
+
+
+def test_root_marker_publication_survives_a_filesystem_without_hard_links(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The atomic publication must degrade, not fail, where link() is missing.
+
+    Markers are published by hard-linking a fully written staging file into
+    place, which is atomic and refuses to clobber. Some bind-mounted and
+    network filesystems -- including Windows bind mounts under some Docker
+    backends -- do not implement ``link``. Falling back to the direct exclusive
+    create keeps those deployments working, and the reader's zero-length wait
+    covers the window it reopens.
+    """
+
+    import os as _os
+
+    def _no_link(*_args: object, **_kwargs: object) -> None:
+        raise OSError(errno.EPERM, "link not supported on this filesystem")
+
+    monkeypatch.setattr(_os, "link", _no_link)
+    root = tmp_path / "root"
+    workers = 8
+    barrier = threading.Barrier(workers)
+    identities: list[tuple[int, int]] = []
+    failures: list[str] = []
+    guard = threading.Lock()
+
+    def _worker(index: int) -> None:
+        try:
+            barrier.wait(timeout=30)
+            identity = ManagedTemporaryRoot(root, namespace="probe").ensure()
+            with guard:
+                identities.append(identity)
+        except BaseException as exc:  # noqa: BLE001 - report, do not mask
+            with guard:
+                failures.append(f"worker {index}: {type(exc).__name__}: {exc}")
+
+    threads = [
+        threading.Thread(target=_worker, args=(index,)) for index in range(workers)
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=60)
+
+    assert failures == []
+    assert len(set(identities)) == 1
+    assert sorted(entry.name for entry in root.iterdir()) == [".fcp-managed-root.json"]
+
+    temporary = ManagedTemporaryRoot(root, namespace="probe").allocate(prefix="probe-")
+    try:
+        temporary.write(b"payload")
+        temporary.flush()
+        assert temporary.path.exists()
+    finally:
+        temporary.close()

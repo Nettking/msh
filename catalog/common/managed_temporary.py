@@ -16,6 +16,7 @@ import os
 import secrets
 import shutil
 import stat
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -25,6 +26,8 @@ _ROOT_SCHEMA = "fcp-managed-temporary-root-v1"
 _OWNER_SCHEMA = "fcp-managed-temporary-owner-v1"
 _ROOT_MARKER = ".fcp-managed-root.json"
 _OWNER_SUFFIX = ".fcp-owner.json"
+_MARKER_WAIT_ATTEMPTS = 50
+_MARKER_WAIT_SECONDS = 0.01
 _MAX_NAME_LENGTH = 240
 
 
@@ -295,6 +298,18 @@ class ManagedTemporaryRoot:
         if marker_present:
             if not _is_plain_file(marker):
                 raise ManagedTemporaryError("managed temporary root marker is unsafe")
+            # A complete marker is never zero length, so an empty one is
+            # unambiguously a creator between its exclusive create and its
+            # write -- the state the link fallback below can still produce.
+            # Waiting briefly is bounded and distinguishes that from a corrupt
+            # marker, which stays non-empty and unparsable.
+            for _attempt in range(_MARKER_WAIT_ATTEMPTS):
+                try:
+                    if marker.lstat().st_size > 0:
+                        break
+                except FileNotFoundError:
+                    break
+                time.sleep(_MARKER_WAIT_SECONDS)
             try:
                 payload = json.loads(marker.read_text(encoding="utf-8"))
             except (OSError, ValueError) as exc:
@@ -321,12 +336,26 @@ class ManagedTemporaryRoot:
             # sees either no marker or a complete one, and a concurrent creator
             # still loses the race exactly as before.
             staging = marker.with_name(f"{marker.name}.{secrets.token_hex(16)}.tmp")
+            body = json.dumps(payload, sort_keys=True) + "\n"
             try:
                 with staging.open("x", encoding="utf-8") as handle:
-                    handle.write(json.dumps(payload, sort_keys=True) + "\n")
+                    handle.write(body)
                     handle.flush()
                     os.fsync(handle.fileno())
-                os.link(staging, marker)
+                try:
+                    os.link(staging, marker)
+                except FileExistsError:
+                    raise
+                except OSError:
+                    # Some bind-mounted and network filesystems do not
+                    # implement link(). Fall back to the direct exclusive
+                    # create, which is still non-clobbering; the brief
+                    # visible-but-empty window it reopens is what the
+                    # zero-length wait above tolerates.
+                    with marker.open("x", encoding="utf-8") as handle:
+                        handle.write(body)
+                        handle.flush()
+                        os.fsync(handle.fileno())
             except FileExistsError:
                 # A concurrent creator won the marker race. Re-read it after
                 # the failed exclusive create; do not recurse on a dangling
