@@ -179,6 +179,19 @@ class _RelayEnrollmentAdapter:
 
     def __init__(self, coordinator: _RelayCoordinatorAdapter) -> None:
         self.coordinator = coordinator
+        self.store = self
+
+    def get(self, *, session_id: str, capability_id: str) -> object:
+        """Treat retired relay-visible bindings as requiring F8.1 reconciliation.
+
+        The coordinator has just supplied the authoritative older announcement.
+        The relay owns the actual enrollment store, so this seam intentionally
+        returns a sentinel rather than manufacturing local enrollment state.
+        ``request`` below then reconciles the real remote record idempotently.
+        """
+
+        del session_id, capability_id
+        return self
 
     def request(
         self,
