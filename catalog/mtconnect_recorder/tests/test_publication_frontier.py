@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
-from catalog.mtconnect_recorder import DurableRecorderStore, parse_probe, parse_streams
-from catalog.mtconnect_recorder.publication_frontier import RecorderPublicationFrontier
+import pytest
+
 from catalog.federation.tests.test_recorder_publication import PROBE_XML, SAMPLE_XML
+from catalog.mtconnect_recorder import DurableRecorderStore, parse_probe, parse_streams
+from catalog.mtconnect_recorder.model import MtconnectProtocolError
+from catalog.mtconnect_recorder.publication_frontier import RecorderPublicationFrontier
 
 
 def _stored_ref(store: DurableRecorderStore):
@@ -109,9 +113,45 @@ def test_frontier_rejects_tampered_path_components(tmp_path):
         encoding="utf-8",
     )
 
-    try:
+    with pytest.raises(MtconnectProtocolError, match="raw_name"):
         frontier.pending(source_name="Mazak", instance_id=batch.header.instance_id)
-    except Exception as exc:
-        assert "raw_name" in str(exc)
-    else:
-        raise AssertionError("tampered publication frontier path was accepted")
+
+
+def test_frontier_rejects_archive_day_symlink_substitution(tmp_path):
+    store = DurableRecorderStore(tmp_path / "data")
+    frontier = RecorderPublicationFrontier(store)
+    batch, ref = _stored_ref(store)
+    frontier.mark_pending(
+        source_name="Mazak",
+        archive_source_name="Mazak",
+        instance_id=batch.header.instance_id,
+        ref=ref,
+    )
+
+    archive_day = ref.manifest_path.parent
+    moved_day = tmp_path / "moved-day"
+    archive_day.rename(moved_day)
+    try:
+        archive_day.symlink_to(moved_day, target_is_directory=True)
+    except OSError as exc:
+        pytest.skip(f"directory symlinks are unavailable on this runner: {exc}")
+
+    with pytest.raises(MtconnectProtocolError, match="symlink or reparse point"):
+        frontier.pending(source_name="Mazak", instance_id=batch.header.instance_id)
+
+
+def test_frontier_preserves_requested_from_in_pointer_identity(tmp_path):
+    store = DurableRecorderStore(tmp_path / "data")
+    frontier = RecorderPublicationFrontier(store)
+    batch, ref = _stored_ref(store)
+    ref = replace(ref, requested_from=7)
+    frontier.mark_pending(
+        source_name="Mazak",
+        archive_source_name="Mazak",
+        instance_id=batch.header.instance_id,
+        ref=ref,
+    )
+
+    pending = frontier.pending(source_name="Mazak", instance_id=77)
+
+    assert pending[0].ref.requested_from == 7

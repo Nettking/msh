@@ -31,6 +31,11 @@ def _mark_pending_after_observation_write(
     source_name: str,
     batch: Any,
     raw_sha256: str,
+    archive_source_name: str | None = None,
+    raw_path: Path | None = None,
+    manifest_path: Path | None = None,
+    requested_from: int | None = None,
+    received_at: str | None = None,
 ) -> None:
     first = batch.first_observation_sequence
     last = batch.last_observation_sequence
@@ -41,9 +46,10 @@ def _mark_pending_after_observation_write(
         batch=batch,
         raw_sha256=raw_sha256,
     )
-    raw_path = _confined_storage_path(
+    archive_source = archive_source_name or source_name
+    raw_path = raw_path or _confined_storage_path(
         store.raw_root,
-        _slug(source_name),
+        _slug(archive_source),
         str(batch.header.instance_id),
         day,
         f"{base_name}.xml.gz",
@@ -51,27 +57,34 @@ def _mark_pending_after_observation_write(
     # ``_batch_location`` uses the same validated identity as the raw writer.
     # Resolve the manifest name exactly as store_raw_batch does; no archive
     # traversal is needed to publish the discovery pointer.
-    manifest_path = raw_path.with_suffix(".manifest.json")
+    manifest_path = manifest_path or raw_path.with_suffix(".manifest.json")
     RecorderPublicationFrontier(store).mark_pending(
         source_name=source_name,
-        archive_source_name=source_name,
+        archive_source_name=archive_source,
         instance_id=int(batch.header.instance_id),
         ref=RawBatchRef(
             raw_path=raw_path,
             manifest_path=manifest_path,
             raw_sha256=raw_sha256,
-            requested_from=int(first),
+            requested_from=(
+                int(first) if requested_from is None else int(requested_from)
+            ),
             first_sequence=int(first),
             last_sequence=int(last),
             next_sequence=int(batch.header.next_sequence),
             observation_count=len(batch.observations),
             manifest_schema=RAW_BATCH_MANIFEST_SCHEMA,
             received_at=(
-                str(batch.observations[0].get("received_at"))
-                if batch.observations and batch.observations[0].get("received_at")
-                else None
+                received_at
+                if received_at is not None
+                else (
+                    str(batch.observations[0].get("received_at"))
+                    if batch.observations
+                    and batch.observations[0].get("received_at")
+                    else None
+                )
             ),
-            source_name=source_name,
+            source_name=archive_source,
         ),
     )
 
@@ -118,12 +131,19 @@ def install_publication_frontier_runtime(runtime_module: ModuleType) -> None:
     store_class = runtime_module.DurableRecorderStore
 
     class PublicationFrontierDurableRecorderStore(store_class):
+        _publication_frontier_runtime_store = True
+
         def store_observation_batch(
             self,
             *,
             source_name: str,
             batch: Any,
             raw_sha256: str | None = None,
+            archive_source_name: str | None = None,
+            raw_path: Path | None = None,
+            manifest_path: Path | None = None,
+            requested_from: int | None = None,
+            received_at: str | None = None,
         ) -> Path:
             path = super().store_observation_batch(
                 source_name=source_name,
@@ -136,6 +156,11 @@ def install_publication_frontier_runtime(runtime_module: ModuleType) -> None:
                     source_name=source_name,
                     batch=batch,
                     raw_sha256=raw_sha256,
+                    archive_source_name=archive_source_name,
+                    raw_path=raw_path,
+                    manifest_path=manifest_path,
+                    requested_from=requested_from,
+                    received_at=received_at,
                 )
             return path
 

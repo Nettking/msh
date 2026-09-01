@@ -1,7 +1,10 @@
 """B03 consequence regressions for incremental recorder publication reconciliation."""
 from __future__ import annotations
 
+import json
 from pathlib import Path
+
+import pytest
 
 from catalog.federation.incremental_recorder_publication import (
     IncrementalRecorderArchiveReconciler,
@@ -14,7 +17,7 @@ from catalog.federation.tests.test_recorder_publication import (
     _store_sample,
     _write_checkpoint,
 )
-from catalog.mtconnect_recorder.model import RawBatchRef
+from catalog.mtconnect_recorder.model import MtconnectProtocolError, RawBatchRef
 from catalog.mtconnect_recorder.publication_frontier import RecorderPublicationFrontier
 from catalog.mtconnect_recorder.schema_compat import RAW_BATCH_MANIFEST_SCHEMA
 
@@ -187,4 +190,223 @@ def test_durable_outbox_survives_failure_before_frontier_retirement(
     assert replay.enqueued == 0
     assert replay.already_enqueued == 1
     assert len(outbox.pending()) == 1
+    assert reconciler.frontier.pending(source_name="Mazak", instance_id=77) == ()
+
+
+def test_legacy_scan_with_unrepresentable_item_becomes_explicitly_blocked(
+    tmp_path, monkeypatch
+):
+    """A malformed legacy item cannot force a lifetime scan on every cycle."""
+
+    client = RecordingClient()
+    store, checkpoint_file, outbox, _queue, legacy = _build_reconciler(
+        tmp_path, client=client
+    )
+    reconciler = _incremental_from(legacy)
+    probe, _batch, _stored = _store_sample(store, SAMPLE_XML)
+    _write_checkpoint(checkpoint_file, probe_sha256=probe.sha256, next_sequence=13)
+
+    malformed = (
+        store.raw_root
+        / "Mazak"
+        / "77"
+        / "2026-08-09"
+        / "unreadable.manifest.json"
+    )
+    malformed.write_text("{not-json", encoding="utf-8")
+
+    first = reconciler.reconcile()
+
+    assert first.enqueued == 1
+    assert first.quarantine.total == 1
+    assert reconciler.frontier.migration_state(
+        source_name="Mazak", instance_id=77
+    ) == "blocked"
+
+    def refuse_lifetime_scan(*args, **kwargs):
+        raise AssertionError("blocked migration was rescanned")
+
+    monkeypatch.setattr(store, "scan_raw_batches", refuse_lifetime_scan)
+    second = reconciler.reconcile()
+
+    assert second.enqueued == 0
+    assert second.quarantine.total == 1
+    assert outbox.pending()
+
+
+def test_legacy_alias_migration_keeps_archive_and_logical_identity_separate(
+    tmp_path,
+):
+    client = RecordingClient()
+    store, checkpoint_file, outbox, _queue, legacy = _build_reconciler(
+        tmp_path, client=client
+    )
+    reconciler = _incremental_from(legacy)
+    probe, _batch, _stored = _store_sample(
+        store,
+        SAMPLE_XML,
+        archive_source_name="Mazak Legacy",
+    )
+    _write_checkpoint(
+        checkpoint_file,
+        probe_sha256=probe.sha256,
+        next_sequence=13,
+        storage_aliases=["Mazak Legacy"],
+    )
+
+    result = reconciler.reconcile()
+
+    assert result.enqueued == 1
+    assert result.quarantine.total == 0
+    assert len(outbox.pending()) == 1
+    assert reconciler.frontier.pending(source_name="Mazak", instance_id=77) == ()
+    assert reconciler.frontier.initialized(
+        source_name="Mazak Legacy", instance_id=77
+    )
+
+
+def test_reconciler_quarantines_manifest_identity_tampering(tmp_path):
+    client = RecordingClient()
+    store, checkpoint_file, outbox, _queue, legacy = _build_reconciler(
+        tmp_path, client=client
+    )
+    reconciler = _incremental_from(legacy)
+    probe, batch, stored = _store_sample(store, SAMPLE_XML)
+    _mark_stored_pending(reconciler.frontier, batch=batch, stored=stored)
+    reconciler.frontier.mark_initialized(source_name="Mazak", instance_id=77)
+    _write_checkpoint(checkpoint_file, probe_sha256=probe.sha256, next_sequence=13)
+
+    manifest_path = stored.raw_path.with_suffix(".manifest.json")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["source_name"] = "Other"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    result = reconciler.reconcile()
+
+    assert result.enqueued == 0
+    assert result.quarantine.total == 1
+    assert outbox.pending() == ()
+    assert reconciler.frontier.pending(source_name="Mazak", instance_id=77)
+
+
+def test_reconciler_quarantines_observation_identity_tampering(tmp_path):
+    client = RecordingClient()
+    store, checkpoint_file, outbox, _queue, legacy = _build_reconciler(
+        tmp_path, client=client
+    )
+    reconciler = _incremental_from(legacy)
+    probe, batch, stored = _store_sample(store, SAMPLE_XML)
+    _mark_stored_pending(reconciler.frontier, batch=batch, stored=stored)
+    reconciler.frontier.mark_initialized(source_name="Mazak", instance_id=77)
+    _write_checkpoint(checkpoint_file, probe_sha256=probe.sha256, next_sequence=13)
+
+    observations = [
+        json.loads(line)
+        for line in stored.observation_path.read_text(encoding="utf-8").splitlines()
+    ]
+    observations[0]["agent_instance_id"] = 78
+    stored.observation_path.write_text(
+        "".join(json.dumps(record) + "\n" for record in observations),
+        encoding="utf-8",
+    )
+
+    result = reconciler.reconcile()
+
+    assert result.enqueued == 0
+    assert result.quarantine.total == 1
+    assert outbox.pending() == ()
+    assert reconciler.frontier.pending(source_name="Mazak", instance_id=77)
+
+
+def test_malformed_initialized_marker_fails_closed_without_rescanning(
+    tmp_path, monkeypatch
+):
+    client = RecordingClient()
+    store, checkpoint_file, _outbox, _queue, legacy = _build_reconciler(
+        tmp_path, client=client
+    )
+    reconciler = _incremental_from(legacy)
+    probe, _batch, _stored = _store_sample(store, SAMPLE_XML)
+    _write_checkpoint(checkpoint_file, probe_sha256=probe.sha256, next_sequence=13)
+    marker = reconciler.frontier.mark_initialized(
+        source_name="Mazak", instance_id=77
+    )
+    marker.write_text(
+        json.dumps(
+            {
+                "schema": "fcp.mtconnect.publication_frontier.v1",
+                "state": "initialized",
+                "source_name": "Other",
+                "agent_instance_id": 77,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def refuse_lifetime_scan(*args, **kwargs):
+        raise AssertionError("malformed marker triggered an archive scan")
+
+    monkeypatch.setattr(store, "scan_raw_batches", refuse_lifetime_scan)
+    with pytest.raises(MtconnectProtocolError, match="state|identity"):
+        reconciler.reconcile()
+
+
+def test_recreated_archive_root_invalidates_initialized_marker(tmp_path):
+    store, checkpoint_file, outbox, _queue, legacy = _build_reconciler(
+        tmp_path, client=RecordingClient()
+    )
+    del checkpoint_file, outbox
+    reconciler = _incremental_from(legacy)
+    _probe, _batch, _stored = _store_sample(store, SAMPLE_XML)
+    reconciler.frontier.mark_initialized(source_name="Mazak", instance_id=77)
+    archive_root = store.raw_root / "Mazak" / "77"
+    moved_root = tmp_path / "moved-archive-root"
+    archive_root.rename(moved_root)
+    archive_root.mkdir(parents=True)
+
+    assert not reconciler.frontier.initialized(source_name="Mazak", instance_id=77)
+
+
+def test_large_pending_backlog_is_drained_in_bounded_passes(tmp_path):
+    """Pending backlog size does not turn one reconciliation into an unbounded pass."""
+
+    client = RecordingClient()
+    store, checkpoint_file, outbox, _queue, legacy = _build_reconciler(
+        tmp_path, client=client
+    )
+    reconciler = _incremental_from(legacy)
+    probe = None
+    for offset in range(64 + 7):
+        first = 10 + offset * 3
+        last = first + 2
+        following = last + 1
+        xml = SAMPLE_XML
+        for old, new in (
+            ('firstSequence="10"', f'firstSequence="{first}"'),
+            ('lastSequence="12"', f'lastSequence="{last}"'),
+            ('nextSequence="13"', f'nextSequence="{following}"'),
+            ('sequence="10"', f'sequence="{first}"'),
+            ('sequence="11"', f'sequence="{first + 1}"'),
+            ('sequence="12"', f'sequence="{last}"'),
+        ):
+            xml = xml.replace(old, new)
+        probe, batch, stored = _store_sample(store, xml)
+        _mark_stored_pending(reconciler.frontier, batch=batch, stored=stored)
+    assert probe is not None
+    _write_checkpoint(
+        checkpoint_file,
+        probe_sha256=probe.sha256,
+        next_sequence=10 + (64 + 7) * 3,
+    )
+    reconciler.frontier.mark_initialized(source_name="Mazak", instance_id=77)
+
+    first = reconciler.reconcile()
+
+    assert first.scanned_batches == 64
+    assert len(reconciler.frontier.pending(source_name="Mazak", instance_id=77)) == 7
+    assert len(outbox.pending()) == 64
+
+    second = reconciler.reconcile()
+
+    assert second.scanned_batches == 7
     assert reconciler.frontier.pending(source_name="Mazak", instance_id=77) == ()

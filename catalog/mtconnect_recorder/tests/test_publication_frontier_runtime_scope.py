@@ -5,8 +5,9 @@ from catalog.mtconnect_recorder.publication_frontier import RecorderPublicationF
 from catalog.mtconnect_recorder.publication_frontier_runtime import (
     install_publication_frontier_runtime,
 )
-from catalog.mtconnect_recorder.storage import DurableRecorderStore as DirectRecorderStore
-
+from catalog.mtconnect_recorder.storage import (
+    DurableRecorderStore as DirectRecorderStore,
+)
 
 _SAMPLE = '''<MTConnectStreams xmlns="urn:mtconnect.org:MTConnectStreams:1.7"><Header instanceId="7" firstSequence="1" lastSequence="1" nextSequence="2"/><Streams><DeviceStream name="M"><ComponentStream><Samples><Position dataItemId="x" sequence="1" timestamp="2026-08-31T00:00:00Z">1</Position></Samples></ComponentStream></DeviceStream></Streams></MTConnectStreams>'''
 
