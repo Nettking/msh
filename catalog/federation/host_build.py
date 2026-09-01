@@ -30,6 +30,7 @@ from .builder_retirement import (
 from .docker_resources import docker_backing_resource_path
 from .host_resources import PressureLevel, ProcessResourceAdmission, ResourceAssessment
 from .image_retirement import retire_superseded_images
+from .process_resource_admission import PROCESS_RESOURCE_ADMISSION
 
 try:  # pragma: no cover - exercised only on supported POSIX hosts
     import fcntl
@@ -143,7 +144,7 @@ def docker_resource_assessment(
     backing_path = docker_backing_resource_path(root, env=env)
     if backing_path is None:
         raise RuntimeError("docker_backing_resource_unproven")
-    admission = controller or ProcessResourceAdmission()
+    admission = controller or PROCESS_RESOURCE_ADMISSION
     return backing_path, admission.assessment(backing_path)
 
 
@@ -530,7 +531,7 @@ def retire_stranded_build_writers(
 
 
 def preflight_disk(root: Path, env: Mapping[str, str]) -> None:
-    admission = ProcessResourceAdmission()
+    admission = PROCESS_RESOURCE_ADMISSION
     backing_path, before = docker_resource_assessment(root, env, controller=admission)
     name = builder_name(root)
     if before.level < PressureLevel.PRESSURE:
@@ -636,7 +637,7 @@ def controlled_core_build(
 ) -> None:
     if timeout_seconds <= 0 or poll_seconds <= 0:
         raise ValueError("build timing bounds must be positive")
-    admission = controller or ProcessResourceAdmission()
+    admission = controller or PROCESS_RESOURCE_ADMISSION
     backing_path, initial = docker_resource_assessment(root, env, controller=admission)
     if initial.level >= PressureLevel.PRESSURE:
         raise RuntimeError("insufficient_disk_for_update")
