@@ -19,18 +19,18 @@ At least one of `cnc-recorder` and `school-control` must be a physical Linux hos
 Validate the local topology using:
 
 ```text
-ops/cf7_physical_topology.template.json
+scripts/acceptance/cf7_physical_topology.template.json
 ```
 
 ```bash
-python -m ops.cf7_physical_readiness topology cf7-topology.local.json
+python -m scripts.acceptance.cf7_physical_readiness topology cf7-topology.local.json
 ```
 
 The local topology file and all evidence remain ignored by Git.
 
 ## Readiness runner
 
-`ops/cf7_physical_readiness.py` provides:
+`scripts/acceptance/cf7_physical_readiness.py` provides:
 
 1. `init` — create the ignored evidence directory and bind a new campaign to one candidate commit.
 2. `preflight` — verify commit, clean checkout, Python, Docker, and the machine-specific physical seam.
@@ -82,7 +82,7 @@ ollama pull llama3.2:3b
 $env:FCP_CF7_OLLAMA_URL = "http://<PRIVATE_OLLAMA_HOST>:11434"
 $env:FCP_CF7_OLLAMA_MODEL = "llama3.2:3b"
 $commit = (git rev-parse HEAD).Trim()
-.\ops\cf7_prepare_windows.ps1 `
+.\scripts\acceptance\cf7_prepare_windows.ps1 `
   -Machine local-ai `
   -Commit $commit `
   -Operator Martin `
@@ -103,7 +103,7 @@ export FCP_CF7_MTCONNECT_ENDPOINTS='{
   "cnc-two":"http://<PRIVATE_AGENT_TWO>:5000"
 }'
 commit="$(git rev-parse HEAD)"
-bash ops/cf7_prepare_linux.sh cnc-recorder "$commit" Martin all
+bash scripts/acceptance/cf7_prepare_linux.sh cnc-recorder "$commit" Martin all
 ```
 
 Windows example:
@@ -114,7 +114,7 @@ $env:FCP_CF7_MTCONNECT_ENDPOINTS = '{
   "cnc-two":"http://<PRIVATE_AGENT_TWO>:5000"
 }'
 $commit = (git rev-parse HEAD).Trim()
-.\ops\cf7_prepare_windows.ps1 `
+.\scripts\acceptance\cf7_prepare_windows.ps1 `
   -Machine cnc-recorder `
   -Commit $commit `
   -Operator Martin `
@@ -135,7 +135,7 @@ export FCP_CF7_PEERS='{
   "cnc-recorder":"<PRIVATE_RECORDER_HOST>:5000"
 }'
 commit="$(git rev-parse HEAD)"
-bash ops/cf7_prepare_linux.sh school-control "$commit" Martin all
+bash scripts/acceptance/cf7_prepare_linux.sh school-control "$commit" Martin all
 ```
 
 Windows example:
@@ -146,7 +146,7 @@ $env:FCP_CF7_PEERS = '{
   "cnc-recorder":"<PRIVATE_RECORDER_HOST>:5000"
 }'
 $commit = (git rev-parse HEAD).Trim()
-.\ops\cf7_prepare_windows.ps1 `
+.\scripts\acceptance\cf7_prepare_windows.ps1 `
   -Machine school-control `
   -Commit $commit `
   -Operator Martin `
