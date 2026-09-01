@@ -312,11 +312,21 @@ class ManagedTemporaryRoot:
                 "token": secrets.token_hex(32),
                 "created_at": datetime.now(timezone.utc).isoformat(),
             }
+            # Publish the marker atomically. ``open("x")`` makes an empty file
+            # visible before its content arrives, and a concurrent ``ensure()``
+            # that reads it in that window parses nothing and reports a corrupt
+            # root -- which is how first use from several threads failed. Write
+            # a private temporary in the same directory and hard-link it into
+            # place: the link is atomic and refuses to clobber, so a reader
+            # sees either no marker or a complete one, and a concurrent creator
+            # still loses the race exactly as before.
+            staging = marker.with_name(f"{marker.name}.{secrets.token_hex(16)}.tmp")
             try:
-                with marker.open("x", encoding="utf-8") as handle:
+                with staging.open("x", encoding="utf-8") as handle:
                     handle.write(json.dumps(payload, sort_keys=True) + "\n")
                     handle.flush()
                     os.fsync(handle.fileno())
+                os.link(staging, marker)
             except FileExistsError:
                 # A concurrent creator won the marker race. Re-read it after
                 # the failed exclusive create; do not recurse on a dangling
@@ -330,6 +340,11 @@ class ManagedTemporaryRoot:
                 return self.ensure()
             except OSError as exc:
                 raise ManagedTemporaryError("managed temporary root marker could not be created") from exc
+            finally:
+                try:
+                    staging.unlink()
+                except OSError:
+                    pass
         self._token = str(payload["token"])
         self._root_identity = root_identity
         return root_identity
@@ -364,25 +379,32 @@ class ManagedTemporaryRoot:
                     "created_at": datetime.now(timezone.utc).isoformat(),
                     "pid": os.getpid(),
                 }
-                with owner_path.open("x+b") as owner_writer:
-                    raw = _canonical(owner_payload) + b"\n"
-                    owner_writer.write(raw)
-                    owner_writer.flush()
-                    os.fsync(owner_writer.fileno())
-                owner_handle = owner_path.open("r+b")
-                if not _lock(owner_handle, blocking=True):
+                # The scavenger reclaims any owner record it can authenticate
+                # and lock. Writing the payload through one handle and locking
+                # a second one leaves the sidecar briefly both -- a concurrent
+                # scavenge then deletes live work, and this allocation fails on
+                # the reopen. Claim the lock on the creating handle first and
+                # write what authenticates the record only after: an empty
+                # sidecar parses as nothing, which the scavenger treats as
+                # ambiguous and never deletes.
+                owner_handle = owner_path.open("x+b")
+                owner_identity = _identity(os.fstat(owner_handle.fileno()))
+                if not _lock(owner_handle, blocking=False):
                     owner_handle.close()
                     handle.close()
-                    _unlink_if_identity(owner_path, _identity(owner_path.lstat()))
-                    _unlink_if_identity(path, _identity(path.lstat()))
+                    _unlink_if_identity(owner_path, owner_identity)
+                    _unlink_if_identity(path, file_identity)
                     raise ManagedTemporaryError("managed temporary ownership lock failed")
+                owner_handle.write(_canonical(owner_payload) + b"\n")
+                owner_handle.flush()
+                os.fsync(owner_handle.fileno())
                 return ManagedTemporaryFile(
                     path=path,
                     owner_path=owner_path,
                     handle=handle,
                     owner_handle=owner_handle,
                     file_identity=file_identity,
-                    owner_identity=_identity(owner_path.lstat()),
+                    owner_identity=owner_identity,
                 )
             except FileExistsError:
                 if handle is not None:
@@ -429,24 +451,27 @@ class ManagedTemporaryRoot:
                     "created_at": datetime.now(timezone.utc).isoformat(),
                     "pid": os.getpid(),
                 }
-                with owner_path.open("x+b") as owner_writer:
-                    owner_writer.write(_canonical(owner_payload) + b"\n")
-                    owner_writer.flush()
-                    os.fsync(owner_writer.fileno())
-                owner_handle = owner_path.open("r+b")
-                if not _lock(owner_handle, blocking=True):
+                # Same ordering as allocate(): the sidecar must never be
+                # authenticatable while unlocked, or a concurrent scavenge can
+                # reclaim a directory that is still being filled.
+                owner_handle = owner_path.open("x+b")
+                owner_identity = _identity(os.fstat(owner_handle.fileno()))
+                if not _lock(owner_handle, blocking=False):
                     owner_handle.close()
-                    _unlink_if_identity(owner_path, _identity(owner_path.lstat()))
+                    _unlink_if_identity(owner_path, owner_identity)
                     _remove_plain_owned_tree(path, max_entries=4096)
                     raise ManagedTemporaryError(
                         "managed temporary directory ownership lock failed"
                     )
+                owner_handle.write(_canonical(owner_payload) + b"\n")
+                owner_handle.flush()
+                os.fsync(owner_handle.fileno())
                 return ManagedTemporaryDirectory(
                     path=path,
                     owner_path=owner_path,
                     owner_handle=owner_handle,
                     directory_identity=directory_identity,
-                    owner_identity=_identity(owner_path.lstat()),
+                    owner_identity=owner_identity,
                 )
             except FileExistsError:
                 if directory_identity is not None and _is_plain_directory(path):

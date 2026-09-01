@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 
 import pytest
@@ -105,3 +106,125 @@ def test_managed_root_rejects_symlink_root(tmp_path: Path) -> None:
 
     with pytest.raises(ManagedTemporaryError):
         ManagedTemporaryRoot(link, namespace="test-root").ensure()
+
+
+def test_owner_record_is_never_authenticatable_while_unlocked(tmp_path: Path) -> None:
+    """The scavenger's safety rests on live records being locked, not on timing.
+
+    ``scavenge_managed_temporary_root`` deletes any owner record it can parse,
+    authenticate, and lock. So a record must never be parseable before its
+    owner holds the lock: allocation writes the payload through the handle it
+    already locked, and an empty sidecar parses as nothing.
+    """
+
+    root = ManagedTemporaryRoot(tmp_path / "root", namespace="probe")
+    temporary = root.allocate(prefix="live-", suffix=".partial")
+    try:
+        temporary.write(b"payload")
+        temporary.flush()
+
+        report = scavenge_managed_temporary_root(tmp_path / "root", namespace="probe")
+
+        assert report.skipped_active == 1
+        assert report.reclaimed_files == 0
+        assert temporary.path.exists()
+        assert temporary.owner_path.exists()
+    finally:
+        temporary.close()
+
+
+def test_concurrent_allocation_beside_scavenging_keeps_every_live_temporary(
+    tmp_path: Path,
+) -> None:
+    """Reproduces the analysis-publication strand at its actual seam.
+
+    ``ContentStore._atomic_write`` scavenges the shared temporary root and then
+    allocates into it, so concurrent artifact writes interleave one thread's
+    scavenge with another's allocation. When the owner record was written
+    through a handle that was closed before a second handle took the lock, the
+    scavenge could authenticate and reclaim a record whose owner was still
+    mid-allocation: the allocation then failed reopening its own sidecar, and
+    the submission was stranded.
+    """
+
+    root = tmp_path / "root"
+    workers = 8
+    rounds = 60
+    barrier = threading.Barrier(workers)
+    failures: list[str] = []
+
+    def _worker(index: int) -> None:
+        try:
+            barrier.wait(timeout=30)
+            for _ in range(rounds):
+                scavenge_managed_temporary_root(root, namespace="probe")
+                temporary = ManagedTemporaryRoot(root, namespace="probe").allocate(
+                    prefix="probe-",
+                    suffix=".partial",
+                )
+                try:
+                    temporary.write(b"payload" * 100)
+                    temporary.flush()
+                    if not temporary.path.exists():
+                        failures.append(
+                            f"worker {index}: live temporary {temporary.path.name} "
+                            "was reclaimed while still owned"
+                        )
+                finally:
+                    temporary.close()
+        except BaseException as exc:  # noqa: BLE001 - report, do not mask
+            failures.append(f"worker {index}: {type(exc).__name__}: {exc}")
+
+    threads = [
+        threading.Thread(target=_worker, args=(index,)) for index in range(workers)
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=120)
+
+    assert failures == []
+    # Every allocation closed cleanly, so nothing owned is left behind.
+    assert sorted(entry.name for entry in root.iterdir()) == [".fcp-managed-root.json"]
+
+
+def test_first_use_from_several_threads_agrees_on_one_root_marker(
+    tmp_path: Path,
+) -> None:
+    """A root marker made visible before it is written reads back as corrupt.
+
+    ``open("x")`` publishes an empty file first, so a thread that inspected the
+    marker in that window rejected the whole root as unreadable and failed the
+    write it was admitting.
+    """
+
+    root = tmp_path / "root"
+    workers = 8
+    barrier = threading.Barrier(workers)
+    identities: list[tuple[int, int]] = []
+    failures: list[str] = []
+    guard = threading.Lock()
+
+    def _worker(index: int) -> None:
+        try:
+            barrier.wait(timeout=30)
+            identity = ManagedTemporaryRoot(root, namespace="probe").ensure()
+            with guard:
+                identities.append(identity)
+        except BaseException as exc:  # noqa: BLE001 - report, do not mask
+            with guard:
+                failures.append(f"worker {index}: {type(exc).__name__}: {exc}")
+
+    threads = [
+        threading.Thread(target=_worker, args=(index,)) for index in range(workers)
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=60)
+
+    assert failures == []
+    assert len(identities) == workers
+    assert len(set(identities)) == 1
+    # One marker won the race; no staging file is left behind.
+    assert sorted(entry.name for entry in root.iterdir()) == [".fcp-managed-root.json"]
