@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+import logging
+import os
+import stat
 from contextlib import AbstractContextManager
 from pathlib import Path
-from typing import BinaryIO, Self
+from typing import TYPE_CHECKING, BinaryIO, Self
 
 from flask import Request, current_app
 from werkzeug.exceptions import RequestEntityTooLarge
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from flask import Flask
 
 from catalog.common.managed_temporary import (
     ManagedTemporaryFile,
@@ -24,6 +30,27 @@ MULTIPART_OVERHEAD_BYTES = 256 * 1024
 REQUEST_SPOOL_FIXED_BYTES = 64 * 1024
 REQUEST_SPOOL_FIXED_INODES = 8
 REQUEST_SPOOL_NAMESPACE = "data-upload-request-spool"
+
+_LOGGER = logging.getLogger(__name__)
+
+
+class UnsupportedFileIngress(RequestEntityTooLarge):
+    """Refusal for a multipart file part outside the supported upload endpoint.
+
+    Werkzeug materializes every multipart part that carries a filename through
+    :meth:`Request._get_file_stream`. Its default factory is a
+    ``SpooledTemporaryFile`` that rolls over to the operating-system temporary
+    directory after 500 KiB, which is host storage this process neither owns,
+    measures, nor reserves. Only ``/data-upload`` reads ``request.files``, so
+    every other file part is unconsumed data. Refusing it at the part header --
+    before the parser obtains a write target -- keeps the whole application on
+    one admitted spool rather than two storage regimes.
+    """
+
+    description = (
+        "This endpoint does not accept file uploads. The file part was refused "
+        "before any request byte reached host storage."
+    )
 
 
 def _configured_int(name: str, default: int) -> int:
@@ -183,6 +210,7 @@ class FCPRequest(Request):
         if self._fcp_spool_session is not None:
             super()._load_form_data()
             return
+        _record_wsgi_input_materialization(self.environ)
         root = Path(
             current_app.config.get(
                 "DATA_UPLOAD_REQUEST_SPOOL_DIRECTORY",
@@ -215,12 +243,13 @@ class FCPRequest(Request):
     ) -> BinaryIO:
         session = self._fcp_spool_session
         if session is None or not self._is_supported_upload_multipart():
-            return super()._get_file_stream(
-                total_content_length,
-                content_type,
-                filename,
-                content_length,
-            )
+            # Fail closed. Delegating here would reach Werkzeug's
+            # ``default_stream_factory`` and spool an arbitrary number of bytes
+            # into the operating-system temporary directory with no reservation
+            # against measured free space or inodes. The parser calls this at
+            # the part header, so refusing costs nothing that already reached
+            # storage.
+            raise UnsupportedFileIngress()
         return session.open_file(filename=filename, content_length=content_length)
 
     def close(self) -> None:
@@ -231,6 +260,120 @@ class FCPRequest(Request):
             self._fcp_spool_session = None
             if session is not None:
                 session.close()
+
+
+_WSGI_INPUT_MATERIALIZATION: str | None = None
+
+
+def _classify_wsgi_input(environ: dict) -> str:
+    """Classify whether the WSGI layer already put this body on host storage.
+
+    ``"host-file"`` means an upstream server or proxy buffered the request body
+    into a regular file before the application was invoked. ``"stream"`` means
+    the application received a socket or pipe, so no request byte has reached
+    storage yet. ``"unknown"`` covers in-memory and synthetic streams that
+    expose no file descriptor.
+    """
+
+    stream = environ.get("wsgi.input")
+    for candidate in (stream, getattr(stream, "_stream", None)):
+        if candidate is None:
+            continue
+        try:
+            mode = os.fstat(candidate.fileno()).st_mode
+        except (AttributeError, OSError, ValueError, TypeError):
+            continue
+        return "host-file" if stat.S_ISREG(mode) else "stream"
+    return "unknown"
+
+
+def _record_wsgi_input_materialization(environ: dict) -> str:
+    """Latch the observed ingress shape once per process and warn on storage.
+
+    The application cannot un-write bytes an upstream layer already spooled, so
+    this does not refuse the request. It makes the deployment prerequisite
+    observable instead of assumed: a supported deployment must report
+    ``"stream"``.
+    """
+
+    global _WSGI_INPUT_MATERIALIZATION
+    if _WSGI_INPUT_MATERIALIZATION is not None:
+        return _WSGI_INPUT_MATERIALIZATION
+    observed = _classify_wsgi_input(environ)
+    _WSGI_INPUT_MATERIALIZATION = observed
+    if observed == "host-file":
+        _LOGGER.warning(
+            "WSGI request body arrived as a regular file: an upstream server or "
+            "proxy buffered it to host storage before FCP admission. The "
+            "supported deployment streams the body from the socket; see "
+            "docs/server_setup.md."
+        )
+    return observed
+
+
+def observed_wsgi_input_materialization() -> str | None:
+    """Return the latched ingress shape, or ``None`` before the first upload."""
+
+    return _WSGI_INPUT_MATERIALIZATION
+
+
+def reset_observed_wsgi_input_materialization() -> None:
+    """Clear the latch. Used by tests that exercise several ingress shapes."""
+
+    global _WSGI_INPUT_MATERIALIZATION
+    _WSGI_INPUT_MATERIALIZATION = None
+
+
+def _positive_config_int(app: Flask, name: str) -> int:
+    value = app.config.get(name)
+    try:
+        parsed = int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError(
+            f"{name} must be a positive integer for the bounded upload ingress "
+            f"contract; got {value!r}."
+        ) from exc
+    if parsed <= 0:
+        raise RuntimeError(
+            f"{name} must be a positive integer for the bounded upload ingress "
+            f"contract; got {parsed!r}."
+        )
+    return parsed
+
+
+def validate_request_ingress_contract(app: Flask) -> dict[str, int | str]:
+    """Fail closed unless the application-level ingress bound is actually installed.
+
+    Two prerequisites are enforceable from inside the process and are therefore
+    startup errors rather than documentation:
+
+    * ``request_class`` must route every multipart file part through
+      :class:`FCPRequest`. Without it Werkzeug spools parts to the
+      operating-system temporary directory with no reservation.
+    * ``MAX_CONTENT_LENGTH`` must be a positive bound. Werkzeug can only cap a
+      terminated unknown-length stream when this is set, so leaving it unset
+      admits an unbounded body.
+
+    The upload budget is validated with them because a non-positive budget
+    silently refuses every upload instead of bounding one.
+    """
+
+    request_class = getattr(app, "request_class", None)
+    installed = isinstance(request_class, type) and issubclass(request_class, FCPRequest)
+    if not installed:
+        raise RuntimeError(
+            "app.request_class must be FCPRequest (or a subclass) so multipart "
+            "file parts are spooled through the admitted FCP-owned root; got "
+            f"{request_class!r}."
+        )
+    contract: dict[str, int | str] = {
+        "request_class": request_class.__name__,
+        "max_content_length": _positive_config_int(app, "MAX_CONTENT_LENGTH"),
+        "max_total_bytes": _positive_config_int(app, "DATA_UPLOAD_MAX_TOTAL_BYTES"),
+        "max_files": _positive_config_int(app, "DATA_UPLOAD_MAX_FILES"),
+        "spool_directory": str(app.config["DATA_UPLOAD_REQUEST_SPOOL_DIRECTORY"]),
+    }
+    return contract
 
 
 def scavenge_request_spool(root: Path | str) -> None:
@@ -259,5 +402,9 @@ __all__ = [
     "REQUEST_SPOOL_FIXED_INODES",
     "REQUEST_SPOOL_NAMESPACE",
     "FCPRequest",
+    "UnsupportedFileIngress",
+    "observed_wsgi_input_materialization",
+    "reset_observed_wsgi_input_materialization",
     "scavenge_request_spool",
+    "validate_request_ingress_contract",
 ]

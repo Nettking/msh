@@ -22,7 +22,13 @@ from catalog.federation.process_resource_admission import (
     SerializedProcessResourceAdmission,
 )
 from catalog.flask_app import data_upload_routes
-from catalog.flask_app.request_resource_admission import FCPRequest
+from catalog.flask_app.request_resource_admission import (
+    FCPRequest,
+    UnsupportedFileIngress,
+    observed_wsgi_input_materialization,
+    reset_observed_wsgi_input_materialization,
+    validate_request_ingress_contract,
+)
 from catalog.flask_app.services.data_upload_resource_admission import (
     enqueue_with_resource_admission,
 )
@@ -408,3 +414,246 @@ def test_request_spool_pressure_refuses_before_root_or_body_creation(
             request.files.getlist("files")
 
     assert not (tmp_path / "request-spool").exists()
+
+
+def _unsupported_multipart_environ(body: bytes, *, path: str = "/federation/nodes") -> dict:
+    return EnvironBuilder(
+        path=path,
+        method="POST",
+        input_stream=io.BytesIO(body),
+        content_type="multipart/form-data; boundary=boundary",
+        content_length=len(body),
+    ).get_environ()
+
+
+def _forbid_werkzeug_default_spool(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make Werkzeug's unadmitted temporary-file factory a hard failure.
+
+    ``default_stream_factory`` returns a ``SpooledTemporaryFile`` that rolls
+    over to the operating-system temporary directory after 500 KiB. Reaching it
+    at all means bytes are about to land on host storage this process does not
+    measure, so the tests below treat the call itself as the defect.
+    """
+
+    def _refuse(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError(
+            "Werkzeug's unadmitted default_stream_factory was reached; "
+            "a multipart part would have spooled outside FCP admission."
+        )
+
+    monkeypatch.setattr(
+        "werkzeug.wrappers.request.default_stream_factory",
+        _refuse,
+    )
+
+
+def test_file_part_outside_supported_upload_never_reaches_host_storage(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    admission = _admission(lambda _path: _measurement("request", free_bytes=10_000_000))
+    app = _request_app(tmp_path, admission)
+    # The production default from create_app(). It caps one request body but
+    # says nothing about where those bytes go, or about concurrent requests.
+    app.config["MAX_CONTENT_LENGTH"] = 1100 * 1024 * 1024
+    _forbid_werkzeug_default_spool(monkeypatch)
+    # Far above the 500 KiB rollover, so the unfixed path materialized a real
+    # file. Only /data-upload reads request.files, so no route consumes this.
+    body = _multipart_file_body(b"x" * 2_000_000)
+
+    with app.request_context(_unsupported_multipart_environ(body)):
+        from flask import request
+
+        with pytest.raises(UnsupportedFileIngress):
+            request.files.getlist("files")
+
+    assert not (tmp_path / "request-spool").exists()
+
+
+def test_unsupported_file_ingress_is_refused_before_any_body_byte(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    admission = _admission(lambda _path: _measurement("request", free_bytes=10_000_000))
+    app = _request_app(tmp_path, admission)
+    app.config["MAX_CONTENT_LENGTH"] = 1100 * 1024 * 1024
+    _forbid_werkzeug_default_spool(monkeypatch)
+    # The parser asks for a write target at the part header. Record how much of
+    # the body it had consumed when the refusal happened.
+    payload = b"y" * 1_000_000
+    body = _multipart_file_body(payload)
+    stream = io.BytesIO(body)
+    environ = EnvironBuilder(
+        path="/federation/nodes",
+        method="POST",
+        input_stream=stream,
+        content_type="multipart/form-data; boundary=boundary",
+        content_length=len(body),
+    ).get_environ()
+
+    with app.request_context(environ):
+        from flask import request
+
+        with pytest.raises(UnsupportedFileIngress) as raised:
+            request.files.getlist("files")
+
+    assert raised.value.code == 413
+    # Refusal happens at the part header, so the payload was never written
+    # anywhere: no destination stream was ever created for it.
+    assert not (tmp_path / "request-spool").exists()
+
+
+def test_multipart_form_fields_without_files_still_parse_outside_upload(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The refusal is scoped to file parts, not to multipart requests.
+
+    Werkzeug only routes a part through the file-stream factory when it
+    declares a filename. Plain fields stay in the bounded in-memory form
+    budget, so CSRF-token and operator forms are unaffected.
+    """
+
+    admission = _admission(lambda _path: _measurement("request", free_bytes=10_000_000))
+    app = _request_app(tmp_path, admission)
+    _forbid_werkzeug_default_spool(monkeypatch)
+    body = (
+        b"--boundary\r\n"
+        b'Content-Disposition: form-data; name="_csrf_token"\r\n\r\n'
+        b"token-value"
+        b"\r\n--boundary--\r\n"
+    )
+
+    with app.request_context(_unsupported_multipart_environ(body)):
+        from flask import request
+
+        assert request.form.get("_csrf_token") == "token-value"
+        assert request.files.getlist("files") == []
+
+    assert not (tmp_path / "request-spool").exists()
+
+
+def test_ingress_contract_refuses_a_request_class_without_the_spool_funnel(
+    tmp_path: Path,
+) -> None:
+    admission = _admission(lambda _path: _measurement("request", free_bytes=10_000_000))
+    app = _request_app(tmp_path, admission)
+    app.request_class = Flask.request_class
+
+    with pytest.raises(RuntimeError) as raised:
+        validate_request_ingress_contract(app)
+
+    assert "FCPRequest" in str(raised.value)
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("MAX_CONTENT_LENGTH", None),
+        ("MAX_CONTENT_LENGTH", 0),
+        ("DATA_UPLOAD_MAX_TOTAL_BYTES", 0),
+        ("DATA_UPLOAD_MAX_FILES", -1),
+    ],
+)
+def test_ingress_contract_refuses_an_unbounded_or_empty_budget(
+    tmp_path: Path,
+    name: str,
+    value: object,
+) -> None:
+    admission = _admission(lambda _path: _measurement("request", free_bytes=10_000_000))
+    app = _request_app(tmp_path, admission)
+    app.config[name] = value
+
+    with pytest.raises(RuntimeError) as raised:
+        validate_request_ingress_contract(app)
+
+    assert name in str(raised.value)
+
+
+def test_ingress_contract_reports_the_installed_bounds(tmp_path: Path) -> None:
+    admission = _admission(lambda _path: _measurement("request", free_bytes=10_000_000))
+    app = _request_app(tmp_path, admission)
+
+    contract = validate_request_ingress_contract(app)
+
+    assert contract["request_class"] == "FCPRequest"
+    assert contract["max_content_length"] == 1024 * 1024
+    assert contract["max_total_bytes"] == 4096
+    assert contract["max_files"] == 2
+    assert contract["spool_directory"] == str(tmp_path / "request-spool")
+
+
+def test_pre_spooled_wsgi_input_is_detected_and_reported(tmp_path: Path) -> None:
+    """A server that buffered the body to disk must be observable, not assumed.
+
+    The application cannot un-write those bytes, so this does not refuse the
+    request. It records that the deployment prerequisite in docs/server_setup.md
+    did not hold, instead of silently claiming an ingress guarantee this
+    process cannot make.
+    """
+
+    reset_observed_wsgi_input_materialization()
+    try:
+        admission = _admission(
+            lambda _path: _measurement("request", free_bytes=10_000_000)
+        )
+        app = _request_app(tmp_path, admission)
+        body = _multipart_file_body(b'{"ok":true}\n')
+        buffered = tmp_path / "upstream-buffered-body"
+        buffered.write_bytes(body)
+
+        with buffered.open("rb") as handle:
+            environ = _multipart_environ(
+                body, content_length=len(body), terminated=False
+            )
+            environ["wsgi.input"] = handle
+            with app.request_context(environ):
+                from flask import request
+
+                assert len(request.files.getlist("files")) == 1
+
+        assert observed_wsgi_input_materialization() == "host-file"
+    finally:
+        reset_observed_wsgi_input_materialization()
+
+
+def test_socket_backed_wsgi_input_is_reported_as_a_stream(tmp_path: Path) -> None:
+    """The supported deployment hands the application a socket, not a file.
+
+    Werkzeug's development server sets ``wsgi.input`` to the connection's
+    ``rfile`` and wraps chunked bodies in ``DechunkedInput``; neither touches
+    storage. A pipe stands in for the socket here because the classification
+    only distinguishes regular files from everything else.
+    """
+
+    import os as _os
+
+    reset_observed_wsgi_input_materialization()
+    read_fd, write_fd = _os.pipe()
+    try:
+        admission = _admission(
+            lambda _path: _measurement("request", free_bytes=10_000_000)
+        )
+        app = _request_app(tmp_path, admission)
+        body = _multipart_file_body(b'{"ok":true}\n')
+        _os.write(write_fd, body)
+        _os.close(write_fd)
+        write_fd = -1
+
+        with _os.fdopen(read_fd, "rb", buffering=0) as handle:
+            read_fd = -1
+            environ = _multipart_environ(
+                body, content_length=len(body), terminated=False
+            )
+            environ["wsgi.input"] = handle
+            with app.request_context(environ):
+                from flask import request
+
+                assert len(request.files.getlist("files")) == 1
+
+        assert observed_wsgi_input_materialization() == "stream"
+    finally:
+        for fd in (read_fd, write_fd):
+            if fd >= 0:
+                _os.close(fd)
+        reset_observed_wsgi_input_materialization()

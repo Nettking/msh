@@ -37,7 +37,11 @@ from .federation_routes import federation_web
 from .operator_strategy_routes import operator_strategy_web
 from .operator_support_routes import operator_support_web
 from .provider_federation_routes import provider_federation_web
-from .request_resource_admission import FCPRequest, scavenge_request_spool
+from .request_resource_admission import (
+    FCPRequest,
+    scavenge_request_spool,
+    validate_request_ingress_contract,
+)
 from .routes import web
 from .server_setup_routes import server_setup_web
 from .services.capability_benchmark_service import get_capability_benchmark_service
@@ -140,6 +144,7 @@ def create_app() -> Flask:
         "DATA_UPLOAD_MAX_LINE_BYTES",
         int(os.getenv("FCP_DATA_UPLOAD_MAX_LINE_BYTES", str(4 * 1024 * 1024))),
     )
+    validate_request_ingress_contract(app)
     with app.app_context():
         scavenge_request_spool(app.config["DATA_UPLOAD_REQUEST_SPOOL_DIRECTORY"])
     app.config.setdefault(
