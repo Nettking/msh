@@ -153,6 +153,36 @@ def test_claim_fence_is_scoped_to_the_drained_session(tmp_path) -> None:
     assert other_session.snapshot.job.session_id == SESSION_B
 
 
+def test_quiescence_is_scoped_when_provider_identity_is_reused_across_sessions(
+    tmp_path,
+) -> None:
+    jobs = SQLiteJobLifecycleStore(tmp_path / "jobs.sqlite3")
+    drains = SQLiteNodeUpdateDrainStore(jobs)
+
+    owned_a = _claim(
+        jobs,
+        session_id=SESSION_A,
+        job_id="owned-a",
+        provider_id="provider-a",
+    )
+    owned_b = _claim(
+        jobs,
+        session_id=SESSION_B,
+        job_id="owned-b",
+        provider_id="provider-a",
+    )
+    assert owned_a.snapshot.ownership is not None
+    assert owned_b.snapshot.ownership is not None
+
+    _request(drains, session_id=SESSION_A, provider_ids=("provider-a",))
+    evidence = drains.active_ownerships(session_id=SESSION_A, node_id=NODE)
+
+    assert len(evidence) == 1
+    assert evidence[0].session_id == SESSION_A
+    assert evidence[0].job_id == "owned-a"
+    assert not drains.is_quiescent(session_id=SESSION_A, node_id=NODE)
+
+
 def test_health_projection_is_scoped_to_session_node_and_provider_set(tmp_path) -> None:
     jobs = SQLiteJobLifecycleStore(tmp_path / "jobs.sqlite3")
     drains = SQLiteNodeUpdateDrainStore(jobs)
