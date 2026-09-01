@@ -29,6 +29,7 @@ from .provider_enrollment import (
 )
 from .provider_health import FederatedProviderHealthService, ProviderHealthRecord
 from .provider_reports import ProviderResourceReport, ProviderStatus
+from .provider_update_drain import SQLiteProviderUpdateDrainStore
 from .worker_activation import LocalComputeHandlerDescriptor
 
 
@@ -67,6 +68,7 @@ class RegisteredComputeProviderRuntime:
         health: FederatedProviderHealthService,
         clock: Callable[[], datetime] = _utc_now,
         report_ttl_seconds: int = 30,
+        update_drain: SQLiteProviderUpdateDrainStore | None = None,
     ) -> None:
         if health.enrollments is not enrollments:
             raise FederationValidationError(
@@ -89,6 +91,7 @@ class RegisteredComputeProviderRuntime:
         self.coordinator = enrollments.coordinator
         self._clock = clock
         self._report_ttl_seconds = report_ttl_seconds
+        self.update_drain = update_drain
 
     @staticmethod
     def binding(
@@ -438,9 +441,24 @@ class RegisteredComputeProviderRuntime:
         Scheduler-visible capability attributes come only from the immutable local
         handler descriptor that produced the contribution candidate. Callers may
         report live capacity/status but cannot claim a different logical contract.
+
+        A durable rolling-update drain only changes READY to DRAINING.  Existing
+        workload counters and stronger failure/disable states are preserved, so
+        drain is an explicit scheduling transition rather than synthetic zero
+        capacity or cancellation of work already owned by this provider.
         """
 
         now = self._clock().astimezone(timezone.utc)
+        effective_status = status
+        if (
+            effective_status is ProviderStatus.READY
+            and self.update_drain is not None
+            and self.update_drain.is_draining(
+                session_id=binding.session_id,
+                node_id=binding.node_id,
+            )
+        ):
+            effective_status = ProviderStatus.DRAINING
         report = ProviderResourceReport(
             capability_id=binding.capability_id,
             node_id=binding.node_id,
@@ -448,7 +466,7 @@ class RegisteredComputeProviderRuntime:
             capability_type=binding.capability_type,
             protocol=binding.protocol,
             protocol_version=binding.protocol_version,
-            status=status,
+            status=effective_status,
             report_revision=report_revision,
             max_concurrent_jobs=max_concurrent_jobs,
             active_jobs=active_jobs,
