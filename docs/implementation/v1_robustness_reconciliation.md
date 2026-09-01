@@ -2,9 +2,9 @@
 
 Status: **authoritative implementation input; independent review reconciled; implementation in progress**
 
-Reviewed: **2026-08-24 Europe/Oslo**
+Reviewed: **2026-09-01 Europe/Oslo**
 
-Code baseline reviewed: `main` at `1bcd9d4ac3b9543afc00254147d85a3df4e9c693`.
+Code baseline reviewed: `main` at `85bd3e664701d5ac9811866681bd3b0266e8d08f` before this delivery.
 
 Related documents:
 
@@ -456,15 +456,26 @@ representation for a bounded failure -- an explicit unavailable projection with
 a safe reason code -- so the refusal now reaches it, and it names
 `authoritative-replay-incomplete` instead of the generic projection failure.
 
-The explicit fail-closed requirement is still not closed. The capability-request,
-update, software-version and recorder-control report aggregators still return
-what they accumulated at their own ceilings; each under-reports rather than
-granting authority, but none of them fails closed yet, so B09 stays at 1/7. The
-remaining five properties are untouched: snapshot/base-revision compaction,
-member-replicated history lifetime and request-history retirement horizons all
-depend on retirement mechanisms that do not exist, and the control-plane
-unavailable/reconnecting representation and the bounded-clock-skew/NTP
-prerequisite are still open. No physical evidence or acceptance state changed.
+The capability-request leader report aggregator was another bounded-prefix
+consumer: after its 128-page ceiling it returned the reports accumulated so far,
+so a member's newer report could be absent while the overview presented the
+partial set as current. Its `_reports` reader now uses the same authoritative
+replay primitive and its passive `snapshot` path propagates
+`authoritative-replay-incomplete`; the existing Federation overview degradation
+path consequently renders the request status unavailable instead of saving or
+presenting a partial report set as truth. Automated evidence is
+`test_capability_report_aggregation_reaches_the_authoritative_revision` and
+`test_capability_report_aggregation_fails_closed_past_its_page_ceiling` in
+`catalog/flask_app/tests/test_federation_capability_requests.py`, alongside the
+existing shared replay, route and active-leader suites. This extends the first
+property only, so B09 stays at **1/7 properties automated-proven**. The update,
+software-version and recorder-control report aggregators still need the same
+consumer-specific wiring. The remaining five properties are untouched:
+snapshot/base-revision compaction, member-replicated history lifetime and
+request-history retirement horizons all depend on retirement mechanisms that do
+not exist, and the control-plane unavailable/reconnecting representation and the
+bounded-clock-skew/NTP prerequisite are still open. No physical evidence or
+acceptance state changed.
 
 ### B10 — quiesced, capacity-safe backup/recovery and host-process identity
 

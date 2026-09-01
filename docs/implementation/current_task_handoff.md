@@ -2,7 +2,7 @@
 
 Status: **current repository handoff**
 
-Reviewed: **2026-08-25 Europe/Oslo**
+Reviewed: **2026-09-01 Europe/Oslo**
 
 ## Repository state
 
@@ -239,16 +239,20 @@ shared, reported at warning level rather than as an ordinary unreachable relay.
 The Federation authority projection adapter is wired onto it too: its bounded
 loop measured progress by page length rather than by revision, so an empty page
 or a non-contiguous page was folded into a `current` overview that presented a
-revoked device as a current member and a demoted node as leader. The remaining
-paged consumers -- the capability-request, update, software-version and
-recorder-control report aggregators -- still return what they accumulated at
-their ceilings, so **B09 stays at 1/7 properties automated-proven and remains
-open**. The two member authority surfaces -- user administration and password
-change -- now report an unresolvable authority as their existing bounded `503`
-rather than letting the refusal escape a `before_request` hook as a broken
-device; the explicit control-plane unavailable/reconnecting operator surface is
-still not built. No page ceiling was widened and no physical evidence or
-acceptance state changed.
+revoked device as a current member and a demoted node as leader. The capability-
+request leader report aggregator now uses the same primitive: if its 128-page
+read cannot reach the coordinator's current revision, `snapshot` propagates the
+explicit bounded error and the existing Federation overview path renders the
+request status unavailable rather than presenting a partial report set. Tests
+cover both complete multi-page aggregation and refusal past the page ceiling.
+The update, software-version and recorder-control report aggregators still
+return what they accumulated at their ceilings, so **B09 stays at 1/7
+properties automated-proven and remains open**. The two member authority
+surfaces -- user administration and password change -- now report an
+unresolvable authority as their existing bounded `503` rather than letting the
+refusal escape a `before_request` hook as a broken device; the explicit
+control-plane unavailable/reconnecting operator surface is still not built. No
+page ceiling was widened and no physical evidence or acceptance state changed.
 
 ### Reconciled robustness branches
 
