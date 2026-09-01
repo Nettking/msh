@@ -18,8 +18,10 @@ from flask import Flask
 from catalog.federation.errors import FederationOperationError, FederationValidationError
 from catalog.federation.outbox import SQLiteOutbox
 from catalog.federation.recorder_delivery import DurableRecorderDeliveryQueue
+from catalog.federation.incremental_recorder_publication import (
+    IncrementalRecorderArchiveReconciler,
+)
 from catalog.federation.recorder_publication import (
-    RecorderArchiveReconciler,
     RecorderFederationDeliveryWorker,
     RecorderPublicationCycleReport,
     RecorderPublicationTarget,
@@ -283,7 +285,7 @@ class RecorderFederationPublicationMonitor:
             session_id=session_id,
             destination_id=group_id,
         )
-        reconciler = RecorderArchiveReconciler(
+        reconciler = IncrementalRecorderArchiveReconciler(
             store=DurableRecorderStore(data_dir),
             checkpoint_file=checkpoint_file,
             queue=queue,

@@ -860,10 +860,23 @@ class RecorderRuntime:
                 and active_checkpoint.next_sequence == expected
                 else {}
             )
+            observation_kwargs = {
+                "source_name": source_name,
+                "batch": batch,
+                "raw_sha256": ref.raw_sha256,
+            }
+            if getattr(self.store, "_publication_frontier_runtime_store", False):
+                observation_kwargs.update(
+                    {
+                        "archive_source_name": archive_source_name,
+                        "raw_path": ref.raw_path,
+                        "manifest_path": ref.manifest_path,
+                        "requested_from": ref.requested_from,
+                        "received_at": ref.received_at,
+                    }
+                )
             observation_path = self.store.store_observation_batch(
-                source_name=source_name,
-                batch=batch,
-                raw_sha256=ref.raw_sha256,
+                **observation_kwargs
             )
             normalized_path, latest_values = self.store.store_normalized_batch(
                 source_name=source_name,

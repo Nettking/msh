@@ -9,6 +9,7 @@ from . import storage as _storage
 from .bounded_storage import BoundedDurableRecorderStore
 from .model import *
 from .parsing import *
+from .publication_frontier_runtime import install_publication_frontier_runtime
 from .resource_pressure import install_runtime_resource_pressure
 from .storage import *
 from .xml_budget import validate_xml_budget
@@ -96,6 +97,10 @@ def _runtime_module():
     # configuration has established DATA_DIR/STATE_FILE. This preserves the
     # lazy-import contract while making normal package startup resource-aware.
     install_runtime_resource_pressure(runtime_module)
+    # B03 adds only bounded publication-discovery metadata. It is composed after
+    # B01 so the record participates in the same transaction reservation rather
+    # than opening a nested process-resource reservation of its own.
+    install_publication_frontier_runtime(runtime_module)
     return runtime_module
 
 

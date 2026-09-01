@@ -35,8 +35,10 @@ from catalog.federation.recorder_delivery import (
     DurableRecorderDeliveryQueue,
     RecorderDeliveryRunResult,
 )
+from catalog.federation.incremental_recorder_publication import (
+    IncrementalRecorderArchiveReconciler,
+)
 from catalog.federation.recorder_publication import (
-    RecorderArchiveReconciler,
     RecorderFederationDeliveryWorker,
     RecorderPublicationTarget,
 )
@@ -663,7 +665,7 @@ class RecorderFederationNode:
             session_id=state.binding.internal_session_id,
             destination_id=group_id,
         )
-        reconciler = RecorderArchiveReconciler(
+        reconciler = IncrementalRecorderArchiveReconciler(
             store=DurableRecorderStore(self.data_directory),
             checkpoint_file=(
                 self.data_directory
