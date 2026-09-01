@@ -1012,3 +1012,103 @@ def test_restart_drains_more_queued_batches_than_worker_capacity(
     assert all(
         not (restarted.staging_root / batch_id).exists() for batch_id in batch_ids
     )
+
+
+def test_real_upload_route_under_the_fcp_request_class_uses_the_admitted_spool(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """End-to-end through the production request class, not around it.
+
+    The other tests in this module build a bare ``Flask(__name__)``, so they
+    exercise the route with Werkzeug's default file-stream factory rather than
+    the funnel ``create_app()`` installs. That leaves the arrangement that
+    actually ships -- ``FCPRequest`` plus the real blueprint -- unexercised in
+    both directions: that a genuine upload still reaches the FCP-owned spool,
+    and that refusing file parts elsewhere does not refuse them here.
+    """
+
+    from catalog.flask_app.request_resource_admission import (
+        REQUEST_SPOOL_NAMESPACE,
+        FCPRequest,
+        UnsupportedFileIngress,
+    )
+
+    runtime = _Runtime()
+    service = _service(tmp_path, runtime)
+    jobs = _Jobs()
+    monkeypatch.setattr(
+        upload_routes,
+        "get_upload_analysis_job_service",
+        lambda: jobs,
+    )
+    spool_root = tmp_path / "request-spool"
+    app = _test_app(service)
+    app.request_class = FCPRequest
+    app.config.update(
+        MAX_CONTENT_LENGTH=8 * 1024 * 1024,
+        DATA_UPLOAD_MAX_TOTAL_BYTES=1024 * 1024,
+        DATA_UPLOAD_MAX_FILE_BYTES=512 * 1024,
+        DATA_UPLOAD_MAX_FILES=4,
+        DATA_UPLOAD_REQUEST_SPOOL_DIRECTORY=str(spool_root),
+    )
+    observed: list[str] = []
+    original = FCPRequest._get_file_stream
+
+    def _record(self, *args, **kwargs):
+        stream = original(self, *args, **kwargs)
+        observed.append(str(getattr(stream, "path", "")))
+        return stream
+
+    monkeypatch.setattr(FCPRequest, "_get_file_stream", _record)
+    client = app.test_client()
+
+    assert client.get("/data-upload/").status_code == 200
+    with client.session_transaction() as session:
+        csrf = session["data_upload_csrf_token"]
+
+    response = client.post(
+        "/data-upload/",
+        data={
+            "_csrf_token": csrf,
+            "files": [
+                (
+                    io.BytesIO(b'{"timestamp":"2026-08-05T10:00:00Z","machine":"A"}\n'),
+                    "first.jsonl",
+                ),
+            ],
+        },
+        content_type="multipart/form-data",
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    batch_id = parse_qs(urlparse(response.headers["Location"]).query)["batch"][0]
+    batch = _wait_for_terminal(service, batch_id)
+    assert batch["status"] == "ready"
+    assert batch["file_count"] == 1
+    # The body was spooled into the FCP-owned root, not the OS temporary dir.
+    assert len(observed) == 1
+    assert Path(observed[0]).parent == spool_root
+    # Nothing owned survives the request; only the managed-root marker remains.
+    assert sorted(entry.name for entry in spool_root.iterdir()) == [
+        ".fcp-managed-root.json"
+    ]
+
+    # The same body posted to any other route is refused before it is spooled.
+    with app.test_request_context(
+        "/rescan",
+        method="POST",
+        data={
+            "files": [
+                (io.BytesIO(b'{"machine":"A"}\n'), "elsewhere.jsonl"),
+            ],
+        },
+        content_type="multipart/form-data",
+    ):
+        from flask import request
+
+        with pytest.raises(UnsupportedFileIngress):
+            request.files.getlist("files")
+
+    assert REQUEST_SPOOL_NAMESPACE == "data-upload-request-spool"
