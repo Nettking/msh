@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import threading
-from contextlib import suppress
 from concurrent.futures import Future
+from contextlib import suppress
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
@@ -361,6 +361,22 @@ def test_publication_loop_proves_each_dataset_before_full_backlog_drain(
             )
             return super().pending(*args, **kwargs)
 
+        def has_pending(self, *args, **kwargs):
+            thread_id = threading.get_ident()
+            self.pending_thread_ids.append(thread_id)
+            assert thread_id != self.forbidden_thread_id, (
+                "the durable backlog was read on the relay event-loop thread"
+            )
+            return super().has_pending(*args, **kwargs)
+
+        def pending_for_delivery(self, *args, **kwargs):
+            thread_id = threading.get_ident()
+            self.pending_thread_ids.append(thread_id)
+            assert thread_id != self.forbidden_thread_id, (
+                "the durable backlog was read on the relay event-loop thread"
+            )
+            return super().pending_for_delivery(*args, **kwargs)
+
     class _StatusClient:
         async def coordinator_status(self):
             return _status(_authority())
@@ -528,7 +544,7 @@ def test_publication_loop_proves_each_dataset_before_full_backlog_drain(
                 assert snapshot.storage_group == "telemetry"
                 assert snapshot.last_committed_count == 2
                 assert snapshot.jsonl_state == "ready"
-            assert len(outbox.pending_thread_ids) >= 3
+            assert len(outbox.pending_thread_ids) >= 2
             assert all(
                 thread_id != outbox.forbidden_thread_id
                 for thread_id in outbox.pending_thread_ids

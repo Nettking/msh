@@ -6,7 +6,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
-from catalog.federation.outbox import RetiredSummary
+from catalog.federation.outbox import RetiredSummary, SQLiteOutbox
+from catalog.federation.phase_d_client import PhaseDIngestOutcome
 from catalog.federation.recorder_delivery import (
     RECORDER_STORAGE_SCHEMA,
     DurableRecorderDeliveryQueue,
@@ -161,3 +162,183 @@ def test_large_outbox_snapshot_is_read_off_the_relay_event_loop_thread() -> None
     assert result == RecorderDeliveryRunResult(attempted=0, committed=0, pending=0)
     assert outbox.thread_id is not None
     assert outbox.thread_id != caller_thread
+
+
+def _enqueue_delivery_row(
+    outbox: SQLiteOutbox,
+    *,
+    dataset_id: str,
+    index: int,
+    destination_id: str = "fcp-local-storage",
+) -> None:
+    outbox.enqueue(
+        session_id="session-a",
+        destination_id=destination_id,
+        schema_id=RECORDER_STORAGE_SCHEMA,
+        payload={
+            "group_id": destination_id,
+            "dataset_id": dataset_id,
+            "batch_id": f"{dataset_id}-{index}",
+            "idempotency_key": f"{dataset_id}-{index}",
+            "content": {"sequence": index},
+            "created_at": "2026-08-09T03:00:00+00:00",
+        },
+        idempotency_key=f"{dataset_id}-{index}",
+        content_hash=f"sha256:{dataset_id}-{index}",
+        now=datetime(2026, 8, 9, 3, 0, tzinfo=timezone.utc),
+    )
+
+
+def test_delivery_window_is_bounded_and_fair_across_datasets(tmp_path) -> None:
+    """A large offline dataset cannot hide another dataset's delivery head."""
+
+    outbox = SQLiteOutbox(tmp_path / "outbox.sqlite3")
+    for index in range(500):
+        _enqueue_delivery_row(outbox, dataset_id="dataset-a", index=index)
+    for index in range(3):
+        _enqueue_delivery_row(outbox, dataset_id="dataset-b", index=index)
+
+    window = outbox.pending_for_delivery(
+        session_id="session-a",
+        destination_id="fcp-local-storage",
+        schema_id=RECORDER_STORAGE_SCHEMA,
+        limit=4,
+    )
+
+    assert len(window) == 4
+    assert [entry.payload["dataset_id"] for entry in window] == [
+        "dataset-a",
+        "dataset-a",
+        "dataset-b",
+        "dataset-b",
+    ]
+    assert [entry.payload["batch_id"] for entry in window] == [
+        "dataset-a-0",
+        "dataset-a-1",
+        "dataset-b-0",
+        "dataset-b-1",
+    ]
+
+
+def test_delivery_window_keeps_destinations_in_separate_ordering_groups(
+    tmp_path,
+) -> None:
+    outbox = SQLiteOutbox(tmp_path / "outbox.sqlite3")
+    _enqueue_delivery_row(
+        outbox,
+        dataset_id="dataset-a",
+        index=0,
+        destination_id="storage-a",
+    )
+    _enqueue_delivery_row(
+        outbox,
+        dataset_id="dataset-a",
+        index=1,
+        destination_id="storage-a",
+    )
+    _enqueue_delivery_row(
+        outbox,
+        dataset_id="dataset-a",
+        index=0,
+        destination_id="storage-b",
+    )
+    _enqueue_delivery_row(
+        outbox,
+        dataset_id="dataset-a",
+        index=1,
+        destination_id="storage-b",
+    )
+
+    window = outbox.pending_for_delivery(
+        session_id="session-a",
+        destination_id=None,
+        schema_id=RECORDER_STORAGE_SCHEMA,
+        limit=2,
+    )
+
+    assert [(entry.destination_id, entry.payload["batch_id"]) for entry in window] == [
+        ("storage-a", "dataset-a-0"),
+        ("storage-b", "dataset-a-0"),
+    ]
+
+
+class _CommitClient:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    async def ingest_batch(self, **kwargs):
+        self.calls.append(dict(kwargs))
+        return PhaseDIngestOutcome(committed=True)
+
+
+def test_restarted_queue_makes_monotonic_bounded_backlog_progress(tmp_path) -> None:
+    """Restarted delivery drains a durable backlog without a full snapshot."""
+
+    outbox = SQLiteOutbox(tmp_path / "outbox.sqlite3")
+    for index in range(12):
+        _enqueue_delivery_row(outbox, dataset_id="dataset-a", index=index)
+        _enqueue_delivery_row(outbox, dataset_id="dataset-b", index=index)
+
+    client = _CommitClient()
+    first_queue = DurableRecorderDeliveryQueue(
+        outbox=outbox,
+        client=client,
+        session_id="session-a",
+        destination_id="fcp-local-storage",
+    )
+    first = asyncio.run(first_queue.run_once(limit=4))
+    assert first.attempted == 2
+    assert first.committed == 2
+
+    # A new queue object models a process restart. The startup route probe is
+    # intentionally bounded to one head per dataset, then ordinary cycles use
+    # the configured window. The durable pending count must decrease after
+    # every successful cycle; no in-memory backlog is carried across restart.
+    restarted_queue = DurableRecorderDeliveryQueue(
+        outbox=SQLiteOutbox(tmp_path / "outbox.sqlite3"),
+        client=client,
+        session_id="session-a",
+        destination_id="fcp-local-storage",
+    )
+    remaining = len(restarted_queue.outbox.pending())
+    assert remaining == 22
+    while remaining:
+        result = asyncio.run(restarted_queue.run_once(limit=4))
+        assert result.committed > 0
+        updated = len(restarted_queue.outbox.pending())
+        assert updated < remaining
+        remaining = updated
+
+    assert len(client.calls) == 24
+
+
+class _BoundedWindowOutbox:
+    def __init__(self) -> None:
+        self.kwargs: dict[str, object] | None = None
+
+    def pending_for_delivery(self, **kwargs):
+        self.kwargs = dict(kwargs)
+        return ()
+
+    def pending(self, **_kwargs):
+        raise AssertionError("the delivery queue requested an unbounded snapshot")
+
+
+def test_delivery_queue_uses_the_bounded_production_window() -> None:
+    outbox = _BoundedWindowOutbox()
+    queue = DurableRecorderDeliveryQueue(
+        outbox=outbox,  # type: ignore[arg-type]
+        client=_EmptyClient(),
+        session_id="session-a",
+        destination_id="fcp-local-storage",
+    )
+
+    result = asyncio.run(queue.run_once(limit=7))
+
+    assert result == RecorderDeliveryRunResult(attempted=0, committed=0, pending=0)
+    assert outbox.kwargs == {
+        "session_id": "session-a",
+        "destination_id": "fcp-local-storage",
+        "schema_id": RECORDER_STORAGE_SCHEMA,
+        "limit": 7,
+    }
