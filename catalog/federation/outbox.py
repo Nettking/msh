@@ -701,6 +701,135 @@ class SQLiteOutbox:
         with self._connect() as db:
             return tuple(self._decode(row) for row in db.execute(query, args))
 
+    def has_pending(
+        self,
+        *,
+        session_id: str | None = None,
+        destination_id: str | None = None,
+        schema_id: str | None = None,
+        now: datetime | None = None,
+    ) -> bool:
+        """Answer whether a scoped pending row exists without decoding rows.
+
+        Restart ordering only needs an existence proof. Calling ``pending``
+        for that purpose made a large offline outbox parse every payload before
+        the worker had even decided whether archive reconciliation should wait.
+        The query is deliberately identity/time-only and returns at most one
+        row; it does not turn a backlog count into an in-memory snapshot.
+        """
+
+        query = "SELECT 1 FROM outbox WHERE state='pending'"
+        args: list[str] = []
+        for column, value in (
+            ("session_id", session_id),
+            ("destination_id", destination_id),
+            ("schema_id", schema_id),
+        ):
+            if value is not None:
+                query += f" AND {column}=?"
+                args.append(value)
+        if now is not None:
+            query += " AND next_attempt_at<=?"
+            args.append(_time(now))
+        query += " LIMIT 1"
+        with self._connect() as db:
+            return db.execute(query, args).fetchone() is not None
+
+    def pending_for_delivery(
+        self,
+        *,
+        session_id: str,
+        destination_id: str | None,
+        schema_id: str,
+        limit: int,
+    ) -> tuple[OutboxEntry, ...]:
+        """Return a bounded, fair window of pending delivery rows.
+
+        A delivery worker must see the oldest row for every ordered
+        ``(destination, dataset)`` pair so one unavailable route cannot hide
+        healthy ones. Once those heads are represented, the window can include
+        additional rows from each pair while never exceeding the worker's
+        delivery limit. The dataset key is read from the JSON envelope only
+        inside SQLite; no payload is decoded or retained by Python beyond the
+        bounded result.
+
+        Rows are intentionally not filtered by ``next_attempt_at`` here. A
+        deferred head must still be visible so the delivery queue can fence
+        newer rows behind it. The queue decides whether the head may receive
+        its startup probe or is waiting for its durable backoff.
+        """
+
+        if (
+            isinstance(limit, bool)
+            or not isinstance(limit, int)
+            or limit <= 0
+        ):
+            raise FederationValidationError(
+                "invalid-limit",
+                "limit",
+                "must be a positive integer",
+            )
+        if not isinstance(session_id, str) or not session_id:
+            raise FederationValidationError(
+                "invalid-id", "session_id", "must be non-empty text"
+            )
+        if destination_id is not None and (
+            not isinstance(destination_id, str) or not destination_id
+        ):
+            raise FederationValidationError(
+                "invalid-id", "destination_id", "must be non-empty text"
+            )
+        if not isinstance(schema_id, str) or not schema_id:
+            raise FederationValidationError(
+                "invalid-id", "schema_id", "must be non-empty text"
+            )
+
+        # JSON validity is a table invariant. Non-string or absent dataset
+        # values are assigned a unique synthetic key, matching the delivery
+        # queue's rule that such a row has no ordering fence of its own.
+        ordering_key = """
+            CASE
+                WHEN json_type(payload_json, '$.dataset_id') = 'text'
+                    AND length(json_extract(payload_json, '$.dataset_id')) > 0
+                THEN json_extract(payload_json, '$.dataset_id')
+                ELSE printf('__unkeyed-outbox-row:%lld', outbox_id)
+            END
+        """
+        where = "state='pending' AND session_id=? AND schema_id=?"
+        args: list[object] = [session_id, schema_id]
+        if destination_id is not None:
+            where += " AND destination_id=?"
+            args.append(destination_id)
+
+        with self._connect() as db:
+            ordering_group_count = int(
+                db.execute(
+                    f"SELECT COUNT(*) FROM ("
+                    f"SELECT DISTINCT destination_id, {ordering_key} "
+                    f"FROM outbox WHERE {where})",
+                    args,
+                ).fetchone()[0]
+            )
+            rows_per_dataset = max(1, limit // max(ordering_group_count, 1))
+            rows = db.execute(
+                f"""
+                SELECT * FROM (
+                    SELECT outbox.*,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY destination_id, {ordering_key}
+                               ORDER BY outbox_id
+                           ) AS delivery_rank
+                    FROM outbox
+                    WHERE {where}
+                )
+                WHERE delivery_rank <= ?
+                ORDER BY outbox_id
+                LIMIT ?
+                """,
+                [*args, rows_per_dataset, limit],
+            ).fetchall()
+        return tuple(self._decode(row) for row in rows)
+
     def get(self, outbox_id: int) -> OutboxEntry | None:
         with self._connect() as db:
             row = db.execute(

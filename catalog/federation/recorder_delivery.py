@@ -263,11 +263,25 @@ class DurableRecorderDeliveryQueue:
                 "must be a boolean when supplied",
             )
 
-        # Reading a large durable backlog parses every pending JSON payload. Do
-        # that blocking SQLite/JSON work off the authenticated relay event loop
-        # so heartbeat and routed replies remain live while an offline backlog
-        # is being recovered.
-        pending_snapshot = await asyncio.to_thread(self.outbox.pending)
+        # Read only a bounded, fair delivery window. The SQLite implementation
+        # includes the oldest row for every ordered dataset before filling the
+        # remaining window, so a large offline dataset cannot starve a healthy
+        # one and a bad head still fences only its own dataset. Keep the
+        # blocking query and bounded row decoding off the relay event loop.
+        pending_for_delivery = getattr(self.outbox, "pending_for_delivery", None)
+        if callable(pending_for_delivery):
+            pending_snapshot = await asyncio.to_thread(
+                pending_for_delivery,
+                session_id=self.session_id,
+                destination_id=self.destination_id,
+                schema_id=RECORDER_STORAGE_SCHEMA,
+                limit=limit,
+            )
+        else:
+            # Compatibility for small test/durable-store adapters that expose
+            # only the original outbox protocol. The installed SQLite outbox
+            # always takes the bounded path above.
+            pending_snapshot = await asyncio.to_thread(self.outbox.pending)
 
         # A new queue object is a new process/runtime delivery session. Its
         # automatic first pass is a bounded route proof: try no more than the

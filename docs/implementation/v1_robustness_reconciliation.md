@@ -2,9 +2,9 @@
 
 Status: **authoritative implementation input; independent review reconciled; implementation in progress**
 
-Reviewed: **2026-08-24 Europe/Oslo**
+Reviewed: **2026-09-01 Europe/Oslo**
 
-Code baseline reviewed: `main` at `1bcd9d4ac3b9543afc00254147d85a3df4e9c693`.
+Code baseline reviewed: `main` at `c47a97415f5c833de3e7b33111742cf4a55a66e0` before this delivery.
 
 Related documents:
 
@@ -122,46 +122,63 @@ Required properties:
 
 `compact_completed()` remains a payload compactor, not a retention bound.
 
-Robustness progress: **B03 2/6 properties automated-proven; B03 remains `OPEN`.**
+Robustness progress: **B03 6/6 software properties automated-proven; B03
+remains `OPEN` pending the exact-candidate physical campaign.**
 
-The isolation property is proven. Every item-level fault archive reconciliation
-can meet -- an observation file that is missing, unreadable, malformed, empty,
-sequence-discontinuous, carrying no usable receipt stamp, or holding a single
-observation larger than the bounded publication size -- was raised out of the
-whole reconcile pass. The worker above treats that as an ordinary cycle failure
-and retries next poll, which is right for a transient fault and useless for this
-one: the same item fails the same way forever. Nothing after it was ever
-published, and that includes every *other* source, because the loop over sorted
-sources never got past the bad one. Capture kept recording, so the durable work
-was not lost; it was stranded, permanently, behind a repeating cycle failure
-that named neither the item nor the source.
+The six software properties are now evidenced as follows:
 
-Those faults now fence one source. The rest of that source waits behind the
-item, because the delivery queue preserves recorder sequence order per dataset
-and publishing across the gap would break the contract that makes a published
-dataset trustworthy; every other source publishes normally. The condition is
-carried in a bounded, truncation-flagged quarantine summary naming the source,
-the error code and the item's bounded locator -- never a local path, because the
-record reaches an operator health surface -- and the monitor reports the cycle as
-`degraded` with `recorder-archive-quarantined`, distinct from the retirement
-degradation it already had. Nothing is deleted: the raw archive is primary
-evidence and stays exactly where it is, so a repaired item publishes on the next
-pass. The fence is deliberately narrow: checkpoint and contract failures --
-unreadable or unsupported recorder state, a session mismatch -- stay fatal rather
-than becoming a quietly skipped source.
+1. **Incremental reconciliation progress.** The recorder writer publishes a
+   bounded discovery frontier after the raw/checkpoint commit. The upgraded
+   reconciler pays one explicit legacy scan, then reads only bounded pending
+   frontier records and retires each record after durable outbox admission.
+   `test_new_recorder_evidence_does_not_require_rereading_prior_manifests` and
+   `test_large_pending_backlog_is_drained_in_bounded_passes` prove that a later
+   batch does not reopen reconciled manifests or rescan lifetime history.
+2. **Poison-item isolation.** Missing, unreadable, malformed, empty,
+   discontinuous, receipt-less and overlarge item-level archive faults fence
+   only their source and remain visible in a bounded quarantine summary. Other
+   sources continue to publish; primary raw evidence is not deleted, and a
+   repaired item can publish on a later pass.
+3. **Required-thread recovery.** Recorder publication catches database/storage
+   failures at its required-thread boundary, exposes the failure/count and
+   retries from durable state. The native and Flask publication paths both have
+   consequence coverage; see the B06 supervision record for the owner-level
+   restart/backoff evidence.
+4. **Backlog forward progress after restart.** The former worker decoded the
+   entire pending outbox before applying its delivery limit, so a large outage
+   backlog amplified every recovery cycle and could hide healthy datasets. The
+   worker now uses `has_pending()` for restart gating and
+   `pending_for_delivery(limit=...)` for a bounded, fair window that includes
+   each ordered dataset's oldest row before filling the window. The window is
+   executed off the relay loop, preserves deferred-head fencing, and carries no
+   backlog snapshot across restart. The real SQLite tests
+   `test_delivery_window_is_bounded_and_fair_across_datasets` and
+   `test_restarted_queue_makes_monotonic_bounded_backlog_progress` prove a
+   restarted durable backlog decreases on every successful bounded cycle.
+5. **Durable terminal retirement.** A deterministically undeliverable row is
+   moved to a durable `retired` state, not deleted or silently retried forever.
+   Its session, destination, schema, idempotency and content identity remain
+   authoritative; its ordering gap, cause and timestamps are retained; explicit
+   repair is required; and a crash between failure recording and retirement is
+   safe. `test_a_restart_cannot_forget_that_a_row_was_retired` and the
+   `test_*retirement*` consequence suite prove the state machine and migration
+   behavior.
+6. **Compaction-safe duplicate suppression and routing identity.** Completed
+   and retired payloads may be replaced by bounded identity receipts without
+   deleting their durable identity columns. Reconciliation still collides with
+   a retired row, a changed content hash still fails closed, and session,
+   destination and recorder dataset ordering remain scoped. The compaction and
+   recorder-publication tests prove the tombstone survives restart, receipt
+   compaction and repeated archive reconciliation without resurrecting work.
 
-The required-thread property is proven with it. Database/storage failures in the
-publication loop are now caught at that boundary on both sides: the merged
-native-recorder delivery covers the recorder's own publication store, and
-`sqlite3.Error` has been added to the Flask-side worker's cycle retry family, so
-a locked or unreadable outbox is handled, counted and paced by the loop that owns
-it rather than escaping to a supervisor rebuild. See the B06 record for that
-supervisor's own restart counting and bounded backoff.
-
-The remaining four properties are untouched: incremental reconciliation progress,
-measurable backlog catch-up after a long outage, the durable outbox
-retirement/frontier/tombstone design, and compaction-safe duplicate-suppression
-semantics. No physical evidence or acceptance state changed.
+The bounded delivery window is a work-queue progress bound, not a retention
+policy: `compact_completed()` remains a payload compactor, and no terminal row
+deletion or arbitrary TTL has been introduced. B07's lifetime policy for
+FCP-owned metadata remains separate. The physical campaign still must exercise
+P05 publication-database failure, P07 sustained Federation outage with an aged
+corpus, P09 durable-write interruption and P12 aged-history soak on one exact
+candidate; automated tests do not upgrade those physical claims or any
+acceptance flag.
 
 ### B04 — one supported update/start contract and one host-mutation serialization boundary
 

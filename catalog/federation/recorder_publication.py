@@ -1009,13 +1009,26 @@ class RecorderFederationDeliveryWorker:
             # one cycle, so this can delay reconciliation by exactly one cycle
             # per restart and never by a permanently failing row.
             now = None if self.queue.startup_probe_pending else self.queue.clock()
-            pending_snapshot = await asyncio.to_thread(
-                self.queue.outbox.pending, now=now
-            )
-            current_backlog = any(
-                self._belongs_to_queue(entry, self.queue)
-                for entry in pending_snapshot
-            )
+            has_pending = getattr(self.queue.outbox, "has_pending", None)
+            if callable(has_pending):
+                current_backlog = await asyncio.to_thread(
+                    has_pending,
+                    session_id=self.queue.session_id,
+                    destination_id=self.queue.destination_id,
+                    schema_id=RECORDER_STORAGE_SCHEMA,
+                    now=now,
+                )
+            else:
+                # Compatibility for test/durable-store adapters that expose
+                # only the original outbox protocol. The installed SQLite
+                # outbox uses the bounded existence query above.
+                pending_snapshot = await asyncio.to_thread(
+                    self.queue.outbox.pending, now=now
+                )
+                current_backlog = any(
+                    self._belongs_to_queue(entry, self.queue)
+                    for entry in pending_snapshot
+                )
 
         if changed and (force_reconcile or not current_backlog):
             reconcile = await asyncio.to_thread(self.reconciler.reconcile)
@@ -1108,14 +1121,14 @@ __all__ = [
     "DEFAULT_MAX_CONTENT_BYTES",
     "MAX_QUARANTINE_IDENTITY_CHARS",
     "MAX_REPORTED_QUARANTINED_SOURCES",
-    "QUARANTINE_CODES",
-    "QuarantineSummary",
-    "QuarantinedSource",
     "MAX_SAFE_CONTENT_BYTES",
     "PUBLICATION_HEALTH_STATES",
+    "QUARANTINE_CODES",
     "RECORDER_DATASET_SCHEMA_NAME",
     "RECORDER_DATASET_SCHEMA_VERSION",
     "RECORDER_TELEMETRY_SCHEMA",
+    "QuarantineSummary",
+    "QuarantinedSource",
     "RecorderArchiveReconciler",
     "RecorderFederationDeliveryWorker",
     "RecorderFederationPublisher",

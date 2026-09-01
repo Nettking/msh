@@ -2,7 +2,7 @@
 
 Status: **current repository handoff**
 
-Reviewed: **2026-08-25 Europe/Oslo**
+Reviewed: **2026-09-01 Europe/Oslo**
 
 ## Repository state
 
@@ -159,23 +159,35 @@ not a further property, so the count is still 4/8.
 
 No physical evidence or acceptance state changed.
 
-Archive reconciliation was stranding durable work on the same shape one layer
-down. Every item-level fault it can meet -- an observation file that is missing,
-unreadable, malformed, empty, sequence-discontinuous, carrying no usable receipt
-stamp, or holding a single observation larger than the bounded publication size
--- was raised out of the whole pass, and the worker above retried the same item
-forever. Nothing after it was ever published, including every *other* source,
-because the loop over sorted sources never got past the bad one. Those faults
-now fence one source: the rest of that source waits behind the item, because the
-delivery queue preserves recorder sequence order per dataset, while every other
-source publishes. The condition is carried in a bounded quarantine summary
-naming the source, the code and a path-free item locator, and the monitor reports
-`degraded` with `recorder-archive-quarantined`. Nothing is deleted, so a repaired
-item publishes on the next pass, and checkpoint/contract failures stay fatal
-rather than becoming a quietly skipped source. With the required-thread
-containment on both the native and Flask sides, this is **B03 2/6 properties
-automated-proven; B03 remains open**. No physical evidence or acceptance state
-changed.
+Archive reconciliation and delivery now cover all six B03 software properties.
+The item-level archive faults -- missing, unreadable, malformed, empty,
+sequence-discontinuous, receipt-less or overlarge observation evidence -- fence
+only their source and remain visible in a bounded quarantine summary; other
+sources continue publishing, primary evidence is never deleted, and a repaired
+item can publish on a later pass. The native and Flask publication loops catch
+database/storage failures at their required-thread boundaries, expose bounded
+failure evidence and retry from durable state.
+
+The remaining restart amplification was in the delivery side: the queue decoded
+the entire pending outbox before applying its delivery limit, and the restart
+gate did the same just to answer whether work existed. `SQLiteOutbox` now has a
+bounded `pending_for_delivery()` window and a one-row `has_pending()` existence
+probe. The window includes each ordered dataset's oldest row before filling the
+configured limit, so one offline dataset cannot hide a healthy one; deferred
+heads remain visible to preserve per-dataset fencing; no backlog snapshot is
+carried across restart. Real SQLite consequence tests prove the window is
+bounded, fair and monotonically drains a durable backlog across a queue restart.
+
+The outbox also retains deterministically undeliverable rows as durable
+`retired` tombstones rather than deleting or retrying them forever. Session,
+destination, schema, idempotency, content and dataset-ordering identity survive
+receipt compaction; repeated archive reconciliation cannot resurrect a retired
+batch, and changed content still fails closed. The retirement/compaction
+consequence suites cover restart, migration, repair, crash windows, primary
+evidence preservation and degraded-health persistence. This brings B03 to
+**6/6 software properties automated-proven; B03 remains open** only for the
+exact-candidate physical P05/P07/P09/P12 evidence. No physical evidence or
+acceptance state changed.
 
 The recorder path-confinement, finite-transaction, incremental recovery-frontier,
 healthy-source progress-isolation, and durable event-storm deliveries together
