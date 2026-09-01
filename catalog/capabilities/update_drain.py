@@ -145,9 +145,17 @@ class NodeUpdateDrainTarget:
         return replace(report, status=ProviderStatus.DRAINING)
 
     def active_ownerships(
-        self, store: SQLiteJobStore
+        self,
+        store: SQLiteJobStore,
+        *,
+        session_id: str | None = None,
     ) -> tuple[ActiveDrainOwnership, ...]:
         """Return validated current F7 ownership rows for this drain target.
+
+        When ``session_id`` is supplied, only ownership in that Federation
+        session contributes to quiescence. This is the form rolling-update
+        orchestration must use: provider identities can be stable across session
+        changes and must not make unrelated sessions block one another.
 
         The canonical job JSON, normalized attempt rows, active ownership columns,
         attempt generation, and non-terminal attempt invariant are all validated by
@@ -161,14 +169,22 @@ class NodeUpdateDrainTarget:
                 "store",
                 "must be a SQLiteJobStore",
             )
+        if session_id is not None:
+            session_id = _text(session_id, "session_id")
         placeholders = ",".join("?" for _ in self.provider_ids)
+        if session_id is None:
+            where = f"active_owner_provider_id IN ({placeholders})"
+            parameters: tuple[str, ...] = self.provider_ids
+        else:
+            where = f"session_id=? AND active_owner_provider_id IN ({placeholders})"
+            parameters = (session_id, *self.provider_ids)
         with store._connect() as connection:  # package-internal read-only seam
             connection.execute("BEGIN")
             rows = connection.execute(
                 f"""SELECT * FROM capability_jobs
-                    WHERE active_owner_provider_id IN ({placeholders})
+                    WHERE {where}
                     ORDER BY session_id, job_id""",
-                self.provider_ids,
+                parameters,
             ).fetchall()
             evidence: list[ActiveDrainOwnership] = []
             for row in rows:
@@ -220,15 +236,25 @@ class NodeUpdateDrainTarget:
                     ) from exc
         return tuple(evidence)
 
-    def active_ownership_count(self, store: SQLiteJobStore) -> int:
+    def active_ownership_count(
+        self,
+        store: SQLiteJobStore,
+        *,
+        session_id: str | None = None,
+    ) -> int:
         """Return the validated number of durable active ownerships."""
 
-        return len(self.active_ownerships(store))
+        return len(self.active_ownerships(store, session_id=session_id))
 
-    def is_quiescent(self, store: SQLiteJobStore) -> bool:
+    def is_quiescent(
+        self,
+        store: SQLiteJobStore,
+        *,
+        session_id: str | None = None,
+    ) -> bool:
         """Return true only after validated durable current ownership reaches zero."""
 
-        return not self.active_ownerships(store)
+        return not self.active_ownerships(store, session_id=session_id)
 
 
 class NodeUpdateDrainState(str, Enum):
@@ -460,6 +486,31 @@ class SQLiteNodeUpdateDrainStore:
             node_id=report.node_id,
         )
         return report if target is None else target.apply_to_report(report)
+
+    def active_ownerships(
+        self,
+        *,
+        session_id: str,
+        node_id: str,
+    ) -> tuple[ActiveDrainOwnership, ...]:
+        """Return session-scoped durable ownership blocking this node's drain."""
+
+        session_id = _text(session_id, "session_id")
+        node_id = _text(node_id, "node_id")
+        target = self.draining_target(session_id=session_id, node_id=node_id)
+        if target is None:
+            return ()
+        return target.active_ownerships(self.jobs, session_id=session_id)
+
+    def active_ownership_count(self, *, session_id: str, node_id: str) -> int:
+        """Return the session-scoped count of validated active ownerships."""
+
+        return len(self.active_ownerships(session_id=session_id, node_id=node_id))
+
+    def is_quiescent(self, *, session_id: str, node_id: str) -> bool:
+        """Return true only when this session/node has no targeted active owner."""
+
+        return not self.active_ownerships(session_id=session_id, node_id=node_id)
 
     def request_drain(
         self,
