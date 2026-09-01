@@ -243,12 +243,14 @@ revoked device as a current member and a demoted node as leader. The capability-
 request leader report aggregator now uses the same primitive: if its 128-page
 read cannot reach the coordinator's current revision, `snapshot` propagates the
 explicit bounded error and the existing Federation overview path renders the
-request status unavailable rather than presenting a partial report set. Tests
-cover both complete multi-page aggregation and refusal past the page ceiling.
-The update, software-version and recorder-control report aggregators still
-return what they accumulated at their ceilings, so **B09 stays at 1/7
-properties automated-proven and remains open**. The two member authority
-surfaces -- user administration and password change -- now report an
+request status unavailable rather than presenting a partial report set. The same
+proof now covers the software-update and software-version report readers and the
+recorder-control event reader; their bounded-prefix reads also refuse with
+`authoritative-replay-incomplete`. Tests cover complete capability aggregation,
+all four consumers' refusal past the page ceiling, and capability snapshot error
+propagation. This completes the software side of the first named property, so
+**B09 stays at 1/7 properties automated-proven and remains open**. The two member
+authority surfaces -- user administration and password change -- now report an
 unresolvable authority as their existing bounded `503` rather than letting the
 refusal escape a `before_request` hook as a broken device; the explicit
 control-plane unavailable/reconnecting operator surface is still not built. No

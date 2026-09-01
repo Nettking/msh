@@ -4,7 +4,13 @@ from types import SimpleNamespace
 
 import pytest
 
-from catalog.flask_app.services import federation_recorder_control_service as service_module
+from catalog.federation.authoritative_replay import (
+    AUTHORITATIVE_REPLAY_INCOMPLETE,
+    AuthoritativeReplayIncomplete,
+)
+from catalog.flask_app.services import (
+    federation_recorder_control_service as service_module,
+)
 from catalog.flask_app.services.federation_recorder_control_service import (
     FederationRecorderControlError,
     FederationRecorderControlService,
@@ -83,6 +89,28 @@ class _Runtime:
         )
 
 
+class _CeilingCoordinator:
+    def __init__(self, total_revisions: int) -> None:
+        self.total_revisions = total_revisions
+
+    def replay_page(
+        self,
+        *,
+        last_applied_revision: int,
+        **_kwargs,
+    ):
+        if last_applied_revision >= self.total_revisions:
+            return (), self.total_revisions
+        return (
+            SimpleNamespace(
+                revision=last_applied_revision + 1,
+                event_type="unrelated",
+                actor_node_id="node-recorder",
+                payload={},
+            ),
+        ), self.total_revisions
+
+
 class _Onboarding:
     def __init__(self, events=()) -> None:
         self.coordinator = _Coordinator(events)
@@ -102,7 +130,7 @@ class _Onboarding:
 
 def _scan_report_event():
     return SimpleNamespace(
-        revision=4,
+        revision=1,
         event_type="recorder.control.scan.reported",
         actor_node_id="node-recorder",
         payload={
@@ -172,6 +200,20 @@ def test_member_can_add_only_source_from_latest_recorder_scan(monkeypatch) -> No
     assert event["event_type"] == "recorder.control.sources.requested"
     assert event["payload"]["add_source_ids"] == ["source-new"]
     assert event["payload"]["remove_source_names"] == ["machine-old"]
+
+
+def test_recorder_control_history_fails_closed_past_its_page_ceiling() -> None:
+    context = SimpleNamespace(
+        coordinator=_CeilingCoordinator(
+            service_module._MAX_EVENT_REPLAY_PAGES + 1
+        ),
+        binding=SimpleNamespace(internal_session_id="session-one"),
+    )
+
+    with pytest.raises(AuthoritativeReplayIncomplete) as failure:
+        FederationRecorderControlService._events(context, "node-member")
+
+    assert failure.value.code == AUTHORITATIVE_REPLAY_INCOMPLETE
 
 
 def test_member_cannot_inject_source_id_not_discovered_by_recorder(monkeypatch) -> None:

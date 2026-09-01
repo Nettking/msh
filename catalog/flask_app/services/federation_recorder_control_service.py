@@ -13,6 +13,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
+from catalog.federation.authoritative_replay import replay_authoritative_history
 from catalog.federation.errors import AuthenticationError, FederationOperationError
 from catalog.federation.recorder_control_events import (
     SCAN_REPORT_EVENT,
@@ -28,6 +29,7 @@ from .mtconnect_discovery_service import validate_scan_cidr
 
 _CONNECTED = frozenset({"connected", "online", "ready", "active"})
 _CONTROL_SCHEMA = "fcp.recorder-control.v1"
+_MAX_EVENT_REPLAY_PAGES = 128
 
 
 class FederationRecorderControlError(RuntimeError):
@@ -167,19 +169,22 @@ class FederationRecorderControlService:
     @staticmethod
     def _events(context: Any, actor: str) -> tuple[Any, ...]:
         collected: list[Any] = []
-        last_revision = 0
-        for _ in range(128):
-            events, current_revision = context.coordinator.replay_page(
+        def read_page(last_revision: int) -> tuple[object, object]:
+            return context.coordinator.replay_page(
                 session_id=context.binding.internal_session_id,
                 actor_node_id=actor,
                 last_applied_revision=last_revision,
                 limit=1000,
             )
-            for event in events:
-                collected.append(event)
-                last_revision = int(event.revision)
-            if not events or last_revision >= int(current_revision):
-                break
+
+        def apply_page(events: tuple[Any, ...]) -> None:
+            collected.extend(events)
+
+        replay_authoritative_history(
+            read_page,
+            apply_page=apply_page,
+            max_pages=_MAX_EVENT_REPLAY_PAGES,
+        )
         return tuple(collected)
 
     @staticmethod

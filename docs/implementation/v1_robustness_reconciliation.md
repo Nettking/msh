@@ -463,14 +463,18 @@ partial set as current. Its `_reports` reader now uses the same authoritative
 replay primitive and its passive `snapshot` path propagates
 `authoritative-replay-incomplete`; the existing Federation overview degradation
 path consequently renders the request status unavailable instead of saving or
-presenting a partial report set as truth. Automated evidence is
-`test_capability_report_aggregation_reaches_the_authoritative_revision` and
-`test_capability_report_aggregation_fails_closed_past_its_page_ceiling` in
-`catalog/flask_app/tests/test_federation_capability_requests.py`, alongside the
+presenting a partial report set as truth. The same proof is now applied to the
+software-update and software-version `_reports` readers and the recorder-control
+`_events` reader. Their incomplete reads likewise raise the explicit bounded
+error instead of returning an accumulated prefix, so each caller's existing
+unavailable/degraded surface can refuse current-looking but incomplete state.
+Automated evidence covers all four consumers: the capability-request complete,
+ceiling and snapshot tests; `test_update_report_aggregation_fails_closed_past_its_page_ceiling`;
+`test_software_version_report_aggregation_fails_closed_past_its_page_ceiling`;
+and `test_recorder_control_history_fails_closed_past_its_page_ceiling`, plus the
 existing shared replay, route and active-leader suites. This extends the first
-property only, so B09 stays at **1/7 properties automated-proven**. The update,
-software-version and recorder-control report aggregators still need the same
-consumer-specific wiring. The remaining five properties are untouched:
+property only, so B09 stays at **1/7 properties automated-proven**. The remaining
+five properties are untouched:
 snapshot/base-revision compaction, member-replicated history lifetime and
 request-history retirement horizons all depend on retirement mechanisms that do
 not exist, and the control-plane unavailable/reconnecting representation and the
