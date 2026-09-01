@@ -24,6 +24,10 @@ from typing import Any
 
 from flask import current_app
 
+from catalog.federation.authoritative_replay import (
+    AuthoritativeReplayIncomplete,
+    replay_authoritative_history,
+)
 from catalog.federation.control_commands import (
     ControlCommandEnvelope,
     ensure_bounded_json,
@@ -63,6 +67,8 @@ REPORT_WINDOW = timedelta(minutes=10)
 CONNECTED_STATES = frozenset({"connected", "online", "ready", "active"})
 TERMINAL_STATES = frozenset({"completed", "partial", "failed", "offline"})
 _MAX_PROCESSOR_REPORTS = 32
+_REPORT_REPLAY_PAGE_EVENTS = 1000
+_MAX_REPORT_REPLAY_PAGES = 128
 
 
 def _bounded(value: object) -> None:
@@ -333,16 +339,9 @@ class FederationCapabilityRequestService:
         request_id: str,
     ) -> dict[str, dict[str, object]]:
         reports: dict[str, dict[str, object]] = {}
-        last_revision = 0
-        for _ in range(128):
-            events, current_revision = context.coordinator.replay_page(
-                session_id=context.binding.internal_session_id,
-                actor_node_id=actor,
-                last_applied_revision=last_revision,
-                limit=1000,
-            )
+
+        def apply_page(events: tuple[Any, ...]) -> None:
             for event in events:
-                last_revision = int(event.revision)
                 if event.event_type != REPORT_EVENT:
                     continue
                 parsed = parse_report(event.payload)
@@ -352,8 +351,17 @@ class FederationCapabilityRequestService:
                 if reported_request != request_id or node_id != event.actor_node_id:
                     continue
                 reports[node_id] = report
-            if not events or last_revision >= current_revision:
-                break
+
+        replay_authoritative_history(
+            lambda last_revision: context.coordinator.replay_page(
+                session_id=context.binding.internal_session_id,
+                actor_node_id=actor,
+                last_applied_revision=last_revision,
+                limit=_REPORT_REPLAY_PAGE_EVENTS,
+            ),
+            apply_page=apply_page,
+            max_pages=_MAX_REPORT_REPLAY_PAGES,
+        )
         return reports
 
     def _refresh(
@@ -416,6 +424,11 @@ class FederationCapabilityRequestService:
             try:
                 context, actor = self._context()
                 refreshed = self._refresh(value, context, actor)
+            except AuthoritativeReplayIncomplete:
+                # The overview route renders an explicit unavailable status for
+                # this bounded refusal. Returning retained local rows here would
+                # make an unfinished report replay look current.
+                raise
             except Exception:  # noqa: BLE001 - passive status read fails closed
                 return value
             if refreshed != value:
