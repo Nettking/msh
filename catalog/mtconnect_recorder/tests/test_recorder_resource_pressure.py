@@ -14,6 +14,9 @@ from catalog.federation.host_resources import (
 )
 from catalog.mtconnect_recorder import runtime as recorder_runtime
 from catalog.mtconnect_recorder.model import ProbeModel, SourceCheckpoint
+from catalog.mtconnect_recorder.publication_frontier_runtime import (
+    install_publication_frontier_runtime,
+)
 from catalog.mtconnect_recorder.recovery_frontier import RecorderRecoveryFrontier
 from catalog.mtconnect_recorder.resource_pressure import (
     RecorderAdmissionController,
@@ -26,11 +29,11 @@ from catalog.mtconnect_recorder.schema_compat import CHECKPOINT_SCHEMA
 from catalog.mtconnect_recorder.storage import DurableRecorderStore
 
 # Production startup reaches runtime through catalog.mtconnect_recorder.run(),
-# which installs the boundary after launcher configuration is established. The
-# full suite may have imported the runtime submodule directly earlier, so make
-# this test module explicitly exercise the same installed production boundary
-# instead of depending on collection/import order.
+# which composes B01 admission before the B03 frontier. The full suite may have
+# imported the runtime submodule directly earlier, so explicitly install both
+# boundaries in production order instead of depending on package import order.
 install_runtime_resource_pressure(recorder_runtime)
+install_publication_frontier_runtime(recorder_runtime)
 
 NOW = datetime(2026, 8, 25, 16, 0, tzinfo=timezone.utc)
 SOURCE = "machine"
@@ -381,7 +384,9 @@ def test_data_and_checkpoint_requirements_share_one_envelope_on_same_filesystem(
         assert data.resource_id == state.resource_id == "device:data"
         assert data.reserved_bytes == state.reserved_bytes
         assert data.reserved_bytes > 0
-        assert data.reserved_inodes == 2
+        # B03's producer-side publication pointer is part of this same finite
+        # recorder transaction, so it consumes one additional data inode.
+        assert data.reserved_inodes == 3
     finally:
         guard.end_transaction()
         guard.end_capture()
@@ -412,7 +417,8 @@ def test_distinct_data_and_checkpoint_filesystems_are_reserved_independently(
         assert state.resource_id == "device:state"
         assert data.reserved_bytes > 0
         assert state.reserved_bytes > 0
-        assert data.reserved_inodes == 1
+        # The discovery pointer belongs to data, not checkpoint state.
+        assert data.reserved_inodes == 2
         assert state.reserved_inodes == 1
     finally:
         guard.end_transaction()
