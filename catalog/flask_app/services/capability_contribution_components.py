@@ -31,6 +31,7 @@ from catalog.federation.onboarding_models import (
     BenchmarkResult,
     ContributionCandidate,
     ContributionDesiredState,
+    ContributionIntent,
     ContributionPolicyState,
 )
 
@@ -38,6 +39,9 @@ from .capability_config_service import CapabilityConfig
 from .capability_onboarding_service import CapabilityOnboardingService
 from .local_capability_candidates import local_contribution_components
 from .recorder_control_service import get_recorder_control_service
+from .registered_compute_provider_composition import (
+    reconcile_registered_compute_provider,
+)
 
 
 def _provider_label(config: CapabilityConfig) -> str:
@@ -217,6 +221,26 @@ def default_components(
                 "compute",
                 "all explicit compute inventory and authority seams are required",
             )
+
+        def reconcile_compute_provider(
+            candidate: ContributionCandidate,
+            intent: ContributionIntent,
+        ) -> None:
+            clock = getattr(onboarding_service, "_clock", None)
+            if callable(clock):
+                reconcile_registered_compute_provider(
+                    onboarding_service=onboarding_service,
+                    candidate=candidate,
+                    intent=intent,
+                    clock=clock,
+                )
+            else:
+                reconcile_registered_compute_provider(
+                    onboarding_service=onboarding_service,
+                    candidate=candidate,
+                    intent=intent,
+                )
+
         sources.append(ComputeCandidateSource(inventory))
         adapters.append(
             ComputeContributionAdapter(
@@ -224,6 +248,7 @@ def default_components(
                 activate_binding=activate_binding,
                 fence_handler=fence_handler,
                 is_handler_active=is_handler_active,
+                reconcile_persisted=reconcile_compute_provider,
             )
         )
     else:
