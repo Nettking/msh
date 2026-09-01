@@ -20,7 +20,7 @@
     "**/tests/**",
     "**/test_*.py",
     "catalog/federation/tests/cf7_acceptance/**",
-    "ops/cf7_*.py",
+    "scripts/acceptance/**",
     "README.md",
     "**/README.md",
     "*.md"

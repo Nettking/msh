@@ -14,7 +14,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$Checkout = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$Checkout = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 Set-Location $Checkout
 
 if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
@@ -25,7 +25,7 @@ function Invoke-Cf7Readiness {
     param([string]$Subcommand)
 
     $Arguments = @(
-        "-m", "ops.cf7_physical_readiness",
+        "-m", "scripts.acceptance.cf7_physical_readiness",
         "--checkout", $Checkout,
         "--evidence-root", "evidence",
         $Subcommand,

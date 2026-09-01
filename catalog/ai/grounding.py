@@ -8,7 +8,15 @@ from pathlib import Path
 from .repo_index import Chunk
 
 PATH_RE = re.compile(r"\b[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+\b")
-REPO_ROOT_PREFIXES = ("catalog/", "docs/", "data/", "results/", "example-data/", "ops/", "legacy/")
+REPO_ROOT_PREFIXES = (
+    "catalog/",
+    "docs/",
+    "data/",
+    "results/",
+    "example-data/",
+    "scripts/",
+    "legacy/",
+)
 FILE_SUFFIXES = (
     ".py",
     ".md",

@@ -30,7 +30,7 @@ case "$action" in
   *) usage; exit 2 ;;
 esac
 
-checkout="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+checkout="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$checkout"
 
 if ! command -v python >/dev/null 2>&1; then
@@ -41,7 +41,7 @@ fi
 run_readiness() {
   local subcommand="$1"
   local args=(
-    -m ops.cf7_physical_readiness
+    -m scripts.acceptance.cf7_physical_readiness
     --checkout "$checkout"
     --evidence-root evidence
     "$subcommand"

@@ -2,7 +2,7 @@
 
 Run from the repository root:
 
-    python reset_fcp.py --yes
+    python scripts/admin/reset_fcp.py --yes
 
 The command stops the Compose stack, removes named volumes (including Ollama
 models and Federation relay state), clears generated local state, and preserves
@@ -132,14 +132,14 @@ def main() -> int:
         )
         return 2
     summary = reset_repository_state(
-        Path(__file__).resolve().parent,
+        Path(__file__).resolve().parents[2],
         stop_compose=not args.skip_docker,
     )
     print("FCP fresh-install reset complete.")
     print(f"Preserved recorder JSONL files: {summary.preserved_jsonl_files}")
     print(f"Removed files: {summary.removed_files}")
     print(f"Removed directories: {summary.removed_directories}")
-    print("Start again with: docker compose up -d --build")
+    print("Start again with start.cmd on Windows or bash start.sh on Linux/macOS.")
     return 0
 
 
