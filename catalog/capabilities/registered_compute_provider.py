@@ -322,19 +322,15 @@ class RegisteredComputeProviderRuntime:
                 actor_node_id=binding.node_id,
                 request_id=retirement_id,
             )
-            if self.enrollments.store.get(
+            self.enrollments.request(
                 session_id=binding.session_id,
                 capability_id=previous.capability_id,
-            ) is not None:
-                self.enrollments.request(
-                    session_id=binding.session_id,
-                    capability_id=previous.capability_id,
-                    actor_node_id=binding.node_id,
-                    command_id=_identifier(
-                        retirement_id,
-                        prefix="compute-provider-retirement-enrollment",
-                    ),
-                )
+                actor_node_id=binding.node_id,
+                command_id=_identifier(
+                    retirement_id,
+                    prefix="compute-provider-retirement-enrollment",
+                ),
+            )
 
     def reconcile_contribution(
         self,
@@ -408,17 +404,16 @@ class RegisteredComputeProviderRuntime:
             actor_node_id=node_id,
             request_id=request_id,
         )
-        enrollment = None
-        if active:
-            enrollment = self.enrollments.request(
-                session_id=session_id,
-                capability_id=binding.capability_id,
-                actor_node_id=node_id,
-                command_id=_identifier(
-                    request_id,
-                    prefix="compute-enrollment-request",
-                ),
-            )
+        reconciled_enrollment = self.enrollments.request(
+            session_id=session_id,
+            capability_id=binding.capability_id,
+            actor_node_id=node_id,
+            command_id=_identifier(
+                request_id,
+                prefix="compute-enrollment-request",
+            ),
+        )
+        enrollment = reconciled_enrollment if active else None
         return binding, announcement, enrollment
 
     def publish_health(
