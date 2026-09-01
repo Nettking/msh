@@ -24,7 +24,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from typing import Any
 
-from .errors import FederationOperationError
+from .errors import FederationOperationError, RevisionGapError
 
 #: Stable machine-readable reason for an authoritative read that stopped short.
 AUTHORITATIVE_REPLAY_INCOMPLETE = "authoritative-replay-incomplete"
@@ -51,6 +51,36 @@ def _revision(value: Any, field: str) -> int:
     return value
 
 
+def _read_page(
+    reader: Callable[[int], tuple[Sequence[Any], Any] | None],
+    last_revision: int,
+) -> tuple[Sequence[Any], Any] | None:
+    """Read one page while preserving revision gaps as fail-closed outcomes.
+
+    A local coordinator reports missing authoritative history with
+    :class:`RevisionGapError`. A paired coordinator returns the same condition
+    through a structured remote operation error whose stable code is
+    ``revision-gap``. Both mean the reader cannot prove current truth and must
+    therefore use the same bounded-incomplete contract as page exhaustion.
+    Other Federation operation failures retain their original semantics.
+    """
+
+    try:
+        return reader(last_revision)
+    except AuthoritativeReplayIncomplete:
+        raise
+    except RevisionGapError as exc:
+        raise AuthoritativeReplayIncomplete(
+            "authoritative replay encountered a revision gap"
+        ) from exc
+    except FederationOperationError as exc:
+        if exc.code == "revision-gap":
+            raise AuthoritativeReplayIncomplete(
+                "authoritative replay encountered a remote revision gap"
+            ) from exc
+        raise
+
+
 def replay_authoritative_history(
     read_page: Callable[[int], tuple[Sequence[Any], Any] | None],
     *,
@@ -68,14 +98,15 @@ def replay_authoritative_history(
     Returns the proven revision. Raises :class:`AuthoritativeReplayIncomplete`
     when the page budget is exhausted first, when a page makes no forward
     progress, skips a revision, contradicts the coordinator's current revision,
-    or when the reader does not report usable revisions at all.
+    when a coordinator reports a revision gap, or when the reader does not
+    report usable revisions at all.
     """
 
     if isinstance(max_pages, bool) or not isinstance(max_pages, int) or max_pages < 1:
         raise ValueError("max_pages must be a positive integer")
     last_revision = _revision(start_revision, "start revision")
     for _ in range(max_pages):
-        result = read_page(last_revision)
+        result = _read_page(read_page, last_revision)
         if result is None:
             raise AuthoritativeReplayIncomplete(
                 "the connected Federation stopped exposing its authoritative event log"
