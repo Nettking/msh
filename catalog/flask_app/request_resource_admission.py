@@ -276,7 +276,15 @@ def _classify_wsgi_input(environ: dict) -> str:
     """
 
     stream = environ.get("wsgi.input")
-    for candidate in (stream, getattr(stream, "_stream", None)):
+    # A chunked request arrives wrapped: Werkzeug's development server replaces
+    # wsgi.input with DechunkedInput, which keeps the socket on ``_rfile``.
+    # Unwrap it so the chunked path classifies as precisely as the plain one.
+    candidates = (
+        stream,
+        getattr(stream, "_rfile", None),
+        getattr(stream, "_stream", None),
+    )
+    for candidate in candidates:
         if candidate is None:
             continue
         try:

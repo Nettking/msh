@@ -657,3 +657,47 @@ def test_socket_backed_wsgi_input_is_reported_as_a_stream(tmp_path: Path) -> Non
             if fd >= 0:
                 _os.close(fd)
         reset_observed_wsgi_input_materialization()
+
+
+def test_a_chunked_body_is_classified_through_its_dechunking_wrapper(
+    tmp_path: Path,
+) -> None:
+    """The development server hands chunked requests to the app wrapped.
+
+    It replaces ``wsgi.input`` with ``DechunkedInput`` and sets
+    ``wsgi.input_terminated``. The wrapper keeps the socket on ``_rfile``, so
+    classifying the wrapper itself would report "unknown" and lose the signal
+    on exactly the ingress shape that has no Content-Length to fall back on.
+    """
+
+    import os as _os
+
+    from werkzeug.serving import DechunkedInput
+
+    reset_observed_wsgi_input_materialization()
+    read_fd, write_fd = _os.pipe()
+    try:
+        admission = _admission(
+            lambda _path: _measurement("request", free_bytes=10_000_000)
+        )
+        app = _request_app(tmp_path, admission)
+        body = _multipart_file_body(b'{"ok":true}\n')
+        _os.write(write_fd, f"{len(body):x}\r\n".encode() + body + b"\r\n0\r\n\r\n")
+        _os.close(write_fd)
+        write_fd = -1
+
+        with _os.fdopen(read_fd, "rb") as handle:
+            read_fd = -1
+            environ = _multipart_environ(body, content_length=None, terminated=True)
+            environ["wsgi.input"] = DechunkedInput(handle)
+            with app.request_context(environ):
+                from flask import request
+
+                assert len(request.files.getlist("files")) == 1
+
+        assert observed_wsgi_input_materialization() == "stream"
+    finally:
+        for fd in (read_fd, write_fd):
+            if fd >= 0:
+                _os.close(fd)
+        reset_observed_wsgi_input_materialization()
