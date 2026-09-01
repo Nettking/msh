@@ -4,7 +4,7 @@ Status: **authoritative implementation input; independent review reconciled; imp
 
 Reviewed: **2026-09-01 Europe/Oslo**
 
-Code baseline reviewed: `main` at `85bd3e664701d5ac9811866681bd3b0266e8d08f` before this delivery.
+Code baseline reviewed: `main` at `c47a97415f5c833de3e7b33111742cf4a55a66e0` before this delivery.
 
 Related documents:
 
