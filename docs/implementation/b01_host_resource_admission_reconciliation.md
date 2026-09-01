@@ -12,10 +12,17 @@ and verified to start at branch head
 `0341166d5611d7bbd59616af8e6614a49a1aa26c`. The handoff named
 `51d09b573d23909305662c911c9a051a828b758b` as current `main` after B05. During
 this continuation, `origin/main` advanced through the B06 merge (#387) and the
-ICSE demo merge (#381) to `954faa357638b13d7291e69ea98fa620c0c3d637`. The final
-review therefore uses `954faa357638b13d7291e69ea98fa620c0c3d637` as the
-current-main baseline and records `51d09b573d23909305662c911c9a051a828b758b`
-as the supplied B05 checkpoint.
+ICSE demo merge (#381) to `954faa357638b13d7291e69ea98fa620c0c3d637`, and then
+through the repository-hygiene merge (#390) to
+`63d56ad068301665e19b4fdddb43e163196b2a55`. The review records
+`51d09b573d23909305662c911c9a051a828b758b` as the supplied B05 checkpoint.
+
+A later independent continuation started from
+`ea46e9edb055590086aeb2e0ccfe8320d26060d7`, re-verified the topology against
+live `main`, and added the ingress, concurrency, recovery and lease work
+recorded below. It found zero changed-file overlap with `main` at every point
+and a clean trial merge, so the branch is not stale; #390 removes `new-stuff/`
+experiments and touches nothing this branch changes.
 
 The branch was validated without merging or rebasing:
 
@@ -105,16 +112,17 @@ still matters.
 | Writer boundary | Consequence and remaining proof | Status |
 |---|---|---|
 | Shared process-wide admission (`host_resources.py`, `process_resource_admission.py`) | Measures bytes/inodes by backing-resource identity; serializes the decision; coalesces requirements; supports atomic multi-resource reservations and unwind. | **PROVEN** |
-| Authorized resource-policy override control plane (`federation/resource_override.py`) | Admin-only/permission-gated retention and maintenance records are exact-scope, expiring, durable-audited, and revocable. Emergency leases are exact-operation/resource-set, one-shot, byte/inode-capped, process-local, and accepted only by the shared controller; PRESSURE may be overridden only above the CRITICAL floor. Consequence tests prove refusal, expiry, revocation, reuse, identity/scope mismatch, cap enforcement, audit-write pressure refusal, and exception unwind. | **PROVEN** |
+| Authorized resource-policy override control plane (`federation/resource_override.py`) | Admin-only/permission-gated retention and maintenance records are exact-scope, expiring, durable-audited, and revocable. Emergency leases are exact-operation/resource-set, one-shot, byte/inode-capped, process-local, and accepted only by the shared controller; PRESSURE may be overridden only above the CRITICAL floor. Lease handles that are used, revoked, or past expiry are dropped at the next issuance, because the lease's own one-shot/expiry contract already proves they can never be admitted again; the durable audit ledger is untouched. No production writer passes an `override` to the shared controller, so the lease is not reachable as a generic bypass from any request path. Consequence tests prove refusal, expiry, revocation, reuse, identity/scope mismatch, cap enforcement, audit-write pressure refusal, exception unwind, and bounded handle cleanup. | **PROVEN** |
 | Recorder capture/recovery/publication (`mtconnect_recorder/resource_pressure.py`, `_resource_pressure_impl.py`) | Sequence-bounded raw XML, manifests, observation NDJSON, normalized JSONL, probes, and checkpoints retain the inherited recorder budget/controller behavior. Recorder publication/outbox ownership and the excluded B03 seam are not re-opened here. | **PARTIAL** |
 | Recorder Federation durable outbox (`catalog/federation/outbox.py`) | Initialization/migration and every state-changing transaction now use the shared controller with bounded byte/inode estimates, WAL autocheckpoint/journal-size limits, rollback, and backing-resource identity checks. Completed/retired payload compaction is bounded. Pending rows and the durable idempotency/tombstone history cannot be automatically deleted without changing at-least-once delivery or re-enqueue suppression. | **PARTIAL** |
 | Federated JSONL local gzip cache (`_prepare_local_file`) | Inherited source/output bounds, stable-directory handling, source re-stat/hash validation, atomic publication, and SQLite transaction envelopes remain. Authenticated owned `fcp-jsonl-*` cleanup is now bounded and proven; cumulative `local_files`/WAL growth is not closed in this PR. | **PARTIAL** |
 | Federated JSONL remote chunk staging (`_write_chunk`, `_record_remote_chunk`) | Inherited completion-at-`PRESSURE` fix admits chunk bytes/inodes and `seen_batches` mutation atomically and preserves identity checks. Authenticated owned `fcp-chunk-*` cleanup is now bounded and proven; cumulative SQLite history remains unresolved. | **PARTIAL** |
 | Federated JSONL reconstruction/materialization (`_try_materialize`) | Inherited encoded/raw bounds, mirror quota, atomic replacement, exact size/hash checks, and completion-at-`PRESSURE` transaction envelope remain. Authenticated owned `fcp-encoded-*`/`fcp-raw-*` cleanup is now bounded and proven; cumulative SQLite/WAL growth remains unresolved. | **PARTIAL** |
-| Browser multipart parser (`flask_app/data_upload_routes.py`, `flask_app/request_resource_admission.py`) | Declared lengths are rejected before form/file parsing. Unknown-length input without `wsgi.input_terminated` fails closed through Werkzeug's safe fallback without FCP spool creation; a terminated streaming-equivalent request is parsed through an FCP-owned managed spool with request-wide/file-wide byte limits, inode reservation, pressure refusal, and unwind tests. A production WSGI server can still materialize bytes before application code and must provide the deployment-level bounded ingress/temp-root contract. | **PARTIAL** |
+| Browser multipart parser and request-body spooling (`flask_app/data_upload_routes.py`, `flask_app/request_resource_admission.py`) | `FCPRequest._get_file_stream` is the single funnel Werkzeug uses to materialize any part that declares a filename, and it now has no delegating path: `/data-upload` parts go to an FCP-owned managed spool with request-wide/file-wide byte limits, inode reservation, pressure refusal and unwind; every other endpoint refuses the part at its header, before the parser is given anywhere to write. Declared lengths are rejected before form parsing; unknown-length input without `wsgi.input_terminated` fails closed on Werkzeug's empty-stream fallback without creating the spool. Because the spool reserves through the process-wide controller, concurrent uploads are bounded in aggregate, not only individually. `create_app()` refuses to start unless the funnel is installed and the request/upload budgets are positive. | **PROVEN** |
+| Pre-application WSGI/proxy request-body buffering | Bytes an upstream layer wrote before the application ran are not application-controllable, and this PR does not claim otherwise. The supported deployment does not do it: `docker-compose.yml` publishes `flask` directly with no reverse proxy, and the entrypoint runs `app.run(..., threaded=True)`, i.e. Werkzeug `run_simple`, which sets `wsgi.input` to the connection socket and wraps chunked bodies in `DechunkedInput` with `wsgi.input_terminated`. Neither touches storage. The prerequisite is stated in `docs/server_setup.md` and is verified rather than assumed: the first upload classifies how the body arrived and logs a warning when it arrived as a regular file. A different WSGI server or buffering proxy owns this bound itself. | **OUT-OF-SCOPE** |
 | Browser upload staging/publication (`data_upload_service.py`, `data_upload_resource_admission.py`) | Staging, final publication, marker/metadata writes, and asynchronous import now reserve through the shared controller with byte/inode estimates; async pressure leaves durable work queued/hidden and retries after pressure clears. Multi-root requirements are coalesced atomically and existing durability ordering is retained. User-visible retained uploads and lifetime metadata have no product retention policy, and service paths do not yet have the storage-provider-level identity proof. | **PARTIAL** |
 | Upload analysis-job metadata links (`upload_analysis_job_service.py`) | Database directory initialization and link insertion/WAL headroom are admitted and exception-safe through the shared controller. The link table is durable cumulative job history without an independent retention policy, so this boundary is not a full aggregate-growth proof. | **PARTIAL** |
-| Analysis input workspace/data-owner publication (`capabilities/analysis/resource_admission.py`, scheduler, content store, slice packaging, artifact authority) | Plan and slice publication now share one atomic multi-resource reservation with the discoverability/job mutation; descriptor registration/audit is admission-aware and receives the held reservation, so nested completion bookkeeping does not re-admit. Content-addressed bodies and deterministic archives use bounded managed temporaries, same-filesystem checks, atomic replacement, and cleanup. The real harness proves a successful plan/slice/registry path and pressure refusal before a second input or job is published; the separate registry call and cumulative history remain explicit boundaries. | **PARTIAL** |
+| Analysis input workspace/data-owner publication (`capabilities/analysis/resource_admission.py`, scheduler, content store, slice packaging, artifact authority) | Plan and slice publication now share one atomic multi-resource reservation with the discoverability/job mutation; descriptor registration/audit is admission-aware and receives the held reservation, so nested completion bookkeeping does not re-admit. Content-addressed bodies and deterministic archives use bounded managed temporaries, same-filesystem checks, atomic replacement, and cleanup. The real harness proves a successful plan/slice/registry path and pressure refusal before a second input or job is published. The separate registry call is no longer an unexamined boundary: publication is one admitted reservation taken before any writer runs, so pressure cannot split it, and the crash-recovery consequences below prove every reachable partial state is repaired by re-discovery without a duplicate or conflicting identity. Cumulative history remains an explicit boundary. | **PARTIAL** |
 | Analysis runtime/session state (`orchestrator/pipeline.py`, `orchestrator/analysis_runtime.py`, managed session metadata) | Runtime workflow-root creation, runtime/startup state JSON, standalone identity, and the analysis capability root now use bounded shared admission; the pressure tests prove refusal before root/state creation. Session metadata writes are covered when entered through the admitted date-slice worker. Durable SQLite histories are scored separately below. | **PROVEN** |
 | Analysis result artifact store (`capabilities/analysis/content_store.py`, worker result publication) | Direct artifact writes and worker result serialization have finite bounds, shared byte/inode reservations, atomic partial-to-final replacement, cleanup, and nested `admission_held` handling. Consequence tests cover refusal before publication and reservation release; the score is scoped to the managed artifact-root boundary. | **PROVEN** |
 | Analysis executor/script workspaces (`orchestrator/analysis_runtime.py`, `runner/script_exec.py`) | Managed run directories and catalog copies use shared byte/inode admission; subprocess output is drained, checked live, terminated on workspace overflow, and cleaned. Tests prove pressure refusal and real output-over-limit refusal. This does not constrain a malicious/unsupported script that intentionally writes outside its managed workspace. | **PROVEN** |
@@ -131,7 +139,7 @@ still matters.
 | Agent and Docker json-file logs | Prior B07 rotation/copy/truncate boundaries are already bounded and are not an unresolved B01 writer in this continuation. | **OUT-OF-SCOPE** |
 | Legacy `data_upload_records` full-payload duplication | The current import path does not persist the obsolete full payload column; this is no longer a supported writer boundary. | **OUT-OF-SCOPE** |
 | Durable resumable transfer, backup/export/import, and migration helpers not instantiated by v1 | No supported installed-product invocation was identified. Claiming admission here would be speculation; adding one would be a separate product boundary. | **OUT-OF-SCOPE** |
-| Crash-stranded `fcp-chunk-*`, `fcp-encoded-*`, `fcp-raw-*`, and B01-owned cache temporaries | Supported JSONL staging/materialization uses authenticated stable-directory owner records; analysis, upload request, observer, source-sync, storage publication, session/filter/index, playback, basic-metrics, content, archive, and telemetry-cache temporaries use authenticated managed roots. Startup/re-entry traversal is bounded, locked active work is skipped, exact filesystem identity and namespace/proof checks are required, and symlinks/reparse points or malformed ownership are never deleted. Consequence tests cover abandoned reclaim, live preservation, unrelated preservation, directory cleanup, and symlink/root safety. Generic or unowned temporary names are deliberately never scavenged. | **PROVEN** |
+| Crash-stranded `fcp-chunk-*`, `fcp-encoded-*`, `fcp-raw-*`, and B01-owned cache temporaries | Supported JSONL staging/materialization uses authenticated stable-directory owner records; analysis, upload request, observer, source-sync, storage publication, session/filter/index, playback, basic-metrics, content, archive, and telemetry-cache temporaries use authenticated managed roots. Startup/re-entry traversal is bounded, locked active work is skipped, exact filesystem identity and namespace/proof checks are required, and symlinks/reparse points or malformed ownership are never deleted. Consequence tests cover abandoned reclaim, live preservation, unrelated preservation, directory cleanup, symlink/root safety, and -- after the concurrency defect found in this continuation -- concurrent allocation beside scavenging on one root. Generic or unowned temporary names are deliberately never scavenged. | **PROVEN** |
 | Cross-writer SQLite/WAL aggregate growth | Per-transaction shared admission and WAL/journal headroom now cover the outbox, upload metadata, storage provider, analysis job/lifecycle, analysis authority, dispatch, coordinator, provider enrollment/health, and efficiency stores, plus the admitted JSONL/cache paths. The remaining gap is aggregate growth after successful transactions: SQLite main files, durable pending/terminal history, JSONL indexes, storage idempotency rows, upload metadata, user-visible data, and the new override audit ledger still need an authorized retention/archive contract. Safe deletion is constrained by delivery identity, ordering gaps, idempotency, tombstones, source-of-truth semantics, or auditability. | **PARTIAL** |
 
 ## Retention and archive decisions requiring Martin
@@ -153,6 +161,7 @@ each cumulative store and the consequence of each alternative.
 | Execution-efficiency observations and derived profiles | Existing configured observation retention and profile rebuild semantics remain; WAL is mechanically checkpointed. | Whether physical SQLite high-water space must be compacted, and the safe operational trigger for VACUUM/backup replacement. | Keep current logical retention; add explicit online backup/VACUUM mechanics only after Martin chooses an operational size/maintenance policy. |
 | Telemetry Parquet cache and analysis derived/cache artifacts | Disposable and rebuildable; source JSONL/session data is authoritative; rebuild tree is bounded and authenticated. | No user-data retention decision is required for the cache itself; only whether operators want a maintenance trigger/telemetry for rebuild cost. | Keep cache disposable and rebuildable. This is not a cumulative-retention blocker for the cache boundary. |
 | Session run outputs and playback/analysis exports | Per-run writes are admitted and bounded; completed user-visible outputs remain available for cache reuse. | Whether completed run outputs are retained forever, archived, or pruned when a session is closed. | Keep until an explicit session-output policy exists; deletion must update session metadata and preserve any required audit/replay references. |
+| Emergency lease handles held in memory | Handles that are used, revoked, or past expiry are dropped at the next issuance. | Nothing. The frontier is the lease's own one-shot use and recorded expiry, both of which already make `consume` refuse forever, so no age cutoff, row count, or deletion horizon is invented. | Resolved mechanically; this row is closed and is not a retention blocker. |
 | Resource override audit ledger | Each issuance/revocation rewrite is bounded, atomically published, identity-checked, and admitted through the shared controller; emergency leases are not rehydrated from it. | Required audit lifetime, archive medium, and whether an immutable external archive becomes the authoritative record. | Keep the local ledger append-history until an authoritative archive/checkpoint contract exists; then compact only behind that identity. Do not silently delete audit evidence as part of B01. |
 
 The recommendation column is a design recommendation for Martin, not an
@@ -178,6 +187,38 @@ write boundaries:
 | Windows/Linux divergence | Windows temporary handles are closed before replacement, owner locks are released before sidecar deletion, and stable NT handle-relative replacement/deletion is retained. POSIX symlink/race tests run where the platform permits them; privilege-limited Windows symlink cases are explicit skips, not passing assertions. |
 | Mocks hiding writer behavior | The added analysis test uses the real harness stack, content store, lifecycle/job database, artifact authority, and registry for success/refusal consequences. Existing unit tests remain focused on individual writer failure/unwind paths. |
 | Override authority abuse, expiry, and hard-floor bypass | The lease is minted only by `ResourceOverrideAuthority`, requires the new admin-only `resource.override` permission (or an explicit trusted equivalent), binds to one exact operation and measured resource set, is one-shot and expiring, and cannot pass CRITICAL or exceed byte/inode caps. The 7-test consequence suite uses the real serialized controller and verifies audit-write refusal and unwind. |
+
+### Findings from the independent continuation
+
+A later independent review attacked the same boundaries against live `main` and
+found four defects the earlier review did not, three of them proven by
+reproduction rather than inspection.
+
+| Finding | Evidence and fix |
+|---|---|
+| **Unadmitted multipart spooling on every non-upload endpoint.** `FCPRequest` owned the file-stream funnel only for `/data-upload` and delegated everything else to Werkzeug's `default_stream_factory`, a `SpooledTemporaryFile` that rolls over to the operating-system temporary directory after 500 KiB. Every POST route reads `request.form` -- CSRF validation alone guarantees it -- and touching `request.form` is what parses the body, so a multipart POST with a file part to any route wrote to host storage with no reservation, bounded only by `MAX_CONTENT_LENGTH` (1100 MiB by default) times the unbounded thread count of `app.run(threaded=True)`. | Measured: a 64 MiB part consumed 67,108,864 bytes of host filesystem, confirmed by `statvfs` delta, on a route that never reads `request.files`. In the container image that lands on the writable layer, a different filesystem from the measured `data/` bind mount. Fixed by refusing the part at its header, where the parser asks for a write target and before it has anywhere to write. Plain multipart fields are unaffected, because Werkzeug only routes a part through the factory when it declares a filename. |
+| **Owner sidecars were authenticatable while unlocked.** `ManagedTemporaryRoot.allocate` wrote the authenticating payload through one handle, closed it, then took the ownership lock on a second open. In between, the sidecar was exactly what `scavenge_managed_temporary_root` reclaims: valid, proof-checked, and unlocked. `ContentStore._atomic_write` scavenges the shared root and then allocates into it, so concurrent artifact writes interleave one thread's scavenge with another's allocation; the scavenge deleted live work and the allocator failed reopening its own sidecar. | This is the cause of `test_concurrent_submission_beside_the_running_driver_strands_nothing` failing in two CI workflows on `ea46e9e`, with both observed symptoms -- a `FileNotFoundError` on the sidecar and a stranded pending job. Reproduced locally at 3/8, and at the managed-temporary seam at 7/10. Fixed by claiming the lock on the handle that exclusively created the sidecar and writing the payload only after: an empty sidecar parses as nothing, which the scavenger already treats as ambiguous. `allocate_directory` had the same ordering and the same fix. |
+| **Root markers were published empty.** `ensure()` created the marker with `open("x")`, which makes an empty file visible before its content arrives. A concurrent `ensure()` reading it in that window parsed nothing and rejected the whole root as unreadable, failing the write it was admitting. | Observed in the same reproduction as `managed temporary root marker is unreadable`. Fixed by writing a private staging file in the same directory and hard-linking it into place: the link is atomic and refuses to clobber, so a reader sees either no marker or a complete one, and a losing creator still re-reads the winner's marker. |
+| **An order-dependent new test.** `test_standalone_identity_refuses_before_state_parent_creation` failed after `catalog/federation/tests` because `create_app()` registers a process-global identity supplier and `resolve_analysis_identity` consults it before reaching the standalone writer. Under `pytest-randomly` and the order-independence job this is a flake, and in the passing direction it is a test of nothing. | Fixed by pinning those bindings the way `catalog/orchestrator/tests/conftest.py` already does, with a second test stating the bypass as a consequence. |
+
+The review also confirmed three properties that were open questions rather than
+defects, and are now pinned by tests instead of assumed:
+
+- **Nested reservations do not deadlock.** `SerializedProcessResourceAdmission`
+  holds its `RLock` only across measurement/accounting and again across
+  release, not across the yielded reservation, so a request-scoped spool
+  reservation held while the route reserves again for staging stacks correctly
+  instead of blocking.
+- **Publication retry cannot duplicate or conflict.** Identities are
+  deterministic functions of the work slice, `job_store.submit()` records its
+  command-replay row inside the same `BEGIN IMMEDIATE` as the job insert, and
+  `register_artifact` returns the existing descriptor for identical content
+  while rejecting a different fingerprint under a registered ID.
+- **The emergency lease is not a generic bypass.** No production writer passes
+  `override=` to the shared controller; the lease is reachable only from the
+  operator-authorized authority.
+
+### Earlier review findings
 
 The review found and fixed the Windows open-handle replacement failure, the
 Windows sidecar cleanup ordering failure, malformed ownership/marker handling,
@@ -241,6 +282,20 @@ The coherent implementation slices pushed to the branch are:
 - `c5a8dca` — hardened override audit load/publication against oversized audit
   state, mutable-value aliasing, non-finite lease bounds, parent/target identity
   races, and POSIX directory substitution during atomic replacement.
+
+The independent continuation added three further slices:
+
+- `86d2e0b` — closed the unadmitted multipart file-spooling path on every
+  non-upload endpoint, made the two in-process ingress prerequisites startup
+  errors, added runtime detection of a pre-spooled WSGI body, and documented
+  which half of the ingress contract is the application's and which is the
+  deployment's;
+- `84f9c1c` — fixed the owner-sidecar lock ordering and the empty root-marker
+  publication in `managed_temporary.py`, added the concurrency regressions, and
+  repaired the B01 workflow's diff-hygiene step under `workflow_dispatch`;
+- `befc267` — added the analysis publication crash-recovery consequence suite,
+  bounded the emergency-lease handle map by the lease's own expiry, and removed
+  the order dependence in the durable-SQLite admission test.
 
 The earlier Federated JSONL completion-at-`PRESSURE` work is inherited by this
 branch and was not reworked as a writer-ledger refinement.
@@ -313,16 +368,60 @@ python -m pytest -o addopts= --basetemp .pytest-b01-override-hardening -q \
 The combined directly relevant collection on the implementation-plus-ledger
 workspace collected **315 tests**, with **310 passed** and **5 platform skips**.
 
+### Independent continuation evidence
+
+The continuation ran wider suites than the focused collection, under the
+randomized ordering CI uses, because the order-dependence defect it found is
+invisible to a fixed order:
+
+```text
+python -m pytest -o addopts= -q -p randomly --randomly-seed=<1|2|3>   catalog/federation/tests catalog/capabilities/tests catalog/common/tests
+# 1385 passed, 8 skipped -- on each of seeds 1, 2 and 3
+
+python -m pytest -o addopts= -q -p randomly --randomly-seed=7   catalog/flask_app/tests catalog/orchestrator/tests catalog/runner/tests
+# 1020 passed, 19 skipped
+```
+
+Each fix was checked against the code it repairs, not only after it:
+
+- the multipart reproduction consumed 67,108,864 bytes of host filesystem
+  before the fix and is refused at the part header after it, with the whole
+  `catalog/flask_app/tests` suite (947 passed, 19 skipped) confirming no route
+  lost behaviour;
+- the managed-temporary regressions catch the pre-fix code on 9 runs in 10 and
+  pass 10 in 10 after, and the analysis-scheduling test that failed in CI went
+  from 3 failures in 8 runs to 20 consecutive passes;
+- the emergency-lease regression fails against the pre-fix authority.
+
+`python -m compileall` and `ruff` with the repository's established baseline
+exclusions pass on every changed file, and `git diff --check` is clean. The
+checkout still cannot produce a repository-wide green signal for the reasons
+recorded above; the continuation installed the release-pinned Flask 3.1.3 and
+Werkzeug 3.1.8 plus the data and auth dependencies so the Flask boundary could
+be exercised for real rather than skipped.
+
 ## Architectural blockers and exact residual work
 
-1. **Pre-route multipart spooling:** the Flask/Werkzeug application now bounds
-   declared requests before form parsing and, when the WSGI environment
-   explicitly provides `wsgi.input_terminated`, owns a bounded FCP spool with
-   request/file byte and inode reservations. An unknown-length request without
-   that signal fails closed without creating the FCP spool. A production WSGI
-   server or reverse proxy may still materialize bytes before application code;
-   the smallest remaining follow-up is a deployment-level bounded ingress and
-   temp-root contract, with evidence from the actual supported server.
+1. **Pre-route multipart spooling — resolved for the supported deployment.**
+   The earlier draft treated this as fundamentally owned by an external WSGI or
+   proxy layer. Tracing the repository's actual supported configuration shows
+   that is not the case: there is no gunicorn, uwsgi, waitress, nginx or other
+   proxy anywhere in the repository, `docker-compose.yml` publishes the `flask`
+   service directly, and the image entrypoint runs `app.run(..., threaded=True)`
+   — Werkzeug's own `run_simple`, in process. That server sets `wsgi.input` to
+   the connection socket and dechunks in memory; it never spools a body to disk.
+
+   So the ingress boundary is ownable in the repository, and now is. The
+   application-level guarantee is server-independent: no multipart file part
+   reaches host storage except through the admitted FCP spool, enforced at the
+   single funnel Werkzeug uses. The deployment-level prerequisite — that the
+   WSGI layer does not buffer bodies to disk before the application runs — is
+   stated in `docs/server_setup.md`, satisfied by the supported deployment, and
+   detected at runtime rather than assumed.
+
+   The residual is narrow and honest: an operator who deliberately puts FCP
+   behind a buffering server or proxy owns that layer's bound. FCP cannot
+   un-write those bytes, and does not claim to.
 2. **Cumulative SQLite and durable retention:** checkpointing bounds transient
    WAL behavior, not the main database or durable history. The outbox cannot
    delete pending/terminal rows without changing at-least-once delivery,
@@ -336,6 +435,19 @@ workspace collected **315 tests**, with **310 passed** and **5 platform skips**.
    escape hatch, but it does not choose retention values or authorize deletion
    by itself. Its own audit ledger consequently needs the same explicit audit
    lifetime/archive decision.
+
+   Re-examined in the independent continuation for mechanically implied
+   frontiers that need no product decision. One was found and implemented: the
+   in-memory emergency-lease handle map, whose frontier is the lease's own
+   one-shot use and recorded expiry. Upload staging was checked and is already
+   closed — `_cleanup_staging` and `_reconcile_orphan_staging` remove staging
+   superseded by publication or absent from SQLite. Every other cumulative
+   store was checked and none yields a frontier that follows from an existing
+   invariant: outbox pending rows and tombstones bound at-least-once delivery
+   and re-enqueue suppression, `seen_batches` bounds duplicate publication,
+   `capability_job_commands` bounds command replay, and storage batches bound
+   replay and conflict detection. Deleting from any of them is a product
+   decision, not a mechanical one, and none is taken here.
 3. **Supported crash-stranded temporary files:** authenticated managed roots
    and the stable JSONL directory boundary now reclaim abandoned owned files
    under bounded traversal, while locked/live, malformed, symlink/reparse,
@@ -348,10 +460,22 @@ workspace collected **315 tests**, with **310 passed** and **5 platform skips**.
 
 ## Handoff facts
 
-The latest implementation head before this ledger refresh is
-`c5a8dca4796de5b6dfc2bba1a6e2f7c978657ab7`; the exact final documentation
-head and exact-head workflow identifiers are recorded in the PR body and final
-handoff after the documentation commit. Current main is
-`954faa357638b13d7291e69ea98fa620c0c3d637`; the PR base and merge-base are
-`17e279c01ae6d48ca9c0f4a0b3eaddbb5922d0ef`. This document does not accept
-physical evidence, declare B01 complete, or authorize a merge.
+The latest implementation head of the independent continuation is
+`befc267`; the heads it added are `86d2e0b`, `84f9c1c` and `befc267`, on top of
+the earlier `c5a8dca4796de5b6dfc2bba1a6e2f7c978657ab7` and the documentation
+head `ea46e9edb055590086aeb2e0ccfe8320d26060d7`. Current main is
+`63d56ad068301665e19b4fdddb43e163196b2a55`; the PR base and merge-base remain
+`17e279c01ae6d48ca9c0f4a0b3eaddbb5922d0ef`, with zero changed-file overlap and
+a clean trial merge.
+
+CI on `ea46e9e` had three failures, all now attributed and addressed: the two
+`Admission boundary` jobs failed in the diff-hygiene step, not in tests or
+lint, because `github.base_ref` is empty under `workflow_dispatch` and expanded
+to the unparseable `origin/...HEAD`; `retry-cancellation` and
+`provider-selection` both failed on the same analysis-scheduling test, which
+the managed-temporary races caused.
+
+This document does not accept physical evidence, declare B01 complete, or
+authorize a merge. Merge readiness of #383 and closure of the B01 lane remain
+separate questions: the retention decisions below are still open regardless of
+the PR's state.
