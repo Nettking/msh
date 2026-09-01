@@ -83,7 +83,7 @@ def test_docs_tests_and_acceptance_tooling_do_not_invalidate_physical_observatio
             ".github/workflows/cf7.yml",
             "catalog/node/tests/test_client.py",
             "catalog/federation/tests/cf7_acceptance/physical_evidence.py",
-            "ops/cf7_physical_readiness.py",
+            "scripts/acceptance/cf7_physical_readiness.py",
         ]
     )
 
