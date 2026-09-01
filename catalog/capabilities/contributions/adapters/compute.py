@@ -9,6 +9,7 @@ from catalog.federation.onboarding_models import (
     ContributionActivationState,
     ContributionCandidate,
     ContributionDesiredState,
+    ContributionIntent,
     DeviceInspectionSnapshot,
 )
 
@@ -69,11 +70,15 @@ class ComputeContributionAdapter:
         activate_binding: Callable[[Any], None],
         fence_handler: Callable[[str, str], None],
         is_handler_active: Callable[[str, str], bool],
+        reconcile_persisted: (
+            Callable[[ContributionCandidate, ContributionIntent], None] | None
+        ) = None,
     ) -> None:
         self._inventory = inventory
         self._activate_binding = activate_binding
         self._fence_handler = fence_handler
         self._is_handler_active = is_handler_active
+        self._persisted_reconciler = reconcile_persisted
 
     def supports(self, candidate: ContributionCandidate) -> bool:
         return (
@@ -116,6 +121,16 @@ class ComputeContributionAdapter:
         if not self._is_handler_active(handler_id, fingerprint):
             self._activate_binding(binding)
         return AdapterOutcome(ContributionActivationState.ACTIVE)
+
+    def reconcile_persisted(
+        self,
+        candidate: ContributionCandidate,
+        intent: ContributionIntent,
+    ) -> None:
+        """Project the store-assigned decision revision after local persistence."""
+
+        if self._persisted_reconciler is not None:
+            self._persisted_reconciler(candidate, intent)
 
     def _current_binding(self, candidate: ContributionCandidate) -> Any:
         handler_id, fingerprint = self._identity(candidate)
