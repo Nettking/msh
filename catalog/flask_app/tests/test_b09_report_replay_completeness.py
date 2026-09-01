@@ -110,6 +110,47 @@ def test_software_version_reports_do_not_return_a_prefix_at_the_existing_page_ce
         service._reports(context, "node-leader", request_id="trial-one")
 
 
+def test_switch_version_persists_an_accepted_request_when_report_replay_is_incomplete(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(version_module, "_REPORT_REPLAY_PAGE_EVENTS", 1)
+    context = _context(version_module._MAX_REPORT_REPLAY_PAGES + 1)
+    service = FederationSoftwareVersionService(
+        _VersionLocal(), tmp_path / "software-version.json"
+    )
+    monkeypatch.setattr(service, "_context", lambda: (context, "node-leader"))
+    monkeypatch.setattr(
+        service,
+        "_authority_devices",
+        lambda _context, _actor: (
+            SimpleNamespace(node_id="node-remote", state="connected", label="Remote"),
+        ),
+    )
+    appended: list[dict[str, Any]] = []
+
+    def append(_context: Any, **kwargs: Any) -> None:
+        appended.append(dict(kwargs))
+
+    monkeypatch.setattr(version_module, "_append_authenticated_event", append)
+
+    result = service.switch_version(
+        node_ids=["node-remote"],
+        branch="fix/b09-report-replay",
+        target_commit="2" * 40,
+    )
+
+    assert len(appended) == 1
+    assert result["status"] == "switching"
+    assert result["expected_report_node_ids"] == ["node-remote"]
+    persisted = service._load()
+    assert persisted["request_id"] == result["request_id"]
+    assert persisted["status"] == "switching"
+
+    with pytest.raises(AuthoritativeReplayIncomplete):
+        service.snapshot()
+
+
 def test_capability_reports_do_not_return_a_prefix_at_the_existing_page_ceiling(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
