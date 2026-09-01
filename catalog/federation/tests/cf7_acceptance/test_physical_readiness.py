@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from ops import cf7_physical_readiness as readiness
+from scripts.acceptance import cf7_physical_readiness as readiness
 
 COMMIT = "a" * 40
 
