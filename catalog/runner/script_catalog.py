@@ -13,7 +13,6 @@ from typing import Literal
 # default "pick script + date range" analysis flow.
 RUNNER_HIDDEN_FOLDERS = {
     "runner",  # runner implementation internals
-    "data_simulator",  # streamlit app, not a one-shot CLI analysis run
     "interventions",  # environment-specific script
     "standalone_recorder",  # ingestion tool (legacy)
     "standalone-recorder_v2",  # ingestion tool (preferred recorder)
