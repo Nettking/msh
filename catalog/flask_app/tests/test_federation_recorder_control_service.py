@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from catalog.federation.authoritative_replay import AuthoritativeReplayIncomplete
 from catalog.flask_app.services import federation_recorder_control_service as service_module
 from catalog.flask_app.services.federation_recorder_control_service import (
     FederationRecorderControlError,
@@ -52,11 +53,13 @@ class _Coordinator:
     ):
         assert session_id == "session-one"
         assert actor_node_id == "node-member"
-        assert limit == 1000
+        assert limit == service_module._REPORT_REPLAY_PAGE_EVENTS
         remaining = tuple(
             event for event in self.events if event.revision > last_applied_revision
         )
-        return remaining, max((event.revision for event in self.events), default=0)
+        return remaining[:limit], max(
+            (event.revision for event in self.events), default=0
+        )
 
 
 class _Runtime:
@@ -102,7 +105,7 @@ class _Onboarding:
 
 def _scan_report_event():
     return SimpleNamespace(
-        revision=4,
+        revision=1,
         event_type="recorder.control.scan.reported",
         actor_node_id="node-recorder",
         payload={
@@ -127,6 +130,18 @@ def _scan_report_event():
             "error_code": None,
             "completed_at": "2026-08-10T21:30:00Z",
         },
+    )
+
+
+def _filler_events(count: int):
+    return tuple(
+        SimpleNamespace(
+            revision=index,
+            event_type="capability.activity.recorded",
+            actor_node_id="node-recorder",
+            payload={"index": index},
+        )
+        for index in range(1, count + 1)
     )
 
 
@@ -190,4 +205,30 @@ def test_member_cannot_inject_source_id_not_discovered_by_recorder(monkeypatch) 
             remove_source_names=[],
         )
 
+    assert onboarding.relay_runtime.appended == []
+
+
+def test_recorder_control_refuses_a_report_prefix_at_its_page_ceiling(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(service_module, "_REPORT_REPLAY_PAGE_EVENTS", 1)
+    onboarding = _Onboarding(
+        events=_filler_events(service_module._MAX_REPORT_REPLAY_PAGES + 1)
+    )
+    monkeypatch.setattr(
+        service_module,
+        "get_capability_onboarding_service",
+        lambda: onboarding,
+    )
+
+    with pytest.raises(AuthoritativeReplayIncomplete):
+        FederationRecorderControlService().snapshot()
+
+    with pytest.raises(AuthoritativeReplayIncomplete):
+        FederationRecorderControlService().request_source_change(
+            "node-recorder",
+            scan_id="scan-current",
+            add_source_ids=[],
+            remove_source_names=["machine-old"],
+        )
     assert onboarding.relay_runtime.appended == []
