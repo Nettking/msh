@@ -106,6 +106,50 @@ Required properties:
 
 The current eight-worker concurrency is not itself a defect. It becomes safe only once individual work is finite and aggregate resource use is admitted.
 
+Robustness progress: **B02 9/9 software properties automated-proven; B02 remains
+`OPEN`** for the exact-candidate physical P04/P05/P09 evidence.
+
+The final property closed the gap between what admission *reserves* and what the
+filesystem *does*. Admission reserves against an estimate of a capture
+transaction; a concurrent writer, another process, or an underestimate can still
+leave the host with no room by the time the admitted write runs, and the
+filesystem then refuses it directly with `ENOSPC`. That refusal is not an
+admission refusal, so it did not carry the pause signal and reached
+`RecorderRuntime.capture_source`'s remote-source `except Exception` instead.
+
+Every consequence was misattribution. A healthy MTConnect Agent was recorded as
+the failing party, its `last_error` carried a host disk message, and its backoff
+doubled toward `BACKOFF_MAX` on each retry, so the recorder walked away from a
+source that was never at fault. Meanwhile `resource_admission` was never set, so
+the harvest could not publish the degraded "paused by local host resource
+pressure; primary evidence is retained" state, and the only local condition that
+actually stopped capture was invisible. This is the same amplification shape the
+B06 recorder status-I/O delivery refused for the heartbeat, on the capture path.
+
+An observable out-of-room refusal raised inside an admitted transaction is now
+reclassified into the existing pause path, carrying a fresh measurement of the
+resource that refused. The boundary is deliberately narrow in three ways, each
+pinned by test: only `ENOSPC`/`EDQUOT` are reclassified, so a permission or I/O
+fault keeps its own failure semantics rather than being presented as a healthy
+pause; only writes inside an admitted transaction are reclassified, so a
+`save_state` outside one -- checkpoint alias reconciliation, for instance --
+keeps an ordinary `OSError` rather than raising a control signal nothing there
+would catch; and if the refusing resource cannot be measured at all, the
+original `OSError` is preserved rather than a pressure state being invented.
+
+The ordering invariant was audited rather than assumed. Where the raw batch
+lands and only the checkpoint write is refused, the raw evidence is retained and
+no durable checkpoint moves past it. The in-memory checkpoint does lead in that
+window, and legitimately: raw, observation and normalized all landed, so the
+batch really was stored and only its record was refused; recovery replays from
+the durable checkpoint, and the content-addressed batch is idempotent. Nothing
+is deleted to make room on any path.
+
+Consequence tests drive real refusals through the installed boundary rather than
+replacing the methods that carry it. P04/P05/P09 physical evidence remains open,
+and B01 still owns aggregate host-resource admission across concurrent writers.
+No physical evidence or acceptance state changed.
+
 ### B03 — recorder publication progress and durable outbox lifecycle
 
 **State:** `OPEN`  

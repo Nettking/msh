@@ -18,6 +18,7 @@ tests or other callers are unaffected unless explicitly attached.
 """
 from __future__ import annotations
 
+import errno
 import json
 import sys
 import threading
@@ -96,6 +97,23 @@ class RecorderResourcePause:
 
     code: str
     assessment: ResourceAssessment
+
+
+#: Stable code for a host filesystem that refused an already-admitted write.
+STORAGE_EXHAUSTED = "storage_exhausted"
+
+#: Errno values that mean the host has no room, rather than a genuine fault.
+#: Deliberately narrow: a permission, I/O or corruption error is a real failure
+#: and must keep its own semantics rather than being presented as pressure.
+_STORAGE_EXHAUSTION_ERRNOS = frozenset(
+    code
+    for code in (getattr(errno, name, None) for name in ("ENOSPC", "EDQUOT"))
+    if code is not None
+)
+
+
+def _is_storage_exhaustion(exc: BaseException) -> bool:
+    return isinstance(exc, OSError) and exc.errno in _STORAGE_EXHAUSTION_ERRNOS
 
 
 class RecorderResourcePaused(RuntimeError):
@@ -447,6 +465,40 @@ class RecorderResourceGuard:
         with self._lock:
             return threading.get_ident() in self._capture_urls
 
+    def in_transaction(self) -> bool:
+        """Report whether this thread currently holds an admitted reservation."""
+
+        with self._lock:
+            return threading.get_ident() in self._transactions
+
+    def record_storage_exhaustion(self, path: Path | str) -> bool:
+        """Record a real filesystem refusal as a measured local pause.
+
+        Admission reserves against an *estimate*. A concurrent writer, another
+        process, or an underestimate can still leave the host with no room by
+        the time the admitted write runs, and the filesystem then refuses it
+        directly. That is the same local condition the controller refuses for,
+        so it must reach the same pause path rather than the remote-source
+        error boundary -- otherwise a healthy Agent is marked failed and backed
+        off for the host's disk being full.
+
+        Nothing is fabricated: the pause carries a fresh measurement of the
+        resource that just refused. If that resource cannot be measured at all
+        the caller keeps the original ``OSError``, because this boundary may
+        only reclassify a condition it can actually observe.
+        """
+
+        try:
+            assessment = self.controller.assessment(path)
+        except (OSError, ValueError, RuntimeError):
+            return False
+        with self._lock:
+            self._refusals[threading.get_ident()] = RecorderResourcePause(
+                code=STORAGE_EXHAUSTED,
+                assessment=assessment,
+            )
+        return True
+
     def _capture_base_url(self, source_name: str) -> str:
         with self._lock:
             active = self._capture_urls.get(threading.get_ident())
@@ -736,6 +788,33 @@ def _runtime_module_value(runtime: Any, name: str, default: Any) -> Any:
     return getattr(module, name, default) if module is not None else default
 
 
+def _admitted_storage_write(guard: Any, path: Any) -> Any:
+    """Reclassify a host-storage refusal raised inside an admitted write.
+
+    Only an admitted transaction may be reclassified. A ``save_state`` outside
+    one -- checkpoint alias reconciliation, for example -- keeps its ordinary
+    failure, because the pause signal is a control flow the capture and
+    recovery wrappers own and nothing else is prepared to catch.
+    """
+
+    @contextmanager
+    def _scope() -> Iterator[None]:
+        if guard is None or not (guard.in_capture() or guard.in_transaction()):
+            yield
+            return
+        try:
+            yield
+        except OSError as exc:
+            if not _is_storage_exhaustion(exc):
+                raise
+            target = getattr(exc, "filename", None) or path
+            if not guard.record_storage_exhaustion(target):
+                raise
+            raise _RecorderPauseSignal from None
+
+    return _scope()
+
+
 def _apply_pause_status(
     runtime: Any,
     source_name: str,
@@ -786,6 +865,7 @@ def install_runtime_resource_pressure(runtime_module: ModuleType) -> None:
     store_class = runtime_module.DurableRecorderStore
     original_store_probe = store_class.store_probe
     original_store_observation = store_class.store_observation_batch
+    original_store_batch = store_class.store_batch
     frontier_class = runtime_module.RecorderRecoveryFrontier
 
     def resource_init(self: Any, *args: Any, **kwargs: Any) -> None:
@@ -810,7 +890,9 @@ def install_runtime_resource_pressure(runtime_module: ModuleType) -> None:
                     for name, checkpoint in sorted(self.checkpoints.items())
                 },
             }
-            _write_bytes_atomic(Path(runtime_module.STATE_FILE), _compact_json(payload))
+            state_file = Path(runtime_module.STATE_FILE)
+            with _admitted_storage_write(guard, state_file):
+                _write_bytes_atomic(state_file, _compact_json(payload))
 
     def resource_store_probe(
         self: Any,
@@ -833,7 +915,7 @@ def install_runtime_resource_pressure(runtime_module: ModuleType) -> None:
             source_name=source_name,
             instance_id=instance_id,
             probe=probe,
-        ):
+        ), _admitted_storage_write(guard, self.raw_root):
             return original_store_probe(
                 self,
                 source_name=source_name,
@@ -856,12 +938,13 @@ def install_runtime_resource_pressure(runtime_module: ModuleType) -> None:
                 batch=batch,
                 raw_sha256=raw_sha256,
             )
-        return original_store_observation(
-            self,
-            source_name=source_name,
-            batch=batch,
-            raw_sha256=raw_sha256,
-        )
+        with _admitted_storage_write(guard, self.observation_root):
+            return original_store_observation(
+                self,
+                source_name=source_name,
+                batch=batch,
+                raw_sha256=raw_sha256,
+            )
 
     class ResourceAwareRecoveryFrontier(frontier_class):
         def mark_pending(
@@ -909,6 +992,11 @@ def install_runtime_resource_pressure(runtime_module: ModuleType) -> None:
             finally:
                 if guard is not None:
                     guard.end_transaction()
+
+    def resource_store_batch(self: Any, **kwargs: Any) -> Any:
+        guard = getattr(self, "_recorder_resource_guard", None)
+        with _admitted_storage_write(guard, self.raw_root):
+            return original_store_batch(self, **kwargs)
 
     def resource_capture(
         self: Any,
@@ -977,12 +1065,14 @@ def install_runtime_resource_pressure(runtime_module: ModuleType) -> None:
     runtime_class._harvest_capture_results = resource_harvest
     store_class.store_probe = resource_store_probe
     store_class.store_observation_batch = resource_store_observation
+    store_class.store_batch = resource_store_batch
     runtime_module.RecorderRecoveryFrontier = ResourceAwareRecoveryFrontier
     runtime_module._RESOURCE_PRESSURE_INSTALLED = True
 
 
 __all__ = [
     "RESOURCE_PRESSURE_RETRY_SECONDS",
+    "STORAGE_EXHAUSTED",
     "RecorderAdmissionController",
     "RecorderResourceBudget",
     "RecorderResourceGuard",

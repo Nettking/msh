@@ -29,11 +29,13 @@ jobs:
           python -m pytest -q
           catalog/mtconnect_recorder/tests/test_resource_pressure_process_wide.py
           catalog/mtconnect_recorder/tests/test_recorder_resource_pressure.py
+          catalog/mtconnect_recorder/tests/test_recorder_storage_exhaustion_pause.py
       - name: Ruff
         run: >-
           python -m ruff check
           catalog/mtconnect_recorder/resource_pressure.py
           catalog/mtconnect_recorder/tests/test_resource_pressure_process_wide.py
+          catalog/mtconnect_recorder/tests/test_recorder_storage_exhaustion_pause.py
       - name: Diff hygiene
         shell: bash
         run: git diff --check origin/main...HEAD
