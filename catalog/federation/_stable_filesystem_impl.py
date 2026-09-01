@@ -10,10 +10,14 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import hmac
+import json
 import os
 import secrets
 import stat
 from collections.abc import Iterator
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import BinaryIO
 
@@ -63,6 +67,69 @@ def _open_posix_absolute_directory(path: Path) -> int:
 
 def _posix_resource_id(fd: int) -> str:
     return f"device:{int(os.fstat(fd).st_dev)}"
+
+
+_TEMP_ROOT_SCHEMA = "fcp-stable-temporary-root-v1"
+_TEMP_OWNER_SCHEMA = "fcp-stable-temporary-owner-v1"
+_TEMP_ROOT_MARKER = ".fcp-stable-temporary-root.json"
+_TEMP_OWNER_SUFFIX = ".fcp-stable-owner.json"
+_TEMP_MAX_NAME_LENGTH = 240
+
+
+def _temporary_proof(token: str, name: str, resource_id: str) -> str:
+    message = f"{name}\0{resource_id}".encode()
+    return hmac.new(token.encode("ascii"), message, hashlib.sha256).hexdigest()
+
+
+def _canonical_json(payload: dict[str, object]) -> bytes:
+    return json.dumps(payload, sort_keys=True, separators=(",", ":")).encode(
+        "utf-8"
+    )
+
+
+def _lock_file(handle: BinaryIO, *, blocking: bool) -> bool:
+    handle.seek(0)
+    if os.name == "nt":
+        mode = msvcrt.LK_LOCK if blocking else msvcrt.LK_NBLCK  # type: ignore[name-defined]
+        try:
+            msvcrt.locking(handle.fileno(), mode, 1)  # type: ignore[name-defined]
+        except OSError:
+            return False
+        return True
+    import fcntl
+
+    flags = fcntl.LOCK_EX | (0 if blocking else fcntl.LOCK_NB)
+    try:
+        fcntl.flock(handle.fileno(), flags)
+    except OSError:
+        return False
+    return True
+
+
+def _unlock_file(handle: BinaryIO) -> None:
+    handle.seek(0)
+    if os.name == "nt":
+        try:
+            msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)  # type: ignore[name-defined]
+        except OSError:
+            pass
+        return
+    import fcntl
+
+    try:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+    except OSError:
+        pass
+
+
+@dataclass(frozen=True)
+class TemporaryScavengeReport:
+    scanned_entries: int
+    reclaimed_files: int
+    reclaimed_owner_records: int
+    skipped_active: int
+    skipped_ambiguous: int
+    cleanup_failures: int
 
 
 if os.name == "nt":
@@ -436,6 +503,90 @@ class StableDirectory:
         assert self._handle is not None
         return _windows_resource_id(self._handle)
 
+    def _open_exclusive(self, name: str) -> int:
+        name = self._name(name)
+        if os.name != "nt":
+            assert self._fd is not None
+            flags = os.O_RDWR | os.O_CREAT | os.O_EXCL
+            flags |= getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+            return os.open(name, flags, 0o600, dir_fd=self._fd)
+        assert self._handle is not None
+        return _windows_open_relative_file(
+            self._handle, name, writable=True, create_new=True
+        )
+
+    def ensure_temporary_root(self) -> str:
+        """Create/verify the authenticated marker for this managed directory."""
+
+        resource_id = self.resource_id
+        try:
+            with self.open_read(_TEMP_ROOT_MARKER) as handle:
+                try:
+                    payload = json.loads(handle.read().decode("utf-8"))
+                except (UnicodeDecodeError, ValueError) as exc:
+                    raise StableFilesystemError(
+                        "managed temporary root marker is unreadable"
+                    ) from exc
+        except FileNotFoundError:
+            payload = {
+                "schema": _TEMP_ROOT_SCHEMA,
+                "resource_id": resource_id,
+                "token": secrets.token_hex(32),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+            try:
+                fd = self._open_exclusive(_TEMP_ROOT_MARKER)
+                with os.fdopen(fd, "wb") as handle:
+                    handle.write(_canonical_json(payload) + b"\n")
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                self.fsync()
+            except FileExistsError:
+                with self.open_read(_TEMP_ROOT_MARKER) as handle:
+                    try:
+                        payload = json.loads(handle.read().decode("utf-8"))
+                    except (UnicodeDecodeError, ValueError) as exc:
+                        raise StableFilesystemError(
+                            "managed temporary root marker race is unreadable"
+                        ) from exc
+        if (
+            not isinstance(payload, dict)
+            or payload.get("schema") != _TEMP_ROOT_SCHEMA
+            or payload.get("resource_id") != resource_id
+            or not isinstance(payload.get("token"), str)
+            or len(str(payload["token"])) < 32
+        ):
+            raise StableFilesystemError("managed temporary root marker ownership mismatch")
+        return str(payload["token"])
+
+    def _write_owner_payload(
+        self, handle: BinaryIO, payload: dict[str, object]
+    ) -> None:
+        handle.seek(0)
+        handle.truncate()
+        handle.write(_canonical_json(payload) + b"\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+
+    def _unlink_if_identity(self, name: str, expected: tuple[int, int]) -> bool:
+        try:
+            actual = self.stat(name)
+        except FileNotFoundError:
+            return True
+        except (OSError, StableFilesystemError):
+            return False
+        if not stat.S_ISREG(actual.st_mode) or (
+            int(actual.st_dev), int(actual.st_ino)
+        ) != expected:
+            return False
+        try:
+            self.unlink(name)
+        except FileNotFoundError:
+            return True
+        except OSError:
+            return False
+        return True
+
     def close(self) -> None:
         if self._fd is not None:
             os.close(self._fd)
@@ -497,31 +648,221 @@ class StableDirectory:
     def temporary_file(
         self, *, prefix: str = "tmp", suffix: str = ""
     ) -> Iterator[tuple[str, BinaryIO]]:
+        if not prefix or Path(prefix).name != prefix or Path(suffix).name != suffix:
+            raise StableFilesystemError("managed temporary name components are unsafe")
+        if len(prefix) + len(suffix) + 24 > _TEMP_MAX_NAME_LENGTH:
+            raise StableFilesystemError("managed temporary name is too long")
+        token = self.ensure_temporary_root()
         fd: int | None = None
+        owner_fd: int | None = None
         name = ""
+        owner_name = ""
+        file_identity: tuple[int, int] | None = None
+        owner_identity: tuple[int, int] | None = None
         for _attempt in range(128):
             name = f"{prefix}{secrets.token_hex(12)}{suffix}"
+            owner_name = f".{name}{_TEMP_OWNER_SUFFIX}"
             try:
-                if os.name != "nt":
-                    assert self._fd is not None
-                    flags = os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0)
-                    flags |= getattr(os, "O_NOFOLLOW", 0)
-                    fd = os.open(name, flags, 0o600, dir_fd=self._fd)
-                else:
-                    assert self._handle is not None
-                    fd = _windows_open_relative_file(
-                        self._handle, name, writable=True, create_new=True
-                    )
+                owner_fd = self._open_exclusive(owner_name)
                 break
             except FileExistsError:
                 continue
-        if fd is None:
+        if owner_fd is None:
             raise StableFilesystemError("could not allocate a unique managed temp file")
         try:
-            with os.fdopen(fd, "w+b") as handle:
-                yield name, handle
+            with os.fdopen(owner_fd, "r+b") as owner:
+                owner_fd = None
+                if not _lock_file(owner, blocking=True):
+                    raise StableFilesystemError("managed temporary ownership lock failed")
+                owner_stat = os.fstat(owner.fileno())
+                owner_identity = (int(owner_stat.st_dev), int(owner_stat.st_ino))
+                self._write_owner_payload(
+                    owner,
+                    {
+                        "schema": _TEMP_OWNER_SCHEMA,
+                        "state": "preparing",
+                        "name": name,
+                        "prefix": prefix,
+                        "resource_id": self.resource_id,
+                        "file_identity": None,
+                        "proof": _temporary_proof(token, name, self.resource_id),
+                        "created_at": datetime.now(timezone.utc).isoformat(),
+                        "pid": os.getpid(),
+                        "owner_name": owner_name,
+                    },
+                )
+                fd = self._open_exclusive(name)
+                file_stat = os.fstat(fd)
+                file_identity = (int(file_stat.st_dev), int(file_stat.st_ino))
+                self._write_owner_payload(
+                    owner,
+                    {
+                        "schema": _TEMP_OWNER_SCHEMA,
+                        "state": "ready",
+                        "name": name,
+                        "prefix": prefix,
+                        "resource_id": self.resource_id,
+                        "file_identity": list(file_identity),
+                        "proof": _temporary_proof(token, name, self.resource_id),
+                        "created_at": datetime.now(timezone.utc).isoformat(),
+                        "pid": os.getpid(),
+                        "owner_name": owner_name,
+                    },
+                )
+                with os.fdopen(fd, "w+b") as handle:
+                    fd = None
+                    yield name, handle
         finally:
-            self.unlink(name, missing_ok=True)
+            if fd is not None:
+                os.close(fd)
+            if owner_fd is not None:
+                os.close(owner_fd)
+            if file_identity is not None:
+                self._unlink_if_identity(name, file_identity)
+            if owner_identity is not None:
+                self._unlink_if_identity(owner_name, owner_identity)
+
+    def _open_readwrite(self, name: str) -> int:
+        name = self._name(name)
+        if os.name != "nt":
+            assert self._fd is not None
+            flags = os.O_RDWR | getattr(os, "O_CLOEXEC", 0) | getattr(
+                os, "O_NOFOLLOW", 0
+            )
+            return os.open(name, flags, dir_fd=self._fd)
+        assert self._handle is not None
+        return _windows_open_relative_file(self._handle, name, writable=True)
+
+    def scavenge_temporary_files(
+        self,
+        *,
+        prefixes: tuple[str, ...],
+        max_entries: int = 4096,
+    ) -> TemporaryScavengeReport:
+        """Reclaim only authenticated, unlocked temporary files in this directory."""
+
+        if max_entries < 1:
+            raise ValueError("max_entries must be positive")
+        token = self.ensure_temporary_root()
+        if os.name != "nt":
+            assert self._fd is not None
+            names = tuple(os.listdir(self._fd))
+        else:
+            names = tuple(os.listdir(self.path))
+        if len(names) > max_entries:
+            raise StableFilesystemError("temporary traversal bound exceeded")
+        resource_id = self.resource_id
+        scanned = reclaimed = reclaimed_owner = active = ambiguous = failures = 0
+        for owner_name in names:
+            if not owner_name.startswith(".") or not owner_name.endswith(
+                _TEMP_OWNER_SUFFIX
+            ):
+                continue
+            scanned += 1
+            owner_identity: tuple[int, int] | None = None
+            try:
+                owner_fd = self._open_readwrite(owner_name)
+                with os.fdopen(owner_fd, "r+b") as owner:
+                    owner_stat = os.fstat(owner.fileno())
+                    owner_identity = (
+                        int(owner_stat.st_dev),
+                        int(owner_stat.st_ino),
+                    )
+                    if not _lock_file(owner, blocking=False):
+                        active += 1
+                        continue
+                    try:
+                        owner.seek(0)
+                        payload = json.loads(owner.read().decode("utf-8"))
+                        valid_common = (
+                            isinstance(payload, dict)
+                            and payload.get("schema") == _TEMP_OWNER_SCHEMA
+                        )
+                        name = payload.get("name") if valid_common else None
+                        prefix = payload.get("prefix") if valid_common else None
+                        file_identity = (
+                            payload.get("file_identity") if valid_common else None
+                        )
+                        state = payload.get("state") if valid_common else None
+                        valid_common = valid_common and (
+                            isinstance(name, str)
+                            and Path(name).name == name
+                            and isinstance(prefix, str)
+                            and prefix in prefixes
+                            and name.startswith(prefix)
+                            and payload.get("resource_id") == resource_id
+                            and payload.get("proof")
+                            == _temporary_proof(token, name, resource_id)
+                            and owner_name == f".{name}{_TEMP_OWNER_SUFFIX}"
+                        )
+                        if not valid_common:
+                            ambiguous += 1
+                            continue
+                        if state == "preparing":
+                            try:
+                                self.stat(name)
+                            except FileNotFoundError:
+                                if self._unlink_if_identity(owner_name, owner_identity):
+                                    reclaimed_owner += 1
+                                else:
+                                    failures += 1
+                            except (OSError, StableFilesystemError):
+                                ambiguous += 1
+                            else:
+                                # The creator may have crashed before the
+                                # file identity was durably recorded. Without
+                                # that identity, never delete the data file.
+                                ambiguous += 1
+                            continue
+                        if (
+                            state != "ready"
+                            or not isinstance(file_identity, list)
+                            or len(file_identity) != 2
+                            or any(
+                                not isinstance(value, int) or value < 0
+                                for value in file_identity
+                            )
+                        ):
+                            ambiguous += 1
+                            continue
+                        expected = (int(file_identity[0]), int(file_identity[1]))
+                        try:
+                            data_stat = self.stat(name)
+                        except FileNotFoundError:
+                            data_stat = None
+                        except (OSError, StableFilesystemError):
+                            ambiguous += 1
+                            continue
+                        if data_stat is not None and (
+                            not stat.S_ISREG(data_stat.st_mode)
+                            or (int(data_stat.st_dev), int(data_stat.st_ino)) != expected
+                        ):
+                            ambiguous += 1
+                            continue
+                        if data_stat is not None and not self._unlink_if_identity(
+                            name, expected
+                        ):
+                            failures += 1
+                            continue
+                        if not self._unlink_if_identity(owner_name, owner_identity):
+                            failures += 1
+                            continue
+                        reclaimed += 1 if data_stat is not None else 0
+                        reclaimed_owner += 1
+                    finally:
+                        _unlock_file(owner)
+            except FileNotFoundError:
+                continue
+            except (OSError, StableFilesystemError, UnicodeDecodeError, ValueError):
+                failures += 1
+        return TemporaryScavengeReport(
+            scanned_entries=scanned,
+            reclaimed_files=reclaimed,
+            reclaimed_owner_records=reclaimed_owner,
+            skipped_active=active,
+            skipped_ambiguous=ambiguous,
+            cleanup_failures=failures,
+        )
 
     def replace(self, source_name: str, destination_name: str) -> None:
         source_name = self._name(source_name)

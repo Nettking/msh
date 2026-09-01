@@ -26,12 +26,14 @@ class SQLiteCapabilityArtifactAuthority(_DurableArtifactAuthority):
         *,
         authority_node_id: str,
         now,
+        admission_held: bool = False,
     ) -> ArtifactDescriptor:
         validate_logical_artifact_endpoint(descriptor.endpoint_id)
         return super().register_artifact(
             descriptor,
             authority_node_id=authority_node_id,
             now=now,
+            admission_held=admission_held,
         )
 
     def issue_grant(

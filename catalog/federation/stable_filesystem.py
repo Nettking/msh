@@ -14,6 +14,8 @@ import os
 from . import _stable_filesystem_impl as _impl
 
 StableFilesystemError = _impl.StableFilesystemError
+TemporaryScavengeReport = _impl.TemporaryScavengeReport
+TEMPORARY_OWNER_SUFFIX = _impl._TEMP_OWNER_SUFFIX
 
 
 if os.name == "nt":
@@ -124,4 +126,10 @@ if os.name == "nt":
 StableDirectory = _impl.StableDirectory
 stable_directory = _impl.stable_directory
 
-__all__ = ["StableDirectory", "StableFilesystemError", "stable_directory"]
+__all__ = [
+    "TEMPORARY_OWNER_SUFFIX",
+    "StableDirectory",
+    "StableFilesystemError",
+    "TemporaryScavengeReport",
+    "stable_directory",
+]

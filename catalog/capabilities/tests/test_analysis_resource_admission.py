@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from catalog.capabilities.analysis.content_store import LocalArtifactContentStore
 from catalog.capabilities.analysis.contracts import (
     MAX_PLAN_BYTES,
     ORIGIN_AUTOMATIC_DISCOVERY,
@@ -18,7 +19,9 @@ from catalog.capabilities.analysis.resource_admission import (
     FederatedAnalysisHandler,
     analysis_workspace_resource_requirement,
 )
-from catalog.capabilities.analysis.worker import FederatedAnalysisHandler as _BaseHandler
+from catalog.capabilities.analysis.worker import (
+    FederatedAnalysisHandler as _BaseHandler,
+)
 from catalog.capabilities.dispatch import ExecutionResult
 from catalog.capabilities.jobs import AttemptStatus, JobAttempt, JobStatus
 from catalog.federation.host_resources import (
@@ -244,3 +247,74 @@ def test_distinct_workspace_resources_have_independent_envelopes(
 
     assert first_result.succeeded is True
     assert second_result.succeeded is True
+
+
+def test_result_publication_pressure_refuses_before_executor_side_effect(
+    tmp_path: Path, monkeypatch
+) -> None:
+    admission = _admission(lambda _path: _measurement("data", free_bytes=102))
+    store = LocalArtifactContentStore(tmp_path / "artifacts")
+    handler = FederatedAnalysisHandler(
+        session_id="session-resource-admission",
+        node_id="node-worker",
+        provider_id="provider-worker",
+        artifact_transport=None,
+        executor=None,
+        workspace_root=tmp_path / "workspaces",
+        content_store=store,
+        clock=lambda: NOW,
+        data_owner_node_id=lambda _job: "node-owner",
+        resource_admission=admission,
+    )
+    called = False
+
+    async def must_not_execute(_self, _job):
+        nonlocal called
+        called = True
+        return ExecutionResult(True, {})
+
+    monkeypatch.setattr(_BaseHandler, "_execute", must_not_execute)
+
+    result = asyncio.run(handler.execute(_job()))
+
+    assert result.succeeded is False
+    assert result.reason_code == "analysis-resource-pressure"
+    assert called is False
+    assert list(store.root.rglob("*.partial")) == []
+
+
+def test_result_reservation_unwinds_after_executor_exception(
+    tmp_path: Path, monkeypatch
+) -> None:
+    admission = _admission(lambda _path: _measurement("data", free_bytes=1_000_000))
+    store = LocalArtifactContentStore(tmp_path / "artifacts")
+    handler = FederatedAnalysisHandler(
+        session_id="session-resource-admission",
+        node_id="node-worker",
+        provider_id="provider-worker",
+        artifact_transport=None,
+        executor=None,
+        workspace_root=tmp_path / "workspaces",
+        content_store=store,
+        clock=lambda: NOW,
+        data_owner_node_id=lambda _job: "node-owner",
+        resource_admission=admission,
+    )
+    calls = 0
+
+    async def fail_once(_self, _job):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise OSError("simulated result publication failure")
+        return ExecutionResult(True, {"job_id": "ok"})
+
+    monkeypatch.setattr(_BaseHandler, "_execute", fail_once)
+
+    first = asyncio.run(handler.execute(_job()))
+    second = asyncio.run(handler.execute(_job()))
+
+    assert first.succeeded is False
+    assert first.reason_code == "analysis-input-unavailable"
+    assert second.succeeded is True
+    assert calls == 2

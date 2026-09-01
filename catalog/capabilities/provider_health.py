@@ -24,6 +24,8 @@ from catalog.federation.errors import (
     FederationValidationError,
     ProtocolCompatibilityError,
 )
+from catalog.federation.host_resources import ProcessResourceAdmission
+from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
 
 from .provider_enrollment import (
     FederatedProviderEnrollmentService,
@@ -488,9 +490,20 @@ class ProviderHealthAuditEvent:
 class SQLiteProviderHealthStore:
     """Transactional latest-report store with generation and revision fencing."""
 
-    def __init__(self, database: Path | str) -> None:
+    def __init__(
+        self,
+        database: Path | str,
+        *,
+        resource_admission: ProcessResourceAdmission | None = None,
+    ) -> None:
         self.database = str(database)
-        Path(self.database).parent.mkdir(parents=True, exist_ok=True)
+        self.resource_admission = resource_admission or PROCESS_RESOURCE_ADMISSION
+        with self.resource_admission.reserve(
+            self.database,
+            bytes_required=4 * 1024 * 1024,
+            inodes_required=4,
+        ):
+            Path(self.database).parent.mkdir(parents=True, exist_ok=True)
         self.initialize()
 
     def _connect(self) -> sqlite3.Connection:
@@ -499,20 +512,27 @@ class SQLiteProviderHealthStore:
         connection.execute("PRAGMA foreign_keys=ON")
         connection.execute("PRAGMA busy_timeout=30000")
         connection.execute("PRAGMA synchronous=FULL")
+        connection.execute("PRAGMA wal_autocheckpoint=1000")
+        connection.execute("PRAGMA journal_size_limit=8388608")
         return connection
 
     @contextmanager
     def transaction(self) -> Iterator[sqlite3.Connection]:
-        database = self._connect()
-        try:
-            database.execute("BEGIN IMMEDIATE")
-            yield database
-            database.commit()
-        except BaseException:
-            database.rollback()
-            raise
-        finally:
-            database.close()
+        with self.resource_admission.reserve(
+            self.database,
+            bytes_required=4 * 1024 * 1024,
+            inodes_required=4,
+        ):
+            database = self._connect()
+            try:
+                database.execute("BEGIN IMMEDIATE")
+                yield database
+                database.commit()
+            except BaseException:
+                database.rollback()
+                raise
+            finally:
+                database.close()
 
     def initialize(self) -> None:
         with self.transaction() as database:

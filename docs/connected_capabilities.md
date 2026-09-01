@@ -14,12 +14,15 @@ The FCP device sends the repository question and retrieved repository context to
 
 ## Install the FCP provider on the laptop
 
-The recommended provider is installed from the FCP repository. Only Docker and Git are required on the laptop:
+The recommended provider is installed from the FCP repository. Docker, Git,
+and Python 3 are required on the laptop:
 
 ```bash
 git clone <repository-url> fcp
 cd fcp
-docker compose --profile provider run --rm model-provider-install
+docker compose --profile provider up -d model-provider
+python3 -m catalog.federation.model_resource_pull \
+  --target model-provider --model "${FCP_PROVIDER_MODEL:-smollm2:360m}"
 ```
 
 The first run pulls the Ollama container and the default `edge-small` model (`smollm2:360m`). It starts a headless FCP provider on port `11434`; it does not start a second Flask workbench. The model remains in the persistent `model_provider_models` Docker volume, so ordinary restarts and repository updates do not download it again.

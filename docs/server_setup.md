@@ -418,8 +418,9 @@ Then start the normal services. This is intended for inspection and debugging.
 A Docker-capable laptop can provision a separate Ollama endpoint:
 
 ```bash
-docker compose --profile provider run --rm model-provider-install
 docker compose --profile provider up -d model-provider
+python3 -m catalog.federation.model_resource_pull \
+  --target model-provider --model "${FCP_PROVIDER_MODEL:-smollm2:360m}"
 ```
 
 Port `11434` is published for the provider profile. Restrict it to a trusted LAN or VPN. The process selection alone does not grant Federation contribution authority.
@@ -440,6 +441,69 @@ docker compose --profile observer-sync run --rm observer-sync
 
 `setup_fcp.py` may still accept older deployment-mode spellings for compatibility. They normalize to role-free command profiles that select local processes only. They do not persist a permanent device role and cannot enable recorder, AI, compute, storage, job, or artifact authority.
 
+## Upload ingress and host storage
+
+Uploaded bytes are the only request data FCP writes to disk before a route
+runs, so the boundary that keeps them bounded is worth stating exactly.
+
+### What the application guarantees
+
+These hold for any WSGI server, because they are enforced inside the process:
+
+- Every multipart part that declares a filename is materialized through
+  `FCPRequest._get_file_stream`. That is the single funnel Werkzeug uses, so
+  there is no second path to disk.
+- On `/data-upload`, parts are written into an FCP-owned spool under
+  `FCP_DATA_UPLOAD_REQUEST_SPOOL_DIR` (default `data/imports/request-spool`).
+  The spool reserves bytes and inodes from the process-wide host-resource
+  controller before the root is created, enforces per-file and per-request
+  byte ceilings while writing, and releases the reservation on every exit
+  path. Under host-resource pressure the upload is refused before any file is
+  created. Because the reservation is process-wide, concurrent uploads are
+  bounded in aggregate, not just individually.
+- On every other endpoint a file part is refused with `413` at the part
+  header, before the parser is given anywhere to write. No route besides
+  `/data-upload` reads `request.files`, so nothing is lost by refusing. Plain
+  multipart fields still parse normally; only parts with a filename are
+  refused.
+- A declared `Content-Length` above the upload budget is rejected before form
+  parsing begins. A request with no `Content-Length` and no
+  `wsgi.input_terminated` fails closed on Werkzeug's empty-stream fallback
+  without creating the spool.
+- `create_app()` calls `validate_request_ingress_contract()` and refuses to
+  start unless `request_class` is `FCPRequest` and `MAX_CONTENT_LENGTH`,
+  `FCP_DATA_UPLOAD_MAX_TOTAL_BYTES`, and `FCP_DATA_UPLOAD_MAX_FILES` are all
+  positive. An unset `MAX_CONTENT_LENGTH` would leave a terminated
+  unknown-length stream unbounded, so it is a startup error, not a warning.
+
+Without the funnel, Werkzeug's `default_stream_factory` writes parts to a
+`SpooledTemporaryFile` that rolls over to the operating-system temporary
+directory after 500 KiB — storage this process does not own, measure, or
+reserve, and in the container image a different filesystem from the `data/`
+bind mount.
+
+### What the deployment must provide
+
+One prerequisite is genuinely outside application code: **the WSGI server must
+not buffer the request body to disk before invoking the application.** Nothing
+the application does can un-write bytes an upstream layer already spooled.
+
+The supported deployment satisfies this. `docker-compose.yml` publishes the
+`flask` service directly with no reverse proxy, and the entrypoint runs
+`app.run(..., threaded=True)`, which is Werkzeug's `run_simple`. That server
+sets `wsgi.input` to the connection's socket file and wraps
+`Transfer-Encoding: chunked` bodies in `DechunkedInput` with
+`wsgi.input_terminated`. Neither touches storage: bodies stream from the
+socket, and the FCP spool is the first and only place they land.
+
+If you put FCP behind a different WSGI server or a buffering reverse proxy,
+that layer owns the pre-application bound and must be configured for it —
+for example `client_max_body_size` and `proxy_request_buffering off` on nginx.
+FCP does not silently assume it held: the first upload records how the body
+arrived, and a body that arrived as a regular file is logged as
+`WSGI request body arrived as a regular file`. Treat that line as a
+misconfigured ingress, not as noise.
+
 ## Ollama configuration
 
 The default local model is selected through:
@@ -453,7 +517,8 @@ Install or retry the configured local model with:
 
 ```bash
 docker compose up -d ollama
-docker compose --profile model-install run --rm ollama-pull
+python3 -m catalog.federation.model_resource_pull \
+  --target ollama --model "${FCP_AI_MODEL:-llama3.2:3b}"
 ```
 
 The local Ollama service and the headless provider use separate persistent model volumes.

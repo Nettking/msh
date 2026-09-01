@@ -2,20 +2,28 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
 from typing import Any
 
 from catalog.capabilities.dispatch import ExecutionResult
 from catalog.capabilities.jobs import JobContract
-from catalog.federation.errors import FederationOperationError, FederationValidationError
-from catalog.federation.host_resources import HostResourceRefused, ProcessResourceAdmission
+from catalog.federation.errors import (
+    FederationOperationError,
+    FederationValidationError,
+)
+from catalog.federation.host_resources import (
+    HostResourceRefused,
+    ProcessResourceAdmission,
+)
 from catalog.federation.object_transfer import MAX_TRANSFER_CHUNKS
 from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
 
 from .contracts import (
     ANALYSIS_DATA_SLICE_SCHEMA,
     ANALYSIS_PLAN_SCHEMA,
+    MAX_ANALYSIS_RESULT_BYTES,
     MAX_PLAN_BYTES,
     AnalysisWorkSlice,
 )
@@ -23,6 +31,7 @@ from .packaging import MAX_SLICE_ENTRIES
 from .scheduler import FederatedAnalysisScheduler as _FederatedAnalysisScheduler
 from .scheduler import SubmissionOutcome
 from .worker import FederatedAnalysisHandler as _FederatedAnalysisHandler
+from .workspace_reconciliation import reconcile_stale_workspaces
 
 # Fixed workspace entries cover the ownership marker, plan/slice publication
 # files, staging/publication directories and a small margin for atomic temp files.
@@ -34,6 +43,23 @@ _ANALYSIS_WORKSPACE_FIXED_INODES = 16
 # for publication directories and filesystem bookkeeping. Archive members are
 # inputs to one tar.gz and therefore do not consume one destination inode each.
 _ANALYSIS_PUBLICATION_FIXED_INODES = 8
+
+# Result JSON is deliberately a bounded summary rather than an arbitrary copy of
+# executor state.  The worker enforces the same limit after serialization, so the
+# reservation below is a real upper bound rather than a hopeful estimate.
+_ANALYSIS_RESULT_INODES = 2  # result partial + result identity/directory margin
+
+# A selected catalog script is allowed to write only inside its owned run tree.
+# The subprocess boundary enforces these limits after each materialization step
+# and while the child is running.  The values are intentionally independent of
+# the host's free space: admission protects the host, while the workspace limit
+# protects the process from an unexpectedly prolific script.
+MAX_CATALOG_COPY_BYTES = 64 * 1024 * 1024
+MAX_CATALOG_COPY_INODES = 4096
+MAX_SCRIPT_OUTPUT_BYTES = 256 * 1024 * 1024
+MAX_SCRIPT_OUTPUT_INODES = 4096
+MAX_ANALYSIS_METADATA_BYTES = 2 * 1024 * 1024
+MAX_DATA_INDEX_BYTES = 16 * 1024 * 1024
 
 
 def analysis_workspace_resource_requirement(
@@ -89,6 +115,74 @@ def analysis_publication_resource_requirement(
     return bytes_required, _ANALYSIS_PUBLICATION_FIXED_INODES
 
 
+def analysis_result_resource_requirement() -> tuple[int, int]:
+    """Return the bounded result-file reservation for one worker attempt."""
+
+    return MAX_ANALYSIS_RESULT_BYTES, _ANALYSIS_RESULT_INODES
+
+
+def analysis_script_workspace_resource_requirement(
+    max_slice_bytes: int,
+    *,
+    catalog_bytes: int = MAX_CATALOG_COPY_BYTES,
+    catalog_inodes: int = MAX_CATALOG_COPY_INODES,
+) -> tuple[int, int]:
+    """Return the peak persistent workspace envelope for one date slice.
+
+    A run may retain the filtered JSONL, the derived metrics CSV, a playback
+    export, the copied catalog, and script-owned outputs at the same time.  The
+    input archive itself is already admitted by the worker; this envelope covers
+    the durable workflow tree and the fallback data copy when symlinks are not
+    available.  All terms are hard-bounded by the executor before it starts.
+    """
+
+    bounded_slice = max(int(max_slice_bytes), 0)
+    bounded_catalog_bytes = min(max(int(catalog_bytes), 0), MAX_CATALOG_COPY_BYTES)
+    bounded_catalog_inodes = min(max(int(catalog_inodes), 0), MAX_CATALOG_COPY_INODES)
+    bytes_required = (
+        (3 * bounded_slice)
+        + bounded_catalog_bytes
+        + MAX_SCRIPT_OUTPUT_BYTES
+        + MAX_ANALYSIS_METADATA_BYTES
+    )
+    inodes_required = (
+        (2 * MAX_SLICE_ENTRIES)
+        + bounded_catalog_inodes
+        + MAX_SCRIPT_OUTPUT_INODES
+        + 24
+    )
+    return bytes_required, inodes_required
+
+
+@contextmanager
+def reserve_analysis_requirements(
+    controller: ProcessResourceAdmission,
+    requirements: Sequence[tuple[Path | str, int, int]],
+) -> Iterator[None]:
+    """Reserve a logical analysis transaction atomically when supported.
+
+    The production controller is the serialized process-wide implementation and
+    exposes ``reserve_many``.  The sequential fallback keeps older injected test
+    doubles import-compatible; production never takes it.
+    """
+
+    reserve_many = getattr(controller, "reserve_many", None)
+    if callable(reserve_many):
+        with reserve_many(requirements):
+            yield
+        return
+    with ExitStack() as stack:
+        for path, bytes_required, inodes_required in requirements:
+            stack.enter_context(
+                controller.reserve(
+                    path,
+                    bytes_required=bytes_required,
+                    inodes_required=inodes_required,
+                )
+            )
+        yield
+
+
 class FederatedAnalysisHandler(_FederatedAnalysisHandler):
     """Analysis handler with shared admission around its owned workspace writes."""
 
@@ -98,8 +192,16 @@ class FederatedAnalysisHandler(_FederatedAnalysisHandler):
         resource_admission: ProcessResourceAdmission | None = None,
         **kwargs: Any,
     ) -> None:
-        super().__init__(*args, **kwargs)
         self.resource_admission = resource_admission or PROCESS_RESOURCE_ADMISSION
+        workspace_root = kwargs.get("workspace_root")
+        if workspace_root is None:
+            raise TypeError("workspace_root is required for admitted analysis workers")
+        # Defer marker-safe reconciliation until the first validated execution.
+        # Construction must remain side-effect free so malformed jobs are still
+        # rejected before host measurement, while the actual root/workspace
+        # creation stays inside the execution reservation below.
+        kwargs["initialize_workspace"] = False
+        super().__init__(*args, **kwargs)
 
     async def execute(self, job: JobContract) -> ExecutionResult:
         try:
@@ -143,11 +245,19 @@ class FederatedAnalysisHandler(_FederatedAnalysisHandler):
         # capacity is measured. The base implementation intentionally repeats the
         # same checks after admission before any workspace write occurs.
         bytes_required, inodes_required = self._resource_requirement(job)
-        with self.resource_admission.reserve(
-            self.workspace_root,
-            bytes_required=bytes_required,
-            inodes_required=inodes_required,
-        ):
+        requirements: list[tuple[Path | str, int, int]] = [
+            (self.workspace_root, bytes_required, inodes_required)
+        ]
+        if self.content_store is not None:
+            result_bytes, result_inodes = analysis_result_resource_requirement()
+            requirements.append(
+                (self.content_store.root, result_bytes, result_inodes)
+            )
+        with reserve_analysis_requirements(self.resource_admission, requirements):
+            self.workspace_reconciliation = reconcile_stale_workspaces(
+                self.workspace_root,
+                now=self.clock(),
+            )
             return await super()._execute(job)
 
 
@@ -179,16 +289,36 @@ class FederatedAnalysisScheduler(_FederatedAnalysisScheduler):
             len(plan_bytes),
             max_slice_bytes=self.gateway.content_store.max_bytes,
         )
+        # Submission is one logical publication transaction: the plan and slice
+        # bodies are durable content, and the job row/audit/WAL mutation makes
+        # them discoverable. Admit both backing resources before any of those
+        # writers run, then tell the nested helpers the reservation is already
+        # held so completion bookkeeping does not spend it twice.
+        job_store_bytes = 8 * 1024 * 1024
+        job_store_inodes = 4
+        store = getattr(self, "store", None)
+        store_database = getattr(store, "database", None)
         try:
-            with self.resource_admission.reserve(
-                self.gateway.content_store.root,
-                bytes_required=bytes_required,
-                inodes_required=inodes_required,
+            requirements = [
+                (
+                    self.gateway.content_store.root,
+                    bytes_required,
+                    inodes_required,
+                ),
+            ]
+            if store_database is not None:
+                requirements.append(
+                    (store_database, job_store_bytes, job_store_inodes)
+                )
+            with reserve_analysis_requirements(
+                self.resource_admission,
+                requirements,
             ):
                 return super().submit(
                     work,
                     slice_files=slice_files,
                     slice_root=slice_root,
+                    admission_held=True,
                 )
         except HostResourceRefused as exc:
             raise FederationOperationError(
@@ -198,8 +328,18 @@ class FederatedAnalysisScheduler(_FederatedAnalysisScheduler):
 
 
 __all__ = [
+    "MAX_ANALYSIS_METADATA_BYTES",
+    "MAX_ANALYSIS_RESULT_BYTES",
+    "MAX_CATALOG_COPY_BYTES",
+    "MAX_CATALOG_COPY_INODES",
+    "MAX_DATA_INDEX_BYTES",
+    "MAX_SCRIPT_OUTPUT_BYTES",
+    "MAX_SCRIPT_OUTPUT_INODES",
     "FederatedAnalysisHandler",
     "FederatedAnalysisScheduler",
     "analysis_publication_resource_requirement",
+    "analysis_result_resource_requirement",
+    "analysis_script_workspace_resource_requirement",
     "analysis_workspace_resource_requirement",
+    "reserve_analysis_requirements",
 ]

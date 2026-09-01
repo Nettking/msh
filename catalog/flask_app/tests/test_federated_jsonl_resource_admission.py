@@ -13,8 +13,16 @@ from flask import Flask
 from catalog.federation.errors import (
     FederationOperationError,
 )
-from catalog.federation.host_resources import HostResourceRefused
+from catalog.federation.host_resources import (
+    FilesystemMeasurement,
+    HostResourceRefused,
+    PressureThresholds,
+    measure_filesystem,
+)
 from catalog.federation.models import CommitState
+from catalog.federation.process_resource_admission import (
+    SerializedProcessResourceAdmission,
+)
 from catalog.federation.storage_catalog import CommittedBatchReference
 from catalog.federation.storage_protocol import BatchIngestRequest
 from catalog.flask_app.services.federated_jsonl_product_bridge import (
@@ -251,7 +259,7 @@ def test_remote_chunk_staging_refuses_before_temp_write(tmp_path: Path) -> None:
 
     assert captured.value.code == "federated-jsonl-resource-pressure"
     # Stable managed traversal may create both remote/hash directories.
-    assert admission.calls == [(target.parent, len(b"bounded chunk"), 4)]
+    assert admission.calls == [(target.parent, len(b"bounded chunk"), 5)]
     assert list(target.parent.iterdir()) == []
 
 
@@ -287,8 +295,9 @@ def test_materialization_reserves_encoded_and_raw_peaks_together(tmp_path: Path)
     assert materialized is True
     payload_calls = [call for call in admission.calls if call[0] != consumer.database.parent]
     assert len(payload_calls) == 3
-    assert len(admission.many_calls) == 1
-    assert len(admission.many_calls[0]) == 2
+    assert len(admission.many_calls) == 2
+    assert len(admission.many_calls[0]) == 2  # chunk + seen_batches
+    assert len(admission.many_calls[1]) == 3  # encoded + raw + SQLite
     chunk_call, encoded_call, raw_call = payload_calls
     assert chunk_call[1] <= int(content["encoded_size"])
     assert encoded_call[0] == consumer.cache_root
@@ -299,6 +308,156 @@ def test_materialization_reserves_encoded_and_raw_peaks_together(tmp_path: Path)
     targets = list(consumer.mirror_root.rglob("*.jsonl"))
     assert len(targets) == 1
     assert targets[0].read_bytes() == b'{"machine_id":"m","value":1}\n'
+
+
+def test_materialization_completes_sqlite_bookkeeping_at_pressure(
+    tmp_path: Path,
+) -> None:
+    """The outer admitted peak must carry its own completion bookkeeping.
+
+    A normal nested reservation is forbidden once the outer encoded/raw peak
+    leaves the measured resource at PRESSURE. The real serialized controller is
+    used here (with a deterministic measurement seam) so this catches the
+    production failure that the recording fake cannot model.
+    """
+
+    batch, session_id = _published_batch(tmp_path)
+    content = batch["content"]
+    assert isinstance(content, dict)
+    consumer = _bridge(tmp_path, "pressure-completion", admission=_RecordingAdmission())
+
+    resource_id = measure_filesystem(consumer.cache_root).resource_id
+    now = datetime.now(timezone.utc)
+    measurement = FilesystemMeasurement(
+        resource_id=resource_id,
+        observed_at=now,
+        total_bytes=10_000_000,
+        free_bytes=5_000_000,
+        total_inodes=None,
+        free_inodes=None,
+        available=True,
+    )
+    controller = SerializedProcessResourceAdmission(
+        thresholds=PressureThresholds(
+            critical_free_bytes=1_000_000,
+            pressure_free_bytes=3_000_000,
+            warning_free_bytes=4_000_000,
+            critical_free_inodes=0,
+            pressure_free_inodes=0,
+            warning_free_inodes=0,
+        ),
+        measurer=lambda _path: measurement,
+        clock=lambda: now,
+    )
+    consumer.resource_admission = controller
+
+    materialized = consumer._ingest_remote(
+        _reference(batch, session_id=session_id),
+        content,
+        local_node_id="node-consumer",
+    )
+
+    assert materialized is True
+    targets = list(consumer.mirror_root.rglob("*.jsonl"))
+    assert len(targets) == 1
+    assert targets[0].read_bytes() == b'{"machine_id":"m","value":1}\n'
+    assert controller.assessment(consumer.database.parent).level.name == "NORMAL"
+
+
+def test_local_cache_completes_sqlite_bookkeeping_at_pressure(tmp_path: Path) -> None:
+    """Local gzip publication carries its local-files mutation in one admission."""
+
+    bridge = _bridge(tmp_path, "local-pressure-completion", admission=_RecordingAdmission())
+    source = bridge.data_root / "sources" / "demo" / "day.jsonl"
+    source.parent.mkdir(parents=True, exist_ok=True)
+    source.write_bytes(b'{"machine_id":"m","value":1}\n')
+
+    resource_id = measure_filesystem(bridge.cache_root).resource_id
+    now = datetime.now(timezone.utc)
+    measurement = FilesystemMeasurement(
+        resource_id=resource_id,
+        observed_at=now,
+        total_bytes=10_000_000,
+        free_bytes=5_000_000,
+        total_inodes=None,
+        free_inodes=None,
+        available=True,
+    )
+    controller = SerializedProcessResourceAdmission(
+        thresholds=PressureThresholds(
+            critical_free_bytes=1_000_000,
+            pressure_free_bytes=3_000_000,
+            warning_free_bytes=4_000_000,
+            critical_free_inodes=0,
+            pressure_free_inodes=0,
+            warning_free_inodes=0,
+        ),
+        measurer=lambda _path: measurement,
+        clock=lambda: now,
+    )
+    bridge.resource_admission = controller
+
+    row = bridge._prepare_local_file("node-local", "sources/demo/day.jsonl", source)
+
+    assert row["file_sha256"]
+    assert Path(str(row["cache_path"])).is_file()
+    assert controller.assessment(bridge.database.parent).level.name == "NORMAL"
+
+
+def test_remote_chunk_records_seen_batch_at_pressure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Chunk publication and its seen-batch row share one admission envelope."""
+
+    batch, session_id = _published_batch(tmp_path)
+    content = batch["content"]
+    assert isinstance(content, dict)
+    consumer = _bridge(tmp_path, "remote-pressure-completion", admission=_RecordingAdmission())
+
+    resource_id = measure_filesystem(consumer.cache_root).resource_id
+    now = datetime.now(timezone.utc)
+    measurement = FilesystemMeasurement(
+        resource_id=resource_id,
+        observed_at=now,
+        total_bytes=10_000_000,
+        free_bytes=5_000_000,
+        total_inodes=None,
+        free_inodes=None,
+        available=True,
+    )
+    controller = SerializedProcessResourceAdmission(
+        thresholds=PressureThresholds(
+            critical_free_bytes=1_000_000,
+            pressure_free_bytes=3_000_000,
+            warning_free_bytes=4_000_000,
+            critical_free_inodes=0,
+            pressure_free_inodes=0,
+            warning_free_inodes=0,
+        ),
+        measurer=lambda _path: measurement,
+        clock=lambda: now,
+    )
+    consumer.resource_admission = controller
+    # Keep this test focused on chunk + seen_batches completion. A one-chunk
+    # version would otherwise immediately enter the larger materialization
+    # envelope, which is covered by the test above.
+    monkeypatch.setattr(consumer, "_try_materialize", lambda **_kwargs: False)
+
+    materialized = consumer._ingest_remote(
+        _reference(batch, session_id=session_id),
+        content,
+        local_node_id="node-consumer",
+    )
+
+    assert materialized is False
+    with consumer._connect() as connection:
+        row = connection.execute(
+            "SELECT chunk_path FROM seen_batches WHERE session_id=? AND dataset_id=?",
+            (session_id, str(batch["dataset_id"])),
+        ).fetchone()
+    assert row is not None
+    assert Path(str(row["chunk_path"])).is_file()
+    assert controller.assessment(consumer.database.parent).level.name == "NORMAL"
 
 
 def test_materialization_rejects_redirect_component_without_outside_write(
@@ -339,9 +498,10 @@ def test_materialization_refuses_if_backing_resource_changes_after_mkdir(
     batch, session_id = _published_batch(tmp_path)
     content = batch["content"]
     assert isinstance(content, dict)
-    # Assessment 1 validates remote chunk staging. Assessment 2 occurs after the
-    # mirror parent is created but before reconstruction starts.
-    admission = _RecordingAdmission(changed_resource_assessment=2)
+    # Assessments 1-4 validate the chunk and its seen-batch bookkeeping.
+    # Assessment 6 occurs after the mirror parent is created but before
+    # reconstruction starts.
+    admission = _RecordingAdmission(changed_resource_assessment=6)
     consumer = _bridge(tmp_path, "materialization-resource-change", admission=admission)
 
     with pytest.raises(FederationOperationError) as captured:

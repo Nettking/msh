@@ -38,7 +38,7 @@ class SQLiteCapabilityArtifactAuthority(SQLiteArtifactAuthority):
     ) -> None:
         resolved = job_store.database if database_path is None else database_path
         super().__init__(job_store, database_path=resolved)
-        with self._connect() as connection:
+        with self._admitted_connection() as connection:
             connection.executescript(
                 """
                 CREATE TABLE IF NOT EXISTS capability_artifact_grant_issuers (
@@ -166,7 +166,7 @@ class SQLiteCapabilityArtifactAuthority(SQLiteArtifactAuthority):
             if placement_policy is None
             else self._fingerprint(placement_policy.to_dict())
         )
-        with self._connect() as connection:
+        with self._admitted_connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             issuer = connection.execute(
                 """SELECT coordinator_node_id
@@ -353,7 +353,7 @@ class SQLiteCapabilityArtifactAuthority(SQLiteArtifactAuthority):
                 grant_id=grant.grant_id,
                 artifact_id=descriptor.artifact_id,
             )
-        with self._connect() as connection:
+        with self._admitted_connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             self._audit(
                 connection,
@@ -396,7 +396,7 @@ class SQLiteCapabilityArtifactAuthority(SQLiteArtifactAuthority):
         cutoff = _timestamp(
             now - timedelta(seconds=PUBLICATION_RESERVATION_SECONDS)
         )
-        with self._connect() as connection:
+        with self._admitted_connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             connection.execute(
                 """DELETE FROM capability_artifact_publication_reservations
@@ -499,7 +499,7 @@ class SQLiteCapabilityArtifactAuthority(SQLiteArtifactAuthority):
             )
         finally:
             if reserved:
-                with self._connect() as connection:
+                with self._admitted_connection() as connection:
                     connection.execute("BEGIN IMMEDIATE")
                     connection.execute(
                         """DELETE FROM capability_artifact_publication_reservations

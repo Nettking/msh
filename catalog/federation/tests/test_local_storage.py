@@ -3,8 +3,19 @@ from __future__ import annotations
 import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
-from catalog.federation.local_storage import FilesystemBatchStorageProvider, LocalStorageService
+import pytest
+
+from catalog.federation.errors import FederationValidationError
+from catalog.federation.host_resources import FilesystemMeasurement, PressureThresholds
+from catalog.federation.local_storage import (
+    FilesystemBatchStorageProvider,
+    LocalStorageService,
+)
+from catalog.federation.process_resource_admission import (
+    SerializedProcessResourceAdmission,
+)
 from catalog.federation.storage_protocol import (
     STORAGE_PROTOCOL,
     STORAGE_PROTOCOL_VERSION,
@@ -261,3 +272,108 @@ def test_invalid_content_hash_never_becomes_visible(tmp_path):
     assert not response.ok
     assert response.error.code is StorageErrorCode.CONTENT_HASH_MISMATCH
     assert not provider.exists(session_id="session-1", group_id="storage-main", batch_id="batch-1")
+
+
+def _storage_admission(measurer):
+    return SerializedProcessResourceAdmission(
+        thresholds=PressureThresholds(
+            critical_free_bytes=100,
+            pressure_free_bytes=200,
+            warning_free_bytes=300,
+            critical_free_inodes=0,
+            pressure_free_inodes=2,
+            warning_free_inodes=4,
+            max_measurement_age_seconds=60,
+        ),
+        measurer=measurer,
+        clock=lambda: datetime(2026, 7, 29, tzinfo=timezone.utc),
+    )
+
+
+def _storage_measurement(
+    resource_id: str,
+    *,
+    free_bytes: int = 10_000_000,
+    free_inodes: int | None = 100,
+) -> FilesystemMeasurement:
+    return FilesystemMeasurement(
+        resource_id=resource_id,
+        observed_at=datetime(2026, 7, 29, tzinfo=timezone.utc),
+        total_bytes=20_000_000,
+        free_bytes=free_bytes,
+        total_inodes=1_000,
+        free_inodes=free_inodes,
+        available=True,
+    )
+
+
+def test_storage_pressure_refuses_before_final_parent_or_catalogue_write(
+    tmp_path: Path,
+) -> None:
+    mode = {"free_bytes": 10_000_000, "free_inodes": 100}
+    admission = _storage_admission(
+        lambda _path: _storage_measurement(
+            "storage-resource",
+            free_bytes=mode["free_bytes"],
+            free_inodes=mode["free_inodes"],
+        )
+    )
+    provider = FilesystemBatchStorageProvider(tmp_path, resource_admission=admission)
+    mode["free_bytes"] = 200
+
+    with pytest.raises(FederationValidationError) as raised:
+        provider.ingest(_request({"value": 1}))
+
+    assert raised.value.code == "storage-resource-pressure"
+    assert tuple((tmp_path / "batches").rglob("*.tmp")) == ()
+    with sqlite3.connect(tmp_path / "storage-index.sqlite3") as connection:
+        assert connection.execute("SELECT COUNT(*) FROM committed_batches").fetchone()[0] == 0
+
+
+def test_storage_inode_pressure_is_refused_and_reservation_unwinds(tmp_path: Path) -> None:
+    mode = {"free_bytes": 10_000_000, "free_inodes": 100}
+    admission = _storage_admission(
+        lambda _path: _storage_measurement(
+            "storage-resource",
+            free_bytes=mode["free_bytes"],
+            free_inodes=mode["free_inodes"],
+        )
+    )
+    provider = FilesystemBatchStorageProvider(tmp_path, resource_admission=admission)
+    mode["free_inodes"] = 2
+
+    with pytest.raises(FederationValidationError) as raised:
+        provider.ingest(_request({"value": 1}))
+    assert raised.value.code == "storage-resource-pressure"
+
+    mode["free_inodes"] = 100
+    assert provider.ingest(_request({"value": 1})).state is BatchIngestState.STORED
+
+
+def test_storage_backing_resource_change_fails_closed_before_payload_commit(
+    tmp_path: Path,
+) -> None:
+    calls = 0
+    baseline = 0
+
+    def measure(_path):
+        nonlocal calls
+        calls += 1
+        resource_id = (
+            "storage-resource"
+            if calls <= baseline + 2
+            else "different-resource"
+        )
+        return _storage_measurement(resource_id)
+
+    admission = _storage_admission(measure)
+    provider = FilesystemBatchStorageProvider(tmp_path, resource_admission=admission)
+    baseline = calls
+
+    with pytest.raises(FederationValidationError) as raised:
+        provider.ingest(_request({"value": 1}))
+
+    assert raised.value.code == "storage-backing-resource-changed"
+    assert not provider.exists(
+        session_id="session-1", group_id="storage-main", batch_id="batch-1"
+    )

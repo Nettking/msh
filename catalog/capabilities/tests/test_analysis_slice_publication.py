@@ -38,7 +38,9 @@ def test_failed_slice_pack_does_not_replace_the_published_target(
         packaging.write_slice_archive(destination, files=(source,), root=root)
 
     assert destination.read_bytes() == previously_published
-    assert list(destination.parent.glob(f".{destination.name}.*.partial")) == []
+    temporary_root = destination.parent / ".fcp-analysis-archive-tmp"
+    assert not list(temporary_root.glob("*.partial"))
+    assert not list(temporary_root.glob(".*.fcp-owner.json"))
 
 
 def test_archive_metadata_cannot_grow_partial_beyond_publication_cap(
@@ -77,7 +79,9 @@ def test_archive_metadata_cannot_grow_partial_beyond_publication_cap(
     assert captured.value.code == "analysis-slice-too-large"
     assert observed_peak <= max_bytes
     assert not destination.exists()
-    assert list(destination.parent.glob(f".{destination.name}.*.partial")) == []
+    temporary_root = destination.parent / ".fcp-analysis-archive-tmp"
+    assert not list(temporary_root.glob("*.partial"))
+    assert not list(temporary_root.glob(".*.fcp-owner.json"))
 
 
 def test_retry_rebuilds_a_partial_slice_before_authority_registration(

@@ -27,6 +27,14 @@ from flask import current_app
 from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
 
+from catalog.capabilities.analysis.resource_admission import (
+    reserve_analysis_requirements,
+)
+from catalog.federation.host_resources import (
+    HostResourceRefused,
+    ProcessResourceAdmission,
+)
+from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
 from catalog.orchestrator.pipeline import get_runtime_manager
 from catalog.runner.script_catalog import repo_root
 
@@ -43,6 +51,11 @@ _DEFAULT_MAX_TOTAL_BYTES = 1024 * 1024 * 1024
 _DEFAULT_MAX_LINE_BYTES = 4 * 1024 * 1024
 _COPY_CHUNK_BYTES = 1024 * 1024
 _DEFAULT_MAX_PENDING_IMPORTS = 8
+_UPLOAD_METADATA_FIXED_BYTES = 2 * 1024 * 1024
+_UPLOAD_METADATA_BYTES_PER_FILE = 8 * 1024
+_UPLOAD_METADATA_FIXED_INODES = 4
+_UPLOAD_PUBLICATION_FIXED_BYTES = 64 * 1024
+_UPLOAD_PUBLICATION_FIXED_INODES = 4
 _SERVICE_INITIALIZATION_LOCK = threading.Lock()
 
 
@@ -109,6 +122,7 @@ class DataUploadService:
         max_total_bytes: int = _DEFAULT_MAX_TOTAL_BYTES,
         max_line_bytes: int = _DEFAULT_MAX_LINE_BYTES,
         max_pending_imports: int = _DEFAULT_MAX_PENDING_IMPORTS,
+        resource_admission: ProcessResourceAdmission | None = None,
     ) -> None:
         self.database = Path(database)
         self.staging_root = Path(staging_root)
@@ -119,15 +133,29 @@ class DataUploadService:
         self.max_total_bytes = max(1, int(max_total_bytes))
         self.max_line_bytes = max(1, int(max_line_bytes))
         self.max_pending_imports = max(1, int(max_pending_imports))
+        self.resource_admission = resource_admission or PROCESS_RESOURCE_ADMISSION
         self._analysis_lock = threading.Lock()
         self._import_lock = threading.Lock()
         self._import_scheduler_lock = threading.Lock()
         self._active_imports: set[str] = set()
+        self._resource_blocked_batches: set[str] = set()
         self._import_slots = threading.BoundedSemaphore(self.max_pending_imports)
-        self.database.parent.mkdir(parents=True, exist_ok=True)
-        self.staging_root.mkdir(parents=True, exist_ok=True)
-        self.published_root.mkdir(parents=True, exist_ok=True)
-        self._initialize()
+        with reserve_analysis_requirements(
+            self.resource_admission,
+            [
+                (
+                    self.database.parent,
+                    _UPLOAD_METADATA_FIXED_BYTES,
+                    _UPLOAD_METADATA_FIXED_INODES,
+                ),
+                (self.staging_root, 0, 2),
+                (self.published_root, 0, 2),
+            ],
+        ):
+            self.database.parent.mkdir(parents=True, exist_ok=True)
+            self.staging_root.mkdir(parents=True, exist_ok=True)
+            self.published_root.mkdir(parents=True, exist_ok=True)
+            self._initialize()
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database, timeout=30)
@@ -515,7 +543,37 @@ class DataUploadService:
             self._prepare_publication_recovery(batch_id)
         return False
 
-    def enqueue(self, files: Iterable[FileStorage]) -> dict[str, Any]:
+    def enqueue(
+        self,
+        files: Iterable[FileStorage],
+        *,
+        resource_admission: ProcessResourceAdmission | None = None,
+        admission_held: bool = False,
+    ) -> dict[str, Any]:
+        """Admit staging plus SQLite metadata before copying request bytes."""
+        if admission_held:
+            return self._enqueue_unadmitted(files)
+        controller = resource_admission or self.resource_admission
+        metadata_bytes = (
+            _UPLOAD_METADATA_FIXED_BYTES
+            + (self.max_files * _UPLOAD_METADATA_BYTES_PER_FILE)
+        )
+        try:
+            with reserve_analysis_requirements(
+                controller,
+                [
+                    (self.staging_root, self.max_total_bytes, self.max_files + 2),
+                    (self.database.parent, metadata_bytes, _UPLOAD_METADATA_FIXED_INODES),
+                ],
+            ):
+                return self._enqueue_unadmitted(files)
+        except HostResourceRefused as exc:
+            raise DataUploadError(
+                "upload-resource-pressure",
+                "The upload was not started because host storage is under resource pressure.",
+            ) from exc
+
+    def _enqueue_unadmitted(self, files: Iterable[FileStorage]) -> dict[str, Any]:
         selected = tuple(item for item in files if item and item.filename)
         if not selected:
             raise DataUploadError(
@@ -639,6 +697,9 @@ class DataUploadService:
             self._import_slots.release()
             raise
 
+        # A successful new request is an explicit retry opportunity for older
+        # queued batches that were held back by resource pressure.
+        self._resource_blocked_batches.clear()
         self._start_import(batch_id, slot_acquired=True)
         return self.batch(batch_id)
 
@@ -678,6 +739,8 @@ class DataUploadService:
                 ).fetchall()
             )
         for batch_id in queued:
+            if batch_id in self._resource_blocked_batches:
+                continue
             if not self._start_import(batch_id):
                 break
 
@@ -706,7 +769,46 @@ class DataUploadService:
         with self._import_lock:
             self._import_batch_serialized(batch_id)
 
+    def _import_resource_requirements(
+        self, batch_id: str
+    ) -> tuple[tuple[Path, int, int], ...]:
+        # Use the configured hard ceiling instead of opening another SQLite
+        # connection before the import transaction. This keeps the reserve
+        # conservative while preserving the existing crash-injection ordering
+        # (state update, then one transactional import connection).
+        del batch_id
+        file_count = self.max_files
+        return (
+            (
+                self.database.parent,
+                _UPLOAD_METADATA_FIXED_BYTES
+                + (file_count * _UPLOAD_METADATA_BYTES_PER_FILE),
+                _UPLOAD_METADATA_FIXED_INODES,
+            ),
+            (
+                self.published_root,
+                _UPLOAD_PUBLICATION_FIXED_BYTES,
+                file_count + _UPLOAD_PUBLICATION_FIXED_INODES,
+            ),
+            (self.staging_root, 0, 2),
+        )
+
     def _import_batch_serialized(self, batch_id: str) -> None:
+        """Admit metadata/WAL and publication identities as one transaction."""
+        try:
+            requirements = self._import_resource_requirements(batch_id)
+            with reserve_analysis_requirements(
+                self.resource_admission,
+                requirements,
+            ):
+                self._import_batch_serialized_unadmitted(batch_id)
+        except HostResourceRefused:
+            # Keep the durable queue row and leave it hidden; a later service
+            # request or restart can retry it. Do not convert temporary host
+            # pressure into a terminal upload-validation failure.
+            self._resource_blocked_batches.add(batch_id)
+
+    def _import_batch_serialized_unadmitted(self, batch_id: str) -> None:
         staging_dir: Path | None = None
         publication_committed = False
         ready_committed = False

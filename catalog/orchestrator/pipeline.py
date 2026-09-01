@@ -23,9 +23,18 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
+from catalog.capabilities.analysis.contracts import DEFAULT_MAX_SLICE_BYTES
+from catalog.capabilities.analysis.resource_admission import (
+    MAX_ANALYSIS_METADATA_BYTES,
+    MAX_DATA_INDEX_BYTES,
+    ProcessResourceAdmission,
+    analysis_script_workspace_resource_requirement,
+    reserve_analysis_requirements,
+)
 from catalog.common.artifact_registry import configured_scan_dirs, scan_artifacts
 from catalog.common.basic_metrics import basic_metrics_path, build_basic_metrics_dataset
 from catalog.common.data_loading import iter_jsonl_files
+from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
 from catalog.runner.data_filtering import (
     date_range_source_signature,
     discover_available_dates,
@@ -44,6 +53,8 @@ from catalog.runner.session_store import (
     script_output_exists,
     write_session_metadata,
 )
+
+_RUNTIME_STATE_INODES = 4
 
 
 @dataclass
@@ -214,6 +225,8 @@ def _load_or_create_auto_session(
     end_date,
     script_options,
     runtime_namespace: str,
+    resource_admission: ProcessResourceAdmission | None = None,
+    admission_held: bool = False,
 ):
     session_id = _auto_session_id(
         start_date.isoformat(),
@@ -235,7 +248,12 @@ def _load_or_create_auto_session(
                 runtime_payload["runtime_namespace"] = runtime_namespace
                 changed = True
             if changed:
-                write_session_metadata(session_dir, metadata)
+                write_session_metadata(
+                    session_dir,
+                    metadata,
+                    resource_admission=resource_admission,
+                    admission_held=admission_held,
+                )
             return session_id, session_dir, metadata, "reused"
 
     session_dir.mkdir(parents=True, exist_ok=True)
@@ -248,7 +266,12 @@ def _load_or_create_auto_session(
         runtime_namespace=runtime_namespace,
         script_options=script_options,
     )
-    write_session_metadata(session_dir, metadata)
+    write_session_metadata(
+        session_dir,
+        metadata,
+        resource_admission=resource_admission,
+        admission_held=admission_held,
+    )
     return session_id, session_dir, metadata, "created"
 
 
@@ -354,6 +377,57 @@ def _run_for_date_slice(
     runtime_namespace: str,
     active_slice: date | str | None = None,
     remaining_slices: int | None = None,
+    resource_admission: ProcessResourceAdmission | None = None,
+    max_slice_bytes: int = DEFAULT_MAX_SLICE_BYTES,
+) -> OrchestrationResult:
+    """Admit the complete persistent analysis slice before any writer runs."""
+    controller = resource_admission or PROCESS_RESOURCE_ADMISSION
+    workspace_bytes, workspace_inodes = analysis_script_workspace_resource_requirement(
+        max_slice_bytes
+    )
+    requirements = [
+        (workflows_root, workspace_bytes, workspace_inodes),
+        # Date discovery/filtering refreshes this process-wide index even when
+        # the slice itself lives in an isolated worker workspace.
+        (
+            Path(__file__).resolve().parents[2] / "results" / "runner",
+            MAX_DATA_INDEX_BYTES,
+            2,
+        ),
+    ]
+    with reserve_analysis_requirements(controller, requirements):
+        return _run_for_date_slice_unadmitted(
+            status=status,
+            workflows_root=workflows_root,
+            data_dir=data_dir,
+            script_options=script_options,
+            target_day=target_day,
+            script_keys=script_keys,
+            run_label=run_label,
+            mark_bootstrap_full_analysis_complete=mark_bootstrap_full_analysis_complete,
+            runtime_namespace=runtime_namespace,
+            active_slice=active_slice,
+            remaining_slices=remaining_slices,
+            resource_admission=controller,
+            max_slice_bytes=max_slice_bytes,
+        )
+
+
+def _run_for_date_slice_unadmitted(
+    *,
+    status: StatusPrinter,
+    workflows_root: Path,
+    data_dir: Path,
+    script_options,
+    target_day: date,
+    script_keys: tuple[str, ...],
+    run_label: str,
+    mark_bootstrap_full_analysis_complete: bool = False,
+    runtime_namespace: str,
+    active_slice: date | str | None = None,
+    remaining_slices: int | None = None,
+    resource_admission: ProcessResourceAdmission | None = None,
+    max_slice_bytes: int = DEFAULT_MAX_SLICE_BYTES,
 ) -> OrchestrationResult:
     """Prepare one single-day automatic session and run the requested script contract.
 
@@ -373,6 +447,8 @@ def _run_for_date_slice(
         end_date=target_day,
         script_options=script_options,
         runtime_namespace=runtime_namespace,
+        resource_admission=resource_admission,
+        admission_held=resource_admission is not None,
     )
     status.info(
         f"{session_mode} bootstrap/update session: {session_id} ({target_day.isoformat()})"
@@ -384,6 +460,8 @@ def _run_for_date_slice(
         metadata=metadata,
         active_slice=active_slice,
         remaining_slices=remaining_slices,
+        resource_admission=resource_admission,
+        admission_held=resource_admission is not None,
     )
     filter_progress_context = _format_filter_progress_context(
         active_slice=active_slice,
@@ -407,7 +485,11 @@ def _run_for_date_slice(
     if filter_status == "cached" and derived_dataset.exists():
         status.info(f"reusing derived metrics dataset: {derived_dataset}")
     else:
-        derived_path, derived_rows = build_basic_metrics_dataset(filtered_data_dir)
+        derived_path, derived_rows = build_basic_metrics_dataset(
+            filtered_data_dir,
+            resource_admission=resource_admission,
+            admission_held=resource_admission is not None,
+        )
         status.info(
             f"prepared derived metrics dataset: {derived_rows} rows at {derived_path}"
         )
@@ -430,6 +512,14 @@ def _run_for_date_slice(
                 # previous source signature. Preserve normal cache reuse only
                 # when the filtered input itself was reused.
                 force_rerun=filter_status == "created",
+                resource_admission=resource_admission,
+                admission_held=resource_admission is not None,
+                max_workspace_bytes=analysis_script_workspace_resource_requirement(
+                    max_slice_bytes
+                )[0],
+                max_workspace_inodes=analysis_script_workspace_resource_requirement(
+                    max_slice_bytes
+                )[1],
             )
         except Exception as exc:  # pragma: no cover - defensive logging path
             failed_scripts.append(script_key)
@@ -464,7 +554,10 @@ def _run_for_date_slice(
     ready, missing = playback_readiness(session_dir, metadata)
     if ready:
         export_path, export_state = prepare_session_playback_exports(
-            session_dir, metadata
+            session_dir,
+            metadata,
+            resource_admission=resource_admission,
+            admission_held=resource_admission is not None,
         )
         if export_state == "cached":
             status.info(f"playback export already fresh: {export_path}")
@@ -484,7 +577,12 @@ def _run_for_date_slice(
             "script_keys": list(script_keys),
             "excluded_script_keys": list(BOOTSTRAP_FULL_ANALYSIS_EXCLUDED_SCRIPT_KEYS),
         }
-        write_session_metadata(session_dir, metadata)
+        write_session_metadata(
+            session_dir,
+            metadata,
+            resource_admission=resource_admission,
+            admission_held=resource_admission is not None,
+        )
 
     artifacts, warnings = scan_artifacts(_canonical_scan_roots())
     return OrchestrationResult(
@@ -510,6 +608,7 @@ class RuntimeOrchestrator:
         *,
         poll_interval_seconds: int = DEFAULT_POLL_INTERVAL_SECONDS,
         analysis_gateway: Any | None = None,
+        resource_admission: ProcessResourceAdmission | None = None,
     ) -> None:
         self.status = StatusPrinter()
         # Discovery only creates work. The gateway turns a discovered slice into a
@@ -519,7 +618,12 @@ class RuntimeOrchestrator:
         self.root = repo_root()
         self.data_dir = self.root / "data"
         self.workflows_root = self.root / "results" / "workflows"
-        self.workflows_root.mkdir(parents=True, exist_ok=True)
+        self.resource_admission = resource_admission or PROCESS_RESOURCE_ADMISSION
+        with reserve_analysis_requirements(
+            self.resource_admission,
+            [(self.workflows_root, MAX_ANALYSIS_METADATA_BYTES, _RUNTIME_STATE_INODES)],
+        ):
+            self.workflows_root.mkdir(parents=True, exist_ok=True)
         self.state_path = self.workflows_root / "runtime_state.json"
         self.startup_state_path = self.workflows_root / "startup_state.json"
         self.poll_interval_seconds = max(int(poll_interval_seconds), 10)
@@ -710,10 +814,20 @@ class RuntimeOrchestrator:
             "source": source,
             "active_runtime_namespace": self._state.active_runtime_namespace,
         }
-        self.startup_state_path.write_text(
-            json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
-        self._persist_state()
+        with reserve_analysis_requirements(
+            self.resource_admission,
+            [
+                (
+                    self.workflows_root,
+                    2 * MAX_ANALYSIS_METADATA_BYTES,
+                    _RUNTIME_STATE_INODES,
+                )
+            ],
+        ):
+            self.startup_state_path.write_text(
+                json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
+            self._persist_state(admission_held=True)
 
     def startup_decision_snapshot(self) -> dict[str, Any]:
         context = self._startup_decision_context()
@@ -744,11 +858,21 @@ class RuntimeOrchestrator:
         self.start_background_updates()
         return True, f"Startup mode set to {mapped.replace('_', ' ')}."
 
-    def _persist_state(self) -> None:
-        self.state_path.write_text(
-            json.dumps(self._state.__dict__, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
+    def _persist_state(self, *, admission_held: bool = False) -> None:
+        def write() -> None:
+            self.state_path.write_text(
+                json.dumps(self._state.__dict__, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+
+        if admission_held:
+            write()
+            return
+        with reserve_analysis_requirements(
+            self.resource_admission,
+            [(self.workflows_root, MAX_ANALYSIS_METADATA_BYTES, _RUNTIME_STATE_INODES)],
+        ):
+            write()
 
     def state_snapshot(self) -> dict[str, Any]:
         with self._lock:
@@ -979,7 +1103,15 @@ class RuntimeOrchestrator:
                 session.session_dir, dict(session.metadata), script_options
             )
             if changed:
-                write_session_metadata(session.session_dir, metadata)
+                controller = getattr(
+                    self, "resource_admission", PROCESS_RESOURCE_ADMISSION
+                )
+                with controller.reserve(
+                    session.session_dir,
+                    bytes_required=MAX_ANALYSIS_METADATA_BYTES,
+                    inodes_required=_RUNTIME_STATE_INODES,
+                ):
+                    write_session_metadata(session.session_dir, metadata)
             runtime_payload = (
                 metadata.get("runtime")
                 if isinstance(metadata.get("runtime"), dict)

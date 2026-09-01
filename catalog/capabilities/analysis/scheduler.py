@@ -140,6 +140,7 @@ class FederatedAnalysisScheduler:
         *,
         slice_files: Sequence[Path],
         slice_root: Path,
+        admission_held: bool = False,
     ) -> SubmissionOutcome:
         """Register the input artifacts and submit/queue the durable job."""
 
@@ -149,13 +150,16 @@ class FederatedAnalysisScheduler:
         slice_key = f"{prefix}/slice.tar.gz"
 
         plan_identity = self.gateway.content_store.write_bytes(
-            plan_key, work.plan_bytes()
+            plan_key,
+            work.plan_bytes(),
+            admission_held=admission_held,
         )
         slice_identity = self._ensure_slice_archive(
             slice_key,
             artifact_id=slice_artifact_id(work),
             files=slice_files,
             root=slice_root,
+            admission_held=admission_held,
         )
 
         job = build_analysis_job(
@@ -166,7 +170,12 @@ class FederatedAnalysisScheduler:
             slice_size=slice_identity.size_bytes,
         )
         existed = self._job_exists(job.job_id)
-        self.store.submit(job, coordinator_id=self.coordinator_node_id, now=now)
+        self.store.submit(
+            job,
+            coordinator_id=self.coordinator_node_id,
+            now=now,
+            admission_held=admission_held,
+        )
 
         self.gateway.register_input(
             artifact_id=plan_artifact_id(work),
@@ -178,6 +187,7 @@ class FederatedAnalysisScheduler:
             identity=plan_identity,
             authority_node_id=self.coordinator_node_id,
             now=now,
+            admission_held=admission_held,
         )
         self.gateway.register_input(
             artifact_id=slice_artifact_id(work),
@@ -189,6 +199,7 @@ class FederatedAnalysisScheduler:
             identity=slice_identity,
             authority_node_id=self.coordinator_node_id,
             now=now,
+            admission_held=admission_held,
         )
 
         snapshot = self.store.snapshot(work.job_id)
@@ -199,6 +210,7 @@ class FederatedAnalysisScheduler:
                 command_id=f"{work.job_id}:queue",
                 expected_revision=snapshot.revision,
                 now=now,
+                admission_held=admission_held,
             ).snapshot
         return SubmissionOutcome(
             job_id=work.job_id,
@@ -221,6 +233,7 @@ class FederatedAnalysisScheduler:
         artifact_id: str,
         files: Sequence[Path],
         root: Path,
+        admission_held: bool = False,
     ) -> ContentIdentity:
         store = self.gateway.content_store
         destination = store.resolve(object_key)
@@ -248,6 +261,8 @@ class FederatedAnalysisScheduler:
                 files=list(files),
                 root=root,
                 max_bytes=store.max_bytes,
+                resource_admission=store.resource_admission,
+                admission_held=admission_held,
             )
         identity = store.identity(object_key)
         if registered is not None and (

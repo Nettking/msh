@@ -16,6 +16,8 @@ from pathlib import Path
 from typing import Any, Self
 
 from catalog.federation.errors import FederationValidationError
+from catalog.federation.host_resources import ProcessResourceAdmission
+from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
 from catalog.federation.sqlite_schema import SQLiteMigration, ensure_sqlite_schema
 
 from .contracts import ExecutionObservation, canonical_json, stamp
@@ -27,6 +29,10 @@ EFFICIENCY_SCHEMA_VERSION = 1
 
 DEFAULT_MAX_OBSERVATIONS = 200_000
 DEFAULT_MAX_DECISIONS = 500
+MAX_DECISION_BYTES = 64 * 1024
+EFFICIENCY_INITIALIZATION_BYTES = 8 * 1024 * 1024
+EFFICIENCY_MUTATION_BYTES = 64 * 1024 * 1024
+EFFICIENCY_MUTATION_INODES = 4
 
 _OBSERVATION_COLUMNS = frozenset(
     {
@@ -162,8 +168,10 @@ class SQLiteExecutionLearningStore:
         policy: EfficiencyPolicy | None = None,
         max_observations: int = DEFAULT_MAX_OBSERVATIONS,
         max_decisions: int = DEFAULT_MAX_DECISIONS,
+        resource_admission: ProcessResourceAdmission | None = None,
     ) -> None:
         self.database = str(database)
+        self.resource_admission = resource_admission or PROCESS_RESOURCE_ADMISSION
         self.policy = policy or EfficiencyPolicy()
         if max_observations <= 0 or max_decisions <= 0:
             raise FederationValidationError(
@@ -173,23 +181,32 @@ class SQLiteExecutionLearningStore:
             )
         self.max_observations = int(max_observations)
         self.max_decisions = int(max_decisions)
-        Path(self.database).parent.mkdir(parents=True, exist_ok=True)
-        with self._session() as connection:
-            connection.execute("PRAGMA journal_mode=WAL")
-            ensure_sqlite_schema(
-                connection,
-                schema_name=EFFICIENCY_SCHEMA_NAME,
-                target_version=EFFICIENCY_SCHEMA_VERSION,
-                migrations=(SQLiteMigration(1, _create_v1),),
-                detect_legacy_version=_detect_legacy_version,
-                validate=_validate_schema,
-            )
+        with self.resource_admission.reserve(
+            self.database,
+            bytes_required=EFFICIENCY_INITIALIZATION_BYTES,
+            inodes_required=EFFICIENCY_MUTATION_INODES,
+        ):
+            Path(self.database).parent.mkdir(parents=True, exist_ok=True)
+            with self._session() as connection:
+                connection.execute("PRAGMA journal_mode=WAL")
+                connection.execute("PRAGMA wal_autocheckpoint=1000")
+                connection.execute("PRAGMA journal_size_limit=8388608")
+                ensure_sqlite_schema(
+                    connection,
+                    schema_name=EFFICIENCY_SCHEMA_NAME,
+                    target_version=EFFICIENCY_SCHEMA_VERSION,
+                    migrations=(SQLiteMigration(1, _create_v1),),
+                    detect_legacy_version=_detect_legacy_version,
+                    validate=_validate_schema,
+                )
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database, timeout=30)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA busy_timeout=30000")
         connection.execute("PRAGMA synchronous=FULL")
+        connection.execute("PRAGMA wal_autocheckpoint=1000")
+        connection.execute("PRAGMA journal_size_limit=8388608")
         return connection
 
     @contextmanager
@@ -202,17 +219,22 @@ class SQLiteExecutionLearningStore:
 
     @contextmanager
     def _transaction(self) -> Iterator[sqlite3.Connection]:
-        connection = self._connect()
-        try:
-            connection.execute("BEGIN IMMEDIATE")
+        with self.resource_admission.reserve(
+            self.database,
+            bytes_required=EFFICIENCY_MUTATION_BYTES,
+            inodes_required=EFFICIENCY_MUTATION_INODES,
+        ):
+            connection = self._connect()
             try:
-                yield connection
-                connection.commit()
-            except Exception:
-                connection.rollback()
-                raise
-        finally:
-            connection.close()
+                connection.execute("BEGIN IMMEDIATE")
+                try:
+                    yield connection
+                    connection.commit()
+                except Exception:
+                    connection.rollback()
+                    raise
+            finally:
+                connection.close()
 
     @property
     def half_life_seconds(self) -> int:
@@ -535,6 +557,13 @@ class SQLiteExecutionLearningStore:
                 "decision",
                 "requires decision_id, job_id and decided_at",
             )
+        encoded = canonical_json(payload, "decision")
+        if len(encoded.encode("utf-8")) > MAX_DECISION_BYTES:
+            raise FederationValidationError(
+                "decision-too-large",
+                "decision",
+                f"must not exceed {MAX_DECISION_BYTES} UTF-8 bytes",
+            )
         with self._transaction() as connection:
             connection.execute(
                 """INSERT OR REPLACE INTO capability_scheduling_decisions(
@@ -545,7 +574,7 @@ class SQLiteExecutionLearningStore:
                     session_id,
                     job_id,
                     decided_at,
-                    canonical_json(payload, "decision"),
+                    encoded,
                 ),
             )
             connection.execute(

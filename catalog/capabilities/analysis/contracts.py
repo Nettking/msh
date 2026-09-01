@@ -70,6 +70,10 @@ _ORIGINS = frozenset({ORIGIN_AUTOMATIC_DISCOVERY, ORIGIN_MANUAL_UPLOAD})
 MAX_PLAN_BYTES = 8_192
 MAX_TARGET_DATES = 64
 MAX_SCRIPT_KEYS = 32
+# Result documents contain bounded execution summaries, never arbitrary payloads.
+# Keep this contract-level so the writer and its admission envelope share one
+# ceiling without importing the admission wrapper back into the worker.
+MAX_ANALYSIS_RESULT_BYTES = 256 * 1024
 #: Default ceiling for one packed input slice. Analysis work larger than this
 #: fails closed at submission instead of silently degrading to local execution.
 DEFAULT_MAX_SLICE_BYTES = 512 * 1024 * 1024

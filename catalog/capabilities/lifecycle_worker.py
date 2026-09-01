@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 from catalog.federation.errors import FederationValidationError
+from catalog.federation.host_resources import ProcessResourceAdmission
 
 from .dispatch import (
     CapabilityWorker,
@@ -28,9 +29,14 @@ from .lifecycle_contracts import (
 class SQLiteLifecycleDispatchInbox(SQLiteDispatchInbox):
     """Pair F7.4 receipts with durable cancellation tombstones."""
 
-    def __init__(self, database: Path | str) -> None:
-        super().__init__(database)
-        with self._connect() as connection:
+    def __init__(
+        self,
+        database: Path | str,
+        *,
+        resource_admission: ProcessResourceAdmission | None = None,
+    ) -> None:
+        super().__init__(database, resource_admission=resource_admission)
+        with self._admitted_connection() as connection:
             connection.executescript(
                 """
                 CREATE TABLE IF NOT EXISTS capability_dispatch_cancellations (
@@ -56,7 +62,7 @@ class SQLiteLifecycleDispatchInbox(SQLiteDispatchInbox):
             )
 
     def cancelled_for(self, request: DispatchRequest) -> bool:
-        with self._connect() as connection:
+        with self._admitted_connection() as connection:
             row = connection.execute(
                 """SELECT 1 FROM capability_dispatch_cancellations
                    WHERE session_id=? AND job_id=? AND attempt_id=?

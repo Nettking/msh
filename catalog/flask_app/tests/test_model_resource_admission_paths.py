@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import json
 import os
-from pathlib import Path
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -16,8 +16,8 @@ from catalog.flask_app.services.capability_config_service import CapabilityConfi
 from catalog.flask_app.services.host_model_install_handoff import (
     HOST_OPERATION_STALE_SECONDS,
     MODEL_REQUEST_ID,
-    HostModelInstallHandoff,
     MODEL_REQUEST_SCHEMA,
+    HostModelInstallHandoff,
 )
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -119,6 +119,11 @@ def test_supported_model_install_paths_have_no_direct_pull_bypass() -> None:
     model_pull = (ROOT / "catalog/federation/model_resource_pull.py").read_text(
         encoding="utf-8"
     )
+    connected_docs = (ROOT / "docs/connected_capabilities.md").read_text(
+        encoding="utf-8"
+    )
+    server_docs = (ROOT / "docs/server_setup.md").read_text(encoding="utf-8")
+    explainer_docs = (ROOT / "docs/ai_explainer.md").read_text(encoding="utf-8")
 
     assert "fcp_model_pull.ps1" in start_cmd
     assert "catalog.federation.model_resource_pull" in start_sh
@@ -131,6 +136,13 @@ def test_supported_model_install_paths_have_no_direct_pull_bypass() -> None:
     assert '"ollama-pull"' not in setup
     assert '"ollama-pull"' not in headless
     assert 'environment.setdefault("COMPOSE_PROJECT_NAME", "fcp")' in model_pull
+    assert "catalog.federation.model_resource_pull" in connected_docs
+    assert "catalog.federation.model_resource_pull" in server_docs
+    assert "catalog.federation.model_resource_pull" in explainer_docs
+    assert "run --rm model-provider-install" not in connected_docs
+    assert "run --rm model-provider-install" not in server_docs
+    assert "run --rm ollama-pull" not in server_docs
+    assert "run --rm ollama-pull" not in explainer_docs
 
 
 def test_update_agents_treat_ollama_as_optional_and_under_host_admission() -> None:

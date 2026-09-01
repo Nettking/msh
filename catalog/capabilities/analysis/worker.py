@@ -41,6 +41,7 @@ from .contracts import (
     ANALYSIS_PROTOCOL_VERSION,
     ANALYSIS_RESULT_SCHEMA,
     DEFAULT_MAX_SLICE_BYTES,
+    MAX_ANALYSIS_RESULT_BYTES,
     MAX_PLAN_BYTES,
     AnalysisPlan,
     analysis_grant_id,
@@ -48,12 +49,14 @@ from .contracts import (
 from .gateway import AnalysisArtifactTransport, retrieve_authorized_artifact
 from .packaging import extract_slice_archive
 from .workspace_reconciliation import (
+    WorkspaceReconciliationReport,
     prepare_owned_workspace,
     reconcile_stale_workspaces,
 )
 
 MAX_REPORTED_SCRIPTS = 32
 MAX_REPORTED_TEXT = 96
+MAX_REPORTED_FIELDS = 16
 
 
 @dataclass(frozen=True)
@@ -107,6 +110,7 @@ class FederatedAnalysisHandler:
         data_owner_node_id: Callable[[JobContract], str],
         endpoint_id: str = ANALYSIS_ENDPOINT_ID,
         max_slice_bytes: int = DEFAULT_MAX_SLICE_BYTES,
+        initialize_workspace: bool = True,
     ) -> None:
         self.session_id = session_id
         self.node_id = node_id
@@ -119,10 +123,12 @@ class FederatedAnalysisHandler:
         self.data_owner_node_id = data_owner_node_id
         self.endpoint_id = endpoint_id
         self.max_slice_bytes = int(max_slice_bytes)
-        self.workspace_reconciliation = reconcile_stale_workspaces(
-            self.workspace_root,
-            now=self.clock(),
-        )
+        self.workspace_reconciliation = WorkspaceReconciliationReport()
+        if initialize_workspace:
+            self.workspace_reconciliation = reconcile_stale_workspaces(
+                self.workspace_root,
+                now=self.clock(),
+            )
 
     async def execute(self, job: JobContract) -> ExecutionResult:
         try:
@@ -330,7 +336,10 @@ class FederatedAnalysisHandler:
                 _short(item) for item in report.failed_scripts[:MAX_REPORTED_SCRIPTS]
             ],
             "script_results": [
-                {key: _short(value) for key, value in dict(item).items()}
+                {
+                    _short(key): _short(value)
+                    for key, value in list(dict(item).items())[:MAX_REPORTED_FIELDS]
+                }
                 for item in report.script_results[:MAX_REPORTED_SCRIPTS]
             ],
             "completed_at": _stamp(self.clock()),
@@ -338,8 +347,20 @@ class FederatedAnalysisHandler:
         payload = json.dumps(
             document, sort_keys=True, separators=(",", ":"), ensure_ascii=True
         ).encode("utf-8")
+        if len(payload) > MAX_ANALYSIS_RESULT_BYTES:
+            raise FederationValidationError(
+                "analysis-result-too-large",
+                "result",
+                f"serialized analysis result exceeds {MAX_ANALYSIS_RESULT_BYTES} bytes",
+            )
         object_key = f"analysis/results/{job.job_id}/{attempt_id}/result.json"
-        identity = self.content_store.write_bytes(object_key, payload)
+        # The handler already holds one atomic workspace + result reservation;
+        # do not re-admit the completion write as a nested transaction.
+        identity = self.content_store.write_bytes(
+            object_key,
+            payload,
+            admission_held=True,
+        )
         result_reference = ArtifactReference(
             reference_id=declared.reference_id,
             session_id=declared.session_id,

@@ -24,6 +24,7 @@ PERMISSIONS: dict[str, str] = {
     "software.update": "Check for and apply software updates",
     "users.manage": "Create, activate, deactivate, and assign roles to human users",
     "account.manage": "Change the authenticated human user's own password",
+    "resource.override": "Issue bounded, audited host-resource policy overrides",
 }
 
 ROLE_PERMISSIONS: dict[str, frozenset[str]] = {

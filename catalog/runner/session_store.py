@@ -10,17 +10,23 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
-from tempfile import NamedTemporaryFile
 from typing import Any
 
+from catalog.common.managed_temporary import (
+    ManagedTemporaryFile,
+    ManagedTemporaryRoot,
+    scavenge_managed_temporary_root,
+)
 from catalog.runner.script_catalog import ScriptOption
 
 SESSION_VERSION = 2
 SESSION_STATE_FILE = "session_state.json"
 LEGACY_SESSION_FILE = "session.json"
+_SESSION_METADATA_TEMP_NAMESPACE = "analysis-session-metadata"
 HEALTH_CHECK_SCRIPT_KEYS: tuple[str, ...] = (
     "machines_active_per_day",
     "analyze_missing_sequence_number",
@@ -265,16 +271,72 @@ def normalize_session_metadata(
     return metadata, changed
 
 
-def write_session_metadata(session_dir: Path, metadata: dict[str, Any]) -> None:
-    """Persist session metadata atomically."""
-    metadata["updated_at"] = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
-    for file_name in (SESSION_STATE_FILE, LEGACY_SESSION_FILE):
-        target = session_dir / file_name
-        with NamedTemporaryFile("w", encoding="utf-8", dir=session_dir, delete=False) as tmp:
-            json.dump(metadata, tmp, ensure_ascii=False, indent=2, sort_keys=True)
-            tmp.write("\n")
-            temp_path = Path(tmp.name)
-        temp_path.replace(target)
+def _fsync_directory(path: Path) -> None:
+    if os.name == "nt":
+        return
+    descriptor = os.open(str(path), os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def write_session_metadata(
+    session_dir: Path,
+    metadata: dict[str, Any],
+    *,
+    resource_admission=None,
+    admission_held: bool = False,
+) -> None:
+    """Persist session metadata atomically under the shared host admission."""
+
+    def write() -> None:
+        metadata["updated_at"] = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+        serialized = (
+            json.dumps(metadata, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+        ).encode("utf-8")
+        temporary_root = ManagedTemporaryRoot(
+            session_dir / ".fcp-session-metadata-tmp",
+            namespace=_SESSION_METADATA_TEMP_NAMESPACE,
+        )
+        scavenge_managed_temporary_root(
+            temporary_root.root,
+            namespace=_SESSION_METADATA_TEMP_NAMESPACE,
+            max_entries=32,
+        )
+        for file_name in (SESSION_STATE_FILE, LEGACY_SESSION_FILE):
+            target = session_dir / file_name
+            temporary: ManagedTemporaryFile | None = None
+            try:
+                temporary = temporary_root.allocate(
+                    prefix="fcp-session-metadata-",
+                    suffix=".partial",
+                )
+                temporary.write(serialized)
+                temporary.flush()
+                os.fsync(temporary.fileno())
+                temporary.prepare_for_replace()
+                temporary.path.replace(target)
+                _fsync_directory(session_dir)
+            finally:
+                if temporary is not None:
+                    temporary.close()
+
+    if admission_held:
+        write()
+        return
+
+    from catalog.capabilities.analysis.resource_admission import (
+        reserve_analysis_requirements,
+    )
+    from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
+
+    controller = resource_admission or PROCESS_RESOURCE_ADMISSION
+    with reserve_analysis_requirements(
+        controller,
+        [(session_dir, 2 * (2 * 1024 * 1024), 8)],
+    ):
+        write()
 
 
 def script_output_exists(session_dir: Path, script_entry: dict[str, Any]) -> bool:

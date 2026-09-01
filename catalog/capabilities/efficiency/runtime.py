@@ -12,6 +12,8 @@ import contextlib
 from pathlib import Path
 from typing import Protocol
 
+from catalog.federation.host_resources import ProcessResourceAdmission
+
 from ..dispatch import DispatchRequest, DispatchResponse, DispatchState
 from ..lifecycle_contracts import CancellationRequest, CancellationResponse
 from ..lifecycle_coordinator import LifecycleTransport
@@ -128,9 +130,14 @@ class ExecutionEfficiencyRuntime:
         *,
         node_id: str,
         policy: EfficiencyPolicy | None = None,
+        resource_admission: ProcessResourceAdmission | None = None,
     ) -> None:
         self.policy = policy or EfficiencyPolicy()
-        self.store = SQLiteExecutionLearningStore(database, policy=self.policy)
+        self.store = SQLiteExecutionLearningStore(
+            database,
+            policy=self.policy,
+            resource_admission=resource_admission,
+        )
         self.estimator = PerformanceEstimator(self.store, policy=self.policy)
         self.ranker = LearnedProviderRanker(
             self.estimator,
