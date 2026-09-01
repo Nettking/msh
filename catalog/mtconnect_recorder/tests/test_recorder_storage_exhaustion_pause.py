@@ -628,3 +628,38 @@ def test_a_refused_probe_write_measures_the_archive_that_refused(
         assert tuple(runtime.store.probe_root.rglob("*.xml.gz")) == ()
     finally:
         _close(runtime)
+
+
+@pytest.mark.skipif(
+    not hasattr(errno, "EDQUOT"),
+    reason="This host's errno does not define EDQUOT.",
+)
+def test_an_exhausted_quota_is_the_same_local_condition_as_a_full_disk(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A filled quota refuses an admitted write for the same reason a full disk does.
+
+    ``EDQUOT`` is the other way the host says there is no room for this writer,
+    and it is just as much not the Agent's doing. It is named alongside
+    ``ENOSPC`` in the reclassified set, so it is exercised alongside it too.
+    """
+
+    runtime, _guard, state_file = _captured(tmp_path, monkeypatch)
+    try:
+        monkeypatch.setattr(
+            runtime.store, "store_raw_batch", _refuse(errno.EDQUOT)
+        )
+
+        _source, success, error = runtime.capture_source(SOURCE, BASE_URL)
+
+        assert success is True
+        assert error == ""
+        status = runtime.source_status[SOURCE]
+        assert status["last_error"] == ""
+        assert status["resource_admission"]["code"] == STORAGE_EXHAUSTED
+        assert runtime.backoff[SOURCE] == recorder_runtime.BACKOFF_INITIAL
+        assert SOURCE not in runtime.checkpoints
+        assert not state_file.exists()
+    finally:
+        _close(runtime)
