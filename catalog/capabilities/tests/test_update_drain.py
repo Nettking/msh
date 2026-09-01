@@ -254,7 +254,7 @@ def test_stale_ready_selection_cannot_claim_after_concurrent_drain(tmp_path) -> 
                 lease_expires_at=NOW + timedelta(minutes=5),
                 now=NOW + timedelta(seconds=5),
             )
-        except Exception as exc:  # expected: durable drain wins the admission race
+        except FederationValidationError as exc:
             failures.append(exc)
 
     def drainer() -> None:
