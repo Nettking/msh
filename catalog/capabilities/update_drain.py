@@ -1,41 +1,34 @@
 """Workload-drain primitives for rolling Federation software updates.
 
-An update drain is a scheduling fence, not a cancellation mechanism.  The node
-continues to own and execute work it already holds while its providers become
-ineligible for new selection.  Replacement may begin only after durable job
-ownership proves that every provider identity belonging to the node is
-quiescent.
+An update drain is a scheduling admission fence, not a cancellation mechanism.
+The node continues to own and execute work it already holds while its providers
+become ineligible for new ownership. Replacement may begin only after durable F7
+ownership proves that every provider identity belonging to the node is quiescent.
 
-This module intentionally does not own update orchestration or activation.  It
-provides the small domain boundary those layers need: persist the exact bounded
-provider identity set being drained, convert READY reports to DRAINING without
-changing live-work metrics, and query the existing F7 durable job store for
-active ownership held by that set.
+The critical ordering property lives in the same SQLite authority as F7 ownership:
+a persistent trigger rejects ownership-granting updates for a draining provider.
+Both first-attempt claims and retry claims therefore serialize with the drain
+transition under SQLite's write transaction, instead of trusting an earlier health
+snapshot.
 """
 
 from __future__ import annotations
 
 import json
 import sqlite3
-from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from enum import Enum
-from pathlib import Path
 
 from catalog.federation.errors import FederationValidationError
-from catalog.federation.host_resources import ProcessResourceAdmission
-from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
 
 from .job_store import SQLiteJobStore
+from .jobs import AttemptStatus
 from .provider_reports import ProviderResourceReport, ProviderStatus
 
 MAX_DRAIN_PROVIDER_IDS = 128
 _MAX_TEXT_BYTES = 512
 UPDATE_DRAIN_STORE_SCHEMA_VERSION = 1
-UPDATE_DRAIN_INITIALIZATION_BYTES = 2 * 1024 * 1024
-UPDATE_DRAIN_MUTATION_BYTES = 1024 * 1024
-UPDATE_DRAIN_MUTATION_INODES = 4
 
 
 def _text(value: object, field: str) -> str:
@@ -85,8 +78,25 @@ def _positive_revision(value: object, field: str) -> int:
 
 
 @dataclass(frozen=True)
+class ActiveDrainOwnership:
+    """Exact durable ownership evidence keeping a drain non-quiescent."""
+
+    session_id: str
+    job_id: str
+    attempt_id: str
+    attempt_number: int
+    provider_id: str
+    coordinator_id: str
+    lease_id: str
+    lease_generation: int
+    attempt_status: AttemptStatus
+    job_revision: int
+    lease_expires_at: datetime
+
+
+@dataclass(frozen=True)
 class NodeUpdateDrainTarget:
-    """The durable provider identities that must quiesce before one node switches."""
+    """Provider identities that must quiesce before one node switches."""
 
     node_id: str
     provider_ids: tuple[str, ...]
@@ -97,6 +107,12 @@ class NodeUpdateDrainTarget:
             _text(value, f"provider_ids[{index}]")
             for index, value in enumerate(self.provider_ids)
         )
+        if not provider_ids:
+            raise FederationValidationError(
+                "empty-drain-provider-set",
+                "provider_ids",
+                "must contain at least one provider identity",
+            )
         if len(provider_ids) > MAX_DRAIN_PROVIDER_IDS:
             raise FederationValidationError(
                 "too-many-drain-providers",
@@ -112,13 +128,7 @@ class NodeUpdateDrainTarget:
         object.__setattr__(self, "provider_ids", tuple(sorted(provider_ids)))
 
     def apply_to_report(self, report: ProviderResourceReport) -> ProviderResourceReport:
-        """Fence new scheduling while preserving the provider's live-work metrics.
-
-        Only an actually READY provider becomes DRAINING.  An unavailable,
-        disabled or revoked provider must keep its stronger state instead of
-        being made to look merely drained.  Reports outside this node/provider
-        set are returned unchanged.
-        """
+        """Project READY to DRAINING without changing capacity or capability data."""
 
         if not isinstance(report, ProviderResourceReport):
             raise FederationValidationError(
@@ -134,13 +144,15 @@ class NodeUpdateDrainTarget:
             return report
         return replace(report, status=ProviderStatus.DRAINING)
 
-    def active_ownership_count(self, store: SQLiteJobStore) -> int:
-        """Count active F7 ownership for this node's providers from durable state.
+    def active_ownerships(
+        self, store: SQLiteJobStore
+    ) -> tuple[ActiveDrainOwnership, ...]:
+        """Return validated current F7 ownership rows for this drain target.
 
-        This is deliberately a single bounded aggregate query.  It does not
-        enumerate job history, trust worker-local counters or infer quiescence
-        from provider-health freshness.  A stale/missing health report therefore
-        cannot hide a lease that still exists in the authoritative job store.
+        The canonical job JSON, normalized attempt rows, active ownership columns,
+        attempt generation, and non-terminal attempt invariant are all validated by
+        ``SQLiteJobStore._snapshot_from_row`` in one pinned read transaction. Any
+        inconsistency raises instead of being misreported as quiescent.
         """
 
         if not isinstance(store, SQLiteJobStore):
@@ -149,28 +161,78 @@ class NodeUpdateDrainTarget:
                 "store",
                 "must be a SQLiteJobStore",
             )
-        if not self.provider_ids:
-            return 0
         placeholders = ",".join("?" for _ in self.provider_ids)
         with store._connect() as connection:  # package-internal read-only seam
-            row = connection.execute(
-                f"""SELECT COUNT(*) AS active_count
-                    FROM capability_jobs
-                    WHERE active_attempt_id IS NOT NULL
-                      AND active_owner_provider_id IN ({placeholders})""",
+            connection.execute("BEGIN")
+            rows = connection.execute(
+                f"""SELECT * FROM capability_jobs
+                    WHERE active_owner_provider_id IN ({placeholders})
+                    ORDER BY session_id, job_id""",
                 self.provider_ids,
-            ).fetchone()
-        assert row is not None
-        return int(row["active_count"])
+            ).fetchall()
+            evidence: list[ActiveDrainOwnership] = []
+            for row in rows:
+                try:
+                    snapshot = store._snapshot_from_row(connection, row)
+                    ownership = snapshot.ownership
+                    if ownership is None:
+                        raise FederationValidationError(
+                            "update-drain-ownership-integrity",
+                            "ownership",
+                            "active provider pointer has no valid durable ownership",
+                        )
+                    active_attempts = tuple(
+                        attempt
+                        for attempt in snapshot.job.attempts
+                        if not attempt.terminal
+                    )
+                    if (
+                        len(active_attempts) != 1
+                        or active_attempts[0].attempt_id != ownership.attempt_id
+                    ):
+                        raise FederationValidationError(
+                            "update-drain-ownership-integrity",
+                            "attempts",
+                            "active ownership does not name exactly one non-terminal attempt",
+                        )
+                    evidence.append(
+                        ActiveDrainOwnership(
+                            session_id=snapshot.job.session_id,
+                            job_id=snapshot.job.job_id,
+                            attempt_id=ownership.attempt_id,
+                            attempt_number=ownership.attempt_number,
+                            provider_id=ownership.owner_provider_id,
+                            coordinator_id=ownership.granted_by_coordinator_id,
+                            lease_id=ownership.lease_id,
+                            lease_generation=ownership.lease_generation,
+                            attempt_status=active_attempts[0].status,
+                            job_revision=snapshot.revision,
+                            lease_expires_at=ownership.lease_expires_at,
+                        )
+                    )
+                except FederationValidationError:
+                    raise
+                except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+                    raise FederationValidationError(
+                        "update-drain-ownership-integrity",
+                        "ownership",
+                        "durable active ownership is malformed",
+                    ) from exc
+        return tuple(evidence)
+
+    def active_ownership_count(self, store: SQLiteJobStore) -> int:
+        """Return the validated number of durable active ownerships."""
+
+        return len(self.active_ownerships(store))
 
     def is_quiescent(self, store: SQLiteJobStore) -> bool:
-        """Return true only when no durable active attempt belongs to this node."""
+        """Return true only after validated durable current ownership reaches zero."""
 
-        return self.active_ownership_count(store) == 0
+        return not self.active_ownerships(store)
 
 
 class NodeUpdateDrainState(str, Enum):
-    """Persistent rolling-update scheduling state for one Federation member."""
+    """Persistent rolling-update admission state for one Federation member."""
 
     READY = "ready"
     DRAINING = "draining"
@@ -217,6 +279,10 @@ class NodeUpdateDrainRecord:
     def provider_ids(self) -> tuple[str, ...]:
         return self.target.provider_ids
 
+    @property
+    def admission_epoch(self) -> int:
+        return self.revision
+
 
 @dataclass(frozen=True)
 class NodeUpdateDrainMutation:
@@ -225,82 +291,96 @@ class NodeUpdateDrainMutation:
 
 
 class SQLiteNodeUpdateDrainStore:
-    """Durable node drain intent; job ownership stays in the existing F7 store."""
+    """Durable drain state installed inside the authoritative F7 job database.
 
-    def __init__(
-        self,
-        database: Path | str,
-        *,
-        resource_admission: ProcessResourceAdmission | None = None,
-    ) -> None:
-        self.database = str(database)
-        self.resource_admission = resource_admission or PROCESS_RESOURCE_ADMISSION
-        with self._resource_reservation(
-            bytes_required=UPDATE_DRAIN_INITIALIZATION_BYTES,
-            inodes_required=UPDATE_DRAIN_MUTATION_INODES,
-        ):
-            Path(self.database).parent.mkdir(parents=True, exist_ok=True)
-            with self._connect() as connection:
-                connection.execute("PRAGMA journal_mode=WAL")
-                connection.executescript(
-                    """
-                    CREATE TABLE IF NOT EXISTS node_update_drain_meta (
-                        key TEXT PRIMARY KEY,
-                        value TEXT NOT NULL
-                    );
-                    INSERT OR IGNORE INTO node_update_drain_meta(key, value)
-                        VALUES ('schema_version', '1');
+    The store deliberately takes an existing ``SQLiteJobStore`` instead of an
+    arbitrary path. This prevents accidental cross-database admission checks:
+    the drain transition and every ownership-granting claim contend for the same
+    SQLite write lock and the persistent trigger below executes inside the claim.
+    """
 
-                    CREATE TABLE IF NOT EXISTS node_update_drain (
-                        session_id TEXT NOT NULL,
-                        node_id TEXT NOT NULL,
-                        provider_ids_json TEXT NOT NULL CHECK(json_valid(provider_ids_json)),
-                        state TEXT NOT NULL CHECK(state IN ('ready', 'draining')),
-                        revision INTEGER NOT NULL CHECK(revision > 0),
-                        updated_at TEXT NOT NULL,
-                        PRIMARY KEY(session_id, node_id)
-                    );
-                    """
+    def __init__(self, jobs: SQLiteJobStore) -> None:
+        if not isinstance(jobs, SQLiteJobStore):
+            raise FederationValidationError(
+                "invalid-job-store",
+                "jobs",
+                "update drain must share the authoritative SQLiteJobStore",
+            )
+        self.jobs = jobs
+        self.database = jobs.database
+        with self.jobs._admitted_connection() as connection:
+            connection.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS node_update_drain_meta (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                );
+                INSERT OR IGNORE INTO node_update_drain_meta(key, value)
+                    VALUES ('schema_version', '1');
+
+                CREATE TABLE IF NOT EXISTS node_update_drain (
+                    session_id TEXT NOT NULL,
+                    node_id TEXT NOT NULL,
+                    provider_ids_json TEXT NOT NULL CHECK(json_valid(provider_ids_json)),
+                    state TEXT NOT NULL CHECK(state IN ('ready', 'draining')),
+                    revision INTEGER NOT NULL CHECK(revision > 0),
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY(session_id, node_id)
+                );
+
+                CREATE TABLE IF NOT EXISTS node_update_drain_provider (
+                    session_id TEXT NOT NULL,
+                    node_id TEXT NOT NULL,
+                    provider_id TEXT NOT NULL,
+                    PRIMARY KEY(session_id, node_id, provider_id),
+                    FOREIGN KEY(session_id, node_id)
+                        REFERENCES node_update_drain(session_id, node_id)
+                        ON DELETE CASCADE
+                );
+                CREATE INDEX IF NOT EXISTS node_update_drain_provider_lookup
+                    ON node_update_drain_provider(session_id, provider_id);
+
+                CREATE TABLE IF NOT EXISTS node_update_drain_commands (
+                    session_id TEXT NOT NULL,
+                    command_id TEXT NOT NULL,
+                    node_id TEXT NOT NULL,
+                    provider_ids_json TEXT NOT NULL CHECK(json_valid(provider_ids_json)),
+                    result_revision INTEGER NOT NULL CHECK(result_revision > 0),
+                    result_updated_at TEXT NOT NULL,
+                    result_changed INTEGER NOT NULL CHECK(result_changed IN (0, 1)),
+                    PRIMARY KEY(session_id, command_id)
+                );
+
+                CREATE TRIGGER IF NOT EXISTS capability_jobs_update_drain_fence
+                BEFORE UPDATE OF active_owner_provider_id ON capability_jobs
+                WHEN NEW.active_owner_provider_id IS NOT NULL
+                 AND EXISTS (
+                    SELECT 1
+                      FROM node_update_drain_provider AS provider
+                      JOIN node_update_drain AS drain
+                        ON drain.session_id = provider.session_id
+                       AND drain.node_id = provider.node_id
+                     WHERE provider.session_id = NEW.session_id
+                       AND provider.provider_id = NEW.active_owner_provider_id
+                       AND drain.state = 'draining'
+                 )
+                BEGIN
+                    SELECT RAISE(ABORT, 'provider-update-draining');
+                END;
+                """
+            )
+            version = connection.execute(
+                "SELECT value FROM node_update_drain_meta WHERE key='schema_version'"
+            ).fetchone()
+            if (
+                version is None
+                or int(version["value"]) != UPDATE_DRAIN_STORE_SCHEMA_VERSION
+            ):
+                raise FederationValidationError(
+                    "unsupported-update-drain-store-schema",
+                    "schema_version",
+                    f"expected {UPDATE_DRAIN_STORE_SCHEMA_VERSION}",
                 )
-                version = connection.execute(
-                    "SELECT value FROM node_update_drain_meta WHERE key='schema_version'"
-                ).fetchone()
-                if (
-                    version is None
-                    or int(version["value"]) != UPDATE_DRAIN_STORE_SCHEMA_VERSION
-                ):
-                    raise FederationValidationError(
-                        "unsupported-update-drain-store-schema",
-                        "schema_version",
-                        f"expected {UPDATE_DRAIN_STORE_SCHEMA_VERSION}",
-                    )
-
-    @contextmanager
-    def _resource_reservation(
-        self,
-        *,
-        bytes_required: int = UPDATE_DRAIN_MUTATION_BYTES,
-        inodes_required: int = UPDATE_DRAIN_MUTATION_INODES,
-    ):
-        with self.resource_admission.reserve(
-            self.database,
-            bytes_required=bytes_required,
-            inodes_required=inodes_required,
-        ):
-            yield
-
-    @contextmanager
-    def _admitted_connection(self):
-        with self._resource_reservation(), self._connect() as connection:
-            yield connection
-
-    def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.database, timeout=30)
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA busy_timeout=30000")
-        connection.execute("PRAGMA synchronous=FULL")
-        connection.execute("PRAGMA wal_autocheckpoint=64")
-        return connection
 
     @staticmethod
     def _provider_ids_json(target: NodeUpdateDrainTarget) -> str:
@@ -313,25 +393,42 @@ class SQLiteNodeUpdateDrainStore:
 
     @staticmethod
     def _record(row: sqlite3.Row) -> NodeUpdateDrainRecord:
-        provider_ids = json.loads(row["provider_ids_json"])
+        try:
+            provider_ids = json.loads(row["provider_ids_json"])
+        except (TypeError, json.JSONDecodeError) as exc:
+            raise FederationValidationError(
+                "invalid-update-drain-provider-set",
+                "provider_ids_json",
+                "must contain valid JSON",
+            ) from exc
         if not isinstance(provider_ids, list):
             raise FederationValidationError(
                 "invalid-update-drain-provider-set",
                 "provider_ids_json",
                 "must contain an array",
             )
+        try:
+            updated_at = datetime.fromisoformat(
+                row["updated_at"].replace("Z", "+00:00")
+            )
+        except (AttributeError, TypeError, ValueError) as exc:
+            raise FederationValidationError(
+                "invalid-update-drain-timestamp",
+                "updated_at",
+                "stored update drain timestamp is invalid",
+            ) from exc
         return NodeUpdateDrainRecord(
             session_id=row["session_id"],
             target=NodeUpdateDrainTarget(row["node_id"], tuple(provider_ids)),
             state=row["state"],
             revision=int(row["revision"]),
-            updated_at=datetime.fromisoformat(row["updated_at"].replace("Z", "+00:00")),
+            updated_at=updated_at,
         )
 
     def get(self, *, session_id: str, node_id: str) -> NodeUpdateDrainRecord | None:
         session_id = _text(session_id, "session_id")
         node_id = _text(node_id, "node_id")
-        with self._connect() as connection:
+        with self.jobs._connect() as connection:
             row = connection.execute(
                 "SELECT * FROM node_update_drain WHERE session_id=? AND node_id=?",
                 (session_id, node_id),
@@ -349,16 +446,33 @@ class SQLiteNodeUpdateDrainStore:
             return None
         return record.target
 
+    def project_report(self, report: ProviderResourceReport) -> ProviderResourceReport:
+        """Project a durable active drain into the provider's live health report."""
+
+        if not isinstance(report, ProviderResourceReport):
+            raise FederationValidationError(
+                "invalid-provider-report",
+                "report",
+                "must be a ProviderResourceReport",
+            )
+        target = self.draining_target(
+            session_id=report.session_id,
+            node_id=report.node_id,
+        )
+        return report if target is None else target.apply_to_report(report)
+
     def request_drain(
         self,
         *,
         session_id: str,
         target: NodeUpdateDrainTarget,
+        command_id: str,
         now: datetime,
     ) -> NodeUpdateDrainMutation:
-        """Persist one exact drain target; duplicate requests are idempotent."""
+        """Atomically make DRAINING effective for claims and persist its target."""
 
         session_id = _text(session_id, "session_id")
+        command_id = _text(command_id, "command_id")
         if not isinstance(target, NodeUpdateDrainTarget):
             raise FederationValidationError(
                 "invalid-update-drain-target",
@@ -367,9 +481,38 @@ class SQLiteNodeUpdateDrainStore:
             )
         now = _utc(now, "now")
         encoded_ids = self._provider_ids_json(target)
-        with self._admitted_connection() as connection:
+        with self.jobs._admitted_connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
+                command = connection.execute(
+                    """SELECT * FROM node_update_drain_commands
+                       WHERE session_id=? AND command_id=?""",
+                    (session_id, command_id),
+                ).fetchone()
+                if command is not None:
+                    if (
+                        command["node_id"] != target.node_id
+                        or command["provider_ids_json"] != encoded_ids
+                    ):
+                        raise FederationValidationError(
+                            "update-drain-command-conflict",
+                            "command_id",
+                            "command ID was already used for a different drain target",
+                        )
+                    replay = NodeUpdateDrainRecord(
+                        session_id=session_id,
+                        target=target,
+                        state=NodeUpdateDrainState.DRAINING,
+                        revision=int(command["result_revision"]),
+                        updated_at=datetime.fromisoformat(
+                            command["result_updated_at"].replace("Z", "+00:00")
+                        ),
+                    )
+                    connection.commit()
+                    return NodeUpdateDrainMutation(
+                        replay, bool(int(command["result_changed"]))
+                    )
+
                 row = connection.execute(
                     "SELECT * FROM node_update_drain WHERE session_id=? AND node_id=?",
                     (session_id, target.node_id),
@@ -397,28 +540,62 @@ class SQLiteNodeUpdateDrainStore:
                                 "provider_ids",
                                 "an active drain cannot change its provider identity set",
                             )
-                        connection.commit()
-                        return NodeUpdateDrainMutation(existing, False)
+                        changed = False
+                    else:
+                        connection.execute(
+                            """UPDATE node_update_drain
+                               SET provider_ids_json=?, state=?, revision=revision+1,
+                                   updated_at=?
+                               WHERE session_id=? AND node_id=?""",
+                            (
+                                encoded_ids,
+                                NodeUpdateDrainState.DRAINING.value,
+                                _stamp(now),
+                                session_id,
+                                target.node_id,
+                            ),
+                        )
+                        changed = True
+
+                if changed:
                     connection.execute(
-                        """UPDATE node_update_drain
-                           SET provider_ids_json=?, state=?, revision=revision+1, updated_at=?
+                        """DELETE FROM node_update_drain_provider
                            WHERE session_id=? AND node_id=?""",
+                        (session_id, target.node_id),
+                    )
+                    connection.executemany(
+                        """INSERT INTO node_update_drain_provider
+                           (session_id, node_id, provider_id)
+                           VALUES (?, ?, ?)""",
                         (
-                            encoded_ids,
-                            NodeUpdateDrainState.DRAINING.value,
-                            _stamp(now),
-                            session_id,
-                            target.node_id,
+                            (session_id, target.node_id, provider_id)
+                            for provider_id in target.provider_ids
                         ),
                     )
-                    changed = True
-                current = connection.execute(
+
+                current_row = connection.execute(
                     "SELECT * FROM node_update_drain WHERE session_id=? AND node_id=?",
                     (session_id, target.node_id),
                 ).fetchone()
-                assert current is not None
+                assert current_row is not None
+                current = self._record(current_row)
+                connection.execute(
+                    """INSERT INTO node_update_drain_commands
+                       (session_id, command_id, node_id, provider_ids_json,
+                        result_revision, result_updated_at, result_changed)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        session_id,
+                        command_id,
+                        target.node_id,
+                        encoded_ids,
+                        current.revision,
+                        _stamp(current.updated_at),
+                        1 if changed else 0,
+                    ),
+                )
                 connection.commit()
-                return NodeUpdateDrainMutation(self._record(current), changed)
+                return NodeUpdateDrainMutation(current, changed)
             except Exception:
                 connection.rollback()
                 raise
@@ -431,13 +608,13 @@ class SQLiteNodeUpdateDrainStore:
         expected_revision: int,
         now: datetime,
     ) -> NodeUpdateDrainMutation:
-        """Return to READY only from the exact drain revision being retired."""
+        """Return to READY only from the exact admission epoch being retired."""
 
         session_id = _text(session_id, "session_id")
         node_id = _text(node_id, "node_id")
         expected_revision = _positive_revision(expected_revision, "expected_revision")
         now = _utc(now, "now")
-        with self._admitted_connection() as connection:
+        with self.jobs._admitted_connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
                 row = connection.execute(
@@ -485,6 +662,7 @@ class SQLiteNodeUpdateDrainStore:
 
 
 __all__ = [
+    "ActiveDrainOwnership",
     "MAX_DRAIN_PROVIDER_IDS",
     "NodeUpdateDrainMutation",
     "NodeUpdateDrainRecord",
