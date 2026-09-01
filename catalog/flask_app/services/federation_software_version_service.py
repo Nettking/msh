@@ -214,6 +214,8 @@ class FederationSoftwareVersionService:
 
         try:
             snapshot = get_active_update_service().snapshot()
+        except AuthoritativeReplayIncomplete:
+            raise
         except Exception:  # noqa: BLE001 - a passive view never fails a page
             return {}
         rows = snapshot.get("devices")
@@ -389,6 +391,8 @@ class FederationSoftwareVersionService:
             value = self._load()
             try:
                 context, actor = self._context()
+            except AuthoritativeReplayIncomplete:
+                raise
             except Exception:  # noqa: BLE001 - a passive view stays available
                 return {**value, "branches": [], "can_manage": False}
             try:
