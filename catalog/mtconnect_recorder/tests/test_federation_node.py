@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import threading
-from contextlib import suppress
 from concurrent.futures import Future
+from contextlib import suppress
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
