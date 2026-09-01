@@ -22,6 +22,7 @@ from pathlib import Path
 
 from .docker_resources import docker_backing_resource_path
 from .host_resources import PressureLevel, ProcessResourceAdmission, ResourceAssessment
+from .process_resource_admission import PROCESS_RESOURCE_ADMISSION
 
 MODEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$")
 MODEL_PULL_TIMEOUT_SECONDS = 3600.0
@@ -227,7 +228,7 @@ def admitted_model_pull(
             "Model installation was not started because FCP could not prove the host resource backing Docker model storage.",
         )
 
-    admission = controller or ProcessResourceAdmission()
+    admission = controller or PROCESS_RESOURCE_ADMISSION
     assessment = admission.assessment(backing_path)
     if assessment.level >= PressureLevel.PRESSURE:
         return ModelPullResult(
