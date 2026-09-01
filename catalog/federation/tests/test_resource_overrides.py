@@ -12,6 +12,7 @@ from catalog.federation.host_resources import (
     PressureThresholds,
 )
 from catalog.federation.process_resource_admission import (
+    EmergencyAdmissionLeaseError,
     SerializedProcessResourceAdmission,
 )
 from catalog.federation.resource_override import (
@@ -360,3 +361,95 @@ def test_emergency_lease_expires_and_revocation_is_enforced(tmp_path: Path) -> N
     ):
         pass
     assert expired.value.code == "emergency_override_expired"
+
+
+def test_spent_and_expired_lease_handles_do_not_accumulate(tmp_path: Path) -> None:
+    """Bounded cleanup that follows from the lease contract, not from a policy.
+
+    Every issued lease used to be kept in memory for the life of the process.
+    A lease is one-shot and expiring, so once it is used, revoked, or past its
+    expiry, ``consume`` refuses it forever and the handle can only serve a
+    ``revoke`` that would change nothing. Dropping it needs no age cutoff or
+    retention horizon: the frontier is the lease's own recorded expiry.
+
+    The audit records are deliberately untouched -- their lifetime is still an
+    open product decision.
+    """
+
+    clock = {"now": NOW}
+    authority = _authority(tmp_path, clock=lambda: clock["now"])
+    admission = SerializedProcessResourceAdmission(
+        thresholds=_thresholds(),
+        measurer=lambda _path: _measurement("device:work", 250, 10_000),
+        clock=lambda: clock["now"],
+    )
+
+    spent = authority.issue_emergency_admission(
+        principal=ADMIN,
+        operation="maintenance",
+        resource_ids=["device:work"],
+        max_bytes=50,
+        max_inodes=5,
+        expires_at=NOW + timedelta(minutes=10),
+        reason="spend this one",
+    )
+    with admission.reserve(
+        tmp_path / "work",
+        bytes_required=10,
+        inodes_required=1,
+        operation="maintenance",
+        override=spent,
+    ):
+        pass
+    assert spent.used is True
+
+    expiring = authority.issue_emergency_admission(
+        principal=ADMIN,
+        operation="maintenance",
+        resource_ids=["device:work"],
+        max_bytes=50,
+        max_inodes=5,
+        expires_at=NOW + timedelta(minutes=5),
+        reason="let this one expire",
+    )
+    revoked = authority.issue_emergency_admission(
+        principal=ADMIN,
+        operation="maintenance",
+        resource_ids=["device:work"],
+        max_bytes=50,
+        max_inodes=5,
+        expires_at=NOW + timedelta(minutes=10),
+        reason="revoke this one",
+    )
+    authority.revoke(principal=ADMIN, override_id=revoked.override_id)
+
+    clock["now"] = NOW + timedelta(minutes=6)
+    live = authority.issue_emergency_admission(
+        principal=ADMIN,
+        operation="maintenance",
+        resource_ids=["device:work"],
+        max_bytes=50,
+        max_inodes=5,
+        expires_at=clock["now"] + timedelta(minutes=10),
+        reason="still admissible",
+    )
+
+    assert authority.live_lease_ids() == (live.override_id,)
+    # Every issuance stays in the durable audit ledger.
+    assert len(authority.audit_records()) == 4
+    assert {record.override_id for record in authority.audit_records()} == {
+        spent.override_id,
+        expiring.override_id,
+        revoked.override_id,
+        live.override_id,
+    }
+    # Dropping the handles changed nothing an operator could still act on:
+    # the lease itself still refuses, whether or not the authority holds it.
+    with pytest.raises(EmergencyAdmissionLeaseError):
+        expiring.consume(
+            operation="maintenance",
+            resource_ids=frozenset({"device:work"}),
+            bytes_required=10,
+            inodes_required=1,
+            now=clock["now"],
+        )

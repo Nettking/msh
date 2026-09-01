@@ -20,6 +20,7 @@ from catalog.federation.host_resources import (
     PressureThresholds,
     ProcessResourceAdmission,
 )
+from catalog.orchestrator import analysis_runtime
 from catalog.orchestrator.analysis_runtime import (
     AnalysisIdentity,
     AnalysisRuntime,
@@ -103,14 +104,61 @@ def test_analysis_runtime_startup_refuses_before_capability_root_creation(
     assert not (root / "results" / "capabilities").exists()
 
 
+@pytest.fixture()
+def standalone_identity_binding(monkeypatch: pytest.MonkeyPatch):
+    """Pin the process-wide bindings resolve_analysis_identity short-circuits on.
+
+    ``create_app()`` registers a process-global identity supplier, and any
+    earlier test in the session that builds a Flask application leaves it
+    installed. ``resolve_analysis_identity`` consults the environment and that
+    supplier before it reaches the standalone writer, so without this the test
+    silently stops exercising the admitted path and passes for the wrong
+    reason -- or, as here, fails depending on suite order. This mirrors the
+    isolation ``catalog/orchestrator/tests/conftest.py`` already applies.
+    """
+
+    monkeypatch.setattr(analysis_runtime, "_IDENTITY_SUPPLIER", None)
+    monkeypatch.delenv("FCP_ANALYSIS_SESSION_ID", raising=False)
+    monkeypatch.delenv("FCP_ANALYSIS_NODE_ID", raising=False)
+
+
 def test_standalone_identity_refuses_before_state_parent_creation(
     tmp_path: Path,
+    standalone_identity_binding: None,
 ) -> None:
     state = tmp_path / "identity-state" / "analysis_identity.json"
 
     with pytest.raises(HostResourceRefused):
         resolve_analysis_identity(state, resource_admission=_admission(200))
 
+    assert not state.parent.exists()
+
+
+def test_a_registered_identity_supplier_bypasses_the_standalone_writer(
+    tmp_path: Path,
+    standalone_identity_binding: None,
+) -> None:
+    """Why the fixture above is required, stated as a consequence.
+
+    A bound federation identity is resolved without writing standalone state at
+    all, so no host resource is measured and nothing is refused. That is
+    correct -- there is no writer to admit -- but it means a leaked supplier
+    turns the refusal test above into a test of nothing.
+    """
+
+    state = tmp_path / "identity-state" / "analysis_identity.json"
+    analysis_runtime.register_identity_supplier(
+        lambda: ("session-bound", "node-bound")
+    )
+    try:
+        identity = resolve_analysis_identity(
+            state, resource_admission=_admission(200)
+        )
+    finally:
+        analysis_runtime.register_identity_supplier(None)
+
+    assert identity.standalone is False
+    assert identity.session_id == "session-bound"
     assert not state.parent.exists()
 
 

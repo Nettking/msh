@@ -269,6 +269,31 @@ class ResourceOverrideAuthority:
     def _now(self) -> datetime:
         return _aware_utc(self.clock(), field="clock")
 
+    def _prune_dead_leases(self, now: datetime) -> None:
+        """Drop lease handles that can never be admitted again.
+
+        An emergency lease is one-shot and expiring, so ``used``, ``revoked``,
+        or past ``expires_at`` means :meth:`EmergencyAdmissionLease.consume`
+        refuses it for the remaining life of the process. The handle's only
+        other use is :meth:`revoke`, which changes nothing once the lease can no
+        longer be consumed -- and revoking a lease whose audit record is already
+        revoked returns before it is consulted at all.
+
+        This is not a retention policy and does not need one. The frontier is
+        the lease's own expiry and single use, both already recorded on the
+        lease, so no age cutoff, row count, or deletion horizon is invented
+        here. The durable audit record is untouched: its lifetime remains an
+        explicit product decision.
+        """
+
+        dead = [
+            override_id
+            for override_id, lease in self._live_leases.items()
+            if lease.used or lease.revoked or now >= lease.expires_at
+        ]
+        for override_id in dead:
+            self._live_leases.pop(override_id, None)
+
     def _load_records(self) -> list[OverrideAuditRecord]:
         try:
             self.audit_path.lstat()
@@ -474,6 +499,8 @@ class ResourceOverrideAuthority:
             resource_ids=tuple(sorted(resources)),
         )
         with self._lock:
+            # Bound the handle map at the only point it grows.
+            self._prune_dead_leases(issued_at)
             self._append(record)
             lease = EmergencyAdmissionLease(
                 override_id=override_id,
@@ -616,6 +643,12 @@ class ResourceOverrideAuthority:
                 return dict(default) if default is not None else None
             selected = max(matches, key=lambda record: (record.issued_at, record.override_id))
             return copy.deepcopy(selected.value or {})
+
+    def live_lease_ids(self) -> tuple[str, ...]:
+        """Return the lease handles still able to reach the shared controller."""
+
+        with self._lock:
+            return tuple(sorted(self._live_leases))
 
     def audit_records(self) -> tuple[OverrideAuditRecord, ...]:
         with self._lock:
