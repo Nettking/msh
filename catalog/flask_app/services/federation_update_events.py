@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from catalog.federation.authoritative_replay import replay_authoritative_history
 from catalog.federation.control_commands import (
     ControlCommandEnvelope,
     ensure_bounded_json,
@@ -55,6 +56,10 @@ SESSION_CREATED_EVENT = "session.created"
 MAX_TARGETS = 256
 MAX_EVENT_BYTES = 8192
 TRIAL_RETIREMENT_STATE_KEY = "trial_result_retirements"
+# The member processor retains its fixed resource ceiling. Reaching it is an
+# explicit bounded failure, never an implicit end-of-history.
+_PROCESSOR_REPLAY_PAGE_EVENTS = 32
+_MAX_PROCESSOR_REPLAY_PAGES = 64
 
 
 def _bounded(value: object) -> None:
@@ -727,15 +732,8 @@ class FederationUpdateEventProcessor:
             last_revision = 0
             state["last_revision"] = 0
         local_node = context.credentials.identity.node_id
-        for _ in range(64):
-            events, current_revision = context.coordinator.replay_page(
-                session_id=context.binding.internal_session_id,
-                actor_node_id=local_node,
-                last_applied_revision=last_revision,
-                limit=32,
-            )
-            if not events:
-                break
+        def apply_page(events: tuple[Any, ...]) -> None:
+            nonlocal authority, last_revision, state
             for event in events:
                 try:
                     authority = self._pin_authority(state, event)
@@ -813,8 +811,18 @@ class FederationUpdateEventProcessor:
                     last_revision = int(event.revision)
                     state["last_revision"] = last_revision
                     _write_state(self.state_file, state)
-            if last_revision >= current_revision:
-                break
+
+        replay_authoritative_history(
+            lambda revision: context.coordinator.replay_page(
+                session_id=context.binding.internal_session_id,
+                actor_node_id=local_node,
+                last_applied_revision=revision,
+                limit=_PROCESSOR_REPLAY_PAGE_EVENTS,
+            ),
+            apply_page=apply_page,
+            max_pages=_MAX_PROCESSOR_REPLAY_PAGES,
+            start_revision=last_revision,
+        )
 
 
 __all__ = [

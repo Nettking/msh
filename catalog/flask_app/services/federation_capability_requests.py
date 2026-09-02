@@ -69,6 +69,10 @@ TERMINAL_STATES = frozenset({"completed", "partial", "failed", "offline"})
 _MAX_PROCESSOR_REPORTS = 32
 _REPORT_REPLAY_PAGE_EVENTS = 1000
 _MAX_REPORT_REPLAY_PAGES = 128
+# The processor has always used these same fixed replay bounds. They are
+# resource ceilings, not permission to treat a prefix as the current log.
+_PROCESSOR_REPLAY_PAGE_EVENTS = 32
+_MAX_PROCESSOR_REPLAY_PAGES = 64
 
 
 def _bounded(value: object) -> None:
@@ -686,15 +690,8 @@ class FederationCapabilityRequestProcessor:
             state["last_revision"] = 0
         local_node = context.credentials.identity.node_id
 
-        for _ in range(64):
-            events, current_revision = context.coordinator.replay_page(
-                session_id=context.binding.internal_session_id,
-                actor_node_id=local_node,
-                last_applied_revision=last_revision,
-                limit=32,
-            )
-            if not events:
-                break
+        def apply_page(events: tuple[Any, ...]) -> None:
+            nonlocal authority, last_revision, state
             for event in events:
                 try:
                     authority = self._pin_authority(state, event)
@@ -722,8 +719,18 @@ class FederationCapabilityRequestProcessor:
                     last_revision = int(event.revision)
                     state["last_revision"] = last_revision
                     self._save(state)
-            if last_revision >= current_revision:
-                break
+
+        replay_authoritative_history(
+            lambda revision: context.coordinator.replay_page(
+                session_id=context.binding.internal_session_id,
+                actor_node_id=local_node,
+                last_applied_revision=revision,
+                limit=_PROCESSOR_REPLAY_PAGE_EVENTS,
+            ),
+            apply_page=apply_page,
+            max_pages=_MAX_PROCESSOR_REPLAY_PAGES,
+            start_revision=last_revision,
+        )
 
 
 def get_federation_capability_request_service() -> FederationCapabilityRequestService:
