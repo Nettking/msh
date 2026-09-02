@@ -5,6 +5,8 @@ from pathlib import Path
 
 from catalog.capabilities.storage_authority_enrollment import STORAGE_AUTHORITY_SCHEMA
 from catalog.capabilities.storage_authority_lease import (
+    DEFAULT_RENEW_BEFORE_SECONDS,
+    MAX_SUPPORTED_CLOCK_SKEW_SECONDS,
     RenewingTrustedGreenStorageAuthority,
 )
 from catalog.federation.coordinator import SessionCoordinator
@@ -113,6 +115,14 @@ def _grant_expiry(grant: dict[str, object]) -> datetime:
     return datetime.fromisoformat(
         str(grant["lease_expires_at"]).replace("Z", "+00:00")
     )
+
+
+def test_v1_clock_skew_bound_reserves_half_the_default_renewal_window() -> None:
+    """The deployment bound leaves an equal margin for renewal/transport work."""
+
+    assert DEFAULT_RENEW_BEFORE_SECONDS == 60
+    assert MAX_SUPPORTED_CLOCK_SKEW_SECONDS == 30
+    assert 2 * MAX_SUPPORTED_CLOCK_SKEW_SECONDS == DEFAULT_RENEW_BEFORE_SECONDS
 
 
 def test_current_green_primary_lease_renews_before_expiry(tmp_path: Path) -> None:
