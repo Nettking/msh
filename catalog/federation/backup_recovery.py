@@ -1,25 +1,9 @@
 """Capacity-safe, quiesced Federation v1 backup support.
 
-The administrator guide used to create a backup inside the checkout, stop FCP
-before proving destination capacity, and then run an Alpine helper that might
-need to be downloaded after production was already quiesced.  B10 requires the
-opposite ordering: prove an independent destination first, fence supported host
-mutation, stop every writer in the selected topology, copy coherently, verify
-SQLite state, and never turn a failed backup into an automatic restart on a
-possibly exhausted host.
-
-This module intentionally implements the ordinary Compose-managed topology.  A
-live native recorder is refused rather than silently copied while it writes.  A
-host tailnet join responder is stopped only when its recorded OS process identity
-still matches, using the same PID-reuse-safe primitive as normal launcher
-replacement.  The supported host-mutation lease is held across quiescence and
-copy, so an update/build/activation cannot race the backup.
-
-The backup command deliberately leaves FCP stopped.  Restart is an explicit
-operator action through the normal launcher after the backup result and host
-capacity have been inspected.  This is conservative by design: failure must not
-implicitly restart writers onto the resource condition the backup may have just
-exposed.
+The supported backup path proves destination capacity before quiescing FCP,
+serializes against supported host mutation, copies only a stopped Compose-managed
+runtime, verifies copied SQLite state, and never implicitly restarts FCP after a
+success or failure.
 """
 
 from __future__ import annotations
@@ -77,7 +61,7 @@ import os
 import stat
 
 root = "/source"
-files = 0
+inodes = 0
 bytes_total = 0
 stack = [root]
 while stack:
@@ -88,13 +72,14 @@ while stack:
             if stat.S_ISLNK(info.st_mode):
                 raise RuntimeError("relay_volume_contains_symlink")
             if stat.S_ISDIR(info.st_mode):
+                inodes += 1
                 stack.append(entry.path)
             elif stat.S_ISREG(info.st_mode):
-                files += 1
+                inodes += 1
                 bytes_total += int(info.st_size)
             else:
                 raise RuntimeError("relay_volume_contains_special_file")
-print(json.dumps({"bytes": bytes_total, "files": files}, separators=(",", ":")))
+print(json.dumps({"bytes": bytes_total, "files": inodes}, separators=(",", ":")))
 """.strip()
 
 
@@ -107,7 +92,7 @@ class TreeEstimate:
     bytes: int
     files: int
 
-    def __add__(self, other: TreeEstimate) -> TreeEstimate:
+    def __add__(self, other: "TreeEstimate") -> "TreeEstimate":
         return TreeEstimate(self.bytes + other.bytes, self.files + other.files)
 
 
@@ -167,13 +152,13 @@ def _is_reparse_point(path: Path) -> bool:
 
 
 def _scan_tree(root: Path) -> TreeEstimate:
-    """Measure one tree without following links or accepting special files."""
+    """Measure regular-file bytes and destination inode demand without links."""
 
     root = root.resolve()
     if not root.is_dir() or _is_reparse_point(root):
         raise BackupError("backup_source_root_unusable")
     total_bytes = 0
-    files = 0
+    inodes = 0
     stack = [root]
     while stack:
         current = stack.pop()
@@ -190,18 +175,17 @@ def _scan_tree(root: Path) -> TreeEstimate:
             except OSError as exc:
                 raise BackupError("backup_source_unreadable") from exc
             if stat.S_ISDIR(info.st_mode):
+                inodes += 1
                 stack.append(path)
             elif stat.S_ISREG(info.st_mode):
-                files += 1
+                inodes += 1
                 total_bytes += int(info.st_size)
             else:
                 raise BackupError("backup_source_contains_special_file")
-    return TreeEstimate(total_bytes, files)
+    return TreeEstimate(total_bytes, inodes)
 
 
 def _copy_tree(source: Path, destination: Path) -> None:
-    """Copy a proven tree without following a link introduced during copy."""
-
     source = source.resolve()
     destination.mkdir(parents=True, exist_ok=False)
     stack = [(source, destination)]
@@ -235,7 +219,7 @@ def _git_commit(root: Path) -> str:
         root=root,
         code="source_commit_unavailable",
     ).strip()
-    if len(value) != 40 or any(character not in "0123456789abcdefABCDEF" for character in value):
+    if len(value) != 40 or any(c not in "0123456789abcdefABCDEF" for c in value):
         raise BackupError("source_commit_unavailable")
     return value.lower()
 
@@ -322,27 +306,46 @@ def _relay_image(root: Path, container: str) -> str:
     return value
 
 
+def _relay_mounted_volume(root: Path, container: str) -> str:
+    """Return Docker's actual retained volume name, not a Compose logical key."""
+
+    output = _require_command(
+        ["docker", "inspect", container, "--format", "{{json .Mounts}}"],
+        root=root,
+        code="relay_volume_mount_unavailable",
+    )
+    try:
+        mounts = json.loads(output)
+    except json.JSONDecodeError as exc:
+        raise BackupError("relay_volume_mount_unavailable") from exc
+    if not isinstance(mounts, list):
+        raise BackupError("relay_volume_mount_unavailable")
+    matches: list[str] = []
+    for mount in mounts:
+        if not isinstance(mount, dict):
+            continue
+        if mount.get("Type") != "volume" or mount.get("Destination") != RELAY_TARGET:
+            continue
+        name = mount.get("Name")
+        if isinstance(name, str) and name.strip():
+            matches.append(name.strip())
+    if len(matches) != 1:
+        raise BackupError("relay_volume_mount_unavailable")
+    return matches[0]
+
+
 def _resolve_layout(root: Path) -> BackupLayout:
     config = _compose_config(root)
     data_source = _service_volume(
-        config,
-        service="flask",
-        target=DATA_TARGET,
-        expected_type="bind",
+        config, service="flask", target=DATA_TARGET, expected_type="bind"
     )
     results_source = _service_volume(
-        config,
-        service="flask",
-        target=RESULTS_TARGET,
-        expected_type="bind",
+        config, service="flask", target=RESULTS_TARGET, expected_type="bind"
     )
-    relay_volume = _service_volume(
-        config,
-        service="relay",
-        target=RELAY_TARGET,
-        expected_type="volume",
+    relay_declared = _service_volume(
+        config, service="relay", target=RELAY_TARGET, expected_type="volume"
     )
-    if data_source is None or relay_volume is None:
+    if data_source is None or relay_declared is None:
         raise BackupError("required_backup_volume_unresolved")
     data_dir = Path(data_source).resolve()
     results_dir = Path(results_source).resolve() if results_source else None
@@ -351,6 +354,7 @@ def _resolve_layout(root: Path) -> BackupLayout:
     if results_dir is not None and not results_dir.exists():
         results_dir = None
     relay_container = _container_id(root, "relay")
+    relay_volume = _relay_mounted_volume(root, relay_container)
     return BackupLayout(
         data_dir=data_dir,
         results_dir=results_dir,
@@ -607,11 +611,18 @@ def _sqlite_files(root: Path) -> list[Path]:
     stack = [root]
     while stack:
         current = stack.pop()
-        for entry in os.scandir(current):
+        try:
+            entries = list(os.scandir(current))
+        except OSError as exc:
+            raise BackupError("backup_copy_unreadable") from exc
+        for entry in entries:
             path = Path(entry.path)
             if entry.is_symlink() or _is_reparse_point(path):
                 raise BackupError("backup_copy_contains_link")
-            info = entry.stat(follow_symlinks=False)
+            try:
+                info = entry.stat(follow_symlinks=False)
+            except OSError as exc:
+                raise BackupError("backup_copy_unreadable") from exc
             if stat.S_ISDIR(info.st_mode):
                 stack.append(path)
                 continue
@@ -651,7 +662,7 @@ def _integrity_checks(destination: Path) -> list[str]:
 
 
 def _directory_digest(root: Path) -> str:
-    """Digest bounded manifest metadata, not the potentially huge file payloads."""
+    """Digest the verified SQLite inventory without hashing large payloads."""
 
     digest = hashlib.sha256()
     for path in sorted(_sqlite_files(root)):
@@ -709,6 +720,17 @@ def _complete_manifest(
     (destination / BACKUP_INCOMPLETE_NAME).unlink()
 
 
+def _read_recorded_source_commit(root: Path) -> str:
+    path = root / SOURCE_COMMIT_NAME
+    try:
+        value = path.read_text(encoding="utf-8").strip().lower()
+    except (OSError, UnicodeDecodeError) as exc:
+        raise BackupError("backup_source_commit_unreadable") from exc
+    if len(value) != 40 or any(c not in "0123456789abcdef" for c in value):
+        raise BackupError("backup_source_commit_unreadable")
+    return value
+
+
 def verify_backup(destination: Path | str) -> dict[str, Any]:
     root = Path(destination).resolve()
     if not root.is_dir() or _is_reparse_point(root):
@@ -728,6 +750,9 @@ def verify_backup(destination: Path | str) -> dict[str, Any]:
         or manifest.get("complete") is not True
     ):
         raise BackupError("backup_manifest_unreadable")
+    recorded_commit = _read_recorded_source_commit(root)
+    if manifest.get("source_commit") != recorded_commit:
+        raise BackupError("backup_source_commit_mismatch")
     checks = _integrity_checks(root)
     expected = manifest.get("sqlite_quick_check")
     if not isinstance(expected, list) or checks != expected:
@@ -750,8 +775,7 @@ def create_quiesced_backup(
     layout = _resolve_layout(repo_root)
     _refuse_live_native_recorder(layout)
 
-    # Preflight before stopping any production writer. The relay scan uses the
-    # already-present relay image with --pull=never and no network.
+    # Capacity is proven before any production writer is stopped.
     preflight_estimate = _local_estimate(repo_root, layout) + _scan_relay_volume(
         repo_root, layout
     )
@@ -767,9 +791,6 @@ def create_quiesced_backup(
         _quiesce_responder(layout.data_dir)
         _stop_compose_and_prove(repo_root)
 
-        # Re-measure only after all selected-topology writers are quiescent.
-        # The helper image is the exact local relay image and --pull=never makes
-        # a post-stop network/download dependency impossible.
         final_estimate = _local_estimate(repo_root, layout) + _scan_relay_volume(
             repo_root, layout
         )
@@ -789,9 +810,7 @@ def create_quiesced_backup(
             sqlite_checks=sqlite_checks,
         )
 
-    # Intentionally no docker compose start here. Explicit resume is part of the
-    # supported recovery boundary and prevents a failed/pressured backup from
-    # restarting writers implicitly.
+    # Explicit resume is intentionally outside the backup primitive.
     return verify_backup(backup_root)
 
 
