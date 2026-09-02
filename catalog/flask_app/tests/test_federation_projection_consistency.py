@@ -372,7 +372,11 @@ def test_production_composition_reads_live_cfi_services(
         reason=None,
     )
 
-    monkeypatch.setattr(composition, "_onboarding_context", lambda: context)
+    monkeypatch.setattr(
+        composition,
+        "_onboarding_context",
+        lambda: (context, True),
+    )
     monkeypatch.setattr(
         composition,
         "get_capability_inspection_service",
