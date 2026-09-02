@@ -5,6 +5,10 @@ from pathlib import Path
 
 import pytest
 
+from catalog.capabilities.storage_authority_lease import (
+    DEFAULT_RENEW_BEFORE_SECONDS,
+    MAX_SUPPORTED_CLOCK_SKEW_SECONDS,
+)
 from catalog.federation.errors import FederationValidationError
 from catalog.federation.local_storage import FilesystemBatchStorageProvider
 from catalog.federation.storage_control_plane import (
@@ -161,6 +165,40 @@ def test_provider_clock_before_grant_issuance_is_rejected(tmp_path: Path) -> Non
     assert not response.ok
     assert response.error.code is StorageErrorCode.GRANT_NOT_YET_VALID
     assert not provider.exists(session_id="session-1", group_id="storage-main", batch_id="batch-1")
+
+
+def test_slow_clock_at_v1_bound_still_fails_closed_until_issuance_catches_up(
+    tmp_path: Path,
+) -> None:
+    """Clock synchronization is a liveness prerequisite, never grant tolerance."""
+
+    store = _control_plane(tmp_path / "control.sqlite3")
+    slow_now = NOW - timedelta(seconds=MAX_SUPPORTED_CLOCK_SKEW_SECONDS)
+    service, provider = _service(tmp_path, store, now=slow_now)
+
+    response = service.dispatch(_envelope(_request()))
+
+    assert not response.ok
+    assert response.error.code is StorageErrorCode.GRANT_NOT_YET_VALID
+    assert not provider.exists(session_id="session-1", group_id="storage-main", batch_id="batch-1")
+
+
+def test_fast_clock_at_v1_bound_retains_renewal_margin(tmp_path: Path) -> None:
+    """At the coordinator renewal frontier, bounded fast skew is still safe/live."""
+
+    store = _control_plane(tmp_path / "control.sqlite3")
+    coordinator_renewal_time = EXPIRY - timedelta(seconds=DEFAULT_RENEW_BEFORE_SECONDS)
+    provider_now = coordinator_renewal_time + timedelta(
+        seconds=MAX_SUPPORTED_CLOCK_SKEW_SECONDS
+    )
+    service, provider = _service(tmp_path, store, now=provider_now)
+
+    response = service.dispatch(_envelope(_request()))
+
+    assert response.ok
+    assert response.result["state"] == "stored"
+    assert EXPIRY - provider_now == timedelta(seconds=MAX_SUPPORTED_CLOCK_SKEW_SECONDS)
+    assert provider.exists(session_id="session-1", group_id="storage-main", batch_id="batch-1")
 
 
 def test_revoked_grant_is_rejected(tmp_path: Path) -> None:
