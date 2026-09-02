@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 from flask import Flask
 
+from catalog.federation.errors import AuthorizationError
 from catalog.federation.onboarding_models import (
     FederationConnectionState,
     FederationSessionBinding,
@@ -33,6 +34,16 @@ class _PersistedOnboarding:
 
     def binding_or_none(self) -> FederationSessionBinding | None:
         return self.store.load()
+
+
+class _RejectedOnboarding(_PersistedOnboarding):
+    def authorized_context(self) -> object:
+        self.authorized_calls += 1
+        raise AuthorizationError(
+            "not-session-member",
+            "the saved node is no longer a Federation member",
+            "node_id",
+        )
 
 
 def _binding_store(tmp_path) -> FederationBindingStore:
@@ -126,3 +137,28 @@ def test_saved_binding_is_not_reused_for_a_different_local_identity(
     assert overview["notice"]["title"] == "Federation setup is not complete"
     assert "federation-saved" not in str(overview)
     assert "session-private-saved" not in str(overview)
+
+
+def test_definitive_membership_rejection_never_uses_saved_outage_fallback(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    """A revoked/removed member is not allowed to masquerade as reconnecting."""
+
+    store = _binding_store(tmp_path)
+    onboarding = _RejectedOnboarding(store, node_id="node-local")
+    monkeypatch.setattr(
+        composition,
+        "get_capability_onboarding_service",
+        lambda: onboarding,
+    )
+
+    app = Flask(__name__)
+    _configure_read_only_projection(app)
+    with app.app_context():
+        overview = composition.get_federation_projection_service().overview().to_dict()
+
+    assert onboarding.authorized_calls == 1
+    assert overview["control_plane"]["membership_retained"] is False
+    assert overview["notice"]["title"] == "Federation setup is not complete"
+    assert "federation-saved" not in str(overview)
