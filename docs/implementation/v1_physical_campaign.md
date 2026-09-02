@@ -29,27 +29,33 @@ evidence/v1-physical/
 ```
 
 The final result is derived from checked-in P01-P12 assertions, exact candidate
-identity, required OS boundaries, elapsed-time requirements, recorded command
-results, resource samples, and a final privacy digest. Do not edit the evidence
-JSON by hand.
+identity, registered host provenance, required OS boundaries, elapsed-time
+requirements, recorded command results, resource samples, and a final privacy
+digest. Do not edit the evidence JSON by hand.
 
 ## What the harness does and does not do
 
 The harness:
 
 - verifies the checkout is clean and exactly at the supplied 40-character SHA;
-- records a redacted host fingerprint rather than the private hostname;
+- records a hashed host fingerprint rather than the private hostname;
+- rejects packets whose candidate, host fingerprint or OS provenance does not
+  match the registered campaign host;
 - records Windows/POSIX provenance for OS-specific assertions;
+- validates host and OS requirements before executing an operator command;
 - executes explicit operator-supplied probes without a shell and captures their
   bounded/redacted output;
 - records physical observations as immutable portable packets;
 - captures host/data/results disk state plus `docker system df` and
   `docker compose ps` when Docker is available;
-- enforces the one-hour P07 outage and 24-hour P12 soak durations;
-- requires resource samples for the time-based scenarios;
+- enforces the one-hour P07 outage and 24-hour P12 soak durations from recorded
+  begin/finish timestamps rather than trusting a claimed elapsed value;
+- requires P07/P12 resource samples to belong to the same timed run and host and
+  to fall inside its begin/finish interval;
 - fails closed on missing/failed assertions;
-- scans evidence for unredacted private values; and
-- binds the final decision to a digest of the reviewed evidence tree.
+- scans evidence for raw private endpoints, addresses, paths, credentials and
+  reusable pairing material; and
+- binds the final decision to a SHA-256 digest of the reviewed evidence tree.
 
 It deliberately does **not** autonomously fill disks, kill processes, corrupt
 files, alter clocks, revoke members, or power-cycle hosts. Those actions are
@@ -115,10 +121,10 @@ python -m scripts.acceptance.v1_physical_campaign \
   -- python <reviewed-probe> --read-existing-object
 ```
 
-The command is executed directly (`shell=False`). The command text and output
-are passed through the same CF7 redaction boundary before persistence. A zero
-exit is expected by default; use `--expect-exit N` when refusal is the expected
-safe outcome.
+The host and assertion OS are validated before the command starts. The command
+is then executed directly (`shell=False`). Its command text and output are
+redacted before persistence. A zero exit is expected by default; use
+`--expect-exit N` when refusal is the expected safe outcome.
 
 ### Record an observed physical consequence
 
@@ -137,6 +143,8 @@ explicitly marks as conditional. It cannot be used to skip ordinary required
 assertions.
 
 ### Capture resource state
+
+For ordinary scenarios:
 
 ```bash
 python -m scripts.acceptance.v1_physical_campaign \
@@ -157,8 +165,20 @@ python -m scripts.acceptance.v1_physical_campaign \
   begin --commit <candidate-sha> --host nitro --scenario P07
 ```
 
-Take resource samples during the run and record the required assertions. After
-at least one real hour:
+Every resource sample for P07/P12 must carry that active run ID:
+
+```bash
+python -m scripts.acceptance.v1_physical_campaign \
+  sample --commit <candidate-sha> --host nitro --scenario P07 \
+  --run-id <run-id> --label outage-midpoint
+```
+
+A timed sample is rejected if the run is missing, belongs to another host, or has
+already finished. During final status calculation, only samples whose timestamp
+falls between that run's matching begin/finish packets count toward the timed
+scenario.
+
+After at least one real hour:
 
 ```bash
 python -m scripts.acceptance.v1_physical_campaign \
@@ -187,7 +207,8 @@ evidence/v1-physical/observations/
 Do not copy raw logs, private endpoints, pairing codes, credentials, database
 files, screenshots containing secrets, or unrestricted service output into this
 tree. If richer evidence is required, reduce/redact it first and record the
-result through the harness.
+result through the harness. Imported packets are rejected if their candidate SHA,
+host fingerprint, or OS provenance does not match the registered host evidence.
 
 ## Campaign status
 
@@ -197,8 +218,9 @@ python -m scripts.acceptance.v1_physical_campaign \
 ```
 
 A scenario reports the exact missing assertions, failed assertions, elapsed time
-and resource-sample count. A later failed observation for an assertion supersedes
-an earlier pass, so a discovered regression cannot be hidden by stale evidence.
+and qualifying resource-sample count. A later failed observation for an assertion
+supersedes an earlier pass, so a discovered regression cannot be hidden by stale
+evidence.
 
 ## Privacy seal and final validation
 
@@ -212,8 +234,9 @@ python -m scripts.acceptance.v1_physical_campaign \
   validate --commit <candidate-sha>
 ```
 
-The privacy command scans the local evidence tree with the CF7 redaction rules
-and writes a SHA-256 digest over the reviewed evidence. Adding or changing any
+The privacy command rejects raw HTTP/WS endpoints, IPv4 addresses, local absolute
+paths, credential-like material and reusable `FCP1-...` pairing material, then
+writes a SHA-256 digest over the reviewed evidence. Adding or changing any
 evidence afterward invalidates that seal and makes final validation fail until
 privacy review is repeated.
 
@@ -223,8 +246,10 @@ privacy review is repeated.
 - both Windows and POSIX evidence are present;
 - every required P01-P12 assertion is currently passing (or explicitly allowed
   as not applicable);
-- P07 contains at least one hour of elapsed evidence and resource samples;
-- P12 contains at least 24 hours of elapsed evidence and resource samples; and
+- P07 contains one matching-host timed session with at least one real hour and
+  the required in-window resource samples;
+- P12 contains one matching-host timed session with at least 24 real hours and
+  the required in-window resource samples; and
 - the privacy digest still matches the complete evidence tree.
 
 A successful robustness validation is still only one side of release acceptance.
