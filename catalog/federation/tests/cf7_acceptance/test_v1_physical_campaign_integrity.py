@@ -11,15 +11,28 @@ COMMIT = "a" * 40
 OTHER_COMMIT = "b" * 40
 
 
-def _ready(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> tuple[Path, Path]:
+def _ready(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> tuple[Path, Path]:
     checkout = tmp_path / "checkout"
     checkout.mkdir()
     root = checkout / "evidence" / "v1-physical"
-    monkeypatch.setattr(campaign, "verify_checkout", lambda *_args, **_kwargs: {"commit_sha": COMMIT})
+    monkeypatch.setattr(
+        campaign,
+        "verify_checkout",
+        lambda *_args, **_kwargs: {"commit_sha": COMMIT},
+    )
     monkeypatch.setattr(campaign.platform, "system", lambda: "Linux")
     monkeypatch.setattr(campaign.platform, "node", lambda: "private-linux-host")
     campaign.initialize(checkout, root, commit=COMMIT, operator="Martin")
-    campaign.register_host(checkout, root, commit=COMMIT, host="nitro", role="school-control")
+    campaign.register_host(
+        checkout,
+        root,
+        commit=COMMIT,
+        host="nitro",
+        role="school-control",
+    )
     return checkout, root
 
 
@@ -28,6 +41,7 @@ def test_imported_packet_from_other_candidate_is_rejected(
     tmp_path: Path,
 ) -> None:
     _checkout, root = _ready(monkeypatch, tmp_path)
+    host = campaign.load_host(root, "nitro", commit=COMMIT)
     path = root / "observations" / "P08" / "wrong-candidate.json"
     path.parent.mkdir(parents=True)
     path.write_text(
@@ -38,7 +52,7 @@ def test_imported_packet_from_other_candidate_is_rejected(
                 "candidate_sha": OTHER_COMMIT,
                 "scenario": "P08",
                 "host_id": "nitro",
-                "host_fingerprint": "deadbeef",
+                "host_fingerprint": host["host_fingerprint"],
                 "os_category": "posix",
                 "recorded_at": "2026-09-02T12:00:00Z",
                 "assertion": "allocation-floor",
@@ -52,6 +66,35 @@ def test_imported_packet_from_other_candidate_is_rejected(
         campaign.scenario_status(root, "P08", expected_commit=COMMIT)
 
 
+def test_imported_packet_with_wrong_host_fingerprint_is_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _checkout, root = _ready(monkeypatch, tmp_path)
+    path = root / "observations" / "P08" / "wrong-host.json"
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        json.dumps(
+            {
+                "schema": campaign.PACKET_SCHEMA,
+                "kind": "assertion",
+                "candidate_sha": COMMIT,
+                "scenario": "P08",
+                "host_id": "nitro",
+                "host_fingerprint": "0000000000000000",
+                "os_category": "posix",
+                "recorded_at": "2026-09-02T12:00:00Z",
+                "assertion": "allocation-floor",
+                "status": "pass",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(campaign.CampaignError, match="fingerprint"):
+        campaign.scenario_status(root, "P08", expected_commit=COMMIT)
+
+
 def test_wrong_os_run_is_rejected_before_command_execution(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -60,7 +103,9 @@ def test_wrong_os_run_is_rejected_before_command_execution(
     monkeypatch.setattr(
         campaign,
         "_run",
-        lambda *_args, **_kwargs: pytest.fail("wrong-OS command must not execute"),
+        lambda *_args, **_kwargs: pytest.fail(
+            "wrong-OS command must not execute"
+        ),
     )
 
     with pytest.raises(campaign.CampaignError, match="windows"):
@@ -83,7 +128,11 @@ def test_host_alias_cannot_be_reused_for_another_machine(
     tmp_path: Path,
 ) -> None:
     checkout, root = _ready(monkeypatch, tmp_path)
-    monkeypatch.setattr(campaign.platform, "node", lambda: "another-private-host")
+    monkeypatch.setattr(
+        campaign.platform,
+        "node",
+        lambda: "another-private-host",
+    )
 
     with pytest.raises(campaign.CampaignError, match="another machine"):
         campaign.register_host(
@@ -92,4 +141,34 @@ def test_host_alias_cannot_be_reused_for_another_machine(
             commit=COMMIT,
             host="nitro",
             role="other",
+        )
+
+
+def test_privacy_scan_accepts_generated_safe_json_and_rejects_pairing_material(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    checkout, root = _ready(monkeypatch, tmp_path)
+    safe = campaign.privacy_check(checkout, root, commit=COMMIT)
+    assert safe["passed"] is True
+
+    leaked = root / "operator-note.txt"
+    leaked.write_text("temporary code FCP1-privateReusableCode123\n", encoding="utf-8")
+    with pytest.raises(campaign.CampaignError, match="privacy scan"):
+        campaign.privacy_check(checkout, root, commit=COMMIT)
+
+
+def test_timed_sample_requires_active_run_id(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    checkout, root = _ready(monkeypatch, tmp_path)
+    with pytest.raises(campaign.CampaignError, match="active --run-id"):
+        campaign.sample_resources(
+            checkout,
+            root,
+            commit=COMMIT,
+            host="nitro",
+            scenario="P07",
+            label="must be timed",
         )
