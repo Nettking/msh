@@ -101,14 +101,28 @@ def test_destination_capacity_is_proven_before_quiescence(
         events.append("lock-exit")
 
     monkeypatch.setattr(backup, "host_mutation_lock", lock)
-    monkeypatch.setattr(backup, "_quiesce_responder", lambda _data: events.append("responder-stop"))
-    monkeypatch.setattr(backup, "_stop_compose_and_prove", lambda _root: events.append("compose-stop"))
-    monkeypatch.setattr(backup, "_create_destination", lambda _dest: events.append("create"))
-    monkeypatch.setattr(backup, "_copy_local_state", lambda *_args: events.append("copy-local"))
-    monkeypatch.setattr(backup, "_copy_relay", lambda *_args: events.append("copy-relay"))
+    monkeypatch.setattr(
+        backup, "_quiesce_responder", lambda _data: events.append("responder-stop")
+    )
+    monkeypatch.setattr(
+        backup, "_stop_compose_and_prove", lambda _root: events.append("compose-stop")
+    )
+    monkeypatch.setattr(
+        backup, "_create_destination", lambda _dest: events.append("create")
+    )
+    monkeypatch.setattr(
+        backup, "_copy_local_state", lambda *_args: events.append("copy-local")
+    )
+    monkeypatch.setattr(
+        backup, "_copy_relay", lambda *_args: events.append("copy-relay")
+    )
     monkeypatch.setattr(backup, "_integrity_checks", lambda _dest: [])
-    monkeypatch.setattr(backup, "_complete_manifest", lambda *_args, **_kwargs: events.append("complete"))
-    monkeypatch.setattr(backup, "verify_backup", lambda _dest: {"source_commit": "a" * 40})
+    monkeypatch.setattr(
+        backup, "_complete_manifest", lambda *_args, **_kwargs: events.append("complete")
+    )
+    monkeypatch.setattr(
+        backup, "verify_backup", lambda _dest: {"source_commit": "a" * 40}
+    )
 
     backup.create_quiesced_backup(repo, destination)
 
@@ -157,9 +171,15 @@ def test_a_failed_copy_never_implicitly_restarts_fcp(
 
     monkeypatch.setattr(backup, "host_mutation_lock", lock)
     monkeypatch.setattr(backup, "_quiesce_responder", lambda _data: None)
-    monkeypatch.setattr(backup, "_stop_compose_and_prove", lambda _root: events.append("stopped"))
-    monkeypatch.setattr(backup, "_create_destination", lambda _dest: events.append("created"))
-    monkeypatch.setattr(backup, "_copy_local_state", lambda *_args: events.append("local-copied"))
+    monkeypatch.setattr(
+        backup, "_stop_compose_and_prove", lambda _root: events.append("stopped")
+    )
+    monkeypatch.setattr(
+        backup, "_create_destination", lambda _dest: events.append("created")
+    )
+    monkeypatch.setattr(
+        backup, "_copy_local_state", lambda *_args: events.append("local-copied")
+    )
 
     def fail_relay(*_args):
         events.append("relay-copy-failed")
@@ -189,6 +209,7 @@ def test_relay_helper_cannot_pull_or_use_the_network(
     assert "--pull=never" in captured
     assert "--network=none" in captured
     assert layout.relay_image in captured
+    assert f"type=volume,src={layout.relay_volume},dst=/source,readonly" in captured
 
 
 def test_live_native_recorder_is_refused(
@@ -259,7 +280,9 @@ def test_stale_responder_record_never_authorizes_termination(
         ),
         encoding="utf-8",
     )
-    monkeypatch.setattr(backup, "process_start_token", lambda _pid: "replacement-token")
+    monkeypatch.setattr(
+        backup, "process_start_token", lambda _pid: "replacement-token"
+    )
 
     def forbidden(*_args):
         raise AssertionError("a reused PID must never be terminated")
@@ -283,7 +306,9 @@ def test_sqlite_backup_copy_must_pass_quick_check(tmp_path: Path) -> None:
 def test_incomplete_backup_is_never_accepted(tmp_path: Path) -> None:
     backup_root = tmp_path / "backup"
     backup_root.mkdir()
-    (backup_root / backup.BACKUP_INCOMPLETE_NAME).write_text("incomplete\n", encoding="utf-8")
+    (backup_root / backup.BACKUP_INCOMPLETE_NAME).write_text(
+        "incomplete\n", encoding="utf-8"
+    )
 
     with pytest.raises(backup.BackupError, match="backup_incomplete"):
         backup.verify_backup(backup_root)
@@ -298,18 +323,41 @@ def test_complete_manifest_is_verified_against_sqlite_inventory(tmp_path: Path) 
     connection.commit()
     connection.close()
     checks = backup._integrity_checks(backup_root)
+    source_commit = "c" * 40
     manifest = {
         "schema": backup.BACKUP_SCHEMA,
         "complete": True,
-        "source_commit": "c" * 40,
+        "source_commit": source_commit,
         "sqlite_quick_check": checks,
+        "sqlite_inventory_sha256": backup._directory_digest(backup_root),
+    }
+    (backup_root / backup.SOURCE_COMMIT_NAME).write_text(
+        source_commit + "\n", encoding="utf-8"
+    )
+    (backup_root / backup.BACKUP_MANIFEST_NAME).write_text(
+        json.dumps(manifest), encoding="utf-8"
+    )
+
+    assert backup.verify_backup(backup_root)["source_commit"] == source_commit
+
+
+def test_verify_refuses_source_commit_manifest_mismatch(tmp_path: Path) -> None:
+    backup_root = tmp_path / "backup"
+    backup_root.mkdir()
+    (backup_root / backup.SOURCE_COMMIT_NAME).write_text("d" * 40 + "\n", encoding="utf-8")
+    manifest = {
+        "schema": backup.BACKUP_SCHEMA,
+        "complete": True,
+        "source_commit": "e" * 40,
+        "sqlite_quick_check": [],
         "sqlite_inventory_sha256": backup._directory_digest(backup_root),
     }
     (backup_root / backup.BACKUP_MANIFEST_NAME).write_text(
         json.dumps(manifest), encoding="utf-8"
     )
 
-    assert backup.verify_backup(backup_root)["source_commit"] == "c" * 40
+    with pytest.raises(backup.BackupError, match="backup_source_commit_mismatch"):
+        backup.verify_backup(backup_root)
 
 
 def test_tree_scan_refuses_symlinked_content(tmp_path: Path) -> None:
@@ -327,7 +375,41 @@ def test_tree_scan_refuses_symlinked_content(tmp_path: Path) -> None:
         backup._scan_tree(source)
 
 
-def test_compose_layout_uses_effective_bind_and_volume_sources(
+def test_tree_scan_counts_directories_against_inode_capacity(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    (source / "a" / "b").mkdir(parents=True)
+    (source / "a" / "b" / "payload").write_bytes(b"1234")
+
+    estimate = backup._scan_tree(source)
+
+    assert estimate.bytes == 4
+    assert estimate.files == 3
+
+
+def test_actual_relay_volume_comes_from_container_mount(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    commands: list[list[str]] = []
+
+    def command(argv, **_kwargs):
+        commands.append(argv)
+        return json.dumps(
+            [
+                {
+                    "Type": "volume",
+                    "Name": "fcp_relay_state",
+                    "Destination": backup.RELAY_TARGET,
+                }
+            ]
+        )
+
+    monkeypatch.setattr(backup, "_require_command", command)
+
+    assert backup._relay_mounted_volume(tmp_path, "relay-id") == "fcp_relay_state"
+    assert commands[0][:3] == ["docker", "inspect", "relay-id"]
+
+
+def test_compose_layout_uses_effective_binds_but_runtime_relay_volume(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     data = tmp_path / "configured-data"
@@ -350,7 +432,7 @@ def test_compose_layout_uses_effective_bind_and_volume_sources(
                 "volumes": [
                     {
                         "type": "volume",
-                        "source": "custom_relay",
+                        "source": "relay_state",
                         "target": backup.RELAY_TARGET,
                     }
                 ]
@@ -359,10 +441,15 @@ def test_compose_layout_uses_effective_bind_and_volume_sources(
     }
     monkeypatch.setattr(backup, "_compose_config", lambda _root: config)
     monkeypatch.setattr(backup, "_container_id", lambda _root, _service: "relay-id")
-    monkeypatch.setattr(backup, "_relay_image", lambda _root, _container: "relay-image")
+    monkeypatch.setattr(
+        backup, "_relay_mounted_volume", lambda _root, _container: "fcp_relay_state"
+    )
+    monkeypatch.setattr(
+        backup, "_relay_image", lambda _root, _container: "relay-image"
+    )
 
     layout = backup._resolve_layout(tmp_path)
 
     assert layout.data_dir == data.resolve()
     assert layout.results_dir == results.resolve()
-    assert layout.relay_volume == "custom_relay"
+    assert layout.relay_volume == "fcp_relay_state"
