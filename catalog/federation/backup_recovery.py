@@ -92,7 +92,7 @@ class TreeEstimate:
     bytes: int
     files: int
 
-    def __add__(self, other: "TreeEstimate") -> "TreeEstimate":
+    def __add__(self, other: TreeEstimate) -> TreeEstimate:
         return TreeEstimate(self.bytes + other.bytes, self.files + other.files)
 
 
