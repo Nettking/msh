@@ -1,16 +1,8 @@
-"""Commit-bound Federation v1 physical robustness campaign harness.
+"""Commit-bound Federation v1 P01-P12 physical robustness evidence harness.
 
-This helper orchestrates P01-P12 without pretending that physical actions can be
-proven by CI. It creates portable, redacted observation packets under
-``evidence/v1-physical``. Packets from independent hosts can be copied into one
-coordinator evidence tree before final validation.
-
-The harness deliberately does not inject destructive faults on its own. The
-operator performs the documented physical action and records the resulting
-probe/command or observation through this CLI. PASS is derived from the
-checked-in scenario contract, exact candidate identity, elapsed-time rules,
-host/OS requirements, and a final privacy digest rather than by hand-editing a
-summary JSON file.
+Physical fault actions remain deliberate operator actions. This module verifies
+one exact clean candidate, records redacted command/observation packets, enforces
+scenario/OS/duration requirements, and seals the final local evidence tree.
 """
 
 from __future__ import annotations
@@ -38,6 +30,14 @@ PACKET_SCHEMA: Final = "fcp.v1.physical-observation.v1"
 PRIVACY_SCHEMA: Final = "fcp.v1.physical-privacy.v1"
 HOST_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,47}")
 SCENARIO_RE = re.compile(r"P(?:0[1-9]|1[0-2])")
+URL_RE = re.compile(r"\b(?:https?|wss?)://[^\s\]\[(){}<>\"']+", re.IGNORECASE)
+IPV4_RE = re.compile(r"(?<![0-9])(?:[0-9]{1,3}\.){3}[0-9]{1,3}(?![0-9])")
+WINDOWS_PATH_RE = re.compile(r"(?i)\b[a-z]:[\\/][^\r\n\t\"']+")
+CREDENTIAL_RE = re.compile(
+    r"(?i)\b(?:authorization|bearer|token|password|secret|private[_-]?key)\b"
+    r"\s*[:=]\s*(?:bearer\s+)?[^\s,;\"']+"
+)
+PAIRING_RE = re.compile(r"\bFCP1-[A-Za-z0-9._~+/=-]{6,}", re.IGNORECASE)
 
 
 class CampaignError(RuntimeError):
@@ -54,21 +54,25 @@ class ScenarioSpec:
     minimum_samples: int = 0
 
 
+def _assertions(*items: tuple[str, str]) -> dict[str, str]:
+    return dict(items)
+
+
 SCENARIOS: Final[dict[str, ScenarioSpec]] = {
     "P01": ScenarioSpec(
         "Repeated Federation update growth and failure cleanup",
-        {
-            "windows-resource-baseline": "Windows/Beast resource baseline covers host, Docker, data/results, logs and model storage.",
-            "posix-resource-baseline": "POSIX resource baseline covers host, Docker, data/results, logs, model storage and inode state.",
-            "windows-three-activations": "At least three supported Windows activations cover unchanged/distinct commits where meaningful.",
-            "posix-three-activations": "At least three supported POSIX activations cover unchanged/distinct commits where meaningful.",
-            "windows-failed-build-cleanup": "A failed/interrupted Windows build leaves bounded cache/resource state or safe pressure behavior.",
-            "posix-failed-build-cleanup": "A failed/interrupted POSIX build leaves bounded cache/resource state or safe pressure behavior.",
-            "windows-runtime-state": "Windows runtime proves exact commit and retained FCP state after activation.",
-            "posix-runtime-state": "POSIX runtime proves exact commit and retained FCP state after activation.",
-            "windows-growth-bounded": "Windows does not return to the historical multi-gigabyte-per-activation growth slope.",
-            "posix-growth-bounded": "POSIX does not show unbounded per-activation growth.",
-        },
+        _assertions(
+            ("windows-resource-baseline", "Windows/Beast baseline covers host, Docker, data/results, logs and model storage."),
+            ("posix-resource-baseline", "POSIX baseline covers host, Docker, data/results, logs, model storage and inode state."),
+            ("windows-three-activations", "At least three supported Windows activations cover unchanged/distinct commits where meaningful."),
+            ("posix-three-activations", "At least three supported POSIX activations cover unchanged/distinct commits where meaningful."),
+            ("windows-failed-build-cleanup", "A failed/interrupted Windows build leaves bounded cache/resource state or safe pressure behavior."),
+            ("posix-failed-build-cleanup", "A failed/interrupted POSIX build leaves bounded cache/resource state or safe pressure behavior."),
+            ("windows-runtime-state", "Windows proves exact running commit and retained FCP state after activation."),
+            ("posix-runtime-state", "POSIX proves exact running commit and retained FCP state after activation."),
+            ("windows-growth-bounded", "Windows does not return to the historical multi-gigabyte-per-activation growth slope."),
+            ("posix-growth-bounded", "POSIX does not show unbounded per-activation growth."),
+        ),
         assertion_os={
             "windows-resource-baseline": "windows",
             "windows-three-activations": "windows",
@@ -84,28 +88,28 @@ SCENARIOS: Final[dict[str, ScenarioSpec]] = {
     ),
     "P02": ScenarioSpec(
         "Independent backing-resource exhaustion",
-        {
-            "checkout-docker-pressure": "Checkout/build/Docker backing resource refuses optional work safely under pressure.",
-            "data-pressure": "Data backing resource pressure is surfaced and does not corrupt committed state.",
-            "results-pressure": "Results backing resource pressure refuses optional work before the emergency floor.",
-            "model-pressure": "Model/provider backing resource pressure refuses large optional writes safely.",
-            "inode-pressure": "Inode/file-capacity pressure is handled where the backing filesystem exposes it.",
-            "core-remains-usable": "The old healthy core remains usable while optional pressure-bound work is refused.",
-        },
+        _assertions(
+            ("checkout-docker-pressure", "Checkout/build/Docker pressure refuses optional work safely."),
+            ("data-pressure", "Data-volume pressure is surfaced without corrupting committed state."),
+            ("results-pressure", "Results pressure refuses optional work before the emergency floor."),
+            ("model-pressure", "Model/provider pressure refuses large optional writes safely."),
+            ("inode-pressure", "Inode/file-capacity pressure is handled where exposed by the filesystem."),
+            ("core-remains-usable", "The old healthy core remains usable while optional work is refused."),
+        ),
         allow_na=frozenset({"inode-pressure"}),
     ),
     "P03": ScenarioSpec(
         "All supported start/update entry points and concurrency",
-        {
-            "start-cmd": "start.cmd exercises the supported Windows start contract.",
-            "start-sh": "start.sh exercises the supported POSIX start contract.",
-            "start-tailscale-cmd": "start-tailscale.cmd exercises the supported Windows/tailnet path.",
-            "update-cmd-disposition": "update.cmd follows its final approved/retired disposition without bypassing update policy.",
-            "windows-concurrent-launchers": "Concurrent Windows launcher attempts serialize host mutation safely.",
-            "posix-concurrent-launchers": "Concurrent POSIX launcher attempts serialize host mutation safely.",
-            "launcher-vs-update": "Launcher versus pending/active host update serializes source/build mutation.",
-            "identity-and-isolation": "Source/image/runtime identity, bounded build state, and model/network failure isolation are proven.",
-        },
+        _assertions(
+            ("start-cmd", "start.cmd exercises the supported Windows start contract."),
+            ("start-sh", "start.sh exercises the supported POSIX start contract."),
+            ("start-tailscale-cmd", "start-tailscale.cmd exercises the supported Windows/tailnet path."),
+            ("update-cmd-disposition", "update.cmd follows its final approved/retired disposition without bypassing update policy."),
+            ("windows-concurrent-launchers", "Concurrent Windows launchers serialize host mutation safely."),
+            ("posix-concurrent-launchers", "Concurrent POSIX launchers serialize host mutation safely."),
+            ("launcher-vs-update", "Launcher versus pending/active update serializes source/build mutation."),
+            ("identity-and-isolation", "Source/image/runtime identity, bounded build state, and model/network failure isolation are proven."),
+        ),
         assertion_os={
             "start-cmd": "windows",
             "start-sh": "posix",
@@ -117,142 +121,142 @@ SCENARIOS: Final[dict[str, ScenarioSpec]] = {
     ),
     "P04": ScenarioSpec(
         "Recorder finite transaction and disk pressure",
-        {
-            "concurrent-sources": "Recorder exercises up to eight simultaneous sources or the supported configured maximum.",
-            "maximum-ingress": "Maximum accepted response, observation and sequence-span bounds are exercised.",
-            "aggregate-admission": "Aggregate admission leaves completion room for raw/manifest/observation/JSONL/checkpoint/status/journal writes.",
-            "pressure-state-ladder": "WARNING, PRESSURE and CRITICAL behavior is observed without crossing the emergency reserve.",
-            "safe-pause": "Critical pressure pauses capture without deleting primary evidence.",
-            "recovery-continuity": "Restored capacity resumes sequence/checkpoint continuity without --fresh.",
-        },
+        _assertions(
+            ("concurrent-sources", "Recorder exercises up to eight simultaneous sources or the supported configured maximum."),
+            ("maximum-ingress", "Maximum accepted response, observation and sequence-span bounds are exercised."),
+            ("aggregate-admission", "Aggregate admission leaves completion room for raw/manifest/observation/JSONL/checkpoint/status/journal writes."),
+            ("pressure-state-ladder", "WARNING, PRESSURE and CRITICAL behavior is observed within the emergency reserve."),
+            ("safe-pause", "Critical pressure pauses capture without deleting primary evidence."),
+            ("recovery-continuity", "Restored capacity resumes sequence/checkpoint continuity without --fresh."),
+        ),
     ),
     "P05": ScenarioSpec(
         "Service and failure injection",
-        {
-            "flask-crash": "Flask crash is bounded and visible.",
-            "relay-crash": "Relay process crash is bounded and visible.",
-            "relay-stale-db-failure": "Relay stale-sweep database failure does not leave a running-but-dead service.",
-            "managed-recorder-crash": "Managed recorder crash is supervised without unrelated loss.",
-            "native-recorder-crash": "Native recorder child crash follows bounded supervision semantics.",
-            "publication-db-failure": "Publication database failure is surfaced and retried without losing durable work.",
-            "analysis-db-failure": "Analysis scheduler database failure is surfaced at the required-thread boundary.",
-            "poison-recorder-archive": "A poison recorder archive is isolated from later eligible work.",
-            "slow-trickle-response": "A slow-trickle MTConnect response is terminated by the finite deadline.",
-            "oversized-ingress": "Oversized MTConnect response/observation input is refused within finite bounds.",
-            "huge-sequence-gap": "Huge sequence discontinuity is handled without proportional allocation.",
-            "malformed-timestamp-path": "Malicious/malformed timestamp path components cannot escape recorder roots.",
-            "event-storm": "Repeated discontinuity evidence is deduplicated/rate-bounded.",
-            "ollama-absence": "Ollama/model absence degrades the capability without removing core availability.",
-            "stale-responder-pid": "Stale responder PID reuse cannot target an unrelated process.",
-            "global-invariant": "Logs remain bounded, health is visible, and no unrelated authority/data is lost.",
-        },
+        _assertions(
+            ("flask-crash", "Flask crash is bounded and visible."),
+            ("relay-crash", "Relay process crash is bounded and visible."),
+            ("relay-stale-db-failure", "Relay stale-sweep database failure does not leave a running-but-dead service."),
+            ("managed-recorder-crash", "Managed recorder crash is supervised without unrelated loss."),
+            ("native-recorder-crash", "Native recorder child crash follows bounded supervision semantics."),
+            ("publication-db-failure", "Publication database failure is surfaced/retried without losing durable work."),
+            ("analysis-db-failure", "Analysis scheduler database failure is surfaced at the required-thread boundary."),
+            ("poison-recorder-archive", "A poison recorder archive is isolated from later eligible work."),
+            ("slow-trickle-response", "A slow-trickle MTConnect response is terminated by the finite deadline."),
+            ("oversized-ingress", "Oversized MTConnect response/observation input is refused within finite bounds."),
+            ("huge-sequence-gap", "Huge sequence discontinuity is handled without proportional allocation."),
+            ("malformed-timestamp-path", "Malicious/malformed timestamp path components cannot escape recorder roots."),
+            ("event-storm", "Repeated discontinuity evidence is deduplicated/rate-bounded."),
+            ("ollama-absence", "Ollama/model absence degrades capability without removing core availability."),
+            ("stale-responder-pid", "Stale responder PID reuse cannot target an unrelated process."),
+            ("global-invariant", "Logs remain bounded, health visible, and no unrelated authority/data is lost."),
+        ),
     ),
     "P06": ScenarioSpec(
         "Native recorder supervision contract",
-        {
-            "unexpected-child-restart": "One unexpected child crash restarts with bounded backoff.",
-            "crash-loop-fence": "Repeated deterministic crashes reach the declared crash-loop fence.",
-            "operator-stop": "Operator Ctrl+C/stop does not restart the child.",
-            "update-trial-semantics": "Approved update/trial replacement semantics remain unchanged.",
-            "checkpoint-continuity": "Recorder checkpoint continuity survives supervised restart.",
-            "service-manager-boundary": "Supervisor crash/reboot behavior matches the actually declared external startup/service-manager contract.",
-        },
+        _assertions(
+            ("unexpected-child-restart", "One unexpected child crash restarts with bounded backoff."),
+            ("crash-loop-fence", "Repeated deterministic crashes reach the declared crash-loop fence."),
+            ("operator-stop", "Operator Ctrl+C/stop does not restart the child."),
+            ("update-trial-semantics", "Approved update/trial replacement semantics remain unchanged."),
+            ("checkpoint-continuity", "Recorder checkpoint continuity survives supervised restart."),
+            ("service-manager-boundary", "Supervisor crash/reboot behavior matches the declared external service-manager boundary."),
+        ),
         allow_na=frozenset({"service-manager-boundary"}),
-        assertion_os={
-            "unexpected-child-restart": "windows",
-            "crash-loop-fence": "windows",
-            "operator-stop": "windows",
-            "update-trial-semantics": "windows",
-            "checkpoint-continuity": "windows",
-            "service-manager-boundary": "windows",
-        },
+        assertion_os={key: "windows" for key in (
+            "unexpected-child-restart",
+            "crash-loop-fence",
+            "operator-stop",
+            "update-trial-semantics",
+            "checkpoint-continuity",
+            "service-manager-boundary",
+        )},
     ),
     "P07": ScenarioSpec(
         "Long Federation outage with aged corpus",
-        {
-            "aged-corpus": "A non-trivial historical corpus/outbox exists before disconnecting Federation.",
-            "capture-continues": "Local capture/checkpoints continue during control-plane outage.",
-            "backlog-durable": "Publication backlog remains durable during outage.",
-            "latency-bounded": "Source polling and publication reconciliation latency remain bounded.",
-            "workers-alive": "No required worker silently dies during outage.",
-            "catchup-progress": "Reconnect catch-up makes continuous measurable forward progress.",
-            "poison-isolation": "A poison item cannot block later eligible work during catch-up.",
-            "duplicate-suppression": "Duplicate suppression remains correct after outage/reconnect.",
-            "restart-progress": "Restart during backlog does not lose durable progress.",
-        },
+        _assertions(
+            ("aged-corpus", "A non-trivial historical corpus/outbox exists before disconnecting Federation."),
+            ("capture-continues", "Local capture/checkpoints continue during control-plane outage."),
+            ("backlog-durable", "Publication backlog remains durable during outage."),
+            ("latency-bounded", "Source polling and publication reconciliation latency remain bounded."),
+            ("workers-alive", "No required worker silently dies during outage."),
+            ("catchup-progress", "Reconnect catch-up makes continuous measurable forward progress."),
+            ("poison-isolation", "A poison item cannot block later eligible work during catch-up."),
+            ("duplicate-suppression", "Duplicate suppression remains correct after outage/reconnect."),
+            ("restart-progress", "Restart during backlog does not lose durable progress."),
+        ),
         minimum_elapsed_seconds=3600,
         minimum_samples=2,
     ),
     "P08": ScenarioSpec(
         "Logical storage exhaustion under host pressure",
-        {
-            "allocation-floor": "A real storage authority reaches allocation/floor under the stricter host-pressure contract.",
-            "committed-reads": "Existing committed reads and control surfaces remain available at refusal.",
-            "no-partial-commit": "No partial storage commit becomes visible.",
-            "recovery-no-repair": "Restored capacity recovers without manual database/filesystem repair.",
-        },
+        _assertions(
+            ("allocation-floor", "A real storage authority reaches allocation/floor under the stricter host-pressure contract."),
+            ("committed-reads", "Existing committed reads and control surfaces remain available at refusal."),
+            ("no-partial-commit", "No partial storage commit becomes visible."),
+            ("recovery-no-repair", "Restored capacity recovers without manual database/filesystem repair."),
+        ),
     ),
     "P09": ScenarioSpec(
         "Durable-write crash windows, control-plane loss and clock skew",
-        {
-            "raw-publication": "Interruption around raw temp/final publication recovers without false commit.",
-            "raw-manifest": "Interruption around raw manifest publication recovers safely.",
-            "observation-archive": "Interruption around observation archive publication recovers safely.",
-            "compat-jsonl": "Interruption around compatibility JSONL publication recovers safely.",
-            "checkpoint-status": "Interruption around checkpoint/status replacement preserves continuity.",
-            "outbox-transaction": "Interruption around outbox transaction preserves durable idempotency/progress.",
-            "analysis-slice": "Interruption around deterministic analysis slice archive cannot promote a truncated artifact.",
-            "upload-transitions": "Upload staging/database/publication crash windows reconcile without partial exposure.",
-            "sqlite-wal": "Coordinator/relay SQLite/WAL interruption preserves authoritative recovery.",
-            "coordinator-disappearance": "Coordinator disappearance cannot fabricate continuity or self-promote authority.",
-            "positive-clock-skew": "Bounded positive clock offset around storage lease expiry fails safely.",
-            "negative-clock-skew": "Bounded negative clock offset around storage lease expiry fails safely.",
-            "authority-projection": "No crash/loss/skew case yields silent partial authority projection.",
-        },
+        _assertions(
+            ("raw-publication", "Interruption around raw temp/final publication recovers without false commit."),
+            ("raw-manifest", "Interruption around raw manifest publication recovers safely."),
+            ("observation-archive", "Interruption around observation archive publication recovers safely."),
+            ("compat-jsonl", "Interruption around compatibility JSONL publication recovers safely."),
+            ("checkpoint-status", "Interruption around checkpoint/status replacement preserves continuity."),
+            ("outbox-transaction", "Interruption around outbox transaction preserves durable idempotency/progress."),
+            ("analysis-slice", "Interruption around deterministic analysis slice cannot promote a truncated artifact."),
+            ("upload-transitions", "Upload staging/database/publication crash windows reconcile without partial exposure."),
+            ("sqlite-wal", "Coordinator/relay SQLite/WAL interruption preserves authoritative recovery."),
+            ("coordinator-disappearance", "Coordinator disappearance cannot fabricate continuity or self-promote authority."),
+            ("positive-clock-skew", "Bounded positive clock offset around storage lease expiry fails safely."),
+            ("negative-clock-skew", "Bounded negative clock offset around storage lease expiry fails safely."),
+            ("authority-projection", "No crash/loss/skew case yields silent partial authority projection."),
+        ),
     ),
     "P10": ScenarioSpec(
         "Model installation through every product path",
-        {
-            "normal-startup": "Required-model absence/pressure is exercised through normal startup.",
-            "federation-update": "Required-model absence/pressure is exercised through Federation update.",
-            "browser-install": "Required-model absence/pressure is exercised through browser-triggered installation.",
-            "provider-profile-install": "Required-model absence/pressure is exercised through provider/profile installation.",
-            "failure-isolation": "Model failure does not remove workbench/Federation/recorder/control availability.",
-            "emergency-floor": "No model pull crosses the host emergency resource floor.",
-        },
+        _assertions(
+            ("normal-startup", "Required-model absence/pressure is exercised through normal startup."),
+            ("federation-update", "Required-model absence/pressure is exercised through Federation update."),
+            ("browser-install", "Required-model absence/pressure is exercised through browser-triggered installation."),
+            ("provider-profile-install", "Required-model absence/pressure is exercised through provider/profile installation."),
+            ("failure-isolation", "Model failure does not remove workbench/Federation/recorder/control availability."),
+            ("emergency-floor", "No model pull crosses the host emergency resource floor."),
+        ),
     ),
     "P11": ScenarioSpec(
         "Exact-candidate backup and restore",
-        {
-            "external-destination": "Backup destination is independent and preflighted before quiescence.",
-            "helper-prestaged": "Any helper needed after quiescence is available before services stop.",
-            "writers-fenced": "Compose and relevant host writers are fenced and quiescence is proven.",
-            "update-refused": "Concurrent update/host mutation is refused while backup owns the host mutation boundary.",
-            "failed-copy-safe": "A deliberate copy/verify failure leaves FCP stopped and primary state intact.",
-            "successful-backup": "A successful exact-candidate backup completes with manifest/source identity.",
-            "sqlite-integrity": "Every applicable restored SQLite database passes integrity/quick-check.",
-            "isolated-restore": "Restore is performed in isolation into clean destination resources.",
-            "identity-continuity": "Same-installation device/Federation/auth/recorder continuity is verified where applicable.",
-            "core-no-model-download": "Core recovery succeeds without requiring model download.",
-            "replacement-identity": "Replacement-member recovery uses a new identity rather than cloning member authority.",
-            "windows-dpapi": "Windows DPAPI identity boundary is exercised where applicable.",
-        },
+        _assertions(
+            ("external-destination", "Backup destination is independent and preflighted before quiescence."),
+            ("helper-prestaged", "Any helper needed after quiescence is available before services stop."),
+            ("writers-fenced", "Compose and relevant host writers are fenced and quiescence is proven."),
+            ("update-refused", "Concurrent update/host mutation is refused while backup owns the host mutation boundary."),
+            ("failed-copy-safe", "A deliberate copy/verify failure leaves FCP stopped and primary state intact."),
+            ("successful-backup", "A successful exact-candidate backup completes with manifest/source identity."),
+            ("sqlite-integrity", "Every applicable restored SQLite database passes integrity/quick-check."),
+            ("isolated-restore", "Restore is performed in isolation into clean destination resources."),
+            ("identity-continuity", "Same-installation device/Federation/auth/recorder continuity is verified where applicable."),
+            ("core-no-model-download", "Core recovery succeeds without requiring model download."),
+            ("replacement-identity", "Replacement-member recovery uses a new identity rather than cloning member authority."),
+            ("windows-dpapi", "Windows DPAPI identity boundary is exercised where applicable."),
+        ),
         allow_na=frozenset({"windows-dpapi"}),
     ),
     "P12": ScenarioSpec(
         "Aged-history 24-hour soak plus accelerated ceiling tests",
-        {
-            "aged-history": "The soak begins with meaningful history rather than an empty installation.",
-            "storage-series": "Free bytes and inode/file counts are sampled for relevant backing resources.",
-            "docker-series": "Docker root/VHDX, cache, image and log growth is sampled.",
-            "recorder-series": "Recorder corpus growth and per-poll recovery time are sampled.",
-            "publication-series": "Publication reconciliation duration/progress and outbox backlog are sampled.",
-            "history-series": "Session/member/job/attempt/command/grant/artifact/provider/update history and database sizes are sampled.",
-            "orphan-series": "Orphan staging/workspaces and required-thread/process/restart health are sampled.",
-            "cpu-ram-series": "CPU/RAM observations are sufficient to identify concrete leaks or OOM isolation defects.",
-            "accelerated-ceilings": "Accelerated tests cross the known authority/history page ceilings.",
-            "no-unexplained-growth": "The completed soak has no unexplained growth, restart amplification, or backlog slope.",
-        },
+        _assertions(
+            ("aged-history", "The soak begins with meaningful history rather than an empty installation."),
+            ("storage-series", "Free bytes and inode/file counts are sampled for relevant backing resources."),
+            ("docker-series", "Docker root/VHDX, cache, image and log growth is sampled."),
+            ("recorder-series", "Recorder corpus growth and per-poll recovery time are sampled."),
+            ("publication-series", "Publication reconciliation duration/progress and outbox backlog are sampled."),
+            ("history-series", "Session/member/job/attempt/command/grant/artifact/provider/update history and DB sizes are sampled."),
+            ("orphan-series", "Orphan staging/workspaces and required-thread/process/restart health are sampled."),
+            ("cpu-ram-series", "CPU/RAM observations are sufficient to identify concrete leaks or OOM isolation defects."),
+            ("accelerated-ceilings", "Accelerated tests cross the known authority/history page ceilings."),
+            ("no-unexplained-growth", "The completed soak has no unexplained growth, restart amplification, or backlog slope."),
+        ),
         minimum_elapsed_seconds=24 * 60 * 60,
         minimum_samples=2,
     ),
@@ -294,10 +298,7 @@ def os_category() -> str:
 def _write_json(path: Path, value: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(path.name + ".tmp")
-    temporary.write_text(
-        json.dumps(value, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    temporary.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     os.replace(temporary, path)
 
 
@@ -324,13 +325,7 @@ def campaign_path(root: Path) -> Path:
     return root / "campaign.json"
 
 
-def initialize(
-    checkout: Path,
-    root: Path,
-    *,
-    commit: str,
-    operator: str,
-) -> dict[str, object]:
+def initialize(checkout: Path, root: Path, *, commit: str, operator: str) -> dict[str, object]:
     expected = require_commit(commit)
     verify_checkout(checkout, expected)
     operator_text = sanitize_text(operator.strip(), cwd=checkout)
@@ -339,8 +334,8 @@ def initialize(
     path = campaign_path(root)
     if path.exists():
         existing = _load_json(path)
-        if existing.get("candidate_sha") != expected:
-            raise CampaignError("existing campaign targets a different candidate")
+        if existing.get("schema") != SCHEMA or existing.get("candidate_sha") != expected:
+            raise CampaignError("existing campaign targets another schema/candidate")
         return existing
     document: dict[str, object] = {
         "schema": SCHEMA,
@@ -355,11 +350,7 @@ def initialize(
     return document
 
 
-def load_campaign(
-    checkout: Path,
-    root: Path,
-    commit: str,
-) -> dict[str, object]:
+def load_campaign(checkout: Path, root: Path, commit: str) -> dict[str, object]:
     expected = require_commit(commit)
     verify_checkout(checkout, expected)
     path = campaign_path(root)
@@ -372,20 +363,13 @@ def load_campaign(
 
 
 def host_fingerprint() -> str:
-    material = (
-        f"{platform.node()}|{platform.system()}|{platform.machine()}"
-    ).encode("utf-8", errors="replace")
+    material = f"{platform.node()}|{platform.system()}|{platform.machine()}".encode(
+        "utf-8", errors="replace"
+    )
     return hashlib.sha256(material).hexdigest()[:16]
 
 
-def register_host(
-    checkout: Path,
-    root: Path,
-    *,
-    commit: str,
-    host: str,
-    role: str,
-) -> dict[str, object]:
+def register_host(checkout: Path, root: Path, *, commit: str, host: str, role: str) -> dict[str, object]:
     load_campaign(checkout, root, commit)
     expected = require_commit(commit)
     host_id = require_host(host)
@@ -430,12 +414,7 @@ def load_host(root: Path, host: str, *, commit: str | None = None) -> dict[str, 
 
 def _packet_path(root: Path, scenario: str, kind: str) -> Path:
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-    return (
-        root
-        / "observations"
-        / scenario
-        / f"{stamp}-{kind}-{uuid.uuid4().hex[:8]}.json"
-    )
+    return root / "observations" / scenario / f"{stamp}-{kind}-{uuid.uuid4().hex[:8]}.json"
 
 
 def write_packet(root: Path, packet: dict[str, object]) -> Path:
@@ -446,14 +425,7 @@ def write_packet(root: Path, packet: dict[str, object]) -> Path:
     return path
 
 
-def base_packet(
-    root: Path,
-    *,
-    commit: str,
-    host: str,
-    scenario: str,
-    kind: str,
-) -> dict[str, object]:
+def base_packet(root: Path, *, commit: str, host: str, scenario: str, kind: str) -> dict[str, object]:
     expected = require_commit(commit)
     host_record = load_host(root, host, commit=expected)
     return {
@@ -468,14 +440,7 @@ def base_packet(
     }
 
 
-def _assertion_contract(
-    root: Path,
-    *,
-    commit: str,
-    host: str,
-    scenario: str,
-    assertion: str,
-) -> tuple[str, ScenarioSpec, dict[str, object]]:
+def _assertion_contract(root: Path, *, commit: str, host: str, scenario: str, assertion: str) -> tuple[str, ScenarioSpec]:
     scenario_id = require_scenario(scenario)
     spec = SCENARIOS[scenario_id]
     if assertion not in spec.assertions:
@@ -483,10 +448,8 @@ def _assertion_contract(
     host_record = load_host(root, host, commit=commit)
     required_os = spec.assertion_os.get(assertion)
     if required_os is not None and host_record.get("os_category") != required_os:
-        raise CampaignError(
-            f"{scenario_id}/{assertion} must be observed on {required_os}"
-        )
-    return scenario_id, spec, host_record
+        raise CampaignError(f"{scenario_id}/{assertion} must be observed on {required_os}")
+    return scenario_id, spec
 
 
 def observe(
@@ -501,28 +464,14 @@ def observe(
     note: str,
 ) -> Path:
     load_campaign(checkout, root, commit)
-    scenario_id, spec, _host_record = _assertion_contract(
-        root,
-        commit=commit,
-        host=host,
-        scenario=scenario,
-        assertion=assertion,
+    scenario_id, spec = _assertion_contract(
+        root, commit=commit, host=host, scenario=scenario, assertion=assertion
     )
     if status not in {"pass", "fail", "not-applicable"}:
-        raise CampaignError(
-            "observation status must be pass, fail, or not-applicable"
-        )
+        raise CampaignError("observation status must be pass, fail, or not-applicable")
     if status == "not-applicable" and assertion not in spec.allow_na:
-        raise CampaignError(
-            f"{scenario_id}/{assertion} cannot be marked not-applicable"
-        )
-    packet = base_packet(
-        root,
-        commit=commit,
-        host=host,
-        scenario=scenario_id,
-        kind="assertion",
-    )
+        raise CampaignError(f"{scenario_id}/{assertion} cannot be marked not-applicable")
+    packet = base_packet(root, commit=commit, host=host, scenario=scenario_id, kind="assertion")
     packet.update(
         {
             "assertion": assertion,
@@ -534,12 +483,7 @@ def observe(
     return write_packet(root, packet)
 
 
-def _run(
-    command: list[str],
-    *,
-    checkout: Path,
-    timeout: float,
-) -> tuple[int, float, str]:
+def _run(command: list[str], *, checkout: Path, timeout: float) -> tuple[int, float, str]:
     if not command:
         raise CampaignError("run requires a command after --")
     started = time.monotonic()
@@ -554,14 +498,8 @@ def _run(
             errors="replace",
             timeout=timeout,
         )
-        output = "\n".join(
-            part for part in (completed.stdout, completed.stderr) if part
-        )
-        return (
-            completed.returncode,
-            round(time.monotonic() - started, 3),
-            output,
-        )
+        output = "\n".join(part for part in (completed.stdout, completed.stderr) if part)
+        return completed.returncode, round(time.monotonic() - started, 3), output
     except subprocess.TimeoutExpired as exc:
         parts: list[str] = []
         for item in (exc.stdout, exc.stderr):
@@ -591,28 +529,12 @@ def run_command(
         command = command[1:]
     spec = SCENARIOS[scenario_id]
     if assertion is not None:
-        _assertion_contract(
-            root,
-            commit=commit,
-            host=host,
-            scenario=scenario_id,
-            assertion=assertion,
-        )
+        _assertion_contract(root, commit=commit, host=host, scenario=scenario_id, assertion=assertion)
     else:
         load_host(root, host, commit=commit)
-    returncode, duration, output = _run(
-        command,
-        checkout=checkout,
-        timeout=timeout,
-    )
+    returncode, duration, output = _run(command, checkout=checkout, timeout=timeout)
     passed = returncode == expected_exit
-    packet = base_packet(
-        root,
-        commit=commit,
-        host=host,
-        scenario=scenario_id,
-        kind="command",
-    )
+    packet = base_packet(root, commit=commit, host=host, scenario=scenario_id, kind="command")
     packet.update(
         {
             "label": sanitize_text(label, cwd=checkout),
@@ -649,49 +571,21 @@ def _disk_snapshot(path: Path) -> dict[str, object]:
     return result
 
 
-def sample_resources(
-    checkout: Path,
-    root: Path,
-    *,
-    commit: str,
-    host: str,
-    scenario: str,
-    label: str,
-) -> Path:
+def sample_resources(checkout: Path, root: Path, *, commit: str, host: str, scenario: str, label: str) -> Path:
     load_campaign(checkout, root, commit)
-    packet = base_packet(
-        root,
-        commit=commit,
-        host=host,
-        scenario=scenario,
-        kind="sample",
-    )
+    packet = base_packet(root, commit=commit, host=host, scenario=scenario, kind="sample")
     resources: dict[str, object] = {"checkout": _disk_snapshot(checkout)}
     for name in ("data", "results"):
         path = checkout / name
         if path.exists():
             resources[name] = _disk_snapshot(path)
-    docker: dict[str, object] = {
-        "available": shutil.which("docker") is not None
-    }
+    docker: dict[str, object] = {"available": shutil.which("docker") is not None}
     if docker["available"]:
-        code, duration, output = _run(
-            ["docker", "system", "df"],
-            checkout=checkout,
-            timeout=30,
-        )
+        code, duration, output = _run(["docker", "system", "df"], checkout=checkout, timeout=30)
         docker.update(
-            {
-                "returncode": code,
-                "duration_seconds": duration,
-                "summary": sanitize_text(output, cwd=checkout),
-            }
+            {"returncode": code, "duration_seconds": duration, "summary": sanitize_text(output, cwd=checkout)}
         )
-        code, duration, output = _run(
-            ["docker", "compose", "ps"],
-            checkout=checkout,
-            timeout=30,
-        )
+        code, duration, output = _run(["docker", "compose", "ps"], checkout=checkout, timeout=30)
         docker.update(
             {
                 "compose_returncode": code,
@@ -699,34 +593,15 @@ def sample_resources(
                 "compose_summary": sanitize_text(output, cwd=checkout),
             }
         )
-    packet.update(
-        {
-            "label": sanitize_text(label, cwd=checkout),
-            "resources": resources,
-            "docker": docker,
-        }
-    )
+    packet.update({"label": sanitize_text(label, cwd=checkout), "resources": resources, "docker": docker})
     return write_packet(root, packet)
 
 
-def begin_session(
-    checkout: Path,
-    root: Path,
-    *,
-    commit: str,
-    host: str,
-    scenario: str,
-) -> tuple[str, Path]:
+def begin_session(checkout: Path, root: Path, *, commit: str, host: str, scenario: str) -> tuple[str, Path]:
     load_campaign(checkout, root, commit)
     scenario_id = require_scenario(scenario)
     run_id = uuid.uuid4().hex
-    packet = base_packet(
-        root,
-        commit=commit,
-        host=host,
-        scenario=scenario_id,
-        kind="begin",
-    )
+    packet = base_packet(root, commit=commit, host=host, scenario=scenario_id, kind="begin")
     packet["run_id"] = run_id
     return run_id, write_packet(root, packet)
 
@@ -743,36 +618,34 @@ def finish_session(
     load_campaign(checkout, root, commit)
     scenario_id = require_scenario(scenario)
     current_host = load_host(root, host, commit=commit)
-    begins = [
-        item
-        for item in read_packets(
-            root,
-            scenario_id,
-            expected_commit=commit,
-        )
-        if item.get("kind") == "begin" and item.get("run_id") == run_id
-    ]
+    packets = read_packets(root, scenario_id, expected_commit=commit)
+    begins = [item for item in packets if item.get("kind") == "begin" and item.get("run_id") == run_id]
+    finishes = [item for item in packets if item.get("kind") == "finish" and item.get("run_id") == run_id]
     if len(begins) != 1:
         raise CampaignError("finish requires exactly one matching begin packet")
+    if finishes:
+        raise CampaignError("timed session has already been finished")
     if begins[0].get("host_fingerprint") != current_host.get("host_fingerprint"):
         raise CampaignError("timed session must finish on the host that began it")
-    packet = base_packet(
-        root,
-        commit=commit,
-        host=host,
-        scenario=scenario_id,
-        kind="finish",
-    )
+    packet = base_packet(root, commit=commit, host=host, scenario=scenario_id, kind="finish")
     packet["run_id"] = run_id
     packet["started_at"] = begins[0]["recorded_at"]
     packet["elapsed_seconds"] = round(
-        (
-            parse_time(str(packet["recorded_at"]))
-            - parse_time(str(begins[0]["recorded_at"]))
-        ).total_seconds(),
+        (parse_time(str(packet["recorded_at"])) - parse_time(str(begins[0]["recorded_at"]))).total_seconds(),
         3,
     )
     return write_packet(root, packet)
+
+
+def _validate_packet_host(root: Path, packet: dict[str, object], commit: str) -> None:
+    host_id = packet.get("host_id")
+    if not isinstance(host_id, str):
+        raise CampaignError("observation is missing host provenance")
+    host = load_host(root, host_id, commit=commit)
+    if packet.get("host_fingerprint") != host.get("host_fingerprint"):
+        raise CampaignError("observation host fingerprint does not match registered host")
+    if packet.get("os_category") != host.get("os_category"):
+        raise CampaignError("observation OS provenance does not match registered host")
 
 
 def read_packets(
@@ -782,54 +655,40 @@ def read_packets(
     expected_commit: str | None = None,
 ) -> list[dict[str, object]]:
     base = root / "observations"
-    paths = (
-        sorted((base / scenario).glob("*.json"))
-        if scenario
-        else sorted(base.glob("*/*.json"))
-    )
+    paths = sorted((base / scenario).glob("*.json")) if scenario else sorted(base.glob("*/*.json"))
     packets: list[dict[str, object]] = []
     expected = require_commit(expected_commit) if expected_commit else None
     for path in paths:
         packet = _load_json(path)
         if packet.get("schema") != PACKET_SCHEMA:
             raise CampaignError(f"unexpected observation schema: {path.name}")
-        if expected is not None and packet.get("candidate_sha") != expected:
-            raise CampaignError(
-                f"observation {path.name} belongs to a different candidate"
-            )
+        packet_commit = packet.get("candidate_sha")
+        if not isinstance(packet_commit, str):
+            raise CampaignError(f"observation {path.name} is missing candidate identity")
+        packet_commit = require_commit(packet_commit)
+        if expected is not None and packet_commit != expected:
+            raise CampaignError(f"observation {path.name} belongs to a different candidate")
         packet_scenario = packet.get("scenario")
         if not isinstance(packet_scenario, str) or require_scenario(packet_scenario) != packet_scenario:
             raise CampaignError(f"observation {path.name} has invalid scenario")
+        _validate_packet_host(root, packet, packet_commit)
         packets.append(packet)
     return packets
 
 
-def scenario_status(
-    root: Path,
-    scenario: str,
-    *,
-    expected_commit: str | None = None,
-) -> dict[str, object]:
+def scenario_status(root: Path, scenario: str, *, expected_commit: str | None = None) -> dict[str, object]:
     scenario_id = require_scenario(scenario)
     spec = SCENARIOS[scenario_id]
-    packets = read_packets(
-        root,
-        scenario_id,
-        expected_commit=expected_commit,
-    )
+    packets = read_packets(root, scenario_id, expected_commit=expected_commit)
     latest: dict[str, dict[str, object]] = {}
     for packet in packets:
         assertion = packet.get("assertion")
         if isinstance(assertion, str) and assertion in spec.assertions:
             required_os = spec.assertion_os.get(assertion)
             if required_os is not None and packet.get("os_category") != required_os:
-                raise CampaignError(
-                    f"stored {scenario_id}/{assertion} evidence has wrong OS provenance"
-                )
+                raise CampaignError(f"stored {scenario_id}/{assertion} evidence has wrong OS provenance")
             current = latest.get(assertion)
-            if current is None or str(packet.get("recorded_at", "")) > str(
-                current.get("recorded_at", "")
-            ):
+            if current is None or str(packet.get("recorded_at", "")) > str(current.get("recorded_at", "")):
                 latest[assertion] = packet
     missing: list[str] = []
     failing: list[str] = []
@@ -839,20 +698,18 @@ def scenario_status(
             missing.append(assertion)
             continue
         status = packet.get("status")
-        if status == "pass":
-            continue
-        if status == "not-applicable" and assertion in spec.allow_na:
+        if status == "pass" or (status == "not-applicable" and assertion in spec.allow_na):
             continue
         failing.append(assertion)
     finishes = [item for item in packets if item.get("kind") == "finish"]
-    elapsed = max(
-        (float(item.get("elapsed_seconds", 0.0)) for item in finishes),
-        default=0.0,
-    )
+    elapsed = max((float(item.get("elapsed_seconds", 0.0)) for item in finishes), default=0.0)
     samples = sum(1 for item in packets if item.get("kind") == "sample")
-    duration_ok = elapsed >= spec.minimum_elapsed_seconds
-    samples_ok = samples >= spec.minimum_samples
-    passed = not missing and not failing and duration_ok and samples_ok
+    passed = (
+        not missing
+        and not failing
+        and elapsed >= spec.minimum_elapsed_seconds
+        and samples >= spec.minimum_samples
+    )
     return {
         "scenario": scenario_id,
         "title": spec.title,
@@ -882,17 +739,23 @@ def _privacy_digest(root: Path) -> tuple[str, int]:
     return digest.hexdigest(), count
 
 
-def privacy_check(
-    checkout: Path,
-    root: Path,
-    *,
-    commit: str,
-) -> dict[str, object]:
+def _contains_private_material(text: str, *, checkout: Path) -> bool:
+    for literal in {str(checkout), str(checkout.resolve()), str(Path.home())}:
+        if literal and literal in text:
+            return True
+    return any(
+        pattern.search(text) is not None
+        for pattern in (URL_RE, IPV4_RE, WINDOWS_PATH_RE, CREDENTIAL_RE, PAIRING_RE)
+    )
+
+
+def privacy_check(checkout: Path, root: Path, *, commit: str) -> dict[str, object]:
     load_campaign(checkout, root, commit)
-    read_packets(root, expected_commit=commit)
+    expected = require_commit(commit)
+    read_packets(root, expected_commit=expected)
     for path in sorted((root / "hosts").glob("*.json")):
         host = _load_json(path)
-        if host.get("candidate_sha") != require_commit(commit):
+        if host.get("candidate_sha") != expected:
             raise CampaignError(f"host {path.name} belongs to a different candidate")
     unsafe: list[str] = []
     for path in sorted(root.rglob("*")):
@@ -902,17 +765,16 @@ def privacy_check(
             unsafe.append(path.relative_to(root).as_posix())
             continue
         text = path.read_text(encoding="utf-8", errors="replace")
-        if sanitize_text(text, cwd=checkout) != text:
+        if _contains_private_material(text, checkout=checkout):
             unsafe.append(path.relative_to(root).as_posix())
     if unsafe:
         raise CampaignError(
-            "privacy scan found unredacted or unsupported evidence: "
-            + ", ".join(unsafe[:10])
+            "privacy scan found unredacted or unsupported evidence: " + ", ".join(unsafe[:10])
         )
     digest, count = _privacy_digest(root)
     result = {
         "schema": PRIVACY_SCHEMA,
-        "candidate_sha": require_commit(commit),
+        "candidate_sha": expected,
         "checked_at": utc_now(),
         "file_count": count,
         "evidence_sha256": digest,
@@ -922,31 +784,16 @@ def privacy_check(
     return result
 
 
-def validate_campaign(
-    checkout: Path,
-    root: Path,
-    *,
-    commit: str,
-) -> dict[str, object]:
+def validate_campaign(checkout: Path, root: Path, *, commit: str) -> dict[str, object]:
     campaign = load_campaign(checkout, root, commit)
     expected = require_commit(commit)
-    hosts = [
-        _load_json(path)
-        for path in sorted((root / "hosts").glob("*.json"))
-    ]
+    hosts = [_load_json(path) for path in sorted((root / "hosts").glob("*.json"))]
     for host in hosts:
-        if (
-            host.get("schema") != PACKET_SCHEMA
-            or host.get("kind") != "host"
-            or host.get("candidate_sha") != expected
-        ):
+        if host.get("schema") != PACKET_SCHEMA or host.get("kind") != "host" or host.get("candidate_sha") != expected:
             raise CampaignError("host evidence schema/candidate mismatch")
     categories = {str(item.get("os_category")) for item in hosts}
     host_coverage_ok = {"windows", "posix"}.issubset(categories)
-    statuses = [
-        scenario_status(root, scenario, expected_commit=expected)
-        for scenario in SCENARIOS
-    ]
+    statuses = [scenario_status(root, scenario, expected_commit=expected) for scenario in SCENARIOS]
     privacy_path = root / "privacy.json"
     privacy_ok = False
     if privacy_path.exists():
@@ -959,11 +806,7 @@ def validate_campaign(
             and privacy.get("evidence_sha256") == digest
             and privacy.get("file_count") == count
         )
-    accepted = (
-        host_coverage_ok
-        and privacy_ok
-        and all(bool(item["passed"]) for item in statuses)
-    )
+    accepted = host_coverage_ok and privacy_ok and all(bool(item["passed"]) for item in statuses)
     return {
         "schema": SCHEMA,
         "candidate_sha": campaign["candidate_sha"],
@@ -996,16 +839,10 @@ def _print(value: object) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description=(
-            "Run commit-bound Federation v1 P01-P12 physical evidence campaign."
-        )
+        description="Run commit-bound Federation v1 P01-P12 physical evidence campaign."
     )
     parser.add_argument("--checkout", type=Path, default=Path.cwd())
-    parser.add_argument(
-        "--evidence-root",
-        type=Path,
-        default=Path("evidence/v1-physical"),
-    )
+    parser.add_argument("--evidence-root", type=Path, default=Path("evidence/v1-physical"))
     sub = parser.add_subparsers(dest="command_name", required=True)
 
     init = sub.add_parser("init")
@@ -1046,11 +883,7 @@ def main(argv: list[str] | None = None) -> int:
     observation.add_argument("--host", required=True)
     observation.add_argument("--scenario", required=True)
     observation.add_argument("--assertion", required=True)
-    observation.add_argument(
-        "--status",
-        choices=("pass", "fail", "not-applicable"),
-        required=True,
-    )
+    observation.add_argument("--status", choices=("pass", "fail", "not-applicable"), required=True)
     observation.add_argument("--note", default="")
 
     finish = sub.add_parser("finish")
@@ -1077,34 +910,16 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         if args.command_name == "init":
-            result: object = initialize(
-                checkout,
-                root,
-                commit=args.commit,
-                operator=args.operator,
-            )
+            result: object = initialize(checkout, root, commit=args.commit, operator=args.operator)
         elif args.command_name == "host":
-            result = register_host(
-                checkout,
-                root,
-                commit=args.commit,
-                host=args.host,
-                role=args.role,
-            )
+            result = register_host(checkout, root, commit=args.commit, host=args.host, role=args.role)
         elif args.command_name == "plan":
             result = plan(args.scenario)
         elif args.command_name == "begin":
             run_id, path = begin_session(
-                checkout,
-                root,
-                commit=args.commit,
-                host=args.host,
-                scenario=args.scenario,
+                checkout, root, commit=args.commit, host=args.host, scenario=args.scenario
             )
-            result = {
-                "run_id": run_id,
-                "evidence": _display_path(path, checkout, root),
-            }
+            result = {"run_id": run_id, "evidence": _display_path(path, checkout, root)}
         elif args.command_name == "sample":
             path = sample_resources(
                 checkout,
@@ -1129,10 +944,7 @@ def main(argv: list[str] | None = None) -> int:
                 timeout=args.timeout,
             )
             packet = _load_json(path)
-            result = {
-                "evidence": _display_path(path, checkout, root),
-                "passed": packet["passed"],
-            }
+            result = {"evidence": _display_path(path, checkout, root), "passed": packet["passed"]}
         elif args.command_name == "observe":
             path = observe(
                 checkout,
@@ -1144,10 +956,7 @@ def main(argv: list[str] | None = None) -> int:
                 status=args.status,
                 note=args.note,
             )
-            result = {
-                "evidence": _display_path(path, checkout, root),
-                "status": args.status,
-            }
+            result = {"evidence": _display_path(path, checkout, root), "status": args.status}
         elif args.command_name == "finish":
             path = finish_session(
                 checkout,
@@ -1159,52 +968,25 @@ def main(argv: list[str] | None = None) -> int:
             )
             result = {
                 "evidence": _display_path(path, checkout, root),
-                "scenario_status": scenario_status(
-                    root,
-                    args.scenario,
-                    expected_commit=args.commit,
-                ),
+                "scenario_status": scenario_status(root, args.scenario, expected_commit=args.commit),
             }
         elif args.command_name == "status":
             load_campaign(checkout, root, args.commit)
-            if args.scenario:
-                result = scenario_status(
-                    root,
-                    args.scenario,
-                    expected_commit=args.commit,
-                )
-            else:
-                result = [
-                    scenario_status(
-                        root,
-                        key,
-                        expected_commit=args.commit,
-                    )
-                    for key in SCENARIOS
-                ]
+            result = (
+                scenario_status(root, args.scenario, expected_commit=args.commit)
+                if args.scenario
+                else [scenario_status(root, key, expected_commit=args.commit) for key in SCENARIOS]
+            )
         elif args.command_name == "privacy":
-            result = privacy_check(
-                checkout,
-                root,
-                commit=args.commit,
-            )
+            result = privacy_check(checkout, root, commit=args.commit)
         else:
-            result = validate_campaign(
-                checkout,
-                root,
-                commit=args.commit,
-            )
+            result = validate_campaign(checkout, root, commit=args.commit)
         _print(result)
         if args.command_name == "validate" and not bool(result["accepted"]):
             return 2
         return 0
     except (CampaignError, OSError, subprocess.SubprocessError) as exc:
-        _print(
-            {
-                "error": sanitize_text(str(exc), cwd=checkout),
-                "accepted": False,
-            }
-        )
+        _print({"error": sanitize_text(str(exc), cwd=checkout), "accepted": False})
         return 2
 
 
