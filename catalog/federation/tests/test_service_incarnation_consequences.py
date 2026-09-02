@@ -52,6 +52,47 @@ def test_repeated_flask_exceptions_are_fcp_visible(
     assert state.consecutive_unclean >= 3
 
 
+def test_real_flask_recovery_from_failure_sequence_deescalates(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    flask_entrypoint = importlib.import_module("catalog.flask_app.app")
+    monkeypatch.setenv("FCP_DATA_ROOT", str(tmp_path))
+
+    class BrokenApp:
+        def run(self, **_kwargs: object) -> None:
+            raise RuntimeError("flask-runtime-failed")
+
+    class HealthyApp:
+        def run(self, **_kwargs: object) -> None:
+            return None
+
+    path = incarnation_state_file(tmp_path, "flask")
+    record_service_start(path, service="flask", now=NOW)
+    for _ in range(3):
+        with pytest.raises(RuntimeError, match="flask-runtime-failed"):
+            flask_entrypoint.run_flask_server(
+                BrokenApp(),
+                host="127.0.0.1",
+                port=5000,
+                debug=False,
+            )
+
+    assert read_restart_state(path, service="flask").state == STATE_CRASH_LOOP
+
+    flask_entrypoint.run_flask_server(
+        HealthyApp(),
+        host="127.0.0.1",
+        port=5000,
+        debug=False,
+    )
+    # The successful run is recorded as completed. The next start is the
+    # first incarnation whose predecessor is clean, so the FCP state clears.
+    recovered = record_service_start(path, service="flask")
+    assert recovered.state != STATE_CRASH_LOOP
+    assert recovered.consecutive_unclean == 0
+
+
 def test_repeated_managed_recorder_failures_are_fcp_visible(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
