@@ -352,6 +352,7 @@ def _empty_state() -> dict[str, object]:
         "last_revision": 0,
         "authority_node_id": None,
         "pending": {},
+        "in_flight": None,
         TRIAL_RETIREMENT_STATE_KEY: [],
     }
 
@@ -505,26 +506,20 @@ class FederationUpdateEventProcessor:
         result: UpdateInspection,
     ) -> None:
         node_id = context.credentials.identity.node_id
-        _append_remote_event(
+        self._send_stored_report(
             self.service,
             context,
-            event_type,
-            report_payload(
+            event_type=event_type,
+            payload=report_payload(
                 request_id=federation_request_id,
                 node_id=node_id,
                 result=result,
             ),
-            _event_request_id(
-                "update-report",
-                ":".join(
-                    (
-                        federation_request_id,
-                        event_type,
-                        result.state,
-                        result.running_commit or "",
-                    )
-                ),
-                node_id,
+            request_id=self._report_request_id(
+                federation_request_id=federation_request_id,
+                event_type=event_type,
+                result=result,
+                node_id=node_id,
             ),
         )
 
@@ -571,6 +566,202 @@ class FederationUpdateEventProcessor:
         if latest is None or latest.request_id != request_id:
             return None
         return latest
+
+    @staticmethod
+    def _report_request_id(
+        *,
+        federation_request_id: str,
+        event_type: str,
+        result: UpdateInspection,
+        node_id: str,
+    ) -> str:
+        return _event_request_id(
+            "update-report",
+            ":".join(
+                (
+                    federation_request_id,
+                    event_type,
+                    result.state,
+                    result.running_commit or "",
+                )
+            ),
+            node_id,
+        )
+
+    @staticmethod
+    def _send_stored_report(
+        service: Any,
+        context: Any,
+        *,
+        event_type: str,
+        payload: dict[str, object],
+        request_id: str,
+    ) -> None:
+        _append_remote_event(service, context, event_type, payload, request_id)
+
+    def _store_result_report(
+        self,
+        context: Any,
+        state: dict[str, object],
+        marker: dict[str, object],
+        *,
+        event_type: str,
+        federation_request_id: str,
+        result: UpdateInspection,
+    ) -> None:
+        node_id = context.credentials.identity.node_id
+        payload = report_payload(
+            request_id=federation_request_id,
+            node_id=node_id,
+            result=result,
+        )
+        marker["report_event_type"] = event_type
+        marker["report_payload"] = payload
+        marker["report_request_id"] = self._report_request_id(
+            federation_request_id=federation_request_id,
+            event_type=event_type,
+            result=result,
+            node_id=node_id,
+        )
+        state["in_flight"] = marker
+        # Persist the exact host outcome before report publication. A report
+        # outage after this point is retried from the marker.
+        _write_state(self.state_file, state)
+
+    def _complete_in_flight(
+        self,
+        state: dict[str, object],
+        *,
+        revision: int,
+    ) -> None:
+        state["in_flight"] = None
+        previous = state.get("last_revision", 0)
+        if isinstance(previous, bool) or not isinstance(previous, int):
+            previous = 0
+        state["last_revision"] = max(previous, revision)
+        _write_state(self.state_file, state)
+
+    def _recover_in_flight(
+        self,
+        context: Any,
+        state: dict[str, object],
+    ) -> None:
+        """Finish an interrupted update without blindly reissuing it."""
+
+        marker = state.get("in_flight")
+        if marker is None:
+            return
+        if not isinstance(marker, dict):
+            raise TypeError("malformed_update_in_flight_marker")
+        request_id = marker.get("request_id")
+        node_id = marker.get("node_id")
+        revision = marker.get("revision")
+        host_request_id = marker.get("host_request_id")
+        target_commit = marker.get("target_commit")
+        kind = marker.get("kind")
+        if (
+            not isinstance(request_id, str)
+            or not request_id
+            or not isinstance(node_id, str)
+            or not node_id
+            or isinstance(revision, bool)
+            or not isinstance(revision, int)
+            or revision < 0
+            or not isinstance(host_request_id, str)
+            or not host_request_id
+            or not isinstance(target_commit, str)
+            or kind not in {"check", "apply", "trial"}
+        ):
+            raise ValueError("malformed_update_in_flight_marker")
+
+        payload = marker.get("report_payload")
+        event_type = marker.get("report_event_type")
+        report_request_id = marker.get("report_request_id")
+        if not (
+            isinstance(payload, dict)
+            and isinstance(event_type, str)
+            and isinstance(report_request_id, str)
+        ):
+            if kind == "trial":
+                document = self._host_trial_result(host_request_id)
+                if document is None:
+                    document = {
+                        "state": "failed",
+                        "code": "processor-crash-window",
+                        "message": (
+                            "The software trial crossed a process crash window; "
+                            "its local outcome is unknown and was not retried."
+                        ),
+                        "target_commit": target_commit,
+                    }
+                node_id = context.credentials.identity.node_id
+                payload = trial_report_payload(
+                    request_id=request_id,
+                    node_id=node_id,
+                    document=document,
+                )
+                marker["report_event_type"] = TRIAL_REPORT_EVENT
+                marker["report_payload"] = payload
+                marker["report_request_id"] = _event_request_id(
+                    "trial-report",
+                    ":".join(
+                        (
+                            request_id,
+                            str(payload.get("state")),
+                            str(payload.get("running_commit") or ""),
+                        )
+                    ),
+                    node_id,
+                )
+                marker["settled"] = _trial_is_settled(document)
+                state["in_flight"] = marker
+                _write_state(self.state_file, state)
+            else:
+                result = self._host_result(host_request_id)
+                if result is None or result.target_commit != target_commit:
+                    result = UpdateInspection(
+                        "error",
+                        target_commit=target_commit,
+                        code="processor-crash-window",
+                        message=(
+                            "The software update crossed a process crash window; "
+                            "its local outcome is unknown and was not retried."
+                        ),
+                        request_id=host_request_id,
+                    )
+                self._store_result_report(
+                    context,
+                    state,
+                    marker,
+                    event_type=(
+                        CHECK_REPORT_EVENT if kind == "check" else APPLY_REPORT_EVENT
+                    ),
+                    federation_request_id=request_id,
+                    result=result,
+                )
+            payload = marker.get("report_payload")
+            event_type = marker.get("report_event_type")
+            report_request_id = marker.get("report_request_id")
+        if not (
+            isinstance(payload, dict)
+            and isinstance(event_type, str)
+            and isinstance(report_request_id, str)
+        ):
+            raise TypeError("malformed_update_in_flight_report")
+        self._send_stored_report(
+            self.service,
+            context,
+            event_type=event_type,
+            payload=payload,
+            request_id=report_request_id,
+        )
+        if kind == "trial" and marker.get("settled"):
+            pending = state.get("pending")
+            if isinstance(pending, dict):
+                pending.pop(request_id, None)
+                state["pending"] = pending
+            self._persist_trial_retirement(state, host_request_id)
+        self._complete_in_flight(state, revision=revision)
 
     def _finish_pending(
         self,
@@ -714,6 +905,7 @@ class FederationUpdateEventProcessor:
         if remote is None:
             return
         state = _read_state(self.state_file)
+        self._recover_in_flight(context, state)
         self._drain_trial_retirements(state)
         self._finish_pending(context, state)
         last_revision = state.get("last_revision", 0)
@@ -732,85 +924,146 @@ class FederationUpdateEventProcessor:
             last_revision = 0
             state["last_revision"] = 0
         local_node = context.credentials.identity.node_id
+
+        def advance(event: Any) -> None:
+            nonlocal last_revision
+            last_revision = int(event.revision)
+            state["last_revision"] = last_revision
+            _write_state(self.state_file, state)
+
         def apply_page(events: tuple[Any, ...]) -> None:
             nonlocal authority, last_revision, state
             for event in events:
-                try:
-                    authority = self._pin_authority(state, event)
-                    if event.event_type not in {
-                        CHECK_REQUEST_EVENT,
-                        APPLY_REQUEST_EVENT,
-                        TRIAL_REQUEST_EVENT,
-                    }:
-                        continue
-                    if authority is None or event.actor_node_id != authority:
-                        continue
-                    if event.event_type == TRIAL_REQUEST_EVENT:
-                        state = self._process_trial_request(
-                            context,
-                            event,
-                            state,
-                            local_node=local_node,
-                        )
-                        continue
-                    payload = validate_command_payload(event.payload)
-                    targets = payload["target_node_ids"]
-                    if local_node not in targets:
+                authority = self._pin_authority(state, event)
+                if event.event_type not in {
+                    CHECK_REQUEST_EVENT,
+                    APPLY_REQUEST_EVENT,
+                    TRIAL_REQUEST_EVENT,
+                }:
+                    advance(event)
+                    continue
+                if authority is None or event.actor_node_id != authority:
+                    advance(event)
+                    continue
+                if event.event_type == TRIAL_REQUEST_EVENT:
+                    payload, selection = validate_trial_command_payload(event.payload)
+                    if local_node not in payload["target_node_ids"]:
+                        advance(event)
                         continue
                     federation_request_id = str(payload["request_id"])
-                    target = str(payload["target_commit"])
-                    if event.event_type == CHECK_REQUEST_EVENT:
-                        result = self.handoff.inspect(target=target, fetch=True)
-                        self._report(
-                            context,
-                            event_type=CHECK_REPORT_EVENT,
-                            federation_request_id=federation_request_id,
-                            result=result,
-                        )
-                    else:
-                        pending = state.get("pending")
-                        if not isinstance(pending, dict):
-                            pending = {}
-                        host_request_id = _host_request_id(
-                            federation_request_id,
-                            local_node,
-                        )
-                        existing = self._host_result(host_request_id)
-                        if existing is not None and existing.target_commit == target:
-                            self._report(
-                                context,
-                                event_type=APPLY_REPORT_EVENT,
-                                federation_request_id=federation_request_id,
-                                result=existing,
-                            )
-                            pending.pop(federation_request_id, None)
-                        else:
-                            queued = self.handoff.apply(
-                                target,
-                                request_id=host_request_id,
-                            )
-                            if queued.state == "activation_queued":
-                                pending[federation_request_id] = {
-                                    "host_request_id": host_request_id,
-                                    "target_commit": target,
-                                }
-                            else:
-                                # A bounded handoff that did not queue the
-                                # request is a terminal report for this command;
-                                # never persist a phantom pending operation.
-                                pending.pop(federation_request_id, None)
-                            state["pending"] = pending
-                            _write_state(self.state_file, state)
-                            self._report(
-                                context,
-                                event_type=APPLY_REPORT_EVENT,
-                                federation_request_id=federation_request_id,
-                                result=queued,
-                            )
-                finally:
-                    last_revision = int(event.revision)
-                    state["last_revision"] = last_revision
+                    host_request_id = _host_request_id(
+                        federation_request_id,
+                        local_node,
+                    )
+                    state["in_flight"] = {
+                        "kind": "trial",
+                        "request_id": federation_request_id,
+                        "node_id": local_node,
+                        "revision": int(event.revision),
+                        "host_request_id": host_request_id,
+                        "target_commit": selection.target_commit,
+                    }
                     _write_state(self.state_file, state)
+                    state = self._process_trial_request(
+                        context,
+                        event,
+                        state,
+                        local_node=local_node,
+                    )
+                    self._complete_in_flight(
+                        state,
+                        revision=int(event.revision),
+                    )
+                    last_revision = int(event.revision)
+                    continue
+
+                payload = validate_command_payload(event.payload)
+                targets = payload["target_node_ids"]
+                if local_node not in targets:
+                    advance(event)
+                    continue
+                federation_request_id = str(payload["request_id"])
+                target = str(payload["target_commit"])
+                host_request_id = _host_request_id(
+                    federation_request_id,
+                    local_node,
+                )
+                kind = (
+                    "check"
+                    if event.event_type == CHECK_REQUEST_EVENT
+                    else "apply"
+                )
+                marker = {
+                    "kind": kind,
+                    "request_id": federation_request_id,
+                    "node_id": local_node,
+                    "revision": int(event.revision),
+                    "host_request_id": host_request_id,
+                    "target_commit": target,
+                }
+                state["in_flight"] = marker
+                # This marker is the pre-side-effect crash boundary. Restart
+                # can report/recover it without reissuing an accepted command.
+                _write_state(self.state_file, state)
+
+                if kind == "check":
+                    result = self.handoff.inspect(
+                        target=target,
+                        fetch=True,
+                        request_id=host_request_id,
+                    )
+                    self._store_result_report(
+                        context,
+                        state,
+                        marker,
+                        event_type=CHECK_REPORT_EVENT,
+                        federation_request_id=federation_request_id,
+                        result=result,
+                    )
+                else:
+                    pending = state.get("pending")
+                    if not isinstance(pending, dict):
+                        pending = {}
+                    existing = self._host_result(host_request_id)
+                    if existing is not None and existing.target_commit == target:
+                        result = existing
+                        pending.pop(federation_request_id, None)
+                    else:
+                        result = self.handoff.apply(
+                            target,
+                            request_id=host_request_id,
+                        )
+                        if result.state == "activation_queued":
+                            pending[federation_request_id] = {
+                                "host_request_id": host_request_id,
+                                "target_commit": target,
+                            }
+                        else:
+                            # A bounded handoff that did not queue the request
+                            # is terminal; never persist a phantom operation.
+                            pending.pop(federation_request_id, None)
+                    state["pending"] = pending
+                    self._store_result_report(
+                        context,
+                        state,
+                        marker,
+                        event_type=APPLY_REPORT_EVENT,
+                        federation_request_id=federation_request_id,
+                        result=result,
+                    )
+
+                self._send_stored_report(
+                    self.service,
+                    context,
+                    event_type=str(marker["report_event_type"]),
+                    payload=marker["report_payload"],  # type: ignore[arg-type]
+                    request_id=str(marker["report_request_id"]),
+                )
+                self._complete_in_flight(
+                    state,
+                    revision=int(event.revision),
+                )
+                last_revision = int(event.revision)
 
         replay_authoritative_history(
             lambda revision: context.coordinator.replay_page(

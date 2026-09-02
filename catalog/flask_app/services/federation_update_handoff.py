@@ -269,11 +269,16 @@ class HostUpdateHandoff:
         *,
         target: str | None = None,
         fetch: bool = True,
+        request_id: str | None = None,
     ) -> UpdateInspection:
         # ``fetch`` remains in the adapter shape; the host agent always performs
         # its own bounded fetch for check operations.
         del fetch
-        request = self._request(action="check", target=target)
+        request = self._request(
+            action="check",
+            target=target,
+            request_id=request_id,
+        )
         request_id = str(request["request_id"])
         try:
             self._write_request(request)

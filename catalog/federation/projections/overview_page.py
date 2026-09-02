@@ -34,6 +34,7 @@ class OverviewProjectionMixin:
         next_action = self._selected_action(snapshot, notice)
         if (
             next_action is None
+            and notice is None
             and snapshot.onboarding.available
             and snapshot.onboarding.connection_state == "connected"
             and snapshot.onboarding.trusted

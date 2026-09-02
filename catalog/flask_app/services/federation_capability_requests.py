@@ -505,6 +505,7 @@ class FederationCapabilityRequestProcessor:
             "last_revision": 0,
             "authority_node_id": None,
             "pending_reports": {},
+            "in_flight": None,
         }
 
     def _load(self) -> dict[str, object]:
@@ -563,6 +564,64 @@ class FederationCapabilityRequestProcessor:
         if changed:
             state["pending_reports"] = pending
             self._save(state)
+
+    def _recover_in_flight(self, state: dict[str, object]) -> None:
+        """Turn an interrupted local command into one explicit report.
+
+        Capability execution has no host-agent request journal that can prove
+        whether a benchmark or policy write happened before a process died.
+        The durable marker therefore chooses the safe side of the crash window:
+        report an unknown/failed outcome and advance past the accepted event,
+        rather than executing a possibly completed command twice.
+        """
+
+        marker = state.get("in_flight")
+        if marker is None:
+            return
+        if not isinstance(marker, dict):
+            raise TypeError("malformed_capability_in_flight_marker")
+        request_id = marker.get("request_id")
+        node_id = marker.get("node_id")
+        revision = marker.get("revision")
+        if (
+            not isinstance(request_id, str)
+            or not request_id
+            or not isinstance(node_id, str)
+            or not node_id
+            or isinstance(revision, bool)
+            or not isinstance(revision, int)
+            or revision < 0
+        ):
+            raise ValueError("malformed_capability_in_flight_marker")
+        pending = state.get("pending_reports")
+        if not isinstance(pending, dict):
+            pending = {}
+        pending.setdefault(
+            request_id,
+            report_payload(
+                request_id=request_id,
+                node_id=node_id,
+                state="failed",
+                benchmarks_attempted=0,
+                benchmarks_passed=0,
+                benchmark_errors=0,
+                contribution_candidates=0,
+                contributions_enabled=0,
+                contributions_blocked=0,
+                contribution_errors=0,
+                message=(
+                    "The capability request crossed a process crash window; "
+                    "its local outcome is unknown and was not retried."
+                ),
+            ),
+        )
+        state["pending_reports"] = pending
+        state["in_flight"] = None
+        previous = state.get("last_revision", 0)
+        if isinstance(previous, bool) or not isinstance(previous, int):
+            previous = 0
+        state["last_revision"] = max(previous, revision)
+        self._save(state)
 
     @staticmethod
     def _execution_report(request_id: str, node_id: str) -> dict[str, object]:
@@ -675,6 +734,7 @@ class FederationCapabilityRequestProcessor:
         if remote is None:
             return
         state = self._load()
+        self._recover_in_flight(state)
         self._flush_reports(context, state)
         last_revision = state.get("last_revision", 0)
         if (
@@ -693,32 +753,49 @@ class FederationCapabilityRequestProcessor:
         def apply_page(events: tuple[Any, ...]) -> None:
             nonlocal authority, last_revision, state
             for event in events:
-                try:
-                    authority = self._pin_authority(state, event)
-                    if event.event_type != REQUEST_EVENT:
-                        continue
-                    if authority is None or event.actor_node_id != authority:
-                        continue
-                    payload = validate_request_payload(event.payload)
-                    targets = payload["target_node_ids"]
-                    if local_node not in targets:
-                        continue
-                    federation_request_id = str(payload["request_id"])
-                    report = self._execution_report(
-                        federation_request_id,
-                        local_node,
-                    )
-                    pending = state.get("pending_reports")
-                    if not isinstance(pending, dict):
-                        pending = {}
-                    pending[federation_request_id] = report
-                    state["pending_reports"] = pending
-                    self._save(state)
-                    self._flush_reports(context, state)
-                finally:
+                authority = self._pin_authority(state, event)
+                if event.event_type != REQUEST_EVENT:
                     last_revision = int(event.revision)
                     state["last_revision"] = last_revision
                     self._save(state)
+                    continue
+                if authority is None or event.actor_node_id != authority:
+                    last_revision = int(event.revision)
+                    state["last_revision"] = last_revision
+                    self._save(state)
+                    continue
+                payload = validate_request_payload(event.payload)
+                targets = payload["target_node_ids"]
+                if local_node not in targets:
+                    last_revision = int(event.revision)
+                    state["last_revision"] = last_revision
+                    self._save(state)
+                    continue
+                federation_request_id = str(payload["request_id"])
+                # This write must precede every local side effect. If the
+                # process dies after it, restart reports the outcome as
+                # unknown instead of silently skipping or executing twice.
+                state["in_flight"] = {
+                    "kind": "capability-request",
+                    "request_id": federation_request_id,
+                    "node_id": local_node,
+                    "revision": int(event.revision),
+                }
+                self._save(state)
+                report = self._execution_report(
+                    federation_request_id,
+                    local_node,
+                )
+                pending = state.get("pending_reports")
+                if not isinstance(pending, dict):
+                    pending = {}
+                pending[federation_request_id] = report
+                state["pending_reports"] = pending
+                state["in_flight"] = None
+                last_revision = int(event.revision)
+                state["last_revision"] = last_revision
+                self._save(state)
+                self._flush_reports(context, state)
 
         replay_authoritative_history(
             lambda revision: context.coordinator.replay_page(

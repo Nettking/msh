@@ -280,7 +280,10 @@ class FederationProjectionCore:
             onboarding.available
             and onboarding.federation_id is not None
             and onboarding.trusted
-            and onboarding.connection_state in {"connected", "reconnecting"}
+            # FederationConnectionState has no ``reconnecting`` enum value.
+            # The UI's unavailable/reconnecting wording is a derived control-
+            # plane status over this retained, still-connected saved binding.
+            and onboarding.connection_state == "connected"
             and not snapshot.federation.available
         )
 
@@ -298,7 +301,7 @@ class FederationProjectionCore:
             return ProjectionNotice(
                 NoticeKind.DEGRADED,
                 "Federation control plane unavailable",
-                "Your saved trusted membership is retained. The coordinator or authoritative history is unavailable, so the Federation is reconnecting; no new setup or member failure was inferred.",
+                "Your saved trusted membership is retained. Its saved connection state remains connected; the coordinator or authoritative history is unavailable, so the control plane is unavailable/reconnecting; no new setup or member failure was inferred.",
                 RecommendedAction(
                     "Reconnect the Federation control plane",
                     "Retry the saved trusted membership after coordinator connectivity or authoritative history recovers.",

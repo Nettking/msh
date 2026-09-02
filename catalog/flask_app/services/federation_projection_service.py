@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+import sqlite3
 from types import SimpleNamespace
 from typing import Any
 
@@ -92,8 +93,30 @@ def _empty_service() -> FederationProjectionService:
 
 
 def _onboarding_context() -> AuthorizedOnboardingContext | None:
+    service = get_capability_onboarding_service()
     try:
-        return get_capability_onboarding_service().authorized_context()
+        return service.authorized_context()
+    except (OSError, TimeoutError, sqlite3.Error) as exc:
+        # A durable trusted binding is still useful for a read-only degraded
+        # projection when the coordinator database/relay is temporarily
+        # unavailable.  It is never used as a write authorization shortcut.
+        current_app.logger.info(
+            "Federation coordinator unavailable; retaining saved binding "
+            "for read-only projection (%s)",
+            type(exc).__name__,
+        )
+        return service.retained_context_for_read_only_projection()
+    except FederationOperationError as exc:
+        # ``onboarding-session-unavailable`` is the authority's explicit
+        # unavailable result.  Revoked/unknown membership and binding errors
+        # remain terminal repair states and must not retain a trusted view.
+        if getattr(exc, "code", None) != "onboarding-session-unavailable":
+            return None
+        current_app.logger.info(
+            "Federation session unavailable; retaining saved binding "
+            "for read-only projection",
+        )
+        return service.retained_context_for_read_only_projection()
     except Exception:  # noqa: BLE001 - projection authorization fails closed
         return None
 
