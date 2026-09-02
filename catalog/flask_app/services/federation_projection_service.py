@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
 import sqlite3
+from collections.abc import Iterable
 from types import SimpleNamespace
 from typing import Any
 
