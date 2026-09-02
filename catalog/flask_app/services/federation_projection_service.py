@@ -98,6 +98,46 @@ def _onboarding_context() -> AuthorizedOnboardingContext | None:
         return None
 
 
+def _saved_projection_binding() -> tuple[object, str] | None:
+    """Recover only persisted membership metadata when live authority is down.
+
+    This is deliberately narrower than ``authorized_context``. A saved binding
+    may tell a read-only projection which trusted Federation this installation
+    previously belonged to and which stable local device identity owns that
+    binding. It must never be promoted into current coordinator, leader,
+    provider, storage, update, or job authority.
+
+    The identity/binding equality check prevents a stale or substituted binding
+    from being displayed as this installation's membership. Any read or shape
+    failure degrades to no fallback rather than guessing.
+    """
+
+    try:
+        onboarding = get_capability_onboarding_service()
+        credentials = onboarding.identity_or_none()
+        binding = onboarding.binding_or_none()
+    except Exception:  # noqa: BLE001 - persisted display state is best effort
+        return None
+    if credentials is None or binding is None:
+        return None
+    identity = getattr(credentials, "identity", None)
+    actor_node_id = _private_binding_text(getattr(identity, "node_id", None))
+    binding_node_id = _private_binding_text(getattr(binding, "device_id", None))
+    internal_session_id = _private_binding_text(
+        getattr(binding, "internal_session_id", None)
+    )
+    federation_id = _private_binding_text(getattr(binding, "federation_id", None))
+    if (
+        actor_node_id is None
+        or binding_node_id != actor_node_id
+        or internal_session_id is None
+        or federation_id is None
+        or not bool(getattr(binding, "trusted", False))
+    ):
+        return None
+    return binding, actor_node_id
+
+
 def _warn_projection(name: str, exc: Exception) -> None:
     current_app.logger.warning(
         "%s projection unavailable (%s)",
@@ -160,7 +200,16 @@ def _contribution_state() -> tuple[tuple[object, ...], tuple[object, ...], bool]
         return (), (), True
 
 
-def _storage_adapter(internal_session_id: str, coordinator: object) -> object:
+def _storage_adapter(internal_session_id: str, coordinator: object | None) -> object:
+    # A retained local storage DB is not current write authority when the
+    # coordinator that fences and renews grants is unavailable. Do not present
+    # it as merely "not configured" during the exact outage the B09 surface is
+    # meant to expose.
+    if coordinator is None:
+        return _StaticSnapshotAdapter(
+            StorageAuthoritySnapshot(False, "federation-authority-unavailable")
+        )
+
     if _STORAGE_STORE_CONFIG_KEY in current_app.config:
         store = current_app.config.get(_STORAGE_STORE_CONFIG_KEY)
         if store is None:
@@ -208,8 +257,14 @@ def get_federation_projection_service() -> FederationProjectionService:
     explicitly composed. Normal Federation GETs never initialize provider
     enrollment/health authority as a side effect. Otherwise the durable
     capability-first identity and trusted binding are revalidated against the
-    existing coordinator. Browser parameters are never accepted as actor,
-    session, endpoint or authority context.
+    existing coordinator.
+
+    If that live revalidation is unavailable, a GET may still use the persisted
+    identity plus trusted binding solely to say "this known member is
+    reconnecting". The fallback never supplies a coordinator or any mutation
+    authority; authoritative Federation/storage/job projections stay explicitly
+    unavailable. Browser parameters are never accepted as actor, session,
+    endpoint or authority context.
     """
 
     surface = current_app.config.get(_OPERATOR_SURFACE_CONFIG_KEY)
@@ -218,6 +273,7 @@ def get_federation_projection_service() -> FederationProjectionService:
     coordinator: object | None = None
     internal_session_id: str | None = None
     actor_node_id: str | None = None
+    live_authority = False
 
     try:
         if isinstance(surface, ProviderOperatorSurface):
@@ -243,14 +299,29 @@ def get_federation_projection_service() -> FederationProjectionService:
             provider_adapter = ProviderOperatorAdapter(
                 _AuthorizedProviderView(authorized_view)
             )
+            live_authority = coordinator is not None
         else:
             context = _onboarding_context()
-            if context is None:
-                return _empty_service()
-            binding = context.binding
-            internal_session_id = context.binding.internal_session_id
-            actor_node_id = context.credentials.identity.node_id
-            coordinator = context.coordinator
+            if context is not None:
+                binding = context.binding
+                internal_session_id = context.binding.internal_session_id
+                actor_node_id = context.credentials.identity.node_id
+                coordinator = context.coordinator
+                live_authority = True
+            else:
+                saved = _saved_projection_binding()
+                if saved is None:
+                    return _empty_service()
+                binding, actor_node_id = saved
+                internal_session_id = _private_binding_text(
+                    getattr(binding, "internal_session_id", None)
+                )
+                if internal_session_id is None:
+                    return _empty_service()
+                # Deliberately no coordinator: persisted membership can explain
+                # the outage, never authorize through it.
+                coordinator = None
+                live_authority = False
 
         inspection, inspection_failed = _inspection_state()
         candidates, intents, contribution_failed = _contribution_state()
@@ -289,7 +360,16 @@ def get_federation_projection_service() -> FederationProjectionService:
                 provider_adapter,
             ),
             storage=_storage_adapter(internal_session_id, coordinator),
-            jobs=_job_adapter(internal_session_id),
+            jobs=(
+                _job_adapter(internal_session_id)
+                if live_authority
+                else _StaticSnapshotAdapter(
+                    JobAuthoritySnapshot(
+                        False,
+                        "federation-authority-unavailable",
+                    )
+                )
+            ),
         )
         return FederationProjectionService(adapters)
     except Exception:  # noqa: BLE001 - authorization/projection must fail closed
