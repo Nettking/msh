@@ -8,6 +8,7 @@ independently revalidates the exact commit through its local host agent.
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 import os
 import tempfile
@@ -344,6 +345,38 @@ def _trial_is_settled(document: dict[str, object]) -> bool:
 def _host_request_id(request_id: str, node_id: str) -> str:
     digest = hashlib.sha256(f"host\0{request_id}\0{node_id}".encode()).hexdigest()[:40]
     return f"fed-{digest}"
+
+
+def _inspect_host_update(
+    handoff: HostUpdateHandoff,
+    *,
+    target: str,
+    fetch: bool,
+    request_id: str,
+) -> UpdateInspection:
+    """Run a check with a stable id when the adapter supports it.
+
+    The production host handoff accepts ``request_id`` so a restart can recover
+    a check without issuing a second host request.  A few older embedded
+    adapters and test doubles still implement the pre-idempotency shape; keep
+    those readers compatible while the real handoff takes the durable path.
+    """
+
+    method = handoff.inspect
+    try:
+        parameters = inspect.signature(method).parameters
+    except (TypeError, ValueError):
+        parameters = None
+    accepts_request_id = parameters is None or (
+        "request_id" in parameters
+        or any(
+            parameter.kind is inspect.Parameter.VAR_KEYWORD
+            for parameter in parameters.values()
+        )
+    )
+    if accepts_request_id:
+        return method(target=target, fetch=fetch, request_id=request_id)
+    return method(target=target, fetch=fetch)
 
 
 def _empty_state() -> dict[str, object]:
@@ -1007,7 +1040,8 @@ class FederationUpdateEventProcessor:
                 _write_state(self.state_file, state)
 
                 if kind == "check":
-                    result = self.handoff.inspect(
+                    result = _inspect_host_update(
+                        self.handoff,
                         target=target,
                         fetch=True,
                         request_id=host_request_id,

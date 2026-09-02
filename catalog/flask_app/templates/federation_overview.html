@@ -27,6 +27,13 @@
   </section>
   {% endif %}
 
+  {% if vm.notice and vm.notice.kind == 'empty' %}
+  <section class="federation-empty federation-empty--information" role="status">
+    <span class="federation-empty__mark" aria-hidden="true"></span>
+    <div><h3>{{ vm.notice.title }}</h3><p>{{ vm.notice.message }}</p></div>
+  </section>
+  {% endif %}
+
   {% if vm.recommended_action %}
   <section class="recommended-action">
     <div><span class="federation-eyebrow">Recommended next action</span><h3>{{ vm.recommended_action.title }}</h3><p>{{ vm.recommended_action.message }}</p></div>
