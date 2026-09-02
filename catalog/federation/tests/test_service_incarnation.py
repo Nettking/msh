@@ -27,6 +27,7 @@ from catalog.federation.service_incarnation import (
     STATE_UNKNOWN,
     STOP_COMPLETED,
     STOP_OPERATOR,
+    STOP_TRIAL,
     STOP_UPDATE,
     incarnation_state_file,
     read_restart_state,
@@ -50,6 +51,24 @@ def _crash(path: Path, moment: datetime) -> None:
 def _clean(path: Path, moment: datetime, *, reason: str = STOP_COMPLETED) -> None:
     record_service_start(path, service="flask", now=moment)
     record_service_stop(path, service="flask", reason=reason, now=moment)
+
+
+def _reported_failure_from_completed_finally(path: Path, moment: datetime) -> None:
+    """Model Flask/recorder calling STOP_COMPLETED while an error unwinds."""
+
+    record_service_start(path, service="flask", now=moment)
+    try:
+        try:
+            raise RuntimeError("restart-worthy")
+        finally:
+            record_service_stop(
+                path,
+                service="flask",
+                reason=STOP_COMPLETED,
+                now=moment,
+            )
+    except RuntimeError:
+        pass
 
 
 def test_a_first_start_has_no_history_and_is_not_a_failure(tmp_path: Path) -> None:
@@ -98,6 +117,57 @@ def test_repeated_kills_in_a_short_window_are_a_crash_loop(tmp_path: Path) -> No
     assert state.since is not None
 
 
+def test_completed_finally_during_exception_remains_restart_worthy(
+    tmp_path: Path,
+) -> None:
+    """A finally block must not turn an exception exit into a clean stop."""
+
+    path = _file(tmp_path)
+    _reported_failure_from_completed_finally(path, NOW)
+
+    state = record_service_start(path, service="flask", now=NOW + timedelta(seconds=1))
+
+    assert state.state == STATE_RESTARTING
+    assert state.consecutive_unclean == 1
+    assert state.last_stop_reason == STOP_COMPLETED
+
+
+def test_repeated_reported_failures_become_a_crash_loop(tmp_path: Path) -> None:
+    """Observed nonzero/exception exits count just like abrupt process death."""
+
+    path = _file(tmp_path)
+    moment = NOW
+    for _ in range(CRASH_LOOP_THRESHOLD + 1):
+        _reported_failure_from_completed_finally(path, moment)
+        moment += timedelta(seconds=5)
+
+    state = read_restart_state(path, service="flask", now=moment)
+
+    assert state.state == STATE_CRASH_LOOP
+    assert state.consecutive_unclean >= CRASH_LOOP_THRESHOLD
+
+
+def test_nonintentional_reported_stop_reason_is_restart_worthy(
+    tmp_path: Path,
+) -> None:
+    """Relay's explicit nonzero failure path must not reset restart history."""
+
+    path = _file(tmp_path)
+    record_service_start(path, service="flask", now=NOW)
+    record_service_stop(
+        path,
+        service="flask",
+        reason="relay-background-task-failed",
+        now=NOW,
+    )
+
+    state = record_service_start(path, service="flask", now=NOW + timedelta(seconds=1))
+
+    assert state.state == STATE_RESTARTING
+    assert state.consecutive_unclean == 1
+    assert state.last_stop_reason == "relay-background-task-failed"
+
+
 def test_the_same_count_spread_over_a_year_is_not_a_crash_loop(
     tmp_path: Path,
 ) -> None:
@@ -138,8 +208,8 @@ def test_a_recorded_stop_clears_the_loop(tmp_path: Path) -> None:
     assert state.consecutive_unclean == 0
 
 
-@pytest.mark.parametrize("reason", [STOP_OPERATOR, STOP_UPDATE])
-def test_operator_stop_and_update_never_read_as_a_crash(
+@pytest.mark.parametrize("reason", [STOP_OPERATOR, STOP_UPDATE, STOP_TRIAL])
+def test_operator_update_and_trial_stops_never_read_as_a_crash(
     tmp_path: Path,
     reason: str,
 ) -> None:
@@ -152,6 +222,27 @@ def test_operator_stop_and_update_never_read_as_a_crash(
         moment += timedelta(seconds=5)
 
     state = read_restart_state(path, service="flask", now=moment)
+
+    assert state.state == STATE_STABLE
+    assert state.consecutive_unclean == 0
+    assert state.last_stop_reason == reason
+
+
+@pytest.mark.parametrize("reason", [STOP_OPERATOR, STOP_UPDATE, STOP_TRIAL])
+def test_intentional_stop_reason_remains_clean_inside_exception_handler(
+    tmp_path: Path,
+    reason: str,
+) -> None:
+    """An active exception alone must not turn an explicit lifecycle stop dirty."""
+
+    path = _file(tmp_path)
+    record_service_start(path, service="flask", now=NOW)
+    try:
+        raise KeyboardInterrupt
+    except KeyboardInterrupt:
+        record_service_stop(path, service="flask", reason=reason, now=NOW)
+
+    state = record_service_start(path, service="flask", now=NOW + timedelta(seconds=1))
 
     assert state.state == STATE_STABLE
     assert state.consecutive_unclean == 0
