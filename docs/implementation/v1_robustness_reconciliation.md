@@ -537,16 +537,20 @@ Property disposition at this exact baseline:
 3. **SAFE V1 BOUNDARY.** There is no session-event compaction or old-event
    retirement path. Consequently no event can be retired without a future
    coordinator-authenticated snapshot/base-revision protocol.
-4. **AUTOMATED-PROVEN FOR THE CURRENT RETENTION DESIGN.** The coordinator's
-   `session_events` and each member's `applied_events` are durable,
-   revision-unique append-only histories with durable replay checkpoints. No
-   member history cleanup path exists, so the member copy is included in the
-   lifetime design rather than being treated as disposable cache.
-5. **SAFE V1 BOUNDARY.** Authoritative accepted requests remain in the
-   append-only session history and `accepted_requests` idempotency table; no
-   request-id history is retired. The separate local trial-result cleanup is
-   protected by a durable retirement intent and does not retire authoritative
-   request history.
+4. **SAFE-V1 AUTHORITATIVE-HISTORY BOUNDARY; NOT PHYSICALLY BOUNDED.** The
+   coordinator's `session_events` and each member's `applied_events` are
+   durable, revision-unique append-only histories with durable replay
+   checkpoints. No member-history cleanup path exists, so the member copy is
+   included in the lifetime semantics rather than being treated as disposable
+   cache. That preserves replay correctness but does not prove bounded physical
+   storage; cumulative growth remains an explicit retention/archival decision.
+5. **SAFE-V1 IDEMPOTENCY-HISTORY BOUNDARY; NOT PHYSICALLY BOUNDED.**
+   Authoritative accepted requests remain in the append-only session history and
+   `accepted_requests` idempotency table; no request-id history is retired.
+   The separate local trial-result cleanup is protected by a durable retirement
+   intent and does not retire authoritative request history. Deleting these
+   rows without a tombstone/hash horizon would weaken replay or duplicate
+   suppression semantics.
 6. **AUTOMATED-PROVEN.** A trusted saved member whose coordinator or
    authoritative history is unavailable is exposed as `Federation control plane
    unavailable` / `Unavailable / reconnecting`, with membership retained and no
@@ -554,11 +558,14 @@ Property disposition at this exact baseline:
    continue to fail closed with their bounded unresolved-authority response.
 7. **AUTOMATED BOUNDED-TIME CONTRACT; PHYSICAL NTP EVIDENCE OPEN.** Existing
    signed assertions, routes, commands, storage grants and provider-side write
-   lease checks reject stale, future or expired time windows under fixed clock
-   bounds. Trusted v1 deployments must run UTC NTP/time synchronisation and
-   keep host clocks within the documented bound before enabling storage write
-   authority; P09 still requires exact-host positive/negative clock-offset
-   evidence around lease/grant expiry.
+   lease checks reject stale, future or expired time windows. The concrete v1
+   deployment bound is an absolute **30 seconds** from the trusted UTC NTP
+   source on the coordinator and every storage provider. It is derived from
+   the normal **300-second** storage authority lease (one tenth of the lease,
+   and no more than half the 60-second renewal margin). The normal operator
+   documentation carries this prerequisite; P09 still requires exact-host
+   positive/negative clock-offset evidence around lease/grant expiry. No
+   distributed clock consensus was introduced.
 
 The remaining physical work is therefore not a new software authority design:
 run the corrected P05/P09 campaign on the exact candidate, including storage

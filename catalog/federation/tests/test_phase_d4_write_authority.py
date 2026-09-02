@@ -6,6 +6,11 @@ from pathlib import Path
 import pytest
 
 from catalog.federation.errors import FederationValidationError
+from catalog.capabilities.storage_authority_enrollment import (
+    DEFAULT_LEASE_SECONDS,
+    MAX_TRUSTED_V1_CLOCK_OFFSET_SECONDS,
+    trusted_v1_clock_offset_is_bounded,
+)
 from catalog.federation.local_storage import FilesystemBatchStorageProvider
 from catalog.federation.storage_control_plane import (
     StorageControlPlaneStore,
@@ -161,6 +166,56 @@ def test_provider_clock_before_grant_issuance_is_rejected(tmp_path: Path) -> Non
     assert not response.ok
     assert response.error.code is StorageErrorCode.GRANT_NOT_YET_VALID
     assert not provider.exists(session_id="session-1", group_id="storage-main", batch_id="batch-1")
+
+
+def test_trusted_v1_clock_contract_accepts_the_exact_boundary() -> None:
+    assert DEFAULT_LEASE_SECONDS == 300
+    assert MAX_TRUSTED_V1_CLOCK_OFFSET_SECONDS == 30
+    assert trusted_v1_clock_offset_is_bounded(-30)
+    assert trusted_v1_clock_offset_is_bounded(0)
+    assert trusted_v1_clock_offset_is_bounded(30)
+
+
+@pytest.mark.parametrize("offset", [-30.001, 30.001, float("inf"), float("nan")])
+def test_trusted_v1_clock_contract_rejects_offsets_outside_the_boundary(
+    offset: float,
+) -> None:
+    assert not trusted_v1_clock_offset_is_bounded(offset)
+
+
+def test_provider_clock_at_the_positive_v1_boundary_can_use_a_live_grant(
+    tmp_path: Path,
+) -> None:
+    store = _control_plane(tmp_path / "control.sqlite3")
+    service, provider = _service(
+        tmp_path,
+        store,
+        now=NOW + timedelta(seconds=MAX_TRUSTED_V1_CLOCK_OFFSET_SECONDS),
+    )
+
+    response = service.dispatch(_envelope(_request()))
+
+    assert response.ok
+    assert provider.exists(
+        session_id="session-1",
+        group_id="storage-main",
+        batch_id="batch-1",
+    )
+
+
+def test_provider_clock_at_lease_expiry_fails_closed(tmp_path: Path) -> None:
+    store = _control_plane(tmp_path / "control.sqlite3")
+    service, provider = _service(tmp_path, store, now=NOW + timedelta(seconds=300))
+
+    response = service.dispatch(_envelope(_request()))
+
+    assert not response.ok
+    assert response.error.code is StorageErrorCode.LEASE_EXPIRED
+    assert not provider.exists(
+        session_id="session-1",
+        group_id="storage-main",
+        batch_id="batch-1",
+    )
 
 
 def test_revoked_grant_is_rejected(tmp_path: Path) -> None:

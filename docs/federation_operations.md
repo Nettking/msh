@@ -32,6 +32,19 @@ If no connected successor exists, FCP fails closed rather than inventing a leade
 
 This is **not** replicated coordinator/quorum failover. If the machine holding the authoritative coordinator database/relay is unavailable, leader promotion cannot replace that missing coordinator service.
 
+### Clock prerequisite for storage authority
+
+Trusted v1 storage writes require UTC NTP synchronization on the coordinator
+and every storage provider. Keep every participating host within an absolute
+**30-second** wall-clock offset of the deployment's trusted NTP source before
+enabling storage authority. The bound is derived from the normal **300-second**
+storage grant/lease and the existing 60-second renewal margin. If NTP is
+unhealthy or the offset is unknown, leave storage write authority disabled.
+
+This is an operator prerequisite, not distributed clock consensus. Providers
+also reject future/not-yet-valid and expired grants, but a signed grant cannot
+prove the host's absolute NTP offset by itself.
+
 ### Human credential authority is separate
 
 Operational leader transfer does not move the human password database. The immutable Federation creator remains the human credential/password authority used by Federation SSO. See [Human users, sign-in, and permissions](human-authentication.md).
