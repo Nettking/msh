@@ -1,7 +1,7 @@
 # Getting started with FCP
 
 Status: **current user guide**
-Reviewed: **2026-08-12**
+Reviewed: **2026-09-02**
 
 This guide gives the product mental model. For installation commands, start with [Quick start](quick_start.md).
 
@@ -44,6 +44,14 @@ The Federation creator is immutable provenance. Operational leader authority can
 If the current leader remains offline beyond the bounded timeout and a valid connected successor exists, the coordinator can promote a deterministic successor. The former leader is then fenced from current-leader controls.
 
 This leader failover assumes the authoritative coordinator/relay service remains available. It is not replicated-quorum failover of the coordinator database itself.
+
+### Storage-authority clocks must stay synchronized
+
+Federation v1 storage grants and leases use UTC timestamps issued by the authoritative coordinator. Every host participating in storage authority must therefore keep system time synchronized with NTP or an equivalent trusted time service.
+
+For the supported default v1 storage-authority configuration, **absolute clock skew between participating hosts must remain at or below 30 seconds**. The coordinator renews the normal storage lease 60 seconds before expiry; the 30-second deployment bound reserves half of that window for renewal/transport processing. A provider clock that is slow may temporarily reject a newly issued grant as `grant-not-yet-valid`; a provider clock that is fast may consider an old lease expired early. Both cases fail closed rather than weakening term, fencing-token, issuance-time, or expiry checks.
+
+Treat a host outside the 30-second bound as unavailable for storage authority until its clock is corrected. Do not work around clock errors by extending a lease locally, editing timestamps, disabling expiry checks, or widening the validator's acceptance window.
 
 ### 5. Human credential authority is separate from operational leadership
 
@@ -142,6 +150,7 @@ Use the light/dark switch in the top menu. FCP follows the OS preference until y
 - display names do not replace cryptographic node identity;
 - current operational leader authority is not the same as immutable creator provenance;
 - human credential authority remains separate from transferable operational leadership;
+- storage-authority hosts require synchronized UTC clocks within the documented 30-second v1 bound;
 - AI does not approve, assign authority, or execute unregistered code;
 - Federation updates cannot select arbitrary repositories/commands;
 - recorder control cannot inject arbitrary URLs or unrestricted scans.
