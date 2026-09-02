@@ -29,6 +29,7 @@ class _Local:
     def __init__(self, state_file: Path | None = None) -> None:
         self.state_file = state_file
         self.apply_calls: list[tuple[str, str | None]] = []
+        self.inspect_request_ids: list[str | None] = []
         self.latest: UpdateInspection | None = None
 
     def inspect(
@@ -36,8 +37,10 @@ class _Local:
         *,
         target: str | None = None,
         fetch: bool = True,
+        request_id: str | None = None,
     ) -> UpdateInspection:
         assert fetch is True
+        self.inspect_request_ids.append(request_id)
         resolved = target or TARGET
         return UpdateInspection(
             "update_available",
@@ -139,10 +142,15 @@ def test_check_targets_only_devices_reported_connected(
             _device(OFFLINE, "disconnected", "Offline"),
         ),
     )
-    service = FederationUpdateService(_Local(), tmp_path / "updates.json")
+    local = _Local()
+    service = FederationUpdateService(local, tmp_path / "updates.json")
 
     snapshot = service.check()
 
+    # The other half of the check contract: an operator-initiated local check
+    # owns no durable command identity, so it passes none and the handoff mints
+    # a fresh one per call. Only replayed Federation commands carry one.
+    assert local.inspect_request_ids == [None]
     check_events = [
         item for item in coordinator.events
         if item["event_type"] == CHECK_REQUEST_EVENT

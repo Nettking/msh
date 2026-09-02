@@ -436,12 +436,27 @@ def _session_created(revision: int = 1) -> SimpleNamespace:
 class _Handoff:
     def __init__(self) -> None:
         self.checks: list[str | None] = []
+        self.check_request_ids: list[str | None] = []
         self.applies: list[tuple[str, str | None]] = []
 
-    def inspect(self, *, target: str | None = None, fetch: bool = True) -> Any:
+    def inspect(
+        self,
+        *,
+        target: str | None = None,
+        fetch: bool = True,
+        request_id: str | None = None,
+    ) -> Any:
         del fetch
         self.checks.append(target)
-        return UpdateInspection("update_available", "c" * 40, target)
+        self.check_request_ids.append(request_id)
+        # The real handoff stamps the request identity onto its result so a
+        # restart can match a recovered publication to the command it answers.
+        return UpdateInspection(
+            "update_available",
+            "c" * 40,
+            target,
+            request_id=request_id,
+        )
 
     def apply(self, target: str, *, request_id: str | None = None) -> Any:
         self.applies.append((target, request_id))
@@ -468,6 +483,12 @@ def test_a_check_command_is_answered_over_the_existing_client(
     assert worker.process_once() is True
 
     assert handoff.checks == [TARGET]
+    # The worker hands the host the deterministic identity derived from the
+    # accepted command, so a restart can recover this check's outcome instead
+    # of reissuing it. A fresh identity per attempt would lose that.
+    assert handoff.check_request_ids == [
+        events._host_request_id("update-1", RECORDER)
+    ]
     assert node.replay_calls >= 1
     reported = [item for item in node.appended if item["event_type"].endswith("reported")]
     assert len(reported) == 1

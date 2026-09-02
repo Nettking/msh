@@ -73,7 +73,13 @@ def _context(count: int) -> Any:
 class _UpdateLocal:
     apply_calls = 0
 
-    def inspect(self, *, target=None, fetch=True):  # pragma: no cover - not used
+    def inspect(
+        self,
+        *,
+        target=None,
+        fetch=True,
+        request_id=None,
+    ):  # pragma: no cover - not used
         raise AssertionError("unexpected inspect")
 
     def apply(self, target, *, request_id=None):  # pragma: no cover - not used
