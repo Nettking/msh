@@ -40,7 +40,7 @@ On Windows, FCP protects the persistent node private key with Windows DPAPI for 
 
 A same-identity Windows recovery is supported only when the restored `identity.pem` remains decryptable by the applicable Windows security context. If the key cannot be opened, stop. Do not delete the key, regenerate a key under the old metadata, edit `identity.json`, or copy another member's identity in an attempt to impersonate the failed device.
 
-## Supported quiesced backup contract
+## Quiesced backup requirement
 
 Use the repository-owned backup command rather than manually copying live directories or volumes:
 
