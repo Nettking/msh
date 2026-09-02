@@ -132,7 +132,7 @@ def _is_saved_membership_outage(exc: Exception) -> bool:
 def _onboarding_context() -> AuthorizedOnboardingContext | None:
     try:
         return get_capability_onboarding_service().authorized_context()
-    except Exception as exc:  # noqa: BLE001 - classify before any saved fallback
+    except Exception as exc:
         if _is_saved_membership_outage(exc):
             return None
         raise
