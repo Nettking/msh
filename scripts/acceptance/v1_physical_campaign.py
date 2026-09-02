@@ -1,13 +1,13 @@
 """Commit-bound Federation v1 physical robustness campaign harness.
 
 This helper orchestrates P01-P12 without pretending that physical actions can be
-proven by CI.  It creates portable, redacted observation packets under
-``evidence/v1-physical``.  Packets from independent hosts can be copied into one
+proven by CI. It creates portable, redacted observation packets under
+``evidence/v1-physical``. Packets from independent hosts can be copied into one
 coordinator evidence tree before final validation.
 
-The harness deliberately does not inject destructive faults on its own.  The
+The harness deliberately does not inject destructive faults on its own. The
 operator performs the documented physical action and records the resulting
-probe/command or observation through this CLI.  PASS is then derived from the
+probe/command or observation through this CLI. PASS is derived from the
 checked-in scenario contract, exact candidate identity, elapsed-time rules,
 host/OS requirements, and a final privacy digest rather than by hand-editing a
 summary JSON file.
@@ -37,7 +37,6 @@ SCHEMA: Final = "fcp.v1.physical-campaign.v1"
 PACKET_SCHEMA: Final = "fcp.v1.physical-observation.v1"
 PRIVACY_SCHEMA: Final = "fcp.v1.physical-privacy.v1"
 HOST_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,47}")
-ASSERTION_RE = re.compile(r"[a-z0-9][a-z0-9-]{0,79}")
 SCENARIO_RE = re.compile(r"P(?:0[1-9]|1[0-2])")
 
 
@@ -295,7 +294,10 @@ def os_category() -> str:
 def _write_json(path: Path, value: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(path.name + ".tmp")
-    temporary.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    temporary.write_text(
+        json.dumps(value, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     os.replace(temporary, path)
 
 
@@ -309,11 +311,26 @@ def _load_json(path: Path) -> dict[str, object]:
     return value
 
 
+def _display_path(path: Path, checkout: Path, root: Path) -> str:
+    for base in (checkout, root.parent):
+        try:
+            return path.relative_to(base).as_posix()
+        except ValueError:
+            continue
+    return path.name
+
+
 def campaign_path(root: Path) -> Path:
     return root / "campaign.json"
 
 
-def initialize(checkout: Path, root: Path, *, commit: str, operator: str) -> dict[str, object]:
+def initialize(
+    checkout: Path,
+    root: Path,
+    *,
+    commit: str,
+    operator: str,
+) -> dict[str, object]:
     expected = require_commit(commit)
     verify_checkout(checkout, expected)
     operator_text = sanitize_text(operator.strip(), cwd=checkout)
@@ -338,7 +355,11 @@ def initialize(checkout: Path, root: Path, *, commit: str, operator: str) -> dic
     return document
 
 
-def load_campaign(checkout: Path, root: Path, commit: str) -> dict[str, object]:
+def load_campaign(
+    checkout: Path,
+    root: Path,
+    commit: str,
+) -> dict[str, object]:
     expected = require_commit(commit)
     verify_checkout(checkout, expected)
     path = campaign_path(root)
@@ -351,19 +372,38 @@ def load_campaign(checkout: Path, root: Path, commit: str) -> dict[str, object]:
 
 
 def host_fingerprint() -> str:
-    material = f"{platform.node()}|{platform.system()}|{platform.machine()}".encode("utf-8", errors="replace")
+    material = (
+        f"{platform.node()}|{platform.system()}|{platform.machine()}"
+    ).encode("utf-8", errors="replace")
     return hashlib.sha256(material).hexdigest()[:16]
 
 
-def register_host(checkout: Path, root: Path, *, commit: str, host: str, role: str) -> dict[str, object]:
+def register_host(
+    checkout: Path,
+    root: Path,
+    *,
+    commit: str,
+    host: str,
+    role: str,
+) -> dict[str, object]:
     load_campaign(checkout, root, commit)
+    expected = require_commit(commit)
     host_id = require_host(host)
+    path = root / "hosts" / f"{host_id}.json"
+    fingerprint = host_fingerprint()
+    if path.exists():
+        existing = _load_json(path)
+        if existing.get("candidate_sha") != expected:
+            raise CampaignError(f"host {host_id} belongs to a different candidate")
+        if existing.get("host_fingerprint") != fingerprint:
+            raise CampaignError(f"host alias {host_id} already identifies another machine")
+        return existing
     record = {
         "schema": PACKET_SCHEMA,
         "kind": "host",
-        "candidate_sha": require_commit(commit),
+        "candidate_sha": expected,
         "host_id": host_id,
-        "host_fingerprint": host_fingerprint(),
+        "host_fingerprint": fingerprint,
         "os_family": platform.system().casefold() or "unknown",
         "os_category": os_category(),
         "machine": platform.machine(),
@@ -371,21 +411,31 @@ def register_host(checkout: Path, root: Path, *, commit: str, host: str, role: s
         "role": sanitize_text(role, cwd=checkout),
         "recorded_at": utc_now(),
     }
-    _write_json(root / "hosts" / f"{host_id}.json", record)
+    _write_json(path, record)
     return record
 
 
-def load_host(root: Path, host: str) -> dict[str, object]:
+def load_host(root: Path, host: str, *, commit: str | None = None) -> dict[str, object]:
     host_id = require_host(host)
     path = root / "hosts" / f"{host_id}.json"
     if not path.exists():
         raise CampaignError(f"host {host_id} is not registered")
-    return _load_json(path)
+    record = _load_json(path)
+    if record.get("schema") != PACKET_SCHEMA or record.get("kind") != "host":
+        raise CampaignError(f"host {host_id} has invalid evidence schema")
+    if commit is not None and record.get("candidate_sha") != require_commit(commit):
+        raise CampaignError(f"host {host_id} evidence belongs to a different candidate")
+    return record
 
 
 def _packet_path(root: Path, scenario: str, kind: str) -> Path:
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-    return root / "observations" / scenario / f"{stamp}-{kind}-{uuid.uuid4().hex[:8]}.json"
+    return (
+        root
+        / "observations"
+        / scenario
+        / f"{stamp}-{kind}-{uuid.uuid4().hex[:8]}.json"
+    )
 
 
 def write_packet(root: Path, packet: dict[str, object]) -> Path:
@@ -396,18 +446,47 @@ def write_packet(root: Path, packet: dict[str, object]) -> Path:
     return path
 
 
-def base_packet(root: Path, *, commit: str, host: str, scenario: str, kind: str) -> dict[str, object]:
-    host_record = load_host(root, host)
+def base_packet(
+    root: Path,
+    *,
+    commit: str,
+    host: str,
+    scenario: str,
+    kind: str,
+) -> dict[str, object]:
+    expected = require_commit(commit)
+    host_record = load_host(root, host, commit=expected)
     return {
         "schema": PACKET_SCHEMA,
         "kind": kind,
-        "candidate_sha": require_commit(commit),
+        "candidate_sha": expected,
         "scenario": require_scenario(scenario),
         "host_id": host_record["host_id"],
         "host_fingerprint": host_record["host_fingerprint"],
         "os_category": host_record["os_category"],
         "recorded_at": utc_now(),
     }
+
+
+def _assertion_contract(
+    root: Path,
+    *,
+    commit: str,
+    host: str,
+    scenario: str,
+    assertion: str,
+) -> tuple[str, ScenarioSpec, dict[str, object]]:
+    scenario_id = require_scenario(scenario)
+    spec = SCENARIOS[scenario_id]
+    if assertion not in spec.assertions:
+        raise CampaignError(f"unknown assertion for {scenario_id}: {assertion}")
+    host_record = load_host(root, host, commit=commit)
+    required_os = spec.assertion_os.get(assertion)
+    if required_os is not None and host_record.get("os_category") != required_os:
+        raise CampaignError(
+            f"{scenario_id}/{assertion} must be observed on {required_os}"
+        )
+    return scenario_id, spec, host_record
 
 
 def observe(
@@ -422,18 +501,28 @@ def observe(
     note: str,
 ) -> Path:
     load_campaign(checkout, root, commit)
-    scenario_id = require_scenario(scenario)
-    spec = SCENARIOS[scenario_id]
-    if assertion not in spec.assertions:
-        raise CampaignError(f"unknown assertion for {scenario_id}: {assertion}")
+    scenario_id, spec, _host_record = _assertion_contract(
+        root,
+        commit=commit,
+        host=host,
+        scenario=scenario,
+        assertion=assertion,
+    )
     if status not in {"pass", "fail", "not-applicable"}:
-        raise CampaignError("observation status must be pass, fail, or not-applicable")
+        raise CampaignError(
+            "observation status must be pass, fail, or not-applicable"
+        )
     if status == "not-applicable" and assertion not in spec.allow_na:
-        raise CampaignError(f"{scenario_id}/{assertion} cannot be marked not-applicable")
-    packet = base_packet(root, commit=commit, host=host, scenario=scenario_id, kind="assertion")
-    required_os = spec.assertion_os.get(assertion)
-    if required_os is not None and packet["os_category"] != required_os:
-        raise CampaignError(f"{scenario_id}/{assertion} must be observed on {required_os}")
+        raise CampaignError(
+            f"{scenario_id}/{assertion} cannot be marked not-applicable"
+        )
+    packet = base_packet(
+        root,
+        commit=commit,
+        host=host,
+        scenario=scenario_id,
+        kind="assertion",
+    )
     packet.update(
         {
             "assertion": assertion,
@@ -445,7 +534,12 @@ def observe(
     return write_packet(root, packet)
 
 
-def _run(command: list[str], *, checkout: Path, timeout: float) -> tuple[int, float, str]:
+def _run(
+    command: list[str],
+    *,
+    checkout: Path,
+    timeout: float,
+) -> tuple[int, float, str]:
     if not command:
         raise CampaignError("run requires a command after --")
     started = time.monotonic()
@@ -460,8 +554,14 @@ def _run(command: list[str], *, checkout: Path, timeout: float) -> tuple[int, fl
             errors="replace",
             timeout=timeout,
         )
-        output = "\n".join(part for part in (completed.stdout, completed.stderr) if part)
-        return completed.returncode, round(time.monotonic() - started, 3), output
+        output = "\n".join(
+            part for part in (completed.stdout, completed.stderr) if part
+        )
+        return (
+            completed.returncode,
+            round(time.monotonic() - started, 3),
+            output,
+        )
     except subprocess.TimeoutExpired as exc:
         parts: list[str] = []
         for item in (exc.stdout, exc.stderr):
@@ -489,11 +589,30 @@ def run_command(
     scenario_id = require_scenario(scenario)
     if command and command[0] == "--":
         command = command[1:]
-    if assertion is not None and assertion not in SCENARIOS[scenario_id].assertions:
-        raise CampaignError(f"unknown assertion for {scenario_id}: {assertion}")
-    returncode, duration, output = _run(command, checkout=checkout, timeout=timeout)
+    spec = SCENARIOS[scenario_id]
+    if assertion is not None:
+        _assertion_contract(
+            root,
+            commit=commit,
+            host=host,
+            scenario=scenario_id,
+            assertion=assertion,
+        )
+    else:
+        load_host(root, host, commit=commit)
+    returncode, duration, output = _run(
+        command,
+        checkout=checkout,
+        timeout=timeout,
+    )
     passed = returncode == expected_exit
-    packet = base_packet(root, commit=commit, host=host, scenario=scenario_id, kind="command")
+    packet = base_packet(
+        root,
+        commit=commit,
+        host=host,
+        scenario=scenario_id,
+        kind="command",
+    )
     packet.update(
         {
             "label": sanitize_text(label, cwd=checkout),
@@ -506,13 +625,10 @@ def run_command(
         }
     )
     if assertion is not None:
-        required_os = SCENARIOS[scenario_id].assertion_os.get(assertion)
-        if required_os is not None and packet["os_category"] != required_os:
-            raise CampaignError(f"{scenario_id}/{assertion} must be observed on {required_os}")
         packet.update(
             {
                 "assertion": assertion,
-                "assertion_text": SCENARIOS[scenario_id].assertions[assertion],
+                "assertion_text": spec.assertions[assertion],
                 "status": "pass" if passed else "fail",
             }
         )
@@ -533,17 +649,37 @@ def _disk_snapshot(path: Path) -> dict[str, object]:
     return result
 
 
-def sample_resources(checkout: Path, root: Path, *, commit: str, host: str, scenario: str, label: str) -> Path:
+def sample_resources(
+    checkout: Path,
+    root: Path,
+    *,
+    commit: str,
+    host: str,
+    scenario: str,
+    label: str,
+) -> Path:
     load_campaign(checkout, root, commit)
-    packet = base_packet(root, commit=commit, host=host, scenario=scenario, kind="sample")
+    packet = base_packet(
+        root,
+        commit=commit,
+        host=host,
+        scenario=scenario,
+        kind="sample",
+    )
     resources: dict[str, object] = {"checkout": _disk_snapshot(checkout)}
     for name in ("data", "results"):
         path = checkout / name
         if path.exists():
             resources[name] = _disk_snapshot(path)
-    docker: dict[str, object] = {"available": shutil.which("docker") is not None}
+    docker: dict[str, object] = {
+        "available": shutil.which("docker") is not None
+    }
     if docker["available"]:
-        code, duration, output = _run(["docker", "system", "df"], checkout=checkout, timeout=30)
+        code, duration, output = _run(
+            ["docker", "system", "df"],
+            checkout=checkout,
+            timeout=30,
+        )
         docker.update(
             {
                 "returncode": code,
@@ -551,7 +687,11 @@ def sample_resources(checkout: Path, root: Path, *, commit: str, host: str, scen
                 "summary": sanitize_text(output, cwd=checkout),
             }
         )
-        code, duration, output = _run(["docker", "compose", "ps"], checkout=checkout, timeout=30)
+        code, duration, output = _run(
+            ["docker", "compose", "ps"],
+            checkout=checkout,
+            timeout=30,
+        )
         docker.update(
             {
                 "compose_returncode": code,
@@ -559,58 +699,137 @@ def sample_resources(checkout: Path, root: Path, *, commit: str, host: str, scen
                 "compose_summary": sanitize_text(output, cwd=checkout),
             }
         )
-    packet.update({"label": sanitize_text(label, cwd=checkout), "resources": resources, "docker": docker})
+    packet.update(
+        {
+            "label": sanitize_text(label, cwd=checkout),
+            "resources": resources,
+            "docker": docker,
+        }
+    )
     return write_packet(root, packet)
 
 
-def begin_session(checkout: Path, root: Path, *, commit: str, host: str, scenario: str) -> tuple[str, Path]:
+def begin_session(
+    checkout: Path,
+    root: Path,
+    *,
+    commit: str,
+    host: str,
+    scenario: str,
+) -> tuple[str, Path]:
     load_campaign(checkout, root, commit)
     scenario_id = require_scenario(scenario)
     run_id = uuid.uuid4().hex
-    packet = base_packet(root, commit=commit, host=host, scenario=scenario_id, kind="begin")
+    packet = base_packet(
+        root,
+        commit=commit,
+        host=host,
+        scenario=scenario_id,
+        kind="begin",
+    )
     packet["run_id"] = run_id
     return run_id, write_packet(root, packet)
 
 
-def finish_session(checkout: Path, root: Path, *, commit: str, host: str, scenario: str, run_id: str) -> Path:
+def finish_session(
+    checkout: Path,
+    root: Path,
+    *,
+    commit: str,
+    host: str,
+    scenario: str,
+    run_id: str,
+) -> Path:
     load_campaign(checkout, root, commit)
     scenario_id = require_scenario(scenario)
+    current_host = load_host(root, host, commit=commit)
     begins = [
         item
-        for item in read_packets(root, scenario_id)
+        for item in read_packets(
+            root,
+            scenario_id,
+            expected_commit=commit,
+        )
         if item.get("kind") == "begin" and item.get("run_id") == run_id
     ]
     if len(begins) != 1:
         raise CampaignError("finish requires exactly one matching begin packet")
-    packet = base_packet(root, commit=commit, host=host, scenario=scenario_id, kind="finish")
+    if begins[0].get("host_fingerprint") != current_host.get("host_fingerprint"):
+        raise CampaignError("timed session must finish on the host that began it")
+    packet = base_packet(
+        root,
+        commit=commit,
+        host=host,
+        scenario=scenario_id,
+        kind="finish",
+    )
     packet["run_id"] = run_id
     packet["started_at"] = begins[0]["recorded_at"]
-    packet["elapsed_seconds"] = round((parse_time(str(packet["recorded_at"])) - parse_time(str(begins[0]["recorded_at"]))).total_seconds(), 3)
+    packet["elapsed_seconds"] = round(
+        (
+            parse_time(str(packet["recorded_at"]))
+            - parse_time(str(begins[0]["recorded_at"]))
+        ).total_seconds(),
+        3,
+    )
     return write_packet(root, packet)
 
 
-def read_packets(root: Path, scenario: str | None = None) -> list[dict[str, object]]:
+def read_packets(
+    root: Path,
+    scenario: str | None = None,
+    *,
+    expected_commit: str | None = None,
+) -> list[dict[str, object]]:
     base = root / "observations"
-    paths = sorted((base / scenario).glob("*.json")) if scenario else sorted(base.glob("*/*.json"))
+    paths = (
+        sorted((base / scenario).glob("*.json"))
+        if scenario
+        else sorted(base.glob("*/*.json"))
+    )
     packets: list[dict[str, object]] = []
+    expected = require_commit(expected_commit) if expected_commit else None
     for path in paths:
         packet = _load_json(path)
         if packet.get("schema") != PACKET_SCHEMA:
             raise CampaignError(f"unexpected observation schema: {path.name}")
+        if expected is not None and packet.get("candidate_sha") != expected:
+            raise CampaignError(
+                f"observation {path.name} belongs to a different candidate"
+            )
+        packet_scenario = packet.get("scenario")
+        if not isinstance(packet_scenario, str) or require_scenario(packet_scenario) != packet_scenario:
+            raise CampaignError(f"observation {path.name} has invalid scenario")
         packets.append(packet)
     return packets
 
 
-def scenario_status(root: Path, scenario: str) -> dict[str, object]:
+def scenario_status(
+    root: Path,
+    scenario: str,
+    *,
+    expected_commit: str | None = None,
+) -> dict[str, object]:
     scenario_id = require_scenario(scenario)
     spec = SCENARIOS[scenario_id]
-    packets = read_packets(root, scenario_id)
+    packets = read_packets(
+        root,
+        scenario_id,
+        expected_commit=expected_commit,
+    )
     latest: dict[str, dict[str, object]] = {}
     for packet in packets:
         assertion = packet.get("assertion")
         if isinstance(assertion, str) and assertion in spec.assertions:
+            required_os = spec.assertion_os.get(assertion)
+            if required_os is not None and packet.get("os_category") != required_os:
+                raise CampaignError(
+                    f"stored {scenario_id}/{assertion} evidence has wrong OS provenance"
+                )
             current = latest.get(assertion)
-            if current is None or str(packet.get("recorded_at", "")) > str(current.get("recorded_at", "")):
+            if current is None or str(packet.get("recorded_at", "")) > str(
+                current.get("recorded_at", "")
+            ):
                 latest[assertion] = packet
     missing: list[str] = []
     failing: list[str] = []
@@ -626,7 +845,10 @@ def scenario_status(root: Path, scenario: str) -> dict[str, object]:
             continue
         failing.append(assertion)
     finishes = [item for item in packets if item.get("kind") == "finish"]
-    elapsed = max((float(item.get("elapsed_seconds", 0.0)) for item in finishes), default=0.0)
+    elapsed = max(
+        (float(item.get("elapsed_seconds", 0.0)) for item in finishes),
+        default=0.0,
+    )
     samples = sum(1 for item in packets if item.get("kind") == "sample")
     duration_ok = elapsed >= spec.minimum_elapsed_seconds
     samples_ok = samples >= spec.minimum_samples
@@ -660,8 +882,18 @@ def _privacy_digest(root: Path) -> tuple[str, int]:
     return digest.hexdigest(), count
 
 
-def privacy_check(checkout: Path, root: Path, *, commit: str) -> dict[str, object]:
+def privacy_check(
+    checkout: Path,
+    root: Path,
+    *,
+    commit: str,
+) -> dict[str, object]:
     load_campaign(checkout, root, commit)
+    read_packets(root, expected_commit=commit)
+    for path in sorted((root / "hosts").glob("*.json")):
+        host = _load_json(path)
+        if host.get("candidate_sha") != require_commit(commit):
+            raise CampaignError(f"host {path.name} belongs to a different candidate")
     unsafe: list[str] = []
     for path in sorted(root.rglob("*")):
         if not path.is_file() or path.name == "privacy.json":
@@ -673,7 +905,10 @@ def privacy_check(checkout: Path, root: Path, *, commit: str) -> dict[str, objec
         if sanitize_text(text, cwd=checkout) != text:
             unsafe.append(path.relative_to(root).as_posix())
     if unsafe:
-        raise CampaignError("privacy scan found unredacted or unsupported evidence: " + ", ".join(unsafe[:10]))
+        raise CampaignError(
+            "privacy scan found unredacted or unsupported evidence: "
+            + ", ".join(unsafe[:10])
+        )
     digest, count = _privacy_digest(root)
     result = {
         "schema": PRIVACY_SCHEMA,
@@ -687,12 +922,31 @@ def privacy_check(checkout: Path, root: Path, *, commit: str) -> dict[str, objec
     return result
 
 
-def validate_campaign(checkout: Path, root: Path, *, commit: str) -> dict[str, object]:
+def validate_campaign(
+    checkout: Path,
+    root: Path,
+    *,
+    commit: str,
+) -> dict[str, object]:
     campaign = load_campaign(checkout, root, commit)
-    hosts = [_load_json(path) for path in sorted((root / "hosts").glob("*.json"))]
+    expected = require_commit(commit)
+    hosts = [
+        _load_json(path)
+        for path in sorted((root / "hosts").glob("*.json"))
+    ]
+    for host in hosts:
+        if (
+            host.get("schema") != PACKET_SCHEMA
+            or host.get("kind") != "host"
+            or host.get("candidate_sha") != expected
+        ):
+            raise CampaignError("host evidence schema/candidate mismatch")
     categories = {str(item.get("os_category")) for item in hosts}
     host_coverage_ok = {"windows", "posix"}.issubset(categories)
-    statuses = [scenario_status(root, scenario) for scenario in SCENARIOS]
+    statuses = [
+        scenario_status(root, scenario, expected_commit=expected)
+        for scenario in SCENARIOS
+    ]
     privacy_path = root / "privacy.json"
     privacy_ok = False
     if privacy_path.exists():
@@ -700,12 +954,16 @@ def validate_campaign(checkout: Path, root: Path, *, commit: str) -> dict[str, o
         digest, count = _privacy_digest(root)
         privacy_ok = (
             privacy.get("schema") == PRIVACY_SCHEMA
-            and privacy.get("candidate_sha") == require_commit(commit)
+            and privacy.get("candidate_sha") == expected
             and privacy.get("passed") is True
             and privacy.get("evidence_sha256") == digest
             and privacy.get("file_count") == count
         )
-    accepted = host_coverage_ok and privacy_ok and all(bool(item["passed"]) for item in statuses)
+    accepted = (
+        host_coverage_ok
+        and privacy_ok
+        and all(bool(item["passed"]) for item in statuses)
+    )
     return {
         "schema": SCHEMA,
         "candidate_sha": campaign["candidate_sha"],
@@ -737,9 +995,17 @@ def _print(value: object) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run commit-bound Federation v1 P01-P12 physical evidence campaign.")
+    parser = argparse.ArgumentParser(
+        description=(
+            "Run commit-bound Federation v1 P01-P12 physical evidence campaign."
+        )
+    )
     parser.add_argument("--checkout", type=Path, default=Path.cwd())
-    parser.add_argument("--evidence-root", type=Path, default=Path("evidence/v1-physical"))
+    parser.add_argument(
+        "--evidence-root",
+        type=Path,
+        default=Path("evidence/v1-physical"),
+    )
     sub = parser.add_subparsers(dest="command_name", required=True)
 
     init = sub.add_parser("init")
@@ -780,7 +1046,11 @@ def main(argv: list[str] | None = None) -> int:
     observation.add_argument("--host", required=True)
     observation.add_argument("--scenario", required=True)
     observation.add_argument("--assertion", required=True)
-    observation.add_argument("--status", choices=("pass", "fail", "not-applicable"), required=True)
+    observation.add_argument(
+        "--status",
+        choices=("pass", "fail", "not-applicable"),
+        required=True,
+    )
     observation.add_argument("--note", default="")
 
     finish = sub.add_parser("finish")
@@ -807,17 +1077,44 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         if args.command_name == "init":
-            result: object = initialize(checkout, root, commit=args.commit, operator=args.operator)
+            result: object = initialize(
+                checkout,
+                root,
+                commit=args.commit,
+                operator=args.operator,
+            )
         elif args.command_name == "host":
-            result = register_host(checkout, root, commit=args.commit, host=args.host, role=args.role)
+            result = register_host(
+                checkout,
+                root,
+                commit=args.commit,
+                host=args.host,
+                role=args.role,
+            )
         elif args.command_name == "plan":
             result = plan(args.scenario)
         elif args.command_name == "begin":
-            run_id, path = begin_session(checkout, root, commit=args.commit, host=args.host, scenario=args.scenario)
-            result = {"run_id": run_id, "evidence": path.relative_to(checkout).as_posix()}
+            run_id, path = begin_session(
+                checkout,
+                root,
+                commit=args.commit,
+                host=args.host,
+                scenario=args.scenario,
+            )
+            result = {
+                "run_id": run_id,
+                "evidence": _display_path(path, checkout, root),
+            }
         elif args.command_name == "sample":
-            path = sample_resources(checkout, root, commit=args.commit, host=args.host, scenario=args.scenario, label=args.label)
-            result = {"evidence": path.relative_to(checkout).as_posix()}
+            path = sample_resources(
+                checkout,
+                root,
+                commit=args.commit,
+                host=args.host,
+                scenario=args.scenario,
+                label=args.label,
+            )
+            result = {"evidence": _display_path(path, checkout, root)}
         elif args.command_name == "run":
             path = run_command(
                 checkout,
@@ -832,7 +1129,10 @@ def main(argv: list[str] | None = None) -> int:
                 timeout=args.timeout,
             )
             packet = _load_json(path)
-            result = {"evidence": path.relative_to(checkout).as_posix(), "passed": packet["passed"]}
+            result = {
+                "evidence": _display_path(path, checkout, root),
+                "passed": packet["passed"],
+            }
         elif args.command_name == "observe":
             path = observe(
                 checkout,
@@ -844,23 +1144,67 @@ def main(argv: list[str] | None = None) -> int:
                 status=args.status,
                 note=args.note,
             )
-            result = {"evidence": path.relative_to(checkout).as_posix(), "status": args.status}
+            result = {
+                "evidence": _display_path(path, checkout, root),
+                "status": args.status,
+            }
         elif args.command_name == "finish":
-            path = finish_session(checkout, root, commit=args.commit, host=args.host, scenario=args.scenario, run_id=args.run_id)
-            result = {"evidence": path.relative_to(checkout).as_posix(), "scenario_status": scenario_status(root, args.scenario)}
+            path = finish_session(
+                checkout,
+                root,
+                commit=args.commit,
+                host=args.host,
+                scenario=args.scenario,
+                run_id=args.run_id,
+            )
+            result = {
+                "evidence": _display_path(path, checkout, root),
+                "scenario_status": scenario_status(
+                    root,
+                    args.scenario,
+                    expected_commit=args.commit,
+                ),
+            }
         elif args.command_name == "status":
             load_campaign(checkout, root, args.commit)
-            result = scenario_status(root, args.scenario) if args.scenario else [scenario_status(root, key) for key in SCENARIOS]
+            if args.scenario:
+                result = scenario_status(
+                    root,
+                    args.scenario,
+                    expected_commit=args.commit,
+                )
+            else:
+                result = [
+                    scenario_status(
+                        root,
+                        key,
+                        expected_commit=args.commit,
+                    )
+                    for key in SCENARIOS
+                ]
         elif args.command_name == "privacy":
-            result = privacy_check(checkout, root, commit=args.commit)
+            result = privacy_check(
+                checkout,
+                root,
+                commit=args.commit,
+            )
         else:
-            result = validate_campaign(checkout, root, commit=args.commit)
+            result = validate_campaign(
+                checkout,
+                root,
+                commit=args.commit,
+            )
         _print(result)
         if args.command_name == "validate" and not bool(result["accepted"]):
             return 2
         return 0
     except (CampaignError, OSError, subprocess.SubprocessError) as exc:
-        _print({"error": sanitize_text(str(exc), cwd=checkout), "accepted": False})
+        _print(
+            {
+                "error": sanitize_text(str(exc), cwd=checkout),
+                "accepted": False,
+            }
+        )
         return 2
 
 
