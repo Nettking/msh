@@ -17,11 +17,12 @@ by anything watching Docker:
   service answers now, never whether it has been dying repeatedly; and
 * it works identically on Windows and POSIX, because it is one small file.
 
-Each supervised service writes one bounded record when it starts and, when it
-is stopped in a way it can observe, when it stops. A start whose predecessor
-never recorded a stop is an unclean start. A short run of those is a crash
-loop; an operator stop, an update or a trial exit is not, which is what keeps
-the ordinary product lifecycle from reading as a failure.
+Each supervised service writes one bounded record when it starts. A clean,
+intentional stop writes ``stopped_at``; an observed restart-worthy failure keeps
+its bounded reason but deliberately leaves that clean-stop marker unset. The
+next start can therefore distinguish ordinary operator/update/trial completion
+from either an abrupt death or a failure path that exited nonzero. A short run
+of those restart-worthy starts is a crash loop.
 
 Every write here is best effort. A service must never fail to start because it
 could not journal its own restart history, and a health read must never fail
@@ -33,6 +34,7 @@ from __future__ import annotations
 import json
 import os
 import stat
+import sys
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -54,7 +56,10 @@ _MAX_TEXT = 128
 
 #: Stop reasons that are part of the ordinary product lifecycle. None of these
 #: counts toward a crash loop, which is what preserves operator stop, update and
-#: trial semantics.
+#: trial semantics. ``completed`` is intentional only when it is recorded
+#: outside exception unwinding; Flask and the managed recorder both journal from
+#: ``finally`` blocks, where an active exception means the process is exiting
+#: through a failure path rather than completing normally.
 STOP_OPERATOR = "operator-stop"
 STOP_UPDATE = "update"
 STOP_TRIAL = "trial"
@@ -240,12 +245,18 @@ def record_service_stop(
     reason: str,
     now: datetime | None = None,
 ) -> None:
-    """Mark the live incarnation as stopped for a reason the service observed.
+    """Record an observed exit without disguising restart-worthy failures.
 
-    Recording *any* reason makes the next start clean. That is deliberate: a
-    process that reached its own shutdown path did not die, whatever prompted
-    it. Which reasons are part of the ordinary lifecycle is a separate question
-    the classifier answers.
+    ``stopped_at`` is the clean-stop acknowledgement read by the next
+    incarnation. Operator, update, trial, and true normal completion write it.
+    Any other reason is restart-worthy and keeps only its diagnostic reason.
+
+    Flask and the managed recorder both call this function from ``finally``
+    with ``STOP_COMPLETED``. During exception unwinding, ``sys.exc_info()`` is
+    still populated across this function call, so that nominal completion is
+    treated as restart-worthy rather than converting an exception into a clean
+    stop. An intentional reason remains clean even when recorded from an
+    exception handler (for example Ctrl+C / SIGTERM handling).
     """
 
     moment = _utc(now)
@@ -257,8 +268,14 @@ def record_service_stop(
         live = entries[-1]
         if _text(live.get("stopped_at")):
             return
-        live["stopped_at"] = _stamp(moment)
-        live["reason"] = _text(reason) or STOP_COMPLETED
+        normalized_reason = _text(reason) or STOP_COMPLETED
+        active_exception = sys.exc_info()[0] is not None
+        intentional = normalized_reason in INTENTIONAL_STOP_REASONS
+        if normalized_reason == STOP_COMPLETED and active_exception:
+            intentional = False
+        if intentional:
+            live["stopped_at"] = _stamp(moment)
+        live["reason"] = normalized_reason
         _publish(target, service, entries)
     except OSError:
         return
@@ -291,7 +308,9 @@ def read_restart_state(
             last_stop_reason = reason
             break
 
-    # Count the trailing run of starts whose predecessor never recorded a stop.
+    # Count the trailing run of starts whose predecessor had no clean-stop
+    # acknowledgement. That includes abrupt process death and an observed
+    # restart-worthy failure exit.
     unclean: list[dict[str, object]] = []
     for entry in reversed(entries):
         if _text(entry.get("preceded_by")) != _PRECEDED_UNCLEAN:
