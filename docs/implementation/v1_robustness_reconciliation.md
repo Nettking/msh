@@ -426,18 +426,22 @@ all of them exactly like a healthy one.
 
 Each supervised service now journals its own bounded incarnation record: one
 entry when it starts, one stop when it stops in a way it can observe. A start
-whose predecessor recorded no stop is unclean; a run of those inside a bounded
-window is a crash loop. The observation is made by the service about itself,
-so it needs no Docker socket, adds no second supervisor, does not depend on a
-Docker `healthcheck`, and is one small file on Windows and POSIX alike.
+whose predecessor did not record an intentional stop is unclean; a run of
+those inside a bounded window is a crash loop. This includes an exception or
+known nonzero relay exit that reaches its own error handler: recording that
+failure preserves the reason but does not turn it into a clean completion. The
+observation is made by the service about itself, so it needs no Docker socket,
+adds no second supervisor, does not depend on a Docker `healthcheck`, and is
+one small file on Windows and POSIX alike.
 
 Only a sustained loop changes a verdict: a single unclean start is reported as
 data, and the same count spread over a year is not a device in trouble now. A
 crash loop leaves liveness alone and overrules readiness, preserving the
-original probe code in the message. Recovery is not sticky -- one recorded stop
-ends it -- and the record is capped, because B07's rule applies to B06's own
-evidence. `ollama` and `model-provider` are deliberately absent from core
-health so an optional model can never read as a broken product.
+original probe code in the message. Recovery is not sticky: an intentional
+stop followed by a new start clears the unclean run, while another
+restart-worthy failure continues it. The record is capped, because B07's rule
+applies to B06's own evidence. `ollama` and `model-provider` are deliberately
+absent from core health so an optional model can never read as a broken product.
 
 Two further defects were found in the audit. Flask had no `SIGTERM` handler at
 all, and `SIGTERM` is what `docker compose stop` sends, so an ordinary operator

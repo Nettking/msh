@@ -19,9 +19,11 @@ by anything watching Docker:
 
 Each supervised service writes one bounded record when it starts and, when it
 is stopped in a way it can observe, when it stops. A start whose predecessor
-never recorded a stop is an unclean start. A short run of those is a crash
-loop; an operator stop, an update or a trial exit is not, which is what keeps
-the ordinary product lifecycle from reading as a failure.
+never recorded an intentional stop is an unclean start. A short run of those
+is a crash loop; an operator stop, an update or a trial exit is not, which is
+what keeps the ordinary product lifecycle from reading as a failure. An
+observed exception/nonzero exit remains unclean evidence even though its stop
+record was written before returning to Docker.
 
 Every write here is best effort. A service must never fail to start because it
 could not journal its own restart history, and a health read must never fail
@@ -59,6 +61,11 @@ STOP_OPERATOR = "operator-stop"
 STOP_UPDATE = "update"
 STOP_TRIAL = "trial"
 STOP_COMPLETED = "completed"
+# A service may have observed a failure and still reach its own shutdown
+# handler. This is deliberately outside ``INTENTIONAL_STOP_REASONS``: the
+# supervisor remains Docker, while the next incarnation can now count this
+# observed nonzero/exception exit as restart-worthy evidence.
+STOP_FAILURE = "restart-worthy-failure"
 INTENTIONAL_STOP_REASONS = frozenset(
     {STOP_OPERATOR, STOP_UPDATE, STOP_TRIAL, STOP_COMPLETED}
 )
@@ -210,7 +217,10 @@ def record_service_start(
         previous = entries[-1] if entries else None
         if previous is None:
             preceded = _PRECEDED_NONE
-        elif _text(previous.get("stopped_at")):
+        elif (
+            _text(previous.get("stopped_at"))
+            and _text(previous.get("reason")) in INTENTIONAL_STOP_REASONS
+        ):
             preceded = _PRECEDED_CLEAN
         else:
             preceded = _PRECEDED_UNCLEAN
@@ -242,10 +252,10 @@ def record_service_stop(
 ) -> None:
     """Mark the live incarnation as stopped for a reason the service observed.
 
-    Recording *any* reason makes the next start clean. That is deliberate: a
-    process that reached its own shutdown path did not die, whatever prompted
-    it. Which reasons are part of the ordinary lifecycle is a separate question
-    the classifier answers.
+    Only an intentional lifecycle reason makes the next start clean. A service
+    can reach its own error handler and return nonzero, so a recorded failure
+    stop must remain restart-worthy evidence even though the process observed
+    and journaled its exit.
     """
 
     moment = _utc(now)
@@ -344,6 +354,7 @@ __all__ = [
     "STATE_STABLE",
     "STATE_UNKNOWN",
     "STOP_COMPLETED",
+    "STOP_FAILURE",
     "STOP_OPERATOR",
     "STOP_TRIAL",
     "STOP_UPDATE",

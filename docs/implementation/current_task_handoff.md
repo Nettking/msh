@@ -294,12 +294,14 @@ the product and must not be made available: `docker.sock` is deliberately not
 mounted in `docker-compose.yml`, and mounting it would hand the web application
 root-equivalent control of the host to gain a status field. Each supervised
 service therefore journals its own incarnations instead. A start records
-whether the previous incarnation ended cleanly, a bounded window of recent
-incarnations is retained, and a trailing run of unclean starts inside a time
-window is a crash loop that the existing core-service health snapshot reports
+whether the previous incarnation ended intentionally, a bounded window of
+recent incarnations is retained, and a trailing run of unclean starts inside a
+time window is a crash loop that the existing core-service health snapshot reports
 as `not_ready`/`degraded` with a `<service>-crash-loop` code, carrying the
 prior probe's own code so the underlying fault is not hidden by the loop
-verdict. Writing it exposed a real supervision defect: the Flask service
+verdict. Exception/nonzero failure exits remain unclean evidence even when
+their own error path records a stop; only normal, operator, update, and trial
+stops are clean. Writing it exposed a real supervision defect: the Flask service
 installed no `SIGTERM` handler, so an ordinary `docker compose stop` exited
 through the default disposition and every operator stop would have been
 journaled -- and read -- as a crash. Journaling is disabled under `debug`,

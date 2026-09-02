@@ -135,9 +135,9 @@ def test_relay_entrypoints_return_nonzero_after_required_loop_failure(
     assert "relay command failed (relay-background-task-failed)" in capsys.readouterr().err
 
     if entrypoint is provider_service:
-        # A reported failure is still an observed stop: the process reached its
-        # own error path rather than being killed, so the next start must not
-        # count as unclean. The record also has to land beside the store the
+        # A reported failure is still restart-worthy evidence: the process
+        # reached its own error path and returned nonzero to Docker. The record
+        # preserves the detailed reason and lands beside the store the
         # entrypoint was given, which is where the health reader looks for it.
         state = read_restart_state(
             incarnation_state_file(tmp_path, "relay"), service="relay"
