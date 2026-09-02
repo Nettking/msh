@@ -261,6 +261,22 @@ expected pathname. B08's automated implementation properties are complete;
 P05/P09 exact-host hard-kill/power-loss evidence remains open and no physical
 acceptance state changed.
 
+The exact remaining B08 physical checklist is: (1) hard-kill the analysis
+scheduler at archive temp creation, durable archive replacement and registration,
+then restart on the same host and prove the deterministic slice is either fully
+verified/rebuilt or absent, never partially accepted; (2) interrupt upload after
+staging ownership, after staging bytes, during database publication and during
+filesystem publication, then prove startup hides non-ready batches and repairs
+each supported crash window without partial batch exposure; (3) interrupt
+federated analysis workspace materialization before and after its ownership
+marker, then prove age/scan-bounded restart reconciliation handles only the
+owned attempt; (4) repeat the same boundaries with actual power-loss or hard
+kill against the relevant SQLite/WAL files and verify integrity, ownership and
+path-confined cleanup after reboot; and (5) record the exact candidate, host,
+timestamps, injected boundary, restart result, retained files/rows and
+operator-visible health for each run under P05/P09. These are evidence runs,
+not additional B08 software properties.
+
 Authoritative-replay completeness is now shared by one primitive that folds a
 caller's own bounded pages and returns only once the coordinator's reported
 current revision has been reached; every other exit raises
