@@ -272,6 +272,19 @@ class FederationProjectionCore:
         return FederationProjectionCore._next_action(snapshot)
 
     @staticmethod
+    def _control_plane_unavailable(snapshot: ProjectionSnapshot) -> bool:
+        """Keep an established member distinct from a missing Federation."""
+
+        onboarding = snapshot.onboarding
+        return (
+            onboarding.available
+            and onboarding.federation_id is not None
+            and onboarding.trusted
+            and onboarding.connection_state in {"connected", "reconnecting"}
+            and not snapshot.federation.available
+        )
+
+    @staticmethod
     def _notice(snapshot: ProjectionSnapshot) -> ProjectionNotice | None:
         onboarding = snapshot.onboarding
         if not onboarding.available or onboarding.federation_id is None:
@@ -280,6 +293,18 @@ class FederationProjectionCore:
                 "Federation setup is not complete",
                 "Complete onboarding to create or join a federation and load safe status projections.",
                 FederationProjectionCore._setup_action(),
+            )
+        if FederationProjectionCore._control_plane_unavailable(snapshot):
+            return ProjectionNotice(
+                NoticeKind.DEGRADED,
+                "Federation control plane unavailable",
+                "Your saved trusted membership is retained. The coordinator or authoritative history is unavailable, so the Federation is reconnecting; no new setup or member failure was inferred.",
+                RecommendedAction(
+                    "Reconnect the Federation control plane",
+                    "Retry the saved trusted membership after coordinator connectivity or authoritative history recovers.",
+                    "Open guided repair",
+                    "/onboarding?repair=1",
+                ),
             )
         if onboarding.connection_state != "connected" or not onboarding.trusted:
             return ProjectionNotice(
@@ -320,6 +345,8 @@ class FederationProjectionCore:
             or snapshot.onboarding.federation_id is None
         ):
             return ProjectionState.EMPTY, "Setup needed"
+        if FederationProjectionCore._control_plane_unavailable(snapshot):
+            return ProjectionState.DEGRADED, "Control plane unavailable / reconnecting"
         if (
             snapshot.onboarding.connection_state != "connected"
             or not snapshot.onboarding.trusted

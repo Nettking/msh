@@ -297,6 +297,28 @@ class OverviewProjectionMixin:
             technical_details=technical,
             content={
                 "device": device,
+                "control_plane": {
+                    "state": (
+                        "unavailable"
+                        if self._control_plane_unavailable(snapshot)
+                        else "available"
+                    ),
+                    "state_label": (
+                        "Unavailable / reconnecting"
+                        if self._control_plane_unavailable(snapshot)
+                        else "Available"
+                    ),
+                    "membership_retained": bool(
+                        snapshot.onboarding.available
+                        and snapshot.onboarding.federation_id is not None
+                        and snapshot.onboarding.trusted
+                    ),
+                    "reason_code": (
+                        snapshot.federation.reason_code
+                        if self._control_plane_unavailable(snapshot)
+                        else "current"
+                    ),
+                },
                 "benchmarks": benchmarks,
                 "contributions": contributions,
                 "services_url": "/federation/services",
