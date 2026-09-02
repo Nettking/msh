@@ -196,6 +196,67 @@ def test_capability_report_failure_is_retried_without_reexecuting(
     assert append_calls == 2
 
 
+def test_capability_checkpoint_failure_after_report_is_idempotent(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    request_id = "capability-checkpoint-write"
+    replay = _capability_events(capability.REQUEST_EVENT, request_id)
+    context = _context(replay)
+    service = _service()
+    executions: list[str] = []
+    monkeypatch.setattr(
+        capability.FederationCapabilityRequestProcessor,
+        "_execution_report",
+        staticmethod(
+            lambda request, _node: executions.append(request)
+            or _capability_report(request)
+        ),
+    )
+    reports: list[str] = []
+    processor = capability.FederationCapabilityRequestProcessor(
+        service,
+        tmp_path / "capability.json",
+    )
+    original_save = processor._save
+    published = False
+    failed = False
+
+    def save_once_after_publication(state: dict[str, object]) -> None:
+        nonlocal failed
+        pending = state.get("pending_reports")
+        if published and not failed and pending == {}:
+            failed = True
+            raise RuntimeError("checkpoint write interrupted")
+        original_save(state)
+
+    def append_report(*args, **kwargs) -> None:
+        nonlocal published
+        del args
+        published = True
+        reports.append(kwargs["request_id"])
+
+    monkeypatch.setattr(processor, "_save", save_once_after_publication)
+    monkeypatch.setattr(capability, "_append_remote_event", append_report)
+    with pytest.raises(RuntimeError, match="checkpoint write interrupted"):
+        processor.process(context)
+
+    assert executions == [request_id]
+    assert len(reports) == 1
+    # The report was published, but the durable pending row still exists.
+    persisted = json.loads(processor.state_file.read_text(encoding="utf-8"))
+    assert request_id in persisted["pending_reports"]
+
+    processor.process(context)
+
+    assert executions == [request_id]
+    assert len(reports) == 2
+    assert reports[0] == reports[1]
+    persisted = json.loads(processor.state_file.read_text(encoding="utf-8"))
+    assert persisted["last_revision"] == 2
+    assert persisted["pending_reports"] == {}
+
+
 class _Handoff:
     def __init__(self) -> None:
         self.inspect_calls: list[str] = []
@@ -301,3 +362,55 @@ def test_update_report_failure_retries_stored_outcome_without_rechecking(
     assert state["last_revision"] == 2
     assert state["in_flight"] is None
     assert append_calls == 2
+
+
+def test_update_checkpoint_failure_after_report_is_idempotent(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    request_id = "update-checkpoint-write"
+    replay = _events(update.CHECK_REQUEST_EVENT, request_id)
+    context = _context(replay)
+    service = _service()
+    handoff = _Handoff()
+    reports: list[str] = []
+    def append_report(*args, **kwargs) -> None:
+        reports.append(str(kwargs.get("request_id", args[-1])))
+
+    monkeypatch.setattr(update, "_append_remote_event", append_report)
+    processor = update.FederationUpdateEventProcessor(
+        service,
+        handoff,
+        tmp_path / "update.json",
+    )
+    original_write = update._write_state
+    failed = False
+
+    def fail_once_after_report(path: Path, state: dict[str, object]) -> None:
+        nonlocal failed
+        if (
+            not failed
+            and state.get("in_flight") is None
+            and state.get("last_revision") == 2
+        ):
+            failed = True
+            raise RuntimeError("checkpoint write interrupted")
+        original_write(path, state)
+
+    monkeypatch.setattr(update, "_write_state", fail_once_after_report)
+    with pytest.raises(RuntimeError, match="checkpoint write interrupted"):
+        processor.process(context)
+
+    assert len(handoff.inspect_calls) == 1
+    assert len(reports) == 1
+    persisted = json.loads(processor.state_file.read_text(encoding="utf-8"))
+    assert persisted["in_flight"]["request_id"] == request_id
+
+    processor.process(context)
+
+    assert len(handoff.inspect_calls) == 1
+    assert len(reports) == 2
+    assert reports[0] == reports[1]
+    persisted = json.loads(processor.state_file.read_text(encoding="utf-8"))
+    assert persisted["last_revision"] == 2
+    assert persisted["in_flight"] is None
