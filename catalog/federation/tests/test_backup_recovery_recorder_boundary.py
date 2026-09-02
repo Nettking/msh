@@ -20,11 +20,16 @@ def _layout(tmp_path: Path) -> backup.BackupLayout:
     )
 
 
-def _identity(*, process_nonce: str | None, supervisor_session: str | None) -> dict[str, object]:
+def _identity(
+    *,
+    pid: int = 1,
+    process_nonce: str | None,
+    supervisor_session: str | None,
+) -> dict[str, object]:
     return {
         "schema": backup.native_update.NATIVE_RUNTIME_SCHEMA,
         "runtime_type": backup.native_update.NATIVE_RUNTIME_TYPE,
-        "pid": 1,
+        "pid": pid,
         "process_nonce": process_nonce,
         "supervisor_session": supervisor_session,
         "build_commit": None,
@@ -62,6 +67,33 @@ def test_compose_managed_recorder_heartbeat_is_left_for_compose_quiescence(
     backup._refuse_live_native_recorder(layout)
 
 
+def test_direct_managed_host_recorder_is_not_mistaken_for_compose(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    layout = _layout(tmp_path)
+    monkeypatch.setattr(
+        backup.native_update,
+        "read_json",
+        lambda _path: {
+            "managed": True,
+            "native_runtime": _identity(
+                pid=4242,
+                process_nonce=None,
+                supervisor_session=None,
+            ),
+        },
+    )
+    monkeypatch.setattr(
+        backup.native_update,
+        "read_recorder_status",
+        lambda _path: SimpleNamespace(present=True, is_running=lambda: True),
+    )
+
+    with pytest.raises(backup.BackupError, match="native_recorder_active"):
+        backup._refuse_live_native_recorder(layout)
+
+
 def test_supervised_native_recorder_is_still_refused_when_managed(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -73,6 +105,7 @@ def test_supervised_native_recorder_is_still_refused_when_managed(
         lambda _path: {
             "managed": True,
             "native_runtime": _identity(
+                pid=4242,
                 process_nonce="a" * 32,
                 supervisor_session="b" * 32,
             ),
@@ -99,6 +132,7 @@ def test_malformed_managed_native_identity_still_fails_closed(
         lambda _path: {
             "managed": True,
             "native_runtime": _identity(
+                pid=4242,
                 process_nonce=None,
                 supervisor_session="not-a-valid-supervisor-session",
             ),
