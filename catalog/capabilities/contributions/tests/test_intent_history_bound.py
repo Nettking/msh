@@ -103,28 +103,33 @@ def test_the_newest_revisions_are_the_ones_retained(tmp_path: Path) -> None:
 
     revisions = _history(path, "candidate-one")
 
-    assert revisions == sorted(revisions)
-    assert revisions[-1] == max(revisions)
+    # Every churn pass is a real state change, so revisions run 1..passes and
+    # what survives must be the contiguous newest window, not an arbitrary
+    # subset that merely happens to fit the bound.
+    assert revisions[-1] == passes
+    assert revisions == list(range(passes - len(revisions) + 1, passes + 1))
+    assert revisions[0] > 1, "the oldest revisions must actually be gone"
     # The authoritative current intent is in the other table and is untouched.
     assert current is not None
-    assert current.decision_revision >= revisions[-1]
+    assert current.decision_revision == passes
 
 
 def test_the_current_intent_is_never_retired(tmp_path: Path) -> None:
     """The authoritative row lives in contribution_intents and must survive."""
 
     path = tmp_path / "intents.sqlite3"
+    passes = MAX_INTENT_HISTORY_REVISIONS * 2
     with SQLiteContributionIntentStore(path) as store:
-        _churn(store, "candidate-one", MAX_INTENT_HISTORY_REVISIONS * 2)
+        _churn(store, "candidate-one", passes)
 
     with SQLiteContributionIntentStore(path) as reopened:
         loaded = reopened.get("candidate-one")
 
+    # Retiring history must not disturb the authoritative row or the revision
+    # counter it hands to the next transition.
     assert loaded is not None
-    assert loaded.desired_state in {
-        ContributionDesiredState.ENABLED,
-        ContributionDesiredState.DISABLED,
-    }
+    assert loaded.decision_revision == passes
+    assert loaded.desired_state is ContributionDesiredState.DISABLED
 
 
 def test_retirement_is_confined_to_the_candidate_that_was_written(

@@ -7,6 +7,10 @@ from pathlib import Path
 import pytest
 
 from catalog.federation.coordinator import SessionCoordinator
+from catalog.federation.service_incarnation import (
+    incarnation_state_file,
+    read_restart_state,
+)
 from catalog.relay import provider_service, service
 from catalog.relay.service import (
     RelayRuntimeError,
@@ -93,6 +97,7 @@ def test_relay_entrypoints_return_nonzero_after_required_loop_failure(
     entrypoint: object,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
 ) -> None:
     stopped = []
 
@@ -120,6 +125,22 @@ def test_relay_entrypoints_return_nonzero_after_required_loop_failure(
     )
     monkeypatch.setattr(entrypoint, relay_class, FailedRelay)
 
-    assert entrypoint.main(["serve", "--database", "unused.sqlite3"]) == 2
+    # A real path rather than a bare filename: the provider entrypoint journals
+    # its incarnation beside the store it is given, so a relative argument here
+    # would write that record into whatever directory the suite happens to run
+    # in.
+    database = tmp_path / "unused.sqlite3"
+    assert entrypoint.main(["serve", "--database", str(database)]) == 2
     assert stopped == [True]
     assert "relay command failed (relay-background-task-failed)" in capsys.readouterr().err
+
+    if entrypoint is provider_service:
+        # A reported failure is still an observed stop: the process reached its
+        # own error path rather than being killed, so the next start must not
+        # count as unclean. The record also has to land beside the store the
+        # entrypoint was given, which is where the health reader looks for it.
+        state = read_restart_state(
+            incarnation_state_file(tmp_path, "relay"), service="relay"
+        )
+        assert state.last_stop_reason == "relay-background-task-failed"
+        assert state.consecutive_unclean == 0

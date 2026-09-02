@@ -87,7 +87,7 @@ def test_one_audit_write_never_retires_more_than_a_batch(tmp_path: Path) -> None
 
 
 def test_repeated_writes_converge_on_the_row_bound(tmp_path: Path) -> None:
-    """Bounded work still has to finish: each write must strictly shrink it."""
+    """Bounded work still has to finish: the overflow must actually drain."""
 
     store, database = _store(tmp_path)
     overflow = AUDIT_MAINTENANCE_BATCH_ROWS * 3
@@ -100,7 +100,9 @@ def test_repeated_writes_converge_on_the_row_bound(tmp_path: Path) -> None:
         _write(store)
         counts.append(_count(database))
 
-    assert counts == sorted(counts, reverse=True), "each pass must shrink the table"
+    # Together these are convergence: no pass may grow the table, and the
+    # overflow is actually gone by the end rather than merely capped per pass.
+    assert counts == sorted(counts, reverse=True), "no pass may grow the table"
     assert _count(database) <= MAX_AUDIT_ROWS
 
 

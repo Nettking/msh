@@ -309,6 +309,12 @@ def read_restart_state(
 
     earliest = _parse(unclean[-1].get("started_at"))
     since = _stamp(earliest) if earliest is not None else None
+    # The window is deliberately one-sided. A host clock that jumped backwards
+    # puts the run's start ahead of ``moment``, and that still reads as recent
+    # rather than as ancient history, because the count is the real gate: a
+    # clock change cannot manufacture unclean starts, so the worst a skewed
+    # clock does here is report a device that genuinely restarted three times
+    # without stopping. Erring the other way would hide exactly that device.
     recent = (
         earliest is not None
         and moment - earliest <= timedelta(seconds=CRASH_LOOP_WINDOW_SECONDS)
