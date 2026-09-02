@@ -15,6 +15,7 @@ from catalog.common.federation_paths import DEFAULT_COORDINATOR_DATABASE
 from catalog.federation.onboarding_models import ContributionDesiredState
 from catalog.federation.service_incarnation import (
     STOP_COMPLETED,
+    STOP_FAILURE,
     STOP_OPERATOR,
     incarnation_state_file,
     record_service_start,
@@ -386,6 +387,65 @@ def _start_runtime_from_capability_state(app: Flask) -> str:
     return "started"
 
 
+def run_flask_server(
+    app: Flask,
+    *,
+    host: str,
+    port: int,
+    debug: bool,
+) -> None:
+    """Run the deployed Flask server and classify the exit it observed."""
+
+    # The debug reloader creates a second process and is not the deployed
+    # supervisor path, so it must not write duplicate incarnation records.
+    incarnation = incarnation_state_file(
+        os.getenv("FCP_DATA_ROOT", "data"),
+        "flask",
+    )
+    journal = not debug
+    if journal:
+        record_service_start(incarnation, service="flask")
+
+        # Werkzeug's server turns SIGINT into KeyboardInterrupt, but
+        # ``docker compose stop`` sends SIGTERM. Record that operator stop
+        # before exiting successfully so it cannot look like a crash restart.
+        def _record_operator_stop(_signum: int, _frame: object) -> None:
+            record_service_stop(
+                incarnation,
+                service="flask",
+                reason=STOP_OPERATOR,
+            )
+            raise SystemExit(0)
+
+        signal.signal(signal.SIGTERM, _record_operator_stop)
+
+    try:
+        app.run(host=host, port=port, debug=debug, threaded=True)
+    except KeyboardInterrupt:
+        if journal:
+            record_service_stop(
+                incarnation,
+                service="flask",
+                reason=STOP_OPERATOR,
+            )
+        raise
+    except Exception:
+        if journal:
+            record_service_stop(
+                incarnation,
+                service="flask",
+                reason=STOP_FAILURE,
+            )
+        raise
+    else:
+        if journal:
+            record_service_stop(
+                incarnation,
+                service="flask",
+                reason=STOP_COMPLETED,
+            )
+
+
 if __name__ == "__main__":
     app = create_app()
     host = os.getenv("FLASK_RUN_HOST", "0.0.0.0")
@@ -419,40 +479,4 @@ if __name__ == "__main__":
 
     print(f"[orchestrator] starting Flask app on http://{host}:{port}", flush=True)
 
-    # Journal this incarnation so a crash-looping web container is visible as
-    # one, rather than as a container that has just started. Skipped under the
-    # debug reloader, which runs this module in two processes and is not a
-    # deployed path. Recording is best effort: a web service must never fail to
-    # start because it could not write its own restart history.
-    incarnation = incarnation_state_file(
-        os.getenv("FCP_DATA_ROOT", "data"),
-        "flask",
-    )
-    journal = not debug
-    if journal:
-        record_service_start(incarnation, service="flask")
-
-        # Werkzeug's server turns SIGINT into KeyboardInterrupt, which the
-        # finally below already sees, but nothing handles SIGTERM -- and
-        # SIGTERM is what `docker compose stop` sends. Without this an
-        # ordinary operator stop would leave no recorded stop and read as a
-        # crash on the next start.
-        def _record_operator_stop(_signum: int, _frame: object) -> None:
-            record_service_stop(
-                incarnation,
-                service="flask",
-                reason=STOP_OPERATOR,
-            )
-            raise SystemExit(0)
-
-        signal.signal(signal.SIGTERM, _record_operator_stop)
-
-    try:
-        app.run(host=host, port=port, debug=debug, threaded=True)
-    finally:
-        if journal:
-            record_service_stop(
-                incarnation,
-                service="flask",
-                reason=STOP_COMPLETED,
-            )
+    run_flask_server(app, host=host, port=port, debug=debug)

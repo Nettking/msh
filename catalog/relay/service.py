@@ -53,6 +53,14 @@ from catalog.federation.protocol import (
     utc_now,
 )
 from catalog.federation.redaction import redact_secrets
+from catalog.federation.service_incarnation import (
+    STOP_COMPLETED,
+    STOP_FAILURE,
+    STOP_OPERATOR,
+    incarnation_state_file,
+    record_service_start,
+    record_service_stop,
+)
 from catalog.federation.shared_file_storage import mask_public_jsonl_chunk_paths
 
 from .authentication import (
@@ -1967,10 +1975,51 @@ def main(argv: Sequence[str] | None = None) -> int:
             logging.basicConfig(
                 level=logging.INFO, format="%(levelname)s %(message)s"
             )
+            incarnation = incarnation_state_file(
+                Path(args.database).parent,
+                "relay",
+            )
+            record_service_start(incarnation, service="relay")
             try:
                 asyncio.run(_serve_from_args(args))
             except KeyboardInterrupt:
+                record_service_stop(
+                    incarnation,
+                    service="relay",
+                    reason=STOP_OPERATOR,
+                )
                 return 0
+            except (
+                FederationValidationError,
+                FederationOperationError,
+                RelayConfigurationError,
+                OSError,
+                sqlite3.Error,
+            ) as error:
+                code = getattr(error, "code", "relay-command-failed")
+                record_service_stop(
+                    incarnation,
+                    service="relay",
+                    reason=code,
+                )
+                print(f"relay command failed ({code})", file=sys.stderr)
+                return 2
+            except Exception:  # noqa: BLE001 - return nonzero to Docker
+                record_service_stop(
+                    incarnation,
+                    service="relay",
+                    reason=STOP_FAILURE,
+                )
+                print(
+                    f"relay command failed ({STOP_FAILURE})",
+                    file=sys.stderr,
+                )
+                return 2
+            record_service_stop(
+                incarnation,
+                service="relay",
+                reason=STOP_COMPLETED,
+            )
             return 0
 
         coordinator = SessionCoordinator(args.database)

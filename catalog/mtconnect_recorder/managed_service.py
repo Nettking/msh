@@ -28,6 +28,9 @@ from typing import Any
 
 from catalog.federation.service_incarnation import (
     STOP_COMPLETED,
+    STOP_FAILURE,
+    STOP_OPERATOR,
+    STOP_UPDATE,
     incarnation_state_file,
     record_service_start,
     record_service_stop,
@@ -281,13 +284,7 @@ def run_managed_recorder(
 
 
 def main() -> int:
-    """Run the managed recorder, journaling this incarnation around it.
-
-    The recorder already stops gracefully on SIGINT/SIGTERM, so reaching the
-    ``finally`` is the proof that this process stopped rather than died. A
-    container that Docker restarted after a kill leaves no stop behind, which
-    is exactly what makes the next start observably unclean.
-    """
+    """Run the managed recorder and journal its actual lifecycle outcome."""
 
     incarnation = incarnation_state_file(
         Path(os.environ.get("FCP_RECORDER_DATA_DIR", "data")),
@@ -296,12 +293,39 @@ def main() -> int:
     record_service_start(incarnation, service="recorder")
     try:
         run_managed_recorder()
-    finally:
+    except KeyboardInterrupt:
         record_service_stop(
             incarnation,
             service="recorder",
-            reason=STOP_COMPLETED,
+            reason=STOP_OPERATOR,
         )
+        return 0
+    except Exception:
+        # The process observed the exception but will still exit nonzero and
+        # Docker remains the only supervisor. Keep this stop explicitly
+        # restart-worthy so the next incarnation contributes to crash-loop
+        # evidence instead of being mistaken for a clean completion.
+        record_service_stop(
+            incarnation,
+            service="recorder",
+            reason=STOP_FAILURE,
+        )
+        raise
+
+    # The capture runtime handles its own signals and external activation
+    # requests. Preserve that reason across the launcher boundary: update/trial
+    # exits and operator signals are intentional, while an ordinary return is
+    # a successful completion.
+    from .runtime import EXTERNAL_STOP_REASON, SIGNAL_STOP_REASON, last_stop_reason
+
+    runtime_reason = last_stop_reason()
+    if runtime_reason == SIGNAL_STOP_REASON:
+        stop_reason = STOP_OPERATOR
+    elif runtime_reason == EXTERNAL_STOP_REASON:
+        stop_reason = STOP_UPDATE
+    else:
+        stop_reason = STOP_COMPLETED
+    record_service_stop(incarnation, service="recorder", reason=stop_reason)
     return 0
 
 

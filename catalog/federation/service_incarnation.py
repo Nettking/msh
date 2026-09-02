@@ -17,12 +17,13 @@ by anything watching Docker:
   service answers now, never whether it has been dying repeatedly; and
 * it works identically on Windows and POSIX, because it is one small file.
 
-Each supervised service writes one bounded record when it starts. A clean,
-intentional stop writes ``stopped_at``; an observed restart-worthy failure keeps
-its bounded reason but deliberately leaves that clean-stop marker unset. The
-next start can therefore distinguish ordinary operator/update/trial completion
-from either an abrupt death or a failure path that exited nonzero. A short run
-of those restart-worthy starts is a crash loop.
+Each supervised service writes one bounded record when it starts and, when it
+is stopped in a way it can observe, when it stops. A start whose predecessor
+never recorded an intentional stop is an unclean start. A short run of those
+is a crash loop; an operator stop, an update or a trial exit is not, which is
+what keeps the ordinary product lifecycle from reading as a failure. An
+observed exception/nonzero exit remains unclean evidence even though its stop
+record was written before returning to Docker.
 
 Every write here is best effort. A service must never fail to start because it
 could not journal its own restart history, and a health read must never fail
@@ -64,6 +65,11 @@ STOP_OPERATOR = "operator-stop"
 STOP_UPDATE = "update"
 STOP_TRIAL = "trial"
 STOP_COMPLETED = "completed"
+# A service may have observed a failure and still reach its own shutdown
+# handler. This is deliberately outside ``INTENTIONAL_STOP_REASONS``: the
+# supervisor remains Docker, while the next incarnation can now count this
+# observed nonzero/exception exit as restart-worthy evidence.
+STOP_FAILURE = "restart-worthy-failure"
 INTENTIONAL_STOP_REASONS = frozenset(
     {STOP_OPERATOR, STOP_UPDATE, STOP_TRIAL, STOP_COMPLETED}
 )
@@ -215,7 +221,10 @@ def record_service_start(
         previous = entries[-1] if entries else None
         if previous is None:
             preceded = _PRECEDED_NONE
-        elif _text(previous.get("stopped_at")):
+        elif (
+            _text(previous.get("stopped_at"))
+            and _text(previous.get("reason")) in INTENTIONAL_STOP_REASONS
+        ):
             preceded = _PRECEDED_CLEAN
         else:
             preceded = _PRECEDED_UNCLEAN
@@ -363,6 +372,7 @@ __all__ = [
     "STATE_STABLE",
     "STATE_UNKNOWN",
     "STOP_COMPLETED",
+    "STOP_FAILURE",
     "STOP_OPERATOR",
     "STOP_TRIAL",
     "STOP_UPDATE",
