@@ -8,8 +8,10 @@ import pytest
 
 from catalog.federation.coordinator import SessionCoordinator
 from catalog.federation.service_incarnation import (
+    STATE_RESTARTING,
     incarnation_state_file,
     read_restart_state,
+    record_service_start,
 )
 from catalog.relay import provider_service, service
 from catalog.relay.service import (
@@ -135,12 +137,14 @@ def test_relay_entrypoints_return_nonzero_after_required_loop_failure(
     assert "relay command failed (relay-background-task-failed)" in capsys.readouterr().err
 
     if entrypoint is provider_service:
-        # A reported failure is still an observed stop: the process reached its
-        # own error path rather than being killed, so the next start must not
-        # count as unclean. The record also has to land beside the store the
-        # entrypoint was given, which is where the health reader looks for it.
-        state = read_restart_state(
-            incarnation_state_file(tmp_path, "relay"), service="relay"
-        )
-        assert state.last_stop_reason == "relay-background-task-failed"
-        assert state.consecutive_unclean == 0
+        path = incarnation_state_file(tmp_path, "relay")
+        failed = read_restart_state(path, service="relay")
+        assert failed.last_stop_reason == "relay-background-task-failed"
+
+        # Simulate Docker's next restart. The nonzero relay exit was observed,
+        # but it was not a clean lifecycle stop, so it must advance the bounded
+        # restart history rather than resetting it.
+        restarted = record_service_start(path, service="relay")
+        assert restarted.state == STATE_RESTARTING
+        assert restarted.consecutive_unclean == 1
+        assert restarted.last_stop_reason == "relay-background-task-failed"
