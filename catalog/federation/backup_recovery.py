@@ -544,18 +544,18 @@ def _refuse_live_native_recorder(layout: BackupLayout) -> None:
         and isinstance(identity, dict)
         and identity.get("schema") == native_update.NATIVE_RUNTIME_SCHEMA
         and identity.get("runtime_type") == native_update.NATIVE_RUNTIME_TYPE
-        and isinstance(identity.get("pid"), int)
-        and not isinstance(identity.get("pid"), bool)
-        and identity.get("pid") > 0
+        # The supported Compose service uses an exec-form Python entrypoint, so
+        # the recorder itself is PID 1 in the container namespace. A direct
+        # host launch may also be managed and unsupervised, but it has a normal
+        # host PID and must remain on the fail-closed native-recorder path.
+        and identity.get("pid") == 1
         and identity.get("process_nonce") is None
         and identity.get("supervisor_session") is None
     )
     if compose_managed_identity:
-        # The Compose recorder publishes the common runtime identity shape, but
-        # Docker owns its lifecycle and therefore supplies no native supervisor
-        # nonce/session. It is stopped and proven below with the other Compose
-        # services. A supported host-native recorder always carries both local
-        # supervisor values, so it must continue through the refusal path.
+        # Docker owns this process lifecycle. It is stopped and proven below
+        # with the other Compose services. Supported supervised native recorders
+        # carry local nonce/session identity and can never satisfy this shape.
         return
     status = native_update.read_recorder_status(status_file)
     if not status.present:
