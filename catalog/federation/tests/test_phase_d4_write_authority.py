@@ -152,6 +152,17 @@ def test_expired_lease_is_rejected(tmp_path: Path) -> None:
     assert not provider.exists(session_id="session-1", group_id="storage-main", batch_id="batch-1")
 
 
+def test_provider_clock_before_grant_issuance_is_rejected(tmp_path: Path) -> None:
+    store = _control_plane(tmp_path / "control.sqlite3")
+    service, provider = _service(tmp_path, store, now=NOW - timedelta(seconds=1))
+
+    response = service.dispatch(_envelope(_request()))
+
+    assert not response.ok
+    assert response.error.code is StorageErrorCode.GRANT_NOT_YET_VALID
+    assert not provider.exists(session_id="session-1", group_id="storage-main", batch_id="batch-1")
+
+
 def test_revoked_grant_is_rejected(tmp_path: Path) -> None:
     store = _control_plane(tmp_path / "control.sqlite3")
     store.revoke_leader("session-1", "coordinator", "storage-main", "grant-1")

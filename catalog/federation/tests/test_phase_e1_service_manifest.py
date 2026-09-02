@@ -369,6 +369,27 @@ def test_primary_policy_publishes_manifest_and_duplicate_keeps_revision(
     assert len(runtime.control.manifest_history(SESSION_ID, GROUP_ID)) == 2
 
 
+def test_provider_clock_before_grant_issuance_fails_closed(
+    tmp_path: Path,
+) -> None:
+    runtime = _runtime(
+        tmp_path,
+        acknowledgement_mode=AcknowledgementMode.PRIMARY,
+    )
+    runtime.service.clock = lambda: NOW - timedelta(seconds=1)
+
+    response = _dispatch(runtime.service, _request(), request_id="request-before-issue")
+
+    assert not response.ok
+    assert response.error is not None
+    assert response.error.code.value == "grant-not-yet-valid"
+    assert not runtime.provider.exists(
+        session_id=SESSION_ID,
+        group_id=GROUP_ID,
+        batch_id="batch-1",
+    )
+
+
 def test_one_replica_unavailable_keeps_genesis_and_manifest_intent_pending(
     tmp_path: Path,
 ) -> None:
