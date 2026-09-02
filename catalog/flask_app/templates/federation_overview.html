@@ -27,10 +27,11 @@
   </section>
   {% endif %}
 
-  {% if vm.notice and vm.notice.kind == 'empty' %}
+  {% set notice = vm.notice|default(none) %}
+  {% if notice and notice.kind == 'empty' %}
   <section class="federation-empty federation-empty--information" role="status">
     <span class="federation-empty__mark" aria-hidden="true"></span>
-    <div><h3>{{ vm.notice.title }}</h3><p>{{ vm.notice.message }}</p></div>
+    <div><h3>{{ notice.title }}</h3><p>{{ notice.message }}</p></div>
   </section>
   {% endif %}
 
