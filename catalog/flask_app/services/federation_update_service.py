@@ -51,11 +51,19 @@ _MAX_REPORT_REPLAY_PAGES = 128
 
 
 class LocalUpdateAdapter(Protocol):
+    # ``request_id`` is part of the check contract, not an optional extra.
+    # A caller that owns a durable, deterministic identity for the operation
+    # passes it so the host agent publishes its result under that identity and
+    # a restart can recover the outcome instead of reissuing an accepted
+    # command. Operator-initiated local checks own no such identity and omit
+    # it; the handoff then mints a fresh one per call. Every implementation
+    # must accept it, so a caller that has an identity never silently loses it.
     def inspect(
         self,
         *,
         target: str | None = None,
         fetch: bool = True,
+        request_id: str | None = None,
     ) -> UpdateInspection: ...
 
     def apply(
