@@ -1022,6 +1022,13 @@ class SQLiteArtifactAuthority:
         return revoked
 
     def expire(self, *, now: datetime, actor_node_id: str) -> tuple[str, ...]:
+        """Expire up to ``MAX_GRANT_EXPIRY_BATCH`` grants that are due.
+
+        One pass is deliberately bounded, so a caller that must drain a
+        backlog completely calls this until it returns fewer grants than
+        the batch rather than assuming a single pass suffices.
+        """
+
         now = _utc(now, "now")
         actor_node_id = _text(actor_node_id, "actor_node_id")
         expired: list[str] = []

@@ -284,6 +284,52 @@ device; the explicit control-plane unavailable/reconnecting operator surface is
 still not built. No page ceiling was widened and no physical evidence or
 acceptance state changed.
 
+The container-supervision delivery closes the last four B06 software
+properties at once, because they were one missing primitive rather than four.
+A crash-looping FCP service was invisible to FCP itself: Compose restarts it,
+the service comes back, and every health probe reports the fresh process as
+healthy, so a service failing every thirty seconds and one running for a week
+read identically. The obvious source -- the Docker API -- is not available to
+the product and must not be made available: `docker.sock` is deliberately not
+mounted in `docker-compose.yml`, and mounting it would hand the web application
+root-equivalent control of the host to gain a status field. Each supervised
+service therefore journals its own incarnations instead. A start records
+whether the previous incarnation ended cleanly, a bounded window of recent
+incarnations is retained, and a trailing run of unclean starts inside a time
+window is a crash loop that the existing core-service health snapshot reports
+as `not_ready`/`degraded` with a `<service>-crash-loop` code, carrying the
+prior probe's own code so the underlying fault is not hidden by the loop
+verdict. Writing it exposed a real supervision defect: the Flask service
+installed no `SIGTERM` handler, so an ordinary `docker compose stop` exited
+through the default disposition and every operator stop would have been
+journaled -- and read -- as a crash. Journaling is disabled under `debug`,
+where the reloader's own process churn is not a fault. Every write is
+best-effort and every read total, so a full or read-only host degrades
+supervision visibility and never the service. With this, **B06 is 8/8 software
+properties automated-proven; B06 remains open** for the exact-candidate
+physical campaign only.
+
+The bounded-growth delivery closes the B07 items whose retirement frontier the
+existing contracts already imply, and names the invariant blocking each one it
+does not. The coordinator audit ring had a row bound but no work bound, so on a
+coordinator whose history predates the ring the first write after upgrade
+retires the entire backlog inside the same transaction as an ordinary audited
+action; `provider_health` and `provider_enrollment` mirror the same row bound
+and both already carried the per-pass batch bound that `audit_log` lacked.
+Superseded contribution intent revisions accumulate on every
+enable/disable/suspend/reconcile and no query in the product reads them, so a
+bound there is semantics-preserving rather than a retention choice; retirement
+is by the candidate's own monotonic revision and confined to the candidate just
+written. Artifact grant expiry selected every due grant in one unbounded pass
+that also appends an audit row per grant -- latent today because the entry point
+has no production caller, and bounded now rather than when one is added. The
+analysis job and artifact metadata tables are deliberately untouched: their
+frontier is `UNIQUE(session_id, idempotency_key)`, command replay suppression
+and per-job audit reads, which are authority/history semantics owned by the B09
+lane, not a bound to be invented here. Recorder and upload evidence is user
+primary data and was not touched at all. No physical evidence or acceptance
+state changed.
+
 ### Reconciled robustness branches
 
 Two branches were preserved for follow-up after the cleanup sequence and are now
