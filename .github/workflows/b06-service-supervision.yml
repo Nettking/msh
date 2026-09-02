@@ -16,7 +16,9 @@ on:
       - "catalog/flask_app/federation_recorder_routes.py"
       - "catalog/flask_app/app.py"
       - "catalog/mtconnect_recorder/managed_service.py"
+      - "catalog/mtconnect_recorder/tests/test_managed_service.py"
       - "catalog/relay/provider_service.py"
+      - "catalog/relay/tests/test_required_loop_failure.py"
       - ".github/workflows/b06-service-supervision.yml"
   workflow_dispatch:
 
@@ -69,6 +71,8 @@ jobs:
           catalog/flask_app/tests/test_core_service_health.py
           catalog/flask_app/tests/test_core_service_health_route.py
           catalog/flask_app/tests/test_core_service_crash_loop_health.py
+          catalog/mtconnect_recorder/tests/test_managed_service.py
+          catalog/relay/tests/test_required_loop_failure.py
 
       - name: Ruff supervision boundary
         run: >-
@@ -77,6 +81,8 @@ jobs:
           catalog/federation/tests/test_service_incarnation.py
           catalog/flask_app/services/core_service_health.py
           catalog/flask_app/tests/test_core_service_crash_loop_health.py
+          catalog/mtconnect_recorder/tests/test_managed_service.py
+          catalog/relay/tests/test_required_loop_failure.py
 
       - name: Diff hygiene
         shell: bash
