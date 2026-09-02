@@ -127,4 +127,7 @@ def test_definitive_membership_rejection_does_not_retain_outage_projection(
     html = response.get_data(as_text=True)
     assert "Federation control plane unavailable" not in html
     assert "saved trusted membership is retained" not in html
-    assert "Federation setup is not complete" in html
+    # EMPTY notice titles are internal projection metadata; the rendered
+    # product contract is the setup-needed state and its single safe action.
+    assert "Setup needed" in html
+    assert "Complete federation setup" in html
