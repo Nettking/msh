@@ -49,6 +49,13 @@ from catalog.federation.errors import (
 )
 from catalog.federation.models import CapabilityAnnouncement
 from catalog.federation.phase_d_control import PhaseDControlPlane
+from catalog.federation.service_incarnation import (
+    STOP_COMPLETED,
+    STOP_OPERATOR,
+    incarnation_state_file,
+    record_service_start,
+    record_service_stop,
+)
 from catalog.relay.service import (
     RelayConfigurationError,
     RelayServer,
@@ -387,11 +394,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         # Delegate the interactive encrypted-key case to the original service.
         # The Compose product path never uses this switch.
         return phase2_main(values)
+    # The relay already installs SIGINT/SIGTERM shutdown, so returning from
+    # asyncio.run is proof this process stopped rather than died. Journal the
+    # incarnation beside the authority store it already owns.
+    incarnation = incarnation_state_file(Path(args.database).parent, "relay")
+    record_service_start(incarnation, service="relay")
     try:
         logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
         asyncio.run(_serve_from_args(args))
+        record_service_stop(incarnation, service="relay", reason=STOP_COMPLETED)
         return 0
     except KeyboardInterrupt:
+        record_service_stop(incarnation, service="relay", reason=STOP_OPERATOR)
         return 0
     except (
         FederationValidationError,
@@ -401,6 +415,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         sqlite3.Error,
     ) as error:
         code = getattr(error, "code", "relay-command-failed")
+        # A reported failure is still an observed stop: the process reached its
+        # own error path rather than being killed. Recording the reason keeps
+        # the next start clean while preserving why this one ended.
+        record_service_stop(incarnation, service="relay", reason=code)
         print(f"relay command failed ({code})", file=sys.stderr)
         return 2
 

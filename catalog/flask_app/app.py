@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import signal
 
 from flask import Flask, current_app, request
 
@@ -12,6 +13,13 @@ from catalog.capabilities.benchmarking.policy import (
 from catalog.common.artifact_refresh import register_artifact_catalog_refresh
 from catalog.common.federation_paths import DEFAULT_COORDINATOR_DATABASE
 from catalog.federation.onboarding_models import ContributionDesiredState
+from catalog.federation.service_incarnation import (
+    STOP_COMPLETED,
+    STOP_OPERATOR,
+    incarnation_state_file,
+    record_service_start,
+    record_service_stop,
+)
 from catalog.orchestrator.analysis_runtime import register_identity_supplier
 from catalog.orchestrator.capability_startup import (
     prepare_capability_runtime,
@@ -410,4 +418,41 @@ if __name__ == "__main__":
         )
 
     print(f"[orchestrator] starting Flask app on http://{host}:{port}", flush=True)
-    app.run(host=host, port=port, debug=debug, threaded=True)
+
+    # Journal this incarnation so a crash-looping web container is visible as
+    # one, rather than as a container that has just started. Skipped under the
+    # debug reloader, which runs this module in two processes and is not a
+    # deployed path. Recording is best effort: a web service must never fail to
+    # start because it could not write its own restart history.
+    incarnation = incarnation_state_file(
+        os.getenv("FCP_DATA_ROOT", "data"),
+        "flask",
+    )
+    journal = not debug
+    if journal:
+        record_service_start(incarnation, service="flask")
+
+        # Werkzeug's server turns SIGINT into KeyboardInterrupt, which the
+        # finally below already sees, but nothing handles SIGTERM -- and
+        # SIGTERM is what `docker compose stop` sends. Without this an
+        # ordinary operator stop would leave no recorded stop and read as a
+        # crash on the next start.
+        def _record_operator_stop(_signum: int, _frame: object) -> None:
+            record_service_stop(
+                incarnation,
+                service="flask",
+                reason=STOP_OPERATOR,
+            )
+            raise SystemExit(0)
+
+        signal.signal(signal.SIGTERM, _record_operator_stop)
+
+    try:
+        app.run(host=host, port=port, debug=debug, threaded=True)
+    finally:
+        if journal:
+            record_service_stop(
+                incarnation,
+                service="flask",
+                reason=STOP_COMPLETED,
+            )
