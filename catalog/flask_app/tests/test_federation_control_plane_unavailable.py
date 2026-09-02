@@ -111,23 +111,40 @@ def test_definitive_membership_rejection_does_not_retain_outage_projection(
     )
     service.binding_store.save(binding)
 
-    def rejected(*_args, **_kwargs):
+    def rejected(*, session_id: str, node_id: str):
+        assert session_id == binding.internal_session_id
+        assert node_id == credentials.identity.node_id
         raise AuthorizationError(
             "membership-required",
             "the saved device is no longer a Federation member",
             "node_id",
         )
 
-    monkeypatch.setattr(service.authority, "reconnect", rejected)
+    # CapabilityOnboardingService.authority creates a fresh
+    # SessionOnboardingAuthority on each access. Patch the stable authority
+    # seam that reconnect() actually calls rather than a temporary authority
+    # instance that production never sees.
+    monkeypatch.setattr(
+        service.coordinator.store,
+        "require_membership",
+        rejected,
+    )
 
     app = _configured_app(service)
+    with app.app_context():
+        projection = composition.get_federation_projection_service().overview().to_dict()
+
+    assert projection["state"] == "empty"
+    assert projection["state_label"] == "Setup needed"
+    assert projection["control_plane"]["membership_retained"] is False
+    assert projection["recommended_action"]["title"] == "Complete federation setup"
+    assert projection["recommended_action"]["url"] == "/onboarding"
+
     response = app.test_client().get("/federation")
 
     assert response.status_code == 200
     html = response.get_data(as_text=True)
     assert "Federation control plane unavailable" not in html
     assert "saved trusted membership is retained" not in html
-    # EMPTY notice titles are internal projection metadata; the rendered
-    # product contract is the setup-needed state and its single safe action.
     assert "Setup needed" in html
     assert "Complete federation setup" in html
