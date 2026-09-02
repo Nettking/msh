@@ -19,6 +19,7 @@ on:
       - "catalog/flask_app/static/css/federation.css"
       - "catalog/flask_app/static/js/onboarding.js"
       - "catalog/flask_app/tests/test_capability_onboarding_route.py"
+      - "catalog/flask_app/tests/test_b09_control_plane_outage_projection.py"
       - "catalog/flask_app/tests/test_federation_capability_requests.py"
       - "catalog/flask_app/tests/test_federation_pairing_service.py"
       - "catalog/flask_app/tests/test_federation_pairing_relay.py"
@@ -48,6 +49,7 @@ on:
       - "catalog/flask_app/static/css/federation.css"
       - "catalog/flask_app/static/js/onboarding.js"
       - "catalog/flask_app/tests/test_capability_onboarding_route.py"
+      - "catalog/flask_app/tests/test_b09_control_plane_outage_projection.py"
       - "catalog/flask_app/tests/test_federation_capability_requests.py"
       - "catalog/flask_app/tests/test_federation_pairing_service.py"
       - "catalog/flask_app/tests/test_federation_pairing_relay.py"
@@ -96,6 +98,7 @@ jobs:
           catalog/flask_app/services/onboarding_view_normalizer.py
           catalog/flask_app/services/federation_projection_service.py
           catalog/flask_app/tests/test_capability_onboarding_route.py
+          catalog/flask_app/tests/test_b09_control_plane_outage_projection.py
           catalog/flask_app/tests/test_federation_capability_requests.py
           catalog/flask_app/tests/test_federation_pairing_service.py
           catalog/flask_app/tests/test_federation_pairing_relay.py
@@ -104,6 +107,7 @@ jobs:
         run: >-
           python -m pytest -o addopts= -q
           catalog/flask_app/tests/test_capability_onboarding_route.py
+          catalog/flask_app/tests/test_b09_control_plane_outage_projection.py
           catalog/flask_app/tests/test_federation_capability_requests.py
           catalog/flask_app/tests/test_federation_pairing_service.py
           catalog/flask_app/tests/test_federation_pairing_relay.py
@@ -130,6 +134,7 @@ jobs:
           catalog/flask_app/services/onboarding_view_normalizer.py
           catalog/flask_app/services/federation_projection_service.py
           catalog/flask_app/tests/test_capability_onboarding_route.py
+          catalog/flask_app/tests/test_b09_control_plane_outage_projection.py
           catalog/flask_app/tests/test_federation_capability_requests.py
           catalog/flask_app/tests/test_federation_pairing_service.py
           catalog/flask_app/tests/test_federation_pairing_relay.py
