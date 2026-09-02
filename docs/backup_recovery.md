@@ -81,6 +81,8 @@ For the ordinary Compose-managed topology, the command:
 - runs `docker compose stop` and positively proves the core `flask`, `relay`, and managed `recorder` containers are no longer running; and
 - remeasures the exact backup payload and destination capacity after quiescence before copying.
 
+Do **not** run `docker compose down -v` as part of backup or recovery. The `-v` option removes named volumes and can destroy the retained relay/coordinator state that the backup is specifically intended to preserve.
+
 A native recorder that is intentionally part of the selected recovery topology must be stopped through its supported supervisor before running this command. Do not bypass the refusal by editing its status file. A POSIX/macOS native recorder without the Windows supervisor remains outside the automated quiescence contract and must be administratively stopped first.
 
 ### What is copied
