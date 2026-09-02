@@ -5,12 +5,12 @@ from pathlib import Path
 
 import pytest
 
-from catalog.federation.errors import FederationValidationError
 from catalog.capabilities.storage_authority_enrollment import (
     DEFAULT_LEASE_SECONDS,
     MAX_TRUSTED_V1_CLOCK_OFFSET_SECONDS,
     trusted_v1_clock_offset_is_bounded,
 )
+from catalog.federation.errors import FederationValidationError
 from catalog.federation.local_storage import FilesystemBatchStorageProvider
 from catalog.federation.storage_control_plane import (
     StorageControlPlaneStore,
