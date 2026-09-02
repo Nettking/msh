@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 from collections.abc import Iterable
 from types import SimpleNamespace
 from typing import Any
@@ -9,7 +10,12 @@ from typing import Any
 from flask import current_app
 
 from catalog.capabilities.operator_surface import ProviderOperatorSurface
-from catalog.federation.errors import FederationOperationError
+from catalog.federation.errors import (
+    AuthenticationError,
+    AuthorizationError,
+    FederationOperationError,
+    FederationValidationError,
+)
 from catalog.federation.onboarding_compat import federation_id_from_session_id
 from catalog.federation.projections import (
     BenchmarkResultsAdapter,
@@ -49,6 +55,17 @@ _EXPECTED_EMPTY_CONTRIBUTION_CODES = {
     "contribution-federation-required",
     "contribution-inspection-required",
     "contribution-inspection-expired",
+}
+
+# Operation-level failures that mean current authoritative truth cannot be read,
+# not that the persisted local identity/binding has been definitively rejected.
+# Only these operation failures may fall back to read-only saved membership.
+_SAVED_MEMBERSHIP_OUTAGE_CODES = {
+    "authoritative-replay-incomplete",
+    "onboarding-session-unavailable",
+    "coordinator-unavailable",
+    "relay-unavailable",
+    "target-unavailable",
 }
 
 
@@ -91,11 +108,34 @@ def _empty_service() -> FederationProjectionService:
     return FederationProjectionService(ProjectionAdapters())
 
 
+def _is_saved_membership_outage(exc: Exception) -> bool:
+    """Allow display fallback only for inability to read current authority.
+
+    A definitive authentication, authorization, or validation rejection means
+    the saved binding is not current truth and must not be rendered as retained
+    membership. Transport/database unavailability and explicitly bounded
+    authoritative-read failures may preserve the saved identity/binding for
+    display while all authority remains absent.
+    """
+
+    if isinstance(
+        exc,
+        (AuthenticationError, AuthorizationError, FederationValidationError),
+    ):
+        return False
+    if isinstance(exc, FederationOperationError):
+        code = str(getattr(exc, "code", ""))
+        return code in _SAVED_MEMBERSHIP_OUTAGE_CODES or code.endswith("-unavailable")
+    return isinstance(exc, (ConnectionError, TimeoutError, OSError, sqlite3.Error))
+
+
 def _onboarding_context() -> AuthorizedOnboardingContext | None:
     try:
         return get_capability_onboarding_service().authorized_context()
-    except Exception:  # noqa: BLE001 - projection authorization fails closed
-        return None
+    except Exception as exc:  # noqa: BLE001 - classify before any saved fallback
+        if _is_saved_membership_outage(exc):
+            return None
+        raise
 
 
 def _saved_projection_binding() -> tuple[object, str] | None:
@@ -261,10 +301,11 @@ def get_federation_projection_service() -> FederationProjectionService:
 
     If that live revalidation is unavailable, a GET may still use the persisted
     identity plus trusted binding solely to say "this known member is
-    reconnecting". The fallback never supplies a coordinator or any mutation
-    authority; authoritative Federation/storage/job projections stay explicitly
-    unavailable. Browser parameters are never accepted as actor, session,
-    endpoint or authority context.
+    reconnecting". Definitive authentication/authorization/validation rejection
+    never takes this fallback. The fallback never supplies a coordinator or any
+    mutation authority; authoritative Federation/storage/job projections stay
+    explicitly unavailable. Browser parameters are never accepted as actor,
+    session, endpoint or authority context.
     """
 
     surface = current_app.config.get(_OPERATOR_SURFACE_CONFIG_KEY)
