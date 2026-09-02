@@ -26,6 +26,12 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from catalog.federation.service_incarnation import (
+    STOP_COMPLETED,
+    incarnation_state_file,
+    record_service_start,
+    record_service_stop,
+)
 from catalog.flask_app.services.capability_config_service import (
     CapabilityConfigError,
     load_capability_config,
@@ -275,7 +281,27 @@ def run_managed_recorder(
 
 
 def main() -> int:
-    run_managed_recorder()
+    """Run the managed recorder, journaling this incarnation around it.
+
+    The recorder already stops gracefully on SIGINT/SIGTERM, so reaching the
+    ``finally`` is the proof that this process stopped rather than died. A
+    container that Docker restarted after a kill leaves no stop behind, which
+    is exactly what makes the next start observably unclean.
+    """
+
+    incarnation = incarnation_state_file(
+        Path(os.environ.get("FCP_RECORDER_DATA_DIR", "data")),
+        "recorder",
+    )
+    record_service_start(incarnation, service="recorder")
+    try:
+        run_managed_recorder()
+    finally:
+        record_service_stop(
+            incarnation,
+            service="recorder",
+            reason=STOP_COMPLETED,
+        )
     return 0
 
 

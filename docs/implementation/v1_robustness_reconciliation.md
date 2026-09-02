@@ -417,6 +417,38 @@ is still retried exactly as before. This is added observability for the same
 bullet rather than a further property, so **B06 stays at 4/8 and remains
 `OPEN`.**
 
+### B06 progress — Docker crash-loop visibility
+
+The last B06 software property is closed. Docker restarts a failed service
+indefinitely at a bounded rate, and every probe in `core_service_health`
+answers a question about *now*, so a container on its fiftieth restart answered
+all of them exactly like a healthy one.
+
+Each supervised service now journals its own bounded incarnation record: one
+entry when it starts, one stop when it stops in a way it can observe. A start
+whose predecessor recorded no stop is unclean; a run of those inside a bounded
+window is a crash loop. The observation is made by the service about itself,
+so it needs no Docker socket, adds no second supervisor, does not depend on a
+Docker `healthcheck`, and is one small file on Windows and POSIX alike.
+
+Only a sustained loop changes a verdict: a single unclean start is reported as
+data, and the same count spread over a year is not a device in trouble now. A
+crash loop leaves liveness alone and overrules readiness, preserving the
+original probe code in the message. Recovery is not sticky -- one recorded stop
+ends it -- and the record is capped, because B07's rule applies to B06's own
+evidence. `ollama` and `model-provider` are deliberately absent from core
+health so an optional model can never read as a broken product.
+
+Two further defects were found in the audit. Flask had no `SIGTERM` handler at
+all, and `SIGTERM` is what `docker compose stop` sends, so an ordinary operator
+stop would have left no recorded stop and read as a crash on the next start;
+the recorder and relay already stopped gracefully. And the semantic health work
+from #387 had **no permanent release gate**, which is why its 7/8 claim could
+not be re-verified mechanically. Both are fixed.
+
+**B06 is 8/8 software properties automated-proven; B06 remains `OPEN`** for the
+exact-candidate physical campaign only.
+
 ### B07 — bounded reconstructible and cumulative metadata growth
 
 **State:** `OPEN`  
@@ -443,6 +475,72 @@ Must **not** be silently auto-deleted merely to satisfy this blocker:
 Those operator/primary paths participate in admission/pressure policy instead.
 
 D09 is explicitly `DEFERRED`: journal-backed resumable transfer retention is not a supported installed-product path today.
+
+#### Current-main inventory
+
+A fresh audit against `87f670f` rather than the historical PR list:
+
+| Item | Status | Evidence |
+|---|---|---|
+| Docker stdout/stderr logs | `PROVEN` | `x-fcp-container-logging` pins `max-size`/`max-file` on all nine services; the anchor comment refuses tunable retention because an environment-supplied `-1` would silently remove the bound. |
+| POSIX update-agent `agent.log` | `PROVEN` | `bound_agent_log` holds one live generation plus a recent tail and never raises; called from the agent runner's poll loop. |
+| BuildKit cache on every build path | `PROVEN` | `prune_build_cache` plus `retire_stranded_build_writers` on the host-build path and the POSIX update engine. |
+| Superseded unused FCP images | `PROVEN` | `retire_superseded_images`, gated on a verified build transition. |
+| Recurring provider-health command/audit history | `PROVEN` | `MAX_HEALTH_AUDIT_ROWS` ring with `AUDIT_MAINTENANCE_BATCH_ROWS` work bound; the same shape in `provider_enrollment`. |
+| Retained host-update result/branch histories | `PROVEN` | Current-state documents with hard 256 KiB serialization caps, plus `MAX_APPROVED_BRANCHES`; these are not accumulating histories. |
+| Coordinator authoritative audit ring | `PROVEN` (fixed here) | Storage was bounded; **work was not**. See below. |
+| Contribution intent history | `PROVEN` (fixed here) | Unbounded, with no reader at all. See below. |
+| Artifact grant expiry sweep | `PROVEN` (fixed here, latent) | Unbounded pass over two tables; no production caller, so the defect was latent rather than live. |
+| Terminal analysis job/attempt/command/audit history | `BLOCKED-BY-SEMANTICS` | See below. |
+| Artifact descriptors/grants/publication/audit metadata | `BLOCKED-BY-SEMANTICS` | See below. |
+
+#### Fixed in this delivery
+
+The coordinator's own `audit_log` ring bounded retained rows but retired
+*everything* past the window in one statement. `provider_health` and
+`provider_enrollment` both retire in batches and both describe themselves as
+mirroring this ring: they mirrored the row bound, and the work bound was only
+ever added on their side. On a coordinator whose history predates the ring, or
+whose bound a later release lowers, one ordinary rejected request deleted the
+entire lifetime overflow inside its own transaction. Reproduced at 5,001 rows
+deleted by a single `audit_rejection`; now exactly one batch, converging over
+repeated writes.
+
+`contribution_intent_history` grew on every enable/disable/suspend/reconcile
+and **nothing in the product reads it** -- not one query selects from that
+table. That is a stronger frontier than the provider-health argument, which
+rests on a reader cap: here there is no reader to preserve anything for. The
+authoritative current intent lives in `contribution_intents` and is untouched;
+recent superseded revisions are retained because their only remaining value is
+operator forensics, and that value is entirely in the recent ones. Retirement
+is by the candidate's own monotonic revision, confined to the candidate being
+written, and batch-bounded like the three existing rings.
+
+#### Blocked by semantics, and why
+
+These are not "policy undecided". Each has a specific invariant that deletion
+would break, and each belongs to the B09 authority/history boundary rather
+than to B07:
+
+- `capability_jobs` carries `UNIQUE(session_id, idempotency_key)`. Retiring a
+  terminal job would let the same work be accepted again as new, so this is
+  the accepted-request tombstone/hash horizon B09 owns, not a B07 bound.
+- `capability_job_commands` is command replay suppression; the same argument.
+- `capability_job_audit` and `capability_artifact_audit` are read *in full per
+  job* (`WHERE job_id=? ORDER BY sequence`), with no reader cap to derive a
+  frontier from. They are bounded per job by that job's lifecycle events, so
+  their only unbounded dimension is the number of retained jobs -- which is
+  the same B09 horizon above.
+- `capability_artifact_grants` is referenced by
+  `capability_artifact_publications` through a foreign key, so grant rows
+  cannot be retired independently of publication history.
+- `data_upload_*` and recorder evidence are user/primary data and are excluded
+  by B07's own rules.
+
+Physical disk reclamation is a separate claim from any of these: every ring
+here is a logical row bound. SQLite reuses the freed pages, so a database stops
+growing but does not shrink without an explicit `VACUUM`, which remains an
+operational decision.
 
 ### B08 — crash-correct derived and upload boundaries
 

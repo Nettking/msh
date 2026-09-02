@@ -45,6 +45,31 @@ COORDINATOR_ID = "fcp-relay-coordinator"
 MAX_EVENT_PAYLOAD_BYTES = 48_000
 MAX_AUDIT_DETAILS_BYTES = 8_192
 MAX_AUDIT_ROWS = 100_000
+
+#: Rows one foreground audit write may retire while catching up on legacy history.
+#
+# A storage bound is not a work bound. Retiring "everything past the window" is
+# one statement, but on a coordinator whose history predates this ring -- or
+# whose bound is lowered by a later release -- that statement deletes the whole
+# lifetime overflow inside the same transaction as an ordinary session action:
+# an arbitrarily long writer lock and an arbitrarily large rollback journal,
+# reached through nothing more than a rejected request.
+#
+# ``provider_health`` and ``provider_enrollment`` already retire in batches for
+# exactly this reason, and their comments describe themselves as mirroring this
+# ring. They mirrored the row bound; the work bound was only ever added on their
+# side. This is that half.
+#
+# Convergence: a write appends exactly one row and may retire up to this many,
+# so while any overflow remains the table strictly shrinks and ordinary traffic
+# cannot outrun cleanup. Progress is restart-safe because the frontier is the
+# table's own monotonic ``audit_id`` order rather than separate state, and
+# ordering by id rather than timestamp means no clock change retires a row
+# early.
+#
+# This is a logical row bound. SQLite reuses the freed pages, so the database
+# stops growing; it does not shrink without an explicit VACUUM.
+AUDIT_MAINTENANCE_BATCH_ROWS = 1_000
 MAX_AUDIT_READ_LIMIT = 10_000
 DEFAULT_AUDIT_READ_LIMIT = 1_000
 MAX_REPLAY_EVENTS = 10_000
@@ -527,16 +552,21 @@ class CoordinatorStore:
         database.execute(
             """
             DELETE FROM audit_log
-            WHERE audit_id <= COALESCE(
-                (
-                    SELECT audit_id FROM audit_log
-                    ORDER BY audit_id DESC
-                    LIMIT 1 OFFSET ?
-                ),
-                -1
+            WHERE audit_id IN (
+                SELECT audit_id FROM audit_log
+                WHERE audit_id <= COALESCE(
+                    (
+                        SELECT audit_id FROM audit_log
+                        ORDER BY audit_id DESC
+                        LIMIT 1 OFFSET ?
+                    ),
+                    -1
+                )
+                ORDER BY audit_id ASC
+                LIMIT ?
             )
             """,
-            (MAX_AUDIT_ROWS,),
+            (MAX_AUDIT_ROWS, AUDIT_MAINTENANCE_BATCH_ROWS),
         )
 
     def audit_rejection(
