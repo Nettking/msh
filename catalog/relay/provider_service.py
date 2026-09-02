@@ -51,8 +51,8 @@ from catalog.federation.models import CapabilityAnnouncement
 from catalog.federation.phase_d_control import PhaseDControlPlane
 from catalog.federation.service_incarnation import (
     STOP_COMPLETED,
-    STOP_OPERATOR,
     STOP_FAILURE,
+    STOP_OPERATOR,
     incarnation_state_file,
     record_service_start,
     record_service_stop,

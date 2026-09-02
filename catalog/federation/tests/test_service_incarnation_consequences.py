@@ -7,10 +7,10 @@ from pathlib import Path
 import pytest
 
 from catalog.federation.service_incarnation import (
+    STATE_CRASH_LOOP,
     STOP_COMPLETED,
     STOP_OPERATOR,
     STOP_UPDATE,
-    STATE_CRASH_LOOP,
     incarnation_state_file,
     read_restart_state,
     record_service_start,
