@@ -271,6 +271,7 @@ class PhaseDStorageService:
                 "authority.fencing_token",
                 "fencing token is stale",
             )
+        issued_at = datetime.fromisoformat(str(grant["issued_at"]).replace("Z", "+00:00"))
         expiry = datetime.fromisoformat(str(grant["lease_expires_at"]).replace("Z", "+00:00"))
         if authority.lease_expires_at != expiry:
             raise FederationValidationError(
@@ -278,7 +279,14 @@ class PhaseDStorageService:
                 "authority.lease_expires_at",
                 "lease expiry does not match the active grant",
             )
-        if self.clock().astimezone(timezone.utc) >= expiry:
+        now = self.clock().astimezone(timezone.utc)
+        if now < issued_at:
+            raise FederationValidationError(
+                StorageErrorCode.GRANT_NOT_YET_VALID.value,
+                "authority.lease_expires_at",
+                "provider clock is before the coordinator-issued grant",
+            )
+        if now >= expiry:
             raise FederationValidationError(
                 StorageErrorCode.LEASE_EXPIRED.value,
                 "authority.lease_expires_at",

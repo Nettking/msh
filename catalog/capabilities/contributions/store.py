@@ -17,6 +17,31 @@ from catalog.federation.onboarding_models import (
     ContributionPolicyState,
 )
 
+#: Retained superseded intent revisions per contribution candidate.
+#
+# ``contribution_intents`` already holds the authoritative current intent for
+# each candidate; this table is the superseded revisions behind it, appended on
+# every enable/disable/suspend/reconcile. Nothing in the product reads it -- not
+# one query selects from it -- so no replay, idempotency, authority or
+# recovery path can observe a retired row. That is what makes a bound here
+# semantics-preserving rather than a retention policy: the frontier follows from
+# the table having no consumer, not from someone choosing how much history is
+# worth keeping.
+#
+# Recent revisions are retained rather than none, because their only remaining
+# value is operator forensics and that value is entirely in the recent ones.
+# Retirement is by the candidate's own monotonic ``revision``, so no clock
+# change retires a row early and progress survives restart.
+MAX_INTENT_HISTORY_REVISIONS = 200
+
+#: Superseded revisions one write may retire while catching up on legacy history.
+#
+# A storage bound is not a work bound: on a device whose history predates this
+# ring, retiring "everything past the window" would happen inside the same
+# transaction as an ordinary intent change. This mirrors the batch bound the
+# provider-health, provider-enrollment and coordinator audit rings already use.
+INTENT_HISTORY_MAINTENANCE_BATCH_ROWS = 500
+
 
 def _stamp(value: datetime) -> str:
     if value.tzinfo is None or value.utcoffset() is None:
@@ -145,6 +170,40 @@ class SQLiteContributionIntentStore:
                     "(candidate_id, revision, intent_json, updated_at) "
                     "VALUES (?, ?, ?, ?)",
                     (candidate.candidate_id, revision, payload, updated_at),
+                )
+                # Retire superseded revisions for this candidate in the same
+                # transaction that appended one, so the history cannot outgrow
+                # its bound between maintenance passes and no separate sweep is
+                # needed. One insert may retire up to a batch, so while any
+                # overflow remains it strictly shrinks.
+                connection.execute(
+                    """
+                    DELETE FROM contribution_intent_history
+                    WHERE candidate_id = ?
+                      AND revision IN (
+                          SELECT revision FROM contribution_intent_history
+                          WHERE candidate_id = ?
+                            AND revision <= COALESCE(
+                                (
+                                    SELECT revision
+                                    FROM contribution_intent_history
+                                    WHERE candidate_id = ?
+                                    ORDER BY revision DESC
+                                    LIMIT 1 OFFSET ?
+                                ),
+                                -1
+                            )
+                          ORDER BY revision ASC
+                          LIMIT ?
+                      )
+                    """,
+                    (
+                        candidate.candidate_id,
+                        candidate.candidate_id,
+                        candidate.candidate_id,
+                        MAX_INTENT_HISTORY_REVISIONS,
+                        INTENT_HISTORY_MAINTENANCE_BATCH_ROWS,
+                    ),
                 )
                 connection.execute(
                     "INSERT INTO contribution_intents "

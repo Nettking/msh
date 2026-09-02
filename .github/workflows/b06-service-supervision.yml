@@ -1,0 +1,89 @@
+name: B06 service supervision
+
+# The semantic core-service health from #387 and the self-observed restart
+# history that makes a Docker crash loop FCP-visible had no permanent gate
+# between them. This is that gate.
+
+on:
+  pull_request:
+    paths:
+      - "catalog/federation/service_incarnation.py"
+      - "catalog/federation/tests/test_service_incarnation.py"
+      - "catalog/flask_app/services/core_service_health.py"
+      - "catalog/flask_app/tests/test_core_service_health.py"
+      - "catalog/flask_app/tests/test_core_service_health_route.py"
+      - "catalog/flask_app/tests/test_core_service_crash_loop_health.py"
+      - "catalog/flask_app/federation_recorder_routes.py"
+      - "catalog/flask_app/app.py"
+      - "catalog/mtconnect_recorder/managed_service.py"
+      - "catalog/mtconnect_recorder/tests/test_managed_service.py"
+      - "catalog/relay/provider_service.py"
+      - "catalog/relay/tests/test_required_loop_failure.py"
+      - ".github/workflows/b06-service-supervision.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: b06-service-supervision-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  service-supervision:
+    name: Service supervision (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install pytest ruff
+
+      - name: Compile supervision boundary
+        run: >-
+          python -m compileall -q
+          catalog/federation/service_incarnation.py
+          catalog/flask_app/services/core_service_health.py
+          catalog/flask_app/app.py
+          catalog/mtconnect_recorder/managed_service.py
+          catalog/relay/provider_service.py
+
+      - name: Supervision regressions
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/federation/tests/test_service_incarnation.py
+          catalog/flask_app/tests/test_core_service_health.py
+          catalog/flask_app/tests/test_core_service_health_route.py
+          catalog/flask_app/tests/test_core_service_crash_loop_health.py
+          catalog/mtconnect_recorder/tests/test_managed_service.py
+          catalog/relay/tests/test_required_loop_failure.py
+
+      - name: Ruff supervision boundary
+        run: >-
+          python -m ruff check
+          catalog/federation/service_incarnation.py
+          catalog/federation/tests/test_service_incarnation.py
+          catalog/flask_app/services/core_service_health.py
+          catalog/flask_app/tests/test_core_service_crash_loop_health.py
+          catalog/mtconnect_recorder/tests/test_managed_service.py
+          catalog/relay/tests/test_required_loop_failure.py
+
+      - name: Diff hygiene
+        shell: bash
+        run: git diff --check "origin/${{ github.base_ref || 'main' }}...HEAD"

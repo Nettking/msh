@@ -152,6 +152,22 @@ If no connected successor exists, FCP fails closed rather than inventing one.
 
 This does **not** provide replicated coordinator/quorum failover. If the host that owns the authoritative coordinator database/relay is unavailable, leader promotion cannot substitute for that missing coordinator service.
 
+### Trusted storage writes require synchronized clocks
+
+Before enabling trusted v1 storage write authority, configure UTC wall-clock
+synchronization on the coordinator and every storage-provider host. The
+absolute offset of each participating host from the deployment's trusted NTP
+source must be known and no greater than **30 seconds**. This is derived from
+the normal **300-second** storage authority lease: the bound is one tenth of the
+lease and no more than half of the existing 60-second renewal margin.
+
+Do not enable storage write authority when NTP is unhealthy, disabled, or its
+offset is unknown. FCP does not run distributed clock consensus. The provider
+still fails closed when a grant is future/not-yet-valid or expired, but the
+application cannot infer an absolute host-clock offset from a single signed
+grant; the 30-second NTP condition is therefore an operator deployment
+requirement, not a substitute for the lease checks.
+
 Human credential/password authority remains creator-backed and does not automatically move with operational leadership. See [Human users, sign-in, and permissions](human-authentication.md).
 
 ## Starting an existing device

@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -57,6 +58,11 @@ DEFAULT_STORAGE_GROUP_ID = "fcp-local-storage"
 MAX_AUTO_BENCHMARK_RUNS = 64
 MAX_AUTO_TEXT_BYTES = 512
 DEFAULT_LEASE_SECONDS = 300
+# The normal storage authority lease is five minutes.  A 30-second absolute
+# UTC wall-clock bound is one tenth of that lease and no more than half of the
+# existing 60-second renewal margin.  This is a v1 deployment prerequisite,
+# not a distributed clock-consensus protocol.
+MAX_TRUSTED_V1_CLOCK_OFFSET_SECONDS = DEFAULT_LEASE_SECONDS // 10
 
 REGISTERED_STATUS = "ready"
 DEACTIVATED_STATUS = "unavailable"
@@ -65,6 +71,18 @@ STORAGE_ROLES = ("primary", "replica")
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def trusted_v1_clock_offset_is_bounded(offset_seconds: float) -> bool:
+    """Return whether an absolute host-clock offset meets the v1 prerequisite."""
+
+    if isinstance(offset_seconds, bool):
+        return False
+    try:
+        value = float(offset_seconds)
+    except (TypeError, ValueError):
+        return False
+    return math.isfinite(value) and abs(value) <= MAX_TRUSTED_V1_CLOCK_OFFSET_SECONDS
 
 
 def _bounded_text(value: object) -> str | None:
@@ -592,6 +610,7 @@ class TrustedGreenStorageAuthority:
 
 __all__ = [
     "DEFAULT_STORAGE_GROUP_ID",
+    "MAX_TRUSTED_V1_CLOCK_OFFSET_SECONDS",
     "STORAGE_AUTHORITY_PROPERTY",
     "STORAGE_AUTHORITY_SCHEMA",
     "StorageAuthorityDecision",
@@ -601,4 +620,5 @@ __all__ = [
     "federation_storage_provider_id",
     "parse_storage_authority_evidence",
     "parse_storage_authority_target",
+    "trusted_v1_clock_offset_is_bounded",
 ]

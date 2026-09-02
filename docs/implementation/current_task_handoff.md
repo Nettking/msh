@@ -261,28 +261,91 @@ expected pathname. B08's automated implementation properties are complete;
 P05/P09 exact-host hard-kill/power-loss evidence remains open and no physical
 acceptance state changed.
 
-Authoritative-replay completeness is shared by one primitive that folds a
+The exact remaining B08 physical checklist is: (1) hard-kill the analysis
+scheduler at archive temp creation, durable archive replacement and registration,
+then restart on the same host and prove the deterministic slice is either fully
+verified/rebuilt or absent, never partially accepted; (2) interrupt upload after
+staging ownership, after staging bytes, during database publication and during
+filesystem publication, then prove startup hides non-ready batches and repairs
+each supported crash window without partial batch exposure; (3) interrupt
+federated analysis workspace materialization before and after its ownership
+marker, then prove age/scan-bounded restart reconciliation handles only the
+owned attempt; (4) repeat the same boundaries with actual power-loss or hard
+kill against the relevant SQLite/WAL files and verify integrity, ownership and
+path-confined cleanup after reboot; and (5) record the exact candidate, host,
+timestamps, injected boundary, restart result, retained files/rows and
+operator-visible health for each run under P05/P09. These are evidence runs,
+not additional B08 software properties.
+
+Authoritative-replay completeness is now shared by one primitive that folds a
 caller's own bounded pages and returns only once the coordinator's reported
 current revision has been reached; every other exit raises
-`authoritative-replay-incomplete`. Leadership and human-auth were wired onto it
-first. Shared knowledge is now wired onto it too, because its prefix behaviour
-was worse than under-reporting: a read that stopped before a document's delete
-event re-published that withdrawn document into the append-only authoritative
-log for every member. It now degrades to the local cache and changes nothing
-shared, reported at warning level rather than as an ordinary unreachable relay.
-The Federation authority projection adapter is wired onto it too: its bounded
-loop measured progress by page length rather than by revision, so an empty page
-or a non-contiguous page was folded into a `current` overview that presented a
-revoked device as a current member and a demoted node as leader. The remaining
-paged consumers -- the capability-request, update, software-version and
-recorder-control report aggregators -- still return what they accumulated at
-their ceilings, so **B09 stays at 1/7 properties automated-proven and remains
-open**. The two member authority surfaces -- user administration and password
-change -- now report an unresolvable authority as their existing bounded `503`
-rather than letting the refusal escape a `before_request` hook as a broken
-device; the explicit control-plane unavailable/reconnecting operator surface is
-still not built. No page ceiling was widened and no physical evidence or
-acceptance state changed.
+`authoritative-replay-incomplete`. Leadership, human-auth, shared knowledge,
+the Federation authority projection, all four report aggregators, and the
+member-side capability-request and software-update processors use that
+complete-read contract or an equivalent complete-read contract. The processor
+ceilings remain unchanged: an incomplete pass persists only its applied
+checkpoint and surfaces the bounded failure rather than silently finishing.
+
+The trusted-member operator surface now distinguishes an unavailable
+coordinator/authoritative history from new setup or an invented member failure:
+the overview reports `Federation control plane unavailable` and
+`Unavailable / reconnecting` while retaining the saved trusted membership.
+The coordinator's `session_events` and each member's durable `applied_events`
+history remain append-only; no compaction or accepted-request retirement path
+exists, so no snapshot/base or tombstone-horizon design is being claimed for
+v1. Signed command/assertion/route windows and provider-side storage lease
+expiry remain bounded-time checks. Trusted deployments require UTC NTP/time
+synchronisation before storage write authority is enabled, and exact-host
+positive/negative offset evidence remains in P09. No page ceiling was widened,
+no CF7 acceptance flag changed, and no physical evidence or acceptance state
+changed.
+
+The container-supervision delivery closes the last four B06 software
+properties at once, because they were one missing primitive rather than four.
+A crash-looping FCP service was invisible to FCP itself: Compose restarts it,
+the service comes back, and every health probe reports the fresh process as
+healthy, so a service failing every thirty seconds and one running for a week
+read identically. The obvious source -- the Docker API -- is not available to
+the product and must not be made available: `docker.sock` is deliberately not
+mounted in `docker-compose.yml`, and mounting it would hand the web application
+root-equivalent control of the host to gain a status field. Each supervised
+service therefore journals its own incarnations instead. A start records
+whether the previous incarnation ended cleanly, a bounded window of recent
+incarnations is retained, and a trailing run of unclean starts inside a time
+window is a crash loop that the existing core-service health snapshot reports
+as `not_ready`/`degraded` with a `<service>-crash-loop` code, carrying the
+prior probe's own code so the underlying fault is not hidden by the loop
+verdict. Writing it exposed a real supervision defect: the Flask service
+installed no `SIGTERM` handler, so an ordinary `docker compose stop` exited
+through the default disposition and every operator stop would have been
+journaled -- and read -- as a crash. Journaling is disabled under `debug`,
+where the reloader's own process churn is not a fault. Every write is
+best-effort and every read total, so a full or read-only host degrades
+supervision visibility and never the service. With this, **B06 is 8/8 software
+properties automated-proven; B06 remains open** for the exact-candidate
+physical campaign only.
+
+The bounded-growth delivery closes the B07 items whose retirement frontier the
+existing contracts already imply, and names the invariant blocking each one it
+does not. The coordinator audit ring had a row bound but no work bound, so on a
+coordinator whose history predates the ring the first write after upgrade
+retires the entire backlog inside the same transaction as an ordinary audited
+action; `provider_health` and `provider_enrollment` mirror the same row bound
+and both already carried the per-pass batch bound that `audit_log` lacked.
+Superseded contribution intent revisions accumulate on every
+enable/disable/suspend/reconcile and no query in the product reads them, so a
+bound there is semantics-preserving rather than a retention choice; retirement
+is by the candidate's own monotonic revision and confined to the candidate just
+written. Artifact grant expiry selected every due grant in one unbounded pass
+that also appends an audit row per grant -- latent today because the entry point
+has no production caller, and bounded now rather than when one is added. The
+analysis job and artifact metadata tables are deliberately untouched: their
+frontier is `UNIQUE(session_id, idempotency_key)`, command replay suppression
+and per-job audit reads, which are authority/history semantics owned by the B09
+lane, not a bound to be invented here. Recorder and upload evidence is user
+primary data and was not touched at all. No physical evidence or acceptance
+state changed.
 
 ### Reconciled robustness branches
 

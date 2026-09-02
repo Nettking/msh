@@ -5,6 +5,12 @@ from types import SimpleNamespace
 
 import pytest
 
+from catalog.federation.service_incarnation import (
+    STATE_RESTARTING,
+    STOP_COMPLETED,
+    incarnation_state_file,
+    record_service_start,
+)
 from catalog.mtconnect_recorder import managed_service
 from catalog.mtconnect_recorder.managed_service import (
     ManagedRecorderFederationRuntime,
@@ -284,6 +290,29 @@ def test_managed_entrypoint_stops_companion_if_capture_exits_with_error(
         )
 
     assert events == ["start", "stop"]
+
+
+def test_managed_main_exception_is_restart_worthy(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Its unconditional finally must not turn capture failure into completion."""
+
+    monkeypatch.setenv("FCP_RECORDER_DATA_DIR", str(tmp_path))
+
+    def fail_capture() -> None:
+        raise RuntimeError("capture-failed")
+
+    monkeypatch.setattr(managed_service, "run_managed_recorder", fail_capture)
+
+    with pytest.raises(RuntimeError, match="capture-failed"):
+        managed_service.main()
+
+    path = incarnation_state_file(tmp_path, "recorder")
+    restarted = record_service_start(path, service="recorder")
+    assert restarted.state == STATE_RESTARTING
+    assert restarted.consecutive_unclean == 1
+    assert restarted.last_stop_reason == STOP_COMPLETED
 
 
 def test_compose_recorder_uses_managed_federation_entrypoint() -> None:

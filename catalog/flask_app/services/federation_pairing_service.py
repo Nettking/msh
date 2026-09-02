@@ -894,6 +894,27 @@ class PairingAwareCapabilityOnboardingService(CapabilityOnboardingService):
             coordinator=RemoteCoordinatorFacade(self.relay_runtime, remote),  # type: ignore[arg-type]
         )
 
+    def retained_context_for_read_only_projection(
+        self,
+    ) -> AuthorizedOnboardingContext | None:
+        """Keep a saved remote membership visible while its relay is down."""
+
+        remote = self.remote_store.load()
+        if remote is None:
+            return super().retained_context_for_read_only_projection()
+        credentials = self.identity_or_none()
+        if (
+            credentials is None
+            or not remote.binding.trusted
+            or credentials.identity.node_id != remote.binding.device_id
+        ):
+            return None
+        return AuthorizedOnboardingContext(
+            credentials=credentials,
+            binding=remote.binding,
+            coordinator=RemoteCoordinatorFacade(self.relay_runtime, remote),  # type: ignore[arg-type]
+        )
+
     def reconnect(self) -> FederationSessionBinding:
         remote = self.remote_store.load()
         if remote is None:

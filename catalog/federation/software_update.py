@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 import subprocess
 from collections.abc import Callable
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -202,6 +202,25 @@ class GitUpdateAdapter:
         return None, current
 
     def inspect(
+        self,
+        *,
+        target: str | None = None,
+        fetch: bool = True,
+        request_id: str | None = None,
+    ) -> UpdateInspection:
+        # ``apply`` already accepts and echoes a caller-owned request identity;
+        # ``inspect`` accepts it on the same terms so this adapter stays a
+        # complete ``LocalUpdateAdapter``. This primitive publishes no
+        # per-request result channel (``latest_result`` is always ``None``), so
+        # the identity is stamped onto the returned record rather than used to
+        # address a stored outcome. Recovering an interrupted check by request
+        # id needs the host handoff, which owns that channel.
+        result = self._inspect(target=target, fetch=fetch)
+        if request_id is None:
+            return result
+        return replace(result, request_id=request_id)
+
+    def _inspect(
         self,
         *,
         target: str | None = None,

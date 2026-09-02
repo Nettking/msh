@@ -157,7 +157,7 @@ def test_phase_d_three_nodes_replicate_and_handover(tmp_path: Path) -> None:
                 outbox=primary_outbox,
                 acknowledgements=primary_acks,
                 replication_transport=primary_endpoint,
-                clock=lambda: NOW,
+                clock=lambda: NOW + timedelta(minutes=2),
             )
             replica_service = PhaseDStorageService(
                 provider_id="provider-replica",
@@ -166,7 +166,7 @@ def test_phase_d_three_nodes_replicate_and_handover(tmp_path: Path) -> None:
                 outbox=replica_outbox,
                 acknowledgements=replica_acks,
                 replication_transport=replica_endpoint,
-                clock=lambda: NOW,
+                clock=lambda: NOW + timedelta(minutes=2),
             )
             primary_endpoint.register_service("provider-primary", primary_service)
             replica_endpoint.register_service("provider-replica", replica_service)

@@ -179,18 +179,31 @@ def test_update_processor_follows_coordinator_leader_term_and_ignores_old_leader
     class Handoff:
         def __init__(self) -> None:
             self.inspect_calls: list[str] = []
+            self.inspect_request_ids: list[str | None] = []
 
         def latest_result(self):
             return None
 
-        def inspect(self, *, target: str, fetch: bool):
+        def inspect(
+            self,
+            *,
+            target: str,
+            fetch: bool,
+            request_id: str | None = None,
+        ):
             assert fetch is True
+            # The processor owns a durable identity for an accepted command
+            # and must hand it to the host, or a restart cannot recover the
+            # outcome without reissuing the command.
+            assert request_id is not None
             self.inspect_calls.append(target)
+            self.inspect_request_ids.append(request_id)
             return UpdateInspection(
                 "up_to_date",
                 TARGET,
                 TARGET,
                 running_commit=TARGET,
+                request_id=request_id,
             )
 
     handoff = Handoff()

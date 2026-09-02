@@ -34,6 +34,17 @@ ARTIFACT_AUTHORITY_INITIALIZATION_BYTES = 4 * 1024 * 1024
 ARTIFACT_AUTHORITY_MUTATION_BYTES = 2 * 1024 * 1024
 ARTIFACT_AUTHORITY_MUTATION_INODES = 4
 
+#: Grants one ``expire`` pass may retire.
+#
+# Expiring a grant is not one write: it updates the grant and appends an audit
+# row, so an unbounded pass is unbounded in two tables at once, inside a single
+# ``BEGIN IMMEDIATE``. This entry point has no production caller today, which is
+# the only reason it is latent rather than live -- wiring it to a scheduler
+# without this bound would make an ordinary maintenance tick lifetime-sized on
+# any coordinator with a backlog. Repeated passes converge, because each pass
+# permanently removes up to this many grants from the unexpired set.
+MAX_GRANT_EXPIRY_BATCH = 1_000
+
 
 @dataclass(frozen=True)
 class ArtifactAuditEvent:
@@ -1011,6 +1022,13 @@ class SQLiteArtifactAuthority:
         return revoked
 
     def expire(self, *, now: datetime, actor_node_id: str) -> tuple[str, ...]:
+        """Expire up to ``MAX_GRANT_EXPIRY_BATCH`` grants that are due.
+
+        One pass is deliberately bounded, so a caller that must drain a
+        backlog completely calls this until it returns fewer grants than
+        the batch rather than assuming a single pass suffices.
+        """
+
         now = _utc(now, "now")
         actor_node_id = _text(actor_node_id, "actor_node_id")
         expired: list[str] = []
@@ -1018,8 +1036,10 @@ class SQLiteArtifactAuthority:
             connection.execute("BEGIN IMMEDIATE")
             rows = connection.execute(
                 """SELECT grant_id, session_id, job_id FROM capability_artifact_grants
-                   WHERE revoked_at IS NULL AND expires_at <= ?""",
-                (_timestamp(now),),
+                   WHERE revoked_at IS NULL AND expires_at <= ?
+                   ORDER BY expires_at ASC, grant_id ASC
+                   LIMIT ?""",
+                (_timestamp(now), MAX_GRANT_EXPIRY_BATCH),
             ).fetchall()
             for row in rows:
                 connection.execute(

@@ -417,6 +417,38 @@ is still retried exactly as before. This is added observability for the same
 bullet rather than a further property, so **B06 stays at 4/8 and remains
 `OPEN`.**
 
+### B06 progress — Docker crash-loop visibility
+
+The last B06 software property is closed. Docker restarts a failed service
+indefinitely at a bounded rate, and every probe in `core_service_health`
+answers a question about *now*, so a container on its fiftieth restart answered
+all of them exactly like a healthy one.
+
+Each supervised service now journals its own bounded incarnation record: one
+entry when it starts, one stop when it stops in a way it can observe. A start
+whose predecessor recorded no stop is unclean; a run of those inside a bounded
+window is a crash loop. The observation is made by the service about itself,
+so it needs no Docker socket, adds no second supervisor, does not depend on a
+Docker `healthcheck`, and is one small file on Windows and POSIX alike.
+
+Only a sustained loop changes a verdict: a single unclean start is reported as
+data, and the same count spread over a year is not a device in trouble now. A
+crash loop leaves liveness alone and overrules readiness, preserving the
+original probe code in the message. Recovery is not sticky -- one recorded stop
+ends it -- and the record is capped, because B07's rule applies to B06's own
+evidence. `ollama` and `model-provider` are deliberately absent from core
+health so an optional model can never read as a broken product.
+
+Two further defects were found in the audit. Flask had no `SIGTERM` handler at
+all, and `SIGTERM` is what `docker compose stop` sends, so an ordinary operator
+stop would have left no recorded stop and read as a crash on the next start;
+the recorder and relay already stopped gracefully. And the semantic health work
+from #387 had **no permanent release gate**, which is why its 7/8 claim could
+not be re-verified mechanically. Both are fixed.
+
+**B06 is 8/8 software properties automated-proven; B06 remains `OPEN`** for the
+exact-candidate physical campaign only.
+
 ### B07 — bounded reconstructible and cumulative metadata growth
 
 **State:** `OPEN`  
@@ -443,6 +475,72 @@ Must **not** be silently auto-deleted merely to satisfy this blocker:
 Those operator/primary paths participate in admission/pressure policy instead.
 
 D09 is explicitly `DEFERRED`: journal-backed resumable transfer retention is not a supported installed-product path today.
+
+#### Current-main inventory
+
+A fresh audit against `87f670f` rather than the historical PR list:
+
+| Item | Status | Evidence |
+|---|---|---|
+| Docker stdout/stderr logs | `PROVEN` | `x-fcp-container-logging` pins `max-size`/`max-file` on all nine services; the anchor comment refuses tunable retention because an environment-supplied `-1` would silently remove the bound. |
+| POSIX update-agent `agent.log` | `PROVEN` | `bound_agent_log` holds one live generation plus a recent tail and never raises; called from the agent runner's poll loop. |
+| BuildKit cache on every build path | `PROVEN` | `prune_build_cache` plus `retire_stranded_build_writers` on the host-build path and the POSIX update engine. |
+| Superseded unused FCP images | `PROVEN` | `retire_superseded_images`, gated on a verified build transition. |
+| Recurring provider-health command/audit history | `PROVEN` | `MAX_HEALTH_AUDIT_ROWS` ring with `AUDIT_MAINTENANCE_BATCH_ROWS` work bound; the same shape in `provider_enrollment`. |
+| Retained host-update result/branch histories | `PROVEN` | Current-state documents with hard 256 KiB serialization caps, plus `MAX_APPROVED_BRANCHES`; these are not accumulating histories. |
+| Coordinator authoritative audit ring | `PROVEN` (fixed here) | Storage was bounded; **work was not**. See below. |
+| Contribution intent history | `PROVEN` (fixed here) | Unbounded, with no reader at all. See below. |
+| Artifact grant expiry sweep | `PROVEN` (fixed here, latent) | Unbounded pass over two tables; no production caller, so the defect was latent rather than live. |
+| Terminal analysis job/attempt/command/audit history | `BLOCKED-BY-SEMANTICS` | See below. |
+| Artifact descriptors/grants/publication/audit metadata | `BLOCKED-BY-SEMANTICS` | See below. |
+
+#### Fixed in this delivery
+
+The coordinator's own `audit_log` ring bounded retained rows but retired
+*everything* past the window in one statement. `provider_health` and
+`provider_enrollment` both retire in batches and both describe themselves as
+mirroring this ring: they mirrored the row bound, and the work bound was only
+ever added on their side. On a coordinator whose history predates the ring, or
+whose bound a later release lowers, one ordinary rejected request deleted the
+entire lifetime overflow inside its own transaction. Reproduced at 5,001 rows
+deleted by a single `audit_rejection`; now exactly one batch, converging over
+repeated writes.
+
+`contribution_intent_history` grew on every enable/disable/suspend/reconcile
+and **nothing in the product reads it** -- not one query selects from that
+table. That is a stronger frontier than the provider-health argument, which
+rests on a reader cap: here there is no reader to preserve anything for. The
+authoritative current intent lives in `contribution_intents` and is untouched;
+recent superseded revisions are retained because their only remaining value is
+operator forensics, and that value is entirely in the recent ones. Retirement
+is by the candidate's own monotonic revision, confined to the candidate being
+written, and batch-bounded like the three existing rings.
+
+#### Blocked by semantics, and why
+
+These are not "policy undecided". Each has a specific invariant that deletion
+would break, and each belongs to the B09 authority/history boundary rather
+than to B07:
+
+- `capability_jobs` carries `UNIQUE(session_id, idempotency_key)`. Retiring a
+  terminal job would let the same work be accepted again as new, so this is
+  the accepted-request tombstone/hash horizon B09 owns, not a B07 bound.
+- `capability_job_commands` is command replay suppression; the same argument.
+- `capability_job_audit` and `capability_artifact_audit` are read *in full per
+  job* (`WHERE job_id=? ORDER BY sequence`), with no reader cap to derive a
+  frontier from. They are bounded per job by that job's lifecycle events, so
+  their only unbounded dimension is the number of retained jobs -- which is
+  the same B09 horizon above.
+- `capability_artifact_grants` is referenced by
+  `capability_artifact_publications` through a foreign key, so grant rows
+  cannot be retired independently of publication history.
+- `data_upload_*` and recorder evidence are user/primary data and are excluded
+  by B07's own rules.
+
+Physical disk reclamation is a separate claim from any of these: every ring
+here is a logical row bound. SQLite reuses the freed pages, so a database stops
+growing but does not shrink without an explicit `VACUUM`, which remains an
+operational decision.
 
 ### B08 — crash-correct derived and upload boundaries
 
@@ -476,76 +574,102 @@ Required properties:
 
 Do not introduce distributed clock consensus. Existing owner/term/fencing checks remain valuable and must be preserved.
 
-Robustness progress: **B09 1/7 properties automated-proven; B09 remains `OPEN`.**
 The authoritative-replay completeness delivery adds one shared bounded reader
 that folds a caller's own pages and returns only once the coordinator's reported
 current revision has been reached; every other exit raises an explicit
-`authoritative-replay-incomplete` bounded error. Both consumers named above are
-wired onto it, so no authority/security projection presents a bounded prefix as
-current truth any more: a leadership handover recorded past the page budget now
-refuses leader authority instead of granting it to the demoted node, and
-human-auth authority endpoints and per-user role/active state are refused rather
-than answered from a prefix in which the newest change had not happened.
-Accelerated automated tests cross the shipped `MAX_LEADERSHIP_REPLAY_PAGES` and
-`MAX_EVENT_PAGES` ceilings against a real coordinator and a real leadership
-handover; only page size is accelerated. No page ceiling was widened, no
-additional history is read, and coordinator authority, fencing, revision-gap,
-lease and membership checks are unchanged.
+`authoritative-replay-incomplete` bounded error. Leadership, human-auth,
+shared knowledge, and the Federation authority projection use it on their
+unchanged page ceilings. The capability/update/software-version/recorder-control
+report aggregators and the member-side capability-request and software-update
+processors now use the same complete-read contract, so an empty page, revision
+gap, or exhausted ceiling is a bounded failure rather than an implicit end of
+history. Accelerated consequence tests cross each existing ceiling without
+widening it. No authority, owner, term, fencing, lease, membership or CF7
+acceptance flag changed.
 
-The shared-knowledge reader is now wired onto the same primitive, on the same
-unchanged `REPLAY_PAGE_EVENTS`/`MAX_REPLAY_PAGES` ceilings. That consumer is not
-an authority projection, but its prefix behaviour was worse than
-under-reporting: `_reduce` learns that a document ever existed only from that
-document's own events, and `seen_document_ids` is the only reason `load_payload`
-leaves a deleted id alone. A read that stopped before a delete therefore treated
-the local cached copy as new content and re-published the withdrawn document
-into the append-only authoritative log, for every member and with no retraction
-available; the projection the caller wrote back to its own cache was also
-missing everything past the stopping point. Incomplete reads now raise the same
-bounded `authoritative-replay-incomplete` error, which the repository's existing
-degradation path turns into "keep reading the local cache and change nothing
-shared", reported at warning level to separate it from an ordinary unreachable
-relay. Regression evidence covers the resurrection itself, a write and a
-tombstone built on a prefix, the accelerated page-budget ceiling against a real
-coordinator, and the deletion still being honoured once complete history is
-readable again.
+The member node's own replay path already persists every accepted event in its
+durable `applied_events` table and marks replay incomplete until its final
+revision is durably present. Capability reconciliation retains its equivalent
+checkpointed complete-read contract and fails closed on gaps or its maximum
+replay bound. The coordinator's `session_events` and `accepted_requests`
+records have no retirement path; the separate local trial-result retirement is
+preceded by a durable intent and does not retire authoritative request history.
 
-Failing closed also has to arrive somewhere. `LoginMode` degrades to `local`
-on an incomplete read, but `saved_remote_member` correctly keeps an established
-member a member, so the two member authority surfaces -- user administration and
-password change -- fell through to `authority(refresh=True)`, which since this
-work raises instead of answering from a prefix. Unhandled in a `before_request`
-hook, that bounded refusal reached the operator as a broken device rather than
-as the `503` those routes already define for an authority they cannot resolve.
-`resolved_authority` now turns any bounded Federation failure there into the
-existing unresolved-authority answer, logging an incomplete authoritative read
-above an ordinary unreachable relay. It never widens anything: both callers
-refuse on an unresolved authority rather than falling back to a device-local
-page. This is the operator-representation half of the control-plane property;
-the explicit unavailable/reconnecting operator surface is still not built, so
-that property stays open.
+`resolved_authority` continues to expose an unresolved authority through the
+existing bounded `503` for member user-administration and password-change
+surfaces. The Federation overview now separately exposes a trusted saved member
+whose coordinator or authoritative projection is unavailable as `Federation
+control plane unavailable` / `Unavailable / reconnecting`, retaining the
+membership and explicitly avoiding a setup or invented member-failure result.
 
-The Federation authority projection adapter is now wired onto the same reader
-as well, on its own unchanged ceilings. Its bounded loop measured progress by
-page length rather than by revision, so only budget exhaustion refused: an empty
-page while the coordinator still reported later history, and a page whose
-revisions were not contiguous, both returned the prefix and reported it as
-`current`. Membership, leadership and device naming are folded from that
-history, so the operator's Federation overview presented a revoked device as a
-current member and a demoted node as leader. `snapshot` already had the right
-representation for a bounded failure -- an explicit unavailable projection with
-a safe reason code -- so the refusal now reaches it, and it names
-`authoritative-replay-incomplete` instead of the generic projection failure.
+Storage grants and provider-side write leases keep their existing fixed
+time-window checks, including stale/future/expired rejection. Trusted v1
+deployments must run UTC NTP/time synchronisation and remain within the
+documented bounded clock-skew prerequisite before storage write authority is
+enabled. Exact-host positive/negative clock-offset and power-loss evidence
+remains a P09 physical requirement; no physical evidence or acceptance state
+changed.
 
-The explicit fail-closed requirement is still not closed. The capability-request,
-update, software-version and recorder-control report aggregators still return
-what they accumulated at their own ceilings; each under-reports rather than
-granting authority, but none of them fails closed yet, so B09 stays at 1/7. The
-remaining five properties are untouched: snapshot/base-revision compaction,
-member-replicated history lifetime and request-history retirement horizons all
-depend on retirement mechanisms that do not exist, and the control-plane
-unavailable/reconnecting representation and the bounded-clock-skew/NTP
-prerequisite are still open. No physical evidence or acceptance state changed.
+Robustness progress: **B09's software lane is exhausted; the release blocker
+remains `OPEN` only for the explicitly physical clock/crash campaign.** The
+shared `replay_authoritative_history` reader folds a caller's own bounded pages
+and returns only after the coordinator's reported current revision is reached;
+every other exit raises `authoritative-replay-incomplete`. Leadership, human
+authentication, shared knowledge, the Federation authority projection, the
+capability/update/software-version/recorder-control report aggregators, and the
+member-side capability-request and software-update processors now use that
+complete-read contract or an equivalent complete-read contract. No page ceiling
+was widened and no authority, owner, term, fencing, membership, lease or CF7
+acceptance flag changed.
+
+Property disposition at this exact baseline:
+
+1. **AUTOMATED-PROVEN.** No authority or security projection returns a bounded
+   prefix as current truth. Consequence tests cover late revocations,
+   leadership changes, revision gaps, empty pages, non-contiguous pages and
+   report/command consumers at their existing ceilings.
+2. **AUTOMATED-PROVEN.** A consumer that cannot prove the current revision
+   raises the stable bounded `authoritative-replay-incomplete` error. Member
+   command processors persist only the applied prefix and surface the failure;
+   they do not silently finish a request pass.
+3. **SAFE V1 BOUNDARY.** There is no session-event compaction or old-event
+   retirement path. Consequently no event can be retired without a future
+   coordinator-authenticated snapshot/base-revision protocol.
+4. **SAFE-V1 AUTHORITATIVE-HISTORY BOUNDARY; NOT PHYSICALLY BOUNDED.** The
+   coordinator's `session_events` and each member's `applied_events` are
+   durable, revision-unique append-only histories with durable replay
+   checkpoints. No member-history cleanup path exists, so the member copy is
+   included in the lifetime semantics rather than being treated as disposable
+   cache. That preserves replay correctness but does not prove bounded physical
+   storage; cumulative growth remains an explicit retention/archival decision.
+5. **SAFE-V1 IDEMPOTENCY-HISTORY BOUNDARY; NOT PHYSICALLY BOUNDED.**
+   Authoritative accepted requests remain in the append-only session history and
+   `accepted_requests` idempotency table; no request-id history is retired.
+   The separate local trial-result cleanup is protected by a durable retirement
+   intent and does not retire authoritative request history. Deleting these
+   rows without a tombstone/hash horizon would weaken replay or duplicate
+   suppression semantics.
+6. **AUTOMATED-PROVEN.** A trusted saved member whose coordinator or
+   authoritative history is unavailable is exposed as `Federation control plane
+   unavailable` / `Unavailable / reconnecting`, with membership retained and no
+   setup or invented member-failure inference. Authority and human-auth routes
+   continue to fail closed with their bounded unresolved-authority response.
+7. **AUTOMATED BOUNDED-TIME CONTRACT; PHYSICAL NTP EVIDENCE OPEN.** Existing
+   signed assertions, routes, commands, storage grants and provider-side write
+   lease checks reject stale, future or expired time windows. The concrete v1
+   deployment bound is an absolute **30 seconds** from the trusted UTC NTP
+   source on the coordinator and every storage provider. It is derived from
+   the normal **300-second** storage authority lease (one tenth of the lease,
+   and no more than half the 60-second renewal margin). The normal operator
+   documentation carries this prerequisite; P09 still requires exact-host
+   positive/negative clock-offset evidence around lease/grant expiry. No
+   distributed clock consensus was introduced.
+
+The remaining physical work is therefore not a new software authority design:
+run the corrected P05/P09 campaign on the exact candidate, including storage
+lease expiry with provider wall-clock offsets, coordinator/relay loss, and the
+already documented crash/power-loss windows. No physical evidence or
+acceptance state changed in this delivery.
 
 ### B10 — quiesced, capacity-safe backup/recovery and host-process identity
 

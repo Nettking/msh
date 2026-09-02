@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, is_dataclass
+from dataclasses import asdict, is_dataclass, replace
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from types import SimpleNamespace
@@ -322,6 +322,34 @@ def test_expired_benchmark_is_evidence_only_and_becomes_next_action() -> None:
     assert overview["recommended_action"]["url"] == "/federation/benchmarks"
     assert benchmarks["items"][0]["state"] == "expired"
     assert "authority" not in _serialized(benchmarks["items"][0])
+
+
+def test_trusted_membership_exposes_control_plane_loss_without_inventing_setup() -> None:
+    adapters = replace(
+        _complete_adapters(),
+        federation=StaticAdapter(
+            FederationAuthoritySnapshot(
+                available=False,
+                reason_code="authoritative-replay-incomplete",
+            )
+        ),
+    )
+
+    overview = FederationProjectionService(adapters, now=lambda: NOW).overview().to_dict()
+
+    assert overview["state"] == "degraded"
+    assert overview["state_label"] == "Control plane unavailable / reconnecting"
+    assert overview["notice"]["title"] == "Federation control plane unavailable"
+    assert "saved trusted membership is retained" in overview["notice"]["message"]
+    assert "no new setup or member failure" in overview["notice"]["message"]
+    assert overview["degraded"]["action"]["url"] == "/onboarding?repair=1"
+    assert overview["recommended_action"] is None
+    assert overview["control_plane"] == {
+        "state": "unavailable",
+        "state_label": "Unavailable / reconnecting",
+        "membership_retained": True,
+        "reason_code": "authoritative-replay-incomplete",
+    }
 
 
 class State(Enum):

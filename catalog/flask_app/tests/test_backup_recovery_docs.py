@@ -25,7 +25,9 @@ def test_backup_recovery_requires_quiesced_non_destructive_snapshot() -> None:
     assert "docker compose down -v" in text
     assert "A normal backup must never delete Docker volumes." in text
     assert "source-commit.txt" in text
-    assert "relay-state.tgz" in text
+    # The repository-owned backup copies the stopped relay volume into a
+    # verified directory rather than the legacy manual relay-state.tgz archive.
+    assert "relay-state/" in text
 
 
 def test_backup_recovery_is_discoverable_from_current_docs_index() -> None:
