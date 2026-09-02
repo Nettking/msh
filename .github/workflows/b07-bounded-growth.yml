@@ -1,0 +1,81 @@
+name: B07 bounded growth
+
+# B07 requires FCP-generated histories to bound both retained storage and the
+# work one ordinary write may do to maintain them. These are the rings that
+# carry that rule.
+
+on:
+  pull_request:
+    paths:
+      - "catalog/federation/persistence.py"
+      - "catalog/federation/tests/test_coordinator_audit_ring_bound.py"
+      - "catalog/capabilities/provider_health.py"
+      - "catalog/capabilities/provider_enrollment.py"
+      - "catalog/capabilities/artifact_authority.py"
+      - "catalog/capabilities/contributions/store.py"
+      - "catalog/capabilities/contributions/tests/test_intent_history_bound.py"
+      - "catalog/federation/agent_log.py"
+      - "catalog/federation/image_retirement.py"
+      - ".github/workflows/b07-bounded-growth.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: b07-bounded-growth-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bounded-growth:
+    name: Bounded growth (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install pytest ruff
+
+      - name: Compile growth boundary
+        run: >-
+          python -m compileall -q
+          catalog/federation/persistence.py
+          catalog/capabilities/artifact_authority.py
+          catalog/capabilities/contributions/store.py
+
+      - name: Bounded growth regressions
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/federation/tests/test_coordinator_audit_ring_bound.py
+          catalog/capabilities/contributions/tests/test_intent_history_bound.py
+          catalog/capabilities/contributions/tests/test_contribution_store.py
+          catalog/federation/tests/test_agent_log.py
+          catalog/federation/tests/test_image_retirement.py
+
+      - name: Ruff growth boundary
+        run: >-
+          python -m ruff check
+          catalog/federation/persistence.py
+          catalog/federation/tests/test_coordinator_audit_ring_bound.py
+          catalog/capabilities/contributions/store.py
+          catalog/capabilities/contributions/tests/test_intent_history_bound.py
+
+      - name: Diff hygiene
+        shell: bash
+        run: git diff --check "origin/${{ github.base_ref || 'main' }}...HEAD"
