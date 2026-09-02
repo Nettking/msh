@@ -7,11 +7,19 @@ from typing import Any
 import pytest
 
 from catalog.federation.authoritative_replay import AuthoritativeReplayIncomplete
-from catalog.flask_app.services import federation_capability_requests as capability_module
-from catalog.flask_app.services import federation_recorder_control_service as recorder_module
-from catalog.flask_app.services import federation_software_version_service as version_module
+from catalog.flask_app.services import (
+    federation_capability_requests as capability_module,
+)
+from catalog.flask_app.services import (
+    federation_recorder_control_service as recorder_module,
+)
+from catalog.flask_app.services import (
+    federation_software_version_service as version_module,
+)
+from catalog.flask_app.services import federation_update_events as events_module
 from catalog.flask_app.services import federation_update_service as update_module
 from catalog.flask_app.services.federation_capability_requests import (
+    FederationCapabilityRequestProcessor,
     FederationCapabilityRequestService,
 )
 from catalog.flask_app.services.federation_recorder_control_service import (
@@ -20,7 +28,10 @@ from catalog.flask_app.services.federation_recorder_control_service import (
 from catalog.flask_app.services.federation_software_version_service import (
     FederationSoftwareVersionService,
 )
-from catalog.flask_app.services.federation_update_events import CHECK_REPORT_EVENT
+from catalog.flask_app.services.federation_update_events import (
+    CHECK_REPORT_EVENT,
+    FederationUpdateEventProcessor,
+)
 from catalog.flask_app.services.federation_update_service import FederationUpdateService
 
 
@@ -200,3 +211,40 @@ def test_passive_status_does_not_hide_authoritative_replay_incomplete(
 
     with pytest.raises(AuthoritativeReplayIncomplete):
         service.snapshot()
+
+
+@pytest.mark.parametrize("kind", ["capability", "update"])
+def test_member_processors_fail_closed_at_their_existing_page_ceiling(
+    kind: str,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """A member command loop cannot silently finish on an unreached head."""
+
+    if kind == "capability":
+        monkeypatch.setattr(capability_module, "_PROCESSOR_REPLAY_PAGE_EVENTS", 1)
+        monkeypatch.setattr(capability_module, "_MAX_PROCESSOR_REPLAY_PAGES", 2)
+        service = SimpleNamespace(
+            remote_store=SimpleNamespace(load=lambda: {"connected": True})
+        )
+        processor = FederationCapabilityRequestProcessor(
+            service,
+            tmp_path / "capability-processor.json",
+        )
+    else:
+        monkeypatch.setattr(events_module, "_PROCESSOR_REPLAY_PAGE_EVENTS", 1)
+        monkeypatch.setattr(events_module, "_MAX_PROCESSOR_REPLAY_PAGES", 2)
+        service = SimpleNamespace(
+            remote_store=SimpleNamespace(load=lambda: {"connected": True})
+        )
+        handoff = SimpleNamespace(directory=tmp_path / "handoff")
+        processor = FederationUpdateEventProcessor(
+            service,
+            handoff,
+            tmp_path / "update-processor.json",
+        )
+
+    # The old loops stopped after two pages and returned normally. The shared
+    # primitive must instead expose the bounded failure to the lifecycle owner.
+    with pytest.raises(AuthoritativeReplayIncomplete):
+        processor.process(_context(3))

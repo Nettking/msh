@@ -108,6 +108,7 @@ class StorageErrorCode(str, Enum):
     STALE_TERM = "stale-term"
     STALE_FENCING_TOKEN = "stale-fencing-token"
     LEASE_EXPIRED = "lease-expired"
+    GRANT_NOT_YET_VALID = "grant-not-yet-valid"
     UNKNOWN_GRANT = "unknown-grant"
     BATCH_NOT_FOUND = "batch-not-found"
     IDEMPOTENCY_CONFLICT = "idempotency-conflict"

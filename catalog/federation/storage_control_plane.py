@@ -181,6 +181,7 @@ class StorageControlPlaneSnapshot:
                 "grant_id": grant_id,
                 "term": term,
                 "fencing_token": fencing_token,
+                "issued_at": event.occurred_at.isoformat(),
                 "lease_expires_at": lease_expires_at.isoformat(),
                 "scopes": list(scopes),
             }

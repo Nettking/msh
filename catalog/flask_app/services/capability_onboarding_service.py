@@ -455,6 +455,34 @@ class CapabilityOnboardingService:
             coordinator=self.coordinator,
         )
 
+    def retained_context_for_read_only_projection(
+        self,
+    ) -> AuthorizedOnboardingContext | None:
+        """Return the durable binding for a degraded read-only projection.
+
+        This is intentionally not an authorization shortcut.  Callers use it
+        only after the normal coordinator-backed ``authorized_context`` check
+        failed because the authority was unavailable.  It never refreshes the
+        binding, proves current membership, or authorizes a mutating request;
+        it lets the operator see that a trusted membership was retained while
+        the control plane is offline.
+        """
+
+        credentials = self.identity_or_none()
+        binding = self.binding_or_none()
+        if (
+            credentials is None
+            or binding is None
+            or not binding.trusted
+            or binding.device_id != credentials.identity.node_id
+        ):
+            return None
+        return AuthorizedOnboardingContext(
+            credentials=credentials,
+            binding=binding,
+            coordinator=self.coordinator,
+        )
+
     def legacy_preview(self) -> None:
         """CFI-2 never reads retired setup; CFI-6 exclusively owns migration."""
 

@@ -223,8 +223,15 @@ def test_remote_processor_pins_creator_from_authenticated_session_event(
         def latest_result(self):
             return None
 
-        def inspect(self, *, target: str, fetch: bool):
+        def inspect(
+            self,
+            *,
+            target: str,
+            fetch: bool,
+            request_id: str | None = None,
+        ):
             assert fetch is True
+            assert request_id is not None
             self.inspect_calls.append(target)
             return UpdateInspection(
                 "up_to_date",

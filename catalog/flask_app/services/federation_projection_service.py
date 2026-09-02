@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 from collections.abc import Iterable
 from types import SimpleNamespace
 from typing import Any
@@ -51,6 +52,18 @@ _EXPECTED_EMPTY_CONTRIBUTION_CODES = {
     "contribution-inspection-expired",
 }
 
+# Only failures that mean current authority could not be read may retain the
+# durable identity/binding for a read-only outage projection. A definitive
+# authentication/authorization/binding rejection must continue to fail closed
+# as setup/repair rather than masquerading as temporary coordinator loss.
+_RETAINED_MEMBERSHIP_OUTAGE_CODES = {
+    "authoritative-replay-incomplete",
+    "onboarding-session-unavailable",
+    "coordinator-unavailable",
+    "relay-unavailable",
+    "target-unavailable",
+}
+
 
 class _AuthorizedProviderView:
     """Reuse one already-authorized operator view without re-reading authority."""
@@ -91,11 +104,38 @@ def _empty_service() -> FederationProjectionService:
     return FederationProjectionService(ProjectionAdapters())
 
 
-def _onboarding_context() -> AuthorizedOnboardingContext | None:
+def _onboarding_context() -> tuple[AuthorizedOnboardingContext | None, bool]:
+    """Return context plus whether it was revalidated against live authority.
+
+    The retained context is display continuity only. The boolean prevents the
+    caller from accidentally carrying its coordinator object into Federation,
+    storage, job, leader, or mutation authority after live revalidation failed.
+    """
+
+    service = get_capability_onboarding_service()
     try:
-        return get_capability_onboarding_service().authorized_context()
+        return service.authorized_context(), True
+    except (OSError, TimeoutError, sqlite3.Error) as exc:
+        current_app.logger.info(
+            "Federation coordinator unavailable; retaining saved binding "
+            "for read-only projection (%s)",
+            type(exc).__name__,
+        )
+        return service.retained_context_for_read_only_projection(), False
+    except FederationOperationError as exc:
+        code = str(getattr(exc, "code", ""))
+        if code not in _RETAINED_MEMBERSHIP_OUTAGE_CODES and not code.endswith(
+            "-unavailable"
+        ):
+            return None, False
+        current_app.logger.info(
+            "Federation authority unavailable; retaining saved binding "
+            "for read-only projection (%s)",
+            code or type(exc).__name__,
+        )
+        return service.retained_context_for_read_only_projection(), False
     except Exception:  # noqa: BLE001 - projection authorization fails closed
-        return None
+        return None, False
 
 
 def _warn_projection(name: str, exc: Exception) -> None:
@@ -160,7 +200,14 @@ def _contribution_state() -> tuple[tuple[object, ...], tuple[object, ...], bool]
         return (), (), True
 
 
-def _storage_adapter(internal_session_id: str, coordinator: object) -> object:
+def _storage_adapter(internal_session_id: str, coordinator: object | None) -> object:
+    # A retained local storage database is not current write authority when the
+    # coordinator that fences and renews grants is unavailable.
+    if coordinator is None:
+        return _StaticSnapshotAdapter(
+            StorageAuthoritySnapshot(False, "federation-authority-unavailable")
+        )
+
     if _STORAGE_STORE_CONFIG_KEY in current_app.config:
         store = current_app.config.get(_STORAGE_STORE_CONFIG_KEY)
         if store is None:
@@ -208,8 +255,13 @@ def get_federation_projection_service() -> FederationProjectionService:
     explicitly composed. Normal Federation GETs never initialize provider
     enrollment/health authority as a side effect. Otherwise the durable
     capability-first identity and trusted binding are revalidated against the
-    existing coordinator. Browser parameters are never accepted as actor,
-    session, endpoint or authority context.
+    existing coordinator.
+
+    When live revalidation is unavailable, the durable identity/binding may be
+    retained only to explain that a known member is reconnecting. That retained
+    view supplies no coordinator and therefore cannot become Federation,
+    storage, job, leader, update, or mutation authority. Browser parameters are
+    never accepted as actor, session, endpoint or authority context.
     """
 
     surface = current_app.config.get(_OPERATOR_SURFACE_CONFIG_KEY)
@@ -218,6 +270,7 @@ def get_federation_projection_service() -> FederationProjectionService:
     coordinator: object | None = None
     internal_session_id: str | None = None
     actor_node_id: str | None = None
+    live_authority = False
 
     try:
         if isinstance(surface, ProviderOperatorSurface):
@@ -243,14 +296,15 @@ def get_federation_projection_service() -> FederationProjectionService:
             provider_adapter = ProviderOperatorAdapter(
                 _AuthorizedProviderView(authorized_view)
             )
+            live_authority = coordinator is not None
         else:
-            context = _onboarding_context()
+            context, live_authority = _onboarding_context()
             if context is None:
                 return _empty_service()
             binding = context.binding
             internal_session_id = context.binding.internal_session_id
             actor_node_id = context.credentials.identity.node_id
-            coordinator = context.coordinator
+            coordinator = context.coordinator if live_authority else None
 
         inspection, inspection_failed = _inspection_state()
         candidates, intents, contribution_failed = _contribution_state()
@@ -289,7 +343,16 @@ def get_federation_projection_service() -> FederationProjectionService:
                 provider_adapter,
             ),
             storage=_storage_adapter(internal_session_id, coordinator),
-            jobs=_job_adapter(internal_session_id),
+            jobs=(
+                _job_adapter(internal_session_id)
+                if live_authority
+                else _StaticSnapshotAdapter(
+                    JobAuthoritySnapshot(
+                        False,
+                        "federation-authority-unavailable",
+                    )
+                )
+            ),
         )
         return FederationProjectionService(adapters)
     except Exception:  # noqa: BLE001 - authorization/projection must fail closed

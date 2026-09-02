@@ -574,76 +574,102 @@ Required properties:
 
 Do not introduce distributed clock consensus. Existing owner/term/fencing checks remain valuable and must be preserved.
 
-Robustness progress: **B09 1/7 properties automated-proven; B09 remains `OPEN`.**
 The authoritative-replay completeness delivery adds one shared bounded reader
 that folds a caller's own pages and returns only once the coordinator's reported
 current revision has been reached; every other exit raises an explicit
-`authoritative-replay-incomplete` bounded error. Both consumers named above are
-wired onto it, so no authority/security projection presents a bounded prefix as
-current truth any more: a leadership handover recorded past the page budget now
-refuses leader authority instead of granting it to the demoted node, and
-human-auth authority endpoints and per-user role/active state are refused rather
-than answered from a prefix in which the newest change had not happened.
-Accelerated automated tests cross the shipped `MAX_LEADERSHIP_REPLAY_PAGES` and
-`MAX_EVENT_PAGES` ceilings against a real coordinator and a real leadership
-handover; only page size is accelerated. No page ceiling was widened, no
-additional history is read, and coordinator authority, fencing, revision-gap,
-lease and membership checks are unchanged.
+`authoritative-replay-incomplete` bounded error. Leadership, human-auth,
+shared knowledge, and the Federation authority projection use it on their
+unchanged page ceilings. The capability/update/software-version/recorder-control
+report aggregators and the member-side capability-request and software-update
+processors now use the same complete-read contract, so an empty page, revision
+gap, or exhausted ceiling is a bounded failure rather than an implicit end of
+history. Accelerated consequence tests cross each existing ceiling without
+widening it. No authority, owner, term, fencing, lease, membership or CF7
+acceptance flag changed.
 
-The shared-knowledge reader is now wired onto the same primitive, on the same
-unchanged `REPLAY_PAGE_EVENTS`/`MAX_REPLAY_PAGES` ceilings. That consumer is not
-an authority projection, but its prefix behaviour was worse than
-under-reporting: `_reduce` learns that a document ever existed only from that
-document's own events, and `seen_document_ids` is the only reason `load_payload`
-leaves a deleted id alone. A read that stopped before a delete therefore treated
-the local cached copy as new content and re-published the withdrawn document
-into the append-only authoritative log, for every member and with no retraction
-available; the projection the caller wrote back to its own cache was also
-missing everything past the stopping point. Incomplete reads now raise the same
-bounded `authoritative-replay-incomplete` error, which the repository's existing
-degradation path turns into "keep reading the local cache and change nothing
-shared", reported at warning level to separate it from an ordinary unreachable
-relay. Regression evidence covers the resurrection itself, a write and a
-tombstone built on a prefix, the accelerated page-budget ceiling against a real
-coordinator, and the deletion still being honoured once complete history is
-readable again.
+The member node's own replay path already persists every accepted event in its
+durable `applied_events` table and marks replay incomplete until its final
+revision is durably present. Capability reconciliation retains its equivalent
+checkpointed complete-read contract and fails closed on gaps or its maximum
+replay bound. The coordinator's `session_events` and `accepted_requests`
+records have no retirement path; the separate local trial-result retirement is
+preceded by a durable intent and does not retire authoritative request history.
 
-Failing closed also has to arrive somewhere. `LoginMode` degrades to `local`
-on an incomplete read, but `saved_remote_member` correctly keeps an established
-member a member, so the two member authority surfaces -- user administration and
-password change -- fell through to `authority(refresh=True)`, which since this
-work raises instead of answering from a prefix. Unhandled in a `before_request`
-hook, that bounded refusal reached the operator as a broken device rather than
-as the `503` those routes already define for an authority they cannot resolve.
-`resolved_authority` now turns any bounded Federation failure there into the
-existing unresolved-authority answer, logging an incomplete authoritative read
-above an ordinary unreachable relay. It never widens anything: both callers
-refuse on an unresolved authority rather than falling back to a device-local
-page. This is the operator-representation half of the control-plane property;
-the explicit unavailable/reconnecting operator surface is still not built, so
-that property stays open.
+`resolved_authority` continues to expose an unresolved authority through the
+existing bounded `503` for member user-administration and password-change
+surfaces. The Federation overview now separately exposes a trusted saved member
+whose coordinator or authoritative projection is unavailable as `Federation
+control plane unavailable` / `Unavailable / reconnecting`, retaining the
+membership and explicitly avoiding a setup or invented member-failure result.
 
-The Federation authority projection adapter is now wired onto the same reader
-as well, on its own unchanged ceilings. Its bounded loop measured progress by
-page length rather than by revision, so only budget exhaustion refused: an empty
-page while the coordinator still reported later history, and a page whose
-revisions were not contiguous, both returned the prefix and reported it as
-`current`. Membership, leadership and device naming are folded from that
-history, so the operator's Federation overview presented a revoked device as a
-current member and a demoted node as leader. `snapshot` already had the right
-representation for a bounded failure -- an explicit unavailable projection with
-a safe reason code -- so the refusal now reaches it, and it names
-`authoritative-replay-incomplete` instead of the generic projection failure.
+Storage grants and provider-side write leases keep their existing fixed
+time-window checks, including stale/future/expired rejection. Trusted v1
+deployments must run UTC NTP/time synchronisation and remain within the
+documented bounded clock-skew prerequisite before storage write authority is
+enabled. Exact-host positive/negative clock-offset and power-loss evidence
+remains a P09 physical requirement; no physical evidence or acceptance state
+changed.
 
-The explicit fail-closed requirement is still not closed. The capability-request,
-update, software-version and recorder-control report aggregators still return
-what they accumulated at their own ceilings; each under-reports rather than
-granting authority, but none of them fails closed yet, so B09 stays at 1/7. The
-remaining five properties are untouched: snapshot/base-revision compaction,
-member-replicated history lifetime and request-history retirement horizons all
-depend on retirement mechanisms that do not exist, and the control-plane
-unavailable/reconnecting representation and the bounded-clock-skew/NTP
-prerequisite are still open. No physical evidence or acceptance state changed.
+Robustness progress: **B09's software lane is exhausted; the release blocker
+remains `OPEN` only for the explicitly physical clock/crash campaign.** The
+shared `replay_authoritative_history` reader folds a caller's own bounded pages
+and returns only after the coordinator's reported current revision is reached;
+every other exit raises `authoritative-replay-incomplete`. Leadership, human
+authentication, shared knowledge, the Federation authority projection, the
+capability/update/software-version/recorder-control report aggregators, and the
+member-side capability-request and software-update processors now use that
+complete-read contract or an equivalent complete-read contract. No page ceiling
+was widened and no authority, owner, term, fencing, membership, lease or CF7
+acceptance flag changed.
+
+Property disposition at this exact baseline:
+
+1. **AUTOMATED-PROVEN.** No authority or security projection returns a bounded
+   prefix as current truth. Consequence tests cover late revocations,
+   leadership changes, revision gaps, empty pages, non-contiguous pages and
+   report/command consumers at their existing ceilings.
+2. **AUTOMATED-PROVEN.** A consumer that cannot prove the current revision
+   raises the stable bounded `authoritative-replay-incomplete` error. Member
+   command processors persist only the applied prefix and surface the failure;
+   they do not silently finish a request pass.
+3. **SAFE V1 BOUNDARY.** There is no session-event compaction or old-event
+   retirement path. Consequently no event can be retired without a future
+   coordinator-authenticated snapshot/base-revision protocol.
+4. **SAFE-V1 AUTHORITATIVE-HISTORY BOUNDARY; NOT PHYSICALLY BOUNDED.** The
+   coordinator's `session_events` and each member's `applied_events` are
+   durable, revision-unique append-only histories with durable replay
+   checkpoints. No member-history cleanup path exists, so the member copy is
+   included in the lifetime semantics rather than being treated as disposable
+   cache. That preserves replay correctness but does not prove bounded physical
+   storage; cumulative growth remains an explicit retention/archival decision.
+5. **SAFE-V1 IDEMPOTENCY-HISTORY BOUNDARY; NOT PHYSICALLY BOUNDED.**
+   Authoritative accepted requests remain in the append-only session history and
+   `accepted_requests` idempotency table; no request-id history is retired.
+   The separate local trial-result cleanup is protected by a durable retirement
+   intent and does not retire authoritative request history. Deleting these
+   rows without a tombstone/hash horizon would weaken replay or duplicate
+   suppression semantics.
+6. **AUTOMATED-PROVEN.** A trusted saved member whose coordinator or
+   authoritative history is unavailable is exposed as `Federation control plane
+   unavailable` / `Unavailable / reconnecting`, with membership retained and no
+   setup or invented member-failure inference. Authority and human-auth routes
+   continue to fail closed with their bounded unresolved-authority response.
+7. **AUTOMATED BOUNDED-TIME CONTRACT; PHYSICAL NTP EVIDENCE OPEN.** Existing
+   signed assertions, routes, commands, storage grants and provider-side write
+   lease checks reject stale, future or expired time windows. The concrete v1
+   deployment bound is an absolute **30 seconds** from the trusted UTC NTP
+   source on the coordinator and every storage provider. It is derived from
+   the normal **300-second** storage authority lease (one tenth of the lease,
+   and no more than half the 60-second renewal margin). The normal operator
+   documentation carries this prerequisite; P09 still requires exact-host
+   positive/negative clock-offset evidence around lease/grant expiry. No
+   distributed clock consensus was introduced.
+
+The remaining physical work is therefore not a new software authority design:
+run the corrected P05/P09 campaign on the exact candidate, including storage
+lease expiry with provider wall-clock offsets, coordinator/relay loss, and the
+already documented crash/power-loss windows. No physical evidence or
+acceptance state changed in this delivery.
 
 ### B10 — quiesced, capacity-safe backup/recovery and host-process identity
 
