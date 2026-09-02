@@ -33,6 +33,15 @@ from .storage_authority_enrollment import (
 
 DEFAULT_RENEW_BEFORE_SECONDS = 60
 
+#: Federation v1 deployment prerequisite for clocks participating in storage
+#: authority. The bound is half the fixed default renewal frontier: a provider
+#: that is this far fast still has at least the other half of the renewal window
+#: before it considers the old grant expired, while a provider this far slow can
+#: remain in the strict ``not-yet-valid`` refusal state for at most this long
+#: after a fresh coordinator grant. This is an operational liveness contract,
+#: not clock tolerance in the authority validator; fencing remains fail closed.
+MAX_SUPPORTED_CLOCK_SKEW_SECONDS = DEFAULT_RENEW_BEFORE_SECONDS // 2
+
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
@@ -233,5 +242,6 @@ class RenewingTrustedGreenStorageAuthority:
 
 __all__ = [
     "DEFAULT_RENEW_BEFORE_SECONDS",
+    "MAX_SUPPORTED_CLOCK_SKEW_SECONDS",
     "RenewingTrustedGreenStorageAuthority",
 ]
