@@ -88,13 +88,30 @@ def test_os_specific_assertions_fail_closed(
         )
 
 
-def test_p07_requires_all_assertions_duration_and_samples(
+def _write_timed_packet(
+    root: Path,
+    *,
+    kind: str,
+    recorded_at: str,
+    run_id: str = "run",
+) -> None:
+    packet = campaign.base_packet(
+        root,
+        commit=COMMIT,
+        host="test-host",
+        scenario="P07",
+        kind=kind,
+    )
+    packet.update({"run_id": run_id, "recorded_at": recorded_at})
+    campaign.write_packet(root, packet)
+
+
+def test_p07_requires_matching_session_duration_and_samples(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     checkout, root = _ready(monkeypatch, tmp_path)
-    spec = campaign.SCENARIOS["P07"]
-    for assertion in spec.assertions:
+    for assertion in campaign.SCENARIOS["P07"].assertions:
         campaign.observe(
             checkout,
             root,
@@ -105,17 +122,80 @@ def test_p07_requires_all_assertions_duration_and_samples(
             status="pass",
             note="observed",
         )
-    begin = campaign.base_packet(
+
+    _write_timed_packet(
         root,
-        commit=COMMIT,
-        host="test-host",
-        scenario="P07",
         kind="begin",
+        recorded_at="2026-09-02T10:00:00Z",
     )
-    begin.update(
-        {"run_id": "run", "recorded_at": "2026-09-02T10:00:00Z"}
+    _write_timed_packet(
+        root,
+        kind="sample",
+        recorded_at="2026-09-02T10:15:00Z",
     )
-    campaign.write_packet(root, begin)
+    _write_timed_packet(
+        root,
+        kind="sample",
+        recorded_at="2026-09-02T10:45:00Z",
+    )
+    _write_timed_packet(
+        root,
+        kind="finish",
+        recorded_at="2026-09-02T11:00:00Z",
+    )
+
+    status = campaign.scenario_status(root, "P07")
+    assert status["passed"] is True
+    assert status["elapsed_seconds"] == 3600
+    assert status["sample_count"] == 2
+
+
+def test_p07_ignores_samples_outside_matching_timed_session(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _checkout, root = _ready(monkeypatch, tmp_path)
+    _write_timed_packet(
+        root,
+        kind="sample",
+        recorded_at="2026-09-02T09:59:00Z",
+    )
+    _write_timed_packet(
+        root,
+        kind="begin",
+        recorded_at="2026-09-02T10:00:00Z",
+    )
+    _write_timed_packet(
+        root,
+        kind="sample",
+        recorded_at="2026-09-02T10:30:00Z",
+    )
+    _write_timed_packet(
+        root,
+        kind="finish",
+        recorded_at="2026-09-02T11:00:00Z",
+    )
+    _write_timed_packet(
+        root,
+        kind="sample",
+        recorded_at="2026-09-02T11:01:00Z",
+    )
+
+    status = campaign.scenario_status(root, "P07")
+    assert status["sample_count"] == 1
+    assert status["passed"] is False
+
+
+def test_timed_elapsed_is_derived_from_timestamps_not_packet_claim(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _checkout, root = _ready(monkeypatch, tmp_path)
+    _write_timed_packet(
+        root,
+        kind="begin",
+        recorded_at="2026-09-02T10:00:00Z",
+    )
     finish = campaign.base_packet(
         root,
         commit=COMMIT,
@@ -126,25 +206,15 @@ def test_p07_requires_all_assertions_duration_and_samples(
     finish.update(
         {
             "run_id": "run",
-            "recorded_at": "2026-09-02T11:00:00Z",
-            "elapsed_seconds": 3600,
+            "recorded_at": "2026-09-02T10:10:00Z",
+            "elapsed_seconds": 999999,
         }
     )
     campaign.write_packet(root, finish)
-    for index in range(2):
-        sample = campaign.base_packet(
-            root,
-            commit=COMMIT,
-            host="test-host",
-            scenario="P07",
-            kind="sample",
-        )
-        sample["label"] = f"sample-{index}"
-        campaign.write_packet(root, sample)
+
     status = campaign.scenario_status(root, "P07")
-    assert status["passed"] is True
-    assert status["elapsed_seconds"] == 3600
-    assert status["sample_count"] == 2
+    assert status["elapsed_seconds"] == 600
+    assert status["passed"] is False
 
 
 def test_failed_assertion_overrides_earlier_pass(
