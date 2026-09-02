@@ -10,10 +10,6 @@ on:
       - "scripts/acceptance/cf7_physical_topology.template.json"
       - "scripts/acceptance/cf7_prepare_windows.ps1"
       - "scripts/acceptance/cf7_prepare_linux.sh"
-      - "scripts/acceptance/v1_physical_campaign.py"
-      - "scripts/acceptance/v1_physical_campaign_contract.py"
-      - "scripts/acceptance/v1_prepare_windows.ps1"
-      - "scripts/acceptance/v1_prepare_linux.sh"
       - "scripts/windows/stop_fcp_for_fresh_reset.ps1"
       - "scripts/windows/tests/stop_fcp_for_fresh_reset_smoke.ps1"
       - "catalog/flask_app/services/device_state_reset.py"
@@ -27,14 +23,10 @@ on:
       - "catalog/federation/tests/cf7_acceptance/test_physical_readiness.py"
       - "catalog/federation/tests/cf7_acceptance/physical_evidence.py"
       - "catalog/federation/tests/cf7_acceptance/test_physical_evidence.py"
-      - "catalog/federation/tests/cf7_acceptance/test_v1_physical_campaign.py"
-      - "catalog/federation/tests/cf7_acceptance/test_v1_physical_campaign_integrity.py"
       - "docs/implementation/cf7c_physical_test_readiness.md"
       - "docs/implementation/federation/acceptance/cf7c_physical_test_readiness.md"
-      - "docs/implementation/v1_physical_campaign.md"
   push:
     branches:
-      - main
       - agent/cf7c-physical-test-readiness
       - fix/v1-physical-acceptance-blockers
     paths:
@@ -45,10 +37,6 @@ on:
       - "scripts/acceptance/cf7_physical_topology.template.json"
       - "scripts/acceptance/cf7_prepare_windows.ps1"
       - "scripts/acceptance/cf7_prepare_linux.sh"
-      - "scripts/acceptance/v1_physical_campaign.py"
-      - "scripts/acceptance/v1_physical_campaign_contract.py"
-      - "scripts/acceptance/v1_prepare_windows.ps1"
-      - "scripts/acceptance/v1_prepare_linux.sh"
       - "scripts/windows/stop_fcp_for_fresh_reset.ps1"
       - "scripts/windows/tests/stop_fcp_for_fresh_reset_smoke.ps1"
       - "catalog/flask_app/services/device_state_reset.py"
@@ -62,11 +50,8 @@ on:
       - "catalog/federation/tests/cf7_acceptance/test_physical_readiness.py"
       - "catalog/federation/tests/cf7_acceptance/physical_evidence.py"
       - "catalog/federation/tests/cf7_acceptance/test_physical_evidence.py"
-      - "catalog/federation/tests/cf7_acceptance/test_v1_physical_campaign.py"
-      - "catalog/federation/tests/cf7_acceptance/test_v1_physical_campaign_integrity.py"
       - "docs/implementation/cf7c_physical_test_readiness.md"
       - "docs/implementation/federation/acceptance/cf7c_physical_test_readiness.md"
-      - "docs/implementation/v1_physical_campaign.md"
 
 permissions:
   contents: read
@@ -97,31 +82,20 @@ jobs:
         run: >-
           python -m compileall -q
           scripts/acceptance/cf7_physical_readiness.py
-          scripts/acceptance/v1_physical_campaign.py
-          scripts/acceptance/v1_physical_campaign_contract.py
           catalog/flask_app/services/device_state_reset.py
           catalog/flask_app/services/headless_federation_cli.py
           catalog/federation/tests/cf7_acceptance/test_physical_readiness.py
-          catalog/federation/tests/cf7_acceptance/test_v1_physical_campaign.py
-          catalog/federation/tests/cf7_acceptance/test_v1_physical_campaign_integrity.py
 
       - name: Validate topology template
         run: >-
           python -m scripts.acceptance.cf7_physical_readiness
           topology scripts/acceptance/cf7_physical_topology.template.json
 
-      - name: Parse P01-P12 campaign contract
-        run: >-
-          python -m scripts.acceptance.v1_physical_campaign
-          plan --scenario P12
-
       - name: Run readiness and evidence tests
         run: >-
           python -m pytest -o addopts= -q
           catalog/federation/tests/cf7_acceptance/test_physical_readiness.py
           catalog/federation/tests/cf7_acceptance/test_physical_evidence.py
-          catalog/federation/tests/cf7_acceptance/test_v1_physical_campaign.py
-          catalog/federation/tests/cf7_acceptance/test_v1_physical_campaign_integrity.py
 
       - name: Run factory-reset and admin-first lifecycle tests
         run: >-
@@ -135,17 +109,14 @@ jobs:
       - name: Validate Linux wrapper syntax
         if: runner.os == 'Linux'
         shell: bash
-        run: |
-          bash -n scripts/acceptance/cf7_prepare_linux.sh
-          bash -n scripts/acceptance/v1_prepare_linux.sh
+        run: bash -n scripts/acceptance/cf7_prepare_linux.sh
 
-      - name: Validate Windows wrappers and fresh-shutdown helper
+      - name: Validate Windows wrapper and fresh-shutdown helper
         if: runner.os == 'Windows'
         shell: powershell
         run: |
           foreach ($script in @(
             'scripts/acceptance/cf7_prepare_windows.ps1',
-            'scripts/acceptance/v1_prepare_windows.ps1',
             'scripts/windows/stop_fcp_for_fresh_reset.ps1',
             'scripts/windows/tests/stop_fcp_for_fresh_reset_smoke.ps1'
           )) {
@@ -170,16 +141,12 @@ jobs:
         run: >-
           ruff check
           scripts/acceptance/cf7_physical_readiness.py
-          scripts/acceptance/v1_physical_campaign.py
-          scripts/acceptance/v1_physical_campaign_contract.py
           catalog/flask_app/services/device_state_reset.py
           catalog/flask_app/services/headless_federation_cli.py
           catalog/flask_app/tests/test_device_state_reset.py
           catalog/flask_app/tests/test_headless_federation_cli.py
           catalog/flask_app/tests/test_fresh_start_contract.py
           catalog/federation/tests/cf7_acceptance/test_physical_readiness.py
-          catalog/federation/tests/cf7_acceptance/test_v1_physical_campaign.py
-          catalog/federation/tests/cf7_acceptance/test_v1_physical_campaign_integrity.py
 
       - name: Diff hygiene
         run: git diff --check
