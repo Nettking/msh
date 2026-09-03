@@ -1,0 +1,151 @@
+name: Federation v1 physical campaign tooling
+
+# The P01-P12 campaign harness is release tooling that runs on Beast, Nitro and
+# other physical hosts. It cannot be exercised for real in CI, but its contract,
+# classification, probes, runner and wrappers must stay valid on both operator
+# operating systems before a release operator depends on them.
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/federation-v1-physical-campaign.yml"
+      - "scripts/acceptance/v1_physical_campaign.py"
+      - "scripts/acceptance/v1_physical_campaign_contract.py"
+      - "scripts/acceptance/v1_physical_campaign_strict.py"
+      - "scripts/acceptance/v1_physical_automation.py"
+      - "scripts/acceptance/v1_physical_probes.py"
+      - "scripts/acceptance/v1_physical_runner.py"
+      - "scripts/acceptance/v1_prepare_linux.sh"
+      - "scripts/acceptance/v1_prepare_windows.ps1"
+      - "update.cmd"
+      - "catalog/federation/tests/cf7_acceptance/test_v1_physical_campaign.py"
+      - "catalog/federation/tests/cf7_acceptance/test_v1_physical_campaign_integrity.py"
+      - "catalog/federation/tests/cf7_acceptance/test_v1_physical_campaign_strict.py"
+      - "catalog/federation/tests/cf7_acceptance/test_v1_physical_probes.py"
+      - "catalog/federation/tests/cf7_acceptance/test_v1_physical_runner.py"
+      - "catalog/federation/tests/cf7_acceptance/test_v1_physical_runner_adversarial.py"
+      - "catalog/federation/tests/cf7_acceptance/test_v1_physical_wrappers.py"
+      - "docs/implementation/v1_physical_campaign.md"
+      - "docs/implementation/v1_physical_campaign_strict.md"
+      - "docs/implementation/v1_physical_campaign_automation.md"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/federation-v1-physical-campaign.yml"
+      - "scripts/acceptance/**"
+      - "catalog/federation/tests/cf7_acceptance/test_v1_physical_*.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: federation-v1-physical-campaign-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  campaign-tooling:
+    name: Campaign tooling (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install pytest ruff
+
+      - name: Compile campaign tooling
+        run: >-
+          python -m compileall -q
+          scripts/acceptance/v1_physical_campaign.py
+          scripts/acceptance/v1_physical_campaign_contract.py
+          scripts/acceptance/v1_physical_campaign_strict.py
+          scripts/acceptance/v1_physical_automation.py
+          scripts/acceptance/v1_physical_probes.py
+          scripts/acceptance/v1_physical_runner.py
+
+      - name: Classification stays aligned with the evidence contract
+        run: >-
+          python -m scripts.acceptance.v1_physical_runner classify
+
+      - name: Checked-in probe registry is listable
+        run: >-
+          python -m scripts.acceptance.v1_physical_runner probes
+
+      - name: Campaign, strict, probe, runner and wrapper tests
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/federation/tests/cf7_acceptance/test_v1_physical_campaign.py
+          catalog/federation/tests/cf7_acceptance/test_v1_physical_campaign_integrity.py
+          catalog/federation/tests/cf7_acceptance/test_v1_physical_campaign_strict.py
+          catalog/federation/tests/cf7_acceptance/test_v1_physical_probes.py
+          catalog/federation/tests/cf7_acceptance/test_v1_physical_runner.py
+          catalog/federation/tests/cf7_acceptance/test_v1_physical_runner_adversarial.py
+          catalog/federation/tests/cf7_acceptance/test_v1_physical_wrappers.py
+
+      - name: The runner refuses a candidate this checkout is not on
+        shell: bash
+        run: |
+          set +e
+          python -m scripts.acceptance.v1_physical_runner \
+            --evidence-root "${RUNNER_TEMP}/v1-physical" \
+            report --commit 0000000000000000000000000000000000000000
+          code=$?
+          set -e
+          # Fail closed: no campaign, wrong candidate, non-zero exit.
+          test "${code}" -ne 0
+
+      - name: Validate POSIX wrapper syntax
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash -n scripts/acceptance/v1_prepare_linux.sh
+
+      - name: Validate Windows wrapper syntax
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path 'scripts/acceptance/v1_prepare_windows.ps1'),
+            [ref]$tokens,
+            [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            exit 1
+          }
+
+      - name: Ruff campaign tooling
+        run: >-
+          python -m ruff check
+          scripts/acceptance
+          catalog/federation/tests/cf7_acceptance/test_v1_physical_campaign.py
+          catalog/federation/tests/cf7_acceptance/test_v1_physical_campaign_integrity.py
+          catalog/federation/tests/cf7_acceptance/test_v1_physical_campaign_strict.py
+          catalog/federation/tests/cf7_acceptance/test_v1_physical_probes.py
+          catalog/federation/tests/cf7_acceptance/test_v1_physical_runner.py
+          catalog/federation/tests/cf7_acceptance/test_v1_physical_runner_adversarial.py
+          catalog/federation/tests/cf7_acceptance/test_v1_physical_wrappers.py
+
+      - name: Evidence tree stays out of the repository
+        shell: bash
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Campaign tooling checks modified the tracked tree:"
+            git status --porcelain
+            exit 1
+          fi

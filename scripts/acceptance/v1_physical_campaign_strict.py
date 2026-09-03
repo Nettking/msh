@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from collections.abc import Mapping
 from pathlib import Path
 
 from scripts.acceptance import v1_physical_campaign as campaign
@@ -67,6 +68,8 @@ def timed_observe(
     assertion: str,
     status: str,
     note: str,
+    detail: Mapping[str, object] | None = None,
+    source: str = "operator",
 ) -> Path:
     campaign.load_campaign(checkout, root, commit)
     scenario_id, spec = _timed_spec(scenario)
@@ -105,9 +108,13 @@ def timed_observe(
             "assertion": assertion,
             "assertion_text": spec.assertions[assertion],
             "status": status,
-            "note": campaign.sanitize_text(note, cwd=checkout),
+            "note": campaign.redact_text(note, cwd=checkout),
+            "source": campaign.redact_text(source, cwd=checkout) or "operator",
         }
     )
+    redacted = campaign.sanitize_detail(detail, cwd=checkout)
+    if redacted is not None:
+        packet["detail"] = redacted
     return campaign.write_packet(root, packet)
 
 
@@ -159,12 +166,12 @@ def timed_run(
     packet.update(
         {
             "run_id": run_id,
-            "label": campaign.sanitize_text(label, cwd=checkout),
-            "command": campaign.sanitize_text(" ".join(command), cwd=checkout),
+            "label": campaign.redact_text(label, cwd=checkout),
+            "command": campaign.redact_text(" ".join(command), cwd=checkout),
             "expected_exit": expected_exit,
             "returncode": returncode,
             "duration_seconds": duration,
-            "output_tail": campaign.sanitize_text(output, cwd=checkout),
+            "output_tail": campaign.redact_text(output, cwd=checkout),
             "passed": passed,
             "assertion": assertion,
             "assertion_text": spec.assertions[assertion],

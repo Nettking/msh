@@ -4,7 +4,9 @@ Status: **final validation rule for the physical P01–P12 campaign**
 
 The base physical harness remains `scripts/acceptance/v1_physical_campaign.py` and owns initialization, host registration, P01–P12 planning, resource samples, ordinary assertions/commands, privacy sealing and the evidence tree.
 
-For the two elapsed-time scenarios, **P07 and P12**, release evidence must additionally be bound to one concrete timed run. Do not use the base `observe`/`run` commands for P07/P12 assertions. Use the strict layer below so a PASS from an earlier outage/soak or another host cannot be combined with the current timed session.
+For the two elapsed-time scenarios, **P07 and P12**, release evidence must additionally be bound to one concrete timed run.
+
+The automated runner (`docs/implementation/v1_physical_campaign_automation.md`) records every timed verdict through this layer, so `runner probe`, `runner prepare` and `runner verify` on P07/P12 require the active `--run-id` and are refused without it. The base `observe`/`run` commands must still never be used for P07/P12 assertions: use the strict layer below so a PASS from an earlier outage/soak or another host cannot be combined with the current timed session.
 
 ## Timed flow
 
