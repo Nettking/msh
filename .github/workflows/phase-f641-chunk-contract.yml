@@ -44,6 +44,9 @@ jobs:
           python -m compileall
           catalog/federation/object_transfer.py
           catalog/federation/tests/test_phase_f641_chunk_contract.py
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
       - name: F6.4.1 contract tests
         run: >-
           python -m pytest -o addopts= -q

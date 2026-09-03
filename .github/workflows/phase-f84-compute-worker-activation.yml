@@ -49,6 +49,9 @@ jobs:
           python -m compileall
           catalog/capabilities
           catalog/relay/tests/test_phase_f84_compute_worker_activation.py
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
       - name: F8.4 and affected regressions
         run: >-
           python -m pytest -o addopts= -q

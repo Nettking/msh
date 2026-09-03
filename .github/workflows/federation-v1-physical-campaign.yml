@@ -85,6 +85,10 @@ jobs:
         run: >-
           python -m scripts.acceptance.v1_physical_runner probes
 
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
+
       - name: Campaign, strict, probe, runner and wrapper tests
         run: >-
           python -m pytest -o addopts= -q

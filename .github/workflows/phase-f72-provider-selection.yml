@@ -41,6 +41,9 @@ jobs:
         run: >-
           python -m compileall
           catalog/capabilities
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
       - name: Capability and affected federation tests
         run: >-
           python -m pytest -o addopts= -q

@@ -50,6 +50,9 @@ jobs:
           python -m compileall
           catalog/capabilities/provider_enrollment.py
           catalog/capabilities/tests/test_provider_enrollment.py
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
       - name: F8.1 and affected federation regressions
         run: >-
           python -m pytest -o addopts= -q

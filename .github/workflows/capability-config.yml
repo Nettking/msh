@@ -93,6 +93,10 @@ jobs:
           catalog/flask_app/tests/test_post_setup_handoff.py
           catalog/flask_app/tests/test_legacy_startup_retired.py
 
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
+
       - name: Run capability configuration regressions
         run: >-
           python -m pytest -o addopts= -q

@@ -99,6 +99,9 @@ jobs:
             'physical.revocation-and-controlled-rejoin',
           };
           assert required_manual <= manual"
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
       - name: Run CF7-B integrated product scenarios
         run: >-
           python -m pytest -o addopts= -q

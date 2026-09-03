@@ -103,6 +103,9 @@ jobs:
           catalog/flask_app/tests/test_federation_pairing_service.py
           catalog/flask_app/tests/test_federation_pairing_relay.py
           catalog/flask_app/tests/test_functional_onboarding_progress.py
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
       - name: Run CFI-2 and affected regressions
         run: >-
           python -m pytest -o addopts= -q

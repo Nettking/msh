@@ -50,6 +50,9 @@ jobs:
           python -m compileall -q
           catalog/capabilities/benchmarking
           catalog/capabilities/tests/test_benchmarking_adapters.py
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
       - name: Run CF1 and CF2 regression tests
         run: >-
           python -m pytest -o addopts= -q

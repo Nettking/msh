@@ -161,6 +161,10 @@ jobs:
           catalog/flask_app/tests/test_federation_pairing_service.py
           catalog/flask_app/tests/test_recorder_config_bootstrap.py
 
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
+
       - name: Recorder capture and Federation publication regressions
         run: >-
           python -m pytest -o addopts= -q

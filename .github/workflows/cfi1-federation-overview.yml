@@ -76,6 +76,9 @@ jobs:
           catalog/flask_app/tests/test_federation_detail_routes.py
           catalog/flask_app/tests/test_federation_projection_consistency.py
           catalog/federation/tests/test_federation_review_services_navigation.py
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
       - name: Run focused and affected tests
         run: >-
           python -m pytest -o addopts= -q

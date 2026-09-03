@@ -72,6 +72,9 @@ jobs:
           catalog/flask_app/services/recorder_control_service.py
           catalog/flask_app/services/mtconnect_discovery_service.py
           catalog/flask_app/tests/test_cf8_role_retirement.py
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
       - name: Run CF8 anti-regression acceptance
         id: cf8_acceptance
         continue-on-error: true

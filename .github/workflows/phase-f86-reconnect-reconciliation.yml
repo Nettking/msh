@@ -62,6 +62,9 @@ jobs:
           catalog/relay/tests/test_phase_f83_remote_ai_binding.py
           catalog/relay/tests/test_phase_f84_compute_worker_activation.py
           catalog/relay/tests/test_phase_f86_reconciliation.py
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
       - name: F8.6 and affected regressions
         run: >-
           python -m pytest -o addopts= -q

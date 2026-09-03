@@ -70,6 +70,9 @@ jobs:
           catalog/flask_app/tests/test_cf5_ui_shell.py
           catalog/flask_app/tests/test_mobile_layout_contract.py
           catalog/flask_app/tests/test_navigation_information_architecture.py
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
       - name: Run CF5 UI shell tests
         run: >-
           python -m pytest -o addopts= -q

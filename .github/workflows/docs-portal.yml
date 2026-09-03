@@ -38,5 +38,9 @@ jobs:
       - name: Install focused test dependencies
         run: python -m pip install Flask Markdown pytest
 
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
+
       - name: Run documentation portal tests
         run: python -m pytest catalog/flask_app/tests/test_docs_portal.py -q

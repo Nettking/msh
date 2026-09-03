@@ -59,6 +59,9 @@ jobs:
           catalog/capabilities/provider_health.py
           catalog/capabilities/tests/test_provider_health.py
           catalog/capabilities/tests/test_provider_health_restart.py
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
       - name: F8.2 and affected federation regressions
         run: >-
           python -m pytest -o addopts= -q

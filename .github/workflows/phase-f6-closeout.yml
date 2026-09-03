@@ -134,6 +134,9 @@ jobs:
           catalog/node/tests/test_phase_f642_verified_chunk_transfer.py
           catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py
           catalog/relay/tests/test_phase_f662_route_rendezvous.py
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
       - name: Phase 5 transport acceptance matrix
         run: >-
           python -m pytest -o addopts= -q
