@@ -33,13 +33,21 @@ from catalog.node.storage_deployment import (
     ThreeMachineDeployment,
     ensure_initial_control,
     render_storage_config,
+)
+from catalog.node.storage_deployment import (
     verify_evidence as verify_f51_evidence,
 )
 from catalog.node.storage_failover_drill import (
     build_authority_evidence as build_f52_authority_evidence,
+)
+from catalog.node.storage_failover_drill import (
     post_failover_probe_with_transport,
     stale_authority_probe_with_transport,
+)
+from catalog.node.storage_failover_drill import (
     storage_evidence_from_agent as f52_storage_evidence,
+)
+from catalog.node.storage_failover_drill import (
     verify_evidence as verify_f52_evidence,
 )
 from catalog.node.storage_recovery_drill import (
@@ -59,7 +67,10 @@ from .test_physical_storage_failover import (
 )
 
 NOW = datetime(2026, 7, 31, 15, 0, tzinfo=timezone.utc)
-TIMEOUT = 5.0
+# Keep the fixture on the product's bounded relay/storage contract. Five seconds
+# is below the existing control-publication budget and can expire on a loaded
+# Windows runner while the local relay and nodes are still making progress.
+TIMEOUT = 15.0
 
 
 async def _scenario(root: Path) -> dict[str, Any]:
