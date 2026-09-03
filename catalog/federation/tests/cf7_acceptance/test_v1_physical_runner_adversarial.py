@@ -836,6 +836,17 @@ def test_reviewed_helpers_are_named_but_never_invoked(
         pytest.fail("a reviewed helper must stay an operator decision")
 
     monkeypatch.setattr(probes.subprocess, "run", _forbidden)
+    with pytest.raises(runner.RunnerError, match="operator-supplied probe options"):
+        runner.prepare_assertion(
+            checkout,
+            root,
+            commit=COMMIT,
+            host="beast",
+            scenario="P11",
+            assertion="successful-backup",
+            run_id=None,
+            overrides={},
+        )
     prepared = runner.prepare_assertion(
         checkout,
         root,
@@ -844,10 +855,51 @@ def test_reviewed_helpers_are_named_but_never_invoked(
         scenario="P11",
         assertion="successful-backup",
         run_id=None,
-        overrides={},
+        overrides={"destination": "/mnt/backup-target"},
     )
     assert prepared["reviewed_helper"]
     assert prepared["harness_performs_this_action"] is False
+
+
+def test_a_restored_database_check_cannot_default_to_the_live_data_directory(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    checkout, root = ready(monkeypatch, tmp_path)
+    _fail_on_execution(monkeypatch)
+    with pytest.raises(runner.RunnerError, match="--option path="):
+        runner.probe_assertion(
+            checkout,
+            root,
+            commit=COMMIT,
+            host="nitro",
+            scenario="P11",
+            assertion="sqlite-integrity",
+            run_id=None,
+            overrides={},
+        )
+
+
+def test_scenario_run_reports_assertions_that_need_operator_input(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    checkout, root = ready(monkeypatch, tmp_path)
+    _replace_runs(monkeypatch, probes.PASS)
+    result = runner.run_scenario(
+        checkout,
+        root,
+        commit=COMMIT,
+        host="nitro",
+        scenario="P11",
+        run_id=None,
+        overrides={},
+    )
+    skipped = {item["assertion"]: item["reason"] for item in result["not_run_here"]}
+    assert "operator-supplied probe options" in skipped["sqlite-integrity"]
+    assert "operator-supplied probe options" in skipped["external-destination"]
+    executed = {item["assertion"] for item in result["executed"]}
+    assert executed == {"helper-prestaged"}
 
 
 def test_report_is_incomplete_while_any_assertion_is_unproven(
