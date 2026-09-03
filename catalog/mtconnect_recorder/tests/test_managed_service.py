@@ -7,7 +7,7 @@ import pytest
 
 from catalog.federation.service_incarnation import (
     STATE_RESTARTING,
-    STOP_COMPLETED,
+    STOP_FAILURE,
     incarnation_state_file,
     record_service_start,
 )
@@ -312,7 +312,7 @@ def test_managed_main_exception_is_restart_worthy(
     restarted = record_service_start(path, service="recorder")
     assert restarted.state == STATE_RESTARTING
     assert restarted.consecutive_unclean == 1
-    assert restarted.last_stop_reason == STOP_COMPLETED
+    assert restarted.last_stop_reason == STOP_FAILURE
 
 
 def test_compose_recorder_uses_managed_federation_entrypoint() -> None:
