@@ -643,6 +643,12 @@ def install_federation_pairing(app: Flask) -> LazyPairingOnboardingService:
     @app.before_request
     def _start_saved_membership_reconnect() -> None:
         app.extensions[_RETAINED_STARTUP_CHECK_KEY] = True
+        # Flask application-factory tests must not leave process-wide
+        # reconnect/control-event loops behind for later, unrelated tests.
+        # The real deployment keeps the default ``TESTING=False`` and starts
+        # both monitors under the external host supervisor as before.
+        if app.testing:
+            return
         monitor.start()
         update_monitor.start()
 

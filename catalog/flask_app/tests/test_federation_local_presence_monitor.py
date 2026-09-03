@@ -143,3 +143,28 @@ def test_contribution_refresh_interrupts_periodic_wait_immediately(monkeypatch) 
         assert publish_count[0] >= 2
     finally:
         monitor.stop()
+
+
+def test_testing_app_does_not_leave_background_federation_monitors(
+    monkeypatch, tmp_path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    app = Flask(__name__)
+    federation_pairing_install.install_federation_pairing(app)
+    app.config["TESTING"] = True
+
+    reconnect = app.extensions["federation_saved_membership_reconnect"]
+    update = app.extensions["federation_update_event_monitor"]
+    starts: list[str] = []
+    monkeypatch.setattr(reconnect, "start", lambda: starts.append("reconnect"))
+    monkeypatch.setattr(update, "start", lambda: starts.append("update"))
+
+    before_request = next(
+        handler
+        for handler in app.before_request_funcs[None]
+        if handler.__name__ == "_start_saved_membership_reconnect"
+    )
+    before_request()
+
+    assert starts == []
+    assert app.extensions["capability_onboarding_startup_checked"] is True
