@@ -937,12 +937,42 @@ class TrustedProviderRuntimeReconciler:
 
     def _desired_compute(
         self,
-    ) -> tuple[tuple[ActivatedComputeWorker, ...], tuple[ReconciledProviderBinding, ...]]:
+        checkpoint: ProviderReconciliationCheckpoint,
+    ) -> tuple[
+        tuple[ActivatedComputeWorker, ...],
+        tuple[ReconciledProviderBinding, ...],
+        tuple[str, ...],
+    ]:
         if self.compute_binder is None:
-            return (), ()
-        workers = self.compute_binder.activate_all()
+            return (), (), ()
+        workers = list(self.compute_binder.activate_all())
+        worker_ids = {worker.snapshot.provider_id for worker in workers}
+        continued_ids: list[str] = []
+        if self.compute_endpoint is not None:
+            for item in checkpoint.compute_bindings:
+                if item.capability_id in worker_ids:
+                    continue
+                existing = self.compute_endpoint.workers.get(item.capability_id)
+                if isinstance(existing, ActivatedComputeWorker):
+                    retained = self.compute_binder.continue_existing(existing)
+                    if retained is not None:
+                        workers.append(retained)
+                        worker_ids.add(item.capability_id)
+                        continued_ids.append(item.capability_id)
+                        continue
+                resumed = self.compute_binder.activate_existing(
+                    item.capability_id,
+                    provider_generation=item.provider_generation,
+                    expected_binding_id=item.binding_id or "",
+                    expected_descriptor_fingerprint=item.descriptor_fingerprint,
+                )
+                if resumed is not None:
+                    workers.append(resumed)
+                    worker_ids.add(item.capability_id)
+                    continued_ids.append(item.capability_id)
+        workers = sorted(workers, key=lambda item: item.snapshot.provider_id)
         evidence = tuple(self._compute_evidence(worker.snapshot) for worker in workers)
-        return workers, evidence
+        return tuple(workers), evidence, tuple(sorted(continued_ids))
 
     def _runtime_matches(
         self,
@@ -983,6 +1013,8 @@ class TrustedProviderRuntimeReconciler:
     def _validate_desired(
         self,
         bindings: tuple[ReconciledProviderBinding, ...],
+        *,
+        continued_compute_ids: tuple[str, ...] = (),
     ) -> None:
         for item in bindings:
             if item.kind is ReconciledBindingKind.REMOTE_AI:
@@ -1011,13 +1043,27 @@ class TrustedProviderRuntimeReconciler:
                         "missing-compute-reconciliation-authority",
                         "compute binding exists without a compute authority",
                     )
+                continued = item.capability_id in continued_compute_ids
                 snapshot = self.compute_binder.authority.current_snapshot(
                     item.capability_id,
                     provider_generation=item.provider_generation,
-                    report_revision=item.report_revision,
+                    report_revision=None if continued else item.report_revision,
                     expected_binding_id=item.binding_id,
+                    allow_draining=continued,
                 )
                 current = self._compute_evidence(snapshot)
+                if continued:
+                    current = ReconciledProviderBinding(
+                        kind=current.kind,
+                        capability_id=current.capability_id,
+                        node_id=current.node_id,
+                        provider_generation=current.provider_generation,
+                        report_revision=item.report_revision,
+                        enrollment_revision=current.enrollment_revision,
+                        binding_id=current.binding_id,
+                        binding_revision=current.binding_revision,
+                        descriptor_fingerprint=current.descriptor_fingerprint,
+                    )
                 if current != item:
                     raise FederationOperationError(
                         "compute-reconciliation-evidence-changed",
@@ -1045,7 +1091,9 @@ class TrustedProviderRuntimeReconciler:
         )
 
         ai_providers, ai_bindings = self._desired_ai()
-        compute_workers, compute_bindings = self._desired_compute()
+        compute_workers, compute_bindings, continued_compute_ids = (
+            self._desired_compute(checkpoint)
+        )
         bindings = tuple(
             sorted(
                 (*ai_bindings, *compute_bindings),
@@ -1102,7 +1150,10 @@ class TrustedProviderRuntimeReconciler:
                     },
                     replace_provider_ids=compute_replace_ids,
                 )
-            self._validate_desired(bindings)
+            self._validate_desired(
+                bindings,
+                continued_compute_ids=continued_compute_ids,
+            )
             self.coordinator.store.require_membership(
                 session_id=self.session_id,
                 node_id=self.actor_node_id,

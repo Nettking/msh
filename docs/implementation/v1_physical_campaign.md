@@ -22,6 +22,18 @@ The campaign harness is:
 scripts/acceptance/v1_physical_campaign.py
 ```
 
+The operator-facing automation layer above it is:
+
+```text
+scripts/acceptance/v1_physical_automation.py   # per-assertion automation lane
+scripts/acceptance/v1_physical_probes.py       # checked-in read-only probes
+scripts/acceptance/v1_physical_runner.py       # orchestrator, report, prepare/verify
+```
+
+`docs/implementation/v1_physical_campaign_automation.md` is the machine-by-machine
+runbook. Use it to execute the campaign; use this document for the evidence rules
+it runs on.
+
 It writes only below the ignored local workspace:
 
 ```text
@@ -53,12 +65,17 @@ The harness:
 - requires P07/P12 resource samples to belong to the same timed run and host and
   to fall inside its begin/finish interval;
 - fails closed on missing/failed assertions;
+- refuses preparation or operator-action evidence that carries an assertion
+  verdict, so staging a fault-injection case can never satisfy it;
+- redacts every string it writes itself, including structured probe detail, to
+  the same standard the privacy seal enforces;
 - scans evidence for raw private endpoints, addresses, paths, credentials and
   reusable pairing material; and
 - binds the final decision to a SHA-256 digest of the reviewed evidence tree.
 
 It deliberately does **not** autonomously fill disks, kill processes, corrupt
-files, alter clocks, revoke members, or power-cycle hosts. Those actions are
+files, alter clocks, revoke members, download models, run backups, or power-cycle
+hosts. Those actions are
 physical test operations and must be selected deliberately for the target test
 environment. Use the harness to execute a reviewed fault-injection command or to
 record the observed consequence. This prevents a release helper from becoming a
@@ -66,15 +83,17 @@ blind destructive test runner.
 
 ## Prepare the hosts
 
-Use a fresh clean checkout of the candidate on every physical host.
+Use a fresh clean checkout of the candidate on every physical host. Every host
+must declare a profile (`local-ai`, `cnc-recorder`, `school-control`); the
+automated runner refuses to probe a host that never declared one.
 
 Windows:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/acceptance/v1_prepare_windows.ps1 `
+powershell -ExecutionPolicy Bypass -File scripts\acceptance\v1_prepare_windows.ps1 `
   -Commit <candidate-sha> `
   -HostId beast `
-  -Role local-ai
+  -HostProfile local-ai
 ```
 
 Linux/POSIX:
@@ -85,14 +104,33 @@ bash scripts/acceptance/v1_prepare_linux.sh \
 ```
 
 The preparation wrapper initializes the candidate-bound campaign, registers the
-host, captures a pre-campaign P01 resource sample and prints the current P01-P12
-status. Registration stores only a hashed machine fingerprint; the chosen safe
-host alias such as `beast` or `nitro` remains visible for audit readability.
+host with its profile, captures a pre-campaign P01 resource sample with the P12
+soak series attached, and prints the current P01-P12 progress report.
+Registration stores only a hashed machine fingerprint; the chosen safe host alias
+such as `beast` or `nitro` remains visible for audit readability. A host alias is
+permanently bound to one machine fingerprint, one candidate and one profile.
 
 At least one Windows and one POSIX host must be present in the final evidence
 set. P01 is explicitly split into Windows and POSIX assertions. P03 pins the
 Windows/POSIX launcher assertions to their applicable OS. P06 native-recorder
 supervision assertions can only be recorded on Windows.
+
+## Run the automated layer first
+
+Before writing any command by hand, run the checked-in probes:
+
+```bash
+bash scripts/acceptance/v1_prepare_linux.sh <candidate-sha> nitro school-control Martin automate
+
+python -m scripts.acceptance.v1_physical_runner report \
+  --commit <candidate-sha> --host nitro
+```
+
+The report states PASS, FAIL, READY FOR OPERATOR ACTION, MISSING or NOT
+APPLICABLE for every P01-P12 assertion and prints the exact next command for each
+one. The manual `run`/`observe` commands below remain available for evidence the
+checked-in probes cannot express, and for the three human-observation
+assertions.
 
 ## Inspect the exact scenario contract
 

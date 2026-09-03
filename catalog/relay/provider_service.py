@@ -51,6 +51,7 @@ from catalog.federation.models import CapabilityAnnouncement
 from catalog.federation.phase_d_control import PhaseDControlPlane
 from catalog.federation.service_incarnation import (
     STOP_COMPLETED,
+    STOP_FAILURE,
     STOP_OPERATOR,
     incarnation_state_file,
     record_service_start,
@@ -415,11 +416,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         sqlite3.Error,
     ) as error:
         code = getattr(error, "code", "relay-command-failed")
-        # A reported failure is still an observed stop: the process reached its
-        # own error path rather than being killed. Recording the reason keeps
-        # the next start clean while preserving why this one ended.
+        # A reported failure is still restart-worthy evidence: the process
+        # reached its own error path and is returning nonzero to Docker. The
+        # incarnation classifier preserves the detailed reason while ensuring
+        # the next start contributes to bounded crash-loop evidence.
         record_service_stop(incarnation, service="relay", reason=code)
         print(f"relay command failed ({code})", file=sys.stderr)
+        return 2
+    except Exception:  # noqa: BLE001 - return nonzero to Docker
+        record_service_stop(incarnation, service="relay", reason=STOP_FAILURE)
+        print(f"relay command failed ({STOP_FAILURE})", file=sys.stderr)
         return 2
 
 

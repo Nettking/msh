@@ -218,6 +218,9 @@ class ActiveLeaderFederationUpdateService(_LEGACY_UPDATE_SERVICE):
         target: str,
         target_node_ids: tuple[str, ...],
         now: datetime,
+        drain_node_id: str | None = None,
+        drain_provider_ids: tuple[str, ...] = (),
+        payload_request_id: str | None = None,
     ) -> None:
         del actor
         if not target_node_ids:
@@ -227,11 +230,13 @@ class ActiveLeaderFederationUpdateService(_LEGACY_UPDATE_SERVICE):
             event_type=event_type,
             request_id=f"{event_type}-{request_id}",
             payload=update_service.command_payload(
-                request_id=request_id,
+                request_id=payload_request_id or request_id,
                 target_commit=target,
                 target_node_ids=target_node_ids,
                 created_at=now,
                 expires_at=now + update_service.COMMAND_TTL,
+                drain_node_id=drain_node_id,
+                drain_provider_ids=drain_provider_ids,
             ),
         )
 
@@ -340,6 +345,7 @@ def get_active_update_service() -> ActiveLeaderFederationUpdateService:
         service = ActiveLeaderFederationUpdateService(
             configured.local,
             configured.state_file,
+            configured.drain_store,
         )
         current_app.config["FEDERATION_UPDATE_SERVICE"] = service
         return service

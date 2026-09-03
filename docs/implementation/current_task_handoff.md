@@ -311,12 +311,14 @@ the product and must not be made available: `docker.sock` is deliberately not
 mounted in `docker-compose.yml`, and mounting it would hand the web application
 root-equivalent control of the host to gain a status field. Each supervised
 service therefore journals its own incarnations instead. A start records
-whether the previous incarnation ended cleanly, a bounded window of recent
-incarnations is retained, and a trailing run of unclean starts inside a time
-window is a crash loop that the existing core-service health snapshot reports
+whether the previous incarnation ended intentionally, a bounded window of
+recent incarnations is retained, and a trailing run of unclean starts inside a
+time window is a crash loop that the existing core-service health snapshot reports
 as `not_ready`/`degraded` with a `<service>-crash-loop` code, carrying the
 prior probe's own code so the underlying fault is not hidden by the loop
-verdict. Writing it exposed a real supervision defect: the Flask service
+verdict. Exception/nonzero failure exits remain unclean evidence even when
+their own error path records a stop; only normal, operator, update, and trial
+stops are clean. Writing it exposed a real supervision defect: the Flask service
 installed no `SIGTERM` handler, so an ordinary `docker compose stop` exited
 through the default disposition and every operator stop would have been
 journaled -- and read -- as a crash. Journaling is disabled under `debug`,
@@ -371,7 +373,7 @@ predated `main` substantially.
 
 1. Continue the reconciled robustness blockers B01-B10 from [the authoritative reconciliation](v1_robustness_reconciliation.md), one named delivery/PR at a time and in the recommended dependency order.
 2. Keep the documented non-goals and accepted boundaries out of the v1 implementation unless new concrete evidence invalidates them.
-3. Execute the corrected P01-P12 physical fault/growth/restore campaign on one exact candidate after the blocker implementations and automated gates are green; green CI alone is insufficient.
+3. Execute the corrected P01-P12 physical fault/growth/restore campaign on one exact candidate after the blocker implementations and automated gates are green; green CI alone is insufficient. Run it machine-by-machine through [the physical campaign automation runbook](v1_physical_campaign_automation.md); the harness records probe verdicts but still performs no fault itself, and the release decision remains [the strict timed validation](v1_physical_campaign_strict.md).
 4. Reconcile physical-acceptance instructions with the current post-CF8, update-capable, recorder-capable product baseline.
 5. Resolve any verified runtime-parity, native-host, privacy, browser, restart, multi-host, recorder-control, update-rollout, resource-exhaustion or recovery defects found on the exact candidate.
 6. Freeze one exact candidate only after known blockers are closed.

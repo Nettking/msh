@@ -193,10 +193,21 @@ class FederationUpdateEventMonitor:
                 federation_root / "update-events" / "processor.json",
             )
         )
+        try:
+            from catalog.orchestrator.analysis_runtime import get_analysis_runtime
+
+            runtime = get_analysis_runtime()
+            drain_store = runtime.update_drain_store
+            health = getattr(runtime.federation, "health", None)
+        except Exception:  # noqa: BLE001 - rolling commands fail closed downstream
+            drain_store = None
+            health = None
         processor = FederationUpdateEventProcessor(
             self.service,
             HostUpdateHandoff(handoff_directory),
             processor_state,
+            drain_store=drain_store,
+            health=health,
         )
         self._update_processor = processor
         return processor

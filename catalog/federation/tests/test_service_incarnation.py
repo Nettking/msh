@@ -26,6 +26,7 @@ from catalog.federation.service_incarnation import (
     STATE_STABLE,
     STATE_UNKNOWN,
     STOP_COMPLETED,
+    STOP_FAILURE,
     STOP_OPERATOR,
     STOP_TRIAL,
     STOP_UPDATE,
@@ -208,7 +209,10 @@ def test_a_recorded_stop_clears_the_loop(tmp_path: Path) -> None:
     assert state.consecutive_unclean == 0
 
 
-@pytest.mark.parametrize("reason", [STOP_OPERATOR, STOP_UPDATE, STOP_TRIAL])
+@pytest.mark.parametrize(
+    "reason",
+    [STOP_OPERATOR, STOP_UPDATE, STOP_TRIAL, STOP_COMPLETED],
+)
 def test_operator_update_and_trial_stops_never_read_as_a_crash(
     tmp_path: Path,
     reason: str,
@@ -247,6 +251,22 @@ def test_intentional_stop_reason_remains_clean_inside_exception_handler(
     assert state.state == STATE_STABLE
     assert state.consecutive_unclean == 0
     assert state.last_stop_reason == reason
+
+
+def test_recorded_failure_stop_is_unclean_on_the_next_start(tmp_path: Path) -> None:
+    path = _file(tmp_path)
+    record_service_start(path, service="flask", now=NOW)
+    record_service_stop(path, service="flask", reason=STOP_FAILURE, now=NOW)
+
+    state = record_service_start(
+        path,
+        service="flask",
+        now=NOW + timedelta(seconds=5),
+    )
+
+    assert state.state == STATE_RESTARTING
+    assert state.consecutive_unclean == 1
+    assert state.last_stop_reason == STOP_FAILURE
 
 
 def test_the_record_survives_restart_rather_than_resetting_each_time(

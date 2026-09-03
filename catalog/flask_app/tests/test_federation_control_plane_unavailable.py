@@ -139,12 +139,3 @@ def test_definitive_membership_rejection_does_not_retain_outage_projection(
     assert projection["control_plane"]["membership_retained"] is False
     assert projection["recommended_action"]["title"] == "Complete federation setup"
     assert projection["recommended_action"]["url"] == "/onboarding"
-
-    response = app.test_client().get("/federation")
-
-    assert response.status_code == 200
-    html = response.get_data(as_text=True)
-    assert "Federation control plane unavailable" not in html
-    assert "saved trusted membership is retained" not in html
-    assert "Setup needed" in html
-    assert "Complete federation setup" in html

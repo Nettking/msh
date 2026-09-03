@@ -27,6 +27,14 @@
   </section>
   {% endif %}
 
+  {% set notice = vm.notice|default(none) %}
+  {% if notice and notice.kind == 'empty' %}
+  <section class="federation-empty federation-empty--information" role="status">
+    <span class="federation-empty__mark" aria-hidden="true"></span>
+    <div><h3>{{ notice.title }}</h3><p>{{ notice.message }}</p></div>
+  </section>
+  {% endif %}
+
   {% if vm.recommended_action %}
   <section class="recommended-action">
     <div><span class="federation-eyebrow">Recommended next action</span><h3>{{ vm.recommended_action.title }}</h3><p>{{ vm.recommended_action.message }}</p></div>
@@ -172,7 +180,7 @@
     <form method="post" action="{{ url_for('federation_web.apply_updates') }}" class="federation-update-confirmation">
       <input type="hidden" name="_csrf_token" value="{{ update_csrf }}">
       <input type="hidden" name="target_commit" value="{{ update_target }}">
-      <label><input type="checkbox" name="confirm_update" value="update-all" required> Update {{ update_eligible }} currently eligible device{{ '' if update_eligible == 1 else 's' }} to exact commit <code>{{ update_target[:12] }}</code>. Offline devices are not queued. Remote devices are requested first; this coordinator activates last.</label>
+      <label><input type="checkbox" name="confirm_update" value="update-all" required> Update {{ update_eligible }} currently eligible device{{ '' if update_eligible == 1 else 's' }} to exact commit <code>{{ update_target[:12] }}</code>. Offline devices are not queued. Reachable devices activate one at a time after durable workload quiescence; this coordinator activates last.</label>
       <button class="federation-button federation-button--primary" type="submit">Update all devices</button>
     </form>
     {% endif %}

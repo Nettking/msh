@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import platform
 import re
@@ -18,11 +19,16 @@ import subprocess
 import sys
 import time
 import uuid
+from collections.abc import Mapping, Sequence
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Final
 
-from scripts.acceptance.cf7_physical_readiness import sanitize_text, verify_checkout
+from scripts.acceptance.cf7_physical_readiness import (
+    ReadinessError,
+    sanitize_text,
+    verify_checkout,
+)
 from scripts.acceptance.v1_physical_campaign_contract import SCENARIOS, ScenarioSpec
 
 SCHEMA: Final = "fcp.v1.physical-campaign.v1"
@@ -38,6 +44,32 @@ CREDENTIAL_RE = re.compile(
     r"\s*[:=]\s*(?:bearer\s+)?[^\s,;\"']+"
 )
 PAIRING_RE = re.compile(r"\bFCP1-[A-Za-z0-9._~+/=-]{6,}", re.IGNORECASE)
+PROFILE_RE = re.compile(r"[a-z][a-z0-9-]{0,31}")
+PREPARE_ID_RE = re.compile(r"[0-9a-f]{32}")
+
+#: Host profiles the campaign is allowed to reason about. ``unspecified`` is the
+#: only value a host may carry without declaring one, and every probe that needs
+#: a profile refuses it, so an undeclared host can never satisfy a
+#: profile-restricted assertion by accident.
+HOST_PROFILES: Final[frozenset[str]] = frozenset(
+    {
+        "unspecified",
+        "local-ai",
+        "cnc-recorder",
+        "school-control",
+    }
+)
+
+#: Packet kinds that carry preparation/operator context only. They may never
+#: carry an assertion verdict, so preparation output cannot become a pass.
+NON_ASSERTION_KINDS: Final[frozenset[str]] = frozenset(
+    {"prepare", "operator-action"}
+)
+ASSERTION_STATUSES: Final[frozenset[str]] = frozenset(
+    {"pass", "fail", "not-applicable"}
+)
+MAX_DETAIL_DEPTH: Final = 10
+MAX_DETAIL_ITEMS: Final = 256
 
 
 class CampaignError(RuntimeError):
@@ -82,6 +114,107 @@ def os_category() -> str:
     return "windows" if platform.system().casefold() == "windows" else "posix"
 
 
+def require_candidate_checkout(checkout: Path, commit: str) -> dict[str, object]:
+    """Prove the checkout is the exact clean candidate, failing as a campaign error.
+
+    ``verify_checkout`` raises the readiness error type. Every campaign entry
+    point already fails closed on ``CampaignError``, so converting here keeps a
+    wrong or dirty checkout a clean refusal rather than an unhandled traceback.
+    """
+
+    try:
+        return verify_checkout(checkout, commit)
+    except ReadinessError as exc:
+        raise CampaignError(str(exc)) from exc
+
+
+def redact_text(value: object, *, cwd: Path | None = None) -> str:
+    """Redact one string with the campaign's own, stricter pattern set.
+
+    ``sanitize_text`` already removes endpoints, addresses, local paths and
+    credential-like values. The campaign privacy scan additionally refuses
+    reusable ``FCP1-`` pairing material, so evidence this harness writes itself
+    must be redacted to the same standard it is later sealed against. Anything
+    the harness writes therefore passes its own privacy scan by construction;
+    the scan stays the backstop for material copied in by hand.
+    """
+
+    text = sanitize_text(value, cwd=cwd)
+    text = URL_RE.sub("<redacted-endpoint>", text)
+    text = IPV4_RE.sub("<redacted-address>", text)
+    text = WINDOWS_PATH_RE.sub("<redacted-path>", text)
+    text = CREDENTIAL_RE.sub("<redacted-credential>", text)
+    return PAIRING_RE.sub("<redacted-pairing-material>", text)
+
+
+def require_profile(value: str) -> str:
+    profile = str(value or "").strip().casefold()
+    if PROFILE_RE.fullmatch(profile) is None or profile not in HOST_PROFILES:
+        raise CampaignError(f"unsupported host profile: {value}")
+    return profile
+
+
+def require_prepare_id(value: str) -> str:
+    prepare_id = str(value or "").strip().casefold()
+    if PREPARE_ID_RE.fullmatch(prepare_id) is None:
+        raise CampaignError("prepare id must be one 32-character hex token")
+    return prepare_id
+
+
+def sanitize_value(value: object, *, cwd: Path, _depth: int = 0) -> object:
+    """Redact one JSON-shaped probe detail without trusting its producer.
+
+    Probe results are structured rather than free text, so redaction has to
+    reach every nested string and key. Unsupported types, unbounded fan-out and
+    non-finite numbers are refused instead of being coerced, because a value the
+    privacy scan cannot reason about must not reach the evidence tree.
+    """
+
+    if _depth > MAX_DETAIL_DEPTH:
+        raise CampaignError("probe detail is nested too deeply")
+    if value is None or isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return int(value)
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise CampaignError("probe detail contains a non-finite number")
+        return float(value)
+    if isinstance(value, str):
+        return redact_text(value, cwd=cwd)
+    if isinstance(value, Mapping):
+        if len(value) > MAX_DETAIL_ITEMS:
+            raise CampaignError("probe detail has too many fields")
+        redacted: dict[str, object] = {}
+        for key, item in value.items():
+            name = redact_text(str(key), cwd=cwd)
+            if not name:
+                raise CampaignError("probe detail contains an empty field name")
+            redacted[name] = sanitize_value(item, cwd=cwd, _depth=_depth + 1)
+        return redacted
+    if isinstance(value, Sequence):
+        if len(value) > MAX_DETAIL_ITEMS:
+            raise CampaignError("probe detail has too many entries")
+        return [
+            sanitize_value(item, cwd=cwd, _depth=_depth + 1) for item in value
+        ]
+    raise CampaignError("probe detail contains an unsupported value type")
+
+
+def sanitize_detail(
+    value: object | None,
+    *,
+    cwd: Path,
+) -> dict[str, object] | None:
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        raise CampaignError("probe detail must be an object")
+    redacted = sanitize_value(value, cwd=cwd)
+    assert isinstance(redacted, dict)
+    return redacted
+
+
 def _write_json(path: Path, value: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(path.name + ".tmp")
@@ -123,8 +256,8 @@ def initialize(
     operator: str,
 ) -> dict[str, object]:
     expected = require_commit(commit)
-    verify_checkout(checkout, expected)
-    operator_text = sanitize_text(operator.strip(), cwd=checkout)
+    require_candidate_checkout(checkout, expected)
+    operator_text = redact_text(operator.strip(), cwd=checkout)
     if not operator_text:
         raise CampaignError("operator must be non-empty")
     path = campaign_path(root)
@@ -152,7 +285,7 @@ def load_campaign(
     commit: str,
 ) -> dict[str, object]:
     expected = require_commit(commit)
-    verify_checkout(checkout, expected)
+    require_candidate_checkout(checkout, expected)
     path = campaign_path(root)
     if not path.exists():
         raise CampaignError("campaign is not initialized; run init first")
@@ -177,10 +310,12 @@ def register_host(
     commit: str,
     host: str,
     role: str,
+    profile: str = "unspecified",
 ) -> dict[str, object]:
     load_campaign(checkout, root, commit)
     expected = require_commit(commit)
     host_id = require_host(host)
+    host_profile = require_profile(profile)
     path = root / "hosts" / f"{host_id}.json"
     fingerprint = host_fingerprint()
     if path.exists():
@@ -189,6 +324,11 @@ def register_host(
             raise CampaignError(f"host {host_id} belongs to a different candidate")
         if existing.get("host_fingerprint") != fingerprint:
             raise CampaignError(f"host alias {host_id} already identifies another machine")
+        recorded = host_profile_of(existing)
+        if recorded != host_profile:
+            raise CampaignError(
+                f"host {host_id} is already registered as profile {recorded}"
+            )
         return existing
     record = {
         "schema": PACKET_SCHEMA,
@@ -200,11 +340,28 @@ def register_host(
         "os_category": os_category(),
         "machine": platform.machine(),
         "python": platform.python_version(),
-        "role": sanitize_text(role, cwd=checkout),
+        "role": redact_text(role, cwd=checkout),
+        "profile": host_profile,
         "recorded_at": utc_now(),
     }
     _write_json(path, record)
     return record
+
+
+def host_profile_of(record: Mapping[str, object]) -> str:
+    """Return one registered host's declared profile, defaulting to unspecified.
+
+    Host evidence recorded before profiles existed carries no field. Reading it
+    as ``unspecified`` keeps that evidence valid while still refusing every
+    profile-restricted probe on it.
+    """
+
+    value = record.get("profile")
+    if value is None:
+        return "unspecified"
+    if not isinstance(value, str):
+        raise CampaignError("host evidence has an invalid profile")
+    return require_profile(value)
 
 
 def load_host(
@@ -235,9 +392,32 @@ def _packet_path(root: Path, scenario: str, kind: str) -> Path:
     )
 
 
+def _reject_manufactured_verdict(packet: Mapping[str, object]) -> None:
+    """Refuse a preparation/operator packet that carries an assertion verdict.
+
+    PREPARE and OPERATOR ACTION evidence exists so a fault-injection case can be
+    staged and attested. If either could carry ``assertion``/``status``, running
+    the preparation step would silently satisfy the assertion it was only meant
+    to set up. Both the write path and the read path refuse it, so hand-written
+    or imported evidence cannot smuggle one in either.
+    """
+
+    kind = str(packet.get("kind", ""))
+    if kind not in NON_ASSERTION_KINDS:
+        return
+    if "assertion" in packet or "status" in packet:
+        raise CampaignError(
+            f"{kind} evidence must not carry an assertion verdict"
+        )
+
+
 def write_packet(root: Path, packet: dict[str, object]) -> Path:
     scenario = require_scenario(str(packet["scenario"]))
     kind = str(packet.get("kind", "observation"))
+    _reject_manufactured_verdict(packet)
+    status = packet.get("status")
+    if status is not None and status not in ASSERTION_STATUSES:
+        raise CampaignError(f"unsupported observation status: {status}")
     path = _packet_path(root, scenario, kind)
     _write_json(path, packet)
     return path
@@ -296,6 +476,8 @@ def observe(
     assertion: str,
     status: str,
     note: str,
+    detail: Mapping[str, object] | None = None,
+    source: str = "operator",
 ) -> Path:
     load_campaign(checkout, root, commit)
     scenario_id, spec = _assertion_contract(
@@ -305,7 +487,7 @@ def observe(
         scenario=scenario,
         assertion=assertion,
     )
-    if status not in {"pass", "fail", "not-applicable"}:
+    if status not in ASSERTION_STATUSES:
         raise CampaignError(
             "observation status must be pass, fail, or not-applicable"
         )
@@ -325,10 +507,186 @@ def observe(
             "assertion": assertion,
             "assertion_text": spec.assertions[assertion],
             "status": status,
-            "note": sanitize_text(note, cwd=checkout),
+            "note": redact_text(note, cwd=checkout),
+            "source": redact_text(source, cwd=checkout) or "operator",
+        }
+    )
+    redacted = sanitize_detail(detail, cwd=checkout)
+    if redacted is not None:
+        packet["detail"] = redacted
+    return write_packet(root, packet)
+
+
+def record_preparation(
+    checkout: Path,
+    root: Path,
+    *,
+    commit: str,
+    host: str,
+    scenario: str,
+    assertion: str,
+    operator_action: str,
+    detail: Mapping[str, object] | None = None,
+) -> tuple[str, Path]:
+    """Record staged state for one fault-injection assertion.
+
+    The returned prepare id is the only handle a later VERIFY accepts, and this
+    packet deliberately carries no verdict: preparation proves the case was
+    staged on this host, never that the consequence was observed.
+    """
+
+    load_campaign(checkout, root, commit)
+    scenario_id, spec = _assertion_contract(
+        root,
+        commit=commit,
+        host=host,
+        scenario=scenario,
+        assertion=assertion,
+    )
+    prepare_id = uuid.uuid4().hex
+    packet = base_packet(
+        root,
+        commit=commit,
+        host=host,
+        scenario=scenario_id,
+        kind="prepare",
+    )
+    packet.update(
+        {
+            "prepare_for": assertion,
+            "prepare_id": prepare_id,
+            "assertion_text": spec.assertions[assertion],
+            "operator_action": redact_text(operator_action, cwd=checkout),
+        }
+    )
+    redacted = sanitize_detail(detail, cwd=checkout)
+    if redacted is not None:
+        packet["detail"] = redacted
+    return prepare_id, write_packet(root, packet)
+
+
+def record_operator_action(
+    checkout: Path,
+    root: Path,
+    *,
+    commit: str,
+    host: str,
+    scenario: str,
+    assertion: str,
+    prepare_id: str,
+    note: str,
+) -> Path:
+    """Attest that the operator performed the explicit physical fault action."""
+
+    load_campaign(checkout, root, commit)
+    scenario_id, _spec = _assertion_contract(
+        root,
+        commit=commit,
+        host=host,
+        scenario=scenario,
+        assertion=assertion,
+    )
+    identifier = require_prepare_id(prepare_id)
+    preparation = find_preparation(
+        root,
+        commit=commit,
+        host=host,
+        scenario=scenario_id,
+        assertion=assertion,
+        prepare_id=identifier,
+    )
+    action_note = redact_text(note, cwd=checkout)
+    if not action_note:
+        raise CampaignError("operator action requires a description")
+    packet = base_packet(
+        root,
+        commit=commit,
+        host=host,
+        scenario=scenario_id,
+        kind="operator-action",
+    )
+    packet.update(
+        {
+            "prepare_for": assertion,
+            "prepare_id": identifier,
+            "prepared_at": preparation["recorded_at"],
+            "operator_note": action_note,
         }
     )
     return write_packet(root, packet)
+
+
+def _matching_context_packets(
+    root: Path,
+    *,
+    commit: str,
+    host: str,
+    scenario: str,
+    assertion: str,
+    prepare_id: str,
+    kind: str,
+) -> list[dict[str, object]]:
+    host_record = load_host(root, host, commit=commit)
+    packets = read_packets(root, scenario, expected_commit=commit)
+    return [
+        packet
+        for packet in packets
+        if packet.get("kind") == kind
+        and packet.get("prepare_for") == assertion
+        and packet.get("prepare_id") == prepare_id
+        and packet.get("host_id") == host_record["host_id"]
+        and packet.get("host_fingerprint") == host_record["host_fingerprint"]
+    ]
+
+
+def find_preparation(
+    root: Path,
+    *,
+    commit: str,
+    host: str,
+    scenario: str,
+    assertion: str,
+    prepare_id: str,
+) -> dict[str, object]:
+    matches = _matching_context_packets(
+        root,
+        commit=commit,
+        host=host,
+        scenario=scenario,
+        assertion=assertion,
+        prepare_id=require_prepare_id(prepare_id),
+        kind="prepare",
+    )
+    if len(matches) != 1:
+        raise CampaignError(
+            "no single matching preparation for this candidate, host and assertion"
+        )
+    return matches[0]
+
+
+def find_operator_action(
+    root: Path,
+    *,
+    commit: str,
+    host: str,
+    scenario: str,
+    assertion: str,
+    prepare_id: str,
+) -> dict[str, object]:
+    matches = _matching_context_packets(
+        root,
+        commit=commit,
+        host=host,
+        scenario=scenario,
+        assertion=assertion,
+        prepare_id=require_prepare_id(prepare_id),
+        kind="operator-action",
+    )
+    if not matches:
+        raise CampaignError(
+            "the explicit operator fault action has not been recorded"
+        )
+    return max(matches, key=lambda item: str(item.get("recorded_at", "")))
 
 
 def _run(
@@ -412,12 +770,12 @@ def run_command(
     )
     packet.update(
         {
-            "label": sanitize_text(label, cwd=checkout),
-            "command": sanitize_text(" ".join(command), cwd=checkout),
+            "label": redact_text(label, cwd=checkout),
+            "command": redact_text(" ".join(command), cwd=checkout),
             "expected_exit": expected_exit,
             "returncode": returncode,
             "duration_seconds": duration,
-            "output_tail": sanitize_text(output, cwd=checkout),
+            "output_tail": redact_text(output, cwd=checkout),
             "passed": passed,
         }
     )
@@ -500,6 +858,12 @@ def read_packets(
         ):
             raise CampaignError(f"observation {path.name} has invalid scenario")
         _validate_packet_host(root, packet, packet_commit)
+        _reject_manufactured_verdict(packet)
+        status = packet.get("status")
+        if status is not None and status not in ASSERTION_STATUSES:
+            raise CampaignError(
+                f"observation {path.name} has an unsupported status"
+            )
         parse_time(str(packet.get("recorded_at", "")))
         packets.append(packet)
     return packets
@@ -543,6 +907,7 @@ def sample_resources(
     scenario: str,
     label: str,
     run_id: str | None = None,
+    extras: Mapping[str, object] | None = None,
 ) -> Path:
     load_campaign(checkout, root, commit)
     scenario_id = require_scenario(scenario)
@@ -586,7 +951,7 @@ def sample_resources(
             {
                 "returncode": code,
                 "duration_seconds": duration,
-                "summary": sanitize_text(output, cwd=checkout),
+                "summary": redact_text(output, cwd=checkout),
             }
         )
         code, duration, output = _run(
@@ -598,16 +963,19 @@ def sample_resources(
             {
                 "compose_returncode": code,
                 "compose_duration_seconds": duration,
-                "compose_summary": sanitize_text(output, cwd=checkout),
+                "compose_summary": redact_text(output, cwd=checkout),
             }
         )
     packet.update(
         {
-            "label": sanitize_text(label, cwd=checkout),
+            "label": redact_text(label, cwd=checkout),
             "resources": resources,
             "docker": docker,
         }
     )
+    redacted = sanitize_detail(extras, cwd=checkout)
+    if redacted is not None:
+        packet["extras"] = redacted
     return write_packet(root, packet)
 
 
@@ -887,6 +1255,7 @@ def validate_campaign(
         ):
             raise CampaignError("host evidence schema/candidate mismatch")
     categories = {str(item.get("os_category")) for item in hosts}
+    profiles = sorted({host_profile_of(item) for item in hosts})
     host_coverage_ok = {"windows", "posix"}.issubset(categories)
     statuses = [
         scenario_status(root, scenario, expected_commit=expected)
@@ -914,6 +1283,7 @@ def validate_campaign(
         "candidate_sha": campaign["candidate_sha"],
         "accepted": accepted,
         "host_os_categories": sorted(categories),
+        "host_profiles": profiles,
         "host_coverage_ok": host_coverage_ok,
         "privacy_ok": privacy_ok,
         "scenarios": statuses,
@@ -961,6 +1331,11 @@ def main(argv: list[str] | None = None) -> int:
     host.add_argument("--commit", required=True)
     host.add_argument("--host", required=True)
     host.add_argument("--role", default="physical-test-host")
+    host.add_argument(
+        "--profile",
+        choices=sorted(HOST_PROFILES),
+        default="unspecified",
+    )
 
     plan_parser = sub.add_parser("plan")
     plan_parser.add_argument("--scenario")
@@ -1036,6 +1411,7 @@ def main(argv: list[str] | None = None) -> int:
                 commit=args.commit,
                 host=args.host,
                 role=args.role,
+                profile=args.profile,
             )
         elif args.command_name == "plan":
             result = plan(args.scenario)
@@ -1148,7 +1524,7 @@ def main(argv: list[str] | None = None) -> int:
     except (CampaignError, OSError, subprocess.SubprocessError) as exc:
         _print(
             {
-                "error": sanitize_text(str(exc), cwd=checkout),
+                "error": redact_text(str(exc), cwd=checkout),
                 "accepted": False,
             }
         )
