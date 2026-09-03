@@ -12,7 +12,10 @@ from catalog.capabilities.jobs import (
 )
 from catalog.capabilities.lifecycle_store import SQLiteJobLifecycleStore
 from catalog.capabilities.provider_reports import ProviderResourceReport, ProviderStatus
-from catalog.capabilities.update_drain import NodeUpdateDrainTarget, SQLiteNodeUpdateDrainStore
+from catalog.capabilities.update_drain import (
+    NodeUpdateDrainTarget,
+    SQLiteNodeUpdateDrainStore,
+)
 from catalog.federation.errors import FederationValidationError
 
 NOW = datetime(2026, 9, 1, 13, 0, tzinfo=timezone.utc)

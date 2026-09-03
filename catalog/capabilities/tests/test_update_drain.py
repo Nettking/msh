@@ -19,6 +19,7 @@ from catalog.capabilities.provider_selection import evaluate_provider_candidate
 from catalog.capabilities.retry_claim import claim_retry
 from catalog.capabilities.update_drain import (
     MAX_DRAIN_PROVIDER_IDS,
+    NodeUpdateDrainMutation,
     NodeUpdateDrainState,
     NodeUpdateDrainTarget,
     SQLiteNodeUpdateDrainStore,
@@ -278,6 +279,45 @@ def test_stale_ready_selection_cannot_claim_after_concurrent_drain(tmp_path) -> 
     snapshot = setup.snapshot(queued.snapshot.job.job_id)
     assert snapshot.ownership is None
     assert snapshot.attempt_generation == 0
+
+
+def test_concurrent_duplicate_drain_commands_commit_one_admission_epoch(tmp_path) -> None:
+    """Concurrent replay of one command cannot create two drain revisions."""
+
+    database = tmp_path / "jobs.sqlite3"
+    SQLiteNodeUpdateDrainStore(SQLiteJobLifecycleStore(database))
+    start = threading.Barrier(2)
+    results: list[NodeUpdateDrainMutation] = []
+    failures: list[Exception] = []
+
+    def request() -> None:
+        try:
+            local = SQLiteNodeUpdateDrainStore(SQLiteJobLifecycleStore(database))
+            start.wait(timeout=10)
+            results.append(_request_drain(local, command_id="drain-concurrent"))
+        except Exception as exc:  # noqa: BLE001 - assertion below reports it
+            failures.append(exc)
+
+    threads = [threading.Thread(target=request) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=15)
+
+    assert not failures
+    assert all(not thread.is_alive() for thread in threads)
+    assert len(results) == 2
+    assert all(mutation.record.revision == 1 for mutation in results)
+    assert all(
+        mutation.record.state is NodeUpdateDrainState.DRAINING for mutation in results
+    )
+    assert all(mutation.changed for mutation in results)
+    persisted = SQLiteNodeUpdateDrainStore(SQLiteJobLifecycleStore(database)).get(
+        session_id=SESSION,
+        node_id=NODE,
+    )
+    assert persisted is not None
+    assert persisted.revision == 1
 
 
 def test_claim_commit_before_drain_remains_owned_and_can_finish(tmp_path) -> None:

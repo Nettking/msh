@@ -713,8 +713,8 @@ class SQLiteNodeUpdateDrainStore:
 
 
 __all__ = [
-    "ActiveDrainOwnership",
     "MAX_DRAIN_PROVIDER_IDS",
+    "ActiveDrainOwnership",
     "NodeUpdateDrainMutation",
     "NodeUpdateDrainRecord",
     "NodeUpdateDrainState",

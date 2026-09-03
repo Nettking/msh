@@ -180,7 +180,7 @@
     <form method="post" action="{{ url_for('federation_web.apply_updates') }}" class="federation-update-confirmation">
       <input type="hidden" name="_csrf_token" value="{{ update_csrf }}">
       <input type="hidden" name="target_commit" value="{{ update_target }}">
-      <label><input type="checkbox" name="confirm_update" value="update-all" required> Update {{ update_eligible }} currently eligible device{{ '' if update_eligible == 1 else 's' }} to exact commit <code>{{ update_target[:12] }}</code>. Offline devices are not queued. Remote devices are requested first; this coordinator activates last.</label>
+      <label><input type="checkbox" name="confirm_update" value="update-all" required> Update {{ update_eligible }} currently eligible device{{ '' if update_eligible == 1 else 's' }} to exact commit <code>{{ update_target[:12] }}</code>. Offline devices are not queued. Reachable devices activate one at a time after durable workload quiescence; this coordinator activates last.</label>
       <button class="federation-button federation-button--primary" type="submit">Update all devices</button>
     </form>
     {% endif %}

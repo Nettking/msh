@@ -663,8 +663,15 @@ class ComputeWorkerActivationAuthority:
         provider_generation: int | None = None,
         report_revision: int | None = None,
         expected_binding_id: str | None = None,
+        allow_draining: bool = False,
     ) -> ComputeWorkerActivationSnapshot:
         provider_id = _text(provider_id, "provider_id")
+        if not isinstance(allow_draining, bool):
+            raise FederationValidationError(
+                "invalid-draining-activation-mode",
+                "allow_draining",
+                "must be a boolean",
+            )
         if provider_generation is not None:
             provider_generation = _positive(
                 provider_generation,
@@ -715,12 +722,15 @@ class ComputeWorkerActivationAuthority:
                 "activation report revision is no longer current",
                 "report_revision",
             )
-        if report.status is not ProviderStatus.READY or not record.is_fresh_at(
-            self.now()
-        ):
+        allowed_statuses = (
+            {ProviderStatus.READY, ProviderStatus.DRAINING}
+            if allow_draining
+            else {ProviderStatus.READY}
+        )
+        if report.status not in allowed_statuses or not record.is_fresh_at(self.now()):
             raise FederationOperationError(
                 "compute-provider-health-expired",
-                "provider is not ready with current health",
+                "provider is not ready or draining with current health",
                 "expires_at",
             )
         if report.capability_type == "language-model":
@@ -796,8 +806,8 @@ class _ActivationFencedHandler:
             current = self.authority.current_snapshot(
                 self.snapshot.provider_id,
                 provider_generation=self.snapshot.provider_generation,
-                report_revision=self.snapshot.report_revision,
                 expected_binding_id=self.snapshot.binding_id,
+                allow_draining=True,
             )
         except (FederationOperationError, FederationValidationError):
             return ExecutionResult(False, {}, "compute-activation-not-current")
@@ -921,8 +931,10 @@ class TrustedComputeWorkerBinder:
         # lifecycle inbox); the activation fencing below is unchanged either way.
         self._worker_factory = worker_factory or CapabilityWorker
 
-    def activate(self, provider_id: str) -> ActivatedComputeWorker:
-        snapshot = self.authority.current_snapshot(provider_id)
+    def _build_worker(
+        self,
+        snapshot: ComputeWorkerActivationSnapshot,
+    ) -> ActivatedComputeWorker:
         registration = WorkerRegistration(
             session_id=snapshot.session_id,
             node_id=snapshot.node_id,
@@ -952,6 +964,79 @@ class TrustedComputeWorkerBinder:
                 "must return a CapabilityWorker",
             )
         return ActivatedComputeWorker(worker, snapshot)
+
+    def activate(self, provider_id: str) -> ActivatedComputeWorker:
+        """Create a new worker only from a READY provider report."""
+
+        return self._build_worker(self.authority.current_snapshot(provider_id))
+
+    def activate_existing(
+        self,
+        provider_id: str,
+        *,
+        provider_generation: int,
+        expected_binding_id: str,
+        expected_descriptor_fingerprint: str | None = None,
+    ) -> ActivatedComputeWorker | None:
+        """Rebind checkpoint-authoritative work while a provider is draining.
+
+        This path is intentionally impossible without prior immutable
+        activation evidence (provider generation and handler descriptor
+        identity).  A restarted inventory may mint a new process-local
+        binding ID for the same descriptor, but a changed generation or
+        descriptor cannot turn a draining provider into a new admission target.
+        """
+
+        try:
+            snapshot = self.authority.current_snapshot(
+                provider_id,
+                provider_generation=provider_generation,
+                allow_draining=True,
+            )
+        except (FederationOperationError, FederationValidationError):
+            return None
+        if snapshot.record.report.status is not ProviderStatus.DRAINING:
+            return None
+        if snapshot.binding_id != expected_binding_id and (
+            expected_descriptor_fingerprint is None
+            or snapshot.descriptor.descriptor_fingerprint
+            != expected_descriptor_fingerprint
+        ):
+            return None
+        return self._build_worker(snapshot)
+
+    def continue_existing(
+        self,
+        worker: ActivatedComputeWorker,
+    ) -> ActivatedComputeWorker | None:
+        """Retain an already-authoritative worker across a durable drain.
+
+        A draining report is an admission fence, not a revocation of work that
+        was already bound to this exact handler.  Continuation deliberately
+        keeps the worker's original immutable evidence; the authority check
+        below only relaxes the report status/revision.  Generation, session,
+        node, enrollment, handler identity, and binding identity remain
+        fenced by ``current_snapshot``.
+        """
+
+        if not isinstance(worker, ActivatedComputeWorker):
+            raise FederationValidationError(
+                "invalid-existing-compute-worker",
+                "worker",
+                "must be an ActivatedComputeWorker",
+            )
+        try:
+            current = self.authority.current_snapshot(
+                worker.snapshot.provider_id,
+                provider_generation=worker.snapshot.provider_generation,
+                expected_binding_id=worker.snapshot.binding_id,
+                allow_draining=True,
+            )
+        except (FederationOperationError, FederationValidationError):
+            return None
+        if current.record.report.status is not ProviderStatus.DRAINING:
+            return None
+        return worker
 
     def activate_all(self) -> tuple[ActivatedComputeWorker, ...]:
         reports = self.authority.health.fresh_reports(

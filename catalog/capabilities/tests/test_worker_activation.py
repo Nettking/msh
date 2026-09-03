@@ -199,6 +199,7 @@ def publish_health(
     revision: int = 0,
     reported_at: datetime = NOW,
     expires_at: datetime | None = None,
+    status: ProviderStatus = ProviderStatus.READY,
 ) -> ProviderResourceReport:
     report = ProviderResourceReport(
         capability_id=capability_id,
@@ -207,7 +208,7 @@ def publish_health(
         capability_type=handler.capability_type,
         protocol=handler.protocol,
         protocol_version=handler.protocol_version,
-        status=ProviderStatus.READY,
+        status=status,
         report_revision=revision,
         max_concurrent_jobs=2,
         active_jobs=0,
@@ -383,6 +384,58 @@ def test_activation_executes_and_duplicate_delivery_replays_once(tmp_path: Path)
     assert first == duplicate
     assert first.state is DispatchState.SUCCEEDED
     assert first.events[-1].details == {"handler": "compute", "job_id": "job-f84"}
+    assert handler.calls == 1
+
+
+def test_already_activated_worker_continues_during_draining_report(
+    tmp_path: Path,
+) -> None:
+    coordinator, enrollments, health, owner, provider, current = environment(tmp_path)
+    local_descriptor = descriptor("draining-handler")
+    handler = CountingHandler()
+    inventory = LocalComputeHandlerInventory()
+    inventory.register(local_descriptor, handler)
+    announce_and_approve(
+        coordinator,
+        enrollments,
+        owner=owner,
+        provider=provider,
+        capability_id="compute-draining",
+    )
+    publish_health(
+        health,
+        provider=provider,
+        capability_id="compute-draining",
+        handler=local_descriptor,
+        generation=1,
+    )
+    activation = binder(health, inventory, provider, current, tmp_path)
+    worker = activation.activate("compute-draining")
+
+    current[0] += timedelta(seconds=1)
+    publish_health(
+        health,
+        provider=provider,
+        capability_id="compute-draining",
+        handler=local_descriptor,
+        generation=1,
+        revision=1,
+        reported_at=current[0],
+        status=ProviderStatus.DRAINING,
+    )
+    continued = handle(
+        worker,
+        dispatch_request(
+            owner,
+            provider,
+            "compute-draining",
+            dispatch_id="dispatch-during-drain",
+            job_id="job-during-drain",
+            sent_at=current[0],
+        ),
+    )
+
+    assert continued.state is DispatchState.SUCCEEDED
     assert handler.calls == 1
 
 

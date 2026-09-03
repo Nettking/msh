@@ -8,11 +8,14 @@ from typing import Any
 
 import pytest
 
+from catalog.capabilities.lifecycle_store import SQLiteJobLifecycleStore
+from catalog.capabilities.update_drain import SQLiteNodeUpdateDrainStore
 from catalog.federation.software_update import UpdateInspection
 from catalog.flask_app.services import federation_update_service as module
 from catalog.flask_app.services.federation_update_events import (
     APPLY_REQUEST_EVENT,
     CHECK_REQUEST_EVENT,
+    report_payload,
 )
 from catalog.flask_app.services.federation_update_service import (
     FederationUpdateService,
@@ -94,12 +97,45 @@ class _Coordinator:
 
 class _Authority:
     devices: tuple[object, ...] = ()
+    capabilities: tuple[object, ...] = ()
 
     def __init__(self, *_args: Any, **_kwargs: Any) -> None:
         pass
 
     def snapshot(self) -> object:
-        return SimpleNamespace(available=True, devices=self.devices)
+        return SimpleNamespace(
+            available=True,
+            devices=self.devices,
+            capabilities=self.capabilities,
+        )
+
+
+class _EventCoordinator(_Coordinator):
+    def append_event(self, **kwargs: Any) -> object:
+        event = SimpleNamespace(
+            revision=len(self.events) + 1,
+            session_id=kwargs["session_id"],
+            event_type=kwargs["event_type"],
+            actor_node_id=kwargs["actor_node_id"],
+            payload=kwargs["payload"],
+        )
+        self.events.append(event)
+        return event
+
+    def replay_page(self, **kwargs: Any) -> tuple[tuple[object, ...], int]:
+        start = kwargs["last_applied_revision"]
+        return (
+            tuple(event for event in self.events if event.revision > start),
+            len(self.events),
+        )
+
+    def append_report(self, *, node_id: str, payload: dict[str, object]) -> None:
+        self.append_event(
+            session_id="session-one",
+            event_type="software.update.apply.reported",
+            actor_node_id=node_id,
+            payload=payload,
+        )
 
 
 def _device(node_id: str, state: str, label: str) -> object:
@@ -125,6 +161,7 @@ def _install_context(
         lambda: onboarding,
     )
     _Authority.devices = devices
+    _Authority.capabilities = ()
     monkeypatch.setattr(module, "FederationAuthorityAdapter", _Authority)
 
 
@@ -388,3 +425,104 @@ def test_apply_aggregation_is_updated_only_when_every_expected_node_verified(
     ]
     partial = service._refresh_apply(failed, context, ACTOR)
     assert partial["status"] == "update_completed_with_failures"
+
+
+def test_update_all_serializes_remote_then_local_activation_behind_drain(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    coordinator = _EventCoordinator()
+    _install_context(
+        monkeypatch,
+        coordinator,
+        (
+            _device(ACTOR, "connected", "Owner"),
+            _device(REMOTE, "connected", "Remote"),
+        ),
+    )
+    _Authority.capabilities = (
+        SimpleNamespace(node_id=ACTOR, capability_id="provider-owner"),
+        SimpleNamespace(node_id=REMOTE, capability_id="provider-remote"),
+    )
+    local = _Local()
+    drains = SQLiteNodeUpdateDrainStore(
+        SQLiteJobLifecycleStore(tmp_path / "analysis-jobs.sqlite3")
+    )
+    service = FederationUpdateService(
+        local,
+        tmp_path / "updates.json",
+        drain_store=drains,
+    )
+    now = datetime.now(timezone.utc)
+    service._save(
+        {
+            "operation": "check",
+            "status": "update_available",
+            "request_id": "check-rolling",
+            "checked_at": service._stamp(now),
+            "check_expires_at": service._stamp(now + timedelta(minutes=5)),
+            "report_deadline": service._stamp(now + timedelta(minutes=5)),
+            "target_commit": TARGET,
+            "expected_report_node_ids": [],
+            "eligible_count": 2,
+            "devices": [
+                service._device(
+                    ACTOR,
+                    "Owner",
+                    UpdateInspection("update_available", CURRENT, TARGET, running_commit=CURRENT),
+                ),
+                service._device(
+                    REMOTE,
+                    "Remote",
+                    UpdateInspection("update_available", CURRENT, TARGET, running_commit=CURRENT),
+                ),
+            ],
+        }
+    )
+
+    first = service.update_all(confirmed_target=TARGET)
+    apply_events = [
+        event for event in coordinator.events if event.event_type == APPLY_REQUEST_EVENT
+    ]
+    assert len(apply_events) == 1
+    assert apply_events[0].payload["target_node_ids"] == [REMOTE]
+    assert apply_events[0].payload["request_id"] == first["request_id"]
+    assert apply_events[0].payload["drain_node_id"] == REMOTE
+    assert apply_events[0].payload["drain_provider_ids"] == ["provider-remote"]
+    assert local.apply_calls == []
+
+    coordinator.append_report(
+        node_id=REMOTE,
+        payload=report_payload(
+            request_id=str(first["request_id"]),
+            node_id=REMOTE,
+            result=UpdateInspection(
+                "runtime_verified",
+                TARGET,
+                TARGET,
+                running_commit=TARGET,
+            ),
+        ),
+    )
+    second = service.snapshot()
+    assert len(local.apply_calls) == 1
+    assert second["rollout"]["current_index"] == 1
+    by_id = {item["node_id"]: item for item in second["devices"]}
+    assert by_id[ACTOR]["state"] == "activation_queued"
+    assert drains.get(session_id="session-one", node_id=REMOTE) is None
+    assert drains.get(session_id="session-one", node_id=ACTOR) is not None
+
+    local.latest = UpdateInspection(
+        "runtime_verified",
+        TARGET,
+        TARGET,
+        running_commit=TARGET,
+        request_id=second["local_host_request_id"],
+    )
+    complete = service.snapshot()
+
+    assert complete["status"] == "updated"
+    assert complete["rollout"]["state"] == "completed"
+    owner_drain = drains.get(session_id="session-one", node_id=ACTOR)
+    assert owner_drain is not None
+    assert owner_drain.state.value == "ready"

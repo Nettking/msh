@@ -291,6 +291,7 @@ def publish_compute(
     generation: int,
     revision: int,
     ttl_seconds: int = 120,
+    status: ProviderStatus = ProviderStatus.READY,
 ) -> ProviderResourceReport:
     report = ProviderResourceReport(
         capability_id=COMPUTE_CAPABILITY,
@@ -299,7 +300,7 @@ def publish_compute(
         capability_type=descriptor.capability_type,
         protocol=descriptor.protocol,
         protocol_version=descriptor.protocol_version,
-        status=ProviderStatus.READY,
+        status=status,
         report_revision=revision,
         max_concurrent_jobs=2,
         active_jobs=0,
@@ -774,3 +775,74 @@ def test_checkpoint_roundtrip_rejects_cross_identity_lookup(tmp_path: Path) -> N
         session_id=SESSION_ID,
         actor_node_id="node-other-actor",
     ) is None
+
+
+def test_restart_reconciliation_retains_checkpoint_work_during_draining(
+    tmp_path: Path,
+) -> None:
+    (
+        coordinator,
+        enrollments,
+        health,
+        checkpoints,
+        owner,
+        ai_provider,
+        local_actor,
+        current,
+    ) = environment(tmp_path)
+    inventory, descriptor = prepare_authority(
+        coordinator=coordinator,
+        enrollments=enrollments,
+        health=health,
+        owner=owner,
+        ai_provider=ai_provider,
+        local_actor=local_actor,
+        current=current,
+    )
+    first, _manager, endpoint = reconciler(
+        tmp_path,
+        coordinator=coordinator,
+        health=health,
+        checkpoints=checkpoints,
+        local_actor=local_actor,
+        current=current,
+        inventory=inventory,
+    )
+    first.reconcile()
+    old_worker = endpoint.workers[COMPUTE_CAPABILITY]
+
+    current[0] += timedelta(seconds=1)
+    publish_compute(
+        health,
+        local_actor,
+        descriptor,
+        current[0],
+        generation=1,
+        revision=1,
+        status=ProviderStatus.DRAINING,
+    )
+
+    # A replacement process starts with an empty endpoint. It may reconstruct
+    # only from the prior checkpoint, never by treating DRAINING as a new
+    # admission opportunity.
+    reopened_coordinator, _reopened_enrollments, reopened_health, reopened_store = (
+        stores(tmp_path, current)
+    )
+    replacement_inventory = LocalComputeHandlerInventory()
+    replacement_inventory.register(descriptor, CountingHandler())
+    restarted, _replacement_manager, replacement_endpoint = reconciler(
+        tmp_path,
+        coordinator=reopened_coordinator,
+        health=reopened_health,
+        checkpoints=reopened_store,
+        local_actor=local_actor,
+        current=current,
+        inventory=replacement_inventory,
+    )
+
+    rebuilt = restarted.reconcile()
+
+    assert rebuilt.changed is True
+    assert replacement_endpoint.workers[COMPUTE_CAPABILITY].snapshot.record.report.status is ProviderStatus.DRAINING
+    assert replacement_endpoint.workers[COMPUTE_CAPABILITY].snapshot.provider_generation == old_worker.snapshot.provider_generation
+    assert replacement_endpoint.workers[COMPUTE_CAPABILITY].snapshot.descriptor.descriptor_fingerprint == old_worker.snapshot.descriptor.descriptor_fingerprint
