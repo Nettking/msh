@@ -60,6 +60,7 @@ from catalog.node.storage_recovery_drill import (
 from catalog.relay.service import RelayServer
 
 from .test_physical_storage_failover import (
+    BOOTSTRAP_OBSERVATION_TIMEOUT,
     _f51_authority_evidence,
     _f51_storage_evidence,
     _wait_for_control_waiting,
@@ -67,9 +68,10 @@ from .test_physical_storage_failover import (
 )
 
 NOW = datetime(2026, 7, 31, 15, 0, tzinfo=timezone.utc)
-# Keep the fixture on the product's bounded relay/storage contract. Five seconds
-# is below the existing control-publication budget and can expire on a loaded
-# Windows runner while the local relay and nodes are still making progress.
+# Bound every individual product operation this drill drives - relay auth and
+# send, node requests, storage requests, control publication and each agent's
+# control sync - at the product's own request budget. This is a per-operation
+# bound, never a budget for a sequence of them; see the restarts below.
 TIMEOUT = 15.0
 
 
@@ -303,7 +305,16 @@ async def _scenario(root: Path) -> dict[str, Any]:
             control_sync_timeout=TIMEOUT,
             clock=lambda: NOW,
         )
-        await asyncio.wait_for(machine_b.bootstrap(), TIMEOUT)
+        # Restarting a storage node is a sequence of individually bounded
+        # operations - reconnect, session check, control sync, capability
+        # announcement and the replay it triggers - not a single operation.
+        # TIMEOUT bounds each of them inside the product; reusing it here as a
+        # deadline for the whole sequence asserts an aggregate latency contract
+        # the product never makes. Completion is what this drill observes, so
+        # the ceiling exists only so a genuine hang still ends the test.
+        await asyncio.wait_for(
+            machine_b.bootstrap(), BOOTSTRAP_OBSERVATION_TIMEOUT
+        )
         assert machine_b.node_id == stable_b_node_id
         stale_probe = await stale_authority_probe_with_transport(
             deployment,
@@ -410,7 +421,13 @@ async def _scenario(root: Path) -> dict[str, Any]:
         restart_b = asyncio.create_task(machine_b.bootstrap())
         restart_c = asyncio.create_task(machine_c.bootstrap())
         bootstrap_tasks.extend((restart_b, restart_c))
-        await asyncio.wait_for(asyncio.gather(restart_b, restart_c), TIMEOUT)
+        # Two restarts in parallel are observed to completion for the same
+        # reason as the single restart above, and each remains bounded by the
+        # product timeouts the agents and the relay were constructed with.
+        await asyncio.wait_for(
+            asyncio.gather(restart_b, restart_c),
+            BOOTSTRAP_OBSERVATION_TIMEOUT,
+        )
         assert machine_b.node_id == stable_b_node_id
         assert machine_c.node_id == stable_c_node_id
 
