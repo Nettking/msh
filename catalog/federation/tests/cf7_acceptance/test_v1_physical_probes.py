@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 
+from catalog.federation.software_update import APPROVED_REPOSITORY
 from scripts.acceptance import v1_physical_probes as probes
 from scripts.acceptance.v1_physical_automation import PLANS
 
@@ -307,7 +308,10 @@ def _candidate_repo(tmp_path: Path) -> str | None:
     # The update surface only reasons about a checkout that tracks the approved
     # repository. Pin the candidate the way a release host does: detached at the
     # exact SHA, so the update path must refuse to mutate it.
-    _git(tmp_path, "remote", "add", "origin", "https://github.com/Nettking/msh.git")
+    # Build the approved remote from the product's own constant rather than
+    # spelling the repository slug here: the update surface owns that name.
+    approved = f"https://github.com/{APPROVED_REPOSITORY}.git"
+    _git(tmp_path, "remote", "add", "origin", approved)
     _git(tmp_path, "checkout", "--quiet", "--detach", "HEAD")
     head = _git(tmp_path, "rev-parse", "HEAD").stdout.strip().lower()
     return head or None

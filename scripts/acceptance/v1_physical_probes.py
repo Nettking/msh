@@ -872,7 +872,15 @@ def _sqlite_candidates(context: ProbeContext) -> list[Path]:
 
 
 def _read_only_connection(path: Path) -> sqlite3.Connection:
-    uri = f"file:{path.as_posix()}?mode=ro"
+    """Open one database read-only.
+
+    ``as_uri`` gives the percent-encoded ``file:///`` form SQLite accepts on both
+    Windows drive letters and POSIX paths, so a database under a path with a
+    space or a drive prefix is still opened rather than silently reported as an
+    integrity failure.
+    """
+
+    uri = f"{path.resolve().as_uri()}?mode=ro"
     connection = sqlite3.connect(uri, uri=True, timeout=5.0)
     connection.row_factory = sqlite3.Row
     return connection
