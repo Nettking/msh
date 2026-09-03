@@ -1159,8 +1159,16 @@ def _probe_service_health(context: ProbeContext) -> ProbeOutcome:
 
 def _probe_core_availability(context: ProbeContext) -> ProbeOutcome:
     health = _probe_service_health(context)
-    detail: dict[str, object] = {"service_health": health.status}
-    detail.update({"service_health_detail": health.detail})
+    # Keep the summary rather than nesting the whole health detail: the
+    # service-health probe records its own packet, and a deeply nested copy only
+    # makes this evidence harder to read.
+    detail: dict[str, object] = {
+        "service_health": health.status,
+        "service_health_summary": health.summary,
+        "running_services": health.detail.get("running_services", []),
+        "not_running_services": health.detail.get("not_running_services", []),
+        "crash_looping": health.detail.get("crash_looping", []),
+    }
     reads = 0
     failures = 0
     for path in _sqlite_candidates(context):
