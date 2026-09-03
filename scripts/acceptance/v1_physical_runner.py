@@ -166,7 +166,7 @@ def _context(
     options = dict(binding.option_map())
     spec = probes.probe_spec(binding.probe_id)
     for key, value in overrides.items():
-        if key in spec.options:
+        if key in spec.options and key not in binding.option_map():
             options[key] = value
     return probes.ProbeContext(
         checkout=checkout,
@@ -182,6 +182,35 @@ def _context(
     )
 
 
+def require_operator_options(
+    bindings: Sequence[ProbeBinding],
+    overrides: Mapping[str, str],
+    *,
+    scenario: str,
+    assertion: str,
+) -> None:
+    """Refuse a probe whose subject only the operator can name.
+
+    A restored destination or a completed activation count cannot be inferred.
+    Without them a probe would silently answer about the wrong thing, so the
+    assertion is refused until they are supplied.
+    """
+
+    missing = sorted(
+        {
+            name
+            for binding in bindings
+            for name in binding.required
+            if not overrides.get(name)
+        }
+    )
+    if missing:
+        raise RunnerError(
+            f"{scenario}/{assertion} needs operator-supplied probe options: "
+            + ", ".join(f"--option {name}=<value>" for name in missing)
+        )
+
+
 def run_bindings(
     checkout: Path,
     root: Path,
@@ -194,6 +223,12 @@ def run_bindings(
     bindings: Sequence[ProbeBinding],
     overrides: Mapping[str, str],
 ) -> list[probes.ProbeOutcome]:
+    require_operator_options(
+        bindings,
+        overrides,
+        scenario=scenario,
+        assertion=assertion,
+    )
     outcomes: list[probes.ProbeOutcome] = []
     for binding in bindings:
         spec = probes.probe_spec(binding.probe_id)
@@ -653,6 +688,18 @@ def run_scenario(
                 }
             )
             continue
+        missing = sorted(plan.required_options() - set(overrides))
+        if missing:
+            skipped.append(
+                {
+                    "assertion": assertion,
+                    "reason": (
+                        "needs operator-supplied probe options: "
+                        + ", ".join(f"--option {name}=<value>" for name in missing)
+                    ),
+                }
+            )
+            continue
         executed.append(
             probe_assertion(
                 checkout,
@@ -797,21 +844,24 @@ def _next_step(
     )
     if state in {STATE_PASS, STATE_NOT_APPLICABLE}:
         return ""
+    required = "".join(
+        f" --option {name}=<value>" for name in sorted(plan.required_options())
+    )
     if plan.classification == AUTOMATED:
-        return f"{base} probe{common}"
+        return f"{base} probe{common}{required}"
     if plan.classification == HUMAN:
         return (
             "python -m scripts.acceptance.v1_physical_campaign observe"
             f"{common} --status <pass|fail|not-applicable> --note \"<observation>\""
         )
     if prepare_id is None:
-        return f"{base} prepare{common}"
+        return f"{base} prepare{common}{required}"
     if not action_recorded:
         return (
             f"{base} action{common} --prepare-id {prepare_id}"
             ' --note "<what you actually did>"'
         )
-    return f"{base} verify{common} --prepare-id {prepare_id}"
+    return f"{base} verify{common} --prepare-id {prepare_id}{required}"
 
 
 def report(
@@ -881,6 +931,7 @@ def report(
                     "prepare_id": prepare_id,
                     "operator_action_recorded": action_recorded,
                     "operator_action": plan.operator_action,
+                    "required_options": sorted(plan.required_options()),
                     "rationale": plan.rationale,
                     "next_step": _next_step(
                         plan,

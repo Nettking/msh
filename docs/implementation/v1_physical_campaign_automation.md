@@ -107,6 +107,16 @@ Only options a probe declares are accepted; anything else is refused before the
 probe runs. Options are validated against a safe character set and are never
 passed through a shell.
 
+A few assertions name a subject only you can supply, and are refused until you
+do. `runner report` prints them per row as `required_options`, and `automate`
+reports them as not run rather than skipping them silently:
+
+| Assertion | Required option | Why |
+| --- | --- | --- |
+| `P01/windows-three-activations`, `P01/posix-three-activations` | `activations` | Only the operator knows how many supported activations were completed. |
+| `P11/external-destination`, `P11/successful-backup`, `P11/isolated-restore` | `destination` | The independent backup destination is an operator choice. |
+| `P11/sqlite-integrity`, `P11/successful-backup`, `P11/isolated-restore` | `path` | Integrity must be checked against the *restored* copy, never the live data directory. |
+
 ## Step 3 — work the report
 
 ```bash

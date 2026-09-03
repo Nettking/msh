@@ -35,17 +35,25 @@ CLASSIFICATIONS: Final = frozenset({AUTOMATED, FAULT_INJECTION, HUMAN})
 
 @dataclass(frozen=True)
 class ProbeBinding:
-    """One checked-in probe with the exact options this assertion needs."""
+    """One checked-in probe with the exact options this assertion needs.
+
+    ``options`` are fixed by the contract. ``required`` names options only the
+    operator can supply -- a restored destination, a completed activation count.
+    The runner refuses the assertion until they are given, so a probe can never
+    quietly answer about the wrong thing (the live data directory instead of the
+    restored copy, say) because an argument was left off.
+    """
 
     probe_id: str
     options: tuple[tuple[str, str], ...] = ()
+    required: tuple[str, ...] = ()
 
     def option_map(self) -> dict[str, str]:
         return dict(self.options)
 
 
-def _p(probe_id: str, **options: str) -> ProbeBinding:
-    return ProbeBinding(probe_id, tuple(sorted(options.items())))
+def _p(probe_id: str, *, require: tuple[str, ...] = (), **options: str) -> ProbeBinding:
+    return ProbeBinding(probe_id, tuple(sorted(options.items())), tuple(sorted(require)))
 
 
 @dataclass(frozen=True)
@@ -75,6 +83,11 @@ class AssertionPlan:
 
     def all_probe_ids(self) -> tuple[str, ...]:
         return tuple(binding.probe_id for binding in self.all_bindings())
+
+    def required_options(self) -> frozenset[str]:
+        return frozenset(
+            name for binding in self.all_bindings() for name in binding.required
+        )
 
 
 def _auto(*probes: ProbeBinding) -> AssertionPlan:
@@ -120,7 +133,7 @@ PLANS: Final[dict[str, dict[str, AssertionPlan]]] = {
         "posix-resource-baseline": _auto(_RESOURCES, _DOCKER, _p("inode-capacity")),
         "windows-three-activations": _fault(
             prepare=(_RESOURCES, _DOCKER, _RUNTIME),
-            verify=(_p("activation-growth"), _RUNTIME),
+            verify=(_p("activation-growth", require=("activations",)), _RUNTIME),
             action=(
                 "Perform three supported Federation activations on this host, "
                 "covering unchanged and distinct commits where meaningful, and "
@@ -129,7 +142,7 @@ PLANS: Final[dict[str, dict[str, AssertionPlan]]] = {
         ),
         "posix-three-activations": _fault(
             prepare=(_RESOURCES, _DOCKER, _RUNTIME),
-            verify=(_p("activation-growth"), _RUNTIME),
+            verify=(_p("activation-growth", require=("activations",)), _RUNTIME),
             action=(
                 "Perform three supported Federation activations on this host, "
                 "covering unchanged and distinct commits where meaningful, and "
@@ -618,7 +631,9 @@ PLANS: Final[dict[str, dict[str, AssertionPlan]]] = {
         "emergency-floor": _auto(_p("model-pull-floor"), _RESOURCES),
     },
     "P11": {
-        "external-destination": _auto(_p("backup-preflight")),
+        "external-destination": _auto(
+            _p("backup-preflight", require=("destination",)),
+        ),
         "helper-prestaged": _auto(_p("backup-helper-prestage")),
         "writers-fenced": _fault(
             prepare=(_HEALTH, _DOCKER),
@@ -646,18 +661,21 @@ PLANS: Final[dict[str, dict[str, AssertionPlan]]] = {
             helper="python -m catalog.federation.backup_recovery",
         ),
         "successful-backup": _fault(
-            prepare=(_p("backup-preflight"), _p("backup-helper-prestage")),
-            verify=(_p("sqlite-integrity"), _CHECKOUT),
+            prepare=(
+                _p("backup-preflight", require=("destination",)),
+                _p("backup-helper-prestage"),
+            ),
+            verify=(_p("sqlite-integrity", require=("path",)), _CHECKOUT),
             action=(
                 "Run one exact-candidate quiesced backup to the preflighted "
                 "destination."
             ),
             helper="python -m catalog.federation.backup_recovery",
         ),
-        "sqlite-integrity": _auto(_p("sqlite-integrity")),
+        "sqlite-integrity": _auto(_p("sqlite-integrity", require=("path",))),
         "isolated-restore": _fault(
-            prepare=(_p("backup-preflight"),),
-            verify=(_p("sqlite-integrity"),),
+            prepare=(_p("backup-preflight", require=("destination",)),),
+            verify=(_p("sqlite-integrity", require=("path",)),),
             action=(
                 "Restore into clean, isolated destination resources on a separate "
                 "installation."
@@ -767,11 +785,18 @@ def _validate() -> None:
                     )
             for binding in plan.all_bindings():
                 spec_options = PROBES[binding.probe_id].options
-                unsupported = sorted(set(binding.option_map()) - set(spec_options))
+                declared = set(binding.option_map()) | set(binding.required)
+                unsupported = sorted(declared - set(spec_options))
                 if unsupported:
                     raise RuntimeError(
                         f"{scenario}/{assertion} passes unsupported options to "
                         f"{binding.probe_id}: {', '.join(unsupported)}"
+                    )
+                overlap = sorted(set(binding.option_map()) & set(binding.required))
+                if overlap:
+                    raise RuntimeError(
+                        f"{scenario}/{assertion} both fixes and requires options "
+                        f"on {binding.probe_id}: {', '.join(overlap)}"
                     )
 
 
@@ -797,6 +822,7 @@ def classification_summary() -> dict[str, dict[str, object]]:
                     "probes": [binding.probe_id for binding in plan.probes],
                     "prepare": [binding.probe_id for binding in plan.prepare],
                     "verify": [binding.probe_id for binding in plan.verify],
+                    "required_options": sorted(plan.required_options()),
                     "operator_action": plan.operator_action,
                     "reviewed_helper": plan.reviewed_helper,
                     "rationale": plan.rationale,
