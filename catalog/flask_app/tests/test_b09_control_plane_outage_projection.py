@@ -12,7 +12,9 @@ from catalog.federation.onboarding_models import (
 )
 from catalog.flask_app import federation_routes
 from catalog.flask_app.services import federation_projection_service as composition
-from catalog.flask_app.services.capability_onboarding_service import FederationBindingStore
+from catalog.flask_app.services.capability_onboarding_service import (
+    FederationBindingStore,
+)
 
 NOW = datetime(2026, 9, 2, 9, 30, tzinfo=timezone.utc)
 
