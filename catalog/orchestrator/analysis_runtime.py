@@ -53,6 +53,7 @@ from catalog.capabilities.efficiency import ExecutionEfficiencyRuntime
 from catalog.capabilities.jobs import JobStatus
 from catalog.capabilities.lifecycle_store import SQLiteJobLifecycleStore
 from catalog.capabilities.retry_claim import attempt_owner
+from catalog.capabilities.update_drain import SQLiteNodeUpdateDrainStore
 from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
 from catalog.node.identity import IdentityStore
 from catalog.orchestrator.analysis_federation import DeviceFederationAuthority
@@ -327,6 +328,9 @@ class AnalysisRuntime:
             self.capability_root / "analysis_jobs.sqlite3",
             resource_admission=self.resource_admission,
         )
+        # Update admission shares the authoritative F7 database so a drain
+        # transition and a new ownership claim serialize on one SQLite lock.
+        self.update_drain_store = SQLiteNodeUpdateDrainStore(self.store)
         self.artifact_authority = SQLiteCapabilityArtifactAuthority(self.store)
         self.content_store = LocalArtifactContentStore(
             self.capability_root / "artifacts",
@@ -468,6 +472,7 @@ class AnalysisRuntime:
             max_concurrent_jobs=self.max_concurrent_jobs,
             active_jobs=self._local_active_jobs,
             provider_generation=self.federation.provider_generation,
+            drain_store=self.update_drain_store,
         )
         outcome = self.provisioner.provision(handler, self.transport)
         self.worker = outcome.worker
@@ -497,7 +502,7 @@ class AnalysisRuntime:
             try:
                 close_transport()
             except Exception:  # noqa: BLE001 - replacement must remain fail-safe
-                pass
+                return
 
 
 class DiscoveryAnalysisGateway:

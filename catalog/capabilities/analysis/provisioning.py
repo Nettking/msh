@@ -32,6 +32,7 @@ from catalog.federation.models import CapabilityAnnouncement, CapabilityStatus
 
 from ..lifecycle_worker import CancellableCapabilityWorker
 from ..provider_reports import ProviderResourceReport, ProviderStatus
+from ..update_drain import SQLiteNodeUpdateDrainStore
 from ..worker_activation import (
     ActivatedComputeWorker,
     ComputeHandlerActivationReference,
@@ -151,6 +152,7 @@ class AnalysisProviderProvisioner:
         active_jobs: Callable[[], int] | None = None,
         report_ttl_seconds: int = DEFAULT_REPORT_TTL_SECONDS,
         provider_generation: int = 1,
+        drain_store: SQLiteNodeUpdateDrainStore | None = None,
     ) -> None:
         if (
             isinstance(provider_generation, bool)
@@ -176,6 +178,15 @@ class AnalysisProviderProvisioner:
         self._active_jobs = active_jobs or (lambda: 0)
         self.report_ttl_seconds = int(report_ttl_seconds)
         self.provider_generation = provider_generation
+        if drain_store is not None and not isinstance(
+            drain_store, SQLiteNodeUpdateDrainStore
+        ):
+            raise FederationValidationError(
+                "invalid-update-drain-store",
+                "drain_store",
+                "must be an SQLiteNodeUpdateDrainStore",
+            )
+        self.drain_store = drain_store
         self._published_revision = 0
         self._endpoint = None
         self._worker: ActivatedComputeWorker | None = None
@@ -246,7 +257,7 @@ class AnalysisProviderProvisioner:
     def _report(self, revision: int) -> ProviderResourceReport:
         now = self.clock()
         active = min(max(int(self._active_jobs()), 0), self.max_concurrent_jobs)
-        return ProviderResourceReport(
+        report = ProviderResourceReport(
             capability_id=self.capability_id,
             node_id=self.node_id,
             session_id=self.session_id,
@@ -269,6 +280,9 @@ class AnalysisProviderProvisioner:
             reported_at=now,
             expires_at=now + timedelta(seconds=self.report_ttl_seconds),
         )
+        if self.drain_store is not None:
+            report = self.drain_store.project_report(report)
+        return report
 
     def publish_health(self, *, force: bool = False) -> bool:
         """Publish a fresh report through F8.2 when the current one is stale.
@@ -288,7 +302,17 @@ class AnalysisProviderProvisioner:
                 int(record.report_revision),
             )
             if not force and record.is_fresh_at(self.clock()):
-                return False
+                drain = (
+                    None
+                    if self.drain_store is None
+                    else self.drain_store.get(
+                        session_id=self.session_id,
+                        node_id=self.node_id,
+                    )
+                )
+                drain_active = drain is not None and drain.state.value == "draining"
+                if drain_active == (record.report.status is ProviderStatus.DRAINING):
+                    return False
         revision = self._published_revision + 1
         try:
             self.health.publish(
@@ -358,7 +382,19 @@ class AnalysisProviderProvisioner:
         if state != "approved":
             return False
         published = self.publish_health()
-        if self._endpoint is not None and (self._worker is None or published):
+        drain_active = (
+            self.drain_store is not None
+            and self.drain_store.draining_target(
+                session_id=self.session_id,
+                node_id=self.node_id,
+            )
+            is not None
+        )
+        if (
+            self._endpoint is not None
+            and (self._worker is None or published)
+            and not drain_active
+        ):
             self._worker = self.activate(self._endpoint)
         return published
 

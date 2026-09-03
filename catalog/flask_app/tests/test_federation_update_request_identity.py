@@ -24,7 +24,12 @@ from typing import Any
 
 import pytest
 
-from catalog.federation.software_update import GitUpdateAdapter
+from catalog.capabilities.lifecycle_store import SQLiteJobLifecycleStore
+from catalog.capabilities.update_drain import (
+    NodeUpdateDrainState,
+    SQLiteNodeUpdateDrainStore,
+)
+from catalog.federation.software_update import GitUpdateAdapter, UpdateInspection
 from catalog.flask_app.services import federation_update_events as update
 from catalog.flask_app.services.federation_update_handoff import (
     RESULT_SCHEMA,
@@ -258,6 +263,189 @@ def test_distinct_commands_and_nodes_never_share_a_host_identity() -> None:
     assert update._host_request_id("update-1", NODE) != update._host_request_id(
         "update-1", "other-node"
     )
+
+
+def test_crash_after_durable_drain_before_host_activation_fails_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    reports: list[dict[str, object]],
+) -> None:
+    handoff = _RecordingHostAgent(tmp_path / "agent")
+    state_file = tmp_path / "processor.json"
+    jobs = SQLiteJobLifecycleStore(tmp_path / "jobs.sqlite3")
+    drains = SQLiteNodeUpdateDrainStore(jobs)
+    now = datetime.now(timezone.utc)
+    payload = update.command_payload(
+        request_id="update-drain-crash",
+        target_commit=TARGET,
+        target_node_ids=(NODE,),
+        created_at=now,
+        expires_at=now + timedelta(minutes=2),
+        drain_node_id=NODE,
+        drain_provider_ids=("provider-a",),
+    )
+    events = (
+        SimpleNamespace(
+            revision=1,
+            event_type=update.SESSION_CREATED_EVENT,
+            actor_node_id=AUTHORITY,
+            payload={"session_id": SESSION},
+        ),
+        SimpleNamespace(
+            revision=2,
+            event_type=update.APPLY_REQUEST_EVENT,
+            actor_node_id=AUTHORITY,
+            payload=payload,
+        ),
+    )
+    processor = update.FederationUpdateEventProcessor(
+        _service(),
+        handoff,
+        state_file,
+        drain_store=drains,
+    )
+
+    original_apply = handoff.apply
+
+    def crash(*_args: object, **_kwargs: object):
+        raise RuntimeError("crashed after durable drain")
+
+    monkeypatch.setattr(handoff, "apply", crash)
+    with pytest.raises(RuntimeError, match="crashed after durable drain"):
+        processor.process(_context(events))
+
+    persisted = drains.get(session_id=SESSION, node_id=NODE)
+    assert persisted is not None
+    assert persisted.state is NodeUpdateDrainState.DRAINING
+    assert handoff.apply_requests == []
+
+    # Recovery reports the unknown host side effect and consumes the accepted
+    # event. It never clears the fence or retries an activation whose outcome
+    # crossed the process crash window.
+    monkeypatch.setattr(handoff, "apply", original_apply)
+    replacement = update.FederationUpdateEventProcessor(
+        _service(),
+        handoff,
+        state_file,
+        drain_store=drains,
+    )
+    replacement.process(_context(events))
+
+    assert handoff.apply_requests == []
+    assert reports[-1]["code"] == "processor-crash-window"
+    assert drains.get(session_id=SESSION, node_id=NODE).state is NodeUpdateDrainState.DRAINING
+
+
+def test_apply_crash_after_verified_candidate_retires_drain_before_report(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    reports: list[dict[str, object]],
+) -> None:
+    """A restart reports the exact result without reapplying the candidate."""
+
+    handoff = _RecordingHostAgent(tmp_path / "agent")
+    state_file = tmp_path / "processor.json"
+    jobs = SQLiteJobLifecycleStore(tmp_path / "jobs.sqlite3")
+    drains = SQLiteNodeUpdateDrainStore(jobs)
+    now = datetime.now(timezone.utc)
+    payload = update.command_payload(
+        request_id="update-after-verify",
+        target_commit=TARGET,
+        target_node_ids=(NODE,),
+        created_at=now,
+        expires_at=now + timedelta(minutes=2),
+        drain_node_id=NODE,
+        drain_provider_ids=("provider-a",),
+    )
+    events = (
+        SimpleNamespace(
+            revision=1,
+            event_type=update.SESSION_CREATED_EVENT,
+            actor_node_id=AUTHORITY,
+            payload={"session_id": SESSION},
+        ),
+        SimpleNamespace(
+            revision=2,
+            event_type=update.APPLY_REQUEST_EVENT,
+            actor_node_id=AUTHORITY,
+            payload=payload,
+        ),
+    )
+
+    def verified_agent_turn(request: dict[str, Any]) -> None:
+        handoff.directory.mkdir(parents=True, exist_ok=True)
+        request_id = str(request["request_id"])
+        handoff._result_path(request_id).write_text(
+            json.dumps(
+                {
+                    "schema": RESULT_SCHEMA,
+                    "request_id": request_id,
+                    "state": "runtime_verified",
+                    "current_commit": TARGET,
+                    "target_commit": request.get("target_commit"),
+                    "running_commit": TARGET,
+                }
+            ),
+            encoding="utf-8",
+        )
+        handoff.request_file.unlink(missing_ok=True)
+
+    monkeypatch.setattr(handoff, "_agent_turn", verified_agent_turn)
+    def verified_apply(target: str, *, request_id: str | None = None) -> UpdateInspection:
+        request = handoff._request(
+            action="apply",
+            target=target,
+            request_id=request_id,
+        )
+        handoff._write_request(request)
+        return UpdateInspection(
+            "runtime_verified",
+            target_commit=target,
+            running_commit=target,
+            request_id=request_id,
+        )
+
+    monkeypatch.setattr(handoff, "apply", verified_apply)
+    original_send = update.FederationUpdateEventProcessor._send_stored_report
+
+    def crash_before_report(*_args: object, **_kwargs: object) -> None:
+        raise RuntimeError("crashed after verified candidate")
+
+    monkeypatch.setattr(
+        update.FederationUpdateEventProcessor,
+        "_send_stored_report",
+        staticmethod(crash_before_report),
+    )
+    processor = update.FederationUpdateEventProcessor(
+        _service(),
+        handoff,
+        state_file,
+        drain_store=drains,
+    )
+    with pytest.raises(RuntimeError, match="crashed after verified candidate"):
+        processor.process(_context(events))
+
+    persisted = drains.get(session_id=SESSION, node_id=NODE)
+    assert persisted is not None
+    assert persisted.state is NodeUpdateDrainState.READY
+    assert len(handoff.apply_requests) == 1
+
+    monkeypatch.setattr(
+        update.FederationUpdateEventProcessor,
+        "_send_stored_report",
+        staticmethod(original_send),
+    )
+    replacement = update.FederationUpdateEventProcessor(
+        _service(),
+        handoff,
+        state_file,
+        drain_store=drains,
+    )
+    replacement.process(_context(events))
+
+    assert len(handoff.apply_requests) == 1
+    assert reports[-1]["state"] == "runtime_verified"
+    assert json.loads(state_file.read_text(encoding="utf-8"))["in_flight"] is None
 
 
 # ---- crash windows ------------------------------------------------------

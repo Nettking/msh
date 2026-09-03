@@ -15,6 +15,10 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from catalog.capabilities.update_drain import (
+    NodeUpdateDrainTarget,
+    SQLiteNodeUpdateDrainStore,
+)
 from catalog.federation.authoritative_replay import replay_authoritative_history
 from catalog.federation.control_commands import (
     ControlCommandEnvelope,
@@ -26,6 +30,7 @@ from catalog.federation.control_commands import (
 from catalog.federation.control_commands import (
     stamp_utc as _stamp,
 )
+from catalog.federation.errors import FederationValidationError
 from catalog.federation.software_trial import (
     TrialRefused,
     TrialSelection,
@@ -77,6 +82,8 @@ def command_payload(
     target_node_ids: tuple[str, ...],
     created_at: datetime,
     expires_at: datetime,
+    drain_node_id: str | None = None,
+    drain_provider_ids: tuple[str, ...] = (),
 ) -> dict[str, object]:
     envelope = ControlCommandEnvelope.issue(
         request_id=request_id,
@@ -88,6 +95,18 @@ def command_payload(
     )
     if not OID_RE.fullmatch(target_commit):
         raise ValueError("malformed_target")
+    if drain_provider_ids or drain_node_id is not None:
+        if not isinstance(drain_node_id, str) or not drain_node_id.strip():
+            raise ValueError("malformed_drain_node")
+        try:
+            drain_target = NodeUpdateDrainTarget(
+                drain_node_id,
+                tuple(drain_provider_ids),
+            )
+        except (FederationValidationError, TypeError, ValueError) as exc:
+            raise ValueError("malformed_drain_provider_ids") from exc
+        if drain_target.node_id not in target_node_ids:
+            raise ValueError("drain_node_not_targeted")
     value: dict[str, object] = {
         "schema": EVENT_SCHEMA,
         **envelope.payload_fields(),
@@ -95,6 +114,9 @@ def command_payload(
         "branch": APPROVED_BRANCH,
         "target_commit": target_commit,
     }
+    if drain_provider_ids:
+        value["drain_node_id"] = drain_node_id
+        value["drain_provider_ids"] = list(drain_target.provider_ids)
     _bounded(value)
     return value
 
@@ -116,6 +138,22 @@ def validate_command_payload(value: object) -> dict[str, object]:
         raise ValueError("unapproved_source")
     if not isinstance(target, str) or not OID_RE.fullmatch(target):
         raise ValueError("malformed_target")
+    drain_node_id = value.get("drain_node_id")
+    drain_provider_ids = value.get("drain_provider_ids")
+    if drain_node_id is not None or drain_provider_ids is not None:
+        if not isinstance(drain_node_id, str):
+            raise ValueError("malformed_drain_node")
+        if not isinstance(drain_provider_ids, list):
+            raise ValueError("malformed_drain_provider_ids")
+        try:
+            target = NodeUpdateDrainTarget(
+                drain_node_id,
+                tuple(drain_provider_ids),
+            )
+        except (FederationValidationError, TypeError, ValueError) as exc:
+            raise ValueError("malformed_drain_provider_ids") from exc
+        if target.node_id not in value.get("target_node_ids", []):
+            raise ValueError("drain_node_not_targeted")
     _bounded(value)
     return value
 
@@ -424,10 +462,60 @@ class FederationUpdateEventProcessor:
         service: Any,
         handoff: HostUpdateHandoff,
         state_file: Path | str,
+        drain_store: SQLiteNodeUpdateDrainStore | None = None,
+        health: Any | None = None,
     ) -> None:
         self.service = service
         self.handoff = handoff
         self.state_file = Path(state_file)
+        self.drain_store = drain_store
+        self.health = health
+
+    def _drain_target(
+        self,
+        payload: dict[str, object],
+        *,
+        local_node: str,
+    ) -> NodeUpdateDrainTarget | None:
+        provider_ids = payload.get("drain_provider_ids")
+        drain_node = payload.get("drain_node_id")
+        if provider_ids is None and drain_node is None:
+            return None
+        if not isinstance(drain_node, str) or drain_node != local_node:
+            raise ValueError("drain-node-identity-mismatch")
+        if not isinstance(provider_ids, list):
+            raise TypeError("malformed-drain-provider-set")
+        try:
+            return NodeUpdateDrainTarget(drain_node, tuple(provider_ids))
+        except (FederationValidationError, TypeError, ValueError) as exc:
+            raise ValueError("malformed-drain-provider-set") from exc
+
+    def _request_drain(
+        self,
+        payload: dict[str, object],
+        *,
+        session_id: str,
+        local_node: str,
+    ):
+        target = self._drain_target(payload, local_node=local_node)
+        if target is None:
+            return None
+        if self.drain_store is None:
+            raise ValueError("update-drain-unavailable")
+        if self.health is not None:
+            for provider_id in target.provider_ids:
+                record = self.health.store.get(
+                    session_id=session_id,
+                    capability_id=provider_id,
+                )
+                if record is None or record.node_id != target.node_id:
+                    raise ValueError("drain-provider-identity-mismatch")
+        return self.drain_store.request_drain(
+            session_id=session_id,
+            target=target,
+            command_id=f"update-drain-{payload['request_id']}",
+            now=datetime.now(timezone.utc),
+        ).record
 
     @staticmethod
     def _trial_retirement_ids(state: dict[str, object]) -> list[str]:
@@ -718,6 +806,7 @@ class FederationUpdateEventProcessor:
                 _write_state(self.state_file, state)
             else:
                 result = self._host_result(host_request_id)
+                host_outcome_unknown = result is None
                 if result is None or result.target_commit != target_commit:
                     result = UpdateInspection(
                         "error",
@@ -729,6 +818,23 @@ class FederationUpdateEventProcessor:
                         ),
                         request_id=host_request_id,
                     )
+                if kind == "apply":
+                    pending = state.get("pending")
+                    if host_outcome_unknown and isinstance(pending, dict):
+                        pending.pop(str(marker.get("pending_key")), None)
+                        state["pending"] = pending
+                    if (
+                        result.state == "runtime_verified"
+                        and marker.get("drain_revision") is not None
+                        and not self._clear_drain(context, marker)
+                    ):
+                        result = UpdateInspection(
+                            "failed",
+                            target_commit=target_commit,
+                            code="drain-clear-failed",
+                            message="The exact candidate was reported healthy but the durable drain could not be retired.",
+                            request_id=host_request_id,
+                        )
                 self._store_result_report(
                     context,
                     state,
@@ -762,6 +868,169 @@ class FederationUpdateEventProcessor:
                 state["pending"] = pending
             self._persist_trial_retirement(state, host_request_id)
         self._complete_in_flight(state, revision=revision)
+
+    def _clear_drain(
+        self,
+        context: Any,
+        record: dict[str, object],
+    ) -> bool:
+        revision = record.get("drain_revision")
+        if revision is None:
+            return True
+        if (
+            self.drain_store is None
+            or isinstance(revision, bool)
+            or not isinstance(revision, int)
+            or revision <= 0
+        ):
+            return False
+        try:
+            self.drain_store.clear_drain(
+                session_id=context.binding.internal_session_id,
+                node_id=context.credentials.identity.node_id,
+                expected_revision=revision,
+                now=datetime.now(timezone.utc),
+            )
+        except Exception:  # noqa: BLE001 - a clear conflict must fail closed
+            return False
+        return True
+
+    def _drain_is_quiescent(self, context: Any, record: dict[str, object]) -> bool:
+        revision = record.get("drain_revision")
+        if revision is None:
+            return True
+        if self.drain_store is None:
+            return False
+        current = self.drain_store.get(
+            session_id=context.binding.internal_session_id,
+            node_id=context.credentials.identity.node_id,
+        )
+        if current is None or current.revision != revision:
+            raise ValueError("update-drain-revision-changed")
+        return self.drain_store.is_quiescent(
+            session_id=context.binding.internal_session_id,
+            node_id=context.credentials.identity.node_id,
+        )
+
+    @staticmethod
+    def _draining_result(target_commit: str) -> UpdateInspection:
+        return UpdateInspection(
+            "draining",
+            target_commit=target_commit,
+            code="workload-draining",
+            message=(
+                "The provider is durably draining; existing authoritative work "
+                "must finish before host activation can start."
+            ),
+        )
+
+    def _finish_pending_apply(
+        self,
+        context: Any,
+        state: dict[str, object],
+        pending: dict[str, object],
+        federation_request_id: str,
+        record: dict[str, object],
+    ) -> bool:
+        """Advance one durable remote apply, or leave it waiting on quiescence."""
+
+        target_commit = record.get("target_commit")
+        host_request_id = record.get("host_request_id")
+        revision = record.get("revision")
+        if (
+            not isinstance(target_commit, str)
+            or not isinstance(host_request_id, str)
+            or isinstance(revision, bool)
+            or not isinstance(revision, int)
+        ):
+            pending.pop(federation_request_id, None)
+            return True
+
+        try:
+            if not self._drain_is_quiescent(context, record):
+                self._report(
+                    context,
+                    event_type=APPLY_REPORT_EVENT,
+                    federation_request_id=federation_request_id,
+                    result=self._draining_result(target_commit),
+                )
+                return False
+        except Exception:  # noqa: BLE001 - a drain authority race fails closed
+            result = UpdateInspection(
+                "failed",
+                target_commit=target_commit,
+                code="drain-authority-lost",
+                message="The durable drain identity changed before activation; update aborted.",
+                request_id=host_request_id,
+            )
+            self._report(
+                context,
+                event_type=APPLY_REPORT_EVENT,
+                federation_request_id=federation_request_id,
+                result=result,
+            )
+            pending.pop(federation_request_id, None)
+            return True
+
+        marker = {
+            "kind": "apply",
+            "phase": "host",
+            "request_id": federation_request_id,
+            "node_id": context.credentials.identity.node_id,
+            "revision": revision,
+            "host_request_id": host_request_id,
+            "target_commit": target_commit,
+            "pending_key": federation_request_id,
+            **{
+                key: record[key]
+                for key in ("drain_revision", "drain_node_id", "drain_provider_ids")
+                if key in record
+            },
+        }
+        result = self._host_result(host_request_id)
+        if result is None:
+            state["in_flight"] = marker
+            _write_state(self.state_file, state)
+            result = self.handoff.apply(target_commit, request_id=host_request_id)
+
+        if result.target_commit != target_commit:
+            result = UpdateInspection(
+                "failed",
+                target_commit=target_commit,
+                code="candidate-mismatch",
+                message="The host returned a result for a different update candidate.",
+                request_id=host_request_id,
+            )
+        if result.state == "runtime_verified" and not self._clear_drain(context, record):
+            result = UpdateInspection(
+                "failed",
+                target_commit=target_commit,
+                code="drain-clear-failed",
+                message="The exact candidate was reported healthy but the durable drain could not be retired.",
+                request_id=host_request_id,
+            )
+        if result.state == "activation_queued":
+            pending[federation_request_id] = record
+        else:
+            pending.pop(federation_request_id, None)
+        state["pending"] = pending
+        self._store_result_report(
+            context,
+            state,
+            marker,
+            event_type=APPLY_REPORT_EVENT,
+            federation_request_id=federation_request_id,
+            result=result,
+        )
+        self._send_stored_report(
+            self.service,
+            context,
+            event_type=APPLY_REPORT_EVENT,
+            payload=marker["report_payload"],  # type: ignore[arg-type]
+            request_id=str(marker["report_request_id"]),
+        )
+        self._complete_in_flight(state, revision=revision)
+        return True
 
     def _finish_pending(
         self,
@@ -802,6 +1071,15 @@ class FederationUpdateEventProcessor:
                 # Every change accumulated so far was included in the durable
                 # state write above. Later records may set this again.
                 changed = False
+                continue
+            if "drain_revision" in record:
+                changed = self._finish_pending_apply(
+                    context,
+                    state,
+                    pending,
+                    federation_request_id,
+                    record,
+                ) or changed
                 continue
             result = self._host_result(host_request_id)
             if result is None or result.target_commit != target_commit:
@@ -995,6 +1273,7 @@ class FederationUpdateEventProcessor:
                 )
                 marker = {
                     "kind": kind,
+                    "phase": "drain" if kind == "apply" else "host",
                     "request_id": federation_request_id,
                     "node_id": local_node,
                     "revision": int(event.revision),
@@ -1024,24 +1303,109 @@ class FederationUpdateEventProcessor:
                     pending = state.get("pending")
                     if not isinstance(pending, dict):
                         pending = {}
-                    existing = self._host_result(host_request_id)
-                    if existing is not None and existing.target_commit == target:
-                        result = existing
-                        pending.pop(federation_request_id, None)
-                    else:
-                        result = self.handoff.apply(
-                            target,
+                    result: UpdateInspection | None = None
+                    drain_record = None
+                    try:
+                        drain_record = self._request_drain(
+                            payload,
+                            session_id=context.binding.internal_session_id,
+                            local_node=local_node,
+                        )
+                    except Exception as exc:  # noqa: BLE001 - fail closed
+                        result = UpdateInspection(
+                            "failed",
+                            target_commit=target,
+                            code=(
+                                "drain-authority-lost"
+                                if isinstance(exc, ValueError)
+                                else "drain-request-failed"
+                            ),
+                            message="The durable workload drain could not be established; update aborted.",
                             request_id=host_request_id,
                         )
-                        if result.state == "activation_queued":
-                            pending[federation_request_id] = {
+                        pending.pop(federation_request_id, None)
+                    else:
+                        if drain_record is not None:
+                            record = {
+                                "kind": "apply",
+                                "revision": int(event.revision),
                                 "host_request_id": host_request_id,
                                 "target_commit": target,
+                                "drain_revision": drain_record.revision,
+                                "drain_node_id": drain_record.node_id,
+                                "drain_provider_ids": list(drain_record.provider_ids),
                             }
+                            marker.update(
+                                {
+                                    key: record[key]
+                                    for key in (
+                                        "drain_revision",
+                                        "drain_node_id",
+                                        "drain_provider_ids",
+                                    )
+                                }
+                            )
+                            _write_state(self.state_file, state)
+                            try:
+                                quiescent = self._drain_is_quiescent(
+                                    context,
+                                    record,
+                                )
+                            except Exception:  # noqa: BLE001 - a drain race fails closed
+                                quiescent = False
+                                result = UpdateInspection(
+                                    "failed",
+                                    target_commit=target,
+                                    code="drain-authority-lost",
+                                    message="The durable workload drain identity changed; update aborted.",
+                                    request_id=host_request_id,
+                                )
+                            if not quiescent and result is None:
+                                pending[federation_request_id] = record
+                                result = self._draining_result(target)
+                            elif result is None:
+                                existing = self._host_result(host_request_id)
+                                if existing is not None and existing.target_commit == target:
+                                    result = existing
+                                    pending.pop(federation_request_id, None)
+                                else:
+                                    result = self.handoff.apply(
+                                        target,
+                                        request_id=host_request_id,
+                                    )
+                                    if result.state == "activation_queued":
+                                        pending[federation_request_id] = record
+                                    else:
+                                        pending.pop(federation_request_id, None)
                         else:
-                            # A bounded handoff that did not queue the request
-                            # is terminal; never persist a phantom operation.
-                            pending.pop(federation_request_id, None)
+                            existing = self._host_result(host_request_id)
+                            if existing is not None and existing.target_commit == target:
+                                result = existing
+                                pending.pop(federation_request_id, None)
+                            else:
+                                result = self.handoff.apply(
+                                    target,
+                                    request_id=host_request_id,
+                                )
+                                if result.state == "activation_queued":
+                                    pending[federation_request_id] = {
+                                        "host_request_id": host_request_id,
+                                        "target_commit": target,
+                                    }
+                                else:
+                                    pending.pop(federation_request_id, None)
+                        if (
+                            drain_record is not None
+                            and result.state == "runtime_verified"
+                            and not self._clear_drain(context, record)
+                        ):
+                            result = UpdateInspection(
+                                "failed",
+                                target_commit=target,
+                                code="drain-clear-failed",
+                                message="The exact candidate was reported healthy but the durable drain could not be retired.",
+                                request_id=host_request_id,
+                            )
                     state["pending"] = pending
                     self._store_result_report(
                         context,
