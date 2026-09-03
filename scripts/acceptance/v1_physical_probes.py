@@ -387,6 +387,15 @@ def _probe_running_commit_identity(context: ProbeContext) -> ProbeOutcome:
 
 
 def _probe_update_status(context: ProbeContext) -> ProbeOutcome:
+    """Report the update surface's own non-mutating verdict on this checkout.
+
+    The probe never fetches, so it touches no network and mutates nothing. What
+    it proves is that the update path answers deterministically about this exact
+    checkout and does not offer to mutate a checkout it should refuse: a dirty
+    tree or an unapproved remote is a real finding, while a candidate pinned off
+    approved main is correctly refused rather than silently updated.
+    """
+
     try:
         from catalog.federation.software_update import GitUpdateAdapter
     except ImportError:  # pragma: no cover - product package always present
@@ -396,41 +405,70 @@ def _probe_update_status(context: ProbeContext) -> ProbeOutcome:
             "the update surface is not importable from this checkout",
             {},
         )
-    adapter = GitUpdateAdapter(context.checkout)
-    inspection = adapter.inspect(fetch=False)
-    detail = {
-        "state": inspection.state,
-        "code": inspection.code,
-        "current_commit_matches_candidate": (
-            str(inspection.current_commit or "").casefold() == context.commit
-        ),
-        "network_fetch_performed": False,
-    }
-    if inspection.state in {"unsupported_checkout", "error"}:
+    detail: dict[str, object] = {"network_fetch_performed": False}
+    try:
+        verify_checkout(context.checkout, context.commit)
+        detail["checkout_is_exact_clean_candidate"] = True
+    except ReadinessError as exc:
         return _outcome(
             "update-status",
-            UNAVAILABLE,
-            "the update surface cannot describe this checkout shape",
+            FAIL,
+            "the update surface is being asked about the wrong checkout",
+            {**detail, "error": sanitize_text(str(exc), cwd=context.checkout)},
+        )
+
+    adapter = GitUpdateAdapter(context.checkout)
+    failure, current = adapter.checkout_baseline()
+    detail["baseline_code"] = None if failure is None else failure.code
+    detail["current_commit_matches_candidate"] = (
+        str(current or "").casefold() == context.commit
+    )
+    if failure is None:
+        inspection = adapter.inspect(fetch=False)
+        detail["state"] = inspection.state
+        detail["code"] = inspection.code
+        detail["mutation_refused"] = False
+        if inspection.state in {"error", "unsupported_checkout"}:
+            return _outcome(
+                "update-status",
+                UNAVAILABLE,
+                "the update surface cannot describe this checkout shape",
+                detail,
+            )
+        return _outcome(
+            "update-status",
+            PASS,
+            f"update status is deterministic and reports {inspection.state}",
             detail,
         )
-    if inspection.state == "dirty":
+
+    detail["state"] = failure.state
+    detail["mutation_refused"] = True
+    if failure.code == "dirty":
         return _outcome(
             "update-status",
             FAIL,
             "the update surface reports an unclean checkout",
             detail,
         )
-    if not detail["current_commit_matches_candidate"]:
+    if failure.code == "unapproved_remote":
         return _outcome(
             "update-status",
             FAIL,
-            "the update surface reports a different current commit",
+            "this checkout does not track the approved update repository",
+            detail,
+        )
+    if failure.code == "detached_head":
+        return _outcome(
+            "update-status",
+            PASS,
+            "the update surface refuses to mutate this pinned candidate checkout",
             detail,
         )
     return _outcome(
         "update-status",
-        PASS,
-        f"update status is deterministic and reports {inspection.state}",
+        UNAVAILABLE,
+        "the update surface cannot describe this checkout shape",
         detail,
     )
 

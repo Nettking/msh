@@ -282,3 +282,106 @@ def test_probe_detail_never_carries_a_raw_source_name(tmp_path: Path) -> None:
     assert outcome.status == probes.PASS
     assert "private-machine-name" not in json.dumps(outcome.detail)
     assert outcome.detail["source_count"] == 1
+
+
+def _git(tmp_path: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", *args],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+
+def _candidate_repo(tmp_path: Path) -> str | None:
+    if subprocess.run(["git", "init", "--quiet", str(tmp_path)], check=False).returncode:
+        return None
+    _git(tmp_path, "config", "user.email", "operator@example.invalid")
+    _git(tmp_path, "config", "user.name", "Operator")
+    _git(tmp_path, "config", "commit.gpgsign", "false")
+    (tmp_path / "update.cmd").write_text("echo retired\nexit /b 2\n", encoding="utf-8")
+    _git(tmp_path, "add", "-A")
+    if _git(tmp_path, "commit", "--quiet", "-m", "candidate").returncode:
+        return None
+    # The update surface only reasons about a checkout that tracks the approved
+    # repository. Pin the candidate the way a release host does: detached at the
+    # exact SHA, so the update path must refuse to mutate it.
+    _git(tmp_path, "remote", "add", "origin", "https://github.com/Nettking/msh.git")
+    _git(tmp_path, "checkout", "--quiet", "--detach", "HEAD")
+    head = _git(tmp_path, "rev-parse", "HEAD").stdout.strip().lower()
+    return head or None
+
+
+def test_update_status_fails_a_checkout_that_is_not_the_candidate(
+    tmp_path: Path,
+) -> None:
+    head = _candidate_repo(tmp_path)
+    if head is None:
+        pytest.skip("git is required for the update-status probe")
+    outcome = probes.PROBES["update-status"].run(context(tmp_path))
+    assert outcome.status == probes.FAIL
+    assert outcome.detail["network_fetch_performed"] is False
+
+
+def test_update_status_passes_a_pinned_candidate_checkout(tmp_path: Path) -> None:
+    head = _candidate_repo(tmp_path)
+    if head is None:
+        pytest.skip("git is required for the update-status probe")
+    outcome = probes.PROBES["update-status"].run(
+        probes.ProbeContext(
+            checkout=tmp_path,
+            evidence_root=tmp_path / "evidence",
+            commit=head,
+            host_id="nitro",
+            os_category="posix",
+            profile="school-control",
+            scenario="P03",
+            assertion="launcher-vs-update",
+        )
+    )
+    assert outcome.status == probes.PASS
+    assert outcome.detail["mutation_refused"] is True
+    assert outcome.detail["baseline_code"] == "detached_head"
+    assert outcome.detail["network_fetch_performed"] is False
+
+
+def test_update_status_fails_an_unapproved_update_remote(tmp_path: Path) -> None:
+    head = _candidate_repo(tmp_path)
+    if head is None:
+        pytest.skip("git is required for the update-status probe")
+    _git(tmp_path, "remote", "set-url", "origin", "https://example.invalid/other.git")
+    outcome = probes.PROBES["update-status"].run(
+        probes.ProbeContext(
+            checkout=tmp_path,
+            evidence_root=tmp_path / "evidence",
+            commit=head,
+            host_id="nitro",
+            os_category="posix",
+            profile="school-control",
+            scenario="P03",
+            assertion="launcher-vs-update",
+        )
+    )
+    assert outcome.status == probes.FAIL
+    assert outcome.detail["baseline_code"] == "unapproved_remote"
+
+
+def test_update_status_fails_a_dirty_candidate_checkout(tmp_path: Path) -> None:
+    head = _candidate_repo(tmp_path)
+    if head is None:
+        pytest.skip("git is required for the update-status probe")
+    (tmp_path / "update.cmd").write_text("echo changed\n", encoding="utf-8")
+    outcome = probes.PROBES["update-status"].run(
+        probes.ProbeContext(
+            checkout=tmp_path,
+            evidence_root=tmp_path / "evidence",
+            commit=head,
+            host_id="nitro",
+            os_category="posix",
+            profile="school-control",
+            scenario="P03",
+            assertion="launcher-vs-update",
+        )
+    )
+    assert outcome.status == probes.FAIL
