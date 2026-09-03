@@ -60,6 +60,7 @@ from catalog.node.storage_recovery_drill import (
 from catalog.relay.service import RelayServer
 
 from .test_physical_storage_failover import (
+    BOOTSTRAP_OBSERVATION_TIMEOUT,
     _f51_authority_evidence,
     _f51_storage_evidence,
     _wait_for_control_waiting,
@@ -71,6 +72,10 @@ NOW = datetime(2026, 7, 31, 15, 0, tzinfo=timezone.utc)
 # is below the existing control-publication budget and can expire on a loaded
 # Windows runner while the local relay and nodes are still making progress.
 TIMEOUT = 15.0
+# Bootstrap completion also includes a replay pass with a 60-second page budget.
+# The F5.1 watchdog bounds a genuinely hung fixture without applying the shorter
+# per-operation budget to the whole bootstrap task; use
+# BOOTSTRAP_OBSERVATION_TIMEOUT for that outer completion watchdog.
 
 
 async def _scenario(root: Path) -> dict[str, Any]:
@@ -303,7 +308,9 @@ async def _scenario(root: Path) -> dict[str, Any]:
             control_sync_timeout=TIMEOUT,
             clock=lambda: NOW,
         )
-        await asyncio.wait_for(machine_b.bootstrap(), TIMEOUT)
+        await asyncio.wait_for(
+            machine_b.bootstrap(), BOOTSTRAP_OBSERVATION_TIMEOUT
+        )
         assert machine_b.node_id == stable_b_node_id
         stale_probe = await stale_authority_probe_with_transport(
             deployment,
@@ -410,7 +417,9 @@ async def _scenario(root: Path) -> dict[str, Any]:
         restart_b = asyncio.create_task(machine_b.bootstrap())
         restart_c = asyncio.create_task(machine_c.bootstrap())
         bootstrap_tasks.extend((restart_b, restart_c))
-        await asyncio.wait_for(asyncio.gather(restart_b, restart_c), TIMEOUT)
+        await asyncio.wait_for(
+            asyncio.gather(restart_b, restart_c), BOOTSTRAP_OBSERVATION_TIMEOUT
+        )
         assert machine_b.node_id == stable_b_node_id
         assert machine_c.node_id == stable_c_node_id
 
