@@ -406,3 +406,54 @@ def test_probe_detail_is_redacted_before_it_reaches_evidence(
     assert "192.168.1.50" not in serialized
     assert "private-token" not in serialized
     assert campaign.privacy_check(checkout, root, commit=COMMIT)["passed"] is True
+
+
+def test_real_probe_detail_survives_evidence_redaction(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Every real probe's detail must be shallow enough to record.
+
+    The runner wraps probe detail in its own envelope before the campaign
+    redacts it, so a probe that nests its findings too deeply would only fail on
+    a physical host, at the moment the evidence is written.
+    """
+
+    checkout, _root = ready(monkeypatch, tmp_path)
+    sample_options = {
+        "path": str(checkout / "data"),
+        "destination": str(checkout / "backup"),
+        "subject": "recorder",
+        "series": "storage",
+        "min_files": "1",
+        "min_bytes": "1",
+        "min_samples": "1",
+        "activations": "3",
+        "max_bytes_per_activation": "1",
+        "max_growth_bytes_per_hour": "1",
+        "max_log_bytes": "1",
+    }
+    outcomes: list[probes.ProbeOutcome] = []
+    for _probe_id, spec in sorted(probes.PROBES.items()):
+        if spec.os_category not in {None, "posix"}:
+            continue
+        outcome = spec.run(
+            probes.ProbeContext(
+                checkout=checkout,
+                evidence_root=checkout / "evidence" / "v1-physical",
+                commit=COMMIT,
+                host_id="nitro",
+                os_category="posix",
+                profile="school-control",
+                scenario="P05",
+                assertion="global-invariant",
+                options={key: sample_options[key] for key in spec.options},
+            )
+        )
+        assert outcome.status in probes.PROBE_STATUSES
+        outcomes.append(outcome)
+    assert any(outcome.detail for outcome in outcomes)
+    envelope = runner._detail(outcomes, extra={"harness_performed_fault": False})
+    redacted = campaign.sanitize_detail(envelope, cwd=checkout)
+    assert redacted is not None
+    assert len(redacted["probes"]) == len(outcomes)

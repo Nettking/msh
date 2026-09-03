@@ -68,7 +68,7 @@ NON_ASSERTION_KINDS: Final[frozenset[str]] = frozenset(
 ASSERTION_STATUSES: Final[frozenset[str]] = frozenset(
     {"pass", "fail", "not-applicable"}
 )
-MAX_DETAIL_DEPTH: Final = 6
+MAX_DETAIL_DEPTH: Final = 10
 MAX_DETAIL_ITEMS: Final = 256
 
 
