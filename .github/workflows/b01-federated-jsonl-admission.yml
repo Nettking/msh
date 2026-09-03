@@ -70,6 +70,10 @@ jobs:
           catalog/common/managed_temporary.py
           catalog/flask_app/request_resource_admission.py
 
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
+
       - name: Adversarial admission regressions
         run: >-
           python -m pytest -o addopts= -q

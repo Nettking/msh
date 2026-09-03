@@ -1,0 +1,27 @@
+name: Ubuntu storage precondition
+description: >-
+  Reclaim hosted-runner disk and assert the product's unchanged host-resource
+  admission floor before any Federation storage test runs.
+
+runs:
+  using: composite
+  steps:
+    - name: Reclaim hosted-runner disk
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "Before reclaim:"
+        df -h / && df -i /
+        # The hosted Ubuntu image ships the Android SDK/NDK, ~11 GiB this
+        # repository never builds against. It is the largest single removable
+        # block and on its own lifts a runner from roughly 11 GiB free to
+        # roughly 22 GiB, clear of the product's 12 GiB admission floor.
+        # The Python and Go tool caches, the Docker state the service
+        # containers need, and the checkout are all left untouched.
+        sudo rm -rf /usr/local/lib/android
+        echo "After reclaim:"
+        df -h / && df -i /
+
+    - name: Assert the product storage precondition
+      shell: bash
+      run: python "${GITHUB_WORKSPACE}/scripts/ci_release_disk_preflight.py"

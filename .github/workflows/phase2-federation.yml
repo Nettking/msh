@@ -104,6 +104,9 @@ jobs:
             cmd/fcp-peer-sidecar/go.sum
           if-no-files-found: error
           retention-days: 1
+      - name: Ubuntu storage precondition
+        uses: ./.github/actions/ubuntu-storage-precondition
+
       - name: Compile
         run: python -m compileall catalog setup_fcp.py
       - name: Phase 0 and 1 regressions

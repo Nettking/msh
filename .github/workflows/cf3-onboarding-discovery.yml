@@ -46,6 +46,9 @@ jobs:
           python -m compileall
           catalog/federation/onboarding_discovery
           catalog/federation/tests/test_onboarding_discovery_service.py
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
       - name: Run CF3 focused tests
         run: >-
           python -m pytest -o addopts= -q

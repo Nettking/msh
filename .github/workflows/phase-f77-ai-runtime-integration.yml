@@ -68,6 +68,9 @@ jobs:
           catalog/flask_app/tests/test_ai_runtime_integration.py
           catalog/flask_app/tests/test_connected_ai_provider.py
           catalog/flask_app/tests/test_model_provider_compose.py
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
       - name: F7.7 AI, F7 capability and affected federation tests
         run: >-
           python -m pytest -o addopts= -q

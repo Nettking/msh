@@ -72,6 +72,9 @@ jobs:
           catalog/flask_app/tests/test_capability_startup_transition_route.py
           catalog/flask_app/tests/test_startup_contribution_reconcile.py
           catalog/flask_app/tests/test_streamlined_onboarding_flow.py
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
       - name: Run CFI-6 and affected regressions
         run: >-
           python -m pytest -o addopts= -q

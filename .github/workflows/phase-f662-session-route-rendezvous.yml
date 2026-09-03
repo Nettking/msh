@@ -50,6 +50,9 @@ jobs:
       - name: Compile F6.6.2 boundary
         run: |
           python -m compileall catalog/federation/session_route_rendezvous.py catalog/node/route_rendezvous.py catalog/relay/route_rendezvous.py catalog/relay/tests/test_phase_f662_route_rendezvous.py
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
       - name: Session route rendezvous tests
         run: python -m pytest -o addopts= -q catalog/relay/tests/test_phase_f662_route_rendezvous.py
       - name: Ruff F6.6.2 boundary

@@ -64,6 +64,10 @@ jobs:
           catalog/mtconnect_recorder/managed_service.py
           catalog/relay/provider_service.py
 
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
+
       - name: Supervision regressions
         run: >-
           python -m pytest -o addopts= -q

@@ -56,6 +56,9 @@ jobs:
           catalog/federation/tests/test_phase_f641_chunk_contract.py
           catalog/node/tests/test_phase_f642_verified_chunk_transfer.py
           catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
       - name: F7 capability, F6 transfer and affected federation tests
         run: >-
           python -m pytest -o addopts= -q

@@ -98,6 +98,10 @@ jobs:
           python -m pip install -r requirements.txt -c constraints-release.txt
           python -m pip install pytest==9.1.1 ruff==0.16.3 -c constraints-release.txt
 
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
+
       - name: Compile maintained product packages
         run: python -m compileall -q catalog
 
@@ -332,6 +336,9 @@ jobs:
           python -m pip install --upgrade pip==26.2.1
           python -m pip install -r requirements.txt -c constraints-release.txt
           python -m pip install pytest==9.1.1 -c constraints-release.txt
+      - name: Ubuntu storage precondition
+        uses: ./.github/actions/ubuntu-storage-precondition
+
       - name: PostgreSQL storage authority regression
         run: >-
           python -m pytest -o addopts= -q
@@ -354,6 +361,9 @@ jobs:
           python -m pip install --upgrade pip==26.2.1
           python -m pip install -r requirements.txt -c constraints-release.txt
           python -m pip install pytest==9.1.1 pytest-randomly==4.1.0 -c constraints-release.txt
+
+      - name: Ubuntu storage precondition
+        uses: ./.github/actions/ubuntu-storage-precondition
 
       - name: Full suite in a fixed shuffled order
         run: python -m pytest -o addopts= -q -p randomly --randomly-seed=20260813

@@ -92,6 +92,9 @@ jobs:
           catalog/flask_app/tests/test_recorder_control_service.py
           catalog/flask_app/tests/test_run_once_capability_evidence.py
           catalog/flask_app/tests/test_startup_contribution_reconcile.py
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
       - name: Run CFI-5 and affected regressions
         run: >-
           python -m pytest -o addopts= -q

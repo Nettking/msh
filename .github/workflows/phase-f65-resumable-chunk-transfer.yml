@@ -49,6 +49,9 @@ jobs:
           catalog/federation/verified_chunk_transfer.py
           catalog/federation/resumable_chunk_transfer.py
           catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
       - name: F6.4 and F6.5 tests
         run: >-
           python -m pytest -o addopts= -q

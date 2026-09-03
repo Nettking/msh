@@ -40,6 +40,9 @@ jobs:
           python -m compileall
           catalog/flask_app/services/local_capability_candidates.py
           catalog/flask_app/tests/test_remote_storage_contribution.py
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
       - name: Test joined-device storage intent
         run: >-
           python -m pytest -o addopts= -q

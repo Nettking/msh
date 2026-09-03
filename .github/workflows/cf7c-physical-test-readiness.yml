@@ -91,6 +91,10 @@ jobs:
           python -m scripts.acceptance.cf7_physical_readiness
           topology scripts/acceptance/cf7_physical_topology.template.json
 
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
+
       - name: Run readiness and evidence tests
         run: >-
           python -m pytest -o addopts= -q

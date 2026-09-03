@@ -59,6 +59,10 @@ jobs:
           catalog/capabilities/artifact_authority.py
           catalog/capabilities/contributions/store.py
 
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
+
       - name: Bounded growth regressions
         run: >-
           python -m pytest -o addopts= -q

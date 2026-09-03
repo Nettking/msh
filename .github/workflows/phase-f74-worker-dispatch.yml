@@ -44,6 +44,9 @@ jobs:
           python -m compileall
           catalog/capabilities
           catalog/relay/tests/test_phase_f74_capability_dispatch.py
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
       - name: F7 capability, relay acceptance and affected federation tests
         run: >-
           python -m pytest -o addopts= -q

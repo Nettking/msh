@@ -157,6 +157,9 @@ jobs:
           assert 'product.recorder-plus-ai-simultaneous-contribution' in blocked;
           assert 'product.complete-capability-first-end-to-end-acceptance' in blocked;
           assert 'physical.mobile-and-desktop-browser-review' in manual"
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
       - name: Run CF7-A harness scenarios
         run: python -m pytest -o addopts= -q catalog/federation/tests/cf7_acceptance
       - name: Run CF1 contract regressions

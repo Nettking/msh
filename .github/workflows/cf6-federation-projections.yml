@@ -51,6 +51,9 @@ jobs:
           catalog/federation/projections
           catalog/federation/tests/test_federation_projections.py
           catalog/federation/tests/test_benchmark_latest_projection.py
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
       - name: Run CF6 projection tests
         run: >-
           python -m pytest -o addopts= -q

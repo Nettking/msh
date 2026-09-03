@@ -36,6 +36,9 @@ jobs:
           python -m pip install pytest ruff
       - name: Compile CF4 contribution service
         run: python -m compileall -q catalog/capabilities/contributions
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
       - name: CF4 focused tests
         run: >-
           python -m pytest -o addopts= -q

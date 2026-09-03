@@ -49,6 +49,9 @@ jobs:
           catalog/federation/onboarding_models.py
           catalog/federation/onboarding_compat.py
           catalog/federation/tests/test_onboarding_contracts.py
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
       - name: Run CF1 contracts and migration tests
         run: >-
           python -m pytest -o addopts= -q

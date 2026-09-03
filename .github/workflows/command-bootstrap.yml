@@ -82,6 +82,10 @@ jobs:
           catalog/flask_app/tests/test_connected_ai_provider.py
           catalog/flask_app/tests/test_termux_phone_script.py
 
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
+
       - name: Run cross-platform command and runtime regressions
         run: >-
           python -m pytest -o addopts= -q

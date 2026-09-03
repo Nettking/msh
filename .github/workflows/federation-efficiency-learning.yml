@@ -54,6 +54,9 @@ jobs:
           python -m compileall
           catalog/capabilities
           catalog/orchestrator/analysis_runtime.py
+      - name: Ubuntu storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
       - name: Efficiency learning contracts, store, ranking and simulation
         run: >-
           python -m pytest -o addopts= -q
