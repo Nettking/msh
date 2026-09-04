@@ -61,6 +61,35 @@ from catalog.mtconnect_recorder.storage import DurableRecorderStore
 MAX_SHARING_READY_SECONDS = 600.0
 MAX_FEDERATION_REQUEST_SECONDS = 120.0
 
+#: The Federation capability type every standalone recorder announces.
+#:
+#: Type is the *shared* recorder semantic: ``fcp.capability.v1`` explicitly
+#: allows several nodes to announce the same type, and recorder-control
+#: discovers recorders by this type rather than by capability ID.
+RECORDER_CAPABILITY_TYPE = "recorder"
+
+#: The session-wide capability ID every recorder build announced before
+#: recorder identity became node-scoped.
+#:
+#: ``(session_id, capability_id)`` is unique per the session contract, so a
+#: fixed ID let only one recorder per Federation session be accepted; every
+#: further legitimate recorder was rejected with ``capability-identity-conflict``.
+LEGACY_RECORDER_CAPABILITY_ID = "recorder-local"
+
+
+def recorder_capability_id(node_id: str) -> str:
+    """Return the session-unique, restart-stable recorder capability ID.
+
+    Capability *type* stays ``recorder`` so a recorder remains recognizably a
+    recorder; only the capability *instance* identity is scoped to the device.
+    The node ID is the digest of the durable Ed25519 identity key, so the same
+    physical recorder derives the same capability ID on every restart and
+    reconnect without leaving a stale row behind.
+    """
+
+    return f"{RECORDER_CAPABILITY_TYPE}-{node_id}"
+
+
 #: Every condition the publication driver retries rather than dies on.
 #:
 #: One tuple, used by the per-cycle boundary *and* by the failure handler's own
@@ -607,12 +636,48 @@ class RecorderFederationNode:
         self._start_publication(saved)
         return self.snapshot()
 
+    def _owns_legacy_capability(self, state: RemotePairingState) -> bool:
+        """Report whether this device already holds the pre-scoping recorder ID.
+
+        A capability row is durable and its heartbeat is refreshed for every
+        capability the node owns, so an abandoned ``recorder-local`` row would
+        never age out: it would stay READY forever and shadow the real recorder
+        in Federation views. An already accepted ID is therefore kept rather
+        than re-scoped, which also leaves single-recorder deployments byte
+        identical across this upgrade. A recorder that never had an
+        announcement accepted -- the rejected second recorder -- has nothing
+        saved here and takes the node-scoped ID.
+        """
+
+        try:
+            client = self.runtime._connected_client()
+        except FederationOperationError:
+            return False
+        read = getattr(getattr(client, "state", None), "advertised_capabilities", None)
+        if not callable(read):
+            return False
+        try:
+            advertised = read(session_id=state.binding.internal_session_id)
+        except FederationValidationError:
+            return False
+        return any(
+            item.capability_id == LEGACY_RECORDER_CAPABILITY_ID
+            and item.node_id == state.binding.device_id
+            and item.type == RECORDER_CAPABILITY_TYPE
+            for item in advertised
+        )
+
+    def _capability_id(self, state: RemotePairingState) -> str:
+        if self._owns_legacy_capability(state):
+            return LEGACY_RECORDER_CAPABILITY_ID
+        return recorder_capability_id(state.binding.device_id)
+
     def _announcement(self, state: RemotePairingState) -> CapabilityAnnouncement:
         return CapabilityAnnouncement(
-            capability_id="recorder-local",
+            capability_id=self._capability_id(state),
             node_id=state.binding.device_id,
             session_id=state.binding.internal_session_id,
-            type="recorder",
+            type=RECORDER_CAPABILITY_TYPE,
             protocol="mtconnect",
             protocol_version="1",
             status=CapabilityStatus.READY,
@@ -886,10 +951,13 @@ class RecorderFederationNode:
 
 
 __all__ = [
+    "LEGACY_RECORDER_CAPABILITY_ID",
+    "RECORDER_CAPABILITY_TYPE",
     "SHARING_STATE_REMEDIES",
     "RecorderFederationNode",
     "RecorderFederationSnapshot",
     "StorageAuthoritySelection",
+    "recorder_capability_id",
     "select_storage_authority",
     "sharing_state_detail",
 ]
