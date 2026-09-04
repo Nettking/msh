@@ -77,6 +77,17 @@ RECORDER_CAPABILITY_TYPE = "recorder"
 LEGACY_RECORDER_CAPABILITY_ID = "recorder-local"
 
 
+#: Statuses that mean a capability row is already retired.
+#:
+#: ``REVOKED`` is coordinator-driven (membership removal, leadership
+#: revocation); a node asserts ``UNAVAILABLE`` for a capability it no longer
+#: serves. Either way the row is inert: recorder-control and storage-authority
+#: selection both require ``READY``.
+RETIRED_CAPABILITY_STATUSES = frozenset(
+    {CapabilityStatus.UNAVAILABLE.value, CapabilityStatus.REVOKED.value}
+)
+
+
 def recorder_capability_id(node_id: str) -> str:
     """Return the session-unique, restart-stable recorder capability ID.
 
@@ -636,45 +647,155 @@ class RecorderFederationNode:
         self._start_publication(saved)
         return self.snapshot()
 
-    def _owns_legacy_capability(self, state: RemotePairingState) -> bool:
-        """Report whether this device already holds the pre-scoping recorder ID.
+    async def _session_capability_rows(
+        self, state: RemotePairingState
+    ) -> dict[str, dict[str, Any]]:
+        """Read this session's capability rows from the authoritative coordinator.
 
-        A capability row is durable and its heartbeat is refreshed for every
-        capability the node owns, so an abandoned ``recorder-local`` row would
-        never age out: it would stay READY forever and shadow the real recorder
-        in Federation views. An already accepted ID is therefore kept rather
-        than re-scoped, which also leaves single-recorder deployments byte
-        identical across this upgrade. A recorder that never had an
-        announcement accepted -- the rejected second recorder -- has nothing
-        saved here and takes the node-scoped ID.
+        Local ``advertised_capabilities`` is a cache of what this node last
+        announced successfully. It can be missing (a response lost between
+        coordinator acceptance and the local save), stale (restored from a
+        backup), or contradicted by the coordinator. Identity selection must
+        therefore never be decided from it.
         """
 
-        try:
-            client = self.runtime._connected_client()
-        except FederationOperationError:
-            return False
-        read = getattr(getattr(client, "state", None), "advertised_capabilities", None)
-        if not callable(read):
-            return False
-        try:
-            advertised = read(session_id=state.binding.internal_session_id)
-        except FederationValidationError:
-            return False
-        return any(
-            item.capability_id == LEGACY_RECORDER_CAPABILITY_ID
-            and item.node_id == state.binding.device_id
-            and item.type == RECORDER_CAPABILITY_TYPE
-            for item in advertised
+        client = self.runtime._connected_client()
+        status = await client.coordinator_status()
+        capabilities = status.get("capabilities") if isinstance(status, dict) else None
+        if not isinstance(capabilities, list):
+            raise FederationOperationError(
+                "recorder-capability-status-unavailable",
+                "coordinator status did not contain a capability list",
+            )
+        rows: dict[str, dict[str, Any]] = {}
+        for value in capabilities:
+            if (
+                isinstance(value, dict)
+                and value.get("session_id") == state.binding.internal_session_id
+                and isinstance(value.get("capability_id"), str)
+            ):
+                rows[str(value["capability_id"])] = value
+        return rows
+
+    def _is_own_live_legacy(
+        self, row: dict[str, Any] | None, *, node_id: str
+    ) -> bool:
+        """Report whether the legacy row is this node's and still in service."""
+
+        return (
+            isinstance(row, dict)
+            and row.get("node_id") == node_id
+            and row.get("type") == RECORDER_CAPABILITY_TYPE
+            and str(row.get("status") or "") not in RETIRED_CAPABILITY_STATUSES
         )
 
-    def _capability_id(self, state: RemotePairingState) -> str:
-        if self._owns_legacy_capability(state):
-            return LEGACY_RECORDER_CAPABILITY_ID
-        return recorder_capability_id(state.binding.device_id)
+    async def _resolve_capability_identity(
+        self, state: RemotePairingState
+    ) -> tuple[str, dict[str, Any] | None]:
+        """Select this recorder's capability ID from authoritative state.
 
-    def _announcement(self, state: RemotePairingState) -> CapabilityAnnouncement:
+        Returns the ID to announce and, when convergence leaves this node
+        holding both identities, the legacy row to retire. The order of the
+        rules is what makes convergence deterministic across reconnect and
+        coordinator restart: a node that has already moved to the node-scoped
+        identity never moves back, even if a stale local backup or a surviving
+        legacy row still claims otherwise.
+        """
+
+        node_id = state.binding.device_id
+        scoped = recorder_capability_id(node_id)
+        rows = await self._session_capability_rows(state)
+        legacy = rows.get(LEGACY_RECORDER_CAPABILITY_ID)
+        own_live_legacy = self._is_own_live_legacy(legacy, node_id=node_id)
+
+        # Already converged. Retire the legacy row only when this exact node
+        # still owns it -- never take over another node's identity.
+        scoped_row = rows.get(scoped)
+        if isinstance(scoped_row, dict) and scoped_row.get("node_id") == node_id:
+            return scoped, (legacy if own_live_legacy else None)
+
+        # An accepted legacy identity is kept: a capability row is durable and
+        # is heartbeated for as long as its node is connected, so abandoning
+        # one silently would leave a permanently READY phantom recorder.
+        if own_live_legacy:
+            return LEGACY_RECORDER_CAPABILITY_ID, None
+
+        # The legacy row is absent, already retired, or belongs to another
+        # node. Only the node-scoped identity can be announced without
+        # conflicting with a legitimate owner.
+        return scoped, None
+
+    async def _retire_legacy_capability(
+        self,
+        state: RemotePairingState,
+        row: dict[str, Any],
+    ) -> None:
+        """Withdraw this node's superseded legacy row from service.
+
+        The relay protocol has no capability withdraw/unregister operation:
+        ``capability.announce`` is the whole capability lifecycle, and the
+        supported way to take a capability out of service is to announce it
+        ``UNAVAILABLE``. That is what the contribution publisher already does
+        for a capability it can no longer reconstruct.
+        """
+
+        properties = row.get("properties")
+        await self.runtime._announce_capability(
+            state,
+            CapabilityAnnouncement(
+                capability_id=LEGACY_RECORDER_CAPABILITY_ID,
+                node_id=state.binding.device_id,
+                session_id=state.binding.internal_session_id,
+                type=str(row.get("type") or RECORDER_CAPABILITY_TYPE),
+                protocol=str(row.get("protocol") or "mtconnect"),
+                protocol_version=str(row.get("protocol_version") or "1"),
+                status=CapabilityStatus.UNAVAILABLE,
+                properties=(
+                    dict(properties)
+                    if isinstance(properties, dict)
+                    else {"kind": "standalone-recorder"}
+                ),
+                announced_at=datetime.now(timezone.utc),
+            ),
+            request_id=f"recorder-capability-retire-{uuid.uuid4().hex}",
+        )
+
+    def _forget_local_capability(
+        self, capability_id: str, state: RemotePairingState
+    ) -> None:
+        client = self.runtime._connected_client()
+        remove = getattr(getattr(client, "state", None), "remove_capability", None)
+        if callable(remove):
+            remove(
+                session_id=state.binding.internal_session_id,
+                capability_id=capability_id,
+            )
+
+    async def _announce_now(self, state: RemotePairingState) -> None:
+        """Resolve identity against the coordinator, reconcile, then announce."""
+
+        capability_id, legacy = await self._resolve_capability_identity(state)
+        if legacy is not None:
+            await self._retire_legacy_capability(state, legacy)
+        if capability_id != LEGACY_RECORDER_CAPABILITY_ID:
+            # The relay client replays every locally cached capability on
+            # connect. A legacy row left in that cache would be re-announced --
+            # and, when the coordinator has no row to conflict with, silently
+            # recreated -- on the next reconnect. Dropping the cache entry is
+            # therefore required whenever this node is not announcing the legacy
+            # identity, not only when a coordinator row had to be retired.
+            self._forget_local_capability(LEGACY_RECORDER_CAPABILITY_ID, state)
+        await self.runtime._announce_capability(
+            state,
+            self._announcement(state, capability_id),
+            request_id=f"recorder-capability-{uuid.uuid4().hex}",
+        )
+
+    def _announcement(
+        self, state: RemotePairingState, capability_id: str
+    ) -> CapabilityAnnouncement:
         return CapabilityAnnouncement(
-            capability_id=self._capability_id(state),
+            capability_id=capability_id,
             node_id=state.binding.device_id,
             session_id=state.binding.internal_session_id,
             type=RECORDER_CAPABILITY_TYPE,
@@ -692,18 +813,13 @@ class RecorderFederationNode:
         )
 
     def _announce(self, state: RemotePairingState) -> None:
-        self.runtime.announce_capability(
-            state,
-            self._announcement(state),
-            request_id=f"recorder-capability-{uuid.uuid4().hex}",
-        )
+        # Bootstrap runs on the caller's thread, so the coroutine is submitted
+        # to the relay loop. The reconnect path awaits the same coroutine
+        # directly; neither drives the synchronous wrapper from the loop thread.
+        self.runtime._submit(self._announce_now(state))
 
     async def _announce_connected(self, state: RemotePairingState) -> None:
-        await self.runtime._announce_capability(
-            state,
-            self._announcement(state),
-            request_id=f"recorder-capability-{uuid.uuid4().hex}",
-        )
+        await self._announce_now(state)
 
     def _start_publication(self, state: RemotePairingState) -> None:
         if self._publication_future is not None and not self._publication_future.done():
@@ -953,6 +1069,7 @@ class RecorderFederationNode:
 __all__ = [
     "LEGACY_RECORDER_CAPABILITY_ID",
     "RECORDER_CAPABILITY_TYPE",
+    "RETIRED_CAPABILITY_STATUSES",
     "SHARING_STATE_REMEDIES",
     "RecorderFederationNode",
     "RecorderFederationSnapshot",
