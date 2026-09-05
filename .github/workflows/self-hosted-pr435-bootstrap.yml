@@ -34,18 +34,22 @@ jobs:
     name: Windows bootstrap (Nettking)
     runs-on: fcp-windows
     timeout-minutes: 10
-    env:
-      PSExecutionPolicyPreference: Bypass
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.VALIDATED_SHA }}
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12.10"
-          cache: pip
+      - name: Use Nettking Python 3.12.10
+        shell: pwsh
+        run: |
+          $root = 'C:\actions-runner\toolchains\python-3.12.10'
+          if (-not (Test-Path "$root\python.exe")) { throw "Python toolchain missing: $root\python.exe" }
+          $root | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
+          "$root\Scripts" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
       - name: Verify candidate SHA and Python
         shell: pwsh
         run: |
           if ((git rev-parse HEAD) -ne $env:VALIDATED_SHA) { throw "candidate SHA mismatch" }
-          python --version
+          $version = python --version 2>&1
+          if ($version -ne 'Python 3.12.10') { throw "unexpected Python: $version" }
+          python -m pip --version
+          python -c "import subprocess,sys; print(sys.executable); subprocess.check_call([sys.executable, '-c', 'print(42)'])"
