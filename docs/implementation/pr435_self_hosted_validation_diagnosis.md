@@ -216,11 +216,24 @@ that SHA.
 
 ## What still blocks a green gate
 
-An operator has to free at least **45.01 GiB on the Nettking `C:` volume**, or
-give the runner a work directory and `TEMP` on a volume that holds at least its
-own derived floor. Nothing inside CI can do this: the runner's own caches are
-about 0.3 GiB, and the remaining 1887 GiB is the workstation's data, which must
-be preserved.
+An operator has to free at least **45.03 GiB on the Nettking `C:` volume**, or
+put the runner's work directory and `TEMP` on a volume whose own derived floor
+it can clear. Nothing inside CI can do this: the runner's own caches are about
+0.3 GiB, and the remaining 1887 GiB is the workstation's data, which must be
+preserved.
+
+The floor is `min(max(10 GiB, 5% of the volume), 64 GiB)`, so a smaller volume
+asks for less, not more:
+
+| Volume | Free space the storage tests need |
+| ---: | ---: |
+| up to 200 GiB | 10 GiB |
+| 400 GiB | 20 GiB |
+| 900 GiB | 45 GiB |
+| 1280 GiB and above | 64 GiB |
+
+Nitro sits in the third row and clears it with 832 GiB free. `C:` on Nettking
+is in the last row with 18.97 GiB.
 
 Lowering `MAXIMUM_FLOOR_BYTES`, configuring `storage_floor_bytes` for CI, or
 skipping the storage tests would all turn the gate green without changing the
