@@ -1,7 +1,12 @@
 # PR 435 self-hosted validation: diagnosis of the red Windows storage gate
 
-Status: the failure is **pre-existing and environment-determined**. It is not a
-regression introduced by PR 435, and it is not flaky.
+Status: **resolved.** The failure was pre-existing and environment-determined,
+not a regression introduced by PR 435 and not flaky. The runner has since been
+given the disk the product asks for -- 141.88 GiB free of 1906.46 GiB against
+the 64.00 GiB floor, clearing it by 77.88 GiB -- and the whole Windows storage,
+transport and failover subset then ran and passed for the first time
+(run 33959839653: 366 passed, 1 skipped). This note is kept as the record of
+how the red gate was attributed.
 
 ## The failure
 
@@ -216,8 +221,13 @@ that SHA.
 
 ## What still blocks a green gate
 
-An operator has to free at least **45.03 GiB on the Nettking `C:` volume**, or
-put the runner's work directory and `TEMP` on a volume whose own derived floor
+**Resolved.** The operator freed the space: `C:` went from 18.97 GiB free to
+**141.88 GiB**, which clears the 64.00 GiB floor by 77.88 GiB, and the
+precondition step now passes on all three measured paths. What follows is kept
+because it is the arithmetic anyone hitting this again will need.
+
+The requirement was at least **45.03 GiB freed on the Nettking `C:` volume**,
+or the runner's work directory and `TEMP` on a volume whose own derived floor
 it can clear. Nothing inside CI can do this: the runner's own caches are about
 0.3 GiB, and the remaining 1887 GiB is the workstation's data, which must be
 preserved.

@@ -154,6 +154,28 @@ python -m pytest -o addopts= -q -p no:randomly \
 # with the fix: 300 passed
 ```
 
+## The first fix was POSIX-only
+
+Copying the database and its `-wal` side by side, after clearing the
+destination's stale sidecars, is correct on POSIX and wrong on Windows: a file
+cannot be unlinked there while any handle is still open on it. Once Nettking
+had the disk and the storage subset ran for real, the gate reported
+
+```
+catalog\mtconnect_recorder\tests\test_multi_recorder_capability_identity.py:83:
+    in _copy_node_state
+    target.unlink(missing_ok=True)
+E   PermissionError: [WinError 32] ... node_state.sqlite3
+```
+
+with the other 366 tests of that subset passing.
+
+The restore now goes through SQLite's online backup API instead, which reads a
+consistent snapshot and writes it through the destination's own connection. No
+sidecar is removed by hand, so there is nothing for Windows to refuse, and the
+same code is correct on both platforms. The scenario still passes 300 out of
+300 repetitions in one process.
+
 ## Where the fix landed
 
 The wrapper on `ci/self-hosted-pr435` cannot help here: the failure is in the
@@ -161,10 +183,12 @@ candidate's own test, so the fix belongs on the product branch.
 
 * `claude/federation-recorder-capability-id-19tqkk`
   `13967aea9f4561cea64b5427bdf572de823ec577` ->
-  **`b2a7c6e5fb68bc4d4dbbb57322ca496feb1438a9`**
-  (`test: restore the whole node state database, not just its main file`)
-* `ci/self-hosted-pr435` `VALIDATED_SHA` re-pointed at that new head, so the
-  gate validates the candidate that can actually be merged.
+  `b2a7c6e5fb68bc4d4dbbb57322ca496feb1438a9`
+  (`test: restore the whole node state database, not just its main file`) ->
+  **`f0434e4a4fd4cf86b3574563151d1e6241b4e06c`**
+  (`test: move the node state through SQLite instead of over the filesystem`)
+* `ci/self-hosted-pr435` `VALIDATED_SHA` follows that head, so the gate
+  validates the candidate that can actually be merged.
 
 No product code changed. The diff is confined to
 `catalog/mtconnect_recorder/tests/test_multi_recorder_capability_identity.py`:
