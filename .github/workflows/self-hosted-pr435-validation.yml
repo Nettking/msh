@@ -40,8 +40,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          df -h / && df -i /
-          python3 scripts/ci_release_disk_preflight.py
+          df -h "${GITHUB_WORKSPACE}" "${RUNNER_TEMP}"
+          df -i "${GITHUB_WORKSPACE}" "${RUNNER_TEMP}"
+          python3 scripts/ci_release_disk_preflight.py "${GITHUB_WORKSPACE}" "${RUNNER_TEMP}"
 
       - name: Python 3.12.13 release regression suite in Docker
         shell: bash
@@ -54,6 +55,7 @@ jobs:
             python:3.12.13-bookworm bash -lc '
               set -euo pipefail
               python --version
+              python scripts/ci_release_disk_preflight.py /workspace /tmp
               python -m pip install --upgrade pip==26.2.1
               python -m pip install -r requirements.txt -c constraints-release.txt
               python -m pip install pytest==9.1.1 ruff==0.16.3 -c constraints-release.txt
@@ -330,8 +332,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          df -h / && df -i /
-          python3 scripts/ci_release_disk_preflight.py
+          df -h "${GITHUB_WORKSPACE}" "${RUNNER_TEMP}"
+          df -i "${GITHUB_WORKSPACE}" "${RUNNER_TEMP}"
+          python3 scripts/ci_release_disk_preflight.py "${GITHUB_WORKSPACE}" "${RUNNER_TEMP}"
       - name: PostgreSQL storage authority regression with Python 3.12.13
         shell: bash
         run: |
@@ -343,6 +346,7 @@ jobs:
             python:3.12.13-bookworm bash -lc '
               set -euo pipefail
               python --version
+              python scripts/ci_release_disk_preflight.py /workspace /tmp
               python -m pip install --upgrade pip==26.2.1
               python -m pip install -r requirements.txt -c constraints-release.txt
               python -m pip install pytest==9.1.1 -c constraints-release.txt
@@ -364,8 +368,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          df -h / && df -i /
-          python3 scripts/ci_release_disk_preflight.py
+          df -h "${GITHUB_WORKSPACE}" "${RUNNER_TEMP}"
+          df -i "${GITHUB_WORKSPACE}" "${RUNNER_TEMP}"
+          python3 scripts/ci_release_disk_preflight.py "${GITHUB_WORKSPACE}" "${RUNNER_TEMP}"
       - name: Full suite twice under Python 3.12.13
         shell: bash
         run: |
@@ -377,6 +382,7 @@ jobs:
             python:3.12.13-bookworm bash -lc '
               set -euo pipefail
               python --version
+              python scripts/ci_release_disk_preflight.py /workspace /tmp
               python -m pip install --upgrade pip==26.2.1
               python -m pip install -r requirements.txt -c constraints-release.txt
               python -m pip install pytest==9.1.1 pytest-randomly==4.1.0 -c constraints-release.txt
