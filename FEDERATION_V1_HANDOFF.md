@@ -10,14 +10,14 @@ CURRENT_PHASE: Software validation and independent review of PR #435; physical d
 CURRENT_MAIN_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356
 CURRENT_CANDIDATE_SHA: f0434e4a4fd4cf86b3574563151d1e6241b4e06c
 PR_435_HEAD: f0434e4a4fd4cf86b3574563151d1e6241b4e06c on claude/federation-recorder-capability-id-19tqkk; OPEN, not merged
-ACTIVE_FIX_BRANCH: None created by Astra; claude/pr435-reconcile-retry is reserved for the bounded R001 follow-up below
+ACTIVE_FIX_BRANCH: codex/pr435-reconcile-retry at f65d11fd028a8eea5478e2fd6dd634fdbdb9d9a1; pushed, reviewed by Astra; pending broader validation and candidate promotion
 VALIDATION_BRANCH: ci/self-hosted-pr435 at 87310dfdbaa33665957589046140b9714a617cdf
 ACTIVE_CI_RUN: 33960401244 (push on ci/self-hosted-pr435 at 87310dfdbaa33665957589046140b9714a617cdf; product VALIDATED_SHA=f0434e4a4fd4cf86b3574563151d1e6241b4e06c). Windows SUCCESS; Linux CANCELLED; order-independence and PostgreSQL QUEUED. Overall API status queued; no duplicate run started by Astra.
 DEPLOYED_NETTKING_SHA: Last physical observation 2026-09-04: 6101c86d94294c70db47d1a8053cac93b9a41356; live runtime not refreshed at takeover
 DEPLOYED_NITRO_SHA: Last physical observation 2026-09-04: 6101c86d94294c70db47d1a8053cac93b9a41356; live runtime not refreshed at takeover
 DEPLOYED_MSH_RECORDER_SHA: Last candidate-runtime observation 2026-09-04: 6101c86d94294c70db47d1a8053cac93b9a41356; legacy runtime also existed; live runtime not refreshed
 CURRENT_SESSION_ID: UNKNOWN; do not infer from old logs or expose pairing/authentication secrets
-LAST_UPDATED_UTC: 2026-09-05T13:47:30Z
+LAST_UPDATED_UTC: 2026-09-05T14:01:58Z
 
 KNOWN_FAILURES:
 - Current PR-triggered runs at f0434e4a report failure; their causes are not yet established. The separate self-hosted run is identified above.
@@ -26,7 +26,7 @@ KNOWN_FAILURES:
 - Historical rig at main 6101c86 had a real multi-recorder `recorder-local` identity collision and no ready logical-storage group. PR435 addresses the identity collision; it is not yet physically validated.
 
 FAILURE_CLASSIFICATIONS:
-- R001: UNVERIFIED RELIABILITY REVIEW FINDING. Publication loop sets `active_client_id` before awaiting multi-step reconciliation. A transient coordinator lookup/legacy-retirement failure on an otherwise connected client may prevent future retry and leave duplicate owned recorder identities READY. Static review evidence exists; no regression test or runtime reproduction has yet been run by Astra. Do not state this as a proven reproduced defect.
+- R001: REPRODUCED RELIABILITY DEFECT; fixed on proposed branch f65d11fd. The premature active_client_id assignment already exists on base main6101c86; PR435's multi-step identity reconciliation exposes the consequence. A single ordinary coordinator-status timeout on the same connected client let publication become healthy with both legacy/scoped recorder identities READY. Moving the assignment after successful reconciliation fixes the failing production-loop regression. This is a pre-existing retry-order defect exposed by the candidate, not an entirely new base regression.
 - CI001: FAILED PR WORKFLOW RESULTS, CAUSE UNKNOWN. Do not equate a red hosted wrapper or billing/startup failure with a product regression.
 - CI002: CONFIRMED incomplete Linux full gate:120-minute timeout plus one visible failed-test marker; exact test/root cause UNKNOWN. Investigate Nitro host/container contention, suite durations, and test collection order before selecting a fix. Do not simply extend the timeout and hide the failed test.
 - ENV001: RESOLVED Windows Python bootstrap, now verified in a real Nettking Actions job. Job 101291502797 checked the exact candidate, ran Python 3.12.10 from the standalone toolchain, and completed successfully under the registered runner. CI intentionally upgraded pip to26.2.1; the earlier preparation report's25.0.1 is historical.
@@ -37,22 +37,23 @@ COMPLETED_TESTS:
 - Python preparation: exact3.12.10 x64; pip 25.0.1; imports, subprocess, venv creation, offline wheel install/import and pip check passed under Nettking\\Martin. Package catalog SHA512 and PSF Authenticode signatures verified.
 - Toolchain permissions: all 2091 audited entries permit read/execute through the runner group containing NetworkService; no ACL/account changes made.
 - Product repository baselines: C:\wsl\msh remained clean main 6101c86; Actions checkout was clean detached13967aea at end of Python preparation. The Actions workspace is managed by jobs and is not the owner development checkout.
-- Astra independent candidate review: scoped identity/migration approach matches the physical collision; no authority regression identified in reviewed production diff; R001 remains to validate.
+- Astra independent candidate review: scoped identity/migration approach matches the physical collision; no authority regression identified in reviewed production diff. R001 reproduced and its two-file minimal fix reviewed.
 - Real self-hosted Windows job 101291502797 SUCCESS:871 passed/1 skipped in capability/product subset;367 passed/1 skipped in transport/storage/failover subset; Go, Ruff, Compose and diff checks passed. Job ran on Nettking from10:24:02Z to10:31:57Z, validated f0434e4a, Python 3.12.10. This is software evidence, not physical acceptance.
-- No product tests, CI dispatch, merge, deployment or physical acceptance operation has been run by Astra in this takeover yet. PR-body test counts are prior-author reports, not refreshed exact-head validation.
+- R001 regression: targeted publication-loop test FAILED before the production fix (legacy remained READY while publication became healthy), then PASSED after. Focused publication-recovery and real-relay identity suites:24 passed in17.12s on f65d11fd with the standalone Windows Python3.12.10; git diff --check passed. No toolchain/live-state changes. Exact commands are in the R001 evidence section below.
+- No CI dispatch, merge, deployment or physical acceptance mutation has been performed by Astra in this takeover yet. PR-body test counts remain prior-author reports, not refreshed exact-head validation.
 
 CURRENTLY_RUNNING_WORK:
-- Astra: durable coordination published; next identify the failed Linux test and retry-reconciliation finding, inspect Nitro runner/container state, and refresh physical inventory read-only.
+- Astra: R001 fix reviewed and pushed; next broader validation and integration decision. Supporting agents own read-only Linux runner/failure diagnosis and three-host runtime inventory, with reports under task outputs.
 - Run 33960401244 still has queued Linux order-independence job 101291502804 and PostgreSQL job 101291502832. Nitro and Nettking both reported online/not-busy at the last API snapshot; queue cause not yet established. Preserve queued work until diagnosed.
 - No newly delegated Claude task has been confirmed active. Do not assume pushing this file starts Claude automatically.
 - Existing Claude work is preserved on the PR branch, ci/self-hosted-pr435 and claude/pr435-validation-diagnosis-n285av.
-- Supporting read-only reviews are complete. One supporting CI-audit agent returned a usage-limit error; no unpublished implementation was produced by it.
+- Supporting R001 implementation is complete and published. The earlier CI-audit usage-limit interruption produced no unpublished work; its read-only investigation has resumed. No live container, service, Federation or deployment changes are authorized to those agents.
 
 NEXT_ACTIONS:
 1. Fetch remote refs and read this file first. Compare main, PR435 head, validation SHA and newest run before changing anything. Do not restart a useful already-running validation.
 2. Refresh run 33960401244 and queued jobs101291502804/101291502832. Its wrapper at 87310dfd checks out f0434e4a in every job. Linux job 101291502702 timed out after64% with an `F` near60%. Retrieve its log, identify that test using exact-head collection order or a focused verbose rerun, and inspect Nitro load/orphan CI containers read-only. Preserve Windows success101291502797 as exact-head evidence; do not rerun it without cause.
-3. Investigate R001 at f0434e4a: `catalog/mtconnect_recorder/federation_node.py` near895 sets active_client_id before awaiting `_announce_connected`; reconciliation near777 includes coordinator lookup and legacy retirement. Test a one-time ordinary timeout through the publication loop, with the same connected client, and observe whether reconciliation retries. Keep this a local benign fault-injection test, not an exploit workflow.
-4. If R001 is proven, implement only the minimal retry-order fix plus meaningful publication-loop regression coverage on claude/pr435-reconcile-retry based on f0434e4a. Run focused recorder/node/pairing/control coverage. Push the branch; record the commit and test results before requesting integration review.
+3. R001 reproduction/fix is complete; do not rebuild it. Fetch codex/pr435-reconcile-retry at f65d11fd and inspect the two-file diff against f0434e4a. Run appropriate broader recorder/node/pairing/control coverage, then Astra decides promotion. PR435 and the validation wrapper still target f0434e4a until that decision is recorded.
+4. Keep one writer on each branch. The previously reserved claude/pr435-reconcile-retry branch is retired; continue the existing published codex/pr435-reconcile-retry branch only after ownership transfer.
 5. Preserve useful Claude diagnosis: inspect claude/pr435-validation-diagnosis-n285av (observed dfc217793d4bcfc0b6e1723c41c4453613db6f2d) and its two docs. Its earlier 487610a and b2a7c6e references are historical, not current authority.
 6. Continue focused -> broader -> complete self-hosted software gates with explicit candidate SHA. Separate environment faults, test defects and product regressions using evidence. Never reduce release thresholds or coverage to obtain green.
 7. In parallel, refresh Nettking/Nitro/MSH Recorder checkouts, container build labels, mounts/projects and session/capability state read-only. Keep identities, telemetry and unrelated legacy runtimes intact.
@@ -60,7 +61,7 @@ NEXT_ACTIONS:
 
 ACTIONS_CLAUDE_IS_AUTHORIZED_TO TAKE:
 - During a confirmed Astra cooldown, claim ACTING_ENGINEER in this file with a normal fast-forward push, then continue reversible diagnosis, scoped implementation, regression tests, focused/broad/full software validation and read-only machine inventory.
-- Use claude/pr435-reconcile-retry for R001. Owned paths are `catalog/mtconnect_recorder/federation_node.py` and the smallest relevant recorder regression test file. Do not change authority semantics, thresholds or unrelated product paths.
+- Continue the published codex/pr435-reconcile-retry for R001 only after ownership transfer. Existing owned paths are `catalog/mtconnect_recorder/federation_node.py` and `catalog/mtconnect_recorder/tests/test_recorder_publication_store_failure.py`. Do not create a competing retry fix or change authority semantics, thresholds or unrelated paths.
 - Push useful scoped commits and update this document immediately. Do not leave the only useful result in an unpushed checkout or chat.
 - Claude may update the PR or validation branch only after confirming no other writer owns that branch and recording the transfer here. Preserve one candidate; distinguish proposed fixes from the accepted working candidate.
 - Retrieve/log CI outcomes, repair proven CI-environment wrapper defects without changing product requirements, and continue an already-started physical test only if its authoritative candidate is unchanged.
@@ -74,7 +75,7 @@ ACTIONS_REQUIRING_ASTRA_REVIEW:
 
 ## Standing merge policy
 
-MERGE_AUTHORIZATION: Claude may perform a normal merge of PR435 during Astra cooldown ONLY if all conditions below hold:
+MERGE_AUTHORIZATION: SUSPENDED: R001 is reproduced, so the previous f0434e4a-only authorization cannot apply. Astra must review broader evidence and explicitly authorize a new exact candidate. The previous policy below is retained for audit and confers no current merge authority:
 1. PR head is still exactly f0434e4a4fd4cf86b3574563151d1e6241b4e06c, and main is still 6101c86d94294c70db47d1a8053cac93b9a41356.
 2. R001 has been conclusively ruled out with recorded production-path regression evidence; it is not merely untested or waived.
 3. This exact head has complete self-hosted release-gate SUCCESS on required Windows and Linux jobs, including all required broader/order/storage/PostgreSQL/verdict checks; no unexplained failure, cancellation, skip of a required gate, stale-SHA substitution or threshold reduction remains.
@@ -88,7 +89,7 @@ If a product fix changes PR head, these standing criteria do not authorize its m
 - `main`: protected; no direct/force pushes.
 - `claude/federation-recorder-capability-id-19tqkk`: existing PR435; no concurrent pushes.
 - `ci/self-hosted-pr435`: existing validation wrapper; no concurrent candidate changes or duplicate dispatch before inventory.
-- `claude/pr435-reconcile-retry`: reserved bounded proposed fix, not authoritative until accepted.
+- `codex/pr435-reconcile-retry`: published bounded proposed fix f65d11fd, owned by Astra; supporting implementation complete; not authoritative until promoted. The unused claude/pr435-reconcile-retry reservation is retired.
 - `coord/federation-v1-release`: coordination only; single acting writer, fetch before edit, normal fast-forward push, never force push or merge into main.
 - Astra owner checkout: task-local `work/msh-owner`, detached at candidate. Coordination checkout: task-local `work/msh-coordination`. Neither is a physical deployed checkout.
 - Runtime isolation requires explicit Compose project, data/results roots and ports. A different source checkout alone does not isolate project volumes. Never use `--fresh` to erase the live rig as a troubleshooting shortcut.
@@ -106,6 +107,19 @@ If a product fix changes PR head, these standing criteria do not authorize its m
 - Actual runtime commit evidence: container label `no.fcp.build_commit` or native recorder `native_runtime.build_commit`. Headless status alone does not prove runtime SHA.
 - Strict P01-P12 and CF7 physical-evidence.v2 are separate required evidence sets. P07 requires at least1 actual hour; P12 at least24 actual hours, with same candidate/host/run_id and valid in-window samples. Old fragments or CI green cannot substitute. Current acceptance flags remain false.
 - Real MTConnect, Ollama/accelerator, desktop/mobile and Windows/POSIX/multi-host observations remain necessary. Use approved existing devices/endpoints; no unrestricted discovery or exploit workflows.
+
+## R001 reproducible evidence
+
+Commit: https://github.com/Nettking/msh/commit/f65d11fd028a8eea5478e2fd6dd634fdbdb9d9a1
+
+Run from the fix checkout with Python3.12.10. The targeted test failed before moving the assignment and passed afterward; the two suites passed24 tests after the fix:
+
+```powershell
+& 'C:\actions-runner\toolchains\python-3.12.10\python.exe' -m pytest catalog/mtconnect_recorder/tests/test_recorder_publication_store_failure.py::test_capability_reconciliation_retries_before_publication_on_same_client -q
+& 'C:\actions-runner\toolchains\python-3.12.10\python.exe' -m pytest catalog/mtconnect_recorder/tests/test_recorder_publication_store_failure.py catalog/mtconnect_recorder/tests/test_multi_recorder_capability_identity.py -o 'addopts=' -q
+```
+
+The local coordinator fixtures inject one ordinary response timeout. The same client remains connected; no live endpoint or machine fault is involved. The assertion requires legacy UNAVAILABLE, scoped READY and one successfully published evidence batch before accepting recovery.
 
 ## Rotation protocol
 
