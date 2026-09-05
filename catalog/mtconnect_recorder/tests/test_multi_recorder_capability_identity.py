@@ -63,6 +63,30 @@ SESSION_ID = "session-recorders"
 # --- real rig ---------------------------------------------------------------
 
 
+def _copy_node_state(source: Path, destination: Path) -> None:
+    """Copy a node state database as a whole, WAL sidecar included.
+
+    ``node_state.sqlite3`` runs in WAL mode, so its committed state is split
+    between the database file and its ``-wal`` sidecar. Copying the database
+    file alone leaves the destination's own sidecar in place, and the reopened
+    database is then a mixture of the two: the event log can hold revisions the
+    session watermark does not. The node's replay check refuses that -- rightly
+    -- with ``invalid-replay-completion``, so a partial copy tests the refusal
+    rather than the restore this scenario is about. Move the whole set, and drop
+    the destination's stale shared-memory index so it is rebuilt from the copied
+    WAL rather than from the replaced one.
+    """
+
+    for suffix in ("", "-wal"):
+        origin = Path(str(source) + suffix)
+        target = Path(str(destination) + suffix)
+        target.unlink(missing_ok=True)
+        if origin.exists():
+            shutil.copy(origin, target)
+    Path(str(destination) + "-shm").unlink(missing_ok=True)
+
+
+
 @dataclass
 class Recorder:
     """One physical recorder host: its own state directory and identity."""
@@ -748,7 +772,7 @@ def test_local_state_restored_from_a_stale_backup_reconverges(
             database = nitro.state_directory / "node_state.sqlite3"
             backup = tmp_path / "nitro-node-state.backup"
             await nitro.close()
-            shutil.copy(database, backup)
+            _copy_node_state(database, backup)
 
             # Move on: the node converges to the scoped identity.
             nitro.runtime = _runtime(nitro.state_directory, nitro.name)
@@ -763,7 +787,7 @@ def test_local_state_restored_from_a_stale_backup_reconverges(
 
             # Now restore the pre-migration backup over the live state.
             await nitro.close()
-            shutil.copy(backup, database)
+            _copy_node_state(backup, database)
             nitro.runtime = _runtime(nitro.state_directory, nitro.name)
             nitro.node.runtime = nitro.runtime
             await nitro.connect()
