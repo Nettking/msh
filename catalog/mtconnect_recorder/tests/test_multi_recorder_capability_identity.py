@@ -22,7 +22,6 @@ durable capability rows asserted here are the rows a physical rig would hold.
 from __future__ import annotations
 
 import asyncio
-import shutil
 import sqlite3
 import threading
 from dataclasses import dataclass
@@ -64,7 +63,7 @@ SESSION_ID = "session-recorders"
 
 
 def _copy_node_state(source: Path, destination: Path) -> None:
-    """Copy a node state database as a whole, WAL sidecar included.
+    """Copy a node state database through SQLite rather than around it.
 
     ``node_state.sqlite3`` runs in WAL mode, so its committed state is split
     between the database file and its ``-wal`` sidecar. Copying the database
@@ -72,18 +71,23 @@ def _copy_node_state(source: Path, destination: Path) -> None:
     database is then a mixture of the two: the event log can hold revisions the
     session watermark does not. The node's replay check refuses that -- rightly
     -- with ``invalid-replay-completion``, so a partial copy tests the refusal
-    rather than the restore this scenario is about. Move the whole set, and drop
-    the destination's stale shared-memory index so it is rebuilt from the copied
-    WAL rather than from the replaced one.
+    rather than the restore this scenario is about.
+
+    The online backup API reads a consistent snapshot and writes it through the
+    destination's own connection, so both ends stay coherent and no sidecar has
+    to be removed by hand -- which Windows refuses for as long as any handle is
+    still open on the file.
     """
 
-    for suffix in ("", "-wal"):
-        origin = Path(str(source) + suffix)
-        target = Path(str(destination) + suffix)
-        target.unlink(missing_ok=True)
-        if origin.exists():
-            shutil.copy(origin, target)
-    Path(str(destination) + "-shm").unlink(missing_ok=True)
+    origin = sqlite3.connect(source)
+    try:
+        target = sqlite3.connect(destination)
+        try:
+            origin.backup(target)
+        finally:
+            target.close()
+    finally:
+        origin.close()
 
 
 
