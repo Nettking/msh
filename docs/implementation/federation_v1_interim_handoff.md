@@ -87,6 +87,32 @@ was cancelled by its own 30-minute budget mid-suite, and the containerised suite
 left root-owned files in the bind-mounted workspace so the next job's checkout
 failed with `EACCES`. Both fixed in the wrapper.
 
+### Open external blocker: GitHub Actions billing
+
+Every **hosted**-runner check in this repository fails without starting. All 18
+on PR #435 and all of PR #436's failed 2-5 seconds in with no runner assigned
+and no steps recorded, each carrying GitHub's own annotation:
+
+> The job was not started because recent account payments have failed or your
+> spending limit needs to be increased. Please check the 'Billing & plans'
+> section in your settings
+
+Classification: **(C) infrastructure**, account level, outside the repository.
+Nothing in the code or the workflows can clear it, and the official release
+gate on `federation-v1-release.yml` cannot produce a green result until it is
+resolved. PR #436 changes three Markdown files and is red in exactly the same
+way, which is the cleanest proof the cause is not content.
+
+**Consequence for the merge decision.** If branch protection requires any of
+those hosted checks, PR #435 cannot merge while the block stands, however green
+the self-hosted gate is. Astra should check the required-checks list against
+what the self-hosted gate actually produces before planning the merge. Resolving
+Actions billing on the account is the only unblock.
+
+No workflow triggers were narrowed to route around this. Making a docs-only PR
+look green by reducing the official release scope would be exactly the kind of
+gate weakening the interim brief rules out.
+
 ## 9. Focused and repeated test evidence
 
 | Check | Result |
@@ -234,12 +260,17 @@ For Astra to approve or reject. Nothing below has been done.
 
 ## 16. Exact next recommended action for Astra
 
-1. Read the verdict of run 33960401244. If green, verify that the head it
+1. **Resolve GitHub Actions billing.** It blocks every hosted check on both
+   PRs and is the one blocker no engineering work can clear. See the section
+   above.
+2. Read the verdict of run 33960401244. If green, verify that the head it
    validated is still `f0434e4a4fd4cf86b3574563151d1e6241b4e06c` and that PR
-   #435's head has not moved, then take the merge decision.
-2. Before any physical step, run the rig baseline workflow against Nitro and
+   #435's head has not moved, then take the merge decision -- checking first
+   whether branch protection requires any hosted check that cannot currently
+   run.
+3. Before any physical step, run the rig baseline workflow against Nitro and
    obtain an MSH Recorder inventory from a session that holds SSH credentials.
-3. Treat Nettking's stuck `connecting` node with its cached `recorder-local`
+4. Treat Nettking's stuck `connecting` node with its cached `recorder-local`
    as the first physical acceptance case, not as an incident to clear by hand.
 
 ## Boundaries observed
