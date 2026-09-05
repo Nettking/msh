@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  VALIDATED_SHA: b2a7c6e5fb68bc4d4dbbb57322ca496feb1438a9
+  VALIDATED_SHA: f0434e4a4fd4cf86b3574563151d1e6241b4e06c
 
 jobs:
   release-linux:
