@@ -67,7 +67,7 @@ jobs:
           docker run --rm "${IMAGE}" python -c "import sys; print('  container python', sys.version.split()[0])"
 
   targeted-beast:
-    name: "Beast-Linux: the five Nitro failures, 20 repeats"
+    name: "Beast-Linux: the five Nitro failures, 20 repeats (confirmatory)"
     runs-on: beast-linux
     needs: smoke-beast
     timeout-minutes: 90
@@ -115,7 +115,7 @@ jobs:
             '
 
   full-beast:
-    name: "Beast-Linux: full candidate suite"
+    name: "Beast-Linux: full candidate suite (confirmatory)"
     runs-on: beast-linux
     needs: targeted-beast
     timeout-minutes: 180
@@ -177,11 +177,12 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "${CANDIDATE_SHA}"
           echo "HEAD verified: ${CANDIDATE_SHA}"
-      - uses: actions/setup-go@v5
       - name: Storage and host-resource preconditions
+        if: always()
         shell: bash
         run: python3 scripts/ci_release_disk_preflight.py "${GITHUB_WORKSPACE}" /tmp
       - name: Compile, manifest, ruff and branding in the release container
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
@@ -199,15 +200,20 @@ jobs:
               python scripts/check_product_branding.py
             '
       - name: Go direct peer sidecar tests
+        if: always()
         shell: bash
-        working-directory: cmd/fcp-peer-sidecar
         run: |
-          go mod tidy
-          go test ./...
+          set -euo pipefail
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}:/workspace" \
+            -w /workspace/cmd/fcp-peer-sidecar \
+            golang:1.25.7 bash -lc 'go mod tidy && go test ./...'
       - name: Validate Compose configuration
+        if: always()
         shell: bash
         run: docker compose config --quiet
       - name: Diff hygiene
+        if: always()
         shell: bash
         run: git diff --check HEAD^ HEAD
       - name: Return workspace ownership to the runner account
@@ -218,9 +224,9 @@ jobs:
             chown -R "$(id -u):$(id -g)" /ws
 
   targeted-nettking:
-    name: "Nettking-Linux: independent targeted control, 20 repeats"
+    name: "Nettking-Linux: the five Nitro failures, 20 repeats"
     runs-on: nettking-linux
-    needs: static-nettking
+    needs: smoke-nettking-linux
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
@@ -260,3 +266,60 @@ jobs:
               echo "TARGETED_REPEATS: $fails of 20 failed"
               exit $fails
             '
+
+  full-nettking:
+    name: "Nettking-Linux: full candidate suite"
+    runs-on: nettking-linux
+    needs: targeted-nettking
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ba8a3b0b828f59c36c5aaaf6130480a2432a5578
+      - name: Verify exact candidate SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${CANDIDATE_SHA}"
+          echo "HEAD verified: ${CANDIDATE_SHA}"
+      - name: Host state before the suite
+        shell: bash
+        run: |
+          echo "cpus $(nproc)"; free -h | sed -n '2p'; df -h / | tail -1
+      - name: Storage precondition
+        shell: bash
+        run: python3 scripts/ci_release_disk_preflight.py "${GITHUB_WORKSPACE}" /tmp
+      - name: Full suite, default order
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --network host \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "${GITHUB_WORKSPACE}:/workspace" \
+            -e PYTHONPYCACHEPREFIX=/tmp/pycache \
+            -w /workspace "${IMAGE}" bash -lc '
+              set -euo pipefail
+              python --version
+              python -m pip install --quiet --upgrade pip==26.2.1
+              python -m pip install --quiet -r requirements.txt -c constraints-release.txt
+              python -m pip install --quiet pytest==9.1.1 -c constraints-release.txt
+              python -m pytest -o addopts= -o cache_dir=/tmp/pytest_cache -p no:randomly -v --durations=50
+            '
+      - name: Host state after the suite
+        if: always()
+        shell: bash
+        run: |
+          echo "cpus $(nproc)"; free -h | sed -n '2p'; df -h / | tail -1
+      - name: Return workspace ownership to the runner account
+        if: always()
+        shell: bash
+        run: |
+          docker run --rm -v "${GITHUB_WORKSPACE}:/ws" "${IMAGE}" \
+            chown -R "$(id -u):$(id -g)" /ws
+      - name: Repository stays clean after the suite
+        if: always()
+        shell: bash
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Working tree modified by the test suite:"; git status --porcelain; exit 1
+          fi
