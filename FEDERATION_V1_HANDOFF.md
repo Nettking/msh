@@ -161,7 +161,11 @@ Run from the fix checkout with Python3.12.10. The targeted test failed before mo
 
 The local coordinator fixtures inject one ordinary response timeout. The same client remains connected; no live endpoint or machine fault is involved. The assertion requires legacy UNAVAILABLE, scoped READY and one successfully published evidence batch before accepting recovery.
 
-LAST_UPDATED_UTC: 2026-09-05T18:55:00Z
+LAST_UPDATED_UTC: 2026-09-05T18:51:36Z
+
+## Candidate/main timeout isolation
+
+Run339750 clean-checkout failure isolation: the four named tests passed together on ba8a3b0 under `C:\actions-runner\toolchains\python-3.12.10\python.exe` (4 passed in 5.97s) and passed together on unchanged main6101c86 (4 passed in 6.40s). This is evidence against a deterministic PR435 regression, but it does not erase the real Nitro randomized-run failure; host-stall/intermittent timeout remains the classification pending the Linux leg and any targeted Nitro reproduction.
 
 ## Rotation protocol
 
