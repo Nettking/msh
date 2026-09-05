@@ -74,7 +74,7 @@ Executed by Claude under operator instruction, 2026-09-05T21:45Z-22:03Z.
 ACTING_ENGINEER in this file remains Astra and is untouched; this section
 reports. Astra holds the release, merge and physical-acceptance decisions.
 
-    FAST_LINUX_VALIDATION:   PASS
+    FAST_LINUX_VALIDATION:   PASS, on two consecutive clean full-suite runs
     FAST_WINDOWS_VALIDATION: PASS on the existing self-hosted Windows gate;
                              INCOMPLETE on Beast-Windows (host has no Python)
     NITRO_SLOW_HOST_STRESS:  RUNNING
@@ -90,7 +90,18 @@ HARNESS: ci/fast-linux-validation at e81bf4d5, run 33994338144; ci/fast-windows-
 | Release static checks 101382063256 | **PASS, every step** | 90 s |
 | Targeted repeats of the five Nitro failures 101381346930 | **0 of 20 failed** | 107 s |
 | Targeted repeats, second independent run 101382063264 | **0 of 20 failed** | 112 s |
-| **Full candidate suite, default order 101382542624** | **3633 passed, 30 skipped, 452 warnings** | **288.01 s (4:48)** |
+| **Full candidate suite, run 1, 101382542624** | **3633 passed, 30 skipped, 452 warnings** | **288.01 s (4:48)** |
+| Targeted repeats, third independent run 101383799720 | **0 of 20 failed** | 100 s |
+| Release static checks, second run 101383799758 | **PASS, every step** | 82 s |
+| **Full candidate suite, run 2, 101384040044** | **3633 passed, 30 skipped, 454 warnings** | **286.27 s (4:46)** |
+
+TWO CONSECUTIVE CLEAN FULL-SUITE PASSES on the exact frozen candidate, from
+independent runs (33994338144 and 33994962383, the second dispatched rather than
+pushed so the harness commit e81bf4d5 is identical across both). Identical
+counts, 3633 passed / 30 skipped, and both left the tree clean. Three
+independent targeted runs, 0 of 20 each. Two independent full static passes.
+That is the two-consecutive-pass criterion met, at ten minutes rather than the
+several hours the same evidence would have cost on Nitro.
 
 The static set is the gate's own: storage/host-resource precondition, compileall
 over catalog, the acceptance-manifest assertions, ruff across its exact 46-path
