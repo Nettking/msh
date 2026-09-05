@@ -113,6 +113,32 @@ No workflow triggers were narrowed to route around this. Making a docs-only PR
 look green by reducing the official release scope would be exactly the kind of
 gate weakening the interim brief rules out.
 
+### Why the Linux suite takes ~175 minutes on Nitro
+
+Worth knowing before anyone reads the runtime as a hang. The rate is wildly
+uneven: 72-test chunks took 19.3, 14.0 and 14.0 minutes early on and under a
+second later. Mapping those chunks onto collection order, the slow ones are
+dominated by durable-SQLite work —
+`catalog/capabilities/tests/test_analysis_scheduling.py`,
+`test_analysis_workspace_reconciliation.py`, the `test_efficiency_*` stores,
+`test_durable_sqlite_resource_admission.py`, and the
+`cf7_acceptance/test_physical_*` set.
+
+Those tests write SQLite under `tmp_path`, which inside the release container
+is `/tmp`. The preflight in the same job reports `/workspace` on `device:2050`
+(the bind-mounted host filesystem) but `/tmp` on `device:139` — the container's
+own overlay layer. Fsync-heavy SQLite on overlayfs is slow in exactly this
+shape, and the same suite takes about 3.5 minutes on a host running it against
+native ext4.
+
+**Not changed, deliberately.** The obvious lever — giving the container a
+tmpfs or host-backed `/tmp` — would alter what `shutil.disk_usage` reports for
+the volume behind `tmp_path`, and that is precisely the number the storage
+allocation floor is derived from. Changing it risks turning the storage tests
+into a different test. `--durations=25` is now enabled on those runs, so the
+next completed run will name the slow tests directly rather than leaving this
+inferred from chunk timings.
+
 ### Open: an unnamed failure in the Linux full suite
 
 Run 33960401244's Linux job was **cancelled at its 120-minute budget** having
