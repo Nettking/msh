@@ -1,10 +1,10 @@
 """Recorder capability identity must converge from authoritative state.
 
 The physical rig ran three hosts on one candidate build. Nitro owned the
-capability ID ``recorder-local`` and the separately paired MSH recorder
-announced the same fixed ID, so the coordinator rejected every MSH
-announcement with ``capability-identity-conflict`` -- thousands of them --
-while the pairing itself was valid and connected.
+capability ID ``recorder-local`` and a second, separately paired recorder host
+announced the same fixed ID, so the coordinator rejected every announcement
+from that second host with ``capability-identity-conflict`` -- thousands of
+them -- while the pairing itself was valid and connected.
 
 ``fcp.capability.v1`` states the invariant these tests hold the product to:
 ``(session_id, capability_id)`` is unique, while *several nodes may announce
@@ -334,7 +334,7 @@ def test_a_fixed_recorder_id_is_what_the_coordinator_rejected(tmp_path: Path) ->
         try:
             rig.create_session(tmp_path / "owner")
             nitro = _recorder(rig, "Nitro")
-            msh = _recorder(rig, "MSH")
+            second = _recorder(rig, "Second")
             rig.seed_capability(
                 node_id=nitro.node_id,
                 capability_id=LEGACY_RECORDER_CAPABILITY_ID,
@@ -342,7 +342,7 @@ def test_a_fixed_recorder_id_is_what_the_coordinator_rejected(tmp_path: Path) ->
 
             with pytest.raises(Exception) as conflict:
                 rig.seed_capability(
-                    node_id=msh.node_id,
+                    node_id=second.node_id,
                     capability_id=LEGACY_RECORDER_CAPABILITY_ID,
                 )
 
@@ -360,15 +360,15 @@ def test_clean_federation_accepts_two_recorders(tmp_path: Path) -> None:
         try:
             rig.create_session(tmp_path / "owner")
             nitro = _recorder(rig, "Nitro", sources=("machine-1",))
-            msh = _recorder(rig, "MSH", sources=("machine-2",))
-            for recorder in (nitro, msh):
+            second = _recorder(rig, "Second", sources=("machine-2",))
+            for recorder in (nitro, second):
                 await recorder.connect()
                 await recorder.announce()
 
             rows = rig.rows()
-            assert set(rows) == {nitro.scoped_id, msh.scoped_id}
+            assert set(rows) == {nitro.scoped_id, second.scoped_id}
             assert rows[nitro.scoped_id]["node_id"] == nitro.node_id
-            assert rows[msh.scoped_id]["node_id"] == msh.node_id
+            assert rows[second.scoped_id]["node_id"] == second.node_id
             assert all(
                 row["status"] == CapabilityStatus.READY.value
                 for row in rows.values()
@@ -495,11 +495,11 @@ def test_case_3_local_ownership_disagreement_still_converges(
         try:
             rig.create_session(tmp_path / "owner")
             nitro = _recorder(rig, "Nitro")
-            msh = _recorder(rig, "MSH", sources=("machine-2",))
+            second = _recorder(rig, "Second", sources=("machine-2",))
 
-            # MSH legitimately owns the legacy ID at the coordinator.
+            # The second host legitimately owns the legacy ID at the coordinator.
             rig.seed_capability(
-                node_id=msh.node_id,
+                node_id=second.node_id,
                 capability_id=LEGACY_RECORDER_CAPABILITY_ID,
                 source_names=("machine-2",),
             )
@@ -527,7 +527,7 @@ def test_case_3_local_ownership_disagreement_still_converges(
             await nitro.announce()
 
             rows = rig.rows()
-            assert rows[LEGACY_RECORDER_CAPABILITY_ID]["node_id"] == msh.node_id
+            assert rows[LEGACY_RECORDER_CAPABILITY_ID]["node_id"] == second.node_id
             assert rows[nitro.scoped_id]["node_id"] == nitro.node_id
             assert LEGACY_RECORDER_CAPABILITY_ID not in nitro.local_capability_ids()
         finally:
@@ -577,14 +577,14 @@ def test_another_nodes_legacy_row_is_never_taken_over(tmp_path: Path) -> None:
         try:
             rig.create_session(tmp_path / "owner")
             nitro = _recorder(rig, "Nitro")
-            msh = _recorder(rig, "MSH", sources=("machine-2",))
+            second = _recorder(rig, "Second", sources=("machine-2",))
             rig.seed_capability(
                 node_id=nitro.node_id,
                 capability_id=LEGACY_RECORDER_CAPABILITY_ID,
             )
 
-            await msh.connect()
-            await msh.announce()
+            await second.connect()
+            await second.announce()
 
             rows = rig.rows()
             assert rows[LEGACY_RECORDER_CAPABILITY_ID]["node_id"] == nitro.node_id
@@ -592,7 +592,7 @@ def test_another_nodes_legacy_row_is_never_taken_over(tmp_path: Path) -> None:
                 rows[LEGACY_RECORDER_CAPABILITY_ID]["status"]
                 == CapabilityStatus.READY.value
             )
-            assert rows[msh.scoped_id]["node_id"] == msh.node_id
+            assert rows[second.scoped_id]["node_id"] == second.node_id
         finally:
             await rig.stop()
 
@@ -613,24 +613,24 @@ def test_convergence_is_stable_across_reconnect_and_restarts(
         try:
             rig.create_session(tmp_path / "owner")
             nitro = _recorder(rig, "Nitro")
-            msh = _recorder(rig, "MSH", sources=("machine-2",))
+            second = _recorder(rig, "Second", sources=("machine-2",))
             rig.seed_capability(
                 node_id=nitro.node_id,
                 capability_id=LEGACY_RECORDER_CAPABILITY_ID,
             )
-            for recorder in (nitro, msh):
+            for recorder in (nitro, second):
                 await recorder.connect()
                 await recorder.announce()
             converged = set(rig.rows())
 
             for _ in range(3):
-                for recorder in (nitro, msh):
+                for recorder in (nitro, second):
                     await recorder.reconnect()
                     await recorder.announce()
             assert set(rig.rows()) == converged
 
             # Recorder restart: a brand new runtime over the same durable state.
-            for recorder in (nitro, msh):
+            for recorder in (nitro, second):
                 await recorder.close()
                 recorder.runtime = _runtime(recorder.state_directory, recorder.name)
                 recorder.node.runtime = recorder.runtime
@@ -639,13 +639,13 @@ def test_convergence_is_stable_across_reconnect_and_restarts(
             assert set(rig.rows()) == converged
 
             await rig.restart_coordinator()
-            for recorder in (nitro, msh):
+            for recorder in (nitro, second):
                 await recorder.connect()
                 await recorder.announce()
             assert set(rig.rows()) == converged
             assert set(rig.ready_rows()) == {
                 LEGACY_RECORDER_CAPABILITY_ID,
-                msh.scoped_id,
+                second.scoped_id,
             }
         finally:
             await rig.stop()
@@ -662,16 +662,16 @@ def test_no_conflict_retry_loop_after_convergence(tmp_path: Path) -> None:
         try:
             rig.create_session(tmp_path / "owner")
             nitro = _recorder(rig, "Nitro")
-            msh = _recorder(rig, "MSH", sources=("machine-2",))
+            second = _recorder(rig, "Second", sources=("machine-2",))
             rig.seed_capability(
                 node_id=nitro.node_id,
                 capability_id=LEGACY_RECORDER_CAPABILITY_ID,
             )
-            for recorder in (nitro, msh):
+            for recorder in (nitro, second):
                 await recorder.connect()
 
             for _ in range(25):
-                for recorder in (nitro, msh):
+                for recorder in (nitro, second):
                     await recorder.announce()
 
             rows = rig.rows()
@@ -690,13 +690,13 @@ def test_both_recorders_remain_independently_targetable(tmp_path: Path) -> None:
         try:
             rig.create_session(tmp_path / "owner")
             nitro = _recorder(rig, "Nitro", sources=("machine-1",))
-            msh = _recorder(rig, "MSH", sources=("machine-2",))
+            second = _recorder(rig, "Second", sources=("machine-2",))
             rig.seed_capability(
                 node_id=nitro.node_id,
                 capability_id=LEGACY_RECORDER_CAPABILITY_ID,
                 source_names=("machine-1",),
             )
-            for recorder in (nitro, msh):
+            for recorder in (nitro, second):
                 await recorder.connect()
                 await recorder.announce()
 
@@ -704,9 +704,9 @@ def test_both_recorders_remain_independently_targetable(tmp_path: Path) -> None:
             status = rig.coordinator.status(actor_node_id=rig.owner_node_id)
             recorders = FederationRecorderControlService._recorders(status)
 
-            assert set(recorders) == {nitro.node_id, msh.node_id}
+            assert set(recorders) == {nitro.node_id, second.node_id}
             assert recorders[nitro.node_id]["source_names"] == ["machine-1"]
-            assert recorders[msh.node_id]["source_names"] == ["machine-2"]
+            assert recorders[second.node_id]["source_names"] == ["machine-2"]
         finally:
             await rig.stop()
 
