@@ -13,9 +13,9 @@ Last updated: 2026-09-05, during self-hosted validation run 33960401244.
 | main | `6101c86d94294c70db47d1a8053cac93b9a41356` |
 | PR #435 head | `f0434e4a4fd4cf86b3574563151d1e6241b4e06c` |
 | PR #435 branch | `claude/federation-recorder-capability-id-19tqkk` |
-| Validation branch | `ci/self-hosted-pr435` @ `87310dfdbaa33665957589046140b9714a617cdf` |
+| Validation branch | `ci/self-hosted-pr435` @ `dc160d63960a2b65618e06fed3e9ef54d5009fff` |
 | `VALIDATED_SHA` in that workflow | `f0434e4a4fd4cf86b3574563151d1e6241b4e06c` (matches the PR head) |
-| Latest validation run | [33960401244](https://github.com/Nettking/msh/actions/runs/33960401244) |
+| Latest validation run | [33971811540](https://github.com/Nettking/msh/actions/runs/33971811540) (supersedes 33960401244) |
 | Diagnosis branch / PR | `claude/pr435-validation-diagnosis-n285av`, PR #436 (docs only) |
 | Rig baseline branch | `ci/rig-readonly-baseline` |
 
@@ -48,7 +48,7 @@ and two follow-ups.
 | Job | Result |
 | --- | --- |
 | Release matrix (Windows) | **success** — all 16 steps |
-| Release matrix (Linux) | running: full pytest in Docker under 3.12.13 |
+| Release matrix (Linux) | **cancelled at its timeout**, 64% through, with one unnamed failure — see below |
 | Clean-checkout suite order independence | queued behind Nitro |
 | PostgreSQL storage release check | queued behind Nitro |
 | Federation v1 automated release verdict | not yet reached |
@@ -112,6 +112,54 @@ Actions billing on the account is the only unblock.
 No workflow triggers were narrowed to route around this. Making a docs-only PR
 look green by reducing the official release scope would be exactly the kind of
 gate weakening the interim brief rules out.
+
+### Open: an unnamed failure in the Linux full suite
+
+Run 33960401244's Linux job was **cancelled at its 120-minute budget** having
+reached 64% of the suite, and its progress output contains **exactly one `F`,
+at about 60%**. Because the job ran under `-q` and was cancelled before pytest
+printed a summary, that failure was never named. This is a real open item, not
+a resolved one.
+
+What is established:
+
+* The suite was **progressing, not hung** — progress lines continued right up
+  to the cancellation.
+* Nitro is far slower than the extrapolation the timeout was based on. 72-test
+  chunks took **19.3, 14.0 and 14.0 minutes** early on and under a second
+  later. One full suite is about **175 minutes**, not the 52 previously
+  assumed.
+* The failure is **not in the Windows subset** — that job passed 367/1 skipped
+  — so only the Linux full suite exercises it.
+
+What is *not* established: which test it is. By index the `F` is the 2162nd
+test in collection order, which locally is
+`catalog/flask_app/tests/test_federation_pairing_relay.py::test_signed_pairing_code_projects_same_members_from_both_viewpoints`.
+Treat that as a **candidate, not an identification**: Nitro collected roughly
+3667-3712 tests against 3662 locally, so the index can drift by up to ~50, and
+the whole neighbourhood is `catalog/flask_app/tests/test_federation_*`.
+
+The candidate is at least plausible. It starts a real `RelayServer` with hard
+five-second `auth_timeout_seconds`, `send_timeout_seconds` and
+`timeout_seconds`, and five seconds is a short budget on a machine where 72
+tests can take 19 minutes. But it did not reproduce locally: **50 runs clean**
+at the PR head (30 plain, 20 more with attempted CPU load).
+
+Classification so far: **not PR 435**. The PR's diff is six files, and the
+only one on this test's dependency path is `catalog/node/client.py`, whose
+change runs solely inside the cached-capability replay loop on a
+`capability-identity-conflict` — a path this test does not exercise. Whether
+it is (D) pre-existing on main or (E) load-sensitive cannot be settled until
+the test is named.
+
+**How it gets named.** `ci/self-hosted-pr435` @ `dc160d6` raises the Linux
+budgets to the measured rate (300 minutes for the full suite, 420 for the two
+shuffled ones) and switches those runs from `-q` to `-v --durations=25`. `-v`
+names each test as it runs, so even a cancelled run says what failed, and the
+durations report gives the evidence for the 175-minute runtime. Scope,
+selection and thresholds are unchanged. Run
+[33971811540](https://github.com/Nettking/msh/actions/runs/33971811540) is the
+first under those settings.
 
 ## 9. Focused and repeated test evidence
 
