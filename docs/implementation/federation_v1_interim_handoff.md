@@ -153,7 +153,7 @@ from the engineering environment. Nothing was started, stopped or reconfigured.
 | --- | --- |
 | hostname | `Nettking` |
 | rig checkout `C:\wsl\msh` | branch `main` @ `6101c86…` — **clean, pre-PR-435** |
-| other checkouts | `C:\wsl\msh-archive-20260903-2145`, `C:\wsl\msh-new` |
+| sibling directories | `C:\wsl\msh-archive-20260903-2145` and `C:\wsl\msh-new`, **neither a git checkout** — each holds only `data/` and `results/` |
 | `C:\msh\git` | absent (that path belongs to MSH Recorder) |
 | ports 5000, 8765 | bound on `127.0.0.1` **and `100.70.61.68`** by `com.docker.backend.exe` (pid 2500) |
 | port 11434 | `ollama.exe` (pid 19704), `wslrelay.exe` (pid 7756) |
@@ -230,8 +230,8 @@ a genuine physical finding rather than a repeat of the known blocker.
 | Instance | Classification |
 | --- | --- |
 | `C:\wsl\msh` @ main `6101c86`, running behind Docker on 5000/8765 | **CURRENT baseline** — the accepted pre-PR-435 build, not a candidate |
-| `C:\wsl\msh-archive-20260903-2145` | **LEGACY** — archived 2026-09-03 |
-| `C:\wsl\msh-new` | **UNKNOWN** — not inspected; contents and purpose unverified |
+| `C:\wsl\msh-archive-20260903-2145` | **LEGACY state archive** — `data/` and `results/` only, no code, dated 2026-09-03 |
+| `C:\wsl\msh-new` | **UNKNOWN, state-shaped** — also `data/` and `results/` only, no code |
 | standalone analysis coordinator in `results/capabilities` | **LEGACY** — separate session, disconnected |
 | ollama / wslrelay on 11434 | supporting services, not FCP nodes |
 | Nitro rig `/home/martin/fcp` | **UNKNOWN** — not yet inventoried |
@@ -244,9 +244,14 @@ For Astra to approve or reject. Nothing below has been done.
 1. Finish the software gate and confirm the verdict is green on `f0434e4`.
 2. Inventory Nitro and MSH Recorder read-only, including
    `C:\wsl\msh-new` on Nettking, before touching anything.
-3. Decide the fate of `msh-archive-20260903-2145` and `msh-new`. Do not delete
-   either until the physical test has passed — the archive is the only rollback
-   artefact on that machine.
+3. Decide the fate of `msh-archive-20260903-2145` and `msh-new`. Neither is a
+   checkout: both hold only `data/` and `results/`, so what they carry is
+   state, not code. The code rollback is trivial — `C:\wsl\msh` is git, on
+   `main` @ `6101c86`, clean — but that archive may be the only copy of the
+   pre-2026-09-03 rig state, which cannot be regenerated. Do not delete either
+   until the physical test has passed. `msh-new` is unexplained and worth
+   understanding before deployment: a candidate pointed at it would start
+   against those directories rather than the live ones.
 4. Deploy the candidate to a **new** checkout per host rather than over the
    running one, so the pre-PR-435 stack remains the rollback.
 5. Stop the old stack per host only at deployment time, in the order
