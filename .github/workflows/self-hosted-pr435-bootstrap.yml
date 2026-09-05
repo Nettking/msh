@@ -1,0 +1,51 @@
+name: PR 435 self-hosted bootstrap check
+
+on:
+  push:
+    branches:
+      - ci/self-hosted-pr435
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  VALIDATED_SHA: 13967aea9f4561cea64b5427bdf572de823ec577
+
+jobs:
+  linux-bootstrap:
+    name: Linux bootstrap (Nitro)
+    runs-on: fcp-linux
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.VALIDATED_SHA }}
+      - name: Verify candidate SHA
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "${VALIDATED_SHA}"
+      - name: Verify exact Python in Docker
+        shell: bash
+        run: |
+          docker run --rm python:3.12.13-bookworm python --version
+          docker run --rm python:3.12.13-bookworm python -c "import platform; print(platform.machine())"
+
+  windows-bootstrap:
+    name: Windows bootstrap (Nettking)
+    runs-on: fcp-windows
+    timeout-minutes: 10
+    env:
+      PSExecutionPolicyPreference: Bypass
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.VALIDATED_SHA }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12.10"
+          cache: pip
+      - name: Verify candidate SHA and Python
+        shell: pwsh
+        run: |
+          if ((git rev-parse HEAD) -ne $env:VALIDATED_SHA) { throw "candidate SHA mismatch" }
+          python --version
