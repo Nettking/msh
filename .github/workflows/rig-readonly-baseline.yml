@@ -306,3 +306,110 @@ jobs:
           where ssh
           echo === probe (BatchMode, no interactive auth) ===
           ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new martin@msh-recorder.tail4ccd2b.ts.net "hostname && uname -a || ver"
+
+      # The job log is only readable from its tail through the API available
+      # here, and the SQLite dump above is long, so restate the facts that
+      # matter in one compact block at the end.
+      - name: Baseline summary
+        shell: python
+        if: always()
+        run: |
+          import csv
+          import io
+          import json
+          import re
+          import shutil
+          import sqlite3
+          import subprocess
+          from pathlib import Path
+
+          GIB = 1024 ** 3
+
+          def run(args):
+              try:
+                  return subprocess.run(
+                      args, capture_output=True, text=True, timeout=120
+                  ).stdout
+              except Exception:  # noqa: BLE001
+                  return ""
+
+          print("================ RIG BASELINE SUMMARY: NETTKING ================")
+          print(f"hostname            : {run(['hostname']).strip()}")
+          usage = shutil.disk_usage("C:/")
+          print(
+              f"C: volume           : {usage.free / GIB:.2f} GiB free of "
+              f"{usage.total / GIB:.2f} GiB"
+          )
+
+          images = {}
+          for row in csv.reader(io.StringIO(run(["tasklist", "/fo", "csv", "/nh"]))):
+              if len(row) >= 2:
+                  images[row[1]] = row[0]
+          print("product ports       :")
+          for line in run(["netstat", "-ano"]).splitlines():
+              parts = line.split()
+              if len(parts) < 5 or parts[0] != "TCP" or parts[3] != "LISTENING":
+                  continue
+              if parts[1].rsplit(":", 1)[-1] not in {"5000", "8765", "11434"}:
+                  continue
+              print(f"    {parts[1]:28s} pid={parts[4]:7s} {images.get(parts[4], '?')}")
+
+          print("checkouts           :")
+          for repo in (Path(r"C:\wsl\msh"), Path(r"C:\msh\git")):
+              if not (repo / ".git").exists():
+                  print(f"    {repo}: absent / not a checkout")
+                  continue
+              head = run(["git", "-c", "safe.directory=*", "-C", str(repo),
+                          "rev-parse", "HEAD"]).strip()
+              branch = run(["git", "-c", "safe.directory=*", "-C", str(repo),
+                            "rev-parse", "--abbrev-ref", "HEAD"]).strip()
+              dirty = run(["git", "-c", "safe.directory=*", "-C", str(repo),
+                           "status", "--porcelain"]).strip()
+              print(f"    {repo}: {branch} @ {head} "
+                    f"({'clean' if not dirty else 'dirty'})")
+
+          print("msh-shaped dirs     :")
+          for base in (Path("C:/"), Path("C:/msh"), Path("C:/wsl")):
+              if not base.exists():
+                  print(f"    {base}: absent")
+                  continue
+              try:
+                  names = sorted(
+                      d.name for d in base.iterdir()
+                      if d.is_dir()
+                      and re.search(r"msh|fcp|acceptance|candidate", d.name, re.I)
+                  )
+              except OSError as error:
+                  names = [f"<unreadable {error}>"]
+              print(f"    {base}: {names}")
+
+          device = Path(r"C:\wsl\msh\data\federation\device\node_state.sqlite3")
+          print("device node state   :")
+          if not device.exists():
+              print("    absent")
+          else:
+              connection = sqlite3.connect(
+                  f"file:{device.as_posix()}?mode=ro", uri=True, timeout=5
+              )
+              connection.row_factory = sqlite3.Row
+              try:
+                  runtime = connection.execute("SELECT * FROM node_runtime").fetchone()
+                  print(f"    node_id           : {runtime['node_id']}")
+                  print(f"    enrollment_state  : {runtime['enrollment_state']}")
+                  print(f"    connection_state  : {runtime['connection_state']}")
+                  print(f"    updated_at        : {runtime['updated_at']}")
+                  for row in connection.execute("SELECT * FROM joined_sessions"):
+                      print(f"    session           : {row['session_id']} "
+                            f"({row['membership_state']}, rev "
+                            f"{row['last_applied_revision']})")
+                  print("    cached capabilities:")
+                  for row in connection.execute(
+                      "SELECT capability_id, capability_json FROM advertised_capabilities"
+                  ):
+                      payload = json.loads(row["capability_json"])
+                      print(f"      {row['capability_id']}  "
+                            f"type={payload.get('type')} status={payload.get('status')}")
+              finally:
+                  connection.close()
+          print("===============================================================")
+
