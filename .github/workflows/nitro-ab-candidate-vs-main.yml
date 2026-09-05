@@ -1,0 +1,598 @@
+name: Nitro A/B candidate vs main
+
+# Five tests failed the Federation v1 release gate on Nitro, every one of them
+# on a wall-clock timeout and none with an assertion failure, while the same
+# tests pass on other hosts. Correlation with host I/O is not a root cause. This
+# workflow runs the identical full suite against the frozen candidate and
+# against unmodified main, on the same runner, in the same container, with the
+# same command, and counterbalances the order so that cache warmth, disk state
+# and accumulated host state cannot masquerade as a branch effect.
+#
+# It changes no product code, no test, no timeout and no Federation state.
+
+on:
+  push:
+    branches:
+      - ci/nitro-ab-candidate-vs-main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nitro-ab-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  targeted:
+    name: "Targeted repeat of the five failing tests"
+    runs-on: fcp-linux
+    timeout-minutes: 120
+    steps:
+      - name: Repair workspace ownership before checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm -v "${{ github.workspace }}:/ws" \
+            python:3.12.13-bookworm chown -R "$(id -u):$(id -g)" /ws
+
+      - name: Check out both trees
+        uses: actions/checkout@v4
+        with:
+          ref: 6101c86d94294c70db47d1a8053cac93b9a41356
+          fetch-depth: 0
+          path: repo
+
+      - name: Make the candidate SHA available too
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C repo fetch --no-tags origin ba8a3b0b828f59c36c5aaaf6130480a2432a5578 || true
+          git -C repo cat-file -e ba8a3b0b828f59c36c5aaaf6130480a2432a5578^{commit}
+          git -C repo cat-file -e 6101c86d94294c70db47d1a8053cac93b9a41356^{commit}
+          echo "both commits present"
+
+      - name: Install the A/B harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/ab" "${RUNNER_TEMP}/pipcache"
+          : > "${RUNNER_TEMP}/ab/results.txt"
+
+          cat > "${RUNNER_TEMP}/ab/telemetry.sh" <<'SH'
+          #!/bin/bash
+          # Read-only host telemetry, one sample every 30 seconds. It opens files under
+          # /proc and /sys and runs df, ss and docker ps. It starts, stops, removes,
+          # prunes and reconfigures nothing.
+          while :; do
+            echo "T $(date -u +%H:%M:%S)"
+            echo "  load $(cut -d' ' -f1-3 /proc/loadavg)  procs $(cut -d' ' -f4 /proc/loadavg)"
+            grep -E '^(MemTotal|MemAvailable|SwapTotal|SwapFree|Dirty|Writeback):' /proc/meminfo \
+              | awk '{printf "  %s %s kB\n", $1, $2}'
+            awk '$3 ~ /^(sd|nvme|vd)[a-z]+$/ {printf "  dev %s rd=%s wr=%s inflight=%s io_ms=%s wio_ms=%s\n", $3,$6,$10,$12,$13,$14}' /proc/diskstats
+            df -B1 --output=target,avail /   2>/dev/null | tail -1 | awk '{printf "  df_bytes %s %s\n", $1, $2}'
+            df     --output=target,iavail /  2>/dev/null | tail -1 | awk '{printf "  df_inodes %s %s\n", $1, $2}'
+            echo "  pytest_procs $(pgrep -f 'python -m pytest' 2>/dev/null | wc -l)"
+            echo "  containers_running $(docker ps -q 2>/dev/null | wc -l)"
+            sleep 30
+          done
+          SH
+          chmod +x "${RUNNER_TEMP}/ab/telemetry.sh"
+
+          cat > "${RUNNER_TEMP}/ab/cleanstate.sh" <<'SH'
+          #!/bin/bash
+          # Verify and document host state between phases.
+          #
+          # This script NEVER touches Federation state. It contains no docker stop, rm,
+          # kill, prune or volume command, and it does not write under /home/martin/fcp*.
+          # Everything it removes is scratch this job itself created, and every removal is
+          # printed.
+          label="$1"
+          echo "===== CLEAN STATE CHECK: ${label} ====="
+          echo "--- orphan pytest processes (report only, nothing is killed) ---"
+          pgrep -af 'python -m pytest' || echo "  none"
+          echo "--- containers (report only, nothing is stopped or removed) ---"
+          docker ps -a --format '  {{.Names}}\t{{.Image}}\t{{.Status}}' 2>/dev/null || echo "  docker unavailable"
+          echo "--- listening TCP ports ---"
+          { ss -ltnp 2>/dev/null || netstat -ltnp 2>/dev/null || echo "no socket tool available"; } \
+            | sed 's/^/  /' | head -40
+          echo "--- host test scratch under /tmp ---"
+          ls -d /tmp/pytest-of-* /tmp/pytest_cache 2>/dev/null | sed 's/^/  /' || echo "  none"
+          echo "--- disk and inodes ---"
+          df -h /   | tail -1 | sed 's/^/  /'
+          df -i /   | tail -1 | sed 's/^/  /'
+          echo "--- kernel errors in the last hour (read-only, best effort) ---"
+          (journalctl -k -p err --since '1 hour ago' --no-pager 2>/dev/null | tail -20 \
+            || dmesg --level=err --since '1 hour ago' 2>/dev/null | tail -20 \
+            || echo "  kernel log not readable by this account") | sed 's/^/  /'
+          echo "--- cleaning scratch this job owns ---"
+          if [ -d "${GITHUB_WORKSPACE}/repo" ]; then
+            echo "  git clean -xdff in repo:"
+            git -C "${GITHUB_WORKSPACE}/repo" clean -xdff | sed 's/^/    /' || true
+          fi
+          echo "===== END CLEAN STATE CHECK: ${label} ====="
+          SH
+          chmod +x "${RUNNER_TEMP}/ab/cleanstate.sh"
+
+          cat > "${RUNNER_TEMP}/ab/runphase.sh" <<'SH'
+          #!/bin/bash
+          # Run one A/B phase: check out an exact SHA into the same clone, sample the host
+          # for the whole suite, run the identical command, and record the outcome.
+          set -uo pipefail
+          phase="$1"; sha="$2"; mode="$3"   # mode: full | targeted
+          temp="${RUNNER_TEMP}/ab"
+          
+          "${temp}/cleanstate.sh" "before ${phase}"
+          
+          echo "===== PHASE ${phase}: checking out ${sha} ====="
+          git -C "${GITHUB_WORKSPACE}/repo" checkout --detach "${sha}"
+          git -C "${GITHUB_WORKSPACE}/repo" clean -xdff >/dev/null
+          actual="$(git -C "${GITHUB_WORKSPACE}/repo" rev-parse HEAD)"
+          if [ "${actual}" != "${sha}" ]; then
+            echo "refusing to run: HEAD is ${actual}, expected ${sha}" >&2
+            exit 1
+          fi
+          echo "HEAD verified: ${actual}"
+          python3 "${GITHUB_WORKSPACE}/repo/scripts/ci_release_disk_preflight.py" \
+            "${GITHUB_WORKSPACE}/repo" /tmp || true
+          
+          rm -f "${temp}/telemetry-${phase}.log"
+          nohup "${temp}/telemetry.sh" > "${temp}/telemetry-${phase}.log" 2>&1 &
+          sampler=$!
+          started="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          
+          if [ "${mode}" = "targeted" ]; then
+            inner='set +e
+                   fails=0
+                   for i in $(seq 1 30); do
+                     out=$(python -m pytest -o addopts= -o cache_dir=/tmp/pytest_cache -p no:randomly -q \
+                       catalog/mtconnect_recorder/tests/test_source_availability_retry.py \
+                       catalog/relay/tests/test_phase2_integration.py::test_f2_006_revocation_rejects_traffic_and_reconnect_but_peer_survives \
+                       catalog/flask_app/tests/test_federation_pairing_relay.py \
+                       catalog/node/tests/test_live_storage_catchup.py 2>&1 | tail -1)
+                     rc=$?
+                     [ $rc -ne 0 ] && fails=$((fails+1))
+                     echo "repeat $i rc=$rc :: $out"
+                   done
+                   echo "TARGETED_REPEATS: $fails of 30 failed"
+                   exit $fails'
+          else
+            inner='python -m pytest -o addopts= -o cache_dir=/tmp/pytest_cache -p no:randomly -v --durations=50'
+          fi
+          
+          set +e
+          docker run --rm --network host \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "${GITHUB_WORKSPACE}/repo:/workspace" \
+            -v "${RUNNER_TEMP}/pipcache:/pipcache" \
+            -e PYTHONPYCACHEPREFIX=/tmp/pycache \
+            -e PIP_CACHE_DIR=/pipcache \
+            -w /workspace \
+            python:3.12.13-bookworm bash -lc "
+              set -euo pipefail
+              python --version
+              python -m pip install --quiet --upgrade pip==26.2.1
+              python -m pip install --quiet -r requirements.txt -c constraints-release.txt
+              python -m pip install --quiet pytest==9.1.1 -c constraints-release.txt
+              python -m pytest -o addopts= -p no:randomly --collect-only -q 2>&1 | tail -1
+              ${inner}
+            "
+          rc=$?
+          set -e
+          finished="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          kill "${sampler}" 2>/dev/null || true
+          
+          echo "===== PHASE ${phase} host telemetry (30s samples, ${started} to ${finished}) ====="
+          cat "${temp}/telemetry-${phase}.log" || echo "(no samples)"
+          echo "===== END PHASE ${phase} telemetry ====="
+          
+          echo "${phase} sha=${sha} mode=${mode} rc=${rc} started=${started} finished=${finished}" \
+            >> "${temp}/results.txt"
+          echo "===== PHASE ${phase} RESULT rc=${rc} ====="
+          
+          "${temp}/cleanstate.sh" "after ${phase}"
+          SH
+          chmod +x "${RUNNER_TEMP}/ab/runphase.sh"
+      - name: "Targeted: candidate, 30 repeats"
+        shell: bash
+        run: |
+          set -euo pipefail
+          "${RUNNER_TEMP}/ab/runphase.sh" t1-candidate ba8a3b0b828f59c36c5aaaf6130480a2432a5578 targeted
+      - name: "Targeted: main, 30 repeats"
+        shell: bash
+        run: |
+          set -euo pipefail
+          "${RUNNER_TEMP}/ab/runphase.sh" t2-main 6101c86d94294c70db47d1a8053cac93b9a41356 targeted
+      - name: A/B summary
+        if: always()
+        shell: bash
+        run: |
+          echo "phase results (rc=0 means the suite passed):"
+          cat "${RUNNER_TEMP}/ab/results.txt" || echo "(none)"
+          echo
+          echo "This job never decides a classification. It produces two"
+          echo "measurements of the same host under the same command, and the"
+          echo "handoff records what they mean."
+
+  pair_ab:
+    name: "Full suite: candidate then main"
+    runs-on: fcp-linux
+    needs: targeted
+    timeout-minutes: 600
+    steps:
+      - name: Repair workspace ownership before checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm -v "${{ github.workspace }}:/ws" \
+            python:3.12.13-bookworm chown -R "$(id -u):$(id -g)" /ws
+
+      - name: Check out both trees
+        uses: actions/checkout@v4
+        with:
+          ref: 6101c86d94294c70db47d1a8053cac93b9a41356
+          fetch-depth: 0
+          path: repo
+
+      - name: Make the candidate SHA available too
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C repo fetch --no-tags origin ba8a3b0b828f59c36c5aaaf6130480a2432a5578 || true
+          git -C repo cat-file -e ba8a3b0b828f59c36c5aaaf6130480a2432a5578^{commit}
+          git -C repo cat-file -e 6101c86d94294c70db47d1a8053cac93b9a41356^{commit}
+          echo "both commits present"
+
+      - name: Install the A/B harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/ab" "${RUNNER_TEMP}/pipcache"
+          : > "${RUNNER_TEMP}/ab/results.txt"
+
+          cat > "${RUNNER_TEMP}/ab/telemetry.sh" <<'SH'
+          #!/bin/bash
+          # Read-only host telemetry, one sample every 30 seconds. It opens files under
+          # /proc and /sys and runs df, ss and docker ps. It starts, stops, removes,
+          # prunes and reconfigures nothing.
+          while :; do
+            echo "T $(date -u +%H:%M:%S)"
+            echo "  load $(cut -d' ' -f1-3 /proc/loadavg)  procs $(cut -d' ' -f4 /proc/loadavg)"
+            grep -E '^(MemTotal|MemAvailable|SwapTotal|SwapFree|Dirty|Writeback):' /proc/meminfo \
+              | awk '{printf "  %s %s kB\n", $1, $2}'
+            awk '$3 ~ /^(sd|nvme|vd)[a-z]+$/ {printf "  dev %s rd=%s wr=%s inflight=%s io_ms=%s wio_ms=%s\n", $3,$6,$10,$12,$13,$14}' /proc/diskstats
+            df -B1 --output=target,avail /   2>/dev/null | tail -1 | awk '{printf "  df_bytes %s %s\n", $1, $2}'
+            df     --output=target,iavail /  2>/dev/null | tail -1 | awk '{printf "  df_inodes %s %s\n", $1, $2}'
+            echo "  pytest_procs $(pgrep -f 'python -m pytest' 2>/dev/null | wc -l)"
+            echo "  containers_running $(docker ps -q 2>/dev/null | wc -l)"
+            sleep 30
+          done
+          SH
+          chmod +x "${RUNNER_TEMP}/ab/telemetry.sh"
+
+          cat > "${RUNNER_TEMP}/ab/cleanstate.sh" <<'SH'
+          #!/bin/bash
+          # Verify and document host state between phases.
+          #
+          # This script NEVER touches Federation state. It contains no docker stop, rm,
+          # kill, prune or volume command, and it does not write under /home/martin/fcp*.
+          # Everything it removes is scratch this job itself created, and every removal is
+          # printed.
+          label="$1"
+          echo "===== CLEAN STATE CHECK: ${label} ====="
+          echo "--- orphan pytest processes (report only, nothing is killed) ---"
+          pgrep -af 'python -m pytest' || echo "  none"
+          echo "--- containers (report only, nothing is stopped or removed) ---"
+          docker ps -a --format '  {{.Names}}\t{{.Image}}\t{{.Status}}' 2>/dev/null || echo "  docker unavailable"
+          echo "--- listening TCP ports ---"
+          { ss -ltnp 2>/dev/null || netstat -ltnp 2>/dev/null || echo "no socket tool available"; } \
+            | sed 's/^/  /' | head -40
+          echo "--- host test scratch under /tmp ---"
+          ls -d /tmp/pytest-of-* /tmp/pytest_cache 2>/dev/null | sed 's/^/  /' || echo "  none"
+          echo "--- disk and inodes ---"
+          df -h /   | tail -1 | sed 's/^/  /'
+          df -i /   | tail -1 | sed 's/^/  /'
+          echo "--- kernel errors in the last hour (read-only, best effort) ---"
+          (journalctl -k -p err --since '1 hour ago' --no-pager 2>/dev/null | tail -20 \
+            || dmesg --level=err --since '1 hour ago' 2>/dev/null | tail -20 \
+            || echo "  kernel log not readable by this account") | sed 's/^/  /'
+          echo "--- cleaning scratch this job owns ---"
+          if [ -d "${GITHUB_WORKSPACE}/repo" ]; then
+            echo "  git clean -xdff in repo:"
+            git -C "${GITHUB_WORKSPACE}/repo" clean -xdff | sed 's/^/    /' || true
+          fi
+          echo "===== END CLEAN STATE CHECK: ${label} ====="
+          SH
+          chmod +x "${RUNNER_TEMP}/ab/cleanstate.sh"
+
+          cat > "${RUNNER_TEMP}/ab/runphase.sh" <<'SH'
+          #!/bin/bash
+          # Run one A/B phase: check out an exact SHA into the same clone, sample the host
+          # for the whole suite, run the identical command, and record the outcome.
+          set -uo pipefail
+          phase="$1"; sha="$2"; mode="$3"   # mode: full | targeted
+          temp="${RUNNER_TEMP}/ab"
+          
+          "${temp}/cleanstate.sh" "before ${phase}"
+          
+          echo "===== PHASE ${phase}: checking out ${sha} ====="
+          git -C "${GITHUB_WORKSPACE}/repo" checkout --detach "${sha}"
+          git -C "${GITHUB_WORKSPACE}/repo" clean -xdff >/dev/null
+          actual="$(git -C "${GITHUB_WORKSPACE}/repo" rev-parse HEAD)"
+          if [ "${actual}" != "${sha}" ]; then
+            echo "refusing to run: HEAD is ${actual}, expected ${sha}" >&2
+            exit 1
+          fi
+          echo "HEAD verified: ${actual}"
+          python3 "${GITHUB_WORKSPACE}/repo/scripts/ci_release_disk_preflight.py" \
+            "${GITHUB_WORKSPACE}/repo" /tmp || true
+          
+          rm -f "${temp}/telemetry-${phase}.log"
+          nohup "${temp}/telemetry.sh" > "${temp}/telemetry-${phase}.log" 2>&1 &
+          sampler=$!
+          started="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          
+          if [ "${mode}" = "targeted" ]; then
+            inner='set +e
+                   fails=0
+                   for i in $(seq 1 30); do
+                     out=$(python -m pytest -o addopts= -o cache_dir=/tmp/pytest_cache -p no:randomly -q \
+                       catalog/mtconnect_recorder/tests/test_source_availability_retry.py \
+                       catalog/relay/tests/test_phase2_integration.py::test_f2_006_revocation_rejects_traffic_and_reconnect_but_peer_survives \
+                       catalog/flask_app/tests/test_federation_pairing_relay.py \
+                       catalog/node/tests/test_live_storage_catchup.py 2>&1 | tail -1)
+                     rc=$?
+                     [ $rc -ne 0 ] && fails=$((fails+1))
+                     echo "repeat $i rc=$rc :: $out"
+                   done
+                   echo "TARGETED_REPEATS: $fails of 30 failed"
+                   exit $fails'
+          else
+            inner='python -m pytest -o addopts= -o cache_dir=/tmp/pytest_cache -p no:randomly -v --durations=50'
+          fi
+          
+          set +e
+          docker run --rm --network host \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "${GITHUB_WORKSPACE}/repo:/workspace" \
+            -v "${RUNNER_TEMP}/pipcache:/pipcache" \
+            -e PYTHONPYCACHEPREFIX=/tmp/pycache \
+            -e PIP_CACHE_DIR=/pipcache \
+            -w /workspace \
+            python:3.12.13-bookworm bash -lc "
+              set -euo pipefail
+              python --version
+              python -m pip install --quiet --upgrade pip==26.2.1
+              python -m pip install --quiet -r requirements.txt -c constraints-release.txt
+              python -m pip install --quiet pytest==9.1.1 -c constraints-release.txt
+              python -m pytest -o addopts= -p no:randomly --collect-only -q 2>&1 | tail -1
+              ${inner}
+            "
+          rc=$?
+          set -e
+          finished="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          kill "${sampler}" 2>/dev/null || true
+          
+          echo "===== PHASE ${phase} host telemetry (30s samples, ${started} to ${finished}) ====="
+          cat "${temp}/telemetry-${phase}.log" || echo "(no samples)"
+          echo "===== END PHASE ${phase} telemetry ====="
+          
+          echo "${phase} sha=${sha} mode=${mode} rc=${rc} started=${started} finished=${finished}" \
+            >> "${temp}/results.txt"
+          echo "===== PHASE ${phase} RESULT rc=${rc} ====="
+          
+          "${temp}/cleanstate.sh" "after ${phase}"
+          SH
+          chmod +x "${RUNNER_TEMP}/ab/runphase.sh"
+      - name: "Full suite A: candidate"
+        shell: bash
+        run: |
+          set -euo pipefail
+          "${RUNNER_TEMP}/ab/runphase.sh" a1-candidate ba8a3b0b828f59c36c5aaaf6130480a2432a5578 full
+      - name: "Full suite B: main"
+        shell: bash
+        run: |
+          set -euo pipefail
+          "${RUNNER_TEMP}/ab/runphase.sh" a2-main 6101c86d94294c70db47d1a8053cac93b9a41356 full
+      - name: A/B summary
+        if: always()
+        shell: bash
+        run: |
+          echo "phase results (rc=0 means the suite passed):"
+          cat "${RUNNER_TEMP}/ab/results.txt" || echo "(none)"
+          echo
+          echo "This job never decides a classification. It produces two"
+          echo "measurements of the same host under the same command, and the"
+          echo "handoff records what they mean."
+
+  pair_ba:
+    name: "Full suite: main then candidate"
+    runs-on: fcp-linux
+    needs: pair_ab
+    timeout-minutes: 600
+    steps:
+      - name: Repair workspace ownership before checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm -v "${{ github.workspace }}:/ws" \
+            python:3.12.13-bookworm chown -R "$(id -u):$(id -g)" /ws
+
+      - name: Check out both trees
+        uses: actions/checkout@v4
+        with:
+          ref: 6101c86d94294c70db47d1a8053cac93b9a41356
+          fetch-depth: 0
+          path: repo
+
+      - name: Make the candidate SHA available too
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C repo fetch --no-tags origin ba8a3b0b828f59c36c5aaaf6130480a2432a5578 || true
+          git -C repo cat-file -e ba8a3b0b828f59c36c5aaaf6130480a2432a5578^{commit}
+          git -C repo cat-file -e 6101c86d94294c70db47d1a8053cac93b9a41356^{commit}
+          echo "both commits present"
+
+      - name: Install the A/B harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/ab" "${RUNNER_TEMP}/pipcache"
+          : > "${RUNNER_TEMP}/ab/results.txt"
+
+          cat > "${RUNNER_TEMP}/ab/telemetry.sh" <<'SH'
+          #!/bin/bash
+          # Read-only host telemetry, one sample every 30 seconds. It opens files under
+          # /proc and /sys and runs df, ss and docker ps. It starts, stops, removes,
+          # prunes and reconfigures nothing.
+          while :; do
+            echo "T $(date -u +%H:%M:%S)"
+            echo "  load $(cut -d' ' -f1-3 /proc/loadavg)  procs $(cut -d' ' -f4 /proc/loadavg)"
+            grep -E '^(MemTotal|MemAvailable|SwapTotal|SwapFree|Dirty|Writeback):' /proc/meminfo \
+              | awk '{printf "  %s %s kB\n", $1, $2}'
+            awk '$3 ~ /^(sd|nvme|vd)[a-z]+$/ {printf "  dev %s rd=%s wr=%s inflight=%s io_ms=%s wio_ms=%s\n", $3,$6,$10,$12,$13,$14}' /proc/diskstats
+            df -B1 --output=target,avail /   2>/dev/null | tail -1 | awk '{printf "  df_bytes %s %s\n", $1, $2}'
+            df     --output=target,iavail /  2>/dev/null | tail -1 | awk '{printf "  df_inodes %s %s\n", $1, $2}'
+            echo "  pytest_procs $(pgrep -f 'python -m pytest' 2>/dev/null | wc -l)"
+            echo "  containers_running $(docker ps -q 2>/dev/null | wc -l)"
+            sleep 30
+          done
+          SH
+          chmod +x "${RUNNER_TEMP}/ab/telemetry.sh"
+
+          cat > "${RUNNER_TEMP}/ab/cleanstate.sh" <<'SH'
+          #!/bin/bash
+          # Verify and document host state between phases.
+          #
+          # This script NEVER touches Federation state. It contains no docker stop, rm,
+          # kill, prune or volume command, and it does not write under /home/martin/fcp*.
+          # Everything it removes is scratch this job itself created, and every removal is
+          # printed.
+          label="$1"
+          echo "===== CLEAN STATE CHECK: ${label} ====="
+          echo "--- orphan pytest processes (report only, nothing is killed) ---"
+          pgrep -af 'python -m pytest' || echo "  none"
+          echo "--- containers (report only, nothing is stopped or removed) ---"
+          docker ps -a --format '  {{.Names}}\t{{.Image}}\t{{.Status}}' 2>/dev/null || echo "  docker unavailable"
+          echo "--- listening TCP ports ---"
+          { ss -ltnp 2>/dev/null || netstat -ltnp 2>/dev/null || echo "no socket tool available"; } \
+            | sed 's/^/  /' | head -40
+          echo "--- host test scratch under /tmp ---"
+          ls -d /tmp/pytest-of-* /tmp/pytest_cache 2>/dev/null | sed 's/^/  /' || echo "  none"
+          echo "--- disk and inodes ---"
+          df -h /   | tail -1 | sed 's/^/  /'
+          df -i /   | tail -1 | sed 's/^/  /'
+          echo "--- kernel errors in the last hour (read-only, best effort) ---"
+          (journalctl -k -p err --since '1 hour ago' --no-pager 2>/dev/null | tail -20 \
+            || dmesg --level=err --since '1 hour ago' 2>/dev/null | tail -20 \
+            || echo "  kernel log not readable by this account") | sed 's/^/  /'
+          echo "--- cleaning scratch this job owns ---"
+          if [ -d "${GITHUB_WORKSPACE}/repo" ]; then
+            echo "  git clean -xdff in repo:"
+            git -C "${GITHUB_WORKSPACE}/repo" clean -xdff | sed 's/^/    /' || true
+          fi
+          echo "===== END CLEAN STATE CHECK: ${label} ====="
+          SH
+          chmod +x "${RUNNER_TEMP}/ab/cleanstate.sh"
+
+          cat > "${RUNNER_TEMP}/ab/runphase.sh" <<'SH'
+          #!/bin/bash
+          # Run one A/B phase: check out an exact SHA into the same clone, sample the host
+          # for the whole suite, run the identical command, and record the outcome.
+          set -uo pipefail
+          phase="$1"; sha="$2"; mode="$3"   # mode: full | targeted
+          temp="${RUNNER_TEMP}/ab"
+          
+          "${temp}/cleanstate.sh" "before ${phase}"
+          
+          echo "===== PHASE ${phase}: checking out ${sha} ====="
+          git -C "${GITHUB_WORKSPACE}/repo" checkout --detach "${sha}"
+          git -C "${GITHUB_WORKSPACE}/repo" clean -xdff >/dev/null
+          actual="$(git -C "${GITHUB_WORKSPACE}/repo" rev-parse HEAD)"
+          if [ "${actual}" != "${sha}" ]; then
+            echo "refusing to run: HEAD is ${actual}, expected ${sha}" >&2
+            exit 1
+          fi
+          echo "HEAD verified: ${actual}"
+          python3 "${GITHUB_WORKSPACE}/repo/scripts/ci_release_disk_preflight.py" \
+            "${GITHUB_WORKSPACE}/repo" /tmp || true
+          
+          rm -f "${temp}/telemetry-${phase}.log"
+          nohup "${temp}/telemetry.sh" > "${temp}/telemetry-${phase}.log" 2>&1 &
+          sampler=$!
+          started="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          
+          if [ "${mode}" = "targeted" ]; then
+            inner='set +e
+                   fails=0
+                   for i in $(seq 1 30); do
+                     out=$(python -m pytest -o addopts= -o cache_dir=/tmp/pytest_cache -p no:randomly -q \
+                       catalog/mtconnect_recorder/tests/test_source_availability_retry.py \
+                       catalog/relay/tests/test_phase2_integration.py::test_f2_006_revocation_rejects_traffic_and_reconnect_but_peer_survives \
+                       catalog/flask_app/tests/test_federation_pairing_relay.py \
+                       catalog/node/tests/test_live_storage_catchup.py 2>&1 | tail -1)
+                     rc=$?
+                     [ $rc -ne 0 ] && fails=$((fails+1))
+                     echo "repeat $i rc=$rc :: $out"
+                   done
+                   echo "TARGETED_REPEATS: $fails of 30 failed"
+                   exit $fails'
+          else
+            inner='python -m pytest -o addopts= -o cache_dir=/tmp/pytest_cache -p no:randomly -v --durations=50'
+          fi
+          
+          set +e
+          docker run --rm --network host \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "${GITHUB_WORKSPACE}/repo:/workspace" \
+            -v "${RUNNER_TEMP}/pipcache:/pipcache" \
+            -e PYTHONPYCACHEPREFIX=/tmp/pycache \
+            -e PIP_CACHE_DIR=/pipcache \
+            -w /workspace \
+            python:3.12.13-bookworm bash -lc "
+              set -euo pipefail
+              python --version
+              python -m pip install --quiet --upgrade pip==26.2.1
+              python -m pip install --quiet -r requirements.txt -c constraints-release.txt
+              python -m pip install --quiet pytest==9.1.1 -c constraints-release.txt
+              python -m pytest -o addopts= -p no:randomly --collect-only -q 2>&1 | tail -1
+              ${inner}
+            "
+          rc=$?
+          set -e
+          finished="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          kill "${sampler}" 2>/dev/null || true
+          
+          echo "===== PHASE ${phase} host telemetry (30s samples, ${started} to ${finished}) ====="
+          cat "${temp}/telemetry-${phase}.log" || echo "(no samples)"
+          echo "===== END PHASE ${phase} telemetry ====="
+          
+          echo "${phase} sha=${sha} mode=${mode} rc=${rc} started=${started} finished=${finished}" \
+            >> "${temp}/results.txt"
+          echo "===== PHASE ${phase} RESULT rc=${rc} ====="
+          
+          "${temp}/cleanstate.sh" "after ${phase}"
+          SH
+          chmod +x "${RUNNER_TEMP}/ab/runphase.sh"
+      - name: "Full suite B: main"
+        shell: bash
+        run: |
+          set -euo pipefail
+          "${RUNNER_TEMP}/ab/runphase.sh" b1-main 6101c86d94294c70db47d1a8053cac93b9a41356 full
+      - name: "Full suite A: candidate"
+        shell: bash
+        run: |
+          set -euo pipefail
+          "${RUNNER_TEMP}/ab/runphase.sh" b2-candidate ba8a3b0b828f59c36c5aaaf6130480a2432a5578 full
+      - name: A/B summary
+        if: always()
+        shell: bash
+        run: |
+          echo "phase results (rc=0 means the suite passed):"
+          cat "${RUNNER_TEMP}/ab/results.txt" || echo "(none)"
+          echo
+          echo "This job never decides a classification. It produces two"
+          echo "measurements of the same host under the same command, and the"
+          echo "handoff records what they mean."
+
