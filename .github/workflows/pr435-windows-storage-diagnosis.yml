@@ -1,0 +1,207 @@
+name: PR 435 Windows storage diagnosis
+
+# Diagnostic-only. The self-hosted Windows release gate for PR 435 fails inside
+# the storage fixtures with
+#
+#   FederationValidationError: content: committing this batch would take the
+#   volume below its reserved free-space floor (allocation-exhausted)
+#
+# That refusal comes from catalog/federation/storage_allocation.py, which no
+# commit on PR 435 touches, and it is decided entirely by the free space on the
+# volume pytest writes its tmp_path into. This workflow measures that volume
+# with the product's own policy and then runs the identical storage subset at
+# the PR head and at the unmodified main baseline on the same runner, so the
+# failure can be classified from evidence rather than from reasoning.
+#
+# It changes no product code and no thresholds. It only reports and compares.
+
+on:
+  push:
+    branches:
+      - claude/pr435-validation-diagnosis-n285av
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr435-windows-storage-diagnosis
+  cancel-in-progress: false
+
+jobs:
+  windows-storage-baseline:
+    name: Windows storage subset (${{ matrix.label }})
+    runs-on: fcp-windows
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include:
+          - label: main-baseline
+            sha: 6101c86d94294c70db47d1a8053cac93b9a41356
+          - label: pr435-head
+            sha: 13967aea9f4561cea64b5427bdf572de823ec577
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.sha }}
+
+      - name: Use Nettking Python 3.12.10
+        shell: cmd
+        run: |
+          if not exist "C:\actions-runner\toolchains\python-3.12.10\python.exe" exit /b 1
+          echo C:\actions-runner\toolchains\python-3.12.10>>"%GITHUB_PATH%"
+          echo C:\actions-runner\toolchains\python-3.12.10\Scripts>>"%GITHUB_PATH%"
+
+      - name: Verify exact checkout
+        shell: cmd
+        run: |
+          for /f "delims=" %%i in ('git rev-parse HEAD') do set ACTUAL=%%i
+          if not "%ACTUAL%"=="${{ matrix.sha }}" exit /b 1
+          python --version
+          python -c "import sys; assert sys.version_info[:3] == (3,12,10), sys.version"
+
+      - name: Install release dependencies
+        shell: cmd
+        run: |
+          python -m pip install --upgrade pip==26.2.1
+          python -m pip install -r requirements.txt -c constraints-release.txt
+          python -m pip install pytest==9.1.1 -c constraints-release.txt
+
+      # Reports only. Never fails the job: the point is to capture the numbers
+      # even when the suite below refuses, so the refusal can be attributed.
+      - name: Measure the volumes the suite writes into
+        shell: python
+        run: |
+          import os
+          import shutil
+          import string
+          import sys
+          import tempfile
+          from pathlib import Path
+
+          sys.path.insert(0, os.getcwd())
+
+          from catalog.federation import host_resources
+          from catalog.federation.storage_allocation import (
+              FLOOR_VOLUME_FRACTION,
+              MAXIMUM_FLOOR_BYTES,
+              default_floor_bytes,
+              minimum_headroom_bytes,
+          )
+
+          GIB = 1024 ** 3
+
+          print("All local volumes:")
+          for letter in string.ascii_uppercase:
+              root = f"{letter}:\\"
+              if not os.path.exists(root):
+                  continue
+              try:
+                  usage = shutil.disk_usage(root)
+              except OSError as error:
+                  print(f"  {root:6s} unavailable ({error})")
+                  continue
+              print(
+                  f"  {root:6s} {usage.free / GIB:9.2f} GiB free of "
+                  f"{usage.total / GIB:9.2f} GiB"
+              )
+
+          print()
+          print("Product allocation floor policy (catalog/federation/storage_allocation.py):")
+          print(f"  absolute minimum headroom : {minimum_headroom_bytes() / GIB:.2f} GiB")
+          print(f"  volume fraction           : {FLOOR_VOLUME_FRACTION}")
+          print(f"  ceiling                   : {MAXIMUM_FLOOR_BYTES / GIB:.2f} GiB")
+
+          thresholds = host_resources.PressureThresholds()
+          print()
+          print("Product admission policy (catalog/federation/host_resources.py):")
+          print(f"  warning   at or below : {thresholds.warning_free_bytes / GIB:.2f} GiB free")
+          print(f"  pressure  at or below : {thresholds.pressure_free_bytes / GIB:.2f} GiB free")
+          print(f"  critical  at or below : {thresholds.critical_free_bytes / GIB:.2f} GiB free")
+
+          targets = {
+              "workspace": Path(os.environ["GITHUB_WORKSPACE"]),
+              "RUNNER_TEMP": Path(os.environ["RUNNER_TEMP"]),
+              "pytest tmp_path root": Path(tempfile.gettempdir()),
+          }
+
+          for name, path in targets.items():
+              print()
+              print(f"{name}: {path}")
+              usage = shutil.disk_usage(path)
+              floor = default_floor_bytes(path)
+              print(
+                  f"  volume            : {usage.free / GIB:.2f} GiB free of "
+                  f"{usage.total / GIB:.2f} GiB"
+              )
+              print(f"  derived allocation floor : {floor / GIB:.2f} GiB")
+              headroom = usage.free - floor
+              print(f"  free minus floor         : {headroom / GIB:+.2f} GiB")
+              if headroom <= 0:
+                  print(
+                      "  VERDICT           : below the allocation floor -- every "
+                      "unbudgeted storage commit on this volume refuses with "
+                      "allocation-exhausted"
+                  )
+              else:
+                  print("  VERDICT           : clears the allocation floor")
+
+              measurement = host_resources.measure_filesystem(path)
+              assessment = host_resources.assess_measurement(
+                  measurement, thresholds=thresholds
+              )
+              print(f"  admission pressure       : {assessment.level.name}")
+              if assessment.reasons:
+                  print(f"  reasons                  : {', '.join(assessment.reasons)}")
+
+      - name: Largest reclaimable directories under the runner account
+        shell: python
+        continue-on-error: true
+        run: |
+          import os
+          import tempfile
+          from pathlib import Path
+
+          GIB = 1024 ** 3
+
+          def size_of(path: Path) -> int:
+              total = 0
+              for root, _directories, files in os.walk(path, onerror=lambda _e: None):
+                  for name in files:
+                      try:
+                          total += os.path.getsize(os.path.join(root, name))
+                      except OSError:
+                          continue
+              return total
+
+          candidates = [
+              Path(tempfile.gettempdir()),
+              Path(os.environ["RUNNER_TEMP"]),
+              Path("C:/actions-runner/_work/_tool"),
+              Path("C:/actions-runner/_work/_temp"),
+              Path.home() / "AppData/Local/pip/Cache",
+              Path.home() / "go/pkg/mod",
+              Path.home() / "AppData/Local/go-build",
+          ]
+
+          print("Reclaimable candidates (runner service account, no elevation):")
+          for candidate in candidates:
+              if not candidate.exists():
+                  print(f"  {str(candidate):70s} absent")
+                  continue
+              print(f"  {str(candidate):70s} {size_of(candidate) / GIB:8.2f} GiB")
+
+      - name: Storage subset that fails on the release gate
+        shell: cmd
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/node/tests/test_storage_agent.py
+          catalog/node/tests/test_three_machine_deployment.py
+          catalog/node/tests/test_physical_storage_failover.py
+          catalog/node/tests/test_physical_storage_recovery.py
+          catalog/node/tests/test_live_storage_replication.py
+          catalog/node/tests/test_live_storage_failover.py
+          catalog/node/tests/test_live_storage_catchup.py
+          catalog/node/tests/test_live_storage_reinstatement.py
