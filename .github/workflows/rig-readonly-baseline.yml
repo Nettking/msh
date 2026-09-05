@@ -1,0 +1,249 @@
+name: Physical rig read-only baseline
+
+# Strictly read-only inventory of the self-hosted rig machines, taken through
+# the runners that already live on them. Nothing here starts, stops,
+# reconfigures or writes to any service: it reads process tables, listening
+# sockets, Docker's own listings, git metadata in the rig checkouts, and
+# SQLite state opened in read-only mode. No secret values are printed, only
+# the names of the keys that are set.
+#
+# Astra needs this baseline before any physical deployment decision, and the
+# rig machines are only reachable from themselves, so the runners collect it.
+
+on:
+  push:
+    branches:
+      - ci/rig-readonly-baseline
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rig-readonly-baseline
+  cancel-in-progress: false
+
+jobs:
+  nettking:
+    name: Nettking baseline (read-only)
+    runs-on: fcp-windows
+    timeout-minutes: 20
+    steps:
+      - name: Use Nettking Python 3.12.10
+        shell: cmd
+        run: |
+          if not exist "C:\actions-runner\toolchains\python-3.12.10\python.exe" exit /b 1
+          echo C:\actions-runner\toolchains\python-3.12.10>>"%GITHUB_PATH%"
+
+      - name: Host identity, OS and uptime
+        shell: cmd
+        continue-on-error: true
+        run: |
+          echo === hostname ===
+          hostname
+          echo === os ===
+          ver
+          systeminfo | findstr /B /C:"OS Name" /C:"OS Version" /C:"System Boot Time" /C:"Total Physical Memory"
+
+      - name: Volumes and free space
+        shell: python
+        continue-on-error: true
+        run: |
+          import os
+          import shutil
+          import string
+
+          GIB = 1024 ** 3
+          for letter in string.ascii_uppercase:
+              root = f"{letter}:\\"
+              if not os.path.exists(root):
+                  continue
+              try:
+                  usage = shutil.disk_usage(root)
+              except OSError as error:
+                  print(f"{root:6s} unavailable ({error})")
+                  continue
+              print(
+                  f"{root:6s} {usage.free / GIB:9.2f} GiB free of "
+                  f"{usage.total / GIB:9.2f} GiB"
+              )
+
+      - name: FCP-related processes
+        shell: cmd
+        continue-on-error: true
+        run: |
+          echo === python / flask / ollama / docker processes ===
+          tasklist /fi "IMAGENAME eq python.exe" /v
+          tasklist /fi "IMAGENAME eq pythonw.exe"
+          tasklist /fi "IMAGENAME eq ollama.exe"
+          tasklist /fi "IMAGENAME eq com.docker.backend.exe"
+          tasklist /fi "IMAGENAME eq Docker Desktop.exe"
+          echo === wsl ===
+          wsl --list --verbose
+
+      - name: Listening sockets on the product ports
+        shell: cmd
+        continue-on-error: true
+        run: |
+          echo === product ports: flask 5000, relay 8765, provider 11434 ===
+          netstat -ano | findstr /R /C:":5000 " /C:":8765 " /C:":11434 "
+          echo === all listening ===
+          netstat -ano | findstr LISTENING
+
+      - name: Docker containers, compose projects and volumes
+        shell: cmd
+        continue-on-error: true
+        run: |
+          echo === docker version ===
+          docker version --format "{{.Server.Version}}"
+          echo === containers (all) ===
+          docker ps -a --format "table {{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
+          echo === compose projects ===
+          docker compose ls --all
+          echo === compose project labels ===
+          docker ps -a --format "{{.Names}}\t{{.Label \"com.docker.compose.project\"}}\t{{.Label \"com.docker.compose.service\"}}"
+          echo === volumes ===
+          docker volume ls
+          echo === images ===
+          docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedAt}}"
+
+      - name: Rig checkout state
+        shell: python
+        continue-on-error: true
+        run: |
+          import subprocess
+          from pathlib import Path
+
+          candidates = [
+              Path(r"C:\wsl\msh"),
+              Path(r"C:\msh\git"),
+              Path(r"C:\actions-runner\_work\msh\msh"),
+          ]
+          for repo in candidates:
+              print(f"\n=== {repo} ===")
+              if not (repo / ".git").exists():
+                  print("  not a git checkout (or absent)")
+                  continue
+              for label, args in (
+                  ("HEAD", ["rev-parse", "HEAD"]),
+                  ("branch", ["rev-parse", "--abbrev-ref", "HEAD"]),
+                  ("last commit", ["log", "-1", "--format=%h %ad %s", "--date=iso"]),
+                  ("status", ["status", "--porcelain"]),
+              ):
+                  try:
+                      out = subprocess.run(
+                          ["git", "-C", str(repo), *args],
+                          capture_output=True, text=True, timeout=60,
+                      )
+                      value = (out.stdout or out.stderr).strip()
+                  except Exception as error:  # noqa: BLE001
+                      value = f"<{error}>"
+                  if label == "status":
+                      lines = [l for l in value.splitlines() if l]
+                      print(f"  status: {len(lines)} modified/untracked entries")
+                      for line in lines[:20]:
+                          print(f"    {line}")
+                  else:
+                      print(f"  {label}: {value}")
+
+      - name: Environment configuration (key names only, no secret values)
+        shell: python
+        continue-on-error: true
+        run: |
+          from pathlib import Path
+
+          SAFE = {
+              "FCP_BUILD_COMMIT", "FCP_WEB_PORT", "FCP_WEB_BIND",
+              "FCP_RELAY_PORT", "FCP_RELAY_BIND", "FCP_PROVIDER_PORT",
+              "FCP_DATA_DIR", "FCP_RECORDER_DATA_DIR", "FCP_RELAY_VOLUME_NAME",
+              "FCP_BASE_URL", "FCP_AI_MODEL", "COMPOSE_PROJECT_NAME",
+          }
+          for repo in (Path(r"C:\wsl\msh"), Path(r"C:\msh\git")):
+              env = repo / ".env"
+              print(f"\n=== {env} ===")
+              if not env.exists():
+                  print("  absent")
+                  continue
+              for raw in env.read_text(encoding="utf-8", errors="replace").splitlines():
+                  line = raw.strip()
+                  if not line or line.startswith("#") or "=" not in line:
+                      continue
+                  key, _, value = line.partition("=")
+                  key = key.strip()
+                  if key in SAFE:
+                      print(f"  {key}={value.strip()}")
+                  else:
+                      print(f"  {key}=<set, not shown>")
+
+      - name: Federation and recorder state (SQLite, read-only)
+        shell: python
+        continue-on-error: true
+        run: |
+          import sqlite3
+          from pathlib import Path
+
+          INTERESTING = (
+              "capabilit", "session", "node", "member", "grant", "group",
+              "identity", "enrol",
+          )
+          roots = [Path(r"C:\wsl\msh"), Path(r"C:\msh\git")]
+          seen = 0
+          for root in roots:
+              if not root.exists():
+                  print(f"\n=== {root}: absent ===")
+                  continue
+              print(f"\n=== {root}: SQLite state ===")
+              for db in sorted(root.rglob("*.sqlite3")):
+                  if ".git" in db.parts or "node_modules" in db.parts:
+                      continue
+                  seen += 1
+                  if seen > 40:
+                      print("  ... more databases not listed")
+                      break
+                  print(f"\n  {db}  ({db.stat().st_size} bytes)")
+                  try:
+                      connection = sqlite3.connect(
+                          f"file:{db.as_posix()}?mode=ro", uri=True, timeout=5
+                      )
+                  except sqlite3.Error as error:
+                      print(f"    unreadable: {error}")
+                      continue
+                  try:
+                      connection.row_factory = sqlite3.Row
+                      tables = [
+                          r[0] for r in connection.execute(
+                              "SELECT name FROM sqlite_master WHERE type='table'"
+                          )
+                      ]
+                      print(f"    tables: {', '.join(tables) or '(none)'}")
+                      for table in tables:
+                          if not any(k in table.lower() for k in INTERESTING):
+                              continue
+                          try:
+                              rows = list(
+                                  connection.execute(
+                                      f'SELECT * FROM "{table}" LIMIT 10'
+                                  )
+                              )
+                          except sqlite3.Error as error:
+                              print(f"    {table}: unreadable ({error})")
+                              continue
+                          print(f"    {table}: {len(rows)} row(s) shown")
+                          for row in rows:
+                              item = {
+                                  k: row[k]
+                                  for k in row.keys()
+                                  if not isinstance(row[k], (bytes, bytearray))
+                              }
+                              print(f"      {item}")
+                  finally:
+                      connection.close()
+
+      - name: MSH Recorder reachability (best effort, read-only)
+        shell: cmd
+        continue-on-error: true
+        run: |
+          echo === ssh availability under the runner account ===
+          where ssh
+          echo === probe (BatchMode, no interactive auth) ===
+          ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new martin@msh-recorder.tail4ccd2b.ts.net "hostname && uname -a || ver"
