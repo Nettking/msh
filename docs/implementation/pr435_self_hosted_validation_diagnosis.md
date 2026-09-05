@@ -25,12 +25,23 @@ E  catalog.federation.errors.FederationValidationError: content: committing this
 ```
 
 Steps 1-9 of that job all passed, including **Windows capability and product
-release regressions** (`871 passed, 1 skipped`) and, inside step 10 itself, the
-new PR 435 test file
-`catalog/mtconnect_recorder/tests/test_multi_recorder_capability_identity.py`,
-which is in the first passing block of the progress output. Steps 11-14 (Go,
-Ruff, Compose, diff hygiene) were skipped only because step 10 had already
-failed.
+release regressions** (`871 passed, 1 skipped`).
+
+The new PR 435 test file also passed, on the same runner, inside the same
+failing step. Step 10's first progress line is
+
+```
+....s..............................................................F.FEE [ 19%]
+```
+
+and the collected counts for the files ahead of the first failure are
+`test_identity.py` 11, `test_state.py` 16, `test_client.py` 21 and
+`test_multi_recorder_capability_identity.py` 17, which is 65. The first `F` is
+at position 68, the third test in `test_storage_agent.py`. **All 17 tests of
+the capability-identity regression PR 435 adds passed on Windows.**
+
+Steps 11-14 (Go, Ruff, Compose, diff hygiene) were skipped only because step 10
+had already failed, which is why the wrapper now runs them first.
 
 ## Root cause
 
@@ -182,8 +193,13 @@ job still checks out and verifies
 * CI reclaims only its own scratch on Windows (stale pytest temp trees, pip
   cache). On this runner that is about 0.3 GiB and does not close a 45 GiB gap.
 * Linux timeouts are sized from Nitro's measured throughput.
-* The containerised suites keep their caches out of the bind mount and return
-  workspace ownership to the runner account even when a suite fails.
+* The containerised suites keep their bytecode and pytest caches out of the
+  bind mount, and workspace ownership is returned to the runner account both
+  before checkout and after the suite, so a job stays recoverable whatever an
+  earlier run left behind. The after-the-suite repair alone was not enough:
+  run 33958636444's Linux job still failed at checkout on leftovers from run
+  33956840831, because the repair could only run once checkout had already
+  given up.
 
 ## What still blocks a green gate
 

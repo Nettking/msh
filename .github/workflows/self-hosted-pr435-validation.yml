@@ -26,6 +26,23 @@ jobs:
     # self-hosted suite mid-flight is a wrapper defect, not a result.
     timeout-minutes: 120
     steps:
+      # actions/checkout deletes the workspace contents as the unprivileged
+      # runner account. A containerised suite from an earlier run leaves
+      # root-owned files behind, and checkout then fails outright with
+      #   EACCES: permission denied, unlink '.../.pytest_cache/.gitignore'
+      # (run 33956840831, PostgreSQL job; run 33958636444, Linux job). Returning
+      # ownership before checkout makes the job recoverable no matter what the
+      # previous run left. It changes ownership only, deletes nothing, and needs
+      # no sudo.
+      - name: Repair workspace ownership before checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}:/workspace" \
+            python:3.12.13-bookworm \
+            chown -R "$(id -u):$(id -g)" /workspace
+
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.VALIDATED_SHA }}
@@ -531,6 +548,23 @@ jobs:
     env:
       FCP_TEST_POSTGRES_DSN: postgresql://fcp:fcp@127.0.0.1:5432/fcp_test
     steps:
+      # actions/checkout deletes the workspace contents as the unprivileged
+      # runner account. A containerised suite from an earlier run leaves
+      # root-owned files behind, and checkout then fails outright with
+      #   EACCES: permission denied, unlink '.../.pytest_cache/.gitignore'
+      # (run 33956840831, PostgreSQL job; run 33958636444, Linux job). Returning
+      # ownership before checkout makes the job recoverable no matter what the
+      # previous run left. It changes ownership only, deletes nothing, and needs
+      # no sudo.
+      - name: Repair workspace ownership before checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}:/workspace" \
+            python:3.12.13-bookworm \
+            chown -R "$(id -u):$(id -g)" /workspace
+
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.VALIDATED_SHA }}
@@ -655,6 +689,23 @@ jobs:
     # 49% of the first suite (run 33956840831).
     timeout-minutes: 180
     steps:
+      # actions/checkout deletes the workspace contents as the unprivileged
+      # runner account. A containerised suite from an earlier run leaves
+      # root-owned files behind, and checkout then fails outright with
+      #   EACCES: permission denied, unlink '.../.pytest_cache/.gitignore'
+      # (run 33956840831, PostgreSQL job; run 33958636444, Linux job). Returning
+      # ownership before checkout makes the job recoverable no matter what the
+      # previous run left. It changes ownership only, deletes nothing, and needs
+      # no sudo.
+      - name: Repair workspace ownership before checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}:/workspace" \
+            python:3.12.13-bookworm \
+            chown -R "$(id -u):$(id -g)" /workspace
+
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.VALIDATED_SHA }}
