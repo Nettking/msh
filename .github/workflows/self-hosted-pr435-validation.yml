@@ -14,7 +14,14 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  VALIDATED_SHA: f0434e4a4fd4cf86b3574563151d1e6241b4e06c
+  # The promoted candidate: f0434e4a plus the R001 retry-order fix (f65d11fd)
+  # plus the branding-boundary fix its own new test needed. Every job checks
+  # this SHA out and asserts it, so the run cannot silently qualify a different
+  # tree. Run 33971811540 validated the previous head and is superseded: R001 is
+  # a demonstrated reliability defect that has to ship with the candidate, so
+  # finishing that run's remaining jobs would have qualified something that
+  # cannot be released.
+  VALIDATED_SHA: ba8a3b0b828f59c36c5aaaf6130480a2432a5578
 
 jobs:
   release-linux:
@@ -133,6 +140,34 @@ jobs:
           print("\nRunner meets the product storage allocation precondition.")
           PY
 
+      # CI002 turned on whether Nitro stalls, and the only evidence for that is
+      # inferred from how far apart pytest's progress lines are: 72 tests in
+      # 0.5 seconds on one line and 1156 on another. Measure it instead of
+      # inferring it. This samples load, memory and disk queue once a minute for
+      # the length of the suite and prints the samples afterwards, so a stall
+      # can be lined up against what the host was doing. It only reads: nothing
+      # is stopped, started, pruned or reconfigured, and it writes solely to the
+      # runner's own temp directory.
+      - name: Start read-only host pressure sampler
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f "${RUNNER_TEMP}/host-pressure.log"
+          cat > "${RUNNER_TEMP}/host-pressure.sh" <<'SAMPLER'
+          #!/bin/bash
+          while :; do
+            printf '%s load=%s\n' "$(date -u +%H:%M:%S)" "$(cut -d' ' -f1-3 /proc/loadavg)"
+            grep -E '^(MemAvailable|Dirty|Writeback):' /proc/meminfo | sed 's/^/    /'
+            awk '$3 ~ /^(sd|nvme|vd)[a-z]+$/ { print "    " $3 " inflight=" $12 " io_ms=" $13 }' /proc/diskstats
+            sleep 60
+          done
+          SAMPLER
+          sed -i 's/^          //' "${RUNNER_TEMP}/host-pressure.sh"
+          nohup bash "${RUNNER_TEMP}/host-pressure.sh" \
+            > "${RUNNER_TEMP}/host-pressure.log" 2>&1 &
+          echo $! > "${RUNNER_TEMP}/host-pressure.pid"
+          echo "sampler pid $(cat "${RUNNER_TEMP}/host-pressure.pid")"
+
       - name: Python 3.12.13 release regression suite in Docker
         shell: bash
         run: |
@@ -163,6 +198,16 @@ jobs:
       # PYTHONPYCACHEPREFIX and cache_dir keep the common offenders out of the
       # mount; this returns anything else the container left behind. It needs no
       # sudo, deletes nothing, and runs even when the suite failed.
+      - name: Host pressure during the suite
+        if: always()
+        shell: bash
+        run: |
+          if [ -f "${RUNNER_TEMP}/host-pressure.pid" ]; then
+            kill "$(cat "${RUNNER_TEMP}/host-pressure.pid")" 2>/dev/null || true
+          fi
+          echo "One sample per minute for the length of the suite:"
+          cat "${RUNNER_TEMP}/host-pressure.log" 2>/dev/null || echo "(no samples recorded)"
+
       - name: Return workspace ownership to the runner account
         if: always()
         shell: bash
@@ -687,9 +732,16 @@ jobs:
     name: Clean-checkout suite order independence
     runs-on: fcp-linux
     # Two full shuffled suites at Nitro's measured ~175 minutes each, plus the
-    # dependency install. The earlier 30- and 180-minute budgets were both
-    # sized from an extrapolation that run 33960401244 disproved.
-    timeout-minutes: 420
+    # dependency install: about 365 minutes. The earlier 30- and 180-minute
+    # budgets were both sized from an extrapolation that run 33960401244
+    # disproved. 420 left only 13% headroom, and that same run showed Nitro
+    # spending 1156 seconds on one 72-test line and 0.5 on another, so 13% is
+    # not headroom against this host -- it is a coin toss. 600 costs nothing
+    # when the suite runs at its measured rate and avoids a second cancellation
+    # that names nothing. The budget is the only thing raised: the runs still
+    # use -v, so a cancellation still names the test it was on, and no
+    # threshold, assertion or selection changes.
+    timeout-minutes: 600
     steps:
       # actions/checkout deletes the workspace contents as the unprivileged
       # runner account. A containerised suite from an earlier run leaves
