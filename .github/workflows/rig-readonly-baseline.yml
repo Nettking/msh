@@ -464,6 +464,12 @@ jobs:
           docker ps -a --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}' || true
           docker compose ls --all || true
           docker volume ls || true
+          echo "=== runtime build commit labels (the only proof of deployed SHA) ==="
+          for c in $(docker ps -a --format '{{.Names}}'); do
+            label=$(docker inspect -f '{{index .Config.Labels "no.fcp.build_commit"}}' "$c" 2>/dev/null)
+            image=$(docker inspect -f '{{.Config.Image}}' "$c" 2>/dev/null)
+            echo "  $c: build_commit=${label:-<none>} image=$image"
+          done
           echo "=== rig checkouts ==="
           for repo in /home/martin/fcp /home/martin/msh /home/martin/actions-runner/_work/msh/msh; do
             if [ -d "$repo/.git" ]; then
@@ -488,7 +494,18 @@ jobs:
           import sqlite3
           from pathlib import Path
 
-          roots = [Path("/home/martin/fcp"), Path("/home/martin/msh")]
+          # The live stack on Nitro is the "fcp-new" Compose project, whose
+          # data root is /home/martin/fcp-new-data -- not the checkout. Looking
+          # only under the checkout reported "no node_state.sqlite3 found",
+          # which was an artefact of scanning the wrong directory.
+          roots = [
+              Path("/home/martin/fcp"),
+              Path("/home/martin/fcp/data"),
+              Path("/home/martin/fcp-new-data"),
+              Path("/home/martin/fcp-new-results"),
+              Path("/home/martin/fcp-archive-20260903-2"),
+              Path("/home/martin/msh"),
+          ]
           print("================ RIG BASELINE SUMMARY: NITRO ================")
           for root in roots:
               if not root.exists():
