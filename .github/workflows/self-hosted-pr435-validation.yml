@@ -38,14 +38,17 @@ jobs:
           ref: ${{ env.VALIDATED_SHA }}
           fetch-depth: 0
 
-      - name: Verify exact candidate SHA
-        shell: bash
-        run: test "$(git rev-parse HEAD)" = "${VALIDATED_SHA}"
-
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
           cache: pip
+
+      - name: Verify exact candidate SHA
+        run: >-
+          python -c "import os, subprocess;
+          actual = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip();
+          expected = os.environ['VALIDATED_SHA'];
+          assert actual == expected, f'{actual} != {expected}'"
 
       - uses: actions/setup-go@v5
         with:
@@ -255,7 +258,6 @@ jobs:
         run: docker compose config --quiet
 
       - name: Diff hygiene
-        shell: bash
         run: git diff --check HEAD^ HEAD
 
   postgres-storage:
