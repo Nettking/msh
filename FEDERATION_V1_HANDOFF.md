@@ -44,7 +44,7 @@ FAILURE_CLASSIFICATIONS:
 
 COMPLETED_TESTS:
 - Real Nettking Windows job101330241662 at ba8a3b0b:871 passed/1 skipped capability-product;367 passed/1 skipped transport-storage-failover; Go,Ruff,Compose,diff,storage preconditions passed.
-- Real Nitro PostgreSQL job101330241653 SUCCESS; exact test total/skip count still to extract before treating database-backed coverage as complete.
+- Real Nitro PostgreSQL job101330241653 SUCCESS:11 passed,0 skipped in8.75s against the healthy PostgreSQL service, exact ba8a3b0b asserted.
 - R001 focused publication-recovery + real-relay identity suites:24 passed; meaningful red→green regression. Candidate history reviewed by Astra.
 - Isolated four CI003 tests on Nettking Python3.12.10: candidate4 passed/5.97s, main4 passed/6.40s. Historical f043 run also4 passed; it is not evidence for current full-suite stability.
 - Claude's reported local candidate full suite3633 passed/30 skipped in default and two shuffled orders, plus repeated recorder/reconnect coverage, are local prequalification—not Nitro or physical acceptance.
