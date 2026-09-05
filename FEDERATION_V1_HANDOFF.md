@@ -68,6 +68,103 @@ NEXT_ACTIONS:
 7. Only after software gates: controlled physical acceptance of exact candidate from clean checkouts on Nettking,Nitro,MSH Recorder. Record roles, initial/runtime/Federation state, supported startup commands, identity ownership, expected/observed results, reconnect/restart, cleanup/rollback and final state. Activate Nitro recorder only as part of that controlled test.
 8. Do NOT merge PR435. User explicitly froze merge during diagnosis. Final review and physical evidence must make a later merge decision defensible.
 
+## FAST-RUNNER VALIDATION OF THE FROZEN CANDIDATE — the primary release evidence
+
+Executed by Claude under operator instruction, 2026-09-05T21:45Z-22:03Z.
+ACTING_ENGINEER in this file remains Astra and is untouched; this section
+reports. Astra holds the release, merge and physical-acceptance decisions.
+
+    FAST_LINUX_VALIDATION:   PASS
+    FAST_WINDOWS_VALIDATION: PASS on the existing self-hosted Windows gate;
+                             INCOMPLETE on Beast-Windows (host has no Python)
+    NITRO_SLOW_HOST_STRESS:  RUNNING
+
+VALIDATED_CANDIDATE_SHA: ba8a3b0b828f59c36c5aaaf6130480a2432a5578 (FROZEN, asserted in every job before anything ran)
+MAIN_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356
+HARNESS: ci/fast-linux-validation at e81bf4d5, run 33994338144; ci/fast-windows-validation at dcd3fca4, run 33994714769.
+
+### Nettking-Linux, 20 cores, docker 29.1.3, python:3.12.13-bookworm verified
+
+| job | result | duration |
+| --- | --- | --- |
+| Release static checks 101382063256 | **PASS, every step** | 90 s |
+| Targeted repeats of the five Nitro failures 101381346930 | **0 of 20 failed** | 107 s |
+| Targeted repeats, second independent run 101382063264 | **0 of 20 failed** | 112 s |
+| **Full candidate suite, default order 101382542624** | **3633 passed, 30 skipped, 452 warnings** | **288.01 s (4:48)** |
+
+The static set is the gate's own: storage/host-resource precondition, compileall
+over catalog, the acceptance-manifest assertions, ruff across its exact 46-path
+selection ("All checks passed!"), the product branding boundary, the Go direct
+peer sidecar tests, Compose configuration, and diff hygiene. The full-suite job
+also passed "Repository stays clean after the suite", so the suite left nothing
+behind. Per-repeat timing in the targeted legs was 1.84-3.04 s for 8 tests.
+
+THE NUMBER THAT MATTERS FOR CI003/CI004: 3633 passed / 30 skipped is exactly what
+the same commit produces off-runner, and the five tests that failed on Nitro run
+in about 2 s each here against roughly 52 s there. The full suite is 4m48s here
+against 56-129 minutes on Nitro. Nothing was retimed, skipped or weakened to get
+this.
+
+### Windows
+
+Windows on this exact candidate ALREADY PASSED on the existing self-hosted gate:
+run 33975032244 job 101330241662, 871 passed / 1 skipped in the capability and
+product subset, 367 passed / 1 skipped in transport/storage/failover, plus Go,
+ruff, Compose and diff hygiene. That is the Windows release evidence.
+
+Beast-Windows was attempted as independent confirmation and is BLOCKED, not
+failing: the host has git and docker but **no python, no py and no go** (42.7 GB
+free on C), and actions/setup-python@v5 did not put an interpreter on PATH, so
+all ten targeted repeats reported "'python' is not recognized". Installing an
+interpreter on that host is a host change and was not made. This says nothing
+about the candidate.
+
+### Beast-Linux never accepted a job
+
+Four runs, ~30 minutes, both `beast-linux` and `[self-hosted, beast-linux]`:
+runner_id 0, no runner assigned, every time. Beast-**Windows** accepts jobs on
+the identical `[self-hosted, ...]` pattern and reports machine name BEAST, so the
+job definitions are not the problem; the Beast-Linux registration, labels or
+runner group needs checking on the host. No runner infrastructure was touched.
+
+### Eight environment defects, all class C, none the candidate's
+
+Recorded because each one produced a red job that says nothing about the product,
+and the next person will hit them: setup-go@v5 with no version on a Go-less
+runner runs a bare `version` and dies; `bash -lc` in the golang image is a login
+shell and discards the image's PATH so `go` vanishes; `check_product_branding.py`
+shells out to git, which refuses a uid-1001 repository from a root container
+("dubious ownership"); the Compose plugin is absent on Nettking-Linux; a root
+container leaves root-owned files that the next actions/checkout cannot clean;
+Beast-Windows has no pwsh; its Windows PowerShell refuses to load .ps1 at all
+("running scripts is disabled on this system"); and it has no Python. The
+PowerShell policy and the missing interpreter were worked around or reported
+rather than fixed, because both would mean changing host configuration.
+
+### What this does and does not settle
+
+It settles that the frozen candidate passes a complete Linux release gate on a
+capable host, in under five minutes, reproducibly on the targeted set across two
+independent runs. Combined with the existing Windows PASS, the software evidence
+for ba8a3b0 is now positive on both platforms.
+
+It does NOT settle the Nitro failures' root cause. Both trees passed the targeted
+A/B on Nitro at the same disk saturation, and no candidate-versus-main difference
+has ever been observed on any host; the Nitro-only failures remain wall-clock
+timeouts on a two-core rotating-disk machine, still classified and still without
+a proven mechanism. No product change is justified by anything measured tonight.
+
+### Exact recommended next action for Astra
+
+1. Decide whether Linux release evidence on Nettking-Linux is acceptable in place
+   of Nitro for the gate, given Nitro is now classified slow-host/stress. This is
+   an executive call and has not been made here.
+2. If a second consecutive clean full suite is wanted before progressing, it costs
+   five minutes on Nettking-Linux, not two hours.
+3. Beast-Linux registration and Beast-Windows Python are operator items.
+4. Physical acceptance has still NOT run on this candidate. Nothing merged,
+   nothing deployed, Beast unchanged as AI_PROVIDER_ONLY.
+
 ## Nitro A/B harness: published, running, and open for Astra to adopt or cancel
 
 Written and started by Claude under direct operator instruction at 19:53Z.
