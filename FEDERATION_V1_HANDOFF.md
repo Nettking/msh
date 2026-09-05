@@ -128,6 +128,63 @@ legs in both positions plus the targeted repeats. The seeded legs are NOT in it
 and remain to be added; the harness takes the leg as a parameter, so adding
 them is a workflow edit, not a rewrite.
 
+### AB001 targeted leg: COMPLETE, and it rules out the simplest explanation
+
+Job 101366217178 finished 20:51:57Z. Both phases asserted their HEAD before
+running and both reported their collection: 3663 on the candidate, 3645 on main,
+matching the counts measured independently off-runner.
+
+RESULT, and it is symmetric:
+
+| leg | SHA | repeats | failures | per-repeat |
+| --- | --- | --- | --- | --- |
+| t1-candidate | ba8a3b0 | 30 | **0** | 8 passed, 51-55 s |
+| t2-main | 6101c86 | 30 | **0** | 8 passed, 51-53 s |
+
+Sixty consecutive runs of the exact five failing tests, on the exact runner that
+failed them, against both trees. Not one failure, and no timing separation
+between the trees.
+
+By the operator's rule this is the "both pass" branch: the earlier failures stay
+INTERMITTENT, the gate is NOT approved, and further reproduction is required.
+Nothing here excuses the red run.
+
+WHAT IT RULES OUT, and this corrects the emphasis of Claude's own earlier
+entries. The telemetry during these sixty clean repeats reads:
+
+| leg | sda busy mean | median | max | MemTotal | MemAvailable mean | SwapFree mean | load mean |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| t1-candidate | 82.9% | 84.3% | 90.5% | 3.26 GiB | 2.00 GiB | 3.10 GiB | 2.11 |
+| t2-main | 82.1% | 85.0% | 89.9% | 3.26 GiB | 2.00 GiB | 3.10 GiB | 2.09 |
+
+That is the SAME disk saturation, within a percentage point, as the 83.4% mean
+measured during the Linux run that failed. So ~83% sustained busy on this
+rotational disk is Nitro's ordinary working state under this workload, and on
+its own it does NOT produce the failures. Sixty repeats prove that. "The host is
+saturated, therefore the tests time out" is not a sufficient explanation and
+should stop being offered as one -- Claude's included.
+
+Memory is likewise steady and unremarkable: 2.00 GiB available of 3.26 total,
+with essentially no swap consumed during these legs, which is consistent with
+Astra's independent observation and with Astra's rejection of the earlier
+"memory-starved" framing.
+
+WHAT REMAINS. The failures need something the isolated repeats do not have, and
+the obvious candidates are properties of the full suite rather than of the host
+baseline: state accumulated across 3600+ tests, memory pressure late in a long
+process, page-cache eviction, or concurrent fixtures competing for the same
+spindle. The full-suite legs now running are what can show this; the targeted
+leg has done its job, which was to be cheap and to eliminate a hypothesis.
+
+AB002 pair_ab (full suite candidate then main) started 20:52:14Z as job
+101374058563. Note for whoever reads the run: a phase's step can show green even
+when the phase failed, because phases record their rc and continue on purpose --
+main's result is worthless if a failing candidate leg aborts the sequence. Read
+`===== PHASE <name> RESULT rc=N =====` in the log, not the step colour. The
+already-written next revision of the harness moves that verdict into the summary
+step so the job itself turns red; it is committed but deliberately unpushed,
+because pushing that branch cancels the run in flight.
+
 ## Two corrections to Claude's earlier entries, both of which Astra was right about
 
 MEMORY. Claude described Nitro as "memory-starved" from MemAvailable readings
