@@ -21,55 +21,55 @@ Host facts assumed by this runbook:
   refer to it as `$RepoRoot`
 - historical service ports: relay `8765`, web `5000`, auto-join `5151`
 
-## 1. Why the provider profile is the correct role
+## 1. The role: a joined device that contributes language-model only
 
-The repository already separates *local process composition* from *capability
-contribution authority*. Both layers must stay in the AI-only configuration;
-neither is invented for this recovery.
+Beast must appear in the Federation with its own node ID and own the
+`language-model` capability. That rules out the `language-model-provider`
+command profile: its `provider` Compose profile starts only `model-provider`
+and the one-shot `model-provider-install`, with no `flask` service, and every
+zero-touch step runs through `docker compose exec -T flask`. That profile is a
+headless endpoint another device consumes over the "connected computer" path;
+it never joins and never owns a capability.
 
-**Layer 1 — command profile.** `catalog/command_setup.py` defines the
-`language-model-provider` profile as "Run only the headless Ollama provider
-service", with `skip_orchestration: True` and `compose_profile: "provider"`.
-The module docstring is explicit: "Command profiles are local process-composition
-choices. They are deliberately separate from capability onboarding and
-contribution authority. ... selecting a command profile never enables a
-contribution or marks onboarding complete."
+Beast therefore runs the **full FCP device** and is constrained at the
+contribution layer, not the process layer.
 
-The `provider` Compose profile in `docker-compose.yml` contains exactly two
-services, `model-provider` and the one-shot `model-provider-install`. It starts
-no `flask`, no `relay`, no `recorder`, and no storage service. A Beast running
-this profile is therefore *structurally* incapable of contributing storage or
-recording — those processes do not exist on the host.
+`catalog/federation/onboarding_compat.py` defines
+`CONTRIBUTION_KEYS = ("workbench", "runtime", "recorder", "language-model",
+"compute", "storage")`, and `_base_intents()` starts every key at
+`ContributionDesiredState.DISABLED`. The AI-only role is exactly:
+`language-model` enabled, all five others disabled.
 
-`model-provider` carries the capability labels directly:
+Storage is additionally candidacy-only — the contribution service describes it
+as "Request candidacy only; assignment remains control-plane owned" — and
+provider enrollment is metadata only:
+`catalog/capabilities/provider_enrollment.py` states an announcement "does not
+create resource reports, reserve capacity, dispatch jobs, invoke providers, or
+grant storage, artifact, or execution authority."
 
-```yaml
-labels:
-  - "no.fcp.capability=language-model"
-  - "no.fcp.protocol=ollama"
+### Hazard: zero-touch auto-enables every available contribution
+
+`scripts/zero_touch_federation_start.py` joins the Federation and then calls
+`catalog.flask_app.services.automatic_capability_bootstrap`. Its
+`_enable_available_contributions` iterates the recommended candidates and
+enables **every one that is not BLOCKED**:
+
+```python
+intent = service.apply_choices(
+    {candidate.candidate_id: ContributionDesiredState.ENABLED.value}
+)[0]
 ```
 
-**Layer 2 — contribution authority.** `catalog/federation/onboarding_compat.py`
-defines `CONTRIBUTION_KEYS = ("workbench", "runtime", "recorder",
-"language-model", "compute", "storage")`. `_base_intents()` initializes every
-key to `ContributionDesiredState.DISABLED`, and the `language-model-provider`
-mode enables `language-model` only. `compute` and `storage` are left disabled
-with the recorded warning that they "remain disabled until the user reviews new
-benchmark candidates".
+There is no capability-type filter and no AI-only option. If Beast's storage
+benchmark returns GREEN, `storage` is enabled; `APPROVAL_REQUIRED` and
+`PENDING` are deliberately kept enabled. Running the script unconditionally can
+therefore make Beast a storage contributor, which this recovery forbids.
 
-Storage is additionally candidacy-only even when enabled — the contribution
-service describes it as "Request candidacy only; assignment remains
-control-plane owned"
-(`catalog/flask_app/services/capability_contribution_service.py`).
-
-**Enrollment is metadata only.** `catalog/capabilities/provider_enrollment.py`
-states that an announcement "does not create resource reports, reserve capacity,
-dispatch jobs, invoke providers, or grant storage, artifact, or execution
-authority."
-
-Conclusion: the supported AI-provider-only role for Beast is the existing
-`language-model-provider` command profile plus a `language-model`-only
-contribution intent. No new role, key, or capability is required.
+The mitigation is the idempotency guard in `bootstrap_capabilities()`: when
+capability startup has already completed it returns early with
+`contributions_enabled: 0` and never re-runs the enable loop. So the safe
+sequence depends on Beast's persisted startup state, and section 5 branches on
+exactly that.
 
 ### Capability identifiers used below
 
@@ -233,61 +233,73 @@ remove a capability.
 
 ## 5. Rejoin — least invasive sequence
 
-Stop at the first step that restores service; do not run later steps unless the
-verification in section 6 still fails.
+First determine which branch applies. Inside the Flask container:
 
-**Step 1 — start the provider service only.**
-
-```powershell
-Set-Location $RepoRoot
-docker compose --profile provider up -d model-provider
-docker compose --profile provider ps model-provider
+```bash
+docker compose exec -T flask python -m \
+  catalog.flask_app.services.zero_touch_federation_cli --json status
 ```
 
-The service declares a healthcheck (`ollama list`, 2s interval, 30 retries).
-Wait for `healthy` before continuing.
+Then read the persisted contribution intents and confirm whether capability
+startup already completed, and whether any storage intent is already ENABLED.
 
-**Step 2 — confirm the model is present, and pull only if missing.**
+### Branch A — capability startup already completed
 
-```powershell
-curl.exe -s http://127.0.0.1:11434/api/tags
-# if the selected model is absent:
-python -m catalog.federation.model_resource_pull --target model-provider --model smollm2:360m
+`bootstrap_capabilities()` early-returns with `contributions_enabled: 0`, so the
+supported script cannot add contributions:
+
+```bash
+python scripts/zero_touch_federation_start.py --web-port 5000
 ```
 
-The model lives in the persistent `model_provider_models` Docker volume, so
-ordinary restarts and repository updates do not re-download it.
+Never pass `--initialize-federation`. Beast is a later device and must be
+join-only; the flag exists solely for first-Federation creation and would risk a
+split Federation.
 
-**Step 3 — repair configuration only if Phase 0 showed class H.**
+Before running, confirm no storage intent is already ENABLED. The early-return
+path still calls `_repair_creator_storage_authority_evidence`, which acts only
+on a node whose storage intent is already enabled — on an AI-only Beast there is
+nothing for it to repair, and that is the state to verify rather than assume.
 
-```powershell
-python setup_fcp.py --profile language-model-provider --ai-profile edge-small --start --pull-model
-```
+### Branch B — capability startup has not completed
 
-This rewrites `.env` and `data/capabilities/config.json` for a provider node and
-starts the `provider` Compose profile. It does not enable any contribution and
-does not mark onboarding complete.
+Do **not** run the full script; its bootstrap would auto-enable every available
+contribution. Join with the separable steps, then choose contributions
+explicitly.
 
-**Step 4 — restore reachability if Phase 0 showed class G.**
+1. Discover and join, using the same tailnet/same-owner responder and a one-use
+   pairing grant. Enrollment uses no human credentials.
 
-```powershell
-tailscale status
-tailscale up
-# private-network inbound rule for the provider port, if absent:
-New-NetFirewallRule -DisplayName "FCP language-model provider" `
-  -Direction Inbound -Action Allow -Protocol TCP -LocalPort 11434 -Profile Private
-```
+   ```bash
+   docker compose exec -T flask python -m \
+     catalog.flask_app.services.zero_touch_federation_cli --json redeem-auto-join
+   ```
 
-Keep port 11434 on the trusted Tailscale/LAN surface only. A plain Ollama
-endpoint has no authentication of its own.
+2. Confirm membership before touching contributions:
 
-**Step 5 — re-enroll only if Phase 0 showed class C or D.** Register Beast from
-the consuming FCP node's provider surface. Enrollment is metadata only and grants
-no storage, artifact, or execution authority.
+   ```bash
+   docker compose exec -T flask python -m \
+     catalog.flask_app.services.zero_touch_federation_cli --json status
+   ```
 
-**Step 6 — enable the AI contribution only if Phase 0 showed class E.** In
-`/onboarding`, set `language-model` to enabled and leave `recorder`, `storage`,
-and `compute` disabled.
+   Proceed only when `state` is `connected` and a `node_id` is present.
+
+3. In `/onboarding`, enable `language-model` and leave `recorder`, `storage`,
+   `compute`, `workbench`, and `runtime` disabled. Every supported contribution
+   needs a persisted decision before startup completes, so disabled must be
+   chosen explicitly rather than skipped.
+
+Automatic join refuses ambiguity by design: it fails when no Federation is
+discovered, and refuses to pick when more than one is. Both are correct
+outcomes, not faults to work around.
+
+### Supporting steps, only as the baseline requires
+
+- **Class B** — start the model service the device serves locally.
+- **Class G** — repair reachability: `tailscale status`, then confirm the
+  provider port is bound on the tailnet address rather than loopback only.
+- **Class H** — repair configuration through `setup_fcp.py`, which never enables
+  a contribution and never marks onboarding complete.
 
 Do not deploy `ba8a3b0b828f59c36c5aaaf6130480a2432a5578` for this recovery. It is
 a release candidate under separate qualification; changing Beast's software is
