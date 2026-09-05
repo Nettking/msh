@@ -11,7 +11,7 @@ how the red gate was attributed.
 ## The failure
 
 `PR 435 self-hosted Federation v1 validation`, run
-[33956840831](https://github.com/Nettking/msh/actions/runs/33956840831), job
+run `33956840831`, job
 **Release matrix (Windows)** on the `Nettking` runner, step 10 **Windows
 transport, storage, and failover regressions**:
 
@@ -72,7 +72,7 @@ The outcome therefore depends only on the free space of the volume pytest writes
 `tmp_path` into.
 
 Measured on the `Nettking` runner (run
-[33958109488](https://github.com/Nettking/msh/actions/runs/33958109488), step
+run `33958109488`, step
 **Measure the volumes the suite writes into**), for the workspace, `RUNNER_TEMP`
 and the pytest temp root, which are all on `C:`:
 
@@ -80,7 +80,7 @@ and the pytest temp root, which are all on `C:`:
 All local volumes:
   C:\        18.99 GiB free of   1906.46 GiB
 
-workspace: C:\actions-runner\_work\msh\msh
+workspace: C:\actions-runner\_work\<repo>\<repo>
   volume            : 18.99 GiB free of 1906.46 GiB
   derived allocation floor : 64.00 GiB
   free minus floor         : -45.01 GiB
@@ -122,7 +122,7 @@ error-path branch in `RelayNodeClient` that drops a cached announcement on
 
 ### 2. Unmodified `main` fails identically on the same runner
 
-Run [33958109488](https://github.com/Nettking/msh/actions/runs/33958109488) ran
+Run run `33958109488` ran
 the same storage subset twice on `Nettking`, once at `main`
 `6101c86d94294c70db47d1a8053cac93b9a41356` and once at the PR head
 `13967aea9f4561cea64b5427bdf572de823ec577`:

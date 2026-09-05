@@ -15,7 +15,7 @@ Last updated: 2026-09-05, during self-hosted validation run 33960401244.
 | PR #435 branch | `claude/federation-recorder-capability-id-19tqkk` |
 | Validation branch | `ci/self-hosted-pr435` @ `dc160d63960a2b65618e06fed3e9ef54d5009fff` |
 | `VALIDATED_SHA` in that workflow | `f0434e4a4fd4cf86b3574563151d1e6241b4e06c` (matches the PR head) |
-| Latest validation run | [33971811540](https://github.com/Nettking/msh/actions/runs/33971811540) (supersedes 33960401244) |
+| Latest validation run | run `33971811540` (supersedes `33960401244`) |
 | Diagnosis branch / PR | `claude/pr435-validation-diagnosis-n285av`, PR #436 (docs only) |
 | Rig baseline branch | `ci/rig-readonly-baseline` |
 
@@ -139,7 +139,7 @@ into a different test. `--durations=25` is now enabled on those runs, so the
 next completed run will name the slow tests directly rather than leaving this
 inferred from chunk timings.
 
-### Open: an unnamed failure in the Linux full suite
+### The Linux full suite's failure, now named
 
 Run 33960401244's Linux job was **cancelled at its 120-minute budget** having
 reached 64% of the suite, and its progress output contains **exactly one `F`,
@@ -158,34 +158,57 @@ What is established:
 * The failure is **not in the Windows subset** — that job passed 367/1 skipped
   — so only the Linux full suite exercises it.
 
-What is *not* established: which test it is. By index the `F` is the 2162nd
-test in collection order, which locally is
-`catalog/flask_app/tests/test_federation_pairing_relay.py::test_signed_pairing_code_projects_same_members_from_both_viewpoints`.
-Treat that as a **candidate, not an identification**: Nitro collected roughly
-3667-3712 tests against 3662 locally, so the index can drift by up to ~50, and
-the whole neighbourhood is `catalog/flask_app/tests/test_federation_*`.
+**The test is now named**, from the cancelled log alone:
 
-The candidate is at least plausible. It starts a real `RelayServer` with hard
-five-second `auth_timeout_seconds`, `send_timeout_seconds` and
-`timeout_seconds`, and five seconds is a short budget on a machine where 72
-tests can take 19 minutes. But it did not reproduce locally: **50 runs clean**
-at the PR head (30 plain, 20 more with attempted CPU load).
+```
+catalog/flask_app/tests/test_federation_pairing_relay.py::test_signed_pairing_code_projects_same_members_from_both_viewpoints
+```
 
-Classification so far: **not PR 435**. The PR's diff is six files, and the
-only one on this test's dependency path is `catalog/node/client.py`, whose
-change runs solely inside the cached-capability replay loop on a
-`capability-identity-conflict` — a path this test does not exercise. Whether
-it is (D) pre-existing on main or (E) load-sensitive cannot be settled until
-the test is named.
+The `F` is the second character of the 31st 72-character progress line, so it
+is at 0-based index 2161. That index maps only if the collection matches, and
+it does: the log's eleven percentage annotations are all consistent with a
+total of exactly 3662 and with no other plausible total, the job installs no
+shuffling plugin so the order is the default one, and the same commit collects
+exactly 3662 items here. The earlier "±50 index drift" caveat is retired — it
+came from treating the percentages as approximate when they pin the total.
+Index 2161 is the only test in its file, so an off-by-one would land on a
+different name.
+
+**PR 435 did not cause it.** The test file is byte-identical on `main` and on
+the candidate, and none of the PR's six changed files is under
+`catalog/flask_app/` or `catalog/relay/`. That is the argument; the evidence is
+a controlled experiment. The test's three hard five-second timeouts were read
+from an environment variable in an untracked copy in two scratch worktrees —
+one at `f0434e4a`, one at unmodified `main` `6101c86`, verified identical — and
+swept downward. Both trees pass 15/15 at 0.08 s, degrade across the same band,
+and fail 15/15 at 0.02 s; at 0.04 s the *candidate* passed nearly twice as
+often as `main`. Same failure mode on both sides, curves indistinguishable.
+
+The experiment also corrected an assumption of the earlier draft. The test's
+2.5-second wall time is almost all import and fixture setup; the operations the
+timeouts guard finish in well under 100 ms, so the headroom is roughly 50-500x,
+not 2x. A merely slower host does not break this test. What does is Nitro's
+**stalls**: in the same run, 72 tests took 1156 seconds on one line and 0.5
+seconds on another. One stall of that size inside any of the three five-second
+windows is enough, and the hung 42-hour `cp` container found on Nitro shares
+that disk.
+
+Classification: **not a PR 435 regression**; **self-hosted infrastructure**
+primarily; **latent pre-existing test defect** secondarily, since the same
+fragility is on `main`. Full working: [pr435_linux_gate_failing_test.md](pr435_linux_gate_failing_test.md).
+
+Still outstanding: no traceback from Nitro itself has been read, because the
+job was cancelled before printing one. The identification is arithmetic and is
+firm; the cause on that host is inference until job `101321613451` confirms
+it.
 
 **How it gets named.** `ci/self-hosted-pr435` @ `dc160d6` raises the Linux
 budgets to the measured rate (300 minutes for the full suite, 420 for the two
 shuffled ones) and switches those runs from `-q` to `-v --durations=25`. `-v`
 names each test as it runs, so even a cancelled run says what failed, and the
 durations report gives the evidence for the 175-minute runtime. Scope,
-selection and thresholds are unchanged. Run
-[33971811540](https://github.com/Nettking/msh/actions/runs/33971811540) is the
-first under those settings.
+selection and thresholds are unchanged. Run `33971811540` is the first under
+those settings.
 
 ## 9. Focused and repeated test evidence
 
@@ -210,9 +233,10 @@ SSH key.
 ## 11. Linux runner (Nitro) state
 
 `/dev/sda2` 832.19 GiB free of 915.81 GiB against a 45.79 GiB derived floor, so
-both product floors are cleared with room. One full suite takes about 52
-minutes. Runner user `martin`, workspace
-`/home/martin/actions-runner/_work/msh/msh`. The rig checkout at
+both product floors are cleared with room. One full suite takes about 175
+minutes, measured. An earlier figure of 52 minutes was extrapolated and wrong.
+Runner user `martin`, workspace
+`/home/martin/actions-runner/_work/<repo>/<repo>`. The rig checkout at
 `/home/martin/fcp` has **not** been inventoried yet — the Linux baseline job was
 deliberately not run while the release gate is serialising on this machine.
 
@@ -226,10 +250,10 @@ from the engineering environment. Nothing was started, stopped or reconfigured.
 | Item | Value |
 | --- | --- |
 | hostname | `Nettking` |
-| rig checkout `C:\wsl\msh` | branch `main` @ `6101c86…` — **clean, pre-PR-435** |
-| sibling directories | `C:\wsl\msh-archive-20260903-2145` and `C:\wsl\msh-new`, **neither a git checkout** — each holds only `data/` and `results/` |
-| `C:\msh\git` | absent (that path belongs to MSH Recorder) |
-| ports 5000, 8765 | bound on `127.0.0.1` **and `100.70.61.68`** by `com.docker.backend.exe` (pid 2500) |
+| rig checkout `C:\wsl\<repo>` | branch `main` @ `6101c86…` — **clean, pre-PR-435** |
+| sibling directories | `C:\wsl\<repo>-archive-20260903-2145` and `C:\wsl\<repo>-new`, **neither a git checkout** — each holds only `data/` and `results/` |
+| `C:\<recorder-root>\git` | absent (that path belongs to the Recorder host) |
+| ports 5000, 8765 | bound on `127.0.0.1` **and the host's private mesh address** by `com.docker.backend.exe` (pid 2500) |
 | port 11434 | `ollama.exe` (pid 19704), `wslrelay.exe` (pid 7756) |
 | Docker inventory | unavailable to the runner account |
 | device node id | `node-UTKPPKDmI2UhdO9vJ_PX75ETb6S8G86T4nFjBXuaZ-A` |
@@ -252,13 +276,27 @@ A second, unrelated standalone coordinator also exists on this machine at
 `session-standalone-92002a52a9cc49d0bb0492f41b3c5ee4`, one
 `background-analysis` capability, connectivity `disconnected`.
 
-### Nitro — not yet inventoried
+### Nitro — inventoried 2026-09-05
 
-Its runner is busy with the release gate. The same workflow will collect it.
+Read-only job `101295293488` collected it. `/home/martin/fcp` is on branch
+`main` @ `6101c86`, clean. The live stack is the Compose project `fcp-new`
+(flask, relay, ollama up) whose data root is the sibling
+`/home/martin/fcp-new-data`, alongside `fcp-new-results` and
+`fcp-archive-20260903-2`. Two things need an operator decision and were not
+touched: `fcp-new-recorder-1` has been `Exited(0)` for 31 hours, so the live
+rig currently has no running recorder; and container `kind_poitras` has been up
+42 hours running `cp -a /src/. /dst/`, its host processes alive for 1d17h. A
+`cp` that has not finished in 42 hours is hung, and it shares the disk with the
+runner. The legacy `fcp` project is fully exited.
 
-### MSH Recorder — not reachable
+No container build label was read in that pass, so the **runtime** commit on
+Nitro is still unproven; the checkout SHA is not evidence of what the running
+containers were built from. The inventory workflow now prints
+`no.fcp.build_commit` per container and needs one more run.
 
-`ssh martin@msh-recorder.tail4ccd2b.ts.net` from the runner returns
+### The Recorder host — not reachable
+
+SSH to it from the runner returns
 `Permission denied (publickey,password,keyboard-interactive)`: the runner
 service account has no key. It must be inventoried from an interactive session
 on Nettking, or by adding a job on a runner that has credentials.
@@ -303,27 +341,27 @@ a genuine physical finding rather than a repeat of the known blocker.
 
 | Instance | Classification |
 | --- | --- |
-| `C:\wsl\msh` @ main `6101c86`, running behind Docker on 5000/8765 | **CURRENT baseline** — the accepted pre-PR-435 build, not a candidate |
-| `C:\wsl\msh-archive-20260903-2145` | **LEGACY state archive** — `data/` and `results/` only, no code, dated 2026-09-03 |
-| `C:\wsl\msh-new` | **UNKNOWN, state-shaped** — also `data/` and `results/` only, no code |
+| `C:\wsl\<repo>` @ main `6101c86`, running behind Docker on 5000/8765 | **CURRENT baseline** — the accepted pre-PR-435 build, not a candidate |
+| `C:\wsl\<repo>-archive-20260903-2145` | **LEGACY state archive** — `data/` and `results/` only, no code, dated 2026-09-03 |
+| `C:\wsl\<repo>-new` | **UNKNOWN, state-shaped** — also `data/` and `results/` only, no code |
 | standalone analysis coordinator in `results/capabilities` | **LEGACY** — separate session, disconnected |
 | ollama / wslrelay on 11434 | supporting services, not FCP nodes |
-| Nitro rig `/home/martin/fcp` | **UNKNOWN** — not yet inventoried |
-| MSH Recorder `C:\msh\git`, `C:\msh\acceptance-6101c86` | **UNKNOWN** — unreachable |
+| Nitro rig `/home/martin/fcp` | **CURRENT baseline** — `main` @ `6101c86`, clean; live stack is Compose project `fcp-new` on `/home/martin/fcp-new-data`, runtime commit still unproven |
+| the Recorder host `C:\<recorder-root>\git`, `C:\<recorder-root>\acceptance-6101c86` | **UNKNOWN** — unreachable |
 
 ## 15. Proposed safe deployment and cleanup plan
 
 For Astra to approve or reject. Nothing below has been done.
 
 1. Finish the software gate and confirm the verdict is green on `f0434e4`.
-2. Inventory Nitro and MSH Recorder read-only, including
-   `C:\wsl\msh-new` on Nettking, before touching anything.
-3. Decide the fate of `msh-archive-20260903-2145` and `msh-new`. Neither is a
+2. Inventory Nitro and the Recorder host read-only, including
+   `C:\wsl\<repo>-new` on Nettking, before touching anything.
+3. Decide the fate of the archive and `-new` siblings. Neither is a
    checkout: both hold only `data/` and `results/`, so what they carry is
-   state, not code. The code rollback is trivial — `C:\wsl\msh` is git, on
+   state, not code. The code rollback is trivial — `C:\wsl\<repo>` is git, on
    `main` @ `6101c86`, clean — but that archive may be the only copy of the
    pre-2026-09-03 rig state, which cannot be regenerated. Do not delete either
-   until the physical test has passed. `msh-new` is unexplained and worth
+   until the physical test has passed. The `-new` sibling is unexplained and worth
    understanding before deployment: a candidate pointed at it would start
    against those directories rather than the live ones.
 4. Deploy the candidate to a **new** checkout per host rather than over the
@@ -348,7 +386,7 @@ For Astra to approve or reject. Nothing below has been done.
    whether branch protection requires any hosted check that cannot currently
    run.
 3. Before any physical step, run the rig baseline workflow against Nitro and
-   obtain an MSH Recorder inventory from a session that holds SSH credentials.
+   obtain an the Recorder host inventory from a session that holds SSH credentials.
 4. Treat Nettking's stuck `connecting` node with its cached `recorder-local`
    as the first physical acceptance case, not as an incident to clear by hand.
 
