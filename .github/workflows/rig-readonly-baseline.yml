@@ -21,7 +21,9 @@ permissions:
 
 concurrency:
   group: rig-readonly-baseline
-  cancel-in-progress: false
+  # A superseded inventory has no value, and Nitro is serialising the release
+  # gate: queued baseline runs must not stack up behind it.
+  cancel-in-progress: true
 
 jobs:
   nettking:
@@ -394,11 +396,19 @@ jobs:
                                      "log", "-1", "--format=%ad %s", "--date=short"]).strip()
                       print(f"    {match}: {branch} @ {head} | {subject[:80]}")
                   else:
+                      # Not a checkout: say what it actually holds, so an
+                      # archive can be told from a staging directory without
+                      # opening any file.
                       try:
-                          entries = len(list(match.iterdir()))
-                      except OSError:
-                          entries = "?"
-                      print(f"    {match}: not a checkout ({entries} entries)")
+                          entries = sorted(match.iterdir())
+                      except OSError as error:
+                          print(f"    {match}: unreadable ({error})")
+                          continue
+                      print(f"    {match}: not a checkout, {len(entries)} entries")
+                      for entry in entries[:12]:
+                          kind = "dir " if entry.is_dir() else "file"
+                          nested = " (git checkout)" if (entry / ".git").exists() else ""
+                          print(f"        {kind} {entry.name}{nested}")
 
           device = Path(r"C:\wsl\msh\data\federation\device\node_state.sqlite3")
           print("device node state   :")
