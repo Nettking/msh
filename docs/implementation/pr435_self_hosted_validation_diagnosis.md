@@ -201,6 +201,19 @@ job still checks out and verifies
   33956840831, because the repair could only run once checkout had already
   given up.
 
+## A second, unrelated defect
+
+While the gate was being diagnosed, the full suite turned up a separate flake
+in PR 435's own new test: `test_local_state_restored_from_a_stale_backup_reconverges`
+restores a WAL-mode SQLite database by copying only its main file, so the
+reopened node state is a mixture of the backup and the live WAL and the node's
+replay check refuses it. It has nothing to do with disk space and would have
+reddened the Linux jobs on its own. See
+[pr435_stale_backup_restore_flake.md](pr435_stale_backup_restore_flake.md).
+It is fixed on the product branch, whose head is now
+`b2a7c6e5fb68bc4d4dbbb57322ca496feb1438a9`; the validation branch validates
+that SHA.
+
 ## What still blocks a green gate
 
 An operator has to free at least **45.01 GiB on the Nettking `C:` volume**, or

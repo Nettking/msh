@@ -154,11 +154,18 @@ python -m pytest -o addopts= -q -p no:randomly \
 # with the fix: 300 passed
 ```
 
-## Why this is not in the wrapper
+## Where the fix landed
 
-The wrapper fix on `ci/self-hosted-pr435` cannot help here: this failure is in
-the candidate's own test, so it has to be fixed on the product branch
-`claude/federation-recorder-capability-id-19tqkk`, which moves PR 435's head
-away from `13967aea9f4561cea64b5427bdf572de823ec577`. The validation branch
-pins that SHA deliberately, so applying this fix means re-pointing
-`VALIDATED_SHA` at the new head and rerunning the gate.
+The wrapper on `ci/self-hosted-pr435` cannot help here: the failure is in the
+candidate's own test, so the fix belongs on the product branch.
+
+* `claude/federation-recorder-capability-id-19tqkk`
+  `13967aea9f4561cea64b5427bdf572de823ec577` ->
+  **`b2a7c6e5fb68bc4d4dbbb57322ca496feb1438a9`**
+  (`test: restore the whole node state database, not just its main file`)
+* `ci/self-hosted-pr435` `VALIDATED_SHA` re-pointed at that new head, so the
+  gate validates the candidate that can actually be merged.
+
+No product code changed. The diff is confined to
+`catalog/mtconnect_recorder/tests/test_multi_recorder_capability_identity.py`:
+one helper and two call sites.
