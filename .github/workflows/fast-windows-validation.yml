@@ -31,7 +31,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Runner identity and available toolchains
-        shell: pwsh
+        shell: powershell
         run: |
           Write-Host "runner name : $env:RUNNER_NAME"
           Write-Host "host        : $env:COMPUTERNAME"
@@ -61,7 +61,7 @@ jobs:
         with:
           ref: ba8a3b0b828f59c36c5aaaf6130480a2432a5578
       - name: Verify exact candidate SHA
-        shell: pwsh
+        shell: powershell
         run: |
           $head = git rev-parse HEAD
           if ($head -ne $env:CANDIDATE_SHA) { throw "HEAD $head is not $env:CANDIDATE_SHA" }
@@ -70,17 +70,17 @@ jobs:
         with:
           python-version: '3.12'
       - name: Python identity and release dependencies
-        shell: pwsh
+        shell: powershell
         run: |
           python --version
           python -m pip install --quiet --upgrade pip==26.2.1
           python -m pip install --quiet -r requirements.txt -c constraints-release.txt
           python -m pip install --quiet pytest==9.1.1 -c constraints-release.txt
       - name: Storage allocation and host-resource preconditions
-        shell: pwsh
+        shell: powershell
         run: python scripts/ci_release_disk_preflight.py "$env:GITHUB_WORKSPACE" "$env:TEMP"
       - name: Windows capability and product release regressions
-        shell: pwsh
+        shell: powershell
         run: |
           python -m pytest -o addopts= -q `
             catalog/capabilities/tests `
@@ -93,7 +93,7 @@ jobs:
             catalog/flask_app/tests/test_federation_overview_route.py
       - name: Windows transport, storage and failover regressions
         if: always()
-        shell: pwsh
+        shell: powershell
         run: |
           python -m pytest -o addopts= -q `
             catalog/node/tests/test_identity.py `
@@ -109,7 +109,7 @@ jobs:
             catalog/federation/tests/test_phase_d4_write_authority.py
       - name: The five tests that failed on Nitro, 10 repeats
         if: always()
-        shell: pwsh
+        shell: powershell
         run: |
           $fails = 0
           for ($i = 1; $i -le 10; $i++) {
