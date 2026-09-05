@@ -68,6 +68,86 @@ NEXT_ACTIONS:
 7. Only after software gates: controlled physical acceptance of exact candidate from clean checkouts on Nettking,Nitro,MSH Recorder. Record roles, initial/runtime/Federation state, supported startup commands, identity ownership, expected/observed results, reconnect/restart, cleanup/rollback and final state. Activate Nitro recorder only as part of that controlled test.
 8. Do NOT merge PR435. User explicitly froze merge during diagnosis. Final review and physical evidence must make a later merge decision defensible.
 
+## Nitro A/B harness: published, running, and open for Astra to adopt or cancel
+
+Written and started by Claude under direct operator instruction at 19:53Z.
+ACTING_ENGINEER in this file stays Astra and has not been touched; Astra claims
+control of A/B execution, so this section reports rather than assumes. Cancel
+the run if it conflicts with a leg sequence Astra has already begun.
+
+HARNESS_BRANCH: `ci/nitro-ab-candidate-vs-main` at `a0f9e756d0e70bfcd5e8c3fe50500067361d63c4`.
+It is a diagnostic identity, deliberately separate from both the product
+candidate and `ci/self-hosted-pr435`; it contains one workflow file and no
+product change.
+AB_RUN: 33988447252, three jobs on `fcp-linux`, chained with `needs` so their
+order is deterministic. `targeted` (120 min), then `pair_ab` (600 min), then
+`pair_ba` (600 min).
+
+LEGS. `targeted` runs the five failing tests 30 times against the candidate and
+then 30 times against main -- minutes, not hours, and it answers whether the
+failures reproduce at all before four full suites are spent. `pair_ab` runs the
+full default-order suite candidate-then-main; `pair_ba` runs it
+main-then-candidate. Counterbalancing is the point: cache warmth, page cache,
+disk state and accumulated host state all drift one way across a long run, and
+running each tree in both positions is what stops that drift from reading as a
+branch effect.
+
+HELD IDENTICAL BY CONSTRUCTION: one clone checked out to each SHA in turn with
+`git checkout --detach` plus `git clean -xdff`, HEAD asserted against the
+expected SHA before anything runs; the same `python:3.12.13-bookworm` container;
+`pip==26.2.1` then `-r requirements.txt -c constraints-release.txt` then
+`pytest==9.1.1` (requirements.txt, constraints-release.txt, pytest.ini and
+conftest.py are byte-identical across the two commits, so the environment is
+equal by construction rather than by assertion); the same
+`python -m pytest -o addopts= -o cache_dir=/tmp/pytest_cache -p no:randomly -v --durations=50`;
+the product's own storage preflight; and a shared pip cache so download
+variance stays out of the measurement. Collection size is the one thing that
+cannot be equal: 3663 on the candidate against 3645 on main, because the
+candidate adds its own tests.
+
+TELEMETRY, every 30 seconds for the length of each suite: load and process
+counts, MemTotal/MemAvailable/SwapTotal/SwapFree/Dirty/Writeback, per-device
+reads, writes, queue depth and both I/O time counters, free bytes and free
+inodes, live pytest processes, running container count. Printed after each
+phase whether it passed or failed, so a timeout can be lined up against what
+the host was doing that minute.
+
+CLEAN STATE, before and after every phase: orphan pytest processes, every
+container, listening TCP ports, host test scratch, disk and inodes, and recent
+kernel errors are all printed. The only thing removed is `git clean -xdff`
+inside the job's own clone and the job's own telemetry file, and every removal
+is logged. The harness contains no `docker stop`, `rm`, `kill`, `prune`,
+`restart` or volume command and writes nothing under the rig's data roots --
+verified by grep over the workflow before it was pushed. The diagnosis must not
+disturb the thing being diagnosed.
+
+DELTA AGAINST NEXT_ACTIONS 3. That list asks for candidate default, main
+default, candidate seed 20260813, main seed 20260813, then two consecutive
+candidate clean-checkout runs at seed 15. This run covers the two default-order
+legs in both positions plus the targeted repeats. The seeded legs are NOT in it
+and remain to be added; the harness takes the leg as a parameter, so adding
+them is a workflow edit, not a rewrite.
+
+## Two corrections to Claude's earlier entries, both of which Astra was right about
+
+MEMORY. Claude described Nitro as "memory-starved" from MemAvailable readings
+of 1.70-2.13 GiB. That was wrong, and Astra's fresh read-only observation says
+why: the host has roughly 3.5 GB of RAM in total, so about 2 GB available is a
+comfortable majority free, not starvation. The disk-busy figure stands on its
+own measurement; the memory claim does not, and is withdrawn. What the fresh
+observation adds is more useful than what it removes: the volume is a
+ROTATIONAL HDD, which makes sustained high busy time a plausible capacity limit
+for an fsync-heavy suite rather than evidence that something else is competing
+for the spindle.
+
+DIFF EXCLUSION. Claude wrote that the candidate was "excluded by diff" because
+every failing test file and the modules under test are byte-identical to main.
+Astra narrowed that correctly: byte-identical files do not exclude an indirect
+effect reaching those paths through the code the candidate does change. The
+byte-identity is still a fact and still worth having, but it is evidence, not a
+proof of exclusion, and the categorical phrasing is withdrawn. The same-runner
+A/B above is precisely what can settle it, which is why it is running.
+
 ## Authority and rotation
 
 ACTIONS_CLAUDE_IS_AUTHORIZED_TO TAKE:
