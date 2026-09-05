@@ -892,8 +892,10 @@ class RecorderFederationNode:
                         outbox = None
                         authority_node_id = None
                         group_id = None
-                        active_client_id = id(client)
                         await self._announce_connected(state)
+                        # Mark success only after reconciliation completes, so
+                        # a transient failure is retried before publication.
+                        active_client_id = id(client)
 
                     status = await client.coordinator_status()
                     selected = select_storage_authority(
