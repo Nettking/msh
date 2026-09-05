@@ -368,20 +368,37 @@ jobs:
               print(f"    {repo}: {branch} @ {head} "
                     f"({'clean' if not dirty else 'dirty'})")
 
-          print("msh-shaped dirs     :")
+          print("sibling checkouts   :")
           for base in (Path("C:/"), Path("C:/msh"), Path("C:/wsl")):
               if not base.exists():
                   print(f"    {base}: absent")
                   continue
               try:
-                  names = sorted(
-                      d.name for d in base.iterdir()
+                  matches = sorted(
+                      d for d in base.iterdir()
                       if d.is_dir()
                       and re.search(r"msh|fcp|acceptance|candidate", d.name, re.I)
                   )
               except OSError as error:
-                  names = [f"<unreadable {error}>"]
-              print(f"    {base}: {names}")
+                  print(f"    {base}: unreadable ({error})")
+                  continue
+              if not matches:
+                  print(f"    {base}: (none matching)")
+              for match in matches:
+                  if (match / ".git").exists():
+                      head = run(["git", "-c", "safe.directory=*", "-C", str(match),
+                                  "rev-parse", "HEAD"]).strip()[:12]
+                      branch = run(["git", "-c", "safe.directory=*", "-C", str(match),
+                                    "rev-parse", "--abbrev-ref", "HEAD"]).strip()
+                      subject = run(["git", "-c", "safe.directory=*", "-C", str(match),
+                                     "log", "-1", "--format=%ad %s", "--date=short"]).strip()
+                      print(f"    {match}: {branch} @ {head} | {subject[:80]}")
+                  else:
+                      try:
+                          entries = len(list(match.iterdir()))
+                      except OSError:
+                          entries = "?"
+                      print(f"    {match}: not a checkout ({entries} entries)")
 
           device = Path(r"C:\wsl\msh\data\federation\device\node_state.sqlite3")
           print("device node state   :")
@@ -412,4 +429,100 @@ jobs:
               finally:
                   connection.close()
           print("===============================================================")
+
+  nitro:
+    name: Nitro baseline (read-only)
+    runs-on: fcp-linux
+    timeout-minutes: 20
+    steps:
+      - name: Nitro read-only inventory
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          echo "=== host ==="
+          hostname; uname -a; uptime
+          echo "=== disk ==="
+          df -h / /home 2>/dev/null | sort -u
+          echo "=== fcp-shaped processes ==="
+          ps -eo pid,etime,cmd --sort=start_time \
+            | grep -Ei 'fcp|flask|recorder|relay|gunicorn|ollama|python' \
+            | grep -v grep || echo "  (none)"
+          echo "=== listening sockets ==="
+          ss -ltnp 2>/dev/null || netstat -ltnp 2>/dev/null || echo "  (unavailable)"
+          echo "=== docker ==="
+          docker ps -a --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}' || true
+          docker compose ls --all || true
+          docker volume ls || true
+          echo "=== rig checkouts ==="
+          for repo in /home/martin/fcp /home/martin/msh /home/martin/actions-runner/_work/msh/msh; do
+            if [ -d "$repo/.git" ]; then
+              echo "  $repo: $(git -c safe.directory='*' -C "$repo" rev-parse --abbrev-ref HEAD) @ $(git -c safe.directory='*' -C "$repo" rev-parse HEAD)"
+              echo "    last: $(git -c safe.directory='*' -C "$repo" log -1 --format='%ad %s' --date=short)"
+              dirty=$(git -c safe.directory='*' -C "$repo" status --porcelain | wc -l)
+              echo "    working tree entries changed: $dirty"
+            else
+              echo "  $repo: absent or not a checkout"
+            fi
+          done
+          echo "=== sibling directories ==="
+          ls -1d /home/martin/*fcp* /home/martin/*msh* 2>/dev/null || echo "  (none)"
+
+      - name: Nitro federation state (SQLite, read-only)
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          python3 - <<'PY'
+          import json
+          import sqlite3
+          from pathlib import Path
+
+          roots = [Path("/home/martin/fcp"), Path("/home/martin/msh")]
+          print("================ RIG BASELINE SUMMARY: NITRO ================")
+          for root in roots:
+              if not root.exists():
+                  print(f"{root}: absent")
+                  continue
+              devices = sorted(root.rglob("node_state.sqlite3"))
+              if not devices:
+                  print(f"{root}: no node_state.sqlite3 found")
+              for device in devices:
+                  print(f"\n{device}")
+                  try:
+                      connection = sqlite3.connect(
+                          f"file:{device.as_posix()}?mode=ro", uri=True, timeout=5
+                      )
+                  except sqlite3.Error as error:
+                      print(f"  unreadable: {error}")
+                      continue
+                  connection.row_factory = sqlite3.Row
+                  try:
+                      runtime = connection.execute(
+                          "SELECT * FROM node_runtime"
+                      ).fetchone()
+                      if runtime is not None:
+                          print(f"  node_id          : {runtime['node_id']}")
+                          print(f"  enrollment_state : {runtime['enrollment_state']}")
+                          print(f"  connection_state : {runtime['connection_state']}")
+                          print(f"  updated_at       : {runtime['updated_at']}")
+                      for row in connection.execute("SELECT * FROM joined_sessions"):
+                          print(f"  session          : {row['session_id']} "
+                                f"({row['membership_state']}, rev "
+                                f"{row['last_applied_revision']})")
+                      print("  cached capabilities:")
+                      for row in connection.execute(
+                          "SELECT capability_id, capability_json "
+                          "FROM advertised_capabilities"
+                      ):
+                          payload = json.loads(row["capability_json"])
+                          print(f"    {row['capability_id']}  "
+                                f"type={payload.get('type')} "
+                                f"status={payload.get('status')}")
+                  except sqlite3.Error as error:
+                      print(f"  query failed: {error}")
+                  finally:
+                      connection.close()
+          print("============================================================")
+          PY
 
