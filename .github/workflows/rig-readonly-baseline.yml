@@ -114,6 +114,10 @@ jobs:
           import subprocess
           from pathlib import Path
 
+          # -c safe.directory is command-scoped. It reads through git's dubious
+          # ownership guard (the checkouts belong to the interactive user, the
+          # runner is NetworkService) without writing any git configuration.
+          BASE = ["git", "-c", "safe.directory=*"]
           candidates = [
               Path(r"C:\wsl\msh"),
               Path(r"C:\msh\git"),
@@ -128,23 +132,37 @@ jobs:
                   ("HEAD", ["rev-parse", "HEAD"]),
                   ("branch", ["rev-parse", "--abbrev-ref", "HEAD"]),
                   ("last commit", ["log", "-1", "--format=%h %ad %s", "--date=iso"]),
+                  ("describes main?", ["merge-base", "--is-ancestor", "HEAD", "origin/main"]),
                   ("status", ["status", "--porcelain"]),
               ):
                   try:
                       out = subprocess.run(
-                          ["git", "-C", str(repo), *args],
+                          [*BASE, "-C", str(repo), *args],
                           capture_output=True, text=True, timeout=60,
                       )
                       value = (out.stdout or out.stderr).strip()
+                      if label.startswith("describes"):
+                          value = "yes" if out.returncode == 0 else "no (or unknown)"
                   except Exception as error:  # noqa: BLE001
                       value = f"<{error}>"
                   if label == "status":
                       lines = [l for l in value.splitlines() if l]
                       print(f"  status: {len(lines)} modified/untracked entries")
-                      for line in lines[:20]:
+                      for line in lines[:25]:
                           print(f"    {line}")
                   else:
                       print(f"  {label}: {value}")
+
+      - name: Identify the processes holding the product ports
+        shell: cmd
+        continue-on-error: true
+        run: |
+          echo === owners of the product ports ===
+          for /f "tokens=5" %%p in ('netstat -ano ^| findstr /R /C:":5000 " /C:":8765 " /C:":11434 "') do @tasklist /fi "PID eq %%p" /fo list ^| findstr /B /C:"Image Name" /C:"PID"
+          echo === candidate and legacy checkouts on C: ===
+          dir /b /ad C:\ 2>nul | findstr /i "msh fcp wsl acceptance"
+          if exist C:\msh dir /b /ad C:\msh
+          if exist C:\wsl dir /b /ad C:\wsl
 
       - name: Environment configuration (key names only, no secret values)
         shell: python
