@@ -1,0 +1,125 @@
+name: Fast Windows validation
+
+# Independent Windows confirmation of the frozen candidate on Beast-Windows.
+# It lives on its own branch so it cannot cancel the Linux run in flight.
+#
+# Beast-Windows is a fresh host, and two setup-* actions have already failed on
+# fresh runners in this campaign, so the first job reports what the machine
+# actually has before anything depends on it. Nothing here changes product code,
+# tests, timeouts, Python versions or the runner.
+
+on:
+  push:
+    branches:
+      - ci/fast-windows-validation
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fast-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CANDIDATE_SHA: ba8a3b0b828f59c36c5aaaf6130480a2432a5578
+
+jobs:
+  smoke-beast-windows:
+    name: "Smoke: Beast-Windows"
+    runs-on: [self-hosted, beast-windows]
+    timeout-minutes: 30
+    steps:
+      - name: Runner identity and available toolchains
+        shell: pwsh
+        run: |
+          Write-Host "runner name : $env:RUNNER_NAME"
+          Write-Host "host        : $env:COMPUTERNAME"
+          Write-Host "user        : $env:USERNAME"
+          Write-Host "cpus        : $env:NUMBER_OF_PROCESSORS"
+          Get-CimInstance Win32_OperatingSystem |
+            Select-Object Caption, Version,
+              @{n='FreeGB';e={[math]::Round($_.FreePhysicalMemory/1MB,2)}},
+              @{n='TotalGB';e={[math]::Round($_.TotalVisibleMemorySize/1MB,2)}} |
+            Format-List
+          Get-PSDrive C | Select-Object Used, Free | Format-List
+          foreach ($tool in 'python','py','go','docker','git') {
+            $found = Get-Command $tool -ErrorAction SilentlyContinue
+            if ($found) { Write-Host ("{0,-8} -> {1}" -f $tool, $found.Source) }
+            else        { Write-Host ("{0,-8} -> NOT FOUND" -f $tool) }
+          }
+          if (Get-Command python -ErrorAction SilentlyContinue) { python --version }
+          if (Get-Command py -ErrorAction SilentlyContinue) { py -0p }
+
+  windows-release-subsets:
+    name: "Beast-Windows: capability, transport and storage subsets"
+    runs-on: [self-hosted, beast-windows]
+    needs: smoke-beast-windows
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ba8a3b0b828f59c36c5aaaf6130480a2432a5578
+      - name: Verify exact candidate SHA
+        shell: pwsh
+        run: |
+          $head = git rev-parse HEAD
+          if ($head -ne $env:CANDIDATE_SHA) { throw "HEAD $head is not $env:CANDIDATE_SHA" }
+          Write-Host "HEAD verified: $head"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Python identity and release dependencies
+        shell: pwsh
+        run: |
+          python --version
+          python -m pip install --quiet --upgrade pip==26.2.1
+          python -m pip install --quiet -r requirements.txt -c constraints-release.txt
+          python -m pip install --quiet pytest==9.1.1 -c constraints-release.txt
+      - name: Storage allocation and host-resource preconditions
+        shell: pwsh
+        run: python scripts/ci_release_disk_preflight.py "$env:GITHUB_WORKSPACE" "$env:TEMP"
+      - name: Windows capability and product release regressions
+        shell: pwsh
+        run: |
+          python -m pytest -o addopts= -q `
+            catalog/capabilities/tests `
+            catalog/ai/tests/test_remote_provider.py `
+            catalog/relay/tests/test_phase_f83_remote_ai_binding.py `
+            catalog/relay/tests/test_phase_f84_compute_worker_activation.py `
+            catalog/federation/tests/cf7_acceptance/test_product_acceptance.py `
+            catalog/federation/tests/cf7_acceptance/test_physical_evidence.py `
+            catalog/federation/tests/cf7_acceptance/test_foundation.py `
+            catalog/flask_app/tests/test_federation_overview_route.py
+      - name: Windows transport, storage and failover regressions
+        if: always()
+        shell: pwsh
+        run: |
+          python -m pytest -o addopts= -q `
+            catalog/node/tests/test_identity.py `
+            catalog/node/tests/test_state.py `
+            catalog/node/tests/test_client.py `
+            catalog/mtconnect_recorder/tests/test_multi_recorder_capability_identity.py `
+            catalog/node/tests/test_storage_agent.py `
+            catalog/node/tests/test_three_machine_deployment.py `
+            catalog/node/tests/test_physical_storage_failover.py `
+            catalog/node/tests/test_physical_storage_recovery.py `
+            catalog/relay/tests/test_service.py `
+            catalog/federation/tests/test_phase_d3_control_plane.py `
+            catalog/federation/tests/test_phase_d4_write_authority.py
+      - name: The five tests that failed on Nitro, 10 repeats
+        if: always()
+        shell: pwsh
+        run: |
+          $fails = 0
+          for ($i = 1; $i -le 10; $i++) {
+            python -m pytest -o addopts= -q `
+              catalog/mtconnect_recorder/tests/test_source_availability_retry.py `
+              catalog/relay/tests/test_phase2_integration.py::test_f2_006_revocation_rejects_traffic_and_reconnect_but_peer_survives `
+              catalog/flask_app/tests/test_federation_pairing_relay.py `
+              catalog/node/tests/test_live_storage_catchup.py 2>&1 | Select-Object -Last 1
+            if ($LASTEXITCODE -ne 0) { $fails++ }
+            Write-Host "repeat $i exit $LASTEXITCODE"
+          }
+          Write-Host "TARGETED_REPEATS: $fails of 10 failed"
+          if ($fails -ne 0) { exit 1 }
