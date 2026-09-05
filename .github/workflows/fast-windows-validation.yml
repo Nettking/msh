@@ -56,12 +56,15 @@ jobs:
         if: always()
         shell: cmd
         run: |
-          python --version || echo no python on PATH
+          python --version
+          if errorlevel 1 echo no python on PATH; this is a probe, not a verdict
+          exit /b 0
       - name: Free disk on C
         if: always()
         shell: cmd
         run: |
           dir C:\ | find "bytes free"
+          exit /b 0
 
   windows-release-subsets:
     name: "Beast-Windows: capability, transport and storage subsets"
