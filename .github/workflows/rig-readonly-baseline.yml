@@ -154,15 +154,56 @@ jobs:
                       print(f"  {label}: {value}")
 
       - name: Identify the processes holding the product ports
-        shell: cmd
+        shell: python
         continue-on-error: true
         run: |
-          echo === owners of the product ports ===
-          for /f "tokens=5" %%p in ('netstat -ano ^| findstr /R /C:":5000 " /C:":8765 " /C:":11434 "') do @tasklist /fi "PID eq %%p" /fo list ^| findstr /B /C:"Image Name" /C:"PID"
-          echo === candidate and legacy checkouts on C: ===
-          dir /b /ad C:\ 2>nul | findstr /i "msh fcp wsl acceptance"
-          if exist C:\msh dir /b /ad C:\msh
-          if exist C:\wsl dir /b /ad C:\wsl
+          import csv
+          import io
+          import re
+          import subprocess
+          from pathlib import Path
+
+          def run(args):
+              return subprocess.run(
+                  args, capture_output=True, text=True, timeout=120
+              ).stdout
+
+          images = {}
+          for row in csv.reader(io.StringIO(run(["tasklist", "/fo", "csv", "/nh"]))):
+              if len(row) >= 2:
+                  images[row[1]] = row[0]
+
+          print("=== owners of the product ports ===")
+          wanted = {"5000", "8765", "11434"}
+          for line in run(["netstat", "-ano"]).splitlines():
+              parts = line.split()
+              if len(parts) < 5 or parts[0] != "TCP" or parts[3] != "LISTENING":
+                  continue
+              port = parts[1].rsplit(":", 1)[-1]
+              if port not in wanted:
+                  continue
+              pid = parts[4]
+              print(f"  {parts[1]:32s} pid={pid:8s} image={images.get(pid, '<unknown>')}")
+
+          print("\n=== every python/ollama/docker process ===")
+          for pid, image in sorted(images.items(), key=lambda kv: kv[1].lower()):
+              if re.search(r"python|ollama|docker|flask|node", image, re.I):
+                  print(f"  pid={pid:8s} {image}")
+
+          print("\n=== msh-shaped directories ===")
+          for base in (Path("C:/"), Path("C:/msh"), Path("C:/wsl")):
+              if not base.exists():
+                  print(f"  {base}: absent")
+                  continue
+              try:
+                  entries = sorted(
+                      d.name for d in base.iterdir()
+                      if d.is_dir() and re.search(r"msh|fcp|wsl|acceptance|candidate", d.name, re.I)
+                  )
+              except OSError as error:
+                  print(f"  {base}: unreadable ({error})")
+                  continue
+              print(f"  {base}: {entries or '(none matching)'}")
 
       - name: Environment configuration (key names only, no secret values)
         shell: python
