@@ -39,14 +39,14 @@ jobs:
         with:
           ref: ${{ env.VALIDATED_SHA }}
       - name: Use Nettking Python 3.12.10
-        shell: pwsh
+        shell: powershell
         run: |
           $root = 'C:\actions-runner\toolchains\python-3.12.10'
           if (-not (Test-Path "$root\python.exe")) { throw "Python toolchain missing: $root\python.exe" }
           $root | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
           "$root\Scripts" | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
       - name: Verify candidate SHA and Python
-        shell: pwsh
+        shell: powershell
         run: |
           if ((git rev-parse HEAD) -ne $env:VALIDATED_SHA) { throw "candidate SHA mismatch" }
           $version = python --version 2>&1
