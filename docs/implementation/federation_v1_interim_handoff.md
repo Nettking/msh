@@ -172,6 +172,33 @@ holding a **`recorder-local`** capability in its local cache from
 is the live form of the previous physical blocker rather than a new fault. No
 logical-storage group could be observed as ready.
 
+### Why this baseline matters for acceptance
+
+The symptom on Nettking is the one PR 435 was written for, and the PR has a
+regression test that asserts exactly this recovery:
+`test_connect_drops_a_cached_identity_the_coordinator_reassigned`. It puts a
+node in the state Nettking is in -- a locally cached
+`recorder-local` the coordinator has since assigned elsewhere -- reconnects it,
+and asserts three things:
+
+```python
+assert reconnected.connected_event.is_set()
+assert reconnected.state.advertised_capabilities(session_id=SESSION_ID) == ()
+assert rig.rows()[LEGACY_RECORDER_CAPABILITY_ID]["node_id"] == owner
+```
+
+That is: the node reaches connected instead of being stranded, it drops the
+stale cache entry, and it does not take the identity away from the node that
+legitimately owns it. `test_connect_still_fails_closed_on_an_unrelated_rejection`
+guards the other direction, so the swallow is scoped to
+`capability-identity-conflict` and nothing else.
+
+So the expected physical outcome is specific and checkable: after deploying the
+candidate, Nettking's device node should move from `connecting` to `connected`,
+its `advertised_capabilities` should lose the `recorder-local` row, and the
+recorder should re-announce under `recorder-{node_id}`. If it does not, that is
+a genuine physical finding rather than a repeat of the known blocker.
+
 ## 14. Legacy / candidate classification
 
 | Instance | Classification |
