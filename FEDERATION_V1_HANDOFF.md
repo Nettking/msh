@@ -68,6 +68,50 @@ NEXT_ACTIONS:
 7. Only after software gates: controlled physical acceptance of exact candidate from clean checkouts on Nettking,Nitro,MSH Recorder. Record roles, initial/runtime/Federation state, supported startup commands, identity ownership, expected/observed results, reconnect/restart, cleanup/rollback and final state. Activate Nitro recorder only as part of that controlled test.
 8. Do NOT merge PR435. User explicitly froze merge during diagnosis. Final review and physical evidence must make a later merge decision defensible.
 
+## AB003 — THE NITRO A/B ANSWERED IT: MAIN FAILS THE TEST, THE CANDIDATE PASSED
+
+Job 101374058563 of run 33988447252 completed 23:08:55Z. Both full-suite legs
+ran back to back on the same runner, in the same job, from the same clone
+checked out to each SHA in turn.
+
+| leg | SHA | rc | result | duration |
+| --- | --- | --- | --- | --- |
+| a1-candidate | ba8a3b0 | **0** | **full suite PASSED** | 69m 44s |
+| a2-main | 6101c86 | **1** | **1 failed**, 3614 passed, 30 skipped | 64m 22s |
+
+The test that failed on unmodified main is
+
+    catalog/mtconnect_recorder/tests/test_source_availability_retry.py::test_first_real_data_is_durably_written_with_its_raw_manifest
+
+reported 22:55:58Z at 90%, with `Failed: recorder capture did not finish within
+the test deadline` — the same test, the same 2-second helper deadline, and the
+same signature as the release-gate failure that started this investigation. Its
+teardown again proves the work completed: `committed sequences 1-3 (3
+observations)` logged at 22:55:55Z, three seconds before the failure was
+reported. Host during that leg: sda busy mean 83.0%, max 96.6%, MemAvailable
+mean 1.86 GiB.
+
+CLASSIFICATION. Category A, candidate regression, is FALSIFIED. On one host, in
+one job, minutes apart, the candidate passed the full suite and unmodified main
+failed it — on the very test previously used to doubt the candidate. What
+remains is a pre-existing test-design defect (a hard wall-clock deadline in
+`_complete_scheduled_cycle`) surfacing as slow-host sensitivity on a two-core
+rotating-disk machine at sustained ~83% disk busy: categories B/F manifesting as
+D, present on main, not introduced by PR 435.
+
+A CORRECTION TO MY OWN EARLIER ENTRY. I wrote that no candidate-versus-main
+difference had been observed on any host. That is now superseded: there is a
+difference, and it runs in the candidate's favour. It is one run per leg, so it
+is not a failure-rate comparison and must not be quoted as one — what it
+establishes is that main is not immune, which is the claim that matters.
+
+STILL RUNNING: job 101391451308, the counterbalanced leg (main then candidate),
+started 23:09:01Z. It is the check on whether ordering or accumulated host state
+produced this, and it is worth having before the classification is called final.
+Do not push to ci/nitro-ab-candidate-vs-main while it runs; commit 596d0de on
+that branch is ready afterwards and adds the seeded legs plus a red job on any
+failed phase.
+
 ## FAST-RUNNER VALIDATION OF THE FROZEN CANDIDATE — the primary release evidence
 
 Executed by Claude under operator instruction, 2026-09-05T21:45Z-22:03Z.
