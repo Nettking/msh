@@ -281,6 +281,61 @@ New-NetFirewallRule -DisplayName "FCP language-model provider" `
 Keep port 11434 on the trusted Tailscale/LAN surface only. A plain Ollama
 endpoint has no authentication of its own.
 
+### WSL2 hosts: the provider port is NAT-isolated by default
+
+If the checkout and the provider run inside a WSL2 distro while Tailscale runs
+on the Windows side, the host is reachable on the tailnet but the provider port
+is not. WSL2 sits behind a NAT'd virtual switch, so binding `0.0.0.0:11434`
+inside the distro serves Windows `localhost` only; the tailnet address answers
+nothing. This is a class G split with a clean provider: loopback returns
+`/api/tags`, the advertised address times out, and the container logs are quiet.
+
+Confirm the split from inside the distro, then from Windows:
+
+```bash
+# inside WSL: provider itself is healthy
+curl -s http://127.0.0.1:11434/api/tags
+ip -4 addr show eth0 | awk '/inet /{print $2}'   # NAT address, not the tailnet address
+```
+
+```powershell
+# from Windows: the tailnet address does not reach the distro
+curl.exe -s --max-time 5 http://100.85.20.75:11434/api/tags
+```
+
+Resolve with one of the following, in order of durability:
+
+1. **Mirrored networking (preferred).** In `%USERPROFILE%\.wslconfig` on Windows:
+
+   ```ini
+   [wsl2]
+   networkingMode=mirrored
+   ```
+
+   Then `wsl --shutdown` and restart the distro. WSL shares the host network
+   interfaces, including the Tailscale one, so the existing
+   `FCP_PROVIDER_BIND=0.0.0.0` binding becomes reachable with no port
+   forwarding. Requires Windows 11 22H2 or later with WSL 2.0.0 or later.
+
+2. **Run Tailscale inside the distro.** The distro joins the tailnet as its own
+   node with its own address. Re-verify which address the coordinator has
+   enrolled for the provider before relying on this.
+
+3. **Windows port proxy (least durable).** Forward the port from Windows to the
+   distro's current NAT address:
+
+   ```powershell
+   netsh interface portproxy add v4tov4 `
+     listenaddress=0.0.0.0 listenport=11434 `
+     connectaddress=<wsl-ip> connectport=11434
+   ```
+
+   The distro's address changes across restarts, so this needs re-applying after
+   every reboot. Prefer option 1 where the Windows build supports it.
+
+Whichever option is used, keep the port on the trusted tailnet or LAN surface
+only; a plain Ollama endpoint carries no authentication of its own.
+
 **Step 5 — re-enroll only if Phase 0 showed class C or D.** Register Beast from
 the consuming FCP node's provider surface. Enrollment is metadata only and grants
 no storage, artifact, or execution authority.
