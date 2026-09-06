@@ -25,7 +25,10 @@ import pytest
 
 from catalog.federation.errors import FederationValidationError
 from catalog.federation.recorder_control_events import (
+    SCAN_REPORT_EVENT,
+    SCAN_REQUEST_EVENT,
     SCHEMA,
+    SOURCES_REQUEST_EVENT,
     is_publishable_scan_cidr,
     scan_command_payload,
     scan_report_payload,
@@ -70,9 +73,19 @@ def _report(**overrides: Any) -> dict[str, Any]:
     return payload
 
 
-def _rejects(payload: dict[str, Any]) -> None:
+def _accepts(payload: dict[str, Any], event_type: str) -> None:
+    _ensure_bounded_json(payload, field="payload", event_type=event_type)
+
+
+def _rejects(payload: dict[str, Any], event_type: str | None = SCAN_REPORT_EVENT) -> None:
+    """Reject under the most permissive event type unless told otherwise.
+
+    Defaulting to a real scan event keeps every boundary case honest: it proves
+    the payload itself is refused, not merely that the event type was wrong.
+    """
+
     with pytest.raises(FederationValidationError) as caught:
-        _ensure_bounded_json(payload, field="payload")
+        _ensure_bounded_json(payload, field="payload", event_type=event_type)
     assert caught.value.code == "nonpublic-payload"
 
 
@@ -82,11 +95,11 @@ def _rejects(payload: dict[str, Any]) -> None:
 def test_the_b03_scan_report_publishes():
     """The exact report the recorder queued and could not publish."""
 
-    _ensure_bounded_json(_report(), field="payload")
+    _accepts(_report(), SCAN_REPORT_EVENT)
 
 
 def test_a_scan_request_with_a_private_network_is_routable():
-    _ensure_bounded_json(_request(cidr="192.168.1.0/24"), field="payload")
+    _accepts(_request(cidr="192.168.1.0/24"), SCAN_REQUEST_EVENT)
 
 
 def test_a_scan_request_without_an_explicit_network_is_routable():
@@ -97,7 +110,7 @@ def test_a_scan_request_without_an_explicit_network_is_routable():
     scan event routable.
     """
 
-    _ensure_bounded_json(
+    _accepts(
         scan_command_payload(
             request_id=B03_REQUEST_ID,
             target_node_id=B03_TARGET_NODE,
@@ -105,14 +118,14 @@ def test_a_scan_request_without_an_explicit_network_is_routable():
             port=5000,
             now=NOW,
         ),
-        field="payload",
+        SCAN_REQUEST_EVENT,
     )
 
 
 @pytest.mark.parametrize("cidr", ["10.1.2.0/25", "172.16.5.0/26", "192.168.9.7/32"])
 def test_networks_smaller_than_a_slash_24_are_routable(cidr: str):
-    _ensure_bounded_json(_request(cidr=cidr), field="payload")
-    _ensure_bounded_json(_report(cidr=cidr), field="payload")
+    _accepts(_request(cidr=cidr), SCAN_REQUEST_EVENT)
+    _accepts(_report(cidr=cidr), SCAN_REPORT_EVENT)
 
 
 # --- the security boundary the allowance must not cross ----------------------
@@ -120,20 +133,20 @@ def test_networks_smaller_than_a_slash_24_are_routable(cidr: str):
 
 @pytest.mark.parametrize("cidr", ["8.8.8.0/24", "1.1.1.1/32", "203.0.113.0/24"])
 def test_public_ipv4_is_still_rejected(cidr: str):
-    _rejects(_request(cidr=cidr))
-    _rejects(_report(cidr=cidr))
+    _rejects(_request(cidr=cidr), SCAN_REQUEST_EVENT)
+    _rejects(_report(cidr=cidr), SCAN_REPORT_EVENT)
 
 
 @pytest.mark.parametrize("cidr", ["192.168.0.0/16", "10.0.0.0/8", "172.16.0.0/12"])
 def test_a_network_wider_than_a_slash_24_is_still_rejected(cidr: str):
-    _rejects(_request(cidr=cidr))
-    _rejects(_report(cidr=cidr))
+    _rejects(_request(cidr=cidr), SCAN_REQUEST_EVENT)
+    _rejects(_report(cidr=cidr), SCAN_REPORT_EVENT)
 
 
 @pytest.mark.parametrize("cidr", ["fd00::/64", "::1/128", "fe80::/10"])
 def test_ipv6_is_still_rejected(cidr: str):
-    _rejects(_request(cidr=cidr))
-    _rejects(_report(cidr=cidr))
+    _rejects(_request(cidr=cidr), SCAN_REQUEST_EVENT)
+    _rejects(_report(cidr=cidr), SCAN_REPORT_EVENT)
 
 
 @pytest.mark.parametrize(
@@ -141,7 +154,7 @@ def test_ipv6_is_still_rejected(cidr: str):
     ["not-a-cidr", "172.19.0.0", "192.168.1.0/33", "192.168.1.0/-1", " 192.168.1.0/24"],
 )
 def test_a_malformed_cidr_is_still_rejected(cidr: str):
-    _rejects(_request(cidr=cidr))
+    _rejects(_request(cidr=cidr), SCAN_REQUEST_EVENT)
 
 
 def test_a_private_address_in_another_field_is_still_rejected():
@@ -196,7 +209,160 @@ def test_a_source_change_command_is_unaffected():
             now=NOW,
         ),
         field="payload",
+        event_type=SOURCES_REQUEST_EVENT,
     )
+
+
+# --- known residual risk, pinned so it cannot drift silently -----------------
+
+
+def test_a_report_naming_a_real_agent_is_still_refused():
+    """A discovered machine without a serial number still cannot be reported.
+
+    This pins a **known, unfixed** residual risk rather than desired behaviour.
+    ``mtconnect_discovery_service`` derives ``display_name`` and
+    ``source_name`` from ``f"{host}:{port}"`` whenever the agent reports no
+    serial number, so a legitimate MTConnect agent yields labels such as
+    ``"Mazak [192.168.1.50:5000]"`` and ``"192.168.1.50-5000"``. The generic
+    filter redacts those, and this allowance deliberately covers only ``cidr``
+    and ``port``.
+
+    B03 passed publication only because it found zero machines. The narrow fix
+    is to derive public-safe labels before publication, which cannot be done
+    here: ``source_name`` is a functional identity -- ``remove_source_names``
+    is validated against ``configured_source_names`` and used as the removal
+    key -- so changing it spans the recorder, the coordinator and existing
+    configured sources. Widening the relay allowance to arbitrary result
+    strings is not an acceptable alternative.
+
+    When that work lands, this test should start failing and be replaced.
+    """
+
+    _rejects(
+        _report(
+            results=[
+                {
+                    "source_id": "abc123",
+                    "source_name": "192.168.1.50-5000",
+                    "display_name": "Mazak [192.168.1.50:5000]",
+                    "machine_count": 1,
+                }
+            ],
+        ),
+        SCAN_REPORT_EVENT,
+    )
+
+
+def test_a_report_naming_an_agent_with_a_serial_number_publishes():
+    """The same report is routable when the agent identifies itself properly.
+
+    This bounds the residual risk above: it is the missing-serial fallback that
+    leaks the address, not recorder-control reporting as such.
+    """
+
+    _accepts(
+        _report(
+            results=[
+                {
+                    "source_id": "abc123",
+                    "source_name": "mazak-sn-7781",
+                    "display_name": "Mazak SN-7781",
+                    "machine_count": 1,
+                }
+            ],
+        ),
+        SCAN_REPORT_EVENT,
+    )
+
+
+# --- the allowance is scoped to the two scan event types ---------------------
+
+
+def test_both_scan_event_types_admit_a_valid_scan_payload():
+    _accepts(_request(cidr="192.168.1.0/24"), SCAN_REQUEST_EVENT)
+    _accepts(_report(cidr=B03_CIDR), SCAN_REPORT_EVENT)
+
+
+@pytest.mark.parametrize(
+    "event_type",
+    [
+        "some.other.event",
+        "recorder.control.sources.requested",
+        "recorder.control.sources.reported",
+        "storage.batch.published",
+        "",
+    ],
+)
+def test_an_unrelated_event_type_gains_nothing_from_a_scan_shaped_payload(event_type):
+    """The payload cannot vouch for the event that carried it.
+
+    An arbitrary session event may put a byte-identical
+    ``fcp.recorder-control.v1`` scan payload on the wire. Only the two scan
+    event types earn the exemption, so every other event still fails.
+    """
+
+    _rejects(_request(cidr="192.168.1.0/24"), event_type)
+    _rejects(_report(cidr=B03_CIDR), event_type)
+
+
+def test_a_payload_with_no_event_type_gains_nothing():
+    """Message routing validates payloads without an event type at all.
+
+    ``_route_message`` calls the filter with no event type, so node-to-node
+    messages can never carry a scan network however they are shaped.
+    """
+
+    _rejects(_request(cidr="192.168.1.0/24"), None)
+    _rejects(_report(cidr=B03_CIDR), None)
+
+
+# --- the allowance does not recurse into look-alike nested objects -----------
+
+
+def test_an_unrelated_outer_schema_cannot_smuggle_a_nested_scan_object():
+    """The exemption belongs to the event payload, not to anything shaped like one."""
+
+    _rejects(
+        {"schema": "fcp.some-other.v1", "data": _request(cidr="192.168.1.0/24")},
+        SCAN_REPORT_EVENT,
+    )
+
+
+def test_a_list_cannot_smuggle_a_nested_scan_object():
+    _rejects(
+        {"schema": "fcp.some-other.v1", "items": [_request(cidr="192.168.1.0/24")]},
+        SCAN_REPORT_EVENT,
+    )
+
+
+def test_a_deeply_nested_scan_object_is_still_refused():
+    _rejects(
+        {"anything": {"deep": {"deeper": _report(cidr=B03_CIDR)}}},
+        SCAN_REPORT_EVENT,
+    )
+
+
+def test_a_valid_top_level_payload_cannot_carry_a_nested_twin():
+    """A real scan report does not license a second scan object inside it."""
+
+    _rejects(
+        {
+            **_report(cidr=B03_CIDR),
+            "nested": {
+                "schema": SCHEMA,
+                "command": "scan",
+                "cidr": "10.0.0.0/24",
+                "port": 5000,
+            },
+        },
+        SCAN_REPORT_EVENT,
+    )
+
+
+def test_the_scan_payload_at_the_protocol_boundary_is_still_admitted():
+    """The positive control for the two negatives above."""
+
+    _accepts(_report(cidr=B03_CIDR), SCAN_REPORT_EVENT)
 
 
 # --- the predicate itself, pinned to the recorder's enforcing validator ------
@@ -250,7 +416,13 @@ NOW_CLOCK = datetime(2026, 9, 6, 12, 0, tzinfo=timezone.utc)
 REQUEST_TIMEOUT_SECONDS = 3.0
 
 
-async def _drive_scan_report(tmp_path, cidr: str) -> str:
+async def _drive_scan_report(
+    tmp_path,
+    cidr: str,
+    *,
+    event_type: str = SCAN_REPORT_EVENT,
+    wrap: bool = False,
+) -> str:
     """Publish one recorder-control scan report over a real relay connection.
 
     Returns ``"accepted"`` or the relay's rejection code. This is the hop that
@@ -289,11 +461,14 @@ async def _drive_scan_report(tmp_path, cidr: str) -> str:
         await recorder.connect(enrollment_token=token)
         session = await recorder.create_session("B03 recorder control")
         session_id = str(session["session_id"])
+        payload = _report(cidr=cidr, target_node_id=recorder.node_id)
+        if wrap:
+            payload = {"schema": "fcp.some-other.v1", "data": payload}
         try:
             await recorder.append_event(
                 session_id=session_id,
-                event_type="recorder.control.scan.reported",
-                payload=_report(cidr=cidr, target_node_id=recorder.node_id),
+                event_type=event_type,
+                payload=payload,
             )
         except RelayRemoteError as error:
             return error.code
@@ -310,4 +485,37 @@ def test_a_bounded_scan_report_publishes_over_a_real_relay(tmp_path):
 def test_a_public_scan_report_is_still_refused_over_a_real_relay(tmp_path):
     assert (
         asyncio.run(_drive_scan_report(tmp_path, "8.8.8.0/24")) == "nonpublic-payload"
+    )
+
+
+def test_a_scan_request_event_publishes_over_a_real_relay(tmp_path):
+    assert (
+        asyncio.run(
+            _drive_scan_report(tmp_path, B03_CIDR, event_type=SCAN_REQUEST_EVENT)
+        )
+        == "accepted"
+    )
+
+
+def test_a_wrong_event_type_is_refused_over_a_real_relay(tmp_path):
+    """The scope hole, driven end to end through the real relay.
+
+    A byte-identical scan payload under an unrelated event type must not earn
+    the CIDR exemption at the server.
+    """
+
+    assert (
+        asyncio.run(
+            _drive_scan_report(tmp_path, B03_CIDR, event_type="some.other.event")
+        )
+        == "nonpublic-payload"
+    )
+
+
+def test_a_nested_scan_object_is_refused_over_a_real_relay(tmp_path):
+    """The smuggling hole, driven end to end through the real relay."""
+
+    assert (
+        asyncio.run(_drive_scan_report(tmp_path, B03_CIDR, wrap=True))
+        == "nonpublic-payload"
     )

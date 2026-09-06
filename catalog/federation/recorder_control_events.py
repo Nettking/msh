@@ -22,6 +22,9 @@ SCAN_REQUEST_EVENT: Final = "recorder.control.scan.requested"
 SCAN_REPORT_EVENT: Final = "recorder.control.scan.reported"
 SOURCES_REQUEST_EVENT: Final = "recorder.control.sources.requested"
 SOURCES_REPORT_EVENT: Final = "recorder.control.sources.reported"
+
+#: The only event types whose payload may carry a bounded scan network.
+SCAN_EVENTS: Final = frozenset({SCAN_REQUEST_EVENT, SCAN_REPORT_EVENT})
 COMMAND_TTL: Final = timedelta(minutes=2)
 MAX_COMMAND_LIFETIME: Final = timedelta(minutes=5)
 MAX_SOURCE_ITEMS: Final = 64
@@ -94,12 +97,12 @@ def _is_scan_control_payload(value: Any) -> bool:
     )
 
 
-def mask_public_recorder_control_scan_fields(value: Any) -> Any:
-    """Mask only the scan fields the relay's privacy filter may safely pass.
+def mask_recorder_control_scan_event_payload(value: Any) -> Any:
+    """Mask only the scan fields of one recorder-control scan event payload.
 
     The relay rejects any payload the generic redaction pass would alter.
     Recorder control intentionally carries a bounded private scan network, so
-    two fields of this one schema are always altered by that pass and the whole
+    two fields of a scan payload are always altered by that pass and the whole
     protocol is unroutable without an exemption:
 
     * ``cidr`` is redacted by *value*, because it reads as an address.
@@ -108,37 +111,38 @@ def mask_public_recorder_control_scan_fields(value: Any) -> Any:
       make a single scan event routable.
 
     Returning those two fields pre-masked lets the relay compare against an
-    expected redaction instead of relaxing the filter. A ``cidr`` outside the
-    recorder's RFC1918 ``/24``-or-smaller contract, or a port outside 1-65535,
-    is left untouched, so the ordinary filter still rejects it. Every other
-    field of this schema, and any ``cidr`` or ``port`` under a different
-    schema, keeps failing exactly as before.
+    expected redaction instead of relaxing the filter.
+
+    This deliberately does **not** recurse. The exemption belongs to the event
+    payload at the protocol boundary and to nothing else, so an unrelated outer
+    payload cannot carry a scan-shaped object in a nested field or a list and
+    inherit the allowance for it. The caller is additionally responsible for
+    applying this only to the two scan event types; the payload alone cannot
+    prove which event carried it.
+
+    A ``cidr`` outside the recorder's RFC1918 ``/24``-or-smaller contract, or a
+    port outside 1-65535, is left untouched so the ordinary filter still
+    rejects it.
     """
 
-    if isinstance(value, dict):
-        masked = {
-            key: mask_public_recorder_control_scan_fields(item)
-            for key, item in value.items()
-        }
-        if _is_scan_control_payload(value):
-            cidr = value.get("cidr")
-            # A scan payload earns the exemption only as a whole. An absent or
-            # empty CIDR is the ordinary "let the recorder infer it" request; a
-            # CIDR that satisfies the contract is masked. Anything else -- IPv6,
-            # public space, wider than /24, malformed -- earns nothing at all,
-            # not even the port exemption, so such a payload stays rejected
-            # exactly as it was before this allowance existed.
-            if cidr is None or cidr == "":
-                if _is_bounded_scan_port(value.get("port")):
-                    masked["port"] = REDACTED
-            elif is_publishable_scan_cidr(cidr):
-                masked["cidr"] = REDACTED
-                if _is_bounded_scan_port(value.get("port")):
-                    masked["port"] = REDACTED
-        return masked
-    if isinstance(value, (list, tuple)):
-        return [mask_public_recorder_control_scan_fields(item) for item in value]
-    return value
+    if not _is_scan_control_payload(value):
+        return value
+    masked = dict(value)
+    cidr = value.get("cidr")
+    # A scan payload earns the exemption only as a whole. An absent or empty
+    # CIDR is the ordinary "let the recorder infer it" request; a CIDR that
+    # satisfies the contract is masked. Anything else -- IPv6, public space,
+    # wider than /24, malformed -- earns nothing at all, not even the port
+    # exemption, so such a payload stays rejected exactly as it was before
+    # this allowance existed.
+    if cidr is None or cidr == "":
+        if _is_bounded_scan_port(value.get("port")):
+            masked["port"] = REDACTED
+    elif is_publishable_scan_cidr(cidr):
+        masked["cidr"] = REDACTED
+        if _is_bounded_scan_port(value.get("port")):
+            masked["port"] = REDACTED
+    return masked
 
 
 def _stamp(value: datetime) -> str:
@@ -415,13 +419,14 @@ __all__ = [
     "MAX_SCAN_RESULT_ITEMS",
     "MAX_SOURCE_ITEMS",
     "MIN_SCAN_PREFIX_LENGTH",
+    "SCAN_EVENTS",
     "SCAN_REPORT_EVENT",
     "SCAN_REQUEST_EVENT",
     "SCHEMA",
     "SOURCES_REPORT_EVENT",
     "SOURCES_REQUEST_EVENT",
     "is_publishable_scan_cidr",
-    "mask_public_recorder_control_scan_fields",
+    "mask_recorder_control_scan_event_payload",
     "parse_command",
     "scan_command_payload",
     "scan_report_payload",
