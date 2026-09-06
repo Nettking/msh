@@ -5,19 +5,55 @@ Coordination only: `coord/federation-v1-release`. NEVER merge this branch into m
 ## Authoritative state
 
 EXECUTIVE_OWNER: Astra
-ACTING_ENGINEER: Astra; single writer of this handoff and controller of Nitro A/B execution. Claude's active remote session and published contributions are acknowledged.
-CURRENT_PHASE: Diagnose failed software gates and run controlled full-suite candidate/main A/B. Physical acceptance awaits software gates.
+ACTING_ENGINEER: Astra; executive reviewer of Claude's published validation and owner of the current conclusion. No active diagnostic process launched by Astra remains.
+CURRENT_PHASE: Requested fast-runner validation complete; scoped software conclusion below. No merge or deployment authorized. Physical acceptance and full shuffled-suite qualification remain open.
 CURRENT_MAIN_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356
 CURRENT_CANDIDATE_SHA: ba8a3b0b828f59c36c5aaaf6130480a2432a5578 — FROZEN
 PR_435_HEAD: ba8a3b0b828f59c36c5aaaf6130480a2432a5578 on claude/federation-recorder-capability-id-19tqkk; OPEN, unmerged
 ACTIVE_FIX_BRANCH: None. R001 f65d11fd028a8eea5478e2fd6dd634fdbdb9d9a1 and branding-only ba8a3b0b are already in the frozen candidate.
-VALIDATION_BRANCH: ci/self-hosted-pr435 at fffba1c06cf37f1f5b7c15129bc4900174a7a6e3
-ACTIVE_CI_RUN: 33975032244 — completed FAILURE. Windows101330241662 SUCCESS; PostgreSQL101330241653 SUCCESS; clean-checkout101330241502 FAILURE; Linux release101330241713 FAILURE; verdict101359577396 FAILURE.
+VALIDATION_BRANCH: ci/fast-linux-validation at e81bf4d59da813bc9f647209113efa8da9951aba; separate diagnostic identity, not a product candidate.
+ACTIVE_CI_RUN: 33994962383 — Nettking-Linux jobs completed SUCCESS; optional Beast-Linux smoke101383784569 QUEUED without an assigned runner at 2026-09-06T06:25Z. Do not label the whole run successful.
+HISTORICAL_RELEASE_RUN: 33975032244 — completed FAILURE. Windows101330241662 SUCCESS; PostgreSQL101330241653 SUCCESS; clean-checkout101330241502 FAILURE; Linux release101330241713 FAILURE; verdict101359577396 FAILURE. These historical results are unchanged.
+FAST_LINUX_VALIDATION: PASS — two successive default-order full candidate suites on Nettking-Linux, 40 targeted repeats independently verified, release/static checks plus actual Compose validation completed. This does not certify shuffled order independence or physical acceptance.
+FAST_WINDOWS_VALIDATION: PASS — existing exact-candidate Nettking Windows gate reused. Optional Beast-Windows confirmation INCOMPLETE due to Python setup execution-policy failure before tests.
+NITRO_SLOW_HOST_STRESS: FAIL — completed full-suite phase failures on both candidate and main; not RUNNING. Precise root cause remains INCONCLUSIVE.
 DEPLOYED_NETTKING_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356, source and no.fcp.build_commit labels observed 2026-09-05 14:00–14:02Z
 DEPLOYED_NITRO_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356, source and own-component build labels observed 14:00–14:02Z; recorder exited0
 DEPLOYED_MSH_RECORDER_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356, source and own-component build labels observed 14:00–14:02Z
 CURRENT_SESSION_ID: UNKNOWN; no fresh authenticated Federation state query completed
-LAST_UPDATED_UTC: 2026-09-05T19:33:00Z
+LAST_UPDATED_UTC: 2026-09-06T06:25:00Z
+
+## Current fast-runner decision and evidence
+
+Astra accepts Nettking-Linux as the primary fast Linux evidence under the user's latest runner instruction. Nitro is retained as slow-host stress evidence and does not delay this scoped conclusion. Candidate ba8a3b0b remains frozen; no product, test, timeout, workflow or deployed service was changed in this verification. No skip/flaky/coverage workaround was introduced. The 30 skips are reported, not silently converted into passes.
+
+- Full candidate job [101382542624](https://github.com/Nettking/msh/actions/runs/33994338144/job/101382542624): **3633 passed, 30 skipped**, pytest duration **288.01s**. Full candidate job [101384040044](https://github.com/Nettking/msh/actions/runs/33994962383/job/101384040044): **3633 passed, 30 skipped**, **286.27s**. Both assert exact SHA, pass storage preflight, run in a new Python 3.12.13 container and finish with a successful clean-checkout check. The first overall run was later cancelled while waiting for Beast; its already-completed primary jobs remain valid evidence.
+- Targeted jobs [101382063264](https://github.com/Nettking/msh/actions/runs/33994338144/job/101382063264) and [101383799720](https://github.com/Nettking/msh/actions/runs/33994962383/job/101383799720): each **20 repeats, zero failures**, 8 selected tests per repeat. These cover the five Nitro failure nodes plus adjacent tests. They do not replace full-suite or shuffled-suite evidence.
+- Static job [101383799758](https://github.com/Nettking/msh/actions/runs/33994962383/job/101383799758): storage preflight, compile, acceptance manifest, existing release Ruff scope, branding, Go 1.25.7 sidecar tests and diff hygiene PASS. Its Compose step performed only YAML parsing because the Linux host has no Compose plugin; that step alone is NOT Compose gate evidence.
+- Astra closed that tooling gap at **2026-09-06T06:24:12–06:24:14Z** under the actual Linux runner account **gha (uid/gid 1001)**, on Nettking, against the exact existing candidate checkout. An official Docker CLI container, with source mounted read-only and no network or Docker socket, ran **Docker Compose v5.5.1 `config --quiet`: PASS**. Checkout SHA and cleanliness verified before/after. This is a local same-account supplemental check, not a new GitHub job. Reproduction command, image digest and output are in [the durable evidence report](diagnostics/PR435_FAST_RUNNER_VALIDATION.md).
+- Windows job [101330241662](https://github.com/Nettking/msh/actions/runs/33975032244/job/101330241662), **Nettking / Python 3.12.10 / exact ba8a3b0b**: **871 passed, 1 skipped** in 220.12s and **367 passed, 1 skipped** in 84.13s, plus Go/Ruff/Compose/diff/storage checks. Reused evidence is explicitly scoped to Nettking; no Beast pass is claimed.
+- Beast-Windows job [101383142124](https://github.com/Nettking/msh/actions/runs/33994714769/job/101383142124) failed before tests: setup-python's `setup.ps1` was blocked by PowerShell execution policy; subsequent diagnostic steps had no `python` on PATH. Classification: **environment/setup**, not a demonstrated candidate regression. Beast-Linux was **offline** in the GitHub runner API at 06:25Z and its existing smoke job was still queued. No duplicate job, runner reconfiguration or global execution-policy change was made.
+
+Full-suite command on both successful primary jobs:
+
+```sh
+python -m pytest -o addopts= -o cache_dir=/tmp/pytest_cache -p no:randomly -v --durations=50
+```
+
+Toolchain: `python:3.12.13-bookworm`, `pip==26.2.1`, requirements plus `constraints-release.txt`, `pytest==9.1.1`; fresh container for each job, bytecode/cache under container `/tmp`. Host: Nettking-Linux in WSL Ubuntu, 20 logical CPUs, approximately 15 GiB RAM, runner account gha. Docker server 29.1.3. No fast candidate test failed, so a fast-host main comparison was not triggered. Fast passes do not prove a reset of all host/shared Docker state; they prove clean source plus fresh test containers with the documented setup.
+
+Nitro run [33988447252](https://github.com/Nettking/msh/actions/runs/33988447252) finished. The diagnostic wrapper preserves phase return codes while continuing, so its green job colors must not be read as all tests passing:
+
+| Job / phase | Exact tree | Full-suite result | Pytest duration |
+| --- | --- | --- | --- |
+| 101374058563 / a1-candidate, first | ba8a3b0b | 3633 passed, 30 skipped; rc=0 | 3983.94s |
+| 101374058563 / a2-main, second | 6101c86d | 1 failed, 3614 passed, 30 skipped; rc=1 | 3862.35s |
+| 101391451308 / b1-main, first | 6101c86d | 3615 passed, 30 skipped; rc=0 | 3750.64s |
+| 101391451308 / b2-candidate, second | ba8a3b0b | 1 failed, 3632 passed, 30 skipped; rc=1 | 3633.43s |
+
+Both failures are `test_first_real_data_is_durably_written_with_its_raw_manifest`, the 2s recorder capture helper deadline. The last phase rc=1 was recorded at 2026-09-06T01:15:56Z. This establishes that the failure also occurs on exact main and associates failure with second position in these two pairs. It does **not** prove all candidate effects absent, isolate the mechanism, prove resource accumulation, or establish assertions that were never reached. Historical categorical statements below that a candidate regression is “FALSIFIED” or that teardown proves all work completed are superseded by this qualified conclusion. Nitro stress remains red; the earlier four-timeout shuffled run remains separately unresolved.
+
+Current source-state evidence: `C:\wsl\msh` clean at main 6101c86d; independent owner checkout clean at ba8a3b0b; Linux Actions checkout clean at ba8a3b0b before/after supplemental Compose. PR API at 06:25Z: OPEN, merged=false, head ba8a3b0b. Only this coordination handoff and diagnostic evidence are being published. The ephemeral Compose containers were removed automatically; the official CLI image remains cached. No FCP container, service, Federation state or normal development checkout was changed.
 
 ## Failures and classification
 
@@ -32,8 +68,8 @@ KNOWN_FAILURES:
 - Physical acceptance has not run on ba8a3b0b. Nitro recorder remains inactive; historical recorder identity collision and unavailable logical storage await controlled candidate validation.
 
 FAILURE_CLASSIFICATIONS:
-- CI004 Linux release: CLASSIFICATION PENDING. Observed test-helper deadline failure, distinct from the shuffled job. Setup completed; no job-budget cancellation. Host I/O contention, test fragility, suite state/accumulation and indirect candidate effects remain open until controlled Linux A/B.
-- CI003 clean-checkout full suite: CLASSIFICATION PENDING. Four real timeout failures, not checkout/setup failure. Isolated Windows passes on candidate/main weaken a simple deterministic-regression hypothesis but cannot exclude Linux-, order-, load- or state-dependent defects.
+- CI004 Linux release: real test-helper deadline failure, also reproduced on exact main in controlled Nitro full-suite A/B; slow-host/position sensitivity observed, exact mechanism unresolved. Fast Nettking-Linux release suites pass twice. This is not an environment/setup failure, nor sufficient proof excluding every indirect candidate effect.
+- CI003 shuffled clean-checkout full suite: CLASSIFICATION PENDING for the four distinct timeouts. Full default-order Nitro A/B and fast default-order passes add evidence but do not replay seed20260813 or close the original suite-order-independence gate. No test deadline/skip/coverage changes allowed.
 - The failing test/runtime files are byte-identical main↔candidate, but this does NOT exclude indirect effects through changed node/client or reconciliation code. Prior categorical “candidate excluded by diff” and “not an order-independence defect” statements are withdrawn.
 - ENV002: Linux job sampler showed high disk busy time during the suite (~83% mean across minute intervals). Causation is unproven. About1.7–2.1GiB MemAvailable alone does NOT establish memory starvation or CPU saturation. Fresh read-only Nitro19:30–19:32Z: 2CPU,~3.5GB totalRAM,~2.39GB available,~704MB swap used without active swap-in/out; measurable recent I/O pressure on rotational HDD, low CPU load. No cp or Runner.Worker process. Container kind_poitras runs a sleeping Python process; its block-I/O counters did not change in the sampled window. Do NOT stop/remove it based on the old assumed hung-cp narrative.
 - CI001 hosted checks: GitHub's annotation reports account billing/spending-limit block before job startup. Distinct from self-hosted software failures; do not disable protections/checks.
@@ -52,21 +88,20 @@ COMPLETED_TESTS:
 - Runtime inventory: all own component labels on threehosts6101c86; Nettking/Nitro source checkouts clean. MSH normal checkout has46 preserved untracked recorder JSONLs, no tracked edits; separate acceptance6101 checkout clean.
 
 CURRENTLY_RUNNING_WORK:
-- Astra prepares standalone diagnostic A/B tooling outside product checkouts and workflows; no A/B leg launched yet.
-- Supporting agent owns outputs/nitro-ab harness implementation; root reviews and is sole remote execution controller.
-- Supporting read-only Linux-log/resource audits are finishing their durable reports.
-- Claude can continue read-only review or publish evidence on its separate diagnosis branch. Do not concurrently edit this handoff or launch Nitro workloads. An active remote Claude session is evidenced by repository commits; this desktop lacks a confirmed direct messaging channel.
-- No product, workflow, live container, service, Federation or deployment changes in this resumption.
+- No Astra diagnostic process remains. Claude's published Nitro A/B is completed and independently reviewed above; do not launch duplicate legs from obsolete instructions below.
+- Optional Beast-Linux smoke101383784569 is queued without a runner. Nettking-Linux primary work is complete; do not wait for this optional confirmation to communicate the conclusion.
+- No active Claude session is assumed from old commits. Fetch and validate current refs before any future handoff write.
 
 NEXT_ACTIONS:
-1. Preserve frozen refs and obtain full job logs, duration progression, sampler evidence; keep CI003 and CI004 separate.
-2. Review and publish diagnostic harness, recording its distinct SHA/hash and exact commands. Use fresh checkout for each leg, identical pinned Python image and dependencies within each mode, same Nitro account/runtime/storage/services and full test selection. Instrument CPU/load, memory/swap, pressure, disk counters, process/container state and per-test timing.
-3. Run sequential candidate default, main default, candidate seed20260813, main seed20260813; then two consecutive candidate clean-checkout runs seed15 if no intervening change is needed. A failed candidate leg must not prevent the main control. Never reuse a prior leg's node/session/temp state.
-4. Record all failures and setup/cleanup/cleanliness independently, including skipped later commands. Preserve raw evidence and failed scratch directories; remove only proven test-owned processes/containers.
-5. Compare same-runner A/B, not Windows isolation. Do not increase TIMEOUT, skip/mark flaky/reduce coverage, tune storage policy or claim stability from one lucky pass. If a real code/test/workflow fix is needed, state exact root cause and narrow Claude task; establish a NEW candidate and qualify it afresh.
-6. Software progression requires Linux release PASS and reproducible full clean-checkout PASS, preferably two consecutive candidate clean passes. Historical failed run stays failed; standalone diagnostic results are not silently relabeled GitHub gate success.
-7. Only after software gates: controlled physical acceptance of exact candidate from clean checkouts on Nettking,Nitro,MSH Recorder. Record roles, initial/runtime/Federation state, supported startup commands, identity ownership, expected/observed results, reconnect/restart, cleanup/rollback and final state. Activate Nitro recorder only as part of that controlled test.
-8. Do NOT merge PR435. User explicitly froze merge during diagnosis. Final review and physical evidence must make a later merge decision defensible.
+1. Preserve this scoped fast-runner result and frozen candidate. No merge, deployment or physical startup under the latest instruction.
+2. If Beast-Linux later accepts its existing job, record its independent result; do not delay primary reporting or dispatch duplicates. Beast-Windows setup is an optional environment blocker, not evidence requiring a product change.
+3. Remaining release qualification: replay the full shuffled suite with recorded seeds and same-host main controls on any failure; retain CI003 and CI004 separately. Two default-order passes are now proven; shuffled-order independence and complete shared-host clean-start are not.
+4. Diagnose slow-host failure mechanism only from measured evidence. No TIMEOUT increase, skips, flaky marking, coverage reduction or storage-policy weakening. A necessary future code/test/workflow change creates a distinct identity and must not inherit this evidence automatically.
+5. Physical acceptance remains unrun on this candidate. A future authorized controlled test must cover the three real machines, recorder identity negative control, clean start, restart/reconnect, cleanup/rollback and final state. No green software label substitutes for that evidence.
+
+## Historical collaboration entries — retained for traceability
+
+Everything below until Authority and rotation is a historical contribution. Any “running”, “next action” or categorical causal statement is superseded by the current state and qualified findings above. The GitHub phase logs, not prose or wrapper job color, determine observed PASS/FAIL.
 
 ## AB003 — first Nitro A/B leg pair (SUPERSEDED IN PART BY AB004 BELOW: read both)
 
