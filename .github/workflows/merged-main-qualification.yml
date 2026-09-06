@@ -93,6 +93,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Read-only memory sampler. Run 34019865738 leg A was SIGKILLed
+          # (exit 137) at 93% with 837 MiB available on a 15 GiB host, and the
+          # runner service then went down, so a repeat needs evidence rather
+          # than a guess. This only reads /proc via free(1): it changes no
+          # product behaviour, no test and no host state, and the trap makes it
+          # report on failure as well as success.
+          ( while true; do
+              echo "$(date -u +%H:%M:%S) $(free -m | awk '/^Mem:/{print $3, $7}')"
+              sleep 10
+            done ) > "${RUNNER_TEMP}/mem.log" 2>&1 &
+          SAMPLER=$!
+          trap 'kill ${SAMPLER} 2>/dev/null || true;
+                echo "--- lowest available MiB during the suite ---";
+                sort -k3 -n "${RUNNER_TEMP}/mem.log" | head -3;
+                echo "--- final samples (time used_MiB available_MiB) ---";
+                tail -4 "${RUNNER_TEMP}/mem.log"' EXIT
           docker run --rm --network host \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v "${GITHUB_WORKSPACE}:/workspace" \
@@ -158,6 +174,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Read-only memory sampler. Run 34019865738 leg A was SIGKILLed
+          # (exit 137) at 93% with 837 MiB available on a 15 GiB host, and the
+          # runner service then went down, so a repeat needs evidence rather
+          # than a guess. This only reads /proc via free(1): it changes no
+          # product behaviour, no test and no host state, and the trap makes it
+          # report on failure as well as success.
+          ( while true; do
+              echo "$(date -u +%H:%M:%S) $(free -m | awk '/^Mem:/{print $3, $7}')"
+              sleep 10
+            done ) > "${RUNNER_TEMP}/mem.log" 2>&1 &
+          SAMPLER=$!
+          trap 'kill ${SAMPLER} 2>/dev/null || true;
+                echo "--- lowest available MiB during the suite ---";
+                sort -k3 -n "${RUNNER_TEMP}/mem.log" | head -3;
+                echo "--- final samples (time used_MiB available_MiB) ---";
+                tail -4 "${RUNNER_TEMP}/mem.log"' EXIT
           docker run --rm --network host \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v "${GITHUB_WORKSPACE}:/workspace" \
@@ -218,6 +250,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Read-only memory sampler. Run 34019865738 leg A was SIGKILLed
+          # (exit 137) at 93% with 837 MiB available on a 15 GiB host, and the
+          # runner service then went down, so a repeat needs evidence rather
+          # than a guess. This only reads /proc via free(1): it changes no
+          # product behaviour, no test and no host state, and the trap makes it
+          # report on failure as well as success.
+          ( while true; do
+              echo "$(date -u +%H:%M:%S) $(free -m | awk '/^Mem:/{print $3, $7}')"
+              sleep 10
+            done ) > "${RUNNER_TEMP}/mem.log" 2>&1 &
+          SAMPLER=$!
+          trap 'kill ${SAMPLER} 2>/dev/null || true;
+                echo "--- lowest available MiB during the suite ---";
+                sort -k3 -n "${RUNNER_TEMP}/mem.log" | head -3;
+                echo "--- final samples (time used_MiB available_MiB) ---";
+                tail -4 "${RUNNER_TEMP}/mem.log"' EXIT
           docker run --rm --network host \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v "${GITHUB_WORKSPACE}:/workspace" \
