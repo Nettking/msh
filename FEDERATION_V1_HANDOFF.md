@@ -5,11 +5,14 @@ Coordination only: `coord/federation-v1-release`. NEVER merge this branch into m
 ## Authoritative state
 
 EXECUTIVE_OWNER: Astra
-ACTING_ENGINEER: Astra; executive owner of the completed software qualification and next merge review.
-CURRENT_PHASE: SOFTWARE-QUALIFIED candidate ba8a3b0b. Shuffled seeds20260813 and15 PASS on Nettking-Linux. Next transition is final PR435 merge decision, then exact merged-main qualification, then mandatory controlled physical acceptance. No merge/deployment performed.
-CURRENT_MAIN_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356
-CURRENT_CANDIDATE_SHA: ba8a3b0b828f59c36c5aaaf6130480a2432a5578 — FROZEN
-PR_435_HEAD: ba8a3b0b828f59c36c5aaaf6130480a2432a5578 on claude/federation-recorder-capability-id-19tqkk; OPEN, unmerged
+ACTING_ENGINEER: Astra; executive owner. PR435 final merge review COMPLETE and merge EXECUTED; authoritative merged-main qualification is now the open leg.
+CURRENT_PHASE: MERGED. PR435 merged to main as bcf5c9ab after a clean final review. Next transition is authoritative fast-host qualification of the exact merged-main SHA on Nettking-Linux, Nettking Windows and the PostgreSQL gate, then mandatory controlled physical acceptance. No deployment performed; no physical acceptance run.
+CURRENT_MAIN_SHA: bcf5c9ab2fb453cb26129b70d41fb64fc4863dd4
+MERGED_MAIN_SHA: bcf5c9ab2fb453cb26129b70d41fb64fc4863dd4 — merge commit; parents 6101c86d (base) and ba8a3b0b (candidate); tree bcbd778ba8009eb79e3349534e623da3861b0e45
+PRE_MERGE_MAIN_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356
+MERGED_MAIN_SOFTWARE_QUALIFICATION: NOT ESTABLISHED — a new identity does not inherit the candidate PASS; required fast-host legs are unrun
+CURRENT_CANDIDATE_SHA: ba8a3b0b828f59c36c5aaaf6130480a2432a5578 — merged; retained as the qualified software identity
+PR_435_HEAD: ba8a3b0b828f59c36c5aaaf6130480a2432a5578 on claude/federation-recorder-capability-id-19tqkk; MERGED 2026-09-06 as bcf5c9ab, normal merge commit with exact expected-head-SHA protection, no branch-protection bypass
 ACTIVE_FIX_BRANCH: None. R001 f65d11fd028a8eea5478e2fd6dd634fdbdb9d9a1 and branding-only ba8a3b0b are already in the frozen candidate.
 VALIDATION_BRANCH: ci/fast-linux-validation at e81bf4d59da813bc9f647209113efa8da9951aba; separate diagnostic identity, not a product candidate.
 ACTIVE_CI_RUN: 33994962383 — Nettking-Linux jobs completed SUCCESS; optional Beast-Linux smoke101383784569 QUEUED without an assigned runner at 2026-09-06T06:25Z. Do not label the whole run successful.
@@ -21,7 +24,27 @@ DEPLOYED_NETTKING_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356, source and no.f
 DEPLOYED_NITRO_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356, source and own-component build labels observed 14:00–14:02Z; recorder exited0
 DEPLOYED_MSH_RECORDER_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356, source and own-component build labels observed 14:00–14:02Z
 CURRENT_SESSION_ID: UNKNOWN; no fresh authenticated Federation state query completed
-LAST_UPDATED_UTC: 2026-09-06T06:50:38Z
+LAST_UPDATED_UTC: 2026-09-06T07:16:15Z
+
+## PR435 merge executed — merged main bcf5c9ab
+
+MERGE_DECISION: APPROVED and EXECUTED. Final review re-fetched live PR state and confirmed head exactly ba8a3b0b, base exactly 6101c86d, six documented commits with no unexpected additions, merge-base equal to main (fast-forwardable, no conflict), zero reviews and zero unresolved review threads, and no unresolved candidate-specific blocker. Merged with `merge_method=merge` and `expectedHeadSha=ba8a3b0b`.
+
+NO_BRANCH_PROTECTION_BYPASS: confirmed. `main` returns `protected: false` with `required_status_checks.enforcement_level: "off"` and empty contexts, so the merge required and used no admin override, force or protection bypass. This corrects the earlier PR-thread statement that `product-branding` is a required check: branch protection currently enforces no status check on main.
+
+CI001_AT_MERGE: all 18 hosted checks on ba8a3b0b were red having completed in 1-10s with log downloads returning HTTP 404, i.e. no runner ever assigned. The block is repository-wide, not candidate-specific: the same workflows failed identically in 3-7s on merged commit bcf5c9ab. Not product failures.
+
+MERGED_TREE_IDENTITY: the merged tree is byte-identical to the qualified candidate. `bcf5c9ab^{tree}` and `ba8a3b0b^{tree}` are both bcbd778ba8009eb79e3349534e623da3861b0e45 and `git diff ba8a3b0b bcf5c9ab` is empty; the identities differ only in merge topology. This is documented precisely as required, and it does NOT substitute for merged-main validation evidence. It also raises the stakes on the fast-host legs: any behavioural difference there cannot originate in merge content and must be investigated before physical acceptance.
+
+ADVERSARIAL_REVIEW: clean, with no reopening of settled Nitro characterization. Three concrete concerns were raised against the product diff and all three resolved in the code's favour on inspection: `_announce` via `runtime._submit` is not fire-and-forget because `_submit` calls `future.result()` and re-raises; `catalog/node/client.py` mutating node state while iterating `advertised_capabilities()` is safe because that returns an immutable tuple from a completed query; and the R001 `active_client_id` reordering genuinely retries because `FederationOperationError` is in `PUBLICATION_RETRY_ERRORS`.
+
+LOCAL_SCREEN (non-authoritative, cloud container, NOT Nettking-Linux): on a fresh clone at exact bcf5c9ab, all static/release checks passed, including product-branding — a positive confirmation that the R002 fix works and that the red hosted product-branding check was purely CI001. The full default-order suite returned 1 failed, 3632 passed, 30 skipped in 253.69s over the same 3663-test collection, worktree clean and SHA unchanged after the run. The single failure is `catalog/federation/tests/test_tailnet_join_responder.py::test_a_matching_child_process_instance_can_be_terminated`, at collection position 1626/3663, duration 0.006s. Root cause established: that screen's uv python-build-standalone CPython 3.12.11 lacks `os.pidfd_open`, so the product's fail-closed Linux path returns False; the same test passes on the same host, tree and site-packages under CPython 3.12.3, which has the syscall. Classification: environment/toolchain artifact of the screen interpreter, NOT a merged-main regression and NOT one of the known slow-host timing failures, which are 2s/3s/5s deadline expiries rather than a 6ms AttributeError path. The host is not slow either: 253.69s here against 288.01s on Nettking-Linux. Per instruction this is not treated as a merged-main regression without fast-host reproduction.
+
+CANCELLED_LOCAL_WORK: shuffled seeds 20260813 and 15 were queued in that container and cancelled by instruction — seed 20260813 terminated in progress, seed 15 never started. No partial shuffled result is claimed and no further local full qualification was run. Windows, PostgreSQL and real Docker Compose validation were not executable there.
+
+REQUIRED_NEXT (authoritative, on the rig; the merge session had no route to Nettking-Linux, Nettking Windows, Nitro or MSH Recorder, and hosted Actions remain CI001-blocked): run legs A-E, the Windows leg and the PostgreSQL leg on exact bcf5c9ab per the runbook, then record MERGED_MAIN_SOFTWARE_QUALIFICATION: PASS, then proceed to the mandatory three-host physical campaign with all three hosts on this same MERGED_MAIN_SHA.
+
+Durable [merge record and local screen](diagnostics/PR435_MERGE_AND_MERGED_MAIN_SCREEN.md) and [authoritative qualification runbook](diagnostics/PR435_MERGED_MAIN_QUALIFICATION_RUNBOOK.md).
 
 ## Completed shuffled qualification and executive software verdict — Astra
 
