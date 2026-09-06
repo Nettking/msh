@@ -213,29 +213,22 @@ def test_a_source_change_command_is_unaffected():
     )
 
 
-# --- known residual risk, pinned so it cannot drift silently -----------------
+# --- the filter still refuses raw labels, so the fix rests on the producer ---
 
 
-def test_a_report_naming_a_real_agent_is_still_refused():
-    """A discovered machine without a serial number still cannot be reported.
+def test_a_raw_address_bearing_label_reaching_the_filter_is_refused():
+    """An address-bearing label is refused if it ever reaches the relay.
 
-    This pins a **known, unfixed** residual risk rather than desired behaviour.
-    ``mtconnect_discovery_service`` derives ``display_name`` and
-    ``source_name`` from ``f"{host}:{port}"`` whenever the agent reports no
-    serial number, so a legitimate MTConnect agent yields labels such as
-    ``"Mazak [192.168.1.50:5000]"`` and ``"192.168.1.50-5000"``. The generic
-    filter redacts those, and this allowance deliberately covers only ``cidr``
-    and ``port``.
+    Discovery no longer produces such labels, and ``scan_report_payload``
+    projects any that survive from an older configuration, so this shape should
+    not occur in practice. The results here are injected *after* that
+    projection, which is the point: it proves the relay allowance still covers
+    only ``cidr`` and ``port``, and that publication is safe because the
+    producer and the projection make it so -- not because the filter was
+    relaxed to tolerate addresses in result strings.
 
-    B03 passed publication only because it found zero machines. The narrow fix
-    is to derive public-safe labels before publication, which cannot be done
-    here: ``source_name`` is a functional identity -- ``remove_source_names``
-    is validated against ``configured_source_names`` and used as the removal
-    key -- so changing it spans the recorder, the coordinator and existing
-    configured sources. Widening the relay allowance to arbitrary result
-    strings is not an acceptable alternative.
-
-    When that work lands, this test should start failing and be replaced.
+    If this ever starts passing, the allowance has been widened and the
+    Federation-visible identity work has been undone.
     """
 
     _rejects(
@@ -254,10 +247,10 @@ def test_a_report_naming_a_real_agent_is_still_refused():
 
 
 def test_a_report_naming_an_agent_with_a_serial_number_publishes():
-    """The same report is routable when the agent identifies itself properly.
+    """A label that carries no address needs no projection and routes as-is.
 
-    This bounds the residual risk above: it is the missing-serial fallback that
-    leaks the address, not recorder-control reporting as such.
+    Together with the test above this bounds the allowance from both sides:
+    public-safe labels cross untouched, address-bearing ones never do.
     """
 
     _accepts(
