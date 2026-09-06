@@ -11,11 +11,12 @@ only to opaque IDs from the recorder's own latest scan.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from hashlib import sha256
 from ipaddress import IPv4Network, ip_network
 from typing import Any, Final
 
 from .errors import FederationValidationError
-from .redaction import REDACTED
+from .redaction import REDACTED, contains_nonpublic_location
 
 SCHEMA: Final = "fcp.recorder-control.v1"
 SCAN_REQUEST_EVENT: Final = "recorder.control.scan.requested"
@@ -143,6 +144,76 @@ def mask_recorder_control_scan_event_payload(value: Any) -> Any:
         if _is_bounded_scan_port(value.get("port")):
             masked["port"] = REDACTED
     return masked
+
+
+#: Prefix for a projected source label. Distinct from the discovery service's
+#: ``mtconnect-source-`` source_id prefix so the two identity spaces never read
+#: as interchangeable.
+FEDERATED_SOURCE_LABEL_PREFIX: Final = "mtconnect-agent-"
+
+
+def federated_source_label(value: Any) -> str:
+    """Return a Federation-safe projection of an operator-facing source label.
+
+    MTConnect discovery derives ``source_name`` and ``display_name`` from
+    ``host:port`` whenever an agent reports no serial number, so a legitimate
+    agent yields labels such as ``"192.168.1.50-5000"`` or
+    ``"Mazak [192.168.1.50:5000]"``. Those are correct locally -- the recorder
+    needs the address to reach the agent, and ``source_name`` is additionally
+    its durable on-disk batch directory and checkpoint key -- but they must not
+    cross into Federation payloads or capability properties.
+
+    A label that is already public-safe is returned unchanged, so ordinary
+    named machines keep readable identities. Only a label carrying location
+    material is replaced, by a digest of that exact label. The projection is
+    therefore deterministic, stable across rescan and restart, and distinct for
+    distinct sources, which is what lets a recorder map a removal request back
+    to the local source it names.
+
+    This keeps the address local rather than widening any privacy filter to
+    admit it.
+    """
+
+    text = str(value or "").strip()
+    if not text or not contains_nonpublic_location(text):
+        return text
+    return FEDERATED_SOURCE_LABEL_PREFIX + sha256(text.encode("utf-8")).hexdigest()[:16]
+
+
+def federated_source_labels(values: Any) -> tuple[str, ...]:
+    """Project a collection of source labels, preserving order and uniqueness."""
+
+    if not isinstance(values, (list, tuple)):
+        return ()
+    return tuple(dict.fromkeys(federated_source_label(item) for item in values))
+
+
+def local_source_names_for(
+    requested: Any,
+    configured: Any,
+) -> tuple[str, ...]:
+    """Map Federation-visible source labels back to local configured names.
+
+    Removal requests name sources by the label the recorder published. For a
+    source whose local name is already public-safe that is the local name
+    itself; for a projected one it is the digest. Both are accepted, so a
+    coordinator that still holds a pre-projection name keeps working and an
+    already-configured IP-derived source can still be removed.
+    """
+
+    if not isinstance(requested, (list, tuple)) or not isinstance(
+        configured, (list, tuple)
+    ):
+        return ()
+    by_label = {federated_source_label(name): name for name in configured}
+    local: list[str] = []
+    for item in requested:
+        text = str(item or "").strip()
+        if text in configured:
+            local.append(text)
+        elif text in by_label:
+            local.append(by_label[text])
+    return tuple(dict.fromkeys(local))
 
 
 def _stamp(value: datetime) -> str:
@@ -363,11 +434,19 @@ def scan_report_payload(
     for item in results[:MAX_SCAN_RESULT_ITEMS]:
         if not isinstance(item, dict):
             continue
+        # ``source_id`` is already an opaque digest and is the key selection
+        # uses, so it crosses unchanged. The two human labels are projected:
+        # discovery derives them from ``host:port`` for an agent that reports
+        # no serial number, and those addresses stay local.
         safe_results.append(
             {
                 "source_id": _text(item.get("source_id"), "source_id", maximum=128),
-                "source_name": _text(item.get("source_name"), "source_name", maximum=128),
-                "display_name": _text(item.get("display_name"), "display_name", maximum=256),
+                "source_name": federated_source_label(
+                    _text(item.get("source_name"), "source_name", maximum=128)
+                ),
+                "display_name": federated_source_label(
+                    _text(item.get("display_name"), "display_name", maximum=256)
+                ),
                 "machine_count": max(1, min(int(item.get("machine_count") or 1), 64)),
             }
         )
@@ -381,8 +460,14 @@ def scan_report_payload(
         "cidr": _text(cidr, "cidr", maximum=64, allow_empty=True),
         "port": port,
         "results": safe_results,
-        "configured_source_names": list(_list(list(configured_source_names), "configured_source_names")),
-        "message": _text(message, "message", maximum=512, allow_empty=True),
+        "configured_source_names": list(
+            federated_source_labels(
+                list(_list(list(configured_source_names), "configured_source_names"))
+            )
+        ),
+        "message": federated_source_label(
+            _text(message, "message", maximum=512, allow_empty=True)
+        ),
         "error_code": None if error_code is None else _text(error_code, "error_code", maximum=128),
         "completed_at": _stamp(now),
     }
@@ -406,8 +491,14 @@ def sources_report_payload(
         "target_node_id": _text(target_node_id, "target_node_id"),
         "scan_id": _text(scan_id, "scan_id", maximum=128),
         "state": _text(state, "state", maximum=64),
-        "configured_source_names": list(_list(list(configured_source_names), "configured_source_names")),
-        "message": _text(message, "message", maximum=512, allow_empty=True),
+        "configured_source_names": list(
+            federated_source_labels(
+                list(_list(list(configured_source_names), "configured_source_names"))
+            )
+        ),
+        "message": federated_source_label(
+            _text(message, "message", maximum=512, allow_empty=True)
+        ),
         "error_code": None if error_code is None else _text(error_code, "error_code", maximum=128),
         "completed_at": _stamp(now),
     }
@@ -415,6 +506,7 @@ def sources_report_payload(
 
 __all__ = [
     "COMMAND_TTL",
+    "FEDERATED_SOURCE_LABEL_PREFIX",
     "MAX_SCAN_ADDRESSES",
     "MAX_SCAN_RESULT_ITEMS",
     "MAX_SOURCE_ITEMS",
@@ -425,7 +517,10 @@ __all__ = [
     "SCHEMA",
     "SOURCES_REPORT_EVENT",
     "SOURCES_REQUEST_EVENT",
+    "federated_source_label",
+    "federated_source_labels",
     "is_publishable_scan_cidr",
+    "local_source_names_for",
     "mask_recorder_control_scan_event_payload",
     "parse_command",
     "scan_command_payload",

@@ -200,11 +200,18 @@ def _machine_from_device(
         identity_value = f"{host}:{port}"
         machine_id = f"mtconnect-host:{identity_value}"
 
+    # ``identity_value`` carries the agent's address and stays local: it backs
+    # ``machine_id`` and the recorder's own connection detail. The *label* an
+    # operator reads, and which recorder-control publishes into Federation,
+    # must not, so it is built from a stable digest of that identity instead.
+    # An agent that reports a serial number never reaches this token; one that
+    # reports nothing still gets a distinct, restart-stable label.
+    public_identity = f"agent-{_short_digest(identity_value, length=12)}"
     display_name = machine_display_name(
         device_name=reported_name,
         serial_number=serial_number,
-        machine_id=identity_value,
-        fallback=f"MTConnect {host}:{port}",
+        machine_id=public_identity,
+        fallback=f"MTConnect {public_identity}",
     )
     description_attributes = device.get("description_attributes")
     if not isinstance(description_attributes, Mapping):
@@ -437,7 +444,10 @@ class MtconnectDiscoveryService:
             "display_name": (
                 machines[0]["display_name"]
                 if len(machines) == 1
-                else f"{len(machines)} MTConnect devices at {host}:{port}"
+                # The multi-device label named the agent's address
+                # unconditionally, even for machines that identify themselves
+                # properly. The source digest already distinguishes agents.
+                else f"{len(machines)} MTConnect devices at {source_id}"
             ),
             "base_url": base_url,
             "probe_url": probe_url,

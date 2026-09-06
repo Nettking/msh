@@ -27,6 +27,7 @@ from catalog.federation.recorder_control_events import (
     SCAN_REQUEST_EVENT,
     SOURCES_REPORT_EVENT,
     SOURCES_REQUEST_EVENT,
+    local_source_names_for,
     parse_command,
     scan_report_payload,
     sources_report_payload,
@@ -379,7 +380,15 @@ class RecorderFederationControlWorker:
         request_id = str(command["request_id"])
         scan_id = str(command["scan_id"])
         additions = tuple(command["add_source_ids"])
-        removals = tuple(command["remove_source_names"])
+        # Removal names a source by the label the recorder published. For a
+        # source whose local name is already public-safe that is the local name
+        # itself; for an IP-derived one it is the projection. Map back before
+        # touching configuration so an already-configured legacy source can
+        # still be removed and nothing is silently missed.
+        removals = local_source_names_for(
+            tuple(command["remove_source_names"]),
+            tuple(_safe_sources(load_capability_config(self.config_path))),
+        )
         if additions and scan_id != str(state.get("last_scan_id") or ""):
             raise MtconnectDiscoveryError(
                 "The selected scan is no longer current on the recorder. Run a new scan first."
