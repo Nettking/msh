@@ -5,8 +5,8 @@ Coordination only: `coord/federation-v1-release`. NEVER merge this branch into m
 ## Authoritative state
 
 EXECUTIVE_OWNER: Astra
-ACTING_ENGINEER: Astra; executive reviewer and controller of the active Nettking-Linux shuffled qualification.
-CURRENT_PHASE: Shuffled software qualification RUNNING on Nettking-Linux, seeds20260813 and15. Completed default-order evidence is retained; no repeat or further Nitro characterization. No merge/deployment authorized.
+ACTING_ENGINEER: Astra; executive owner of the completed software qualification and next merge review.
+CURRENT_PHASE: SOFTWARE-QUALIFIED candidate ba8a3b0b. Shuffled seeds20260813 and15 PASS on Nettking-Linux. Next transition is final PR435 merge decision, then exact merged-main qualification, then mandatory controlled physical acceptance. No merge/deployment performed.
 CURRENT_MAIN_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356
 CURRENT_CANDIDATE_SHA: ba8a3b0b828f59c36c5aaaf6130480a2432a5578 — FROZEN
 PR_435_HEAD: ba8a3b0b828f59c36c5aaaf6130480a2432a5578 on claude/federation-recorder-capability-id-19tqkk; OPEN, unmerged
@@ -21,15 +21,19 @@ DEPLOYED_NETTKING_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356, source and no.f
 DEPLOYED_NITRO_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356, source and own-component build labels observed 14:00–14:02Z; recorder exited0
 DEPLOYED_MSH_RECORDER_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356, source and own-component build labels observed 14:00–14:02Z
 CURRENT_SESSION_ID: UNKNOWN; no fresh authenticated Federation state query completed
-LAST_UPDATED_UTC: 2026-09-06T06:34:27Z
+LAST_UPDATED_UTC: 2026-09-06T06:50:38Z
 
-## Active shuffled qualification — Astra
+## Completed shuffled qualification and executive software verdict — Astra
 
-SHUFFLED_ORDER_VALIDATION: RUNNING. Started2026-09-06T06:34:27Z on Nettking-Linux as gha, controller PID1532722. Task exec session18536 is only a local tool handle; durable state is `/home/gha/qualification/pr435-shuffle-20260906-astra` with controller.log, results.tsv and per-leg checkout/logs/JUnit/pip-freeze/15-second host samples. Seed20260813 completed PASS at06:42:52Z:3633 passed,30 skipped,459 warnings in408.81s; setup/pytest/final-clean rc all0. Seed15 is now running in its own fresh clone/container. Script [diagnostics/run-pr435-shuffled.sh](diagnostics/run-pr435-shuffled.sh) immediately runs the identical seed against exact main on any failed candidate leg. Do not duplicate this controller.
+SHUFFLED_ORDER_VALIDATION: PASS. On Nettking-Linux as actual service account gha, seed20260813:3633 passed,30 skipped,459 warnings in408.81s; seed15:3633 passed,30 skipped,455 warnings in379.01s. Both full3663-test collections ran in different orders, with byte-identical installed dependencies, fresh clean clones/containers and successful exact-SHA/final-clean checks. Setup/pytest/clean rc all0. No main control was triggered because no candidate leg failed. Controller PID1532722 completed at06:50:38Z; do not duplicate completed work.
+
+SOFTWARE_QUALIFICATION: PASS for frozen ba8a3b0b828f59c36c5aaaf6130480a2432a5578 on the documented release environments. Astra combines the two new shuffled passes with the retained default-order, targeted, release/static, Windows and PostgreSQL passes. This qualifies the candidate for final merge review; it does not claim physical acceptance, universal seed/host stability, or Nitro stress success. No code, timeout, retry, skip, flaky marker or test-selection change was needed. The30 existing skips are23 Windows guards and7 PostgreSQL-service guards, with separate exact-candidate gates already passed.
+
+Durable [qualification report and transition decision](diagnostics/PR435_SHUFFLED_QUALIFICATION.md), [raw logs/JUnit/dependencies/resource samples](diagnostics/PR435_SHUFFLE_RAW_EVIDENCE.tar.gz), [hash manifest](diagnostics/PR435_SHUFFLE_MANIFEST.json), and [machine-readable summary](diagnostics/PR435_SHUFFLE_SUMMARY.json). Raw archive SHA256:1f388b4394a78a9ace194c89186f68e6f8479f1bc373e6abcbbe57e00d00a90f. Original retained data: `/home/gha/qualification/pr435-shuffle-20260906-astra`. No diagnostic process remains active.
 
 Fresh independent clones come from a verified Git bundle containing only advertised candidate HEAD ba8a3b0b and origin/main6101c86d; each leg asserts exact SHA and initial cleanliness, runs the entire repository suite, then verifies final SHA/cleanliness. Candidate and source branches are not changed. Same release environment plus pinned pytest-randomly4.1.0; Python image ID3eb66c6a8a2399cdf305afe7f680ea1e3aad64e9a6684cd6e46baf6b8b701ec8, repo digest python@sha256:3cd9086bdb30f7c9bc08a3fa621d9842e0d3f6f9291aeb4677e0547817c10b12. This is a local execution under the actual Linux service account on the same host; it is not a new GitHub job. Exact script hash at launch: cbec7e0248e231e6eb26b1d868fc5cc117f5558e823d998fc61fefca67736e7e.
 
-Next: read results.tsv and complete raw logs, classify any failure before code changes, publish evidence and explicit software verdict. Required later transition is software-qualified candidate → final PR435 merge decision (no merge authorized now) → qualification of exact resulting merged-main SHA → controlled physical acceptance. Physical evidence remains mandatory and unrun on this candidate.
+Required transition: software-qualified candidate (REACHED) → final PR435 merge decision (NEXT, Astra; no merge performed by this software-only completion) → qualification of exact resulting merged-main SHA (new identity; do not inherit PASS automatically) → controlled physical acceptance (mandatory, not yet run). The detailed report records exact checks and clean-start/identity/negative-control/restart/rollback requirements for each step. No deployment or live physical startup is authorized now.
 
 ## Current fast-runner decision and evidence
 
@@ -77,7 +81,7 @@ KNOWN_FAILURES:
 
 FAILURE_CLASSIFICATIONS:
 - CI004 Linux release: real test-helper deadline failure, also reproduced on exact main in controlled Nitro full-suite A/B; slow-host/position sensitivity observed, exact mechanism unresolved. Fast Nettking-Linux release suites pass twice. This is not an environment/setup failure, nor sufficient proof excluding every indirect candidate effect.
-- CI003 shuffled clean-checkout full suite: CLASSIFICATION PENDING for the four distinct timeouts. Full default-order Nitro A/B and fast default-order passes add evidence but do not replay seed20260813 or close the original suite-order-independence gate. No test deadline/skip/coverage changes allowed.
+- CI003 shuffled qualification: CLOSED for the requested Nettking-Linux gate by full candidate seeds20260813 and15 PASS. The original Nitro four-timeout failure remains historical FAIL with its precise mechanism unresolved; it is not relabeled green or categorically excluded as an indirect candidate effect. No further Nitro characterization is requested absent new evidence.
 - The failing test/runtime files are byte-identical main↔candidate, but this does NOT exclude indirect effects through changed node/client or reconciliation code. Prior categorical “candidate excluded by diff” and “not an order-independence defect” statements are withdrawn.
 - ENV002: Linux job sampler showed high disk busy time during the suite (~83% mean across minute intervals). Causation is unproven. About1.7–2.1GiB MemAvailable alone does NOT establish memory starvation or CPU saturation. Fresh read-only Nitro19:30–19:32Z: 2CPU,~3.5GB totalRAM,~2.39GB available,~704MB swap used without active swap-in/out; measurable recent I/O pressure on rotational HDD, low CPU load. No cp or Runner.Worker process. Container kind_poitras runs a sleeping Python process; its block-I/O counters did not change in the sampled window. Do NOT stop/remove it based on the old assumed hung-cp narrative.
 - CI001 hosted checks: GitHub's annotation reports account billing/spending-limit block before job startup. Distinct from self-hosted software failures; do not disable protections/checks.
@@ -96,16 +100,16 @@ COMPLETED_TESTS:
 - Runtime inventory: all own component labels on threehosts6101c86; Nettking/Nitro source checkouts clean. MSH normal checkout has46 preserved untracked recorder JSONLs, no tracked edits; separate acceptance6101 checkout clean.
 
 CURRENTLY_RUNNING_WORK:
-- Astra shuffled controller PID1532722 is active on Nettking-Linux; exact state is recorded above. Claude's published Nitro A/B is completed; do not launch duplicate legs from obsolete instructions below.
+- Astra shuffled controller PID1532722 completed. No active software leg remains. Claude's published Nitro A/B is also completed; do not launch duplicate legs from obsolete instructions below.
 - Optional Beast-Linux smoke101383784569 is queued without a runner. Nettking-Linux primary work is complete; do not wait for this optional confirmation to communicate the conclusion.
 - No active Claude session is assumed from old commits. Fetch and validate current refs before any future handoff write.
 
 NEXT_ACTIONS:
-1. Preserve this scoped fast-runner result and frozen candidate. No merge, deployment or physical startup under the latest instruction.
-2. If Beast-Linux later accepts its existing job, record its independent result; do not delay primary reporting or dispatch duplicates. Beast-Windows setup is an optional environment blocker, not evidence requiring a product change.
-3. Remaining release qualification: replay the full shuffled suite with recorded seeds and same-host main controls on any failure; retain CI003 and CI004 separately. Two default-order passes are now proven; shuffled-order independence and complete shared-host clean-start are not.
-4. Diagnose slow-host failure mechanism only from measured evidence. No TIMEOUT increase, skips, flaky marking, coverage reduction or storage-policy weakening. A necessary future code/test/workflow change creates a distinct identity and must not inherit this evidence automatically.
-5. Physical acceptance remains unrun on this candidate. A future authorized controlled test must cover the three real machines, recorder identity negative control, clean start, restart/reconnect, cleanup/rollback and final state. No green software label substitutes for that evidence.
+1. Preserve frozen software-qualified ba8a3b0b and this evidence. Do not reopen completed default-order or shuffled qualification absent a new defect or changed identity; do not characterize Nitro further without new evidence.
+2. Astra's final PR435 merge review is next: recheck exact head/base, adversarial diff, recorded limitations and branch protections, then record an explicit merge decision. No merge/deployment action is performed by this software-only completion and no protection bypass is authorized.
+3. After a separately authorized merge, record the actual resulting main SHA, compare its tree to the candidate, and qualify that exact identity through Linux release/full suite, shuffled seeds, static, Windows and PostgreSQL gates. Candidate evidence supports review but is not automatically evidence of PASS for a new SHA. Any additional change creates a new frozen qualification identity.
+4. After merged-main software qualification and controlled-start authorization: physical acceptance on three real hosts from clean checkouts/builds. Record fresh baseline and rollback targets, exact build labels, recorder identities and independent targeting, a negative control for the original conflict, restart/reconnect, scenario PASS/FAIL, cleanup/rollback and final Federation state. Activate Nitro recorder only inside that controlled campaign. Existing P07/P12 physical durations still apply.
+5. Keep optional Beast results separate if they arrive; do not dispatch duplicates or block the completed primary software conclusion. No software evidence substitutes for the still-open physical Federation-v1 acceptance.
 
 ## Historical collaboration entries — retained for traceability
 

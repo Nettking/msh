@@ -1,0 +1,153 @@
+{
+  "root": "/home/gha/qualification/pr435-shuffle-20260906-astra",
+  "legs": [
+    {
+      "leg": "candidate-15",
+      "pytest_summary": [
+        "========== 3633 passed, 30 skipped, 455 warnings in 379.01s (0:06:19) =========="
+      ],
+      "setup.rc": "0",
+      "pytest.rc": "0",
+      "final-sha.txt": "ba8a3b0b828f59c36c5aaaf6130480a2432a5578",
+      "final-status.txt": "",
+      "ordered_test_ids_sha256": "60c1c5765af943cf14362ca0204ff0ce077aa51314b0bc3a44ebc6b99b8f7d1b",
+      "sorted_test_ids_sha256": "a6b6cd555a1bd76ed601829bd6b4f3383424e44ee9ed4342be60f2aeb18c5263",
+      "junit_suites": [
+        {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "0",
+          "skipped": "30",
+          "tests": "3663",
+          "time": "378.134",
+          "timestamp": "2026-09-06T06:44:08.370451+00:00",
+          "hostname": "Nettking"
+        }
+      ],
+      "skips": {
+        "Windows PowerShell parser check": 8,
+        "Windows PowerShell scalar/array semantics": 1,
+        "requires real Windows cmd.exe": 1,
+        "requires real Windows cmd.exe and git": 1,
+        "Windows cmd expansion regression": 2,
+        "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?": 7,
+        "Windows batch execution regression": 1,
+        "Windows PowerShell native argument check": 1,
+        "Windows process-tree recovery contract": 1,
+        "Windows cmd metacharacter regression": 1,
+        "Windows launcher execution": 3,
+        "Windows migration smoke": 1,
+        "Windows PowerShell regression": 2
+      },
+      "failures": [],
+      "mem_available_bytes": {
+        "min": 835964928,
+        "mean": 1434898035.612903,
+        "max": 2138664960
+      },
+      "load_1m": {
+        "min": 4.71,
+        "mean": 6.102903225806451,
+        "max": 8.07
+      },
+      "swap_used_bytes": {
+        "min": 4294955008,
+        "mean": 4294966371.096774,
+        "max": 4294967296
+      },
+      "disk_free_bytes": {
+        "min": 949553221632,
+        "mean": 949927047762.5807,
+        "max": 951023853568
+      },
+      "sample_count": 31,
+      "log_hashes": {
+        "checkout.log": "0ebd9608b20181750f44f6d4570e9d44d6103eb8f27e8eace6e756263ff6e2ea",
+        "final-sha.txt": "78ad2b4441316d1565bf8932ce795ce91c2044607e0b8dbe39c1bbc46d44e396",
+        "final-status.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "host-after.txt": "97f3bb517ad7bad68a9ab7addbb44fd37c4dc89aab331d770bc3260ac6fc793a",
+        "host-before.txt": "734758b1e41246186755a26eff66f39fff531e139b916e2af0193c5a37c96ae8",
+        "host-samples.txt": "5086b0d3b3d356728a21d0836fad14595a93713f11e719736dcc5e2f681ca92b",
+        "pip-freeze.txt": "deff8503a7deb26d27695a57892381cc637f8f05db68b1ccc350493076c74020",
+        "pytest.rc": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+        "pytest.xml": "9c624975748a753ed41cc61172d9bc1d6c2c8cadb32b0f211479c0b104d5dd2f",
+        "setup.rc": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+        "test.log": "5cf663802516203c76259aec75ed3490ef494ab4d2a9ef94175fe01193c398c8"
+      }
+    },
+    {
+      "leg": "candidate-20260813",
+      "pytest_summary": [
+        "========== 3633 passed, 30 skipped, 459 warnings in 408.81s (0:06:48) =========="
+      ],
+      "setup.rc": "0",
+      "pytest.rc": "0",
+      "final-sha.txt": "ba8a3b0b828f59c36c5aaaf6130480a2432a5578",
+      "final-status.txt": "",
+      "ordered_test_ids_sha256": "e57f416c107d78773cf272574a2fff9a3e898fd6e9a4b87fdcde9ba55def1e8f",
+      "sorted_test_ids_sha256": "a6b6cd555a1bd76ed601829bd6b4f3383424e44ee9ed4342be60f2aeb18c5263",
+      "junit_suites": [
+        {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "0",
+          "skipped": "30",
+          "tests": "3663",
+          "time": "407.780",
+          "timestamp": "2026-09-06T06:35:53.859897+00:00",
+          "hostname": "Nettking"
+        }
+      ],
+      "skips": {
+        "Windows batch execution regression": 1,
+        "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?": 7,
+        "Windows PowerShell parser check": 8,
+        "requires real Windows cmd.exe": 1,
+        "requires real Windows cmd.exe and git": 1,
+        "Windows cmd expansion regression": 2,
+        "Windows PowerShell regression": 2,
+        "Windows migration smoke": 1,
+        "Windows PowerShell scalar/array semantics": 1,
+        "Windows cmd metacharacter regression": 1,
+        "Windows process-tree recovery contract": 1,
+        "Windows launcher execution": 3,
+        "Windows PowerShell native argument check": 1
+      },
+      "failures": [],
+      "mem_available_bytes": {
+        "min": 509415424,
+        "mean": 1358775513.2121212,
+        "max": 2225836032
+      },
+      "load_1m": {
+        "min": 4.72,
+        "mean": 5.675757575757576,
+        "max": 8.06
+      },
+      "swap_used_bytes": {
+        "min": 4294959104,
+        "mean": 4294966923.6363635,
+        "max": 4294967296
+      },
+      "disk_free_bytes": {
+        "min": 949637210112,
+        "mean": 950001818903.2727,
+        "max": 951124733952
+      },
+      "sample_count": 33,
+      "log_hashes": {
+        "checkout.log": "e2bbd551c383c1c4a69e9c74aeb469cebf2955c64157ba4ce934357e215d883e",
+        "final-sha.txt": "78ad2b4441316d1565bf8932ce795ce91c2044607e0b8dbe39c1bbc46d44e396",
+        "final-status.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "host-after.txt": "2b87f869c6e22d6de26d20674240bd1cec9935d303b47a3a791849898d93b429",
+        "host-before.txt": "e9a26b5a18e2810d3c9c7dea58e61c79c4297d87eed10a77f4252c4f02ae854a",
+        "host-samples.txt": "bd6a564032adbd87d6259ba7b8502691bcd5d27d671460ac1f6053e27c7fac8e",
+        "pip-freeze.txt": "deff8503a7deb26d27695a57892381cc637f8f05db68b1ccc350493076c74020",
+        "pytest.rc": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+        "pytest.xml": "e2dab345816792eca8780d415c5908a177f086cb60ca0d5ee079565c4e234c75",
+        "setup.rc": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+        "test.log": "2352d6c31a0acf0bb18e168d40363eaa11d8590fbdaec5eee92d3fa1daca502b"
+      }
+    }
+  ]
+}

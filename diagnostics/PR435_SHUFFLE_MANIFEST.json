@@ -1,0 +1,31 @@
+{
+  "archive": "/mnt/c/Users/Martin/Documents/Codex/2026-09-05/nettking-msh-self-hosted-ci-runner/work/msh-coordination/diagnostics/PR435_SHUFFLE_RAW_EVIDENCE.tar.gz",
+  "sha256": "1f388b4394a78a9ace194c89186f68e6f8479f1bc373e6abcbbe57e00d00a90f",
+  "bytes": 372367,
+  "files": {
+    "controller.log": "3f2801c88217f77a939e2b8c57025eccc75434c24224f1074562a68c4c4d4f2d",
+    "results.tsv": "a30f33c8206d8074cabadaa0407399edadacccaa81964e534592e63db8cf2140",
+    "candidate-15/checkout.log": "0ebd9608b20181750f44f6d4570e9d44d6103eb8f27e8eace6e756263ff6e2ea",
+    "candidate-15/test.log": "5cf663802516203c76259aec75ed3490ef494ab4d2a9ef94175fe01193c398c8",
+    "candidate-15/pytest.xml": "9c624975748a753ed41cc61172d9bc1d6c2c8cadb32b0f211479c0b104d5dd2f",
+    "candidate-15/pip-freeze.txt": "deff8503a7deb26d27695a57892381cc637f8f05db68b1ccc350493076c74020",
+    "candidate-15/setup.rc": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "candidate-15/pytest.rc": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "candidate-15/final-sha.txt": "78ad2b4441316d1565bf8932ce795ce91c2044607e0b8dbe39c1bbc46d44e396",
+    "candidate-15/final-status.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "candidate-15/host-before.txt": "734758b1e41246186755a26eff66f39fff531e139b916e2af0193c5a37c96ae8",
+    "candidate-15/host-after.txt": "97f3bb517ad7bad68a9ab7addbb44fd37c4dc89aab331d770bc3260ac6fc793a",
+    "candidate-15/host-samples.txt": "5086b0d3b3d356728a21d0836fad14595a93713f11e719736dcc5e2f681ca92b",
+    "candidate-20260813/checkout.log": "e2bbd551c383c1c4a69e9c74aeb469cebf2955c64157ba4ce934357e215d883e",
+    "candidate-20260813/test.log": "2352d6c31a0acf0bb18e168d40363eaa11d8590fbdaec5eee92d3fa1daca502b",
+    "candidate-20260813/pytest.xml": "e2dab345816792eca8780d415c5908a177f086cb60ca0d5ee079565c4e234c75",
+    "candidate-20260813/pip-freeze.txt": "deff8503a7deb26d27695a57892381cc637f8f05db68b1ccc350493076c74020",
+    "candidate-20260813/setup.rc": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "candidate-20260813/pytest.rc": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "candidate-20260813/final-sha.txt": "78ad2b4441316d1565bf8932ce795ce91c2044607e0b8dbe39c1bbc46d44e396",
+    "candidate-20260813/final-status.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "candidate-20260813/host-before.txt": "e9a26b5a18e2810d3c9c7dea58e61c79c4297d87eed10a77f4252c4f02ae854a",
+    "candidate-20260813/host-after.txt": "2b87f869c6e22d6de26d20674240bd1cec9935d303b47a3a791849898d93b429",
+    "candidate-20260813/host-samples.txt": "bd6a564032adbd87d6259ba7b8502691bcd5d27d671460ac1f6053e27c7fac8e"
+  }
+}
