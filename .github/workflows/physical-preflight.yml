@@ -137,52 +137,56 @@ jobs:
     name: "Pre-flight: Nettking (Windows)"
     runs-on: fcp-windows
     timeout-minutes: 20
+    # cmd, not powershell/pwsh. This runner has PowerShell execution policy
+    # Restricted for the runner account -- a .ps1 step dies with
+    # PSSecurityException before running, which is the same condition already
+    # recorded against Beast-Windows. The proven Windows release gate uses cmd
+    # for exactly this reason. Changing the host's execution policy is a runner
+    # configuration change and is out of scope, so the harness adapts instead.
     steps:
       - name: Host identity, disk and memory
-        shell: powershell
+        shell: cmd
         run: |
-          "runner name : $env:RUNNER_NAME"
-          "hostname    : $(hostname)"
-          "user        : $env:USERNAME"
-          Get-CimInstance Win32_OperatingSystem |
-            Select-Object Caption, Version,
-              @{n='TotalGB';e={[math]::Round($_.TotalVisibleMemorySize/1MB,2)}},
-              @{n='FreeGB';e={[math]::Round($_.FreePhysicalMemory/1MB,2)}} | Format-List
-          Get-PSDrive -PSProvider FileSystem |
-            Select-Object Name,@{n='UsedGB';e={[math]::Round($_.Used/1GB,1)}},@{n='FreeGB';e={[math]::Round($_.Free/1GB,1)}} |
-            Format-Table -AutoSize
+          echo runner name : %RUNNER_NAME%
+          echo hostname    : %COMPUTERNAME%
+          echo user        : %USERNAME%
+          systeminfo | findstr /C:"OS Name" /C:"Total Physical Memory" /C:"Available Physical Memory"
+          echo --- drives ---
+          wmic logicaldisk get caption,freespace,size 2>nul || fsutil volume diskfree C:
       - name: Containers and services (read-only)
         continue-on-error: true
-        shell: powershell
+        shell: cmd
         run: |
-          "--- docker ps -a ---"
-          docker ps -a --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}' 2>&1 | Select-Object -First 40
-          "--- services matching fcp/msh/recorder/arrowhead ---"
-          Get-Service | Where-Object { $_.Name -match 'fcp|msh|recorder|arrowhead|relay' } |
-            Select-Object Status,Name,DisplayName | Format-Table -AutoSize
+          echo --- docker ps -a ---
+          docker ps -a --format "table {{.Names}}\t{{.Image}}\t{{.Status}}" 2>&1
+          echo.
+          echo --- running container build commits ---
+          for /f "delims=" %%n in ('docker ps --format "{{.Names}}" 2^>nul') do @( ^
+            for /f "delims=" %%c in ('docker inspect %%n --format "{{ index .Config.Labels \"no.fcp.build_commit\" }}" 2^>nul') do @echo   %%n -^> %%c )
+          echo.
+          echo --- running services matching fcp/msh/recorder/arrowhead/relay ---
+          net start | findstr /I "fcp msh recorder arrowhead relay"
+          if errorlevel 1 echo   (no matching running services)
       - name: Deployment checkouts and rollback reachability (read-only)
         continue-on-error: true
-        shell: powershell
+        shell: cmd
         run: |
-          "MERGED_MAIN_SHA target : $env:MERGED_MAIN_SHA"
-          "ROLLBACK_SHA           : $env:ROLLBACK_SHA"
-          $roots = @('C:\wsl\msh','C:\msh','C:\fcp\msh',"$env:USERPROFILE\msh",'C:\actions-runner\_work\msh\msh')
-          $found = Get-ChildItem -Path 'C:\' -Directory -Filter 'msh' -Depth 3 -ErrorAction SilentlyContinue |
-                     Select-Object -ExpandProperty FullName
-          foreach ($d in ($roots + $found | Select-Object -Unique)) {
-            if (Test-Path (Join-Path $d '.git')) {
-              "--- checkout: $d"
-              "    HEAD        : $(git -C $d rev-parse HEAD 2>$null)"
-              "    branch      : $(git -C $d rev-parse --abbrev-ref HEAD 2>$null)"
-              "    dirty files : $((git -C $d status --porcelain 2>$null | Measure-Object -Line).Lines)"
-              "    has merged  : $(git -C $d cat-file -t $env:MERGED_MAIN_SHA 2>$null)"
-              "    has rollback: $(git -C $d cat-file -t $env:ROLLBACK_SHA 2>$null)"
-            }
-          }
-      - name: Tailscale reachability (read-only)
+          echo MERGED_MAIN_SHA target : %MERGED_MAIN_SHA%
+          echo ROLLBACK_SHA           : %ROLLBACK_SHA%
+          for %%d in ("C:\wsl\msh" "C:\msh" "C:\fcp\msh" "%USERPROFILE%\msh" "C:\actions-runner\_work\msh\msh") do @( ^
+            if exist "%%~d\.git" ( ^
+              echo --- checkout: %%~d & ^
+              git -C "%%~d" rev-parse HEAD & ^
+              git -C "%%~d" rev-parse --abbrev-ref HEAD & ^
+              git -C "%%~d" cat-file -t %MERGED_MAIN_SHA% & ^
+              git -C "%%~d" cat-file -t %ROLLBACK_SHA% ) )
+      - name: Recorder state and Tailscale reachability (read-only)
         continue-on-error: true
-        shell: powershell
+        shell: cmd
         run: |
-          $ts = Get-Command tailscale -ErrorAction SilentlyContinue
-          if ($ts) { tailscale status 2>&1 | Select-Object -First 20 }
-          else { "(tailscale CLI not on PATH for this runner account)" }
+          echo --- recorder/node state locations (existence only) ---
+          for %%p in ("%USERPROFILE%\.fcp" "%USERPROFILE%\.msh" "C:\fcp-data" "C:\ProgramData\fcp") do @( ^
+            if exist "%%~p" echo   present: %%~p )
+          echo.
+          echo --- tailscale ---
+          where tailscale >nul 2>&1 && tailscale status || echo   (tailscale CLI not on PATH for this runner account)
