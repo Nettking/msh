@@ -6,22 +6,23 @@ Coordination only: `coord/federation-v1-release`. NEVER merge this branch into m
 
 EXECUTIVE_OWNER: Astra
 ACTING_ENGINEER: Claude (Opus), acting under Astra's existing executive policy. **EXECUTIVE_OWNER remains Astra** and that marker is unchanged. Delegated scope: close the merged-main software verdict on evidence, publish durable coordination state, then controlled physical Federation v1 acceptance. No executive policy is changed and no completed qualification is reinterpreted.
-CURRENT_PHASE: B03 PRIVACY/IDENTITY FIX MERGED TO MAIN. Physical acceptance B03 found recorder control unroutable; the fix is merged as PR437 and main has moved to 1004b274. That is a **new identity**, so the bcf5c9ab qualification PASS does not carry over: merged-main software requalification of 1004b274 is the next required step, then B03 retest, then the controlled physical campaign. No physical startup, deployment or host mutation has occurred.
+CURRENT_PHASE: **MERGED-MAIN SOFTWARE QUALIFICATION OF 1004b274 CLOSED — PASS.** The B03 privacy/identity fix merged as PR437, main moved to 1004b274, and that new identity has now been qualified in its own right by run 34048266256 (10/10 SUCCESS, first attempt). Next required step is physical B03 retest, then the controlled physical campaign. No physical startup, deployment or host mutation has occurred, and nothing has been said to Luna about deploying.
 CURRENT_MAIN_SHA: 1004b274c198018161658cd1379d6cb4a20dbc82
 MERGED_MAIN_SHA: 1004b274c198018161658cd1379d6cb4a20dbc82 — merge commit; parents 3fe0d95f (the PR437 merge) and 9281d581 (the reviewed PR head); tree 055ba20d3bcd8c03af4d26420c18a4e482eb7874, **byte-identical to the reviewed head 9281d581**, so the merged content is exactly what was reviewed.
 PREVIOUS_MAIN_SHA: bcf5c9ab2fb453cb26129b70d41fb64fc4863dd4 — merge commit of PR435; software-qualified by run 34029983129. Retained as history; it is no longer main and its PASS does not transfer to 1004b274.
 PRE_MERGE_MAIN_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356
-MERGED_MAIN_SOFTWARE_QUALIFICATION: **NOT ESTABLISHED for 1004b274c198018161658cd1379d6cb4a20dbc82.** A new identity does not inherit the previous PASS, and the required fast-host legs are unrun against it. The harness .github/workflows/merged-main-qualification.yml exists and works but is pinned to bcf5c9ab; it must be retargeted at 1004b274 to requalify. Blocked in practice by CI001 for hosted jobs; the self-hosted rig is unaffected.
-QUALIFIED_PREVIOUS_IDENTITY: **PASS** for bcf5c9ab — authoritative run 34029983129, 9/9 SUCCESS, harness f5bded77, verified live. Historical; it does not qualify current main.
+MERGED_MAIN_SOFTWARE_QUALIFICATION: **PASS for exact 1004b274c198018161658cd1379d6cb4a20dbc82** — authoritative run 34048266256, 10/10 SUCCESS on the first attempt, 2026-09-06T17:19:53Z to 17:46:15Z, harness 3c827991436e6508ad847b0b554dbe1101eb9b1f. Every leg checked out and asserted this exact SHA and proved the worktree clean before and after. Legs: A default order 3723 passed/30 skipped; A2 default-order repeat on an independent checkout 3723 passed/30 skipped; B shuffled seed 20260813; C shuffled seed 15; D release/static gates; E real Compose validation (Compose v5.5.1 from the pinned CLI image, not a YAML parse); Windows release matrix on Nettking; PostgreSQL storage gate on Nitro; automated verdict. PRODUCT/ENVIRONMENT/INFRASTRUCTURE/UNRESOLVED failures: none in all four classes.
+QUALIFIED_PREVIOUS_IDENTITY: **PASS** for bcf5c9ab — run 34029983129, 9/9 SUCCESS, harness f5bded77, verified live. Historical only; it never qualified 1004b274 and was not used to. 1004b274 carries its own PASS from run 34048266256.
 CURRENT_CANDIDATE_SHA: ba8a3b0b828f59c36c5aaaf6130480a2432a5578 — merged; retained as the qualified software identity
 PR_435_HEAD: ba8a3b0b828f59c36c5aaaf6130480a2432a5578 on claude/federation-recorder-capability-id-19tqkk; MERGED 2026-09-06 as bcf5c9ab, normal merge commit with exact expected-head-SHA protection, no branch-protection bypass
 ACTIVE_FIX_BRANCH: None. R001 f65d11fd028a8eea5478e2fd6dd634fdbdb9d9a1 and branding-only ba8a3b0b are already in the frozen candidate.
-VALIDATION_BRANCH: claude/pr-435-final-merge-k01mfi at f5bded772dd70893416c1345c9e450b96633c6fe; diagnostic harness identity, all product checkouts pinnedbcf5c9ab.
-AUTHORITATIVE_CI_RUN: 34029983129 — COMPLETED SUCCESS 2026-09-06T11:46:55Z, started 11:20:53Z. No qualification job is running and none is to be launched.
+VALIDATION_BRANCH: claude/pr-435-final-merge-k01mfi at 3c827991436e6508ad847b0b554dbe1101eb9b1f; diagnostic harness identity, all product checkouts pinned 1004b274. The retarget changed only SHA pins, the header comment, one re-chained `needs:` and the verdict job name, and added Leg A2. No timeout, retry, assertion, skip, flaky marker or coverage selection was weakened, and no product or test code was touched.
+AUTHORITATIVE_CI_RUN: 34048266256 — COMPLETED SUCCESS 2026-09-06T17:46:15Z, started 17:19:53Z, run_attempt 1. No qualification job is running and none is to be launched. Superseded run 34029983129 (bcf5c9ab) is retained below as history.
 RUN_HISTORY (all three preserved as-is; none is rewritten as green):
   34019865738 — FAILURE, ENV/OOM interruption. Leg A SIGKILLed exit137 at 93% with 837 MiB available, no test having failed, then the runner service was lost. Operationally attributed to the resident Arrowhead services. Not a product failure and not to be reclassified as one.
   34025305598 — FAILURE at leg D's post-check. Product suites A/B/C, Windows and PostgreSQL all PASSED on exact bcf5c9ab. D's own gates passed; the harness's final cleanliness assertion failed on the untracked cmd/fcp-peer-sidecar/go.sum that the gate's own `go mod tidy` generates. E skipped. The tool-generated-file history is deliberately retained, not hidden.
-  34029983129 — AUTHORITATIVE PASS, 9/9 SUCCESS.
+  34029983129 — PASS for bcf5c9ab, 9/9 SUCCESS. Superseded as the authoritative run when main moved to 1004b274.
+  34048266256 — **AUTHORITATIVE PASS for 1004b274**, 10/10 SUCCESS, first attempt, no retries and no re-runs. Nettking-Linux held 11 GiB available throughout (low-water 11097 MiB on leg A, 11098 MiB on leg A2), so the earlier Arrowhead OOM condition was absent; Arrowhead stayed stopped and was not restarted, and no host service, Docker, WSL or runner configuration was changed.
 HISTORICAL_RELEASE_RUN: 33975032244 — completed FAILURE. Windows101330241662 SUCCESS; PostgreSQL101330241653 SUCCESS; clean-checkout101330241502 FAILURE; Linux release101330241713 FAILURE; verdict101359577396 FAILURE. These historical results are unchanged.
 FAST_LINUX_VALIDATION: PASS — two successive default-order full candidate suites on Nettking-Linux, 40 targeted repeats independently verified, release/static checks plus actual Compose validation completed. This does not certify shuffled order independence or physical acceptance.
 FAST_WINDOWS_VALIDATION: PASS — existing exact-candidate Nettking Windows gate reused. Optional Beast-Windows confirmation INCOMPLETE due to Python setup execution-policy failure before tests.
@@ -44,7 +45,7 @@ ROLLBACK_TARGET: 6101c86d94294c70db47d1a8053cac93b9a41356 on all three hosts; to
 ARROWHEAD_STATE: STOPPED on Nettking-Linux by operator intervention (~14 Java services, ~9-10+ GiB RSS, swap exhausted) to free memory for qualification. Not to be blindly restarted. For physical acceptance: record it as stopped, determine whether it is unrelated to the campaign, keep it stopped if it is not part of the test, and do not let unrelated Arrowhead memory pressure contaminate the physical baseline. Swap may currently be disabled after the controlled OOM recovery; do not change swap during active physical scenarios unless required and documented. Preserve and identify the exact stopped service set before any restoration; do not guess.
 BEAST_ROLE: AI_PROVIDER_ONLY, unchanged. Beast-Linux remains OFFLINE and is deliberately not repaired. Keep Beast out of the product Federation.
 CURRENT_SESSION_ID: UNKNOWN; no fresh authenticated Federation state query completed
-LAST_UPDATED_UTC: 2026-09-06T16:57:55Z
+LAST_UPDATED_UTC: 2026-09-06T17:50:00Z
 
 ## B03 privacy and identity fix merged — PR437, main now 1004b274
 
@@ -61,9 +62,11 @@ NO_HOSTED_CI_EVIDENCE: PR437 carried none. All 28 checks were red on both its he
 
 EXACT_NEXT_ACTION, in order:
 
-1. Requalify **1004b274** on the self-hosted rig. Retarget `.github/workflows/merged-main-qualification.yml` (currently pinned to bcf5c9ab) and run legs A-E on Nettking-Linux, the Nettking Windows gate and the PostgreSQL gate. Do not inherit the bcf5c9ab PASS.
-2. Only then retest physical B03 on the three hosts.
+1. ~~Requalify **1004b274** on the self-hosted rig.~~ **DONE — PASS**, run 34048266256, 10/10 SUCCESS on exact 1004b274. The bcf5c9ab PASS was not inherited; the harness was retargeted and a default-order repeat added. This also closes NO_HOSTED_CI_EVIDENCE: the merged identity now has a full authoritative software answer that PR437 itself never had.
+2. **NEXT:** retest physical B03 on the three hosts. Requires an executive go-ahead for physical action; PHYSICAL_ACCEPTANCE_AUTHORIZED is a decision for Astra, and software PASS is a precondition for it, not the authorisation itself.
 3. Only then the full controlled physical campaign, all three hosts on one identical SHA, with the recorder-identity Part B coverage the P01-P12 contract still does not provide.
+
+Note that the physical blockers below are **unchanged by this software PASS**. B1 (no route to MSH Recorder) and the missing Part B recorder-identity coverage still mean the campaign cannot reach a verdict as currently specified, and all three hosts remain on 6101c86d — now **three** identities behind main.
 
 Known upgrade consequence for release notes: a source configured before this change keeps its address-derived name on disk and appears in coordinator views as `mtconnect-agent-<digest>`. Nothing breaks — removal resolves both forms — but the label visibly changes.
 
@@ -570,3 +573,36 @@ ROTATION: Complete safe atomic work, push harness/evidence, record exact PID/con
 - Runtime proof uses no.fcp.build_commit (native recorder: native_runtime.build_commit), not source HEAD or container Running alone.
 - Separate full physical requirements remain: P01–P12 and CF7 physical-evidence.v2; P07≥1 actual hour, P12≥24 actual hours, same candidate/host/run_id with valid in-window samples. Real MTConnect/Ollama/accelerator, desktop/mobile and multi-host observations remain required. No CI/simulated evidence substitutes.
 - Private endpoints, credentials, pairing grants, SSH keys and complete environment dumps must stay out of committed evidence. Preserve all existing rig data and legacy projects.
+
+## Merged-main software requalification of 1004b274 — CLOSED, PASS
+
+QUALIFIED_SHA: `1004b274c198018161658cd1379d6cb4a20dbc82`
+AUTHORITATIVE_RUN: [34048266256](https://github.com/Nettking/msh/actions/runs/34048266256) — success, run_attempt 1, 2026-09-06T17:19:53Z to 17:46:15Z
+HARNESS: `claude/pr-435-final-merge-k01mfi` at `3c827991436e6508ad847b0b554dbe1101eb9b1f`
+
+Hard gate before anything ran: `origin/main` = 1004b274, candidate checkout HEAD = 1004b274, working tree clean. Neither the branch head 9281d581 nor the historical bcf5c9ab was qualified.
+
+| Leg | Runner | Result | Evidence |
+| --- | --- | --- | --- |
+| Host/container identity | Nettking-Linux | success 5s | 20 cpus, 11 GiB available of 15 GiB, docker 29.1.3, container python 3.12.13 |
+| A full suite, default order | Nettking-Linux | success 400s | 3723 passed, 30 skipped, 0 failed in 328.91s |
+| A2 full suite, default-order repeat | Nettking-Linux | success 345s | 3723 passed, 30 skipped, 0 failed in 277.34s, independent checkout |
+| B full suite, shuffled seed 20260813 | Nettking-Linux | success 361s | order-independence |
+| C full suite, shuffled seed 15 | Nettking-Linux | success 354s | order-independence |
+| D release and static gates | Nettking-Linux | success 85s | compileall, acceptance manifest, ruff, branding, Go sidecar tests, diff hygiene |
+| E real Compose validation | Nettking-Linux | success 9s | `COMPOSE_CONFIG_PASS pinned-cli-image`, Docker Compose v5.5.1, not a YAML parse |
+| Windows release matrix | Nettking | success 428s | exact-SHA Windows gate |
+| PostgreSQL storage release check | Nitro | success 206s | light targeted gate only; no full suite on Nitro |
+| Automated verdict | Nettking-Linux | success 5s | `MERGED_MAIN_SOFTWARE_QUALIFICATION_LEGS: ALL PASS for 1004b274c198018161658cd1379d6cb4a20dbc82` |
+
+FAILURE_CLASSIFICATION: PRODUCT none; ENVIRONMENT none; INFRASTRUCTURE none within the qualification; UNRESOLVED none. Nothing needed classifying — every leg was green on the first attempt, with no re-run, no retry and no leg excused.
+
+CLEAN_CHECKOUT_AND_ORDER_INDEPENDENCE: every leg checked out 1004b274 by exact ref, asserted `git rev-parse HEAD` against `VALIDATED_SHA`, printed `CHECKOUT_BEFORE_CLEAN`, and re-asserted both SHA and cleanliness afterwards (`CHECKOUT_AFTER_CLEAN`). No test leaked a file into any worktree. Two default-order passes plus two fixed shuffled seeds on four independent checkouts.
+
+CI001_POSITION: hosted checks on 1004b274 are all red — every `ubuntu-latest`/`windows-latest` job terminated in 1-2s with no runner assigned and zero steps, the whole `Federation v1 release gate` included. Classified INFRASTRUCTURE (account-level Actions billing), not product, on that decisive evidence. It is recorded, not excused: the self-hosted rig produced the full answer instead, and the hosted gate should still be expected to go green once billing is restored.
+
+WHAT_WAS_NOT_WEAKENED: no timeout, retry, assertion, skip, flaky marker or coverage selection was changed, and no product or test code was modified during qualification. The harness diff removed only SHA pins, the stale header comment, one re-chained `needs:` and the verdict job name; it added Leg A2. Leg A2 is the one deliberate addition to the established set: the previous candidate only ever got a default-order repeat because its first run had to be retried after the host OOM, so the repeat is now part of the standard rather than an accident.
+
+RESOURCE_DISCIPLINE_OBSERVED: Arrowhead remained stopped and was not restarted; no unrelated service, Docker, WSL or runner configuration was touched; Nettking-Linux never dropped below 11 GiB available (against 837 MiB at the historical OOM), so no leg was at risk of the earlier failure mode; Nitro ran only the light PostgreSQL gate and no full suite.
+
+SCOPE_OF_THIS_VERDICT: software only, for one commit identity. It does not authorise deployment, does not start Luna's campaign, and does not retire any physical blocker. `PHYSICAL_ACCEPTANCE_AUTHORIZED` remains Astra's decision.
