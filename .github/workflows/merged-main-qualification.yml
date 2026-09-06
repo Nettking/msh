@@ -1,0 +1,899 @@
+name: Merged main qualification
+
+# Authoritative post-merge software qualification of the exact merged-main
+# identity bcf5c9ab. PR435 is merged; the merged tree is byte-identical to the
+# qualified candidate ba8a3b0b, but the merged identity does not inherit that
+# PASS and is validated here in its own right.
+#
+# The Linux release answer runs on Nettking-Linux, sequentially, because the
+# legs must not compete for the host. Windows reuses the exact gate that
+# qualified the candidate on the Nettking Windows runner, and PostgreSQL reuses
+# its proven service configuration. Nitro is not on the critical path and is not
+# being characterised here.
+#
+# Every job checks out and asserts this one SHA, and verifies the worktree is
+# clean before and after. No product code, test, timeout, threshold, skip or
+# Federation state is changed by this workflow.
+
+on:
+  push:
+    branches:
+      - claude/pr-435-final-merge-k01mfi
+    paths:
+      - '.github/workflows/merged-main-qualification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: merged-main-qualification
+  cancel-in-progress: false
+
+env:
+  VALIDATED_SHA: bcf5c9ab2fb453cb26129b70d41fb64fc4863dd4
+  IMAGE: python:3.12.13-bookworm
+  # The exact official Docker CLI image Astra used for the candidate's real
+  # Compose validation. Nettking-Linux has no Compose plugin installed, and
+  # changing runner infrastructure is out of scope, so the gate's own check runs
+  # inside this pinned image with the source read-only, no network and no socket.
+  COMPOSE_CLI_IMAGE: docker@sha256:eccaacfeed644c7de222ff047483568cb988dde95476fbaaf10ea2d04921bb66
+
+jobs:
+  smoke-nettking-linux:
+    name: "Nettking-Linux: host and container identity"
+    runs-on: nettking-linux
+    timeout-minutes: 20
+    steps:
+      - name: Runner and container identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "runner name : ${RUNNER_NAME:-unknown}"
+          echo "host        : $(hostname)"
+          echo "user        : $(id -un) ($(id -u))"
+          echo "cpus        : $(nproc)"
+          free -h | sed -n '1,2p'
+          df -h / | tail -1
+          lsblk -d -o NAME,ROTA,SIZE 2>/dev/null | sed 's/^/  /' || true
+          docker version --format '  docker client {{.Client.Version}} server {{.Server.Version}}'
+          docker run --rm "${IMAGE}" python -c "import sys; print('  container python', sys.version.split()[0])"
+
+  linux-default-order:
+    name: "Leg A: Nettking-Linux full suite, default order"
+    runs-on: nettking-linux
+    needs: smoke-nettking-linux
+    timeout-minutes: 180
+    steps:
+      - name: Repair workspace ownership before checkout
+        shell: bash
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/ws" \
+            python:3.12.13-bookworm chown -R "$(id -u):$(id -g)" /ws || true
+      - uses: actions/checkout@v4
+        with:
+          ref: bcf5c9ab2fb453cb26129b70d41fb64fc4863dd4
+          fetch-depth: 0
+      - name: Verify exact merged SHA and initial cleanliness
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${VALIDATED_SHA}"
+          test -z "$(git status --porcelain)"
+          echo "HEAD verified: ${VALIDATED_SHA}"
+          echo "CHECKOUT_BEFORE_CLEAN"
+      - name: Host state before the suite
+        shell: bash
+        run: |
+          echo "cpus $(nproc)"; free -h | sed -n '2p'; df -h / | tail -1
+      - name: Storage precondition
+        shell: bash
+        run: python3 scripts/ci_release_disk_preflight.py "${GITHUB_WORKSPACE}" /tmp
+      - name: Full suite, default order
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --network host \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "${GITHUB_WORKSPACE}:/workspace" \
+            -e PYTHONPYCACHEPREFIX=/tmp/pycache \
+            -w /workspace "${IMAGE}" bash -lc '
+              set -euo pipefail
+              python --version
+              python -m pip install --quiet --upgrade pip==26.2.1
+              python -m pip install --quiet -r requirements.txt -c constraints-release.txt
+              python -m pip install --quiet pytest==9.1.1 -c constraints-release.txt
+              python -m pip freeze | sort | sha256sum | sed "s/^/dependency-set sha256 /"
+              python -m pytest -o addopts= -o cache_dir=/tmp/pytest_cache -p no:randomly -v --durations=50
+            '
+      - name: Host state after the suite
+        if: always()
+        shell: bash
+        run: |
+          echo "cpus $(nproc)"; free -h | sed -n '2p'; df -h / | tail -1
+      - name: Return workspace ownership to the runner account
+        if: always()
+        shell: bash
+        run: |
+          docker run --rm -v "${GITHUB_WORKSPACE}:/ws" "${IMAGE}" \
+            chown -R "$(id -u):$(id -g)" /ws
+      - name: Exact SHA and repository still clean after the suite
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${VALIDATED_SHA}"
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Working tree modified by the test suite:"; git status --porcelain; exit 1
+          fi
+          echo "CHECKOUT_AFTER_CLEAN"
+
+  linux-shuffled-20260813:
+    name: "Leg B: Nettking-Linux full suite, shuffled seed 20260813"
+    runs-on: nettking-linux
+    needs: linux-default-order
+    timeout-minutes: 180
+    steps:
+      - name: Repair workspace ownership before checkout
+        shell: bash
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/ws" \
+            python:3.12.13-bookworm chown -R "$(id -u):$(id -g)" /ws || true
+      - uses: actions/checkout@v4
+        with:
+          ref: bcf5c9ab2fb453cb26129b70d41fb64fc4863dd4
+          fetch-depth: 0
+      - name: Verify exact merged SHA and initial cleanliness
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${VALIDATED_SHA}"
+          test -z "$(git status --porcelain)"
+          echo "HEAD verified: ${VALIDATED_SHA}"
+          echo "CHECKOUT_BEFORE_CLEAN"
+      - name: Storage precondition
+        shell: bash
+        run: python3 scripts/ci_release_disk_preflight.py "${GITHUB_WORKSPACE}" /tmp
+      - name: Full suite, shuffled seed 20260813
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --network host \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "${GITHUB_WORKSPACE}:/workspace" \
+            -e PYTHONPYCACHEPREFIX=/tmp/pycache \
+            -w /workspace "${IMAGE}" bash -lc '
+              set -euo pipefail
+              python --version
+              python -m pip install --quiet --upgrade pip==26.2.1
+              python -m pip install --quiet -r requirements.txt -c constraints-release.txt
+              python -m pip install --quiet pytest==9.1.1 pytest-randomly==4.1.0 -c constraints-release.txt
+              python -m pip freeze | sort | sha256sum | sed "s/^/dependency-set sha256 /"
+              python -m pytest -o addopts= -o cache_dir=/tmp/pytest_cache -v --durations=25 -p randomly --randomly-seed=20260813
+            '
+      - name: Return workspace ownership to the runner account
+        if: always()
+        shell: bash
+        run: |
+          docker run --rm -v "${GITHUB_WORKSPACE}:/ws" "${IMAGE}" \
+            chown -R "$(id -u):$(id -g)" /ws
+      - name: Exact SHA and repository still clean after the suite
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${VALIDATED_SHA}"
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Working tree modified by the test suite:"; git status --porcelain; exit 1
+          fi
+          echo "CHECKOUT_AFTER_CLEAN"
+
+  linux-shuffled-15:
+    name: "Leg C: Nettking-Linux full suite, shuffled seed 15"
+    runs-on: nettking-linux
+    needs: linux-shuffled-20260813
+    timeout-minutes: 180
+    steps:
+      - name: Repair workspace ownership before checkout
+        shell: bash
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/ws" \
+            python:3.12.13-bookworm chown -R "$(id -u):$(id -g)" /ws || true
+      - uses: actions/checkout@v4
+        with:
+          ref: bcf5c9ab2fb453cb26129b70d41fb64fc4863dd4
+          fetch-depth: 0
+      - name: Verify exact merged SHA and initial cleanliness
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${VALIDATED_SHA}"
+          test -z "$(git status --porcelain)"
+          echo "HEAD verified: ${VALIDATED_SHA}"
+          echo "CHECKOUT_BEFORE_CLEAN"
+      - name: Storage precondition
+        shell: bash
+        run: python3 scripts/ci_release_disk_preflight.py "${GITHUB_WORKSPACE}" /tmp
+      - name: Full suite, shuffled seed 15
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --network host \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "${GITHUB_WORKSPACE}:/workspace" \
+            -e PYTHONPYCACHEPREFIX=/tmp/pycache \
+            -w /workspace "${IMAGE}" bash -lc '
+              set -euo pipefail
+              python --version
+              python -m pip install --quiet --upgrade pip==26.2.1
+              python -m pip install --quiet -r requirements.txt -c constraints-release.txt
+              python -m pip install --quiet pytest==9.1.1 pytest-randomly==4.1.0 -c constraints-release.txt
+              python -m pip freeze | sort | sha256sum | sed "s/^/dependency-set sha256 /"
+              python -m pytest -o addopts= -o cache_dir=/tmp/pytest_cache -v --durations=25 -p randomly --randomly-seed=15
+            '
+      - name: Return workspace ownership to the runner account
+        if: always()
+        shell: bash
+        run: |
+          docker run --rm -v "${GITHUB_WORKSPACE}:/ws" "${IMAGE}" \
+            chown -R "$(id -u):$(id -g)" /ws
+      - name: Exact SHA and repository still clean after the suite
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${VALIDATED_SHA}"
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Working tree modified by the test suite:"; git status --porcelain; exit 1
+          fi
+          echo "CHECKOUT_AFTER_CLEAN"
+
+  linux-static:
+    name: "Leg D: Nettking-Linux release and static gates"
+    runs-on: nettking-linux
+    needs: linux-shuffled-15
+    timeout-minutes: 90
+    steps:
+      - name: Repair workspace ownership before checkout
+        shell: bash
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/ws" \
+            python:3.12.13-bookworm chown -R "$(id -u):$(id -g)" /ws || true
+      - uses: actions/checkout@v4
+        with:
+          ref: bcf5c9ab2fb453cb26129b70d41fb64fc4863dd4
+          fetch-depth: 0
+      - name: Verify exact merged SHA and initial cleanliness
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${VALIDATED_SHA}"
+          test -z "$(git status --porcelain)"
+          echo "HEAD verified: ${VALIDATED_SHA}"
+          echo "CHECKOUT_BEFORE_CLEAN"
+      - name: Storage and host-resource preconditions
+        if: always()
+        shell: bash
+        run: python3 scripts/ci_release_disk_preflight.py "${GITHUB_WORKSPACE}" /tmp
+      - name: Compile, manifest, ruff and branding in the release container
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}:/workspace" \
+            -e PYTHONPYCACHEPREFIX=/tmp/pycache \
+            -w /workspace "${IMAGE}" bash -lc '
+              set -euo pipefail
+              python -m pip install --quiet --upgrade pip==26.2.1
+              python -m pip install --quiet -r requirements.txt -c constraints-release.txt
+              python -m pip install --quiet ruff==0.16.3 -c constraints-release.txt
+              git config --global --add safe.directory /workspace
+              python -m compileall -q catalog
+              python -c "import json, pathlib; m = json.loads(pathlib.Path(\"catalog/federation/tests/cf7_acceptance/scenarios.json\").read_text(encoding=\"utf-8\")); req = {\"federation_v1_end_to_end_accepted\", \"capability_first_onboarding_end_to_end_accepted\", \"automated_product_acceptance_executable\", \"physical_evidence_accepted\", \"executable_now\", \"blocked_by_cfi\", \"manual_physical_verification\"}; assert req <= m.keys(); assert m[\"automated_product_acceptance_executable\"] is True; assert m[\"executable_now\"]; assert m[\"manual_physical_verification\"]"
+              python -m ruff check catalog/capabilities catalog/ai/remote_provider.py catalog/common/data_loading.py catalog/flask_app/app.py catalog/flask_app/capability_startup_transition_routes.py catalog/flask_app/data_upload_routes.py catalog/flask_app/docs_routes.py catalog/flask_app/provider_federation_routes.py catalog/flask_app/services/capability_contribution_components.py catalog/flask_app/services/data_upload_service.py catalog/flask_app/services/device_state_reset.py catalog/flask_app/services/existing_setup_resume.py catalog/flask_app/services/federation_pairing_install.py catalog/flask_app/services/local_capability_candidates.py catalog/flask_app/services/resilient_pairing_runtime.py catalog/flask_app/services/run_once_capability_evidence.py catalog/flask_app/services/upload_analysis_job_service.py catalog/flask_app/tests/test_legacy_startup_retired.py catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py catalog/flask_app/tests/test_capability_runtime_startup.py catalog/flask_app/tests/test_capability_startup_transition_route.py catalog/flask_app/tests/test_data_upload.py catalog/flask_app/tests/test_device_state_reset.py catalog/flask_app/tests/test_docs_viewer.py catalog/flask_app/tests/test_existing_setup_resume.py catalog/flask_app/tests/test_federation_auto_reconnect.py catalog/flask_app/tests/test_local_capability_candidates.py catalog/flask_app/tests/test_provider_federation_surface.py catalog/flask_app/tests/test_release_reproducibility.py catalog/flask_app/tests/test_run_once_capability_evidence.py catalog/flask_app/tests/test_upload_analysis_jobs.py catalog/flask_app/tests/test_windows_start_script.py catalog/flask_app/tests/test_windows_update_script.py catalog/flask_app/tests/test_windows_volume_name_selection.py catalog/federation/projections/benchmark_adapter.py catalog/federation/projections/onboarding_adapter.py catalog/federation/projections/storage_job_adapters.py catalog/federation/tests/cf7_acceptance/physical_evidence.py catalog/federation/tests/cf7_acceptance/test_physical_evidence.py catalog/federation/tests/cf7_acceptance/test_product_acceptance.py catalog/federation/tests/test_benchmark_latest_projection.py catalog/federation/tests/test_onboarding_projection_policy.py catalog/federation/tests/test_release_documentation_links.py catalog/relay/tests/test_phase_f83_remote_ai_binding.py catalog/relay/tests/test_phase_f84_compute_worker_activation.py --ignore I001,RUF022,B008,C408,PLC0206,UP035
+              python scripts/check_product_branding.py
+            '
+      - name: Go direct peer sidecar tests
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}:/workspace" \
+            -w /workspace/cmd/fcp-peer-sidecar \
+            golang:1.25.7 bash -c 'go version && go mod tidy && go test ./...'
+      - name: Diff hygiene
+        if: always()
+        shell: bash
+        run: git diff --check HEAD^ HEAD
+      - name: Return workspace ownership to the runner account
+        if: always()
+        shell: bash
+        run: |
+          docker run --rm -v "${GITHUB_WORKSPACE}:/ws" "${IMAGE}" \
+            chown -R "$(id -u):$(id -g)" /ws
+      - name: Exact SHA and repository still clean
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${VALIDATED_SHA}"
+          test -z "$(git status --porcelain)"
+          echo "CHECKOUT_AFTER_CLEAN"
+
+  linux-compose:
+    name: "Leg E: Nettking-Linux real Docker Compose validation"
+    runs-on: nettking-linux
+    needs: linux-static
+    timeout-minutes: 30
+    steps:
+      - name: Repair workspace ownership before checkout
+        shell: bash
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/ws" \
+            python:3.12.13-bookworm chown -R "$(id -u):$(id -g)" /ws || true
+      - uses: actions/checkout@v4
+        with:
+          ref: bcf5c9ab2fb453cb26129b70d41fb64fc4863dd4
+          fetch-depth: 0
+      - name: Verify exact merged SHA and initial cleanliness
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${VALIDATED_SHA}"
+          test -z "$(git status --porcelain)"
+          echo "HEAD verified: ${VALIDATED_SHA}"
+          echo "CHECKOUT_BEFORE_CLEAN"
+      - name: Actual docker compose config --quiet
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The gate's own check. If the host ever gains the plugin, use it
+          # directly; otherwise run the real Compose implementation from the
+          # pinned official Docker CLI image, source read-only, no network and
+          # no Docker socket. This is never a YAML parse.
+          if docker compose version >/dev/null 2>&1; then
+            echo "host Compose plugin present"
+            docker compose version
+            docker compose config --quiet
+            echo "COMPOSE_CONFIG_PASS host-plugin"
+            exit 0
+          fi
+          echo "host has no Compose plugin; using the pinned official Docker CLI image"
+          docker image inspect "${COMPOSE_CLI_IMAGE}" >/dev/null 2>&1 || docker pull --quiet "${COMPOSE_CLI_IMAGE}"
+          docker image inspect --format '{{.Id}} {{.RepoDigests}}' "${COMPOSE_CLI_IMAGE}"
+          docker run --rm --network none "${COMPOSE_CLI_IMAGE}" docker compose version
+          docker run --rm --network none \
+            --mount type=bind,source=${GITHUB_WORKSPACE},target=/workspace,readonly \
+            -w /workspace "${COMPOSE_CLI_IMAGE}" docker compose config --quiet
+          echo "COMPOSE_CONFIG_PASS pinned-cli-image"
+      - name: Exact SHA and repository still clean
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${VALIDATED_SHA}"
+          test -z "$(git status --porcelain)"
+          echo "CHECKOUT_AFTER_CLEAN"
+
+  release-windows:
+    name: Release matrix (Windows)
+    runs-on: fcp-windows
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.VALIDATED_SHA }}
+          fetch-depth: 0
+
+      - name: Use Nettking Python 3.12.10
+        shell: cmd
+        run: |
+          if not exist "C:\actions-runner\toolchains\python-3.12.10\python.exe" exit /b 1
+          echo C:\actions-runner\toolchains\python-3.12.10>>"%GITHUB_PATH%"
+          echo C:\actions-runner\toolchains\python-3.12.10\Scripts>>"%GITHUB_PATH%"
+
+      - name: Verify exact candidate SHA and Python
+        shell: cmd
+        run: |
+          for /f "delims=" %%i in ('git rev-parse HEAD') do set ACTUAL=%%i
+          if not "%ACTUAL%"=="%VALIDATED_SHA%" exit /b 1
+          python --version
+          python -c "import sys; assert sys.version_info[:3] == (3,12,10), sys.version"
+          python -m pip --version
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: "cmd/fcp-peer-sidecar/go.mod"
+          cache: false
+
+      - name: Install release dependencies
+        shell: cmd
+        run: |
+          python -m pip install --upgrade pip==26.2.1
+          python -m pip install -r requirements.txt -c constraints-release.txt
+          python -m pip install pytest==9.1.1 ruff==0.16.3 -c constraints-release.txt
+
+      - name: Compile maintained product packages
+        shell: cmd
+        run: python -m compileall -q catalog
+
+      - name: Validate acceptance manifest shape
+        shell: cmd
+        run: >-
+          python -c "import json, pathlib;
+          manifest = json.loads(pathlib.Path('catalog/federation/tests/cf7_acceptance/scenarios.json').read_text(encoding='utf-8'));
+          required = {'federation_v1_end_to_end_accepted','capability_first_onboarding_end_to_end_accepted','automated_product_acceptance_executable','physical_evidence_accepted','executable_now','blocked_by_cfi','manual_physical_verification'};
+          assert required <= manifest.keys();
+          assert all(isinstance(manifest[key], bool) for key in ('federation_v1_end_to_end_accepted','capability_first_onboarding_end_to_end_accepted','automated_product_acceptance_executable','physical_evidence_accepted'));
+          assert manifest['automated_product_acceptance_executable'] is True;
+          assert manifest['executable_now'];
+          assert manifest['manual_physical_verification']"
+
+      - name: Windows capability and product release regressions
+        shell: cmd
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/capabilities/tests
+          catalog/ai/tests/test_remote_provider.py
+          catalog/relay/tests/test_phase_f83_remote_ai_binding.py
+          catalog/relay/tests/test_phase_f84_compute_worker_activation.py
+          catalog/federation/tests/cf7_acceptance/test_product_acceptance.py
+          catalog/federation/tests/cf7_acceptance/test_physical_evidence.py
+          catalog/federation/tests/cf7_acceptance/test_foundation.py
+          catalog/flask_app/tests/test_capability_onboarding_route.py
+          catalog/flask_app/tests/test_capability_inspection_route.py
+          catalog/flask_app/tests/test_capability_benchmark_route.py
+          catalog/flask_app/tests/test_capability_contribution_route.py
+          catalog/flask_app/tests/test_capability_startup_transition_route.py
+          catalog/flask_app/tests/test_federation_overview_route.py
+          catalog/flask_app/test_navigation_smoke.py
+          catalog/flask_app/tests/test_mobile_layout_contract.py
+          catalog/flask_app/tests/test_responsive_routes.py
+          catalog/flask_app/tests/test_post_setup_handoff.py
+          catalog/flask_app/tests/test_provider_federation_surface.py
+          catalog/flask_app/tests/test_recorder_control_service.py
+          catalog/flask_app/tests/test_ai_runtime_integration.py
+          catalog/flask_app/tests/test_device_state_reset.py
+          catalog/flask_app/tests/test_local_capability_candidates.py
+          catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py
+          catalog/flask_app/tests/test_capability_runtime_startup.py
+          catalog/flask_app/tests/test_data_upload.py
+          catalog/flask_app/tests/test_upload_analysis_jobs.py
+          catalog/flask_app/tests/test_federation_auto_reconnect.py
+          catalog/flask_app/tests/test_existing_setup_resume.py
+          catalog/flask_app/tests/test_run_once_capability_evidence.py
+          catalog/flask_app/tests/test_release_reproducibility.py
+          catalog/flask_app/tests/test_windows_start_script.py
+          catalog/flask_app/tests/test_windows_update_script.py
+          catalog/flask_app/tests/test_windows_volume_name_selection.py
+          catalog/federation/tests/test_federation_projections.py
+          catalog/federation/tests/test_benchmark_latest_projection.py
+          catalog/federation/tests/test_onboarding_contracts.py
+          catalog/federation/tests/test_onboarding_discovery_service.py
+          catalog/federation/tests/test_onboarding_projection_policy.py
+          catalog/federation/tests/test_release_documentation_links.py
+          catalog/federation/tests/test_phase0.py
+          catalog/federation/tests/test_phase1.py
+          catalog/federation/tests/test_phase2_unit.py
+
+      - name: Go direct peer sidecar tests
+        shell: cmd
+        working-directory: cmd/fcp-peer-sidecar
+        run: |
+          go mod tidy
+          go test ./...
+
+      - name: Ruff maintained release boundaries
+        shell: cmd
+        run: >-
+          python -m ruff check
+          catalog/capabilities
+          catalog/ai/remote_provider.py
+          catalog/common/data_loading.py
+          catalog/flask_app/app.py
+          catalog/flask_app/capability_startup_transition_routes.py
+          catalog/flask_app/data_upload_routes.py
+          catalog/flask_app/docs_routes.py
+          catalog/flask_app/provider_federation_routes.py
+          catalog/flask_app/services/capability_contribution_components.py
+          catalog/flask_app/services/data_upload_service.py
+          catalog/flask_app/services/device_state_reset.py
+          catalog/flask_app/services/existing_setup_resume.py
+          catalog/flask_app/services/federation_pairing_install.py
+          catalog/flask_app/services/local_capability_candidates.py
+          catalog/flask_app/services/resilient_pairing_runtime.py
+          catalog/flask_app/services/run_once_capability_evidence.py
+          catalog/flask_app/services/upload_analysis_job_service.py
+          catalog/flask_app/tests/test_legacy_startup_retired.py
+          catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py
+          catalog/flask_app/tests/test_capability_runtime_startup.py
+          catalog/flask_app/tests/test_capability_startup_transition_route.py
+          catalog/flask_app/tests/test_data_upload.py
+          catalog/flask_app/tests/test_device_state_reset.py
+          catalog/flask_app/tests/test_docs_viewer.py
+          catalog/flask_app/tests/test_existing_setup_resume.py
+          catalog/flask_app/tests/test_federation_auto_reconnect.py
+          catalog/flask_app/tests/test_local_capability_candidates.py
+          catalog/flask_app/tests/test_provider_federation_surface.py
+          catalog/flask_app/tests/test_release_reproducibility.py
+          catalog/flask_app/tests/test_run_once_capability_evidence.py
+          catalog/flask_app/tests/test_upload_analysis_jobs.py
+          catalog/flask_app/tests/test_windows_start_script.py
+          catalog/flask_app/tests/test_windows_update_script.py
+          catalog/flask_app/tests/test_windows_volume_name_selection.py
+          catalog/federation/projections/benchmark_adapter.py
+          catalog/federation/projections/onboarding_adapter.py
+          catalog/federation/projections/storage_job_adapters.py
+          catalog/federation/tests/cf7_acceptance/physical_evidence.py
+          catalog/federation/tests/cf7_acceptance/test_physical_evidence.py
+          catalog/federation/tests/cf7_acceptance/test_product_acceptance.py
+          catalog/federation/tests/test_benchmark_latest_projection.py
+          catalog/federation/tests/test_onboarding_projection_policy.py
+          catalog/federation/tests/test_release_documentation_links.py
+          catalog/relay/tests/test_phase_f83_remote_ai_binding.py
+          catalog/relay/tests/test_phase_f84_compute_worker_activation.py
+          --ignore I001,RUF022,B008,C408,PLC0206,UP035
+
+      - name: Validate Compose configuration
+        shell: cmd
+        run: docker compose config --quiet
+
+      - name: Diff hygiene
+        shell: cmd
+        run: git diff --check HEAD^ HEAD
+
+      # The Nettking runner is a workstation, not a disposable hosted image.
+      # Reclaim only what this CI job itself produced: pytest temp trees from
+      # earlier runs and the pip download cache. Nothing outside the runner
+      # service account's own scratch is touched, nothing is elevated, and no
+      # machine-wide configuration is changed.
+      - name: Reclaim CI-owned scratch on the Windows runner
+        shell: python
+        continue-on-error: true
+        run: |
+          import shutil
+          import tempfile
+          from pathlib import Path
+
+          GIB = 1024 ** 3
+          temp_root = Path(tempfile.gettempdir())
+          before = shutil.disk_usage(temp_root).free
+
+          reclaimed = []
+          for stale in sorted(temp_root.glob("pytest-of-*")):
+              reclaimed.append(stale)
+              shutil.rmtree(stale, ignore_errors=True)
+          pip_cache = Path.home() / "AppData/Local/pip/Cache"
+          if pip_cache.exists():
+              reclaimed.append(pip_cache)
+              shutil.rmtree(pip_cache, ignore_errors=True)
+
+          after = shutil.disk_usage(temp_root).free
+          for path in reclaimed:
+              print(f"  removed {path}")
+          print(
+              f"free before {before / GIB:.2f} GiB -> after {after / GIB:.2f} GiB "
+              f"(reclaimed {(after - before) / GIB:.2f} GiB)"
+          )
+
+      # The storage fixtures below open a Federation storage authority, and the
+      # product refuses every unbudgeted commit that would take the volume under
+      # its reserved free-space floor. That floor is derived by the product from
+      # the volume itself, so on a large disk it is much larger than the
+      # host-resource admission floor that scripts/ci_release_disk_preflight.py
+      # asserts: a runner can pass that preflight and still be unable to commit
+      # a single batch. Measure the real bound here, with the product's own
+      # unchanged policy, so a short runner is reported as the infrastructure
+      # fact it is instead of surfacing as a product failure inside unrelated
+      # fixtures. This never relaxes, overrides or bypasses the floor.
+      - name: Windows storage allocation precondition
+        shell: python
+        run: |
+          import os
+          import shutil
+          import sys
+          import tempfile
+          from pathlib import Path
+
+          sys.path.insert(0, os.getcwd())
+
+          from catalog.federation import host_resources
+          from catalog.federation.storage_allocation import default_floor_bytes
+
+          GIB = 1024 ** 3
+          thresholds = host_resources.PressureThresholds()
+
+          print("Product storage preconditions (both are the product's own):")
+          print(
+              "  allocation floor : max(10 GiB, 5% of the volume), capped at 64 GiB"
+          )
+          print(
+              f"  admission floor  : refuse at or below "
+              f"{thresholds.pressure_free_bytes / GIB:.0f} GiB free"
+          )
+
+          short = []
+          for name, path in (
+              ("workspace", Path(os.environ["GITHUB_WORKSPACE"])),
+              ("RUNNER_TEMP", Path(os.environ["RUNNER_TEMP"])),
+              ("pytest tmp_path root", Path(tempfile.gettempdir())),
+          ):
+              usage = shutil.disk_usage(path)
+              floor = default_floor_bytes(path)
+              assessment = host_resources.assess_measurement(
+                  host_resources.measure_filesystem(path), thresholds=thresholds
+              )
+              print()
+              print(f"{name}: {path}")
+              print(
+                  f"  volume                 : {usage.free / GIB:.2f} GiB free of "
+                  f"{usage.total / GIB:.2f} GiB"
+              )
+              print(f"  allocation floor       : {floor / GIB:.2f} GiB")
+              print(f"  free minus floor       : {(usage.free - floor) / GIB:+.2f} GiB")
+              print(f"  admission pressure     : {assessment.level.name}")
+              if usage.free <= floor:
+                  short.append((name, path, usage, floor))
+
+          if short:
+              print(
+                  "\nINFRASTRUCTURE PRECONDITION FAILED: this runner does not hold "
+                  "the free space the product requires before it will commit a "
+                  "storage batch.",
+                  file=sys.stderr,
+              )
+              for name, path, usage, floor in short:
+                  deficit = (floor - usage.free) / GIB
+                  print(
+                      f"  - {name} ({path}): {usage.free / GIB:.2f} GiB free, "
+                      f"floor {floor / GIB:.2f} GiB, short by {deficit:.2f} GiB",
+                      file=sys.stderr,
+                  )
+              print(
+                  "\nEvery unbudgeted commit on such a volume refuses with "
+                  "allocation-exhausted, which is correct product behaviour on a "
+                  "host that is genuinely short of disk. This is an environment "
+                  "defect: free the space on the runner. Do not lower the product "
+                  "floor, do not configure a CI-only floor, and do not add an "
+                  "admission bypass.",
+                  file=sys.stderr,
+              )
+              raise SystemExit(1)
+
+          print("\nRunner meets the product storage allocation precondition.")
+
+      - name: Windows transport, storage, and failover regressions
+        shell: cmd
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/node/tests/test_identity.py
+          catalog/node/tests/test_state.py
+          catalog/node/tests/test_client.py
+          catalog/mtconnect_recorder/tests/test_multi_recorder_capability_identity.py
+          catalog/node/tests/test_storage_agent.py
+          catalog/node/tests/test_three_machine_deployment.py
+          catalog/node/tests/test_physical_storage_failover.py
+          catalog/node/tests/test_physical_storage_recovery.py
+          catalog/node/tests/test_phase_f61_transport.py
+          catalog/node/tests/test_phase_f62_direct_peer.py
+          catalog/node/tests/test_phase_f63_relay_loss_continuity.py
+          catalog/node/tests/test_live_storage_replication.py
+          catalog/node/tests/test_live_storage_failover.py
+          catalog/node/tests/test_live_storage_catchup.py
+          catalog/node/tests/test_live_storage_reinstatement.py
+          catalog/node/tests/test_verified_live_failover.py
+          catalog/relay/tests/test_service.py
+          catalog/federation/tests/test_storage_protocol.py
+          catalog/federation/tests/test_local_storage.py
+          catalog/federation/tests/test_phase_d3_control_plane.py
+          catalog/federation/tests/test_phase_d4_write_authority.py
+          catalog/federation/tests/test_phase_d5_logical_storage.py
+          catalog/federation/tests/test_phase_d6_replication.py
+          catalog/federation/tests/test_phase_d7_d8_ack_handover.py
+          catalog/federation/tests/test_phase_e0_contracts.py
+          catalog/federation/tests/test_phase_e1_manifest_store.py
+          catalog/federation/tests/test_phase_e1_service_manifest.py
+          catalog/federation/tests/test_phase_e2_watermarks.py
+          catalog/federation/tests/test_phase_e3_reports.py
+          catalog/federation/tests/test_phase_e4_selection.py
+          catalog/federation/tests/test_phase_e5_degraded_state.py
+          catalog/federation/tests/test_phase_e6_promotion_transaction.py
+          catalog/federation/tests/test_phase_e63_provider_fencing.py
+          catalog/federation/tests/test_phase_e64_authority_grant.py
+          catalog/federation/tests/test_phase_e65_finalization.py
+          catalog/federation/tests/test_phase_e66_recovery.py
+          catalog/federation/tests/test_phase_e67_coordinator_publication.py
+          catalog/federation/tests/test_phase_e71_former_primary_recovery.py
+          catalog/federation/tests/test_phase_e72_former_primary_transfer.py
+          catalog/federation/tests/test_phase_e78_former_primary_completion.py
+
+  postgres-storage:
+    name: PostgreSQL storage release check
+    runs-on: fcp-linux
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: fcp
+          POSTGRES_PASSWORD: fcp
+          POSTGRES_DB: fcp_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U fcp -d fcp_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      FCP_TEST_POSTGRES_DSN: postgresql://fcp:fcp@127.0.0.1:5432/fcp_test
+    steps:
+      # actions/checkout deletes the workspace contents as the unprivileged
+      # runner account. A containerised suite from an earlier run leaves
+      # root-owned files behind, and checkout then fails outright with
+      #   EACCES: permission denied, unlink '.../.pytest_cache/.gitignore'
+      # (run 33956840831, PostgreSQL job; run 33958636444, Linux job). Returning
+      # ownership before checkout makes the job recoverable no matter what the
+      # previous run left. It changes ownership only, deletes nothing, and needs
+      # no sudo.
+      - name: Repair workspace ownership before checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}:/workspace" \
+            python:3.12.13-bookworm \
+            chown -R "$(id -u):$(id -g)" /workspace
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.VALIDATED_SHA }}
+      - name: Verify exact candidate SHA
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "${VALIDATED_SHA}"
+      - name: Self-hosted Linux storage precondition
+        shell: bash
+        run: |
+          set -euo pipefail
+          df -h "${GITHUB_WORKSPACE}" "${RUNNER_TEMP}"
+          df -i "${GITHUB_WORKSPACE}" "${RUNNER_TEMP}"
+          python3 scripts/ci_release_disk_preflight.py "${GITHUB_WORKSPACE}" "${RUNNER_TEMP}"
+          # ci_release_disk_preflight.py asserts the host-resource admission
+          # floor only. The storage fixtures are also bounded by the allocation
+          # floor in catalog/federation/storage_allocation.py, which is derived
+          # from the volume -- max(10 GiB, 5% of it), capped at 64 GiB -- and on
+          # a large disk is far above the admission floor. A runner can pass the
+          # preflight and still refuse every commit with allocation-exhausted,
+          # so assert that bound too, with the product's own unchanged policy.
+          # The modules are loaded from source by path, exactly as the preflight
+          # does, because the bare runner has no product dependencies installed.
+          python3 - "${GITHUB_WORKSPACE}" "${RUNNER_TEMP}" <<'PY'
+          import importlib.util
+          import shutil
+          import sys
+          from pathlib import Path
+
+          GIB = 1024 ** 3
+          federation = Path("catalog/federation").resolve()
+
+          def load(name, filename):
+              spec = importlib.util.spec_from_file_location(name, federation / filename)
+              module = importlib.util.module_from_spec(spec)
+              sys.modules[name] = module
+              spec.loader.exec_module(module)
+              return module
+
+          load("catalog.federation.errors", "errors.py")
+          allocation = load("_fcp_storage_allocation", "storage_allocation.py")
+
+          print("Product storage allocation floor (the product's own policy):")
+          short = []
+          for target in sys.argv[1:]:
+              usage = shutil.disk_usage(target)
+              floor = allocation.default_floor_bytes(target)
+              print(f"  {target}")
+              print(
+                  f"    volume           : {usage.free / GIB:.2f} GiB free of "
+                  f"{usage.total / GIB:.2f} GiB"
+              )
+              print(f"    allocation floor : {floor / GIB:.2f} GiB")
+              print(f"    free minus floor : {(usage.free - floor) / GIB:+.2f} GiB")
+              if usage.free <= floor:
+                  short.append((target, usage.free, floor))
+
+          if short:
+              print(
+                  "\nINFRASTRUCTURE PRECONDITION FAILED: this runner does not hold "
+                  "the free space the product requires before it will commit a "
+                  "storage batch.",
+                  file=sys.stderr,
+              )
+              for target, free, floor in short:
+                  print(
+                      f"  - {target}: {free / GIB:.2f} GiB free, floor "
+                      f"{floor / GIB:.2f} GiB, short by {(floor - free) / GIB:.2f} GiB",
+                      file=sys.stderr,
+                  )
+              print(
+                  "\nFree the space on the runner. Do not lower the product floor, "
+                  "do not configure a CI-only floor, and do not add an admission "
+                  "bypass.",
+                  file=sys.stderr,
+              )
+              raise SystemExit(1)
+
+          print("\nRunner meets the product storage allocation precondition.")
+          PY
+      - name: PostgreSQL storage authority regression with Python 3.12.13
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --network host \
+            -e FCP_TEST_POSTGRES_DSN="${FCP_TEST_POSTGRES_DSN}" \
+            -v "${GITHUB_WORKSPACE}:/workspace" \
+            -e PYTHONPYCACHEPREFIX=/tmp/pycache \
+            -w /workspace \
+            python:3.12.13-bookworm bash -lc '
+              set -euo pipefail
+              python --version
+              python scripts/ci_release_disk_preflight.py /workspace /tmp
+              python -m pip install --upgrade pip==26.2.1
+              python -m pip install -r requirements.txt -c constraints-release.txt
+              python -m pip install pytest==9.1.1 -c constraints-release.txt
+              python -m pytest -o addopts= -o cache_dir=/tmp/pytest_cache -q catalog/federation/tests/test_phase_d2_postgres.py
+            '
+
+      # The suite above runs as root inside the container with the workspace
+      # bind-mounted, so anything it writes there is root-owned on the host. The
+      # unprivileged runner account then cannot clean those files, and the next
+      # job's actions/checkout fails with
+      #   EACCES: permission denied, unlink '.../.pytest_cache/.gitignore'
+      # PYTHONPYCACHEPREFIX and cache_dir keep the common offenders out of the
+      # mount; this returns anything else the container left behind. It needs no
+      # sudo, deletes nothing, and runs even when the suite failed.
+      - name: Return workspace ownership to the runner account
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}:/workspace" \
+            python:3.12.13-bookworm \
+            chown -R "$(id -u):$(id -g)" /workspace
+
+
+  merged-main-verdict:
+    name: "Merged main bcf5c9ab automated software verdict"
+    needs:
+      - linux-default-order
+      - linux-shuffled-20260813
+      - linux-shuffled-15
+      - linux-static
+      - linux-compose
+      - release-windows
+      - postgres-storage
+    runs-on: nettking-linux
+    if: always()
+    steps:
+      - name: Require every required merged-main leg
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "merged main : ${VALIDATED_SHA}"
+          echo "leg A default order        : ${{ needs.linux-default-order.result }}"
+          echo "leg B shuffled 20260813    : ${{ needs.linux-shuffled-20260813.result }}"
+          echo "leg C shuffled 15          : ${{ needs.linux-shuffled-15.result }}"
+          echo "leg D release/static       : ${{ needs.linux-static.result }}"
+          echo "leg E compose              : ${{ needs.linux-compose.result }}"
+          echo "Windows (Nettking)         : ${{ needs.release-windows.result }}"
+          echo "PostgreSQL                 : ${{ needs.postgres-storage.result }}"
+          test "${{ needs.linux-default-order.result }}" = "success"
+          test "${{ needs.linux-shuffled-20260813.result }}" = "success"
+          test "${{ needs.linux-shuffled-15.result }}" = "success"
+          test "${{ needs.linux-static.result }}" = "success"
+          test "${{ needs.linux-compose.result }}" = "success"
+          test "${{ needs.release-windows.result }}" = "success"
+          test "${{ needs.postgres-storage.result }}" = "success"
+          echo "MERGED_MAIN_SOFTWARE_QUALIFICATION_LEGS: ALL PASS for ${VALIDATED_SHA}"
