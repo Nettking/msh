@@ -6,22 +6,30 @@ Coordination only: `coord/federation-v1-release`. NEVER merge this branch into m
 
 EXECUTIVE_OWNER: Astra
 ACTING_ENGINEER: Claude (Opus), acting while Astra is rate-limited. Astra remains EXECUTIVE_OWNER and that marker is unchanged. Scope of this delegation: execute the authoritative merged-main qualification of bcf5c9ab and publish durable state. No executive policy is changed and no completed qualification is reinterpreted.
-CURRENT_PHASE: MERGED-MAIN QUALIFICATION BLOCKED ON INFRASTRUCTURE. PR435 merged to main as bcf5c9ab. Windows and PostgreSQL both PASS on that exact SHA. The Linux legs are unfinished because the Nettking-Linux host ran out of memory mid-suite and its runner service went down; that is an environment failure, not a product failure. Physical acceptance remains mandatory, gated on the completed verdict, and unrun. No deployment performed.
+CURRENT_PHASE: MERGED-MAIN SOFTWARE QUALIFICATION COMPLETE AND PASS for bcf5c9ab. Every required gate — Linux legs A-E on Nettking-Linux, the Nettking Windows release matrix and the PostgreSQL gate — passed in one coherent run, 34029983129. The next transition is the mandatory controlled three-host physical acceptance, which is unrun and not yet authorized. No deployment performed.
 CURRENT_MAIN_SHA: bcf5c9ab2fb453cb26129b70d41fb64fc4863dd4
 MERGED_MAIN_SHA: bcf5c9ab2fb453cb26129b70d41fb64fc4863dd4 — merge commit; parents 6101c86d (base) and ba8a3b0b (candidate); tree bcbd778ba8009eb79e3349534e623da3861b0e45
 PRE_MERGE_MAIN_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356
-MERGED_MAIN_SOFTWARE_QUALIFICATION: **INCOMPLETE** — not PASS and not FAIL. Windows PASS and PostgreSQL PASS on exact bcf5c9ab; Linux legs A-E unfinished after an environment kill. No product failure has been observed on the merged identity on any host.
-MERGED_MAIN_WINDOWS: PASS — run 34019865738 job 101450327063 on the Nettking Windows runner, all 19 steps SUCCESS, Python 3.12.10, exact-SHA asserted; transport/storage/failover subset 367 passed,1 skipped in175.18s, plus compile, manifest, Go, Ruff, real Compose and diff hygiene.
-MERGED_MAIN_POSTGRESQL: PASS — run 34019865738 job 101450327045 on Nitro, all 11 steps SUCCESS, exact-SHA asserted, PostgreSQL storage authority regression under Python 3.12.13 against postgres:16-alpine in its proven configuration.
-MERGED_MAIN_LINUX: INCOMPLETE — leg A job 101450344435 was SIGKILLed (exit137) at 93% with no test having failed; legs B-E skipped by the needs-gate. Classified ENV, see the run classification report.
+MERGED_MAIN_SOFTWARE_QUALIFICATION: **PASS** for bcf5c9ab2fb453cb26129b70d41fb64fc4863dd4, run 34029983129 (conclusion success), harness f5bded772dd70893416c1345c9e450b96633c6fe. Software only: not physical acceptance, not deployment approval, not a Federation v1 acceptance claim.
+MERGED_MAIN_LINUX: PASS — run 34029983129 on Nettking-Linux, all legs sequential, each asserting exact SHA and a clean worktree before and after.
+  leg A default order, job101477632578: 3633 passed,30 skipped,455 warnings, pytest456.84s.
+  leg B shuffled seed20260813, job101478798113: 3633 passed,30 skipped,456 warnings, pytest486.54s.
+  leg C shuffled seed15, job101480050185: 3633 passed,30 skipped,455 warnings, pytest249.91s.
+  leg D release/static gates, job101480768775: SUCCESS — preconditions, compileall, acceptance manifest, release Ruff scope, product-branding, Go sidecar under golang:1.25.7, diff hygiene.
+  leg E actual Compose, job101480923587: SUCCESS — Docker Compose v5.5.1 `config --quiet` from the pinned official CLI image, source read-only, no network, no socket. Not a YAML parse.
+MERGED_MAIN_WINDOWS: PASS — run 34029983129 job101477615064 on the Nettking Windows runner (id22, fcp-windows), all19 steps SUCCESS, Python 3.12.10, exact SHA and Python asserted, both regression subsets plus compile, manifest, Go, Ruff, real Compose, diff hygiene and the storage allocation precondition. Independently confirmed on the merged SHA in runs 34019865738 (job101450327063, transport subset 367 passed,1 skipped in175.18s) and 34025305598.
+MERGED_MAIN_POSTGRESQL: PASS — run 34029983129 job101477615224 on Nitro (id21, fcp-linux), all11 steps SUCCESS, exact-SHA asserted, PostgreSQL storage authority regression under Python 3.12.13 against postgres:16-alpine in its proven configuration. Independently confirmed on the merged SHA in runs 34019865738 and 34025305598.
+MERGED_MAIN_MEMORY_EVIDENCE: lowest available MiB sampled inside each suite — leg A11108, leg B11126, leg C11086; host after leg A 15 GiB total,3.7 GiB used,11 GiB available. Compare the killed leg A of run 34019865738 at 837 MiB. Better than thirteenfold margin; no leg approached pressure.
+ARROWHEAD_HOST_ISOLATION: the operator confirmed ~14 Arrowhead Java services holding ~9-10+ GiB RSS with swap exhausted as the OOM root cause, then deliberately STOPPED the Arrowhead stack, reset swap and restarted the runner service before this qualification. Environment preparation only; no product, test, timeout, retry, skip, flaky, coverage or storage-admission change. **Arrowhead remains stopped and must not be restarted until the operator decides to.**
 CURRENT_CANDIDATE_SHA: ba8a3b0b828f59c36c5aaaf6130480a2432a5578 — merged; retained as the qualified software identity
 PR_435_HEAD: ba8a3b0b828f59c36c5aaaf6130480a2432a5578 on claude/federation-recorder-capability-id-19tqkk; MERGED 2026-09-06 as bcf5c9ab, normal merge commit with exact expected-head-SHA protection, no branch-protection bypass
 ACTIVE_FIX_BRANCH: None. R001 f65d11fd028a8eea5478e2fd6dd634fdbdb9d9a1 and branding-only ba8a3b0b are already in the frozen candidate.
 VALIDATION_BRANCH: ci/fast-linux-validation at e81bf4d59da813bc9f647209113efa8da9951aba; separate diagnostic identity, not a product candidate.
-ACTIVE_CI_RUN: 34025305598 — retry of the merged-main qualification at harness commit 028c18174ebf6ebdbe121aedf9635b5fd24e8f01, QUEUED behind run 34019865738 by the merged-main-qualification concurrency group. It starts automatically once Nettking-Linux returns; the retry adds a read-only free(1) sampler to the Linux suite legs and changes no pytest invocation.
-STRANDED_CI_RUN: 34019865738 — first merged-main qualification, started 2026-09-06T07:42:24Z at harness commit 074ceef9. Windows and PostgreSQL completed SUCCESS; leg A failed ENV; legs B-E skipped; verdict job 101451300256 remains QUEUED because its runner is gone. This session cannot cancel it: the GitHub integration returns 403 Resource not accessible by integration for workflow-run cancellation.
-RUNNER_AVAILABILITY (latest): Nettking-Linux runner_id27 **OFFLINE since 2026-09-06T07:49Z** — it took the smoke job in 2 seconds while healthy, then received a shutdown signal during leg A and has not accepted its queued verdict job since. Nettking Windows runner_id22 label fcp-windows ONLINE, leg passed. Nitro runner_id21 label fcp-linux ONLINE, leg passed. Beast-Linux OFFLINE — smoke job101383784569 QUEUED with no assigned runner since 2026-09-05T22:06:47Z; optional confirmation only, role unchanged at AI_PROVIDER_ONLY, not being repaired or waited on.
-BLOCKING_INFRASTRUCTURE: Nettking-Linux needs its runner service restarted AND memory freed before the Linux legs can complete. It was at 14 GiB of 15 GiB used with 837 MiB available when the suite container was killed, with the Federation services deployed at 6101c86d also resident. This session has no shell on that host and cannot remediate it.
+AUTHORITATIVE_CI_RUN: 34029983129 — merged-main qualification of bcf5c9ab, conclusion SUCCESS, completed 2026-09-06T11:47Z. No qualification job is running now.
+SUPERSEDED_RUN_1: 34019865738 — FAILURE, ENV. Leg A SIGKILLed (exit137) at 93% with 837 MiB available and no test having failed, then the runner service went down. Classified ENV and confirmed operationally as the Arrowhead memory load; NOT to be reclassified as a product failure. Windows and PostgreSQL passed on the merged SHA in it.
+SUPERSEDED_RUN_2: 34025305598 — FAILURE, harness defect. Windows, PostgreSQL and legs A, B and C all PASSED (leg A 3633 passed,30 skipped in273.84s; sampler minimum11020 MiB). Leg D passed every actual gate and then failed the harness's own post-check, because `go mod tidy` — the release gate's own command — generates cmd/fcp-peer-sidecar/go.sum, which this repository has never tracked and does not ignore. The authoritative release job never sees this since it asserts cleanliness BEFORE its Go step. Fixed by correcting the check, not the gate.
+RUNNER_AVAILABILITY (latest): Nettking-Linux runner_id27 ONLINE and healthy, all five Linux legs passed on it. Nettking Windows runner_id22 label fcp-windows ONLINE, leg passed. Nitro runner_id21 label fcp-linux ONLINE, PostgreSQL leg passed. Beast-Linux OFFLINE — smoke job101383784569 queued with no assigned runner since 2026-09-05T22:06:47Z; deliberately NOT repaired, optional confirmation only, Federation role unchanged at AI_PROVIDER_ONLY.
+BLOCKING_INFRASTRUCTURE: RESOLVED. The operator stopped the Arrowhead stack, reset swap and restarted the runner service; the host then held ~11 GiB available throughout all three full suites.
 SUPERSEDED_CI_RUN: 33994962383 — candidate-era fast Linux validation; its Nettking-Linux jobs completed SUCCESS and remain valid candidate evidence. Do not label that whole run successful; its Beast smoke job never started.
 HISTORICAL_RELEASE_RUN: 33975032244 — completed FAILURE. Windows101330241662 SUCCESS; PostgreSQL101330241653 SUCCESS; clean-checkout101330241502 FAILURE; Linux release101330241713 FAILURE; verdict101359577396 FAILURE. These historical results are unchanged.
 FAST_LINUX_VALIDATION: PASS — two successive default-order full candidate suites on Nettking-Linux, 40 targeted repeats independently verified, release/static checks plus actual Compose validation completed. This does not certify shuffled order independence or physical acceptance.
@@ -31,61 +39,41 @@ DEPLOYED_NETTKING_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356, source and no.f
 DEPLOYED_NITRO_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356, source and own-component build labels observed 14:00–14:02Z; recorder exited0
 DEPLOYED_MSH_RECORDER_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356, source and own-component build labels observed 14:00–14:02Z
 CURRENT_SESSION_ID: UNKNOWN; no fresh authenticated Federation state query completed
-LAST_UPDATED_UTC: 2026-09-06T09:42:20Z
+LAST_UPDATED_UTC: 2026-09-06T11:50:44Z
 
-## Merged-main qualification — results so far, acting engineer Claude
+## Merged-main software qualification — PASS, acting engineer Claude
 
-MERGED_MAIN_SOFTWARE_QUALIFICATION: **INCOMPLETE**, not PASS and not FAIL. Windows and PostgreSQL passed on the exact merged SHA. The Linux legs did not finish, for an environment reason with no product failure in it. A PASS is not recordable until legs A-E complete.
+MERGED_MAIN_SOFTWARE_QUALIFICATION: **PASS** for exact `bcf5c9ab2fb453cb26129b70d41fb64fc4863dd4`.
 
-**No product failure has been observed on bcf5c9ab on any host.** Leg A ran to 93% of the suite with every test passing and was then SIGKILLed (exit 137) with 837 MiB available on a 15 GiB box, after which the runner service went down. Full evidence and classification: [run 34019865738 classification](diagnostics/PR435_MERGED_MAIN_RUN1_CLASSIFICATION.md).
+Authoritative run [34029983129](https://github.com/Nettking/msh/actions/runs/34029983129), conclusion SUCCESS, harness `f5bded772dd70893416c1345c9e450b96633c6fe`. Full evidence: [merged-main qualification report](diagnostics/PR435_MERGED_MAIN_QUALIFICATION.md); the first run's environment kill is classified in [run 34019865738 classification](diagnostics/PR435_MERGED_MAIN_RUN1_CLASSIFICATION.md).
 
-| Leg | Job | Runner | Result |
-| --- | --- | --- | --- |
-| identity smoke | 101450326992 | Nettking-Linux | SUCCESS |
-| Windows release matrix | 101450327063 | Nettking Windows | **PASS** |
-| PostgreSQL storage release check | 101450327045 | Nitro | **PASS** |
-| A full suite, default order | 101450344435 | Nettking-Linux | FAILURE — ENV, exit137 SIGKILL |
-| B shuffled seed 20260813 | 101451171364 | — | skipped, gated on A |
-| C shuffled seed 15 | 101451171445 | — | skipped, gated on A |
-| D release/static gates | 101451171728 | — | skipped, gated on A |
-| E real Compose validation | 101451171874 | — | skipped, gated on A |
-| verdict | 101451300256 | — | stranded QUEUED, runner gone |
+| Leg | Job | Runner | Result | Duration |
+| --- | --- | --- | --- | --- |
+| identity smoke | 101477615248 | Nettking-Linux | SUCCESS | 6s |
+| A full suite, default order | 101477632578 | Nettking-Linux | 3633 passed, 30 skipped, pytest 456.84s | 544s |
+| B full suite, shuffled seed 20260813 | 101478798113 | Nettking-Linux | 3633 passed, 30 skipped, pytest 486.54s | 578s |
+| C full suite, shuffled seed 15 | 101480050185 | Nettking-Linux | 3633 passed, 30 skipped, pytest 249.91s | 335s |
+| D release and static gates | 101480768775 | Nettking-Linux | SUCCESS | 69s |
+| E actual Docker Compose validation | 101480923587 | Nettking-Linux | SUCCESS, Compose v5.5.1 | 10s |
+| Windows release matrix | 101477615064 | Nettking Windows | SUCCESS, all 19 steps | 515s |
+| PostgreSQL storage release check | 101477615224 | Nitro | SUCCESS, all 11 steps | 153s |
+| Automated verdict | 101480948149 | Nettking-Linux | SUCCESS | 4s |
 
-The needs-gate did its job: progression stopped at the first failing leg rather than reporting a partial verdict.
+All three full suites report an identical **3633 passed, 30 skipped** over the same 3663-test collection, matching the qualified candidate `ba8a3b0b` exactly. The 30 skips are the documented 23 Windows guards and 7 PostgreSQL service guards, both covered by their own gates in this same run. Every job asserted the exact SHA and a clean worktree before and after; legs A, B and C passed the strict check including untracked files, so the suites wrote nothing into the tracked tree in any of the three orders.
 
-EXACT_NEXT_ACTION, in order:
+Environment: `python:3.12.13-bookworm`, `pip==26.2.1`, requirements with `constraints-release.txt`, `pytest==9.1.1`, `pytest-randomly==4.1.0` on the shuffled legs, `ruff==0.16.3`, `golang:1.25.7` for the sidecar, Windows on its Python 3.12.10 toolchain, runner account `gha`, fresh clone per job.
 
-1. Restart the Nettking-Linux self-hosted runner service, and free memory on that host first. It held 14 GiB of 15 GiB with the Federation services deployed at 6101c86d also resident; a full suite plus the release container did not fit.
-2. Nothing else needs launching. Run 34025305598 is already queued at harness commit 028c1817 and starts by itself once that runner returns: run 34019865738 clears its stranded verdict job, then the retry executes legs A-E with memory sampling. Windows and PostgreSQL re-run inside it and are expected to pass again.
-3. Read the sampler output on leg A. If it is killed again while memory is genuinely adequate, that is new evidence about the merged identity and must be investigated before physical acceptance, not retried.
-4. When legs A-E, Windows and PostgreSQL are all green on bcf5c9ab, record MERGED_MAIN_SOFTWARE_QUALIFICATION: PASS with the run and job identifiers, update this handoff, and only then prepare the three-host physical campaign.
+Memory evidence, sampled read-only every 10s inside each suite: lowest available 11108 MiB (A), 11126 MiB (B), 11086 MiB (C); host after leg A at 15 GiB total, 3.7 GiB used, 11 GiB available. The killed leg A of run 34019865738 had 837 MiB.
 
-Do NOT record a PASS from the Windows and PostgreSQL legs alone. Do NOT weaken any test, deadline, skip or coverage setting to get the Linux legs green; the observed kill is a host resource condition and the remedy is host memory, not the suite.
+Host isolation: the operator confirmed ~14 Arrowhead Java services holding ~9-10+ GiB RSS with swap exhausted as the OOM root cause, then deliberately stopped Arrowhead, reset swap and restarted the runner. Environment preparation only. No product code, test, timeout, retry, skip, flaky, coverage or storage-admission threshold was changed at any point, and no failure was masked to reach this verdict. **Arrowhead remains stopped.**
 
-PHYSICAL_ACTION_STARTED: NO. No deployment, no host update, no Federation state change, no recorder activation. The three hosts remain on 6101c86d and rollback to 6101c86d is unchanged.
+Two superseded runs are recorded rather than hidden: 34019865738 (ENV kill, confirmed operationally, not a product failure) and 34025305598 (Windows, PostgreSQL and legs A/B/C all passed; leg D failed the harness's own post-check because the gate's own `go mod tidy` generates the untracked `cmd/fcp-peer-sidecar/go.sum`, fixed by correcting the check rather than the gate).
 
-Harness: `.github/workflows/merged-main-qualification.yml`, published on `claude/pr-435-final-merge-k01mfi` at 074ceef9b32ace0fced1f18ff8d9c0e50d141aae. Astra's locally prepared tooling was not committed anywhere reachable, so this harness was built by reusing what is already proven rather than inventing a second way to run the release: the Windows job and the PostgreSQL job are lifted verbatim from `ci/self-hosted-pr435`, which produced the candidate's 871/1 and 367/1 Windows result and its passing PostgreSQL gate. Both referenced the SHA only through `env.VALIDATED_SHA`, so retargeting them at the merged commit changed one line and left their test selection untouched.
+Standing observation, deliberately not acted on: with no committed `go.sum`, the Go sidecar gate resolves ~90 modules with no checksum pinning. Pre-existing on `main` and on the candidate, not a property of the merged identity, and for the executive owner to decide on separately.
 
-Required legs, all against exact bcf5c9ab, run 34019865738:
+PHYSICAL_ACTION_STARTED: NO. No deployment, no host update, no Federation state change, no recorder activation. All three hosts remain on `6101c86d` and rollback to `6101c86d` is unchanged. Beast-Linux remains OFFLINE and was deliberately not repaired; role unchanged at AI_PROVIDER_ONLY.
 
-| Leg | Job | Host | Status |
-| --- | --- | --- | --- |
-| identity smoke | 101450326992 | Nettking-Linux | SUCCESS |
-| A full suite, default order | linux-default-order | Nettking-Linux | running |
-| B full suite, shuffled seed 20260813 | linux-shuffled-20260813 | Nettking-Linux | queued behind A |
-| C full suite, shuffled seed 15 | linux-shuffled-15 | Nettking-Linux | queued behind B |
-| D release/static gates | linux-static | Nettking-Linux | queued behind C |
-| E actual Docker Compose validation | linux-compose | Nettking-Linux | queued behind D |
-| Windows release matrix | 101450327063 | Nettking Windows | running |
-| PostgreSQL storage release check | 101450327045 | Nitro | running |
-
-The Linux legs are chained by `needs:` so they run strictly sequentially and cannot compete for the host; Windows and PostgreSQL run in parallel on their own runners. Nitro carries only the PostgreSQL gate in its proven configuration and is not being characterised.
-
-Two gaps in the candidate-era fast-Linux harness are closed for the merged identity. Seeds 20260813 and 15 are named explicitly rather than one fixed seed plus the run number, so the merged identity gets the same two orders the candidate was qualified on. And Compose is the real implementation: Nettking-Linux has no Compose plugin, so instead of falling back to a YAML parse and calling it a gate, leg E runs `docker compose config --quiet` from the pinned official Docker CLI image Astra used for the candidate (`docker@sha256:eccaacfeed644c7de222ff047483568cb988dde95476fbaaf10ea2d04921bb66`), source read-only, no network and no Docker socket.
-
-Every job checks out the exact SHA, asserts it, and asserts a clean worktree before and after; suite jobs additionally record host state and a sha256 of the installed dependency set. No product code, test, timeout, threshold, skip, flaky mark, coverage setting or Federation state is touched by the harness.
-
-PHYSICAL_ACTION_STARTED: NO. No deployment, no host update, no Federation state change, no recorder activation. The three hosts remain on 6101c86d.
+EXACT_NEXT_ACTION: prepare the controlled three-host physical acceptance campaign on Nettking, Nitro and the MSH Recorder, all three on this same `bcf5c9ab`, per [the physical acceptance preparation](diagnostics/PR435_MERGED_MAIN_QUALIFICATION_RUNBOOK.md). Physical acceptance remains mandatory, unrun and separately authorized; Federation v1 is not accepted.
 
 ## PR435 merge executed — merged main bcf5c9ab
 
