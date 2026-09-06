@@ -5,7 +5,7 @@ Coordination only: `coord/federation-v1-release`. NEVER merge this branch into m
 ## Authoritative state
 
 EXECUTIVE_OWNER: Astra
-ACTING_ENGINEER: Astra; executive reviewer of Claude's published validation and owner of the current conclusion. No active diagnostic process launched by Astra remains.
+ACTING_ENGINEER: Astra; executive reviewer and controller of the active Nettking-Linux shuffled qualification.
 CURRENT_PHASE: Shuffled software qualification RUNNING on Nettking-Linux, seeds20260813 and15. Completed default-order evidence is retained; no repeat or further Nitro characterization. No merge/deployment authorized.
 CURRENT_MAIN_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356
 CURRENT_CANDIDATE_SHA: ba8a3b0b828f59c36c5aaaf6130480a2432a5578 — FROZEN
@@ -25,7 +25,7 @@ LAST_UPDATED_UTC: 2026-09-06T06:34:27Z
 
 ## Active shuffled qualification — Astra
 
-SHUFFLED_ORDER_VALIDATION: RUNNING. Started2026-09-06T06:34:27Z on Nettking-Linux as gha, controller PID1532722. Task exec session18536 is only a local tool handle; durable state is `/home/gha/qualification/pr435-shuffle-20260906-astra` with controller.log, results.tsv and per-leg checkout/logs/JUnit/pip-freeze/15-second host samples. Current first leg candidate-20260813. Script [diagnostics/run-pr435-shuffled.sh](diagnostics/run-pr435-shuffled.sh) runs seed15 next and immediately runs the identical seed against exact main on any failed candidate leg. Do not duplicate this controller.
+SHUFFLED_ORDER_VALIDATION: RUNNING. Started2026-09-06T06:34:27Z on Nettking-Linux as gha, controller PID1532722. Task exec session18536 is only a local tool handle; durable state is `/home/gha/qualification/pr435-shuffle-20260906-astra` with controller.log, results.tsv and per-leg checkout/logs/JUnit/pip-freeze/15-second host samples. Seed20260813 completed PASS at06:42:52Z:3633 passed,30 skipped,459 warnings in408.81s; setup/pytest/final-clean rc all0. Seed15 is now running in its own fresh clone/container. Script [diagnostics/run-pr435-shuffled.sh](diagnostics/run-pr435-shuffled.sh) immediately runs the identical seed against exact main on any failed candidate leg. Do not duplicate this controller.
 
 Fresh independent clones come from a verified Git bundle containing only advertised candidate HEAD ba8a3b0b and origin/main6101c86d; each leg asserts exact SHA and initial cleanliness, runs the entire repository suite, then verifies final SHA/cleanliness. Candidate and source branches are not changed. Same release environment plus pinned pytest-randomly4.1.0; Python image ID3eb66c6a8a2399cdf305afe7f680ea1e3aad64e9a6684cd6e46baf6b8b701ec8, repo digest python@sha256:3cd9086bdb30f7c9bc08a3fa621d9842e0d3f6f9291aeb4677e0547817c10b12. This is a local execution under the actual Linux service account on the same host; it is not a new GitHub job. Exact script hash at launch: cbec7e0248e231e6eb26b1d868fc5cc117f5558e823d998fc61fefca67736e7e.
 
@@ -96,7 +96,7 @@ COMPLETED_TESTS:
 - Runtime inventory: all own component labels on threehosts6101c86; Nettking/Nitro source checkouts clean. MSH normal checkout has46 preserved untracked recorder JSONLs, no tracked edits; separate acceptance6101 checkout clean.
 
 CURRENTLY_RUNNING_WORK:
-- No Astra diagnostic process remains. Claude's published Nitro A/B is completed and independently reviewed above; do not launch duplicate legs from obsolete instructions below.
+- Astra shuffled controller PID1532722 is active on Nettking-Linux; exact state is recorded above. Claude's published Nitro A/B is completed; do not launch duplicate legs from obsolete instructions below.
 - Optional Beast-Linux smoke101383784569 is queued without a runner. Nettking-Linux primary work is complete; do not wait for this optional confirmation to communicate the conclusion.
 - No active Claude session is assumed from old commits. Fetch and validate current refs before any future handoff write.
 
