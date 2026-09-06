@@ -1,9 +1,16 @@
 name: Merged main qualification
 
 # Authoritative post-merge software qualification of the exact merged-main
-# identity bcf5c9ab. PR435 is merged; the merged tree is byte-identical to the
-# qualified candidate ba8a3b0b, but the merged identity does not inherit that
-# PASS and is validated here in its own right.
+# identity 1004b274, the merge of PR437 into main. Its tree is byte-identical
+# to the reviewed PR head 9281d581, and its first parent 3fe0d95f descends from
+# the previously qualified merged main bcf5c9ab, but neither of those PASS
+# verdicts transfers: a qualification is bound to the commit identity it names,
+# so 1004b274 is validated here in its own right.
+#
+# GitHub-hosted checks on this SHA are all red under CI001 (account-level
+# Actions billing), terminating in one to two seconds with no runner assigned
+# and no steps executed. That is why the answer is produced on the self-hosted
+# hosts below rather than on hosted runners.
 #
 # The Linux release answer runs on Nettking-Linux, sequentially, because the
 # legs must not compete for the host. Windows reuses the exact gate that
@@ -31,7 +38,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  VALIDATED_SHA: bcf5c9ab2fb453cb26129b70d41fb64fc4863dd4
+  VALIDATED_SHA: 1004b274c198018161658cd1379d6cb4a20dbc82
   IMAGE: python:3.12.13-bookworm
   # The exact official Docker CLI image Astra used for the candidate's real
   # Compose validation. Nettking-Linux has no Compose plugin installed, and
@@ -72,7 +79,7 @@ jobs:
             python:3.12.13-bookworm chown -R "$(id -u):$(id -g)" /ws || true
       - uses: actions/checkout@v4
         with:
-          ref: bcf5c9ab2fb453cb26129b70d41fb64fc4863dd4
+          ref: 1004b274c198018161658cd1379d6cb4a20dbc82
           fetch-depth: 0
       - name: Verify exact merged SHA and initial cleanliness
         shell: bash
@@ -144,8 +151,13 @@ jobs:
           fi
           echo "CHECKOUT_AFTER_CLEAN"
 
-  linux-shuffled-20260813:
-    name: "Leg B: Nettking-Linux full suite, shuffled seed 20260813"
+  linux-default-order-repeat:
+    name: "Leg A2: Nettking-Linux full suite, default order repeat"
+    # A second default-order pass on its own fresh checkout. Leg A alone
+    # cannot distinguish a stable suite from one that happened to pass
+    # once, and the previous candidate only got a de facto repeat because
+    # its first run was retried. Repeating it here makes the default-order
+    # answer reproducible by design rather than by accident.
     runs-on: nettking-linux
     needs: linux-default-order
     timeout-minutes: 180
@@ -157,7 +169,92 @@ jobs:
             python:3.12.13-bookworm chown -R "$(id -u):$(id -g)" /ws || true
       - uses: actions/checkout@v4
         with:
-          ref: bcf5c9ab2fb453cb26129b70d41fb64fc4863dd4
+          ref: 1004b274c198018161658cd1379d6cb4a20dbc82
+          fetch-depth: 0
+      - name: Verify exact merged SHA and initial cleanliness
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${VALIDATED_SHA}"
+          test -z "$(git status --porcelain)"
+          echo "HEAD verified: ${VALIDATED_SHA}"
+          echo "CHECKOUT_BEFORE_CLEAN"
+      - name: Host state before the suite
+        shell: bash
+        run: |
+          echo "cpus $(nproc)"; free -h | sed -n '2p'; df -h / | tail -1
+      - name: Storage precondition
+        shell: bash
+        run: python3 scripts/ci_release_disk_preflight.py "${GITHUB_WORKSPACE}" /tmp
+      - name: Full suite, default order (repeat)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Read-only memory sampler. Run 34019865738 leg A was SIGKILLed
+          # (exit 137) at 93% with 837 MiB available on a 15 GiB host, and the
+          # runner service then went down, so a repeat needs evidence rather
+          # than a guess. This only reads /proc via free(1): it changes no
+          # product behaviour, no test and no host state, and the trap makes it
+          # report on failure as well as success.
+          ( while true; do
+              echo "$(date -u +%H:%M:%S) $(free -m | awk '/^Mem:/{print $3, $7}')"
+              sleep 10
+            done ) > "${RUNNER_TEMP}/mem.log" 2>&1 &
+          SAMPLER=$!
+          trap 'kill ${SAMPLER} 2>/dev/null || true;
+                echo "--- lowest available MiB during the suite ---";
+                sort -k3 -n "${RUNNER_TEMP}/mem.log" | head -3;
+                echo "--- final samples (time used_MiB available_MiB) ---";
+                tail -4 "${RUNNER_TEMP}/mem.log"' EXIT
+          docker run --rm --network host \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "${GITHUB_WORKSPACE}:/workspace" \
+            -e PYTHONPYCACHEPREFIX=/tmp/pycache \
+            -w /workspace "${IMAGE}" bash -lc '
+              set -euo pipefail
+              python --version
+              python -m pip install --quiet --upgrade pip==26.2.1
+              python -m pip install --quiet -r requirements.txt -c constraints-release.txt
+              python -m pip install --quiet pytest==9.1.1 -c constraints-release.txt
+              python -m pip freeze | sort | sha256sum | sed "s/^/dependency-set sha256 /"
+              python -m pytest -o addopts= -o cache_dir=/tmp/pytest_cache -p no:randomly -v --durations=50
+            '
+      - name: Host state after the suite
+        if: always()
+        shell: bash
+        run: |
+          echo "cpus $(nproc)"; free -h | sed -n '2p'; df -h / | tail -1
+      - name: Return workspace ownership to the runner account
+        if: always()
+        shell: bash
+        run: |
+          docker run --rm -v "${GITHUB_WORKSPACE}:/ws" "${IMAGE}" \
+            chown -R "$(id -u):$(id -g)" /ws
+      - name: Exact SHA and repository still clean after the suite
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${VALIDATED_SHA}"
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Working tree modified by the test suite:"; git status --porcelain; exit 1
+          fi
+          echo "CHECKOUT_AFTER_CLEAN"
+
+  linux-shuffled-20260813:
+    name: "Leg B: Nettking-Linux full suite, shuffled seed 20260813"
+    runs-on: nettking-linux
+    needs: linux-default-order-repeat
+    timeout-minutes: 180
+    steps:
+      - name: Repair workspace ownership before checkout
+        shell: bash
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/ws" \
+            python:3.12.13-bookworm chown -R "$(id -u):$(id -g)" /ws || true
+      - uses: actions/checkout@v4
+        with:
+          ref: 1004b274c198018161658cd1379d6cb4a20dbc82
           fetch-depth: 0
       - name: Verify exact merged SHA and initial cleanliness
         shell: bash
@@ -233,7 +330,7 @@ jobs:
             python:3.12.13-bookworm chown -R "$(id -u):$(id -g)" /ws || true
       - uses: actions/checkout@v4
         with:
-          ref: bcf5c9ab2fb453cb26129b70d41fb64fc4863dd4
+          ref: 1004b274c198018161658cd1379d6cb4a20dbc82
           fetch-depth: 0
       - name: Verify exact merged SHA and initial cleanliness
         shell: bash
@@ -309,7 +406,7 @@ jobs:
             python:3.12.13-bookworm chown -R "$(id -u):$(id -g)" /ws || true
       - uses: actions/checkout@v4
         with:
-          ref: bcf5c9ab2fb453cb26129b70d41fb64fc4863dd4
+          ref: 1004b274c198018161658cd1379d6cb4a20dbc82
           fetch-depth: 0
       - name: Verify exact merged SHA and initial cleanliness
         shell: bash
@@ -402,7 +499,7 @@ jobs:
             python:3.12.13-bookworm chown -R "$(id -u):$(id -g)" /ws || true
       - uses: actions/checkout@v4
         with:
-          ref: bcf5c9ab2fb453cb26129b70d41fb64fc4863dd4
+          ref: 1004b274c198018161658cd1379d6cb4a20dbc82
           fetch-depth: 0
       - name: Verify exact merged SHA and initial cleanliness
         shell: bash
@@ -936,9 +1033,10 @@ jobs:
 
 
   merged-main-verdict:
-    name: "Merged main bcf5c9ab automated software verdict"
+    name: "Merged main 1004b274 automated software verdict"
     needs:
       - linux-default-order
+      - linux-default-order-repeat
       - linux-shuffled-20260813
       - linux-shuffled-15
       - linux-static
@@ -954,6 +1052,7 @@ jobs:
           set -euo pipefail
           echo "merged main : ${VALIDATED_SHA}"
           echo "leg A default order        : ${{ needs.linux-default-order.result }}"
+          echo "leg A2 default order repeat: ${{ needs.linux-default-order-repeat.result }}"
           echo "leg B shuffled 20260813    : ${{ needs.linux-shuffled-20260813.result }}"
           echo "leg C shuffled 15          : ${{ needs.linux-shuffled-15.result }}"
           echo "leg D release/static       : ${{ needs.linux-static.result }}"
@@ -961,6 +1060,7 @@ jobs:
           echo "Windows (Nettking)         : ${{ needs.release-windows.result }}"
           echo "PostgreSQL                 : ${{ needs.postgres-storage.result }}"
           test "${{ needs.linux-default-order.result }}" = "success"
+          test "${{ needs.linux-default-order-repeat.result }}" = "success"
           test "${{ needs.linux-shuffled-20260813.result }}" = "success"
           test "${{ needs.linux-shuffled-15.result }}" = "success"
           test "${{ needs.linux-static.result }}" = "success"
