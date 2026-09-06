@@ -53,6 +53,10 @@ from catalog.federation.protocol import (
     utc_now,
 )
 from catalog.federation.redaction import redact_secrets
+from catalog.federation.recorder_control_events import (
+    SCAN_EVENTS as RECORDER_CONTROL_SCAN_EVENTS,
+    mask_recorder_control_scan_event_payload,
+)
 from catalog.federation.service_incarnation import (
     STOP_COMPLETED,
     STOP_FAILURE,
@@ -219,7 +223,12 @@ def _bounded_token(payload: dict[str, Any], field: str = "token") -> str:
     return value
 
 
-def _ensure_bounded_json(value: object, *, field: str) -> None:
+def _ensure_bounded_json(
+    value: object,
+    *,
+    field: str,
+    event_type: str | None = None,
+) -> None:
     try:
         encoded = json.dumps(
             value,
@@ -248,12 +257,34 @@ def _ensure_bounded_json(value: object, *, field: str) -> None:
     # something. Every payload the relay routes goes through here, including
     # storage batch traffic that has no redactable field at all, so the clean
     # case must cost exactly one walk as it did before the allowance existed.
-    if redacted != value and redacted != mask_public_jsonl_chunk_paths(value):
-        raise FederationValidationError(
-            "nonpublic-payload",
-            field,
-            "must not contain credentials, backend paths, or physical addresses",
-        )
+    if redacted == value:
+        return
+    if redacted == mask_public_jsonl_chunk_paths(value):
+        return
+    # Recorder control is the second, and only other, narrow allowance.
+    # ``fcp.recorder-control.v1`` scan events intentionally carry a bounded
+    # RFC1918 scan network, and the generic pass always alters two of their
+    # fields: ``cidr`` by value, and ``port`` by key. Both must be admitted or
+    # no scan event is routable at all -- allowing ``cidr`` alone still leaves
+    # every scan request rejected on ``port``.
+    #
+    # The allowance is bounded on three sides at once. It applies only to the
+    # two scan event types, which the payload cannot prove about itself and the
+    # caller must therefore supply; only to the event payload at the protocol
+    # boundary, because the expectation does not recurse into nested objects
+    # that merely resemble a scan payload; and only when the CIDR satisfies the
+    # recorder's own RFC1918 /24-or-smaller contract and the port is bounded.
+    # Message routing passes no event type and so never earns it.
+    if (
+        event_type in RECORDER_CONTROL_SCAN_EVENTS
+        and redacted == mask_recorder_control_scan_event_payload(value)
+    ):
+        return
+    raise FederationValidationError(
+        "nonpublic-payload",
+        field,
+        "must not contain credentials, backend paths, or physical addresses",
+    )
 
 
 def _safe_error_payload(
@@ -1410,7 +1441,9 @@ class RelayServer:
             session_id = self._required_session(request)
             event_type = _payload_text(request.payload, "event_type")
             event_payload = _payload_object(request.payload, "payload")
-            _ensure_bounded_json(event_payload, field="payload")
+            _ensure_bounded_json(
+                event_payload, field="payload", event_type=event_type
+            )
             event, created = self.coordinator.append_event(
                 session_id=session_id,
                 actor_node_id=record.node_id,

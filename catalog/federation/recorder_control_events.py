@@ -11,19 +11,209 @@ only to opaque IDs from the recorder's own latest scan.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from hashlib import sha256
+from ipaddress import IPv4Network, ip_network
 from typing import Any, Final
 
 from .errors import FederationValidationError
+from .redaction import REDACTED, contains_nonpublic_location
 
 SCHEMA: Final = "fcp.recorder-control.v1"
 SCAN_REQUEST_EVENT: Final = "recorder.control.scan.requested"
 SCAN_REPORT_EVENT: Final = "recorder.control.scan.reported"
 SOURCES_REQUEST_EVENT: Final = "recorder.control.sources.requested"
 SOURCES_REPORT_EVENT: Final = "recorder.control.sources.reported"
+
+#: The only event types whose payload may carry a bounded scan network.
+SCAN_EVENTS: Final = frozenset({SCAN_REQUEST_EVENT, SCAN_REPORT_EVENT})
 COMMAND_TTL: Final = timedelta(minutes=2)
 MAX_COMMAND_LIFETIME: Final = timedelta(minutes=5)
 MAX_SOURCE_ITEMS: Final = 64
 MAX_SCAN_RESULT_ITEMS: Final = 64
+MAX_SCAN_ADDRESSES: Final = 256
+MIN_SCAN_PREFIX_LENGTH: Final = 24
+
+#: The same RFC1918 space the recorder's discovery validator admits.
+_RFC1918_NETWORKS: Final = (
+    IPv4Network("10.0.0.0/8"),
+    IPv4Network("172.16.0.0/12"),
+    IPv4Network("192.168.0.0/16"),
+)
+
+
+def is_publishable_scan_cidr(value: Any) -> bool:
+    """Return whether ``value`` is a scan CIDR the recorder would itself accept.
+
+    "Publishable" means the relay may route it, not that the address is public.
+    The predicate admits *only* private RFC1918 space; a publicly routable
+    address is exactly what it refuses.
+
+    This is the relay-side mirror of the recorder's discovery security
+    contract: an explicit IPv4 RFC1918 network, ``/24`` or smaller, of at most
+    ``MAX_SCAN_ADDRESSES`` addresses. It is deliberately a predicate rather
+    than a parser -- it decides only whether a value may be exempted from the
+    generic privacy filter, and it never widens what a scan may target.
+
+    ``catalog.flask_app.services.mtconnect_discovery_service.validate_scan_cidr``
+    remains the enforcing validator on the recorder side. The relay cannot
+    import it without taking a dependency on the Flask application layer, so
+    the contract is restated here and pinned to that validator by test.
+    """
+
+    if not isinstance(value, str):
+        return False
+    raw = value.strip()
+    if "/" not in raw or raw != value:
+        return False
+    try:
+        network = ip_network(raw, strict=False)
+    except ValueError:
+        return False
+    return (
+        isinstance(network, IPv4Network)
+        and network.prefixlen >= MIN_SCAN_PREFIX_LENGTH
+        and network.num_addresses <= MAX_SCAN_ADDRESSES
+        and any(network.subnet_of(private) for private in _RFC1918_NETWORKS)
+    )
+
+
+def _is_bounded_scan_port(value: Any) -> bool:
+    return not isinstance(value, bool) and isinstance(value, int) and 1 <= value <= 65535
+
+
+def _is_scan_control_payload(value: Any) -> bool:
+    """Return whether ``value`` is exactly one recorder-control scan payload.
+
+    Both ``recorder.control.scan.requested`` and
+    ``recorder.control.scan.reported`` carry ``command == "scan"`` under this
+    schema; the source-change events carry ``"sources"`` and neither declares a
+    network field. The relay validates a payload without its event type, so the
+    payload's own ``command`` is what distinguishes them.
+    """
+
+    return (
+        isinstance(value, dict)
+        and value.get("schema") == SCHEMA
+        and value.get("command") == "scan"
+    )
+
+
+def mask_recorder_control_scan_event_payload(value: Any) -> Any:
+    """Mask only the scan fields of one recorder-control scan event payload.
+
+    The relay rejects any payload the generic redaction pass would alter.
+    Recorder control intentionally carries a bounded private scan network, so
+    two fields of a scan payload are always altered by that pass and the whole
+    protocol is unroutable without an exemption:
+
+    * ``cidr`` is redacted by *value*, because it reads as an address.
+    * ``port`` is redacted by *key*, because ``port`` is a location key. This
+      holds even when ``cidr`` is empty, so allowing ``cidr`` alone would not
+      make a single scan event routable.
+
+    Returning those two fields pre-masked lets the relay compare against an
+    expected redaction instead of relaxing the filter.
+
+    This deliberately does **not** recurse. The exemption belongs to the event
+    payload at the protocol boundary and to nothing else, so an unrelated outer
+    payload cannot carry a scan-shaped object in a nested field or a list and
+    inherit the allowance for it. The caller is additionally responsible for
+    applying this only to the two scan event types; the payload alone cannot
+    prove which event carried it.
+
+    A ``cidr`` outside the recorder's RFC1918 ``/24``-or-smaller contract, or a
+    port outside 1-65535, is left untouched so the ordinary filter still
+    rejects it.
+    """
+
+    if not _is_scan_control_payload(value):
+        return value
+    masked = dict(value)
+    cidr = value.get("cidr")
+    # A scan payload earns the exemption only as a whole. An absent or empty
+    # CIDR is the ordinary "let the recorder infer it" request; a CIDR that
+    # satisfies the contract is masked. Anything else -- IPv6, public space,
+    # wider than /24, malformed -- earns nothing at all, not even the port
+    # exemption, so such a payload stays rejected exactly as it was before
+    # this allowance existed.
+    if cidr is None or cidr == "":
+        if _is_bounded_scan_port(value.get("port")):
+            masked["port"] = REDACTED
+    elif is_publishable_scan_cidr(cidr):
+        masked["cidr"] = REDACTED
+        if _is_bounded_scan_port(value.get("port")):
+            masked["port"] = REDACTED
+    return masked
+
+
+#: Prefix for a projected source label. Distinct from the discovery service's
+#: ``mtconnect-source-`` source_id prefix so the two identity spaces never read
+#: as interchangeable.
+FEDERATED_SOURCE_LABEL_PREFIX: Final = "mtconnect-agent-"
+
+
+def federated_source_label(value: Any) -> str:
+    """Return a Federation-safe projection of an operator-facing source label.
+
+    MTConnect discovery derives ``source_name`` and ``display_name`` from
+    ``host:port`` whenever an agent reports no serial number, so a legitimate
+    agent yields labels such as ``"192.168.1.50-5000"`` or
+    ``"Mazak [192.168.1.50:5000]"``. Those are correct locally -- the recorder
+    needs the address to reach the agent, and ``source_name`` is additionally
+    its durable on-disk batch directory and checkpoint key -- but they must not
+    cross into Federation payloads or capability properties.
+
+    A label that is already public-safe is returned unchanged, so ordinary
+    named machines keep readable identities. Only a label carrying location
+    material is replaced, by a digest of that exact label. The projection is
+    therefore deterministic, stable across rescan and restart, and distinct for
+    distinct sources, which is what lets a recorder map a removal request back
+    to the local source it names.
+
+    This keeps the address local rather than widening any privacy filter to
+    admit it.
+    """
+
+    text = str(value or "").strip()
+    if not text or not contains_nonpublic_location(text):
+        return text
+    return FEDERATED_SOURCE_LABEL_PREFIX + sha256(text.encode("utf-8")).hexdigest()[:16]
+
+
+def federated_source_labels(values: Any) -> tuple[str, ...]:
+    """Project a collection of source labels, preserving order and uniqueness."""
+
+    if not isinstance(values, (list, tuple)):
+        return ()
+    return tuple(dict.fromkeys(federated_source_label(item) for item in values))
+
+
+def local_source_names_for(
+    requested: Any,
+    configured: Any,
+) -> tuple[str, ...]:
+    """Map Federation-visible source labels back to local configured names.
+
+    Removal requests name sources by the label the recorder published. For a
+    source whose local name is already public-safe that is the local name
+    itself; for a projected one it is the digest. Both are accepted, so a
+    coordinator that still holds a pre-projection name keeps working and an
+    already-configured IP-derived source can still be removed.
+    """
+
+    if not isinstance(requested, (list, tuple)) or not isinstance(
+        configured, (list, tuple)
+    ):
+        return ()
+    by_label = {federated_source_label(name): name for name in configured}
+    local: list[str] = []
+    for item in requested:
+        text = str(item or "").strip()
+        if text in configured:
+            local.append(text)
+        elif text in by_label:
+            local.append(by_label[text])
+    return tuple(dict.fromkeys(local))
 
 
 def _stamp(value: datetime) -> str:
@@ -244,11 +434,19 @@ def scan_report_payload(
     for item in results[:MAX_SCAN_RESULT_ITEMS]:
         if not isinstance(item, dict):
             continue
+        # ``source_id`` is already an opaque digest and is the key selection
+        # uses, so it crosses unchanged. The two human labels are projected:
+        # discovery derives them from ``host:port`` for an agent that reports
+        # no serial number, and those addresses stay local.
         safe_results.append(
             {
                 "source_id": _text(item.get("source_id"), "source_id", maximum=128),
-                "source_name": _text(item.get("source_name"), "source_name", maximum=128),
-                "display_name": _text(item.get("display_name"), "display_name", maximum=256),
+                "source_name": federated_source_label(
+                    _text(item.get("source_name"), "source_name", maximum=128)
+                ),
+                "display_name": federated_source_label(
+                    _text(item.get("display_name"), "display_name", maximum=256)
+                ),
                 "machine_count": max(1, min(int(item.get("machine_count") or 1), 64)),
             }
         )
@@ -262,8 +460,14 @@ def scan_report_payload(
         "cidr": _text(cidr, "cidr", maximum=64, allow_empty=True),
         "port": port,
         "results": safe_results,
-        "configured_source_names": list(_list(list(configured_source_names), "configured_source_names")),
-        "message": _text(message, "message", maximum=512, allow_empty=True),
+        "configured_source_names": list(
+            federated_source_labels(
+                list(_list(list(configured_source_names), "configured_source_names"))
+            )
+        ),
+        "message": federated_source_label(
+            _text(message, "message", maximum=512, allow_empty=True)
+        ),
         "error_code": None if error_code is None else _text(error_code, "error_code", maximum=128),
         "completed_at": _stamp(now),
     }
@@ -287,8 +491,14 @@ def sources_report_payload(
         "target_node_id": _text(target_node_id, "target_node_id"),
         "scan_id": _text(scan_id, "scan_id", maximum=128),
         "state": _text(state, "state", maximum=64),
-        "configured_source_names": list(_list(list(configured_source_names), "configured_source_names")),
-        "message": _text(message, "message", maximum=512, allow_empty=True),
+        "configured_source_names": list(
+            federated_source_labels(
+                list(_list(list(configured_source_names), "configured_source_names"))
+            )
+        ),
+        "message": federated_source_label(
+            _text(message, "message", maximum=512, allow_empty=True)
+        ),
         "error_code": None if error_code is None else _text(error_code, "error_code", maximum=128),
         "completed_at": _stamp(now),
     }
@@ -296,13 +506,22 @@ def sources_report_payload(
 
 __all__ = [
     "COMMAND_TTL",
+    "FEDERATED_SOURCE_LABEL_PREFIX",
+    "MAX_SCAN_ADDRESSES",
     "MAX_SCAN_RESULT_ITEMS",
     "MAX_SOURCE_ITEMS",
+    "MIN_SCAN_PREFIX_LENGTH",
+    "SCAN_EVENTS",
     "SCAN_REPORT_EVENT",
     "SCAN_REQUEST_EVENT",
     "SCHEMA",
     "SOURCES_REPORT_EVENT",
     "SOURCES_REQUEST_EVENT",
+    "federated_source_label",
+    "federated_source_labels",
+    "is_publishable_scan_cidr",
+    "local_source_names_for",
+    "mask_recorder_control_scan_event_payload",
     "parse_command",
     "scan_command_payload",
     "scan_report_payload",

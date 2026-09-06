@@ -56,6 +56,7 @@ from catalog.flask_app.services.federation_pairing_service import (
     RemotePairingState,
     RemotePairingStore,
 )
+from catalog.federation.recorder_control_events import federated_source_labels
 from catalog.mtconnect_recorder.storage import DurableRecorderStore
 
 MAX_SHARING_READY_SECONDS = 600.0
@@ -805,7 +806,12 @@ class RecorderFederationNode:
             properties={
                 "kind": "standalone-recorder",
                 "source_count": len(self.source_names),
-                "source_names": list(self.source_names),
+                # Discovery derives a source name from ``host:port`` when an
+                # agent reports no serial number. That name is this recorder's
+                # durable on-disk key and stays local; what Federation sees is
+                # its public-safe projection, so a real agent cannot make
+                # capability re-announcement fail ``nonpublic-property``.
+                "source_names": list(federated_source_labels(list(self.source_names))),
                 "dataset_schema": "fcp.mtconnect.observations.v1",
                 "logical_storage": True,
             },
