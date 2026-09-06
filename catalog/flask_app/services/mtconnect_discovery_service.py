@@ -23,6 +23,7 @@ from urllib.parse import urlsplit
 
 import requests
 
+from catalog.federation.redaction import contains_nonpublic_location
 from catalog.mtconnect_recorder.parsing import machine_display_name, parse_probe
 
 from .capability_config_service import (
@@ -200,13 +201,21 @@ def _machine_from_device(
         identity_value = f"{host}:{port}"
         machine_id = f"mtconnect-host:{identity_value}"
 
-    # ``identity_value`` carries the agent's address and stays local: it backs
-    # ``machine_id`` and the recorder's own connection detail. The *label* an
-    # operator reads, and which recorder-control publishes into Federation,
-    # must not, so it is built from a stable digest of that identity instead.
-    # An agent that reports a serial number never reaches this token; one that
-    # reports nothing still gets a distinct, restart-stable label.
-    public_identity = f"agent-{_short_digest(identity_value, length=12)}"
+    # Identity strength decides what may be published. A UUID or serial number
+    # identifies the machine without naming where it lives, so it stays exactly
+    # as reported and remains readable. The ``device_id`` and ``host`` cases
+    # embed ``host:port``, so those -- and only those -- are replaced by a
+    # stable digest of the same material. ``identity_value`` itself is
+    # untouched: it backs ``machine_id`` and stays local.
+    #
+    # The test is the privacy predicate rather than the identity kind, so a
+    # surprising UUID or serial that happens to carry an address is caught too
+    # and cannot drift away from what the relay enforces.
+    public_identity = (
+        identity_value
+        if not contains_nonpublic_location(identity_value)
+        else f"agent-{_short_digest(identity_value, length=12)}"
+    )
     display_name = machine_display_name(
         device_name=reported_name,
         serial_number=serial_number,
@@ -223,6 +232,7 @@ def _machine_from_device(
         "identity_value": identity_value,
         "identity_key": f"{identity_kind}:{identity_value}",
         "display_name": display_name,
+        "public_identity": public_identity,
         "reported_name": reported_name,
         "device_uuid": device_uuid,
         "serial_number": serial_number,
@@ -237,8 +247,12 @@ def _machine_from_device(
 
 
 def _source_name_for(machines: list[dict[str, Any]]) -> str:
+    # ``source_name`` is both the recorder's durable on-disk key and a
+    # Federation-visible label, so a newly discovered source is named from the
+    # public identity rather than the raw one. A UUID or serial machine is
+    # unaffected: its public identity is its reported identity.
     if len(machines) == 1:
-        return _slug(str(machines[0]["identity_value"]))
+        return _slug(str(machines[0]["public_identity"]))
     identity_material = "|".join(
         sorted(str(machine["identity_key"]) for machine in machines)
     )
