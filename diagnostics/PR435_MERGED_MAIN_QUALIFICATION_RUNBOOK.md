@@ -178,3 +178,57 @@ physical acceptance on Nettking, Nitro and the MSH Recorder — all three on thi
 same `MERGED_MAIN_SHA`, with identity negative control, restart/reconnect,
 cleanup/rollback and final-state evidence. Federation v1 is not accepted until
 that three-host campaign passes.
+
+## Physical acceptance preparation (gated — do not start before the verdict)
+
+Not authorized until `MERGED_MAIN_SOFTWARE_QUALIFICATION: PASS` is recorded for
+`bcf5c9ab` and explicit controlled-start authorization is given. The detailed
+requirements already exist in `PR435_SHUFFLED_QUALIFICATION.md` step 4 and are
+not restated here. What the merge changes is the identity they bind to.
+
+### SHA binding — the precondition that is currently unmet
+
+All three hosts must run the **same exact** `MERGED_MAIN_SHA`:
+
+```
+bcf5c9ab2fb453cb26129b70d41fb64fc4863dd4
+```
+
+As last observed (2026-09-05 14:00-14:02Z) all three are on the pre-merge main:
+
+| Host | Deployed SHA | Required |
+| --- | --- | --- |
+| Nettking | `6101c86d` | `bcf5c9ab` |
+| Nitro | `6101c86d` (recorder exited 0) | `bcf5c9ab` |
+| MSH Recorder | `6101c86d` | `bcf5c9ab` |
+
+So each host needs a clean checkout/build moved to `bcf5c9ab`, with the
+deployed identity re-verified from the source label and the per-component
+build label — not assumed from the checkout — before the campaign starts.
+A campaign in which the three hosts are not all on one identical SHA is void.
+
+### Why this candidate makes the recorder identity checks the point
+
+The merged change scopes recorder capability instance identity to
+`recorder-{node_id}`. The campaign must therefore prove, on real hardware:
+
+- Two legitimate recorders (Nitro and MSH Recorder) both accepted in one
+  session, on distinct, restart-stable identities.
+- A negative control that would still detect the original collision, i.e. it
+  fails when the fixed capability ID is used. A campaign that cannot fail the
+  old way has not tested the fix.
+- `recorder-control` targeting each recorder independently by node ID.
+- Legacy migration on a node that genuinely holds `recorder-local`, including
+  retirement of the superseded row to `UNAVAILABLE` and non-recreation of the
+  retired identity across reconnect replay.
+- Reconnect, recorder restart and coordinator restart convergence.
+- Deterministic cleanup/rollback and captured final state, plus the existing
+  P07/P12 duration requirements.
+
+Nitro's recorder is currently inactive and is to be activated only within the
+campaign. Capture fresh initial runtime/Federation state and rollback targets
+first. CI, loopback tests and schema-only evidence cannot substitute for any of
+this.
+
+`CURRENT_SESSION_ID` is still UNKNOWN in the handoff; a fresh authenticated
+Federation state query is a prerequisite for meaningful before/after evidence.
