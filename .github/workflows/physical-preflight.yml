@@ -132,6 +132,21 @@ jobs:
           else
             echo "(tailscale CLI not on PATH for this runner account)"
           fi
+      - name: SUMMARY
+        if: always()
+        shell: bash
+        run: |
+          echo "=========== PRE-FLIGHT SUMMARY: ${{ matrix.host }} ==========="
+          echo "runner account : $(id -un)"
+          echo "containers     : $(docker ps -q 2>/dev/null | wc -l) running / $(docker ps -aq 2>/dev/null | wc -l) total"
+          echo "fcp|msh images : $(docker images --format '{{.Repository}}' 2>/dev/null | grep -ciE 'fcp|msh' || true)"
+          echo "java processes : $(pgrep -c java 2>/dev/null || echo 0)"
+          echo "mem available  : $(free -m | awk '/^Mem:/{print $7" MiB"}')"
+          echo "swap devices   : $(swapon --show=NAME --noheadings 2>/dev/null | wc -l)"
+          echo "VISIBILITY CAVEAT: taken as the runner account. Containers, services"
+          echo "  or state owned by another user session may be invisible here."
+          echo "  'Not visible to the runner' is not the same as 'not deployed'."
+          echo "============================================================"
 
   preflight-windows:
     name: "Pre-flight: Nettking (Windows)"
@@ -171,6 +186,14 @@ jobs:
           echo MERGED_MAIN_SHA target : %MERGED_MAIN_SHA%
           echo ROLLBACK_SHA           : %ROLLBACK_SHA%
           echo.
+          REM Ephemeral, per-process safe.directory. GIT_CONFIG_* is read by
+          REM this git invocation only: it writes nothing to the runner
+          REM account's global config and mutates no host state. The checkout
+          REM is owned by Nettking\Martin while this job runs as NETWORK
+          REM SERVICE, so git otherwise refuses with "dubious ownership".
+          set GIT_CONFIG_COUNT=1
+          set GIT_CONFIG_KEY_0=safe.directory
+          set GIT_CONFIG_VALUE_0=*
           echo === C:\wsl\msh ===
           if exist "C:\wsl\msh\.git" git -C "C:\wsl\msh" rev-parse HEAD
           if exist "C:\wsl\msh\.git" git -C "C:\wsl\msh" rev-parse --abbrev-ref HEAD
