@@ -68,7 +68,7 @@ NEXT_ACTIONS:
 7. Only after software gates: controlled physical acceptance of exact candidate from clean checkouts on Nettking,Nitro,MSH Recorder. Record roles, initial/runtime/Federation state, supported startup commands, identity ownership, expected/observed results, reconnect/restart, cleanup/rollback and final state. Activate Nitro recorder only as part of that controlled test.
 8. Do NOT merge PR435. User explicitly froze merge during diagnosis. Final review and physical evidence must make a later merge decision defensible.
 
-## AB003 — THE NITRO A/B ANSWERED IT: MAIN FAILS THE TEST, THE CANDIDATE PASSED
+## AB003 — first Nitro A/B leg pair (SUPERSEDED IN PART BY AB004 BELOW: read both)
 
 Job 101374058563 of run 33988447252 completed 23:08:55Z. Both full-suite legs
 ran back to back on the same runner, in the same job, from the same clone
@@ -105,12 +105,33 @@ difference, and it runs in the candidate's favour. It is one run per leg, so it
 is not a failure-rate comparison and must not be quoted as one — what it
 establishes is that main is not immune, which is the claim that matters.
 
-STILL RUNNING: job 101391451308, the counterbalanced leg (main then candidate),
-started 23:09:01Z. It is the check on whether ordering or accumulated host state
-produced this, and it is worth having before the classification is called final.
-Do not push to ci/nitro-ab-candidate-vs-main while it runs; commit 596d0de on
-that branch is ready afterwards and adds the seeded legs plus a red job on any
-failed phase.
+## AB004 — THE COUNTERBALANCED LEG CORRECTS AB003: POSITION PREDICTS THE FAILURE, NOT THE BRANCH
+
+Job 101391451308 completed 01:16:01Z, main first this time, then the candidate.
+
+| leg | SHA | rc | result |
+| --- | --- | --- | --- |
+| b1-main | 6101c86 | **0** | full suite PASSED (64m 21s) |
+| b2-candidate | ba8a3b0 | **1** | **1 failed**, 3632 passed, 30 skipped (60m 33s) |
+
+Same test, same message, same place: `test_first_real_data_is_durably_written_with_its_raw_manifest`, 01:05:04Z, at 90%, `recorder capture did not finish within the test deadline`. Host during that leg: sda 81.6% mean busy, MemAvailable 1.79 GiB.
+
+Put the two jobs side by side and the pattern is unmistakable:
+
+| job | first leg | result | second leg | result |
+| --- | --- | --- | --- | --- |
+| pair_ab | candidate | PASS | main | **FAIL** |
+| pair_ba | main | PASS | candidate | **FAIL** |
+
+**In both jobs the first suite passed and the second failed, whichever tree was in which position.** This is precisely what counterbalancing exists to catch, and it corrects AB003's headline. AB003 reported "main fails the test, the candidate passed" — true of that job, and half the picture. The branch is not what predicts the failure; the position is, or something that tracks position.
+
+WHAT SURVIVES AND WHAT DOES NOT. Category A, candidate regression, stays falsified and is now doubly so: each tree passed in first position and failed in second. But any reading that main is uniquely affected is equally dead, and I should not have written the AB003 summary in a way that invited it before the control landed.
+
+WHAT THE POSITION EFFECT IS NOT SUFFICIENT TO EXPLAIN. The original release-gate failures ran ONE suite per job and still failed: run 33975032244's Linux release job (this same test, at 90%) and its order-independence job (four tests). So "second suite in a job" cannot be the whole mechanism. Counting every default-order full suite observed on Nitro: candidate 1 pass / 2 fail, main 1 pass / 1 fail, and this test appears in every failure. The honest summary is that **this test fails on roughly half of full-suite runs on Nitro, on both trees, and has never failed on a fast host** — 0 of 60 targeted repeats on Nitro itself, 0 of 60 across three runs on Nettking-Linux, and two clean full suites there. Position correlation at n=2 is suggestive, not established.
+
+CLASSIFICATION: B/F manifesting as D — a pre-existing hard wall-clock deadline in `_complete_scheduled_cycle`, surfacing only on a two-core rotating-disk host at sustained ~82-83% disk busy. Not introduced by PR 435, not fixed by it, and not a release blocker for the candidate on any capable host.
+
+RECOMMENDATION ON FURTHER NITRO TIME: stop. The A/B has answered the branch question in both orders, at roughly two hours per job. Commit 596d0de on ci/nitro-ab-candidate-vs-main (seeded legs, plus a failed phase turning the job red) is ready and deliberately NOT pushed: seeded order variation would characterise the slow host further, but it cannot change the release conclusion and costs another four hours of the only slow runner. If Astra wants the deadline defect fixed, that is a scoped test-design task against `_complete_scheduled_cycle`, on its own schedule, with a new candidate SHA and fresh qualification — not something to fold into this candidate.
 
 ## FAST-RUNNER VALIDATION OF THE FROZEN CANDIDATE — the primary release evidence
 
