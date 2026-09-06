@@ -5,8 +5,8 @@ Coordination only: `coord/federation-v1-release`. NEVER merge this branch into m
 ## Authoritative state
 
 EXECUTIVE_OWNER: Astra
-ACTING_ENGINEER: Astra; executive owner. PR435 final merge review COMPLETE and merge EXECUTED; authoritative merged-main qualification is now the open leg.
-CURRENT_PHASE: MERGED. PR435 merged to main as bcf5c9ab after a clean final review. Next transition is authoritative fast-host qualification of the exact merged-main SHA on Nettking-Linux, Nettking Windows and the PostgreSQL gate, then mandatory controlled physical acceptance. No deployment performed; no physical acceptance run.
+ACTING_ENGINEER: Claude (Opus), acting while Astra is rate-limited. Astra remains EXECUTIVE_OWNER and that marker is unchanged. Scope of this delegation: execute the authoritative merged-main qualification of bcf5c9ab and publish durable state. No executive policy is changed and no completed qualification is reinterpreted.
+CURRENT_PHASE: MERGED-MAIN QUALIFICATION IN PROGRESS. PR435 merged to main as bcf5c9ab. The authoritative fast-host qualification of that exact SHA is RUNNING as run 34019865738 on the self-hosted rig. Physical acceptance remains mandatory, gated on that verdict, and unrun. No deployment performed.
 CURRENT_MAIN_SHA: bcf5c9ab2fb453cb26129b70d41fb64fc4863dd4
 MERGED_MAIN_SHA: bcf5c9ab2fb453cb26129b70d41fb64fc4863dd4 — merge commit; parents 6101c86d (base) and ba8a3b0b (candidate); tree bcbd778ba8009eb79e3349534e623da3861b0e45
 PRE_MERGE_MAIN_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356
@@ -15,7 +15,9 @@ CURRENT_CANDIDATE_SHA: ba8a3b0b828f59c36c5aaaf6130480a2432a5578 — merged; reta
 PR_435_HEAD: ba8a3b0b828f59c36c5aaaf6130480a2432a5578 on claude/federation-recorder-capability-id-19tqkk; MERGED 2026-09-06 as bcf5c9ab, normal merge commit with exact expected-head-SHA protection, no branch-protection bypass
 ACTIVE_FIX_BRANCH: None. R001 f65d11fd028a8eea5478e2fd6dd634fdbdb9d9a1 and branding-only ba8a3b0b are already in the frozen candidate.
 VALIDATION_BRANCH: ci/fast-linux-validation at e81bf4d59da813bc9f647209113efa8da9951aba; separate diagnostic identity, not a product candidate.
-ACTIVE_CI_RUN: 33994962383 — Nettking-Linux jobs completed SUCCESS; optional Beast-Linux smoke101383784569 QUEUED without an assigned runner at 2026-09-06T06:25Z. Do not label the whole run successful.
+ACTIVE_CI_RUN: 34019865738 — merged-main qualification of bcf5c9ab, workflow .github/workflows/merged-main-qualification.yml on claude/pr-435-final-merge-k01mfi at 074ceef9b32ace0fced1f18ff8d9c0e50d141aae. Started 2026-09-06T07:42:24Z. Legs A-E sequential on Nettking-Linux, Windows on the Nettking Windows runner, PostgreSQL on Nitro in its proven service configuration.
+RUNNER_AVAILABILITY (observed 2026-09-06T07:42Z, all accepted work within seconds): Nettking-Linux runner_id27 ONLINE; Nettking Windows runner_id22 label fcp-windows ONLINE; Nitro runner_id21 label fcp-linux ONLINE. Beast-Linux OFFLINE — its smoke job101383784569 in superseded run 33994962383 has been QUEUED with no assigned runner since 2026-09-05T22:06:47Z. Beast is optional confirmation only, role unchanged at AI_PROVIDER_ONLY, and is not being repaired or waited on.
+SUPERSEDED_CI_RUN: 33994962383 — candidate-era fast Linux validation; its Nettking-Linux jobs completed SUCCESS and remain valid candidate evidence. Do not label that whole run successful; its Beast smoke job never started.
 HISTORICAL_RELEASE_RUN: 33975032244 — completed FAILURE. Windows101330241662 SUCCESS; PostgreSQL101330241653 SUCCESS; clean-checkout101330241502 FAILURE; Linux release101330241713 FAILURE; verdict101359577396 FAILURE. These historical results are unchanged.
 FAST_LINUX_VALIDATION: PASS — two successive default-order full candidate suites on Nettking-Linux, 40 targeted repeats independently verified, release/static checks plus actual Compose validation completed. This does not certify shuffled order independence or physical acceptance.
 FAST_WINDOWS_VALIDATION: PASS — existing exact-candidate Nettking Windows gate reused. Optional Beast-Windows confirmation INCOMPLETE due to Python setup execution-policy failure before tests.
@@ -24,7 +26,34 @@ DEPLOYED_NETTKING_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356, source and no.f
 DEPLOYED_NITRO_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356, source and own-component build labels observed 14:00–14:02Z; recorder exited0
 DEPLOYED_MSH_RECORDER_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356, source and own-component build labels observed 14:00–14:02Z
 CURRENT_SESSION_ID: UNKNOWN; no fresh authenticated Federation state query completed
-LAST_UPDATED_UTC: 2026-09-06T07:16:15Z
+LAST_UPDATED_UTC: 2026-09-06T07:43:20Z
+
+## Merged-main qualification in progress — acting engineer Claude
+
+MERGED_MAIN_SOFTWARE_QUALIFICATION: **INCOMPLETE — RUNNING**, not PASS and not FAIL. Do not record a verdict from this section; the verdict is recorded only when every required leg has reported.
+
+Harness: `.github/workflows/merged-main-qualification.yml`, published on `claude/pr-435-final-merge-k01mfi` at 074ceef9b32ace0fced1f18ff8d9c0e50d141aae. Astra's locally prepared tooling was not committed anywhere reachable, so this harness was built by reusing what is already proven rather than inventing a second way to run the release: the Windows job and the PostgreSQL job are lifted verbatim from `ci/self-hosted-pr435`, which produced the candidate's 871/1 and 367/1 Windows result and its passing PostgreSQL gate. Both referenced the SHA only through `env.VALIDATED_SHA`, so retargeting them at the merged commit changed one line and left their test selection untouched.
+
+Required legs, all against exact bcf5c9ab, run 34019865738:
+
+| Leg | Job | Host | Status |
+| --- | --- | --- | --- |
+| identity smoke | 101450326992 | Nettking-Linux | SUCCESS |
+| A full suite, default order | linux-default-order | Nettking-Linux | running |
+| B full suite, shuffled seed 20260813 | linux-shuffled-20260813 | Nettking-Linux | queued behind A |
+| C full suite, shuffled seed 15 | linux-shuffled-15 | Nettking-Linux | queued behind B |
+| D release/static gates | linux-static | Nettking-Linux | queued behind C |
+| E actual Docker Compose validation | linux-compose | Nettking-Linux | queued behind D |
+| Windows release matrix | 101450327063 | Nettking Windows | running |
+| PostgreSQL storage release check | 101450327045 | Nitro | running |
+
+The Linux legs are chained by `needs:` so they run strictly sequentially and cannot compete for the host; Windows and PostgreSQL run in parallel on their own runners. Nitro carries only the PostgreSQL gate in its proven configuration and is not being characterised.
+
+Two gaps in the candidate-era fast-Linux harness are closed for the merged identity. Seeds 20260813 and 15 are named explicitly rather than one fixed seed plus the run number, so the merged identity gets the same two orders the candidate was qualified on. And Compose is the real implementation: Nettking-Linux has no Compose plugin, so instead of falling back to a YAML parse and calling it a gate, leg E runs `docker compose config --quiet` from the pinned official Docker CLI image Astra used for the candidate (`docker@sha256:eccaacfeed644c7de222ff047483568cb988dde95476fbaaf10ea2d04921bb66`), source read-only, no network and no Docker socket.
+
+Every job checks out the exact SHA, asserts it, and asserts a clean worktree before and after; suite jobs additionally record host state and a sha256 of the installed dependency set. No product code, test, timeout, threshold, skip, flaky mark, coverage setting or Federation state is touched by the harness.
+
+PHYSICAL_ACTION_STARTED: NO. No deployment, no host update, no Federation state change, no recorder activation. The three hosts remain on 6101c86d.
 
 ## PR435 merge executed — merged main bcf5c9ab
 
