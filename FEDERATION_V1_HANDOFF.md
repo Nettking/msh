@@ -6,17 +6,22 @@ Coordination only: `coord/federation-v1-release`. NEVER merge this branch into m
 
 EXECUTIVE_OWNER: Astra
 ACTING_ENGINEER: Claude (Opus), acting while Astra is rate-limited. Astra remains EXECUTIVE_OWNER and that marker is unchanged. Scope of this delegation: execute the authoritative merged-main qualification of bcf5c9ab and publish durable state. No executive policy is changed and no completed qualification is reinterpreted.
-CURRENT_PHASE: MERGED-MAIN QUALIFICATION IN PROGRESS. PR435 merged to main as bcf5c9ab. The authoritative fast-host qualification of that exact SHA is RUNNING as run 34019865738 on the self-hosted rig. Physical acceptance remains mandatory, gated on that verdict, and unrun. No deployment performed.
+CURRENT_PHASE: MERGED-MAIN QUALIFICATION BLOCKED ON INFRASTRUCTURE. PR435 merged to main as bcf5c9ab. Windows and PostgreSQL both PASS on that exact SHA. The Linux legs are unfinished because the Nettking-Linux host ran out of memory mid-suite and its runner service went down; that is an environment failure, not a product failure. Physical acceptance remains mandatory, gated on the completed verdict, and unrun. No deployment performed.
 CURRENT_MAIN_SHA: bcf5c9ab2fb453cb26129b70d41fb64fc4863dd4
 MERGED_MAIN_SHA: bcf5c9ab2fb453cb26129b70d41fb64fc4863dd4 — merge commit; parents 6101c86d (base) and ba8a3b0b (candidate); tree bcbd778ba8009eb79e3349534e623da3861b0e45
 PRE_MERGE_MAIN_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356
-MERGED_MAIN_SOFTWARE_QUALIFICATION: NOT ESTABLISHED — a new identity does not inherit the candidate PASS; required fast-host legs are unrun
+MERGED_MAIN_SOFTWARE_QUALIFICATION: **INCOMPLETE** — not PASS and not FAIL. Windows PASS and PostgreSQL PASS on exact bcf5c9ab; Linux legs A-E unfinished after an environment kill. No product failure has been observed on the merged identity on any host.
+MERGED_MAIN_WINDOWS: PASS — run 34019865738 job 101450327063 on the Nettking Windows runner, all 19 steps SUCCESS, Python 3.12.10, exact-SHA asserted; transport/storage/failover subset 367 passed,1 skipped in175.18s, plus compile, manifest, Go, Ruff, real Compose and diff hygiene.
+MERGED_MAIN_POSTGRESQL: PASS — run 34019865738 job 101450327045 on Nitro, all 11 steps SUCCESS, exact-SHA asserted, PostgreSQL storage authority regression under Python 3.12.13 against postgres:16-alpine in its proven configuration.
+MERGED_MAIN_LINUX: INCOMPLETE — leg A job 101450344435 was SIGKILLed (exit137) at 93% with no test having failed; legs B-E skipped by the needs-gate. Classified ENV, see the run classification report.
 CURRENT_CANDIDATE_SHA: ba8a3b0b828f59c36c5aaaf6130480a2432a5578 — merged; retained as the qualified software identity
 PR_435_HEAD: ba8a3b0b828f59c36c5aaaf6130480a2432a5578 on claude/federation-recorder-capability-id-19tqkk; MERGED 2026-09-06 as bcf5c9ab, normal merge commit with exact expected-head-SHA protection, no branch-protection bypass
 ACTIVE_FIX_BRANCH: None. R001 f65d11fd028a8eea5478e2fd6dd634fdbdb9d9a1 and branding-only ba8a3b0b are already in the frozen candidate.
 VALIDATION_BRANCH: ci/fast-linux-validation at e81bf4d59da813bc9f647209113efa8da9951aba; separate diagnostic identity, not a product candidate.
-ACTIVE_CI_RUN: 34019865738 — merged-main qualification of bcf5c9ab, workflow .github/workflows/merged-main-qualification.yml on claude/pr-435-final-merge-k01mfi at 074ceef9b32ace0fced1f18ff8d9c0e50d141aae. Started 2026-09-06T07:42:24Z. Legs A-E sequential on Nettking-Linux, Windows on the Nettking Windows runner, PostgreSQL on Nitro in its proven service configuration.
-RUNNER_AVAILABILITY (observed 2026-09-06T07:42Z, all accepted work within seconds): Nettking-Linux runner_id27 ONLINE; Nettking Windows runner_id22 label fcp-windows ONLINE; Nitro runner_id21 label fcp-linux ONLINE. Beast-Linux OFFLINE — its smoke job101383784569 in superseded run 33994962383 has been QUEUED with no assigned runner since 2026-09-05T22:06:47Z. Beast is optional confirmation only, role unchanged at AI_PROVIDER_ONLY, and is not being repaired or waited on.
+ACTIVE_CI_RUN: 34025305598 — retry of the merged-main qualification at harness commit 028c18174ebf6ebdbe121aedf9635b5fd24e8f01, QUEUED behind run 34019865738 by the merged-main-qualification concurrency group. It starts automatically once Nettking-Linux returns; the retry adds a read-only free(1) sampler to the Linux suite legs and changes no pytest invocation.
+STRANDED_CI_RUN: 34019865738 — first merged-main qualification, started 2026-09-06T07:42:24Z at harness commit 074ceef9. Windows and PostgreSQL completed SUCCESS; leg A failed ENV; legs B-E skipped; verdict job 101451300256 remains QUEUED because its runner is gone. This session cannot cancel it: the GitHub integration returns 403 Resource not accessible by integration for workflow-run cancellation.
+RUNNER_AVAILABILITY (latest): Nettking-Linux runner_id27 **OFFLINE since 2026-09-06T07:49Z** — it took the smoke job in 2 seconds while healthy, then received a shutdown signal during leg A and has not accepted its queued verdict job since. Nettking Windows runner_id22 label fcp-windows ONLINE, leg passed. Nitro runner_id21 label fcp-linux ONLINE, leg passed. Beast-Linux OFFLINE — smoke job101383784569 QUEUED with no assigned runner since 2026-09-05T22:06:47Z; optional confirmation only, role unchanged at AI_PROVIDER_ONLY, not being repaired or waited on.
+BLOCKING_INFRASTRUCTURE: Nettking-Linux needs its runner service restarted AND memory freed before the Linux legs can complete. It was at 14 GiB of 15 GiB used with 837 MiB available when the suite container was killed, with the Federation services deployed at 6101c86d also resident. This session has no shell on that host and cannot remediate it.
 SUPERSEDED_CI_RUN: 33994962383 — candidate-era fast Linux validation; its Nettking-Linux jobs completed SUCCESS and remain valid candidate evidence. Do not label that whole run successful; its Beast smoke job never started.
 HISTORICAL_RELEASE_RUN: 33975032244 — completed FAILURE. Windows101330241662 SUCCESS; PostgreSQL101330241653 SUCCESS; clean-checkout101330241502 FAILURE; Linux release101330241713 FAILURE; verdict101359577396 FAILURE. These historical results are unchanged.
 FAST_LINUX_VALIDATION: PASS — two successive default-order full candidate suites on Nettking-Linux, 40 targeted repeats independently verified, release/static checks plus actual Compose validation completed. This does not certify shuffled order independence or physical acceptance.
@@ -26,11 +31,38 @@ DEPLOYED_NETTKING_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356, source and no.f
 DEPLOYED_NITRO_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356, source and own-component build labels observed 14:00–14:02Z; recorder exited0
 DEPLOYED_MSH_RECORDER_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356, source and own-component build labels observed 14:00–14:02Z
 CURRENT_SESSION_ID: UNKNOWN; no fresh authenticated Federation state query completed
-LAST_UPDATED_UTC: 2026-09-06T07:43:20Z
+LAST_UPDATED_UTC: 2026-09-06T09:42:20Z
 
-## Merged-main qualification in progress — acting engineer Claude
+## Merged-main qualification — results so far, acting engineer Claude
 
-MERGED_MAIN_SOFTWARE_QUALIFICATION: **INCOMPLETE — RUNNING**, not PASS and not FAIL. Do not record a verdict from this section; the verdict is recorded only when every required leg has reported.
+MERGED_MAIN_SOFTWARE_QUALIFICATION: **INCOMPLETE**, not PASS and not FAIL. Windows and PostgreSQL passed on the exact merged SHA. The Linux legs did not finish, for an environment reason with no product failure in it. A PASS is not recordable until legs A-E complete.
+
+**No product failure has been observed on bcf5c9ab on any host.** Leg A ran to 93% of the suite with every test passing and was then SIGKILLed (exit 137) with 837 MiB available on a 15 GiB box, after which the runner service went down. Full evidence and classification: [run 34019865738 classification](diagnostics/PR435_MERGED_MAIN_RUN1_CLASSIFICATION.md).
+
+| Leg | Job | Runner | Result |
+| --- | --- | --- | --- |
+| identity smoke | 101450326992 | Nettking-Linux | SUCCESS |
+| Windows release matrix | 101450327063 | Nettking Windows | **PASS** |
+| PostgreSQL storage release check | 101450327045 | Nitro | **PASS** |
+| A full suite, default order | 101450344435 | Nettking-Linux | FAILURE — ENV, exit137 SIGKILL |
+| B shuffled seed 20260813 | 101451171364 | — | skipped, gated on A |
+| C shuffled seed 15 | 101451171445 | — | skipped, gated on A |
+| D release/static gates | 101451171728 | — | skipped, gated on A |
+| E real Compose validation | 101451171874 | — | skipped, gated on A |
+| verdict | 101451300256 | — | stranded QUEUED, runner gone |
+
+The needs-gate did its job: progression stopped at the first failing leg rather than reporting a partial verdict.
+
+EXACT_NEXT_ACTION, in order:
+
+1. Restart the Nettking-Linux self-hosted runner service, and free memory on that host first. It held 14 GiB of 15 GiB with the Federation services deployed at 6101c86d also resident; a full suite plus the release container did not fit.
+2. Nothing else needs launching. Run 34025305598 is already queued at harness commit 028c1817 and starts by itself once that runner returns: run 34019865738 clears its stranded verdict job, then the retry executes legs A-E with memory sampling. Windows and PostgreSQL re-run inside it and are expected to pass again.
+3. Read the sampler output on leg A. If it is killed again while memory is genuinely adequate, that is new evidence about the merged identity and must be investigated before physical acceptance, not retried.
+4. When legs A-E, Windows and PostgreSQL are all green on bcf5c9ab, record MERGED_MAIN_SOFTWARE_QUALIFICATION: PASS with the run and job identifiers, update this handoff, and only then prepare the three-host physical campaign.
+
+Do NOT record a PASS from the Windows and PostgreSQL legs alone. Do NOT weaken any test, deadline, skip or coverage setting to get the Linux legs green; the observed kill is a host resource condition and the remedy is host memory, not the suite.
+
+PHYSICAL_ACTION_STARTED: NO. No deployment, no host update, no Federation state change, no recorder activation. The three hosts remain on 6101c86d and rollback to 6101c86d is unchanged.
 
 Harness: `.github/workflows/merged-main-qualification.yml`, published on `claude/pr-435-final-merge-k01mfi` at 074ceef9b32ace0fced1f18ff8d9c0e50d141aae. Astra's locally prepared tooling was not committed anywhere reachable, so this harness was built by reusing what is already proven rather than inventing a second way to run the release: the Windows job and the PostgreSQL job are lifted verbatim from `ci/self-hosted-pr435`, which produced the candidate's 871/1 and 367/1 Windows result and its passing PostgreSQL gate. Both referenced the SHA only through `env.VALIDATED_SHA`, so retargeting them at the merged commit changed one line and left their test selection untouched.
 
@@ -71,7 +103,7 @@ LOCAL_SCREEN (non-authoritative, cloud container, NOT Nettking-Linux): on a fres
 
 CANCELLED_LOCAL_WORK: shuffled seeds 20260813 and 15 were queued in that container and cancelled by instruction — seed 20260813 terminated in progress, seed 15 never started. No partial shuffled result is claimed and no further local full qualification was run. Windows, PostgreSQL and real Docker Compose validation were not executable there.
 
-REQUIRED_NEXT (authoritative, on the rig; the merge session had no route to Nettking-Linux, Nettking Windows, Nitro or MSH Recorder, and hosted Actions remain CI001-blocked): run legs A-E, the Windows leg and the PostgreSQL leg on exact bcf5c9ab per the runbook, then record MERGED_MAIN_SOFTWARE_QUALIFICATION: PASS, then proceed to the mandatory three-host physical campaign with all three hosts on this same MERGED_MAIN_SHA.
+REQUIRED_NEXT (superseded by the results section above, which records Windows and PostgreSQL as PASS on the merged SHA; retained for provenance) (authoritative, on the rig; the merge session had no route to Nettking-Linux, Nettking Windows, Nitro or MSH Recorder, and hosted Actions remain CI001-blocked): run legs A-E, the Windows leg and the PostgreSQL leg on exact bcf5c9ab per the runbook, then record MERGED_MAIN_SOFTWARE_QUALIFICATION: PASS, then proceed to the mandatory three-host physical campaign with all three hosts on this same MERGED_MAIN_SHA.
 
 Durable [merge record and local screen](diagnostics/PR435_MERGE_AND_MERGED_MAIN_SCREEN.md) and [authoritative qualification runbook](diagnostics/PR435_MERGED_MAIN_QUALIFICATION_RUNBOOK.md).
 
