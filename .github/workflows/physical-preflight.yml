@@ -160,33 +160,43 @@ jobs:
           echo --- docker ps -a ---
           docker ps -a --format "table {{.Names}}\t{{.Image}}\t{{.Status}}" 2>&1
           echo.
-          echo --- running container build commits ---
-          for /f "delims=" %%n in ('docker ps --format "{{.Names}}" 2^>nul') do @( ^
-            for /f "delims=" %%c in ('docker inspect %%n --format "{{ index .Config.Labels \"no.fcp.build_commit\" }}" 2^>nul') do @echo   %%n -^> %%c )
-          echo.
           echo --- running services matching fcp/msh/recorder/arrowhead/relay ---
           net start | findstr /I "fcp msh recorder arrowhead relay"
           if errorlevel 1 echo   (no matching running services)
+          exit /b 0
       - name: Deployment checkouts and rollback reachability (read-only)
         continue-on-error: true
         shell: cmd
         run: |
           echo MERGED_MAIN_SHA target : %MERGED_MAIN_SHA%
           echo ROLLBACK_SHA           : %ROLLBACK_SHA%
-          for %%d in ("C:\wsl\msh" "C:\msh" "C:\fcp\msh" "%USERPROFILE%\msh" "C:\actions-runner\_work\msh\msh") do @( ^
-            if exist "%%~d\.git" ( ^
-              echo --- checkout: %%~d & ^
-              git -C "%%~d" rev-parse HEAD & ^
-              git -C "%%~d" rev-parse --abbrev-ref HEAD & ^
-              git -C "%%~d" cat-file -t %MERGED_MAIN_SHA% & ^
-              git -C "%%~d" cat-file -t %ROLLBACK_SHA% ) )
+          echo.
+          echo === C:\wsl\msh ===
+          if exist "C:\wsl\msh\.git" git -C "C:\wsl\msh" rev-parse HEAD
+          if exist "C:\wsl\msh\.git" git -C "C:\wsl\msh" rev-parse --abbrev-ref HEAD
+          if exist "C:\wsl\msh\.git" git -C "C:\wsl\msh" cat-file -t %MERGED_MAIN_SHA%
+          if exist "C:\wsl\msh\.git" git -C "C:\wsl\msh" cat-file -t %ROLLBACK_SHA%
+          if exist "C:\wsl\msh\.git" git -C "C:\wsl\msh" status --porcelain
+          if not exist "C:\wsl\msh\.git" echo   (absent)
+          echo.
+          echo === C:\actions-runner\_work\msh\msh (CI workspace, not a deployment) ===
+          if exist "C:\actions-runner\_work\msh\msh\.git" git -C "C:\actions-runner\_work\msh\msh" rev-parse HEAD
+          echo.
+          echo === other candidate roots ===
+          if exist "C:\msh\.git" git -C "C:\msh" rev-parse HEAD
+          if exist "C:\fcp\msh\.git" git -C "C:\fcp\msh" rev-parse HEAD
+          if exist "%USERPROFILE%\msh\.git" git -C "%USERPROFILE%\msh" rev-parse HEAD
+          exit /b 0
       - name: Recorder state and Tailscale reachability (read-only)
         continue-on-error: true
         shell: cmd
         run: |
           echo --- recorder/node state locations (existence only) ---
-          for %%p in ("%USERPROFILE%\.fcp" "%USERPROFILE%\.msh" "C:\fcp-data" "C:\ProgramData\fcp") do @( ^
-            if exist "%%~p" echo   present: %%~p )
+          if exist "%USERPROFILE%\.fcp" echo   present: %USERPROFILE%\.fcp
+          if exist "%USERPROFILE%\.msh" echo   present: %USERPROFILE%\.msh
+          if exist "C:\fcp-data" echo   present: C:\fcp-data
+          if exist "C:\ProgramData\fcp" echo   present: C:\ProgramData\fcp
           echo.
-          echo --- tailscale ---
-          where tailscale >nul 2>&1 && tailscale status || echo   (tailscale CLI not on PATH for this runner account)
+          echo --- tailscale (runner account may not own the tailscaled session) ---
+          where tailscale >nul 2>&1 && tailscale status 2>&1 || echo   (tailscale CLI not on PATH)
+          exit /b 0
