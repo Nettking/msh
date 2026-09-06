@@ -53,6 +53,9 @@ from catalog.federation.protocol import (
     utc_now,
 )
 from catalog.federation.redaction import redact_secrets
+from catalog.federation.recorder_control_events import (
+    mask_public_recorder_control_scan_fields,
+)
 from catalog.federation.service_incarnation import (
     STOP_COMPLETED,
     STOP_FAILURE,
@@ -248,7 +251,20 @@ def _ensure_bounded_json(value: object, *, field: str) -> None:
     # something. Every payload the relay routes goes through here, including
     # storage batch traffic that has no redactable field at all, so the clean
     # case must cost exactly one walk as it did before the allowance existed.
-    if redacted != value and redacted != mask_public_jsonl_chunk_paths(value):
+    #
+    # Recorder control is the second, and only other, narrow allowance.
+    # ``fcp.recorder-control.v1`` scan events intentionally carry a bounded
+    # RFC1918 scan network, and the generic pass always alters two of their
+    # fields: ``cidr`` by value, and ``port`` by key. Both must be admitted or
+    # no scan event is routable at all -- allowing ``cidr`` alone still leaves
+    # every scan request rejected on ``port``. The expectation masks only those
+    # two fields, only under that schema, and only when the CIDR satisfies the
+    # recorder's own RFC1918 /24-or-smaller contract and the port is bounded.
+    if (
+        redacted != value
+        and redacted != mask_public_jsonl_chunk_paths(value)
+        and redacted != mask_public_recorder_control_scan_fields(value)
+    ):
         raise FederationValidationError(
             "nonpublic-payload",
             field,

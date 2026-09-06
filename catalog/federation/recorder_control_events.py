@@ -11,9 +11,11 @@ only to opaque IDs from the recorder's own latest scan.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from ipaddress import IPv4Network, ip_network
 from typing import Any, Final
 
 from .errors import FederationValidationError
+from .redaction import REDACTED
 
 SCHEMA: Final = "fcp.recorder-control.v1"
 SCAN_REQUEST_EVENT: Final = "recorder.control.scan.requested"
@@ -24,6 +26,119 @@ COMMAND_TTL: Final = timedelta(minutes=2)
 MAX_COMMAND_LIFETIME: Final = timedelta(minutes=5)
 MAX_SOURCE_ITEMS: Final = 64
 MAX_SCAN_RESULT_ITEMS: Final = 64
+MAX_SCAN_ADDRESSES: Final = 256
+MIN_SCAN_PREFIX_LENGTH: Final = 24
+
+#: The same RFC1918 space the recorder's discovery validator admits.
+_RFC1918_NETWORKS: Final = (
+    IPv4Network("10.0.0.0/8"),
+    IPv4Network("172.16.0.0/12"),
+    IPv4Network("192.168.0.0/16"),
+)
+
+
+def is_publishable_scan_cidr(value: Any) -> bool:
+    """Return whether ``value`` is a scan CIDR the recorder would itself accept.
+
+    "Publishable" means the relay may route it, not that the address is public.
+    The predicate admits *only* private RFC1918 space; a publicly routable
+    address is exactly what it refuses.
+
+    This is the relay-side mirror of the recorder's discovery security
+    contract: an explicit IPv4 RFC1918 network, ``/24`` or smaller, of at most
+    ``MAX_SCAN_ADDRESSES`` addresses. It is deliberately a predicate rather
+    than a parser -- it decides only whether a value may be exempted from the
+    generic privacy filter, and it never widens what a scan may target.
+
+    ``catalog.flask_app.services.mtconnect_discovery_service.validate_scan_cidr``
+    remains the enforcing validator on the recorder side. The relay cannot
+    import it without taking a dependency on the Flask application layer, so
+    the contract is restated here and pinned to that validator by test.
+    """
+
+    if not isinstance(value, str):
+        return False
+    raw = value.strip()
+    if "/" not in raw or raw != value:
+        return False
+    try:
+        network = ip_network(raw, strict=False)
+    except ValueError:
+        return False
+    return (
+        isinstance(network, IPv4Network)
+        and network.prefixlen >= MIN_SCAN_PREFIX_LENGTH
+        and network.num_addresses <= MAX_SCAN_ADDRESSES
+        and any(network.subnet_of(private) for private in _RFC1918_NETWORKS)
+    )
+
+
+def _is_bounded_scan_port(value: Any) -> bool:
+    return not isinstance(value, bool) and isinstance(value, int) and 1 <= value <= 65535
+
+
+def _is_scan_control_payload(value: Any) -> bool:
+    """Return whether ``value`` is exactly one recorder-control scan payload.
+
+    Both ``recorder.control.scan.requested`` and
+    ``recorder.control.scan.reported`` carry ``command == "scan"`` under this
+    schema; the source-change events carry ``"sources"`` and neither declares a
+    network field. The relay validates a payload without its event type, so the
+    payload's own ``command`` is what distinguishes them.
+    """
+
+    return (
+        isinstance(value, dict)
+        and value.get("schema") == SCHEMA
+        and value.get("command") == "scan"
+    )
+
+
+def mask_public_recorder_control_scan_fields(value: Any) -> Any:
+    """Mask only the scan fields the relay's privacy filter may safely pass.
+
+    The relay rejects any payload the generic redaction pass would alter.
+    Recorder control intentionally carries a bounded private scan network, so
+    two fields of this one schema are always altered by that pass and the whole
+    protocol is unroutable without an exemption:
+
+    * ``cidr`` is redacted by *value*, because it reads as an address.
+    * ``port`` is redacted by *key*, because ``port`` is a location key. This
+      holds even when ``cidr`` is empty, so allowing ``cidr`` alone would not
+      make a single scan event routable.
+
+    Returning those two fields pre-masked lets the relay compare against an
+    expected redaction instead of relaxing the filter. A ``cidr`` outside the
+    recorder's RFC1918 ``/24``-or-smaller contract, or a port outside 1-65535,
+    is left untouched, so the ordinary filter still rejects it. Every other
+    field of this schema, and any ``cidr`` or ``port`` under a different
+    schema, keeps failing exactly as before.
+    """
+
+    if isinstance(value, dict):
+        masked = {
+            key: mask_public_recorder_control_scan_fields(item)
+            for key, item in value.items()
+        }
+        if _is_scan_control_payload(value):
+            cidr = value.get("cidr")
+            # A scan payload earns the exemption only as a whole. An absent or
+            # empty CIDR is the ordinary "let the recorder infer it" request; a
+            # CIDR that satisfies the contract is masked. Anything else -- IPv6,
+            # public space, wider than /24, malformed -- earns nothing at all,
+            # not even the port exemption, so such a payload stays rejected
+            # exactly as it was before this allowance existed.
+            if cidr is None or cidr == "":
+                if _is_bounded_scan_port(value.get("port")):
+                    masked["port"] = REDACTED
+            elif is_publishable_scan_cidr(cidr):
+                masked["cidr"] = REDACTED
+                if _is_bounded_scan_port(value.get("port")):
+                    masked["port"] = REDACTED
+        return masked
+    if isinstance(value, (list, tuple)):
+        return [mask_public_recorder_control_scan_fields(item) for item in value]
+    return value
 
 
 def _stamp(value: datetime) -> str:
@@ -296,13 +411,17 @@ def sources_report_payload(
 
 __all__ = [
     "COMMAND_TTL",
+    "MAX_SCAN_ADDRESSES",
     "MAX_SCAN_RESULT_ITEMS",
     "MAX_SOURCE_ITEMS",
+    "MIN_SCAN_PREFIX_LENGTH",
     "SCAN_REPORT_EVENT",
     "SCAN_REQUEST_EVENT",
     "SCHEMA",
     "SOURCES_REPORT_EVENT",
     "SOURCES_REQUEST_EVENT",
+    "is_publishable_scan_cidr",
+    "mask_public_recorder_control_scan_fields",
     "parse_command",
     "scan_command_payload",
     "scan_report_payload",
