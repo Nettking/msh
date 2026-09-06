@@ -6,7 +6,7 @@ Coordination only: `coord/federation-v1-release`. NEVER merge this branch into m
 
 EXECUTIVE_OWNER: Astra
 ACTING_ENGINEER: Astra; executive reviewer of Claude's published validation and owner of the current conclusion. No active diagnostic process launched by Astra remains.
-CURRENT_PHASE: Requested fast-runner validation complete; scoped software conclusion below. No merge or deployment authorized. Physical acceptance and full shuffled-suite qualification remain open.
+CURRENT_PHASE: Shuffled software qualification RUNNING on Nettking-Linux, seeds20260813 and15. Completed default-order evidence is retained; no repeat or further Nitro characterization. No merge/deployment authorized.
 CURRENT_MAIN_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356
 CURRENT_CANDIDATE_SHA: ba8a3b0b828f59c36c5aaaf6130480a2432a5578 — FROZEN
 PR_435_HEAD: ba8a3b0b828f59c36c5aaaf6130480a2432a5578 on claude/federation-recorder-capability-id-19tqkk; OPEN, unmerged
@@ -21,7 +21,15 @@ DEPLOYED_NETTKING_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356, source and no.f
 DEPLOYED_NITRO_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356, source and own-component build labels observed 14:00–14:02Z; recorder exited0
 DEPLOYED_MSH_RECORDER_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356, source and own-component build labels observed 14:00–14:02Z
 CURRENT_SESSION_ID: UNKNOWN; no fresh authenticated Federation state query completed
-LAST_UPDATED_UTC: 2026-09-06T06:25:00Z
+LAST_UPDATED_UTC: 2026-09-06T06:34:27Z
+
+## Active shuffled qualification — Astra
+
+SHUFFLED_ORDER_VALIDATION: RUNNING. Started2026-09-06T06:34:27Z on Nettking-Linux as gha, controller PID1532722. Task exec session18536 is only a local tool handle; durable state is `/home/gha/qualification/pr435-shuffle-20260906-astra` with controller.log, results.tsv and per-leg checkout/logs/JUnit/pip-freeze/15-second host samples. Current first leg candidate-20260813. Script [diagnostics/run-pr435-shuffled.sh](diagnostics/run-pr435-shuffled.sh) runs seed15 next and immediately runs the identical seed against exact main on any failed candidate leg. Do not duplicate this controller.
+
+Fresh independent clones come from a verified Git bundle containing only advertised candidate HEAD ba8a3b0b and origin/main6101c86d; each leg asserts exact SHA and initial cleanliness, runs the entire repository suite, then verifies final SHA/cleanliness. Candidate and source branches are not changed. Same release environment plus pinned pytest-randomly4.1.0; Python image ID3eb66c6a8a2399cdf305afe7f680ea1e3aad64e9a6684cd6e46baf6b8b701ec8, repo digest python@sha256:3cd9086bdb30f7c9bc08a3fa621d9842e0d3f6f9291aeb4677e0547817c10b12. This is a local execution under the actual Linux service account on the same host; it is not a new GitHub job. Exact script hash at launch: cbec7e0248e231e6eb26b1d868fc5cc117f5558e823d998fc61fefca67736e7e.
+
+Next: read results.tsv and complete raw logs, classify any failure before code changes, publish evidence and explicit software verdict. Required later transition is software-qualified candidate → final PR435 merge decision (no merge authorized now) → qualification of exact resulting merged-main SHA → controlled physical acceptance. Physical evidence remains mandatory and unrun on this candidate.
 
 ## Current fast-runner decision and evidence
 
