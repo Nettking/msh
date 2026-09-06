@@ -73,7 +73,13 @@ Standing observation, deliberately not acted on: with no committed `go.sum`, the
 
 PHYSICAL_ACTION_STARTED: NO. No deployment, no host update, no Federation state change, no recorder activation. All three hosts remain on `6101c86d` and rollback to `6101c86d` is unchanged. Beast-Linux remains OFFLINE and was deliberately not repaired; role unchanged at AI_PROVIDER_ONLY.
 
-EXACT_NEXT_ACTION: prepare the controlled three-host physical acceptance campaign on Nettking, Nitro and the MSH Recorder, all three on this same `bcf5c9ab`, per [the physical acceptance preparation](diagnostics/PR435_MERGED_MAIN_QUALIFICATION_RUNBOOK.md). Physical acceptance remains mandatory, unrun and separately authorized; Federation v1 is not accepted.
+EXACT_NEXT_ACTION: the controlled three-host physical acceptance campaign is now PREPARED, not executed — see [the physical acceptance plan](diagnostics/PR435_PHYSICAL_ACCEPTANCE_PLAN.md). It requires explicit authorization, all three hosts moved to `bcf5c9ab` under clean acceptance checkouts with rollback to `6101c86d` preserved, and the coverage gap below closed first.
+
+PHYSICAL_COVERAGE_GAP (important): **the existing P01-P12 campaign does not exercise recorder capability identity at all.** Searching every file under `scripts/acceptance/` and `catalog/federation/tests/cf7_acceptance/` at bcf5c9ab for `capability-identity-conflict`, `recorder-local`, `recorder-{`, multi-recorder or "two recorders" returns nothing; the contract's recorder scenarios are P04 finite transaction/disk pressure and P06 supervision. A green P01-P12 run would therefore say nothing about the defect PR435 fixed. Eleven of the twenty-two required proof rows have no physical coverage today, and they are exactly the PR435 rows: two recorders coexisting, distinct `recorder-{node_id}` identities, absence of capability-identity-conflict, restart-stable identity, independent recorder-control targeting, legacy migration and retirement, non-recreation on replay, stale local-state recovery, no duplicate ownership and no unauthorized takeover. The campaign needs a Part B covering these on real hardware; the in-process suite is not a substitute, because the defect appeared precisely when two separately paired physical recorders met in one session.
+
+NEGATIVE_CONTROL_REQUIREMENT: the campaign must reproduce the original collision on the real rig — a second recorder announcing the fixed `recorder-local` while another node owns it, observed to be rejected with `capability-identity-conflict` by the live coordinator — and then succeed on its node-scoped identity. A campaign that cannot fail the old way has not tested the fix, and simulating it by editing SQLite or asserting on a schema does not count.
+
+PHYSICAL_ACCEPTANCE: NOT RUN — PREPARED ONLY. Federation v1 is not accepted and no physical PASS is declared.
 
 ## PR435 merge executed — merged main bcf5c9ab
 
