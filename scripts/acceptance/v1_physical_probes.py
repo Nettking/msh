@@ -42,6 +42,7 @@ from scripts.acceptance.cf7_physical_readiness import (
     sanitize_text,
     verify_checkout,
 )
+from scripts.acceptance.v1_physical_runtime_binding import RuntimeBinding
 
 PASS: Final = "pass"
 FAIL: Final = "fail"
@@ -81,6 +82,8 @@ class ProbeContext:
     assertion: str
     run_id: str | None = None
     options: Mapping[str, str] = field(default_factory=dict)
+    runtime_binding: RuntimeBinding | None = None
+    harness_sha: str | None = None
 
     def option(self, name: str, default: str = "") -> str:
         return str(self.options.get(name, default))
@@ -108,10 +111,14 @@ class ProbeContext:
 
     @property
     def data_dir(self) -> Path:
+        if self.runtime_binding and self.runtime_binding.data_root is not None:
+            return self.runtime_binding.data_root
         return self.checkout / "data"
 
     @property
     def results_dir(self) -> Path:
+        if self.runtime_binding and self.runtime_binding.results_root is not None:
+            return self.runtime_binding.results_root
         return self.checkout / "results"
 
 
@@ -265,9 +272,17 @@ def _probe_checkout_identity(context: ProbeContext) -> ProbeOutcome:
 
 
 def _compose_containers(context: ProbeContext) -> list[dict[str, object]]:
+    if context.runtime_binding is not None and context.runtime_binding.kind != "compose":
+        return []
+    command = ["docker", "compose"]
+    cwd = context.checkout
+    if context.runtime_binding is not None:
+        command = context.runtime_binding.compose_prefix()
+        cwd = context.runtime_binding.compose_working_directory or cwd
+    command.extend(["ps", "--format", "json"])
     code, output = _run(
-        ["docker", "compose", "ps", "--format", "json"],
-        cwd=context.checkout,
+        command,
+        cwd=cwd,
     )
     if code != 0 or not output.strip():
         return []
@@ -293,6 +308,9 @@ def _compose_containers(context: ProbeContext) -> list[dict[str, object]]:
 
 
 def _container_label(context: ProbeContext, container: str, label: str) -> str:
+    cwd = context.checkout
+    if context.runtime_binding is not None:
+        cwd = context.runtime_binding.compose_working_directory or cwd
     code, output = _run(
         [
             "docker",
@@ -301,7 +319,7 @@ def _container_label(context: ProbeContext, container: str, label: str) -> str:
             f'{{{{index .Config.Labels "{label}"}}}}',
             container,
         ],
-        cwd=context.checkout,
+        cwd=cwd,
     )
     if code != 0:
         return ""
@@ -352,7 +370,11 @@ def _probe_running_commit_identity(context: ProbeContext) -> ProbeOutcome:
     detail["containers"] = observed
     detail["running_containers"] = running
 
-    status_file = context.data_dir / "source_state" / "mtconnect_recorder_status.json"
+    status_file = (
+        context.runtime_binding.recorder_status_file
+        if context.runtime_binding and context.runtime_binding.recorder_status_file
+        else context.data_dir / "source_state" / "mtconnect_recorder_status.json"
+    )
     payload = _load_json(status_file)
     if isinstance(payload, dict):
         runtime = payload.get("native_runtime")
@@ -1545,7 +1567,10 @@ def _probe_corpus_size(context: ProbeContext) -> ProbeOutcome:
     )
 
 
-def collect_sample_extras(checkout: Path) -> dict[str, object]:
+def collect_sample_extras(
+    checkout: Path,
+    runtime_binding: RuntimeBinding | None = None,
+) -> dict[str, object]:
     """Gather the extra series a P12 soak sample must carry.
 
     This is deliberately the same read-only material the individual probes use,
@@ -1561,6 +1586,7 @@ def collect_sample_extras(checkout: Path) -> dict[str, object]:
         profile="unspecified",
         scenario="P12",
         assertion="storage-series",
+        runtime_binding=runtime_binding,
     )
     extras: dict[str, object] = {}
 

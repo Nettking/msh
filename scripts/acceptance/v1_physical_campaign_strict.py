@@ -70,8 +70,14 @@ def timed_observe(
     note: str,
     detail: Mapping[str, object] | None = None,
     source: str = "operator",
+    allow_external_harness: bool = False,
 ) -> Path:
-    campaign.load_campaign(checkout, root, commit)
+    campaign.load_campaign(
+        checkout,
+        root,
+        commit,
+        verify_checkout_identity=not allow_external_harness,
+    )
     scenario_id, spec = _timed_spec(scenario)
     campaign._assertion_contract(
         root,

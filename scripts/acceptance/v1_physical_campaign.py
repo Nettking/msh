@@ -97,6 +97,12 @@ def require_commit(value: str) -> str:
     return commit
 
 
+def require_harness_sha(value: str) -> str:
+    """Validate the acceptance-tooling revision independently of the target."""
+
+    return require_commit(value)
+
+
 def require_host(value: str) -> str:
     if HOST_RE.fullmatch(value) is None:
         raise CampaignError("host id must be a safe 1-48 character alias")
@@ -254,9 +260,11 @@ def initialize(
     *,
     commit: str,
     operator: str,
+    harness_sha: str | None = None,
 ) -> dict[str, object]:
     expected = require_commit(commit)
     require_candidate_checkout(checkout, expected)
+    tooling_sha = require_harness_sha(harness_sha) if harness_sha else None
     operator_text = redact_text(operator.strip(), cwd=checkout)
     if not operator_text:
         raise CampaignError("operator must be non-empty")
@@ -265,10 +273,16 @@ def initialize(
         existing = _load_json(path)
         if existing.get("schema") != SCHEMA or existing.get("candidate_sha") != expected:
             raise CampaignError("existing campaign targets another schema/candidate")
+        if tooling_sha is not None and existing.get("harness_sha") not in {None, tooling_sha}:
+            raise CampaignError("existing campaign targets another harness revision")
+        if tooling_sha is not None and existing.get("harness_sha") is None:
+            existing["harness_sha"] = tooling_sha
+            _write_json(path, existing)
         return existing
     document: dict[str, object] = {
         "schema": SCHEMA,
         "candidate_sha": expected,
+        **({"harness_sha": tooling_sha} if tooling_sha is not None else {}),
         "operator": operator_text,
         "created_at": utc_now(),
         "scenario_ids": list(SCENARIOS),
@@ -283,15 +297,35 @@ def load_campaign(
     checkout: Path,
     root: Path,
     commit: str,
+    *,
+    verify_checkout_identity: bool = True,
 ) -> dict[str, object]:
     expected = require_commit(commit)
-    require_candidate_checkout(checkout, expected)
+    if verify_checkout_identity:
+        require_candidate_checkout(checkout, expected)
     path = campaign_path(root)
     if not path.exists():
         raise CampaignError("campaign is not initialized; run init first")
     document = _load_json(path)
     if document.get("schema") != SCHEMA or document.get("candidate_sha") != expected:
         raise CampaignError("campaign schema/candidate does not match this checkout")
+    return document
+
+
+def bind_harness(root: Path, *, commit: str, harness_sha: str) -> dict[str, object]:
+    """Record an external acceptance-tooling SHA without changing candidate data."""
+
+    expected = require_commit(commit)
+    tooling_sha = require_harness_sha(harness_sha)
+    path = campaign_path(root)
+    document = _load_json(path)
+    if document.get("schema") != SCHEMA or document.get("candidate_sha") != expected:
+        raise CampaignError("campaign schema/candidate does not match this binding")
+    existing = document.get("harness_sha")
+    if existing is not None and existing != tooling_sha:
+        raise CampaignError("campaign is already bound to another harness revision")
+    document["harness_sha"] = tooling_sha
+    _write_json(path, document)
     return document
 
 
@@ -433,7 +467,7 @@ def base_packet(
 ) -> dict[str, object]:
     expected = require_commit(commit)
     host_record = load_host(root, host, commit=expected)
-    return {
+    packet: dict[str, object] = {
         "schema": PACKET_SCHEMA,
         "kind": kind,
         "candidate_sha": expected,
@@ -443,6 +477,13 @@ def base_packet(
         "os_category": host_record["os_category"],
         "recorded_at": utc_now(),
     }
+    campaign_file = campaign_path(root)
+    if campaign_file.exists():
+        document = _load_json(campaign_file)
+        harness_sha = document.get("harness_sha")
+        if harness_sha is not None:
+            packet["harness_sha"] = require_harness_sha(str(harness_sha))
+    return packet
 
 
 def _assertion_contract(
@@ -478,8 +519,14 @@ def observe(
     note: str,
     detail: Mapping[str, object] | None = None,
     source: str = "operator",
+    allow_external_harness: bool = False,
 ) -> Path:
-    load_campaign(checkout, root, commit)
+    load_campaign(
+        checkout,
+        root,
+        commit,
+        verify_checkout_identity=not allow_external_harness,
+    )
     scenario_id, spec = _assertion_contract(
         root,
         commit=commit,
@@ -527,6 +574,7 @@ def record_preparation(
     assertion: str,
     operator_action: str,
     detail: Mapping[str, object] | None = None,
+    allow_external_harness: bool = False,
 ) -> tuple[str, Path]:
     """Record staged state for one fault-injection assertion.
 
@@ -535,7 +583,12 @@ def record_preparation(
     staged on this host, never that the consequence was observed.
     """
 
-    load_campaign(checkout, root, commit)
+    load_campaign(
+        checkout,
+        root,
+        commit,
+        verify_checkout_identity=not allow_external_harness,
+    )
     scenario_id, spec = _assertion_contract(
         root,
         commit=commit,
@@ -575,10 +628,16 @@ def record_operator_action(
     assertion: str,
     prepare_id: str,
     note: str,
+    allow_external_harness: bool = False,
 ) -> Path:
     """Attest that the operator performed the explicit physical fault action."""
 
-    load_campaign(checkout, root, commit)
+    load_campaign(
+        checkout,
+        root,
+        commit,
+        verify_checkout_identity=not allow_external_harness,
+    )
     scenario_id, _spec = _assertion_contract(
         root,
         commit=commit,
@@ -908,8 +967,14 @@ def sample_resources(
     label: str,
     run_id: str | None = None,
     extras: Mapping[str, object] | None = None,
+    allow_external_harness: bool = False,
 ) -> Path:
-    load_campaign(checkout, root, commit)
+    load_campaign(
+        checkout,
+        root,
+        commit,
+        verify_checkout_identity=not allow_external_harness,
+    )
     scenario_id = require_scenario(scenario)
     spec = SCENARIOS[scenario_id]
     if spec.minimum_elapsed_seconds and not run_id:
@@ -1326,6 +1391,7 @@ def main(argv: list[str] | None = None) -> int:
     init = sub.add_parser("init")
     init.add_argument("--commit", required=True)
     init.add_argument("--operator", required=True)
+    init.add_argument("--harness-sha")
 
     host = sub.add_parser("host")
     host.add_argument("--commit", required=True)
@@ -1403,6 +1469,7 @@ def main(argv: list[str] | None = None) -> int:
                 root,
                 commit=args.commit,
                 operator=args.operator,
+                harness_sha=args.harness_sha,
             )
         elif args.command_name == "host":
             result = register_host(
