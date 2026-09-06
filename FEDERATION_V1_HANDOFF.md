@@ -6,11 +6,13 @@ Coordination only: `coord/federation-v1-release`. NEVER merge this branch into m
 
 EXECUTIVE_OWNER: Astra
 ACTING_ENGINEER: Claude (Opus), acting under Astra's existing executive policy. **EXECUTIVE_OWNER remains Astra** and that marker is unchanged. Delegated scope: close the merged-main software verdict on evidence, publish durable coordination state, then controlled physical Federation v1 acceptance. No executive policy is changed and no completed qualification is reinterpreted.
-CURRENT_PHASE: MERGED-MAIN SOFTWARE QUALIFICATION **PASS**. Run 34029983129 completed with all nine jobs SUCCESS on exact bcf5c9ab — legs A-E on Nettking-Linux, the Nettking Windows release matrix, the PostgreSQL gate and the automated verdict. The transition is now controlled physical Federation v1 acceptance, beginning with read-only pre-flight. No physical startup, deployment or host mutation has occurred.
-CURRENT_MAIN_SHA: bcf5c9ab2fb453cb26129b70d41fb64fc4863dd4
-MERGED_MAIN_SHA: bcf5c9ab2fb453cb26129b70d41fb64fc4863dd4 — merge commit; parents 6101c86d (base) and ba8a3b0b (candidate); tree bcbd778ba8009eb79e3349534e623da3861b0e45
+CURRENT_PHASE: B03 PRIVACY/IDENTITY FIX MERGED TO MAIN. Physical acceptance B03 found recorder control unroutable; the fix is merged as PR437 and main has moved to 1004b274. That is a **new identity**, so the bcf5c9ab qualification PASS does not carry over: merged-main software requalification of 1004b274 is the next required step, then B03 retest, then the controlled physical campaign. No physical startup, deployment or host mutation has occurred.
+CURRENT_MAIN_SHA: 1004b274c198018161658cd1379d6cb4a20dbc82
+MERGED_MAIN_SHA: 1004b274c198018161658cd1379d6cb4a20dbc82 — merge commit; parents 3fe0d95f (the PR437 merge) and 9281d581 (the reviewed PR head); tree 055ba20d3bcd8c03af4d26420c18a4e482eb7874, **byte-identical to the reviewed head 9281d581**, so the merged content is exactly what was reviewed.
+PREVIOUS_MAIN_SHA: bcf5c9ab2fb453cb26129b70d41fb64fc4863dd4 — merge commit of PR435; software-qualified by run 34029983129. Retained as history; it is no longer main and its PASS does not transfer to 1004b274.
 PRE_MERGE_MAIN_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356
-MERGED_MAIN_SOFTWARE_QUALIFICATION: **PASS** for exact bcf5c9ab2fb453cb26129b70d41fb64fc4863dd4. Authoritative run 34029983129, conclusion success, 9/9 jobs, harness f5bded772dd70893416c1345c9e450b96633c6fe. Verified live. Software only: not physical acceptance, not deployment approval, not a Federation v1 acceptance claim.
+MERGED_MAIN_SOFTWARE_QUALIFICATION: **NOT ESTABLISHED for 1004b274c198018161658cd1379d6cb4a20dbc82.** A new identity does not inherit the previous PASS, and the required fast-host legs are unrun against it. The harness .github/workflows/merged-main-qualification.yml exists and works but is pinned to bcf5c9ab; it must be retargeted at 1004b274 to requalify. Blocked in practice by CI001 for hosted jobs; the self-hosted rig is unaffected.
+QUALIFIED_PREVIOUS_IDENTITY: **PASS** for bcf5c9ab — authoritative run 34029983129, 9/9 SUCCESS, harness f5bded77, verified live. Historical; it does not qualify current main.
 CURRENT_CANDIDATE_SHA: ba8a3b0b828f59c36c5aaaf6130480a2432a5578 — merged; retained as the qualified software identity
 PR_435_HEAD: ba8a3b0b828f59c36c5aaaf6130480a2432a5578 on claude/federation-recorder-capability-id-19tqkk; MERGED 2026-09-06 as bcf5c9ab, normal merge commit with exact expected-head-SHA protection, no branch-protection bypass
 ACTIVE_FIX_BRANCH: None. R001 f65d11fd028a8eea5478e2fd6dd634fdbdb9d9a1 and branding-only ba8a3b0b are already in the frozen candidate.
@@ -27,7 +29,7 @@ NITRO_SLOW_HOST_STRESS: FAIL — completed full-suite phase failures on both can
 DEPLOYED_NETTKING_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356, source and no.fcp.build_commit labels observed 2026-09-05 14:00–14:02Z
 DEPLOYED_NITRO_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356, source and own-component build labels observed 14:00–14:02Z; recorder exited0
 DEPLOYED_MSH_RECORDER_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356, source and own-component build labels observed 14:00–14:02Z
-PHYSICAL_ACTION_STARTED: **NO** — read-only pre-flight completed (run 34033694489, 2026-09-06T12:38Z); nothing deployed, started, stopped or mutated on any host, and no authenticated Federation query made. Detail: [physical pre-flight](diagnostics/PR435_PHYSICAL_PREFLIGHT.md).
+PHYSICAL_ACTION_STARTED: **NO** — read-only pre-flight completed (run 34033694489, 2026-09-06T12:38Z); nothing deployed, started, stopped or mutated on any host, and no authenticated Federation query made. Nothing has been said to Luna about deploying. Detail: [physical pre-flight](diagnostics/PR435_PHYSICAL_PREFLIGHT.md). The three hosts remain on 6101c86d and are now **two** identities behind main.
 DEPLOYED_STATE_REPROVEN by live inspection, no longer assumed: Nettking `C:\wsl\msh` HEAD **6101c86d**, branch main, clean; Nitro `/home/martin/fcp` HEAD **6101c86d**, branch main, clean. **Neither checkout can resolve bcf5c9ab — a fetch is required on both.** Both retain the rollback commit. Nitro is the host actually running the stack: 5 containers up, 9 fcp/msh images, 2078 MiB available, 1 swap device. Nettking-Linux has 0 containers and 0 FCP images, 11845 MiB available, swap 0 devices, 0 java processes — the Arrowhead isolation holds and the memory it freed is still free. All 14 arrowhead-* units are present and not running (mostly failed, rest inactive dead); Arrowhead was not touched.
 TAILNET (from Nitro): nettking 100.70.61.68 windows active relay "hel"; nitro 100.78.187.87 linux; msh-recorder 100.66.214.22 windows; beast 100.85.20.75 windows (AI_PROVIDER_ONLY, keep out); utlan2026 offline 22h. Idle peers show "-", which is normal and is not evidence of unreachability; real host-to-host reachability must still be demonstrated inside the campaign.
 PHYSICAL_BLOCKERS:
@@ -42,7 +44,28 @@ ROLLBACK_TARGET: 6101c86d94294c70db47d1a8053cac93b9a41356 on all three hosts; to
 ARROWHEAD_STATE: STOPPED on Nettking-Linux by operator intervention (~14 Java services, ~9-10+ GiB RSS, swap exhausted) to free memory for qualification. Not to be blindly restarted. For physical acceptance: record it as stopped, determine whether it is unrelated to the campaign, keep it stopped if it is not part of the test, and do not let unrelated Arrowhead memory pressure contaminate the physical baseline. Swap may currently be disabled after the controlled OOM recovery; do not change swap during active physical scenarios unless required and documented. Preserve and identify the exact stopped service set before any restoration; do not guess.
 BEAST_ROLE: AI_PROVIDER_ONLY, unchanged. Beast-Linux remains OFFLINE and is deliberately not repaired. Keep Beast out of the product Federation.
 CURRENT_SESSION_ID: UNKNOWN; no fresh authenticated Federation state query completed
-LAST_UPDATED_UTC: 2026-09-06T12:42:03Z
+LAST_UPDATED_UTC: 2026-09-06T16:57:55Z
+
+## B03 privacy and identity fix merged — PR437, main now 1004b274
+
+PHYSICAL_B03_BLOCKER: **FIXED and MERGED.** [PR437](https://github.com/Nettking/msh/pull/437) merged by Nettking 2026-09-06T16:56:00Z. Reviewed head 9281d5815c195a871f1dadb54f7630564b219e9d; resulting main 1004b274c198018161658cd1379d6cb4a20dbc82, whose tree is byte-identical to that head.
+
+What B03 found and what shipped:
+
+- The relay refused a successful recorder scan report with `nonpublic-payload`. `fcp.recorder-control.v1` intentionally carries a bounded RFC1918 scan network, and the generic filter rejects any payload redaction would alter. A narrow allowance now admits `cidr` and `port` — `port` too, because it is redacted by *key* even when `cidr` is empty, so admitting `cidr` alone left every scan event unroutable.
+- The allowance is bounded on three sides: only the two scan event types (supplied by the relay, since the payload cannot vouch for itself), only the event payload at the protocol boundary (the expectation does not recurse, so a look-alike nested object earns nothing), and only for a CIDR meeting the recorder's own RFC1918 /24-or-smaller contract. Two scope holes found in independent review — event-type bypass and nested-schema smuggling — were reproduced and closed.
+- A second face of the same defect: discovery derives names from `host:port` for an agent with no UUID or serial, so once such a source was configured the recorder's capability re-announcement failed `nonpublic-property` and reconnect stranded it. Weak identities are now projected to deterministic public-safe labels; UUID and serial identities stay readable; the raw endpoint stays local; legacy on-disk names are kept (they are the batch directory and checkpoint key) and projected only at Federation boundaries, with removal mapping back.
+- No relay or capability privacy rule was widened, and negative tests pin that an unprojected address-derived name is still refused.
+
+NO_HOSTED_CI_EVIDENCE: PR437 carried none. All 28 checks were red on both its heads under CI001 — 0-4s, `runner_name` NONE, zero steps recorded — and main was red identically, which is why it was stood down on rather than treated as this PR's ([issuecomment-5560706654](https://github.com/Nettking/msh/pull/437#issuecomment-5560706654)). Its only validation is local: identity lifecycle 44, recorder-control filter 36, relay privacy filters 80, existing discovery 16, recorder-control/config/migration/capability 30, and flask_app+relay+mtconnect_recorder+capabilities at 2292 passed / 22 skipped / 0 failed, with compileall, branding and Ruff clean. That gap is a property of the merged identity and should be closed by requalification, not assumed away.
+
+EXACT_NEXT_ACTION, in order:
+
+1. Requalify **1004b274** on the self-hosted rig. Retarget `.github/workflows/merged-main-qualification.yml` (currently pinned to bcf5c9ab) and run legs A-E on Nettking-Linux, the Nettking Windows gate and the PostgreSQL gate. Do not inherit the bcf5c9ab PASS.
+2. Only then retest physical B03 on the three hosts.
+3. Only then the full controlled physical campaign, all three hosts on one identical SHA, with the recorder-identity Part B coverage the P01-P12 contract still does not provide.
+
+Known upgrade consequence for release notes: a source configured before this change keeps its address-derived name on disk and appears in coordinator views as `mtconnect-agent-<digest>`. Nothing breaks — removal resolves both forms — but the label visibly changes.
 
 ## Merged-main software qualification CLOSED — PASS (acting engineer Claude)
 
