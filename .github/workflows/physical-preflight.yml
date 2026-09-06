@@ -1,0 +1,225 @@
+name: Physical acceptance pre-flight (read-only)
+
+# Read-only inventory of the physical hosts ahead of the controlled Federation
+# v1 acceptance campaign for merged main bcf5c9ab.
+#
+# This workflow MUTATES NOTHING. It starts, stops, deploys and reconfigures
+# nothing; it does not touch Arrowhead, swap, Docker, WSL, the runner, any FCP
+# service, any Federation state or any development checkout. Every command below
+# reads state only. Individual probes are allowed to fail without failing the
+# job, because a missing optional tool is itself part of the inventory.
+
+on:
+  push:
+    branches:
+      - claude/pr-435-final-merge-k01mfi
+    paths:
+      - '.github/workflows/physical-preflight.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: physical-preflight
+  cancel-in-progress: false
+
+env:
+  MERGED_MAIN_SHA: bcf5c9ab2fb453cb26129b70d41fb64fc4863dd4
+  ROLLBACK_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356
+
+jobs:
+  preflight-posix:
+    name: "Pre-flight: ${{ matrix.host }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - host: Nettking-Linux
+            label: nettking-linux
+          - host: Nitro
+            label: fcp-linux
+    runs-on: ${{ matrix.label }}
+    timeout-minutes: 20
+    steps:
+      - name: Host identity and role
+        shell: bash
+        run: |
+          echo "declared host   : ${{ matrix.host }}"
+          echo "runner name     : ${RUNNER_NAME:-unknown}"
+          echo "hostname        : $(hostname)"
+          echo "user            : $(id -un) ($(id -u))"
+          echo "kernel          : $(uname -srm)"
+          echo "os              : $(. /etc/os-release 2>/dev/null && echo "$PRETTY_NAME")"
+          echo "cpus            : $(nproc)"
+      - name: Disk and memory state
+        continue-on-error: true
+        shell: bash
+        run: |
+          echo "--- memory ---"; free -h
+          echo "--- swap ---";   swapon --show || echo "(no swap configured)"
+          echo "--- disk ---";   df -h | grep -vE '^(tmpfs|overlay|shm)' | head -20
+      - name: Containers and services (read-only)
+        continue-on-error: true
+        shell: bash
+        run: |
+          echo "--- docker ps -a ---"
+          docker ps -a --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}' 2>&1 | head -40 || echo "(docker unavailable)"
+          echo
+          echo "--- no.fcp.build_commit labels on local images ---"
+          for img in $(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -iE 'fcp|msh|flask|recorder|relay' | head -20); do
+            c=$(docker image inspect "$img" --format '{{ index .Config.Labels "no.fcp.build_commit" }}' 2>/dev/null || true)
+            [ -n "${c}" ] && [ "${c}" != "<no value>" ] && echo "  $img -> $c"
+          done || true
+          echo
+          echo "--- running container build commits ---"
+          for n in $(docker ps --format '{{.Names}}' 2>/dev/null | head -20); do
+            c=$(docker inspect "$n" --format '{{ index .Config.Labels "no.fcp.build_commit" }}' 2>/dev/null || true)
+            echo "  $n -> ${c:-<none>}"
+          done || true
+      - name: FCP and Arrowhead service units (read-only)
+        continue-on-error: true
+        shell: bash
+        run: |
+          echo "--- systemd units matching fcp/msh/recorder/arrowhead ---"
+          systemctl list-units --all --no-pager --no-legend 2>/dev/null \
+            | grep -iE 'fcp|msh|recorder|arrowhead|relay' | head -30 || echo "(none / systemd unavailable)"
+          echo
+          echo "--- arrowhead-looking processes (expected: none while stopped) ---"
+          ps -eo pid,rss,comm,args 2>/dev/null | grep -iE 'arrowhead|[j]ava' | head -15 || echo "(no java/arrowhead processes)"
+      - name: Deployment checkouts and rollback reachability (read-only)
+        continue-on-error: true
+        shell: bash
+        run: |
+          echo "MERGED_MAIN_SHA target : ${MERGED_MAIN_SHA}"
+          echo "ROLLBACK_SHA           : ${ROLLBACK_SHA}"
+          echo "--- discovered msh checkouts (bounded search) ---"
+          CANDIDATES=$(
+            { for d in "$HOME"/msh "$HOME"/work/msh /opt/msh /srv/msh /home/*/msh /mnt/c/wsl/msh; do
+                [ -d "$d/.git" ] && echo "$d"
+              done
+              find "$HOME" /opt /srv -maxdepth 4 -type d -name .git 2>/dev/null \
+                | sed 's#/\.git$##' | grep -iE 'msh|fcp' || true
+            } | sort -u | head -10
+          )
+          [ -z "${CANDIDATES}" ] && echo "  (no msh/fcp checkout found in the searched roots)"
+          for d in ${CANDIDATES}; do
+            [ -d "$d/.git" ] || continue
+            echo "--- checkout: $d"
+            echo "    HEAD        : $(git -C "$d" rev-parse HEAD 2>/dev/null)"
+            echo "    branch      : $(git -C "$d" rev-parse --abbrev-ref HEAD 2>/dev/null)"
+            echo "    dirty files : $(git -C "$d" status --porcelain 2>/dev/null | wc -l)"
+            echo "    has merged  : $(git -C "$d" cat-file -t "${MERGED_MAIN_SHA}" 2>/dev/null || echo 'NOT PRESENT - fetch required')"
+            echo "    has rollback: $(git -C "$d" cat-file -t "${ROLLBACK_SHA}" 2>/dev/null || echo 'NOT PRESENT')"
+          done
+      - name: Recorder and Federation local state (read-only)
+        continue-on-error: true
+        shell: bash
+        run: |
+          echo "--- candidate node/recorder state stores (existence and size only) ---"
+          for p in "$HOME/.fcp" "$HOME/.msh" "$HOME/fcp-data" /var/lib/fcp /srv/fcp-data; do
+            [ -e "$p" ] || continue
+            echo "  $p"; du -sh "$p" 2>/dev/null | sed 's/^/    /'
+            find "$p" -maxdepth 2 -name '*node_state*' -o -maxdepth 2 -name '*.sqlite3' 2>/dev/null | head -10 | sed 's/^/    /'
+          done
+          echo "(no authenticated Federation query is performed here: this step is inventory only)"
+      - name: Tailscale reachability (read-only)
+        continue-on-error: true
+        shell: bash
+        run: |
+          if command -v tailscale >/dev/null 2>&1; then
+            tailscale status 2>&1 | head -20
+          else
+            echo "(tailscale CLI not on PATH for this runner account)"
+          fi
+      - name: SUMMARY
+        if: always()
+        shell: bash
+        run: |
+          echo "=========== PRE-FLIGHT SUMMARY: ${{ matrix.host }} ==========="
+          echo "runner account : $(id -un)"
+          echo "containers     : $(docker ps -q 2>/dev/null | wc -l) running / $(docker ps -aq 2>/dev/null | wc -l) total"
+          echo "fcp|msh images : $(docker images --format '{{.Repository}}' 2>/dev/null | grep -ciE 'fcp|msh' || true)"
+          echo "java processes : $(pgrep -c java 2>/dev/null || echo 0)"
+          echo "mem available  : $(free -m | awk '/^Mem:/{print $7" MiB"}')"
+          echo "swap devices   : $(swapon --show=NAME --noheadings 2>/dev/null | wc -l)"
+          echo "VISIBILITY CAVEAT: taken as the runner account. Containers, services"
+          echo "  or state owned by another user session may be invisible here."
+          echo "  'Not visible to the runner' is not the same as 'not deployed'."
+          echo "============================================================"
+
+  preflight-windows:
+    name: "Pre-flight: Nettking (Windows)"
+    runs-on: fcp-windows
+    timeout-minutes: 20
+    # cmd, not powershell/pwsh. This runner has PowerShell execution policy
+    # Restricted for the runner account -- a .ps1 step dies with
+    # PSSecurityException before running, which is the same condition already
+    # recorded against Beast-Windows. The proven Windows release gate uses cmd
+    # for exactly this reason. Changing the host's execution policy is a runner
+    # configuration change and is out of scope, so the harness adapts instead.
+    steps:
+      - name: Host identity, disk and memory
+        shell: cmd
+        run: |
+          echo runner name : %RUNNER_NAME%
+          echo hostname    : %COMPUTERNAME%
+          echo user        : %USERNAME%
+          systeminfo | findstr /C:"OS Name" /C:"Total Physical Memory" /C:"Available Physical Memory"
+          echo --- drives ---
+          wmic logicaldisk get caption,freespace,size 2>nul || fsutil volume diskfree C:
+      - name: Containers and services (read-only)
+        continue-on-error: true
+        shell: cmd
+        run: |
+          echo --- docker ps -a ---
+          docker ps -a --format "table {{.Names}}\t{{.Image}}\t{{.Status}}" 2>&1
+          echo.
+          echo --- running services matching fcp/msh/recorder/arrowhead/relay ---
+          net start | findstr /I "fcp msh recorder arrowhead relay"
+          if errorlevel 1 echo   (no matching running services)
+          exit /b 0
+      - name: Deployment checkouts and rollback reachability (read-only)
+        continue-on-error: true
+        shell: cmd
+        run: |
+          echo MERGED_MAIN_SHA target : %MERGED_MAIN_SHA%
+          echo ROLLBACK_SHA           : %ROLLBACK_SHA%
+          echo.
+          REM Ephemeral, per-process safe.directory. GIT_CONFIG_* is read by
+          REM this git invocation only: it writes nothing to the runner
+          REM account's global config and mutates no host state. The checkout
+          REM is owned by Nettking\Martin while this job runs as NETWORK
+          REM SERVICE, so git otherwise refuses with "dubious ownership".
+          set GIT_CONFIG_COUNT=1
+          set GIT_CONFIG_KEY_0=safe.directory
+          set GIT_CONFIG_VALUE_0=*
+          echo === C:\wsl\msh ===
+          if exist "C:\wsl\msh\.git" git -C "C:\wsl\msh" rev-parse HEAD
+          if exist "C:\wsl\msh\.git" git -C "C:\wsl\msh" rev-parse --abbrev-ref HEAD
+          if exist "C:\wsl\msh\.git" git -C "C:\wsl\msh" cat-file -t %MERGED_MAIN_SHA%
+          if exist "C:\wsl\msh\.git" git -C "C:\wsl\msh" cat-file -t %ROLLBACK_SHA%
+          if exist "C:\wsl\msh\.git" git -C "C:\wsl\msh" status --porcelain
+          if not exist "C:\wsl\msh\.git" echo   (absent)
+          echo.
+          echo === C:\actions-runner\_work\msh\msh (CI workspace, not a deployment) ===
+          if exist "C:\actions-runner\_work\msh\msh\.git" git -C "C:\actions-runner\_work\msh\msh" rev-parse HEAD
+          echo.
+          echo === other candidate roots ===
+          if exist "C:\msh\.git" git -C "C:\msh" rev-parse HEAD
+          if exist "C:\fcp\msh\.git" git -C "C:\fcp\msh" rev-parse HEAD
+          if exist "%USERPROFILE%\msh\.git" git -C "%USERPROFILE%\msh" rev-parse HEAD
+          exit /b 0
+      - name: Recorder state and Tailscale reachability (read-only)
+        continue-on-error: true
+        shell: cmd
+        run: |
+          echo --- recorder/node state locations (existence only) ---
+          if exist "%USERPROFILE%\.fcp" echo   present: %USERPROFILE%\.fcp
+          if exist "%USERPROFILE%\.msh" echo   present: %USERPROFILE%\.msh
+          if exist "C:\fcp-data" echo   present: C:\fcp-data
+          if exist "C:\ProgramData\fcp" echo   present: C:\ProgramData\fcp
+          echo.
+          echo --- tailscale (runner account may not own the tailscaled session) ---
+          where tailscale >nul 2>&1 && tailscale status 2>&1 || echo   (tailscale CLI not on PATH)
+          exit /b 0
