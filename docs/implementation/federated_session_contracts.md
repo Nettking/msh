@@ -138,6 +138,15 @@ Invariants:
 - `(session_id, capability_id)` is unique.
 - One node may announce multiple capabilities.
 - Several nodes may announce the same capability type.
+- `capability_id` identifies one capability *instance*, `type` identifies the
+  shared semantic. A capability type that can legitimately run on more than one
+  device must therefore derive its ID from the announcing node (for example
+  `recorder-<node_id>`), never from the type alone: a fixed, type-wide ID lets
+  only the first node be accepted and rejects every other legitimate announcer
+  with `capability-identity-conflict`.
+- The derivation must be stable for the life of the device, because the ID is
+  durable and its row is heartbeated for as long as the node is connected. An ID
+  that changes across restart leaves a permanently READY row behind.
 - `properties` must not contain secrets.
 - Capability presence does not itself grant authorization or leader eligibility.
 

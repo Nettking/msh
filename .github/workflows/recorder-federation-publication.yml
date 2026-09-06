@@ -180,6 +180,7 @@ jobs:
           catalog/mtconnect_recorder/tests/test_federation_control.py
           catalog/mtconnect_recorder/tests/test_federation_node.py
           catalog/mtconnect_recorder/tests/test_managed_service.py
+          catalog/mtconnect_recorder/tests/test_multi_recorder_capability_identity.py
           catalog/mtconnect_recorder/tests/test_native_recorder_supervisor_boundary.py
           catalog/mtconnect_recorder/tests/test_native_recorder_update_agent.py
           catalog/mtconnect_recorder/tests/test_recorder_federation_update.py
@@ -220,6 +221,7 @@ jobs:
           catalog/mtconnect_recorder/tests/test_federation_control.py
           catalog/mtconnect_recorder/tests/test_federation_node.py
           catalog/mtconnect_recorder/tests/test_managed_service.py
+          catalog/mtconnect_recorder/tests/test_multi_recorder_capability_identity.py
           catalog/mtconnect_recorder/tests/test_native_recorder_supervisor_boundary.py
           catalog/mtconnect_recorder/tests/test_native_recorder_update_agent.py
           catalog/mtconnect_recorder/tests/test_recorder_federation_update.py

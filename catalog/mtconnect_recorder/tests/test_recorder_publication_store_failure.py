@@ -37,8 +37,10 @@ from catalog.federation.storage_protocol import (
 )
 from catalog.mtconnect_recorder import federation_node as federation_node_module
 from catalog.mtconnect_recorder.federation_node import (
+    LEGACY_RECORDER_CAPABILITY_ID,
     RecorderFederationNode,
     RecorderFederationSnapshot,
+    recorder_capability_id,
     sharing_state_detail,
 )
 
@@ -624,6 +626,75 @@ def test_an_unclassified_publication_fault_stops_advertising_health(
             assert "restart the recorder" in sharing_state_detail(
                 snapshot.storage_state
             )
+        finally:
+            _quiesce(node, runner)
+            with suppress(BaseException):
+                await runner
+
+    asyncio.run(scenario())
+
+
+def test_capability_reconciliation_retries_before_publication_on_same_client(
+    tmp_path, monkeypatch
+) -> None:
+    """One status timeout must not leave a duplicate READY recorder behind."""
+
+    async def scenario() -> None:
+        storage_client = _StorageClient()
+        outbox = _FaultyOutbox(tmp_path / "outbox.sqlite3")
+        node = _node(tmp_path, outbox, storage_client, monkeypatch)
+        state = _state()
+        scoped_id = recorder_capability_id(state.binding.device_id)
+        # A reconnect can replay an old backup's legacy announcement alongside
+        # the accepted scoped identity. Exercise the real reconciliation path,
+        # with only the coordinator boundary replaced by local fixture state.
+        status = _status()
+        rows = {
+            capability_id: node._announcement(state, capability_id).to_dict()
+            for capability_id in (LEGACY_RECORDER_CAPABILITY_ID, scoped_id)
+        }
+        connected_client = node.runtime.client
+        status_timeout_pending = True
+
+        async def coordinator_status():
+            nonlocal status_timeout_pending
+            if status_timeout_pending:
+                status_timeout_pending = False
+                raise TimeoutError("one coordinator status response timed out")
+            return {
+                **status,
+                "capabilities": [*status["capabilities"], *rows.values()],
+            }
+
+        async def announce_capability(_state, capability, *, request_id):
+            rows[capability.capability_id] = capability.to_dict()
+            return capability
+
+        connected_client.coordinator_status = coordinator_status
+        node.runtime._announce_capability = announce_capability
+        del node._announce_connected
+        _seed(outbox, storage_client, index=1)
+
+        runner = asyncio.create_task(node._publication_loop(state))
+        try:
+            assert await _until(
+                lambda: node.snapshot().last_error_code == "TimeoutError",
+                runner,
+            ), f"the transient status failure was not reported ({_driver_state(runner)})"
+            assert node.snapshot().status == "retrying"
+            assert storage_client.batch_ids == []
+
+            assert await _until(
+                lambda: node.snapshot().storage_state == "up-to-date",
+                runner,
+            ), f"publication did not recover from the timeout ({_driver_state(runner)})"
+            assert node.runtime._connected_client() is connected_client
+            assert rows[LEGACY_RECORDER_CAPABILITY_ID]["status"] == "unavailable", (
+                "publication reported healthy after the timeout without "
+                "retrying reconciliation of the duplicate legacy recorder"
+            )
+            assert rows[scoped_id]["status"] == "ready"
+            assert storage_client.batch_ids == ["dataset-a-batch-1"]
         finally:
             _quiesce(node, runner)
             with suppress(BaseException):

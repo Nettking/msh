@@ -318,7 +318,22 @@ class RelayNodeClient:
             for session in self.state.joined_sessions():
                 await self.request_replay(session.session_id)
             for capability in self.state.advertised_capabilities():
-                await self.announce_capability(capability)
+                try:
+                    await self.announce_capability(capability)
+                except RelayRemoteError as error:
+                    if error.code != "capability-identity-conflict":
+                        raise
+                    # The coordinator is authoritative about who owns a scoped
+                    # capability identity. A cached announcement it now assigns
+                    # to another node or type can never be replayed
+                    # successfully, so failing the connection on it would strand
+                    # this node permanently offline over stale local state.
+                    # Drop the cache entry and let the owner re-announce its own
+                    # live capability.
+                    self.state.remove_capability(
+                        session_id=capability.session_id,
+                        capability_id=capability.capability_id,
+                    )
         except asyncio.CancelledError:
             await self.disconnect(error_code="initial-replay-cancelled")
             raise
