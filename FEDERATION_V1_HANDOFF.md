@@ -6,16 +6,16 @@ Coordination only: `coord/federation-v1-release`. NEVER merge this branch into m
 
 EXECUTIVE_OWNER: Astra
 ACTING_ENGINEER: Astra; executive owner. PR435 final merge review COMPLETE and merge EXECUTED; authoritative merged-main qualification is now the open leg.
-CURRENT_PHASE: MERGED. PR435 merged to main as bcf5c9ab after a clean final review. Next transition is authoritative fast-host qualification of the exact merged-main SHA on Nettking-Linux, Nettking Windows and the PostgreSQL gate, then mandatory controlled physical acceptance. No deployment performed; no physical acceptance run.
+CURRENT_PHASE: Merged-main qualification INCOMPLETE pending static-cleanliness resolution and actual Compose. Run34025305598 completed: A/B/C, Windows and PostgreSQL PASS; D final cleanliness FAIL, E skipped. Claude's subsequent harness push already started34029983129; Astra monitors it without launching duplicates. No physical startup until qualification PASS.
 CURRENT_MAIN_SHA: bcf5c9ab2fb453cb26129b70d41fb64fc4863dd4
 MERGED_MAIN_SHA: bcf5c9ab2fb453cb26129b70d41fb64fc4863dd4 — merge commit; parents 6101c86d (base) and ba8a3b0b (candidate); tree bcbd778ba8009eb79e3349534e623da3861b0e45
 PRE_MERGE_MAIN_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356
-MERGED_MAIN_SOFTWARE_QUALIFICATION: NOT ESTABLISHED — a new identity does not inherit the candidate PASS; required fast-host legs are unrun
+MERGED_MAIN_SOFTWARE_QUALIFICATION: INCOMPLETE. Exact bcf5c9ab A/B/C, Windows and PostgreSQL passed in34025305598. D checks passed but its final cleanliness assertion failed; E skipped. No release/physical transition yet.
 CURRENT_CANDIDATE_SHA: ba8a3b0b828f59c36c5aaaf6130480a2432a5578 — merged; retained as the qualified software identity
 PR_435_HEAD: ba8a3b0b828f59c36c5aaaf6130480a2432a5578 on claude/federation-recorder-capability-id-19tqkk; MERGED 2026-09-06 as bcf5c9ab, normal merge commit with exact expected-head-SHA protection, no branch-protection bypass
 ACTIVE_FIX_BRANCH: None. R001 f65d11fd028a8eea5478e2fd6dd634fdbdb9d9a1 and branding-only ba8a3b0b are already in the frozen candidate.
-VALIDATION_BRANCH: ci/fast-linux-validation at e81bf4d59da813bc9f647209113efa8da9951aba; separate diagnostic identity, not a product candidate.
-ACTIVE_CI_RUN: 33994962383 — Nettking-Linux jobs completed SUCCESS; optional Beast-Linux smoke101383784569 QUEUED without an assigned runner at 2026-09-06T06:25Z. Do not label the whole run successful.
+VALIDATION_BRANCH: claude/pr-435-final-merge-k01mfi at f5bded772dd70893416c1345c9e450b96633c6fe; diagnostic harness identity, all product checkouts pinnedbcf5c9ab.
+ACTIVE_CI_RUN: 34029983129 — already started by Claude's f5bded77 workflow push at11:20:53Z. No Astra duplicate dispatched. Prior34025305598 completed FAILURE at D's post-check; its successful legs remain valid.
 HISTORICAL_RELEASE_RUN: 33975032244 — completed FAILURE. Windows101330241662 SUCCESS; PostgreSQL101330241653 SUCCESS; clean-checkout101330241502 FAILURE; Linux release101330241713 FAILURE; verdict101359577396 FAILURE. These historical results are unchanged.
 FAST_LINUX_VALIDATION: PASS — two successive default-order full candidate suites on Nettking-Linux, 40 targeted repeats independently verified, release/static checks plus actual Compose validation completed. This does not certify shuffled order independence or physical acceptance.
 FAST_WINDOWS_VALIDATION: PASS — existing exact-candidate Nettking Windows gate reused. Optional Beast-Windows confirmation INCOMPLETE due to Python setup execution-policy failure before tests.
@@ -25,6 +25,28 @@ DEPLOYED_NITRO_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356, source and own-com
 DEPLOYED_MSH_RECORDER_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356, source and own-component build labels observed 14:00–14:02Z
 CURRENT_SESSION_ID: UNKNOWN; no fresh authenticated Federation state query completed
 LAST_UPDATED_UTC: 2026-09-06T07:16:15Z
+
+## Astra live takeover — 2026-09-06 after run34025305598
+
+Coordination source reconciliation: Opus addf77aa/c8cb43c were incorporated as d61df740/74861a0f; newer factual execution evidence from f5bded77 is reconciled here rather than copying stale handoff status. Astra remains executive owner and acting engineer. Local `work/msh-merged-validation` and `outputs/build-merged-qualification.py` are UNPUBLISHED, UNEXECUTED drafts superseded by the active remote harness. Do not push or launch them.
+
+| Completed leg in34025305598 | Job | Exact merged-main result |
+| --- | --- | --- |
+| Nettking-Linux A default | 101474832429 | 3633 passed,30 skipped in273.84s; initial/final exact-SHA and clean checks PASS |
+| Nettking-Linux B seed20260813 | 101475563810 | 3633 passed,30 skipped in224.32s; initial/final exact-SHA and clean checks PASS |
+| Nettking-Linux C seed15 | 101476168715 | 3633 passed,30 skipped in216.61s; initial/final exact-SHA and clean checks PASS |
+| Nettking Windows | 101474817915 | release matrix PASS, including367 passed,1 skipped transport/storage/failover in86.78s; exact SHA/Python3.12.10 asserted |
+| PostgreSQL on Nitro | 101474818047 | 11 passed in3.37s against existing service configuration, Python3.12.13, exact SHA asserted |
+| Nettking-Linux D | 101476759709 | compile/manifest/Ruff/branding/Go/diff PASS; final exact-SHA/cleanliness step FAIL (exit1) |
+| Nettking-Linux E | 101476922743 | SKIPPED because D failed; no Compose PASS claimed from this run |
+
+D classification: workflow-generated artifact/checkout hygiene under investigation, not an observed product assertion or OOM. The log's bare `test -z` did not print the offending paths. Claude's f5bded77 identifies generated untracked cmd/fcp-peer-sidecar/go.sum and allows that one path; source inspection independently confirms go.sum is not tracked and the preceding go mod tidy/test succeeded. Do not call that exception an entirely clean checkout. Preserve the original D FAIL and inspect current D/E evidence before the software verdict. No product change is proposed.
+
+Host intervention supplied by user: the earlier137 kill and runner loss were operationally attributed to ~14 resident Arrowhead Java services (~9–10+GiB RSS) plus exhausted swap. Those services were temporarily stopped, swap reset and runner restarted; available RAM rose to~11–12GiB. Run34025305598 A ended with~11GiB available. These are environment/resource facts, not product test failures. Do not restart Arrowhead or alter WSL/Docker/runner/swap while qualification is active. Restore unrelated services only after software completion at a controlled point before physical baseline capture. Preserve/identify the exact stopped service set before restoration; do not guess.
+
+The uv CPython3.12.11 pidfd_open incompatibility stays separately classified as local environment/toolchain, and cancelled local shuffled runs stay cancelled. No further testing in that environment or Nitro stress characterization.
+
+Latest user authorization supersedes older preparation-only restrictions: after all mandatory exact-merged-main gates PASS and durable verdict publication, Astra shall enter CONTROLLED PHYSICAL FEDERATION V1 ACCEPTANCE without additional confirmation for the already-defined routine campaign. Use clean acceptance checkouts atbcf5c9ab on Nettking/Nitro/MSH Recorder, preserve rollback6101c86d, record initial source/build/service/Federation/recorder state, then perform the physical matrix including negative control, independent recorders, legacy/stale-state recovery, restarts, storage recovery, rolling update/drain and cleanup/final convergence. Do not casually update development checkouts. Physical final acceptance still requires real evidence; software PASS alone is insufficient.
 
 ## PR435 merge executed — merged main bcf5c9ab
 
