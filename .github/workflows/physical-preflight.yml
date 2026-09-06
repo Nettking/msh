@@ -43,7 +43,6 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Host identity and role
-        continue-on-error: true
         shell: bash
         run: |
           echo "declared host   : ${{ matrix.host }}"
@@ -94,7 +93,17 @@ jobs:
         run: |
           echo "MERGED_MAIN_SHA target : ${MERGED_MAIN_SHA}"
           echo "ROLLBACK_SHA           : ${ROLLBACK_SHA}"
-          for d in "$HOME/msh" "$HOME/work/msh" /opt/msh /srv/msh /home/*/msh; do
+          echo "--- discovered msh checkouts (bounded search) ---"
+          CANDIDATES=$(
+            { for d in "$HOME"/msh "$HOME"/work/msh /opt/msh /srv/msh /home/*/msh /mnt/c/wsl/msh; do
+                [ -d "$d/.git" ] && echo "$d"
+              done
+              find "$HOME" /opt /srv -maxdepth 4 -type d -name .git 2>/dev/null \
+                | sed 's#/\.git$##' | grep -iE 'msh|fcp' || true
+            } | sort -u | head -10
+          )
+          [ -z "${CANDIDATES}" ] && echo "  (no msh/fcp checkout found in the searched roots)"
+          for d in ${CANDIDATES}; do
             [ -d "$d/.git" ] || continue
             echo "--- checkout: $d"
             echo "    HEAD        : $(git -C "$d" rev-parse HEAD 2>/dev/null)"
@@ -130,8 +139,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Host identity, disk and memory
-        continue-on-error: true
-        shell: pwsh
+        shell: powershell
         run: |
           "runner name : $env:RUNNER_NAME"
           "hostname    : $(hostname)"
@@ -145,7 +153,7 @@ jobs:
             Format-Table -AutoSize
       - name: Containers and services (read-only)
         continue-on-error: true
-        shell: pwsh
+        shell: powershell
         run: |
           "--- docker ps -a ---"
           docker ps -a --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}' 2>&1 | Select-Object -First 40
@@ -154,11 +162,14 @@ jobs:
             Select-Object Status,Name,DisplayName | Format-Table -AutoSize
       - name: Deployment checkouts and rollback reachability (read-only)
         continue-on-error: true
-        shell: pwsh
+        shell: powershell
         run: |
           "MERGED_MAIN_SHA target : $env:MERGED_MAIN_SHA"
           "ROLLBACK_SHA           : $env:ROLLBACK_SHA"
-          foreach ($d in @('C:\wsl\msh','C:\msh','C:\fcp\msh',"$env:USERPROFILE\msh")) {
+          $roots = @('C:\wsl\msh','C:\msh','C:\fcp\msh',"$env:USERPROFILE\msh",'C:\actions-runner\_work\msh\msh')
+          $found = Get-ChildItem -Path 'C:\' -Directory -Filter 'msh' -Depth 3 -ErrorAction SilentlyContinue |
+                     Select-Object -ExpandProperty FullName
+          foreach ($d in ($roots + $found | Select-Object -Unique)) {
             if (Test-Path (Join-Path $d '.git')) {
               "--- checkout: $d"
               "    HEAD        : $(git -C $d rev-parse HEAD 2>$null)"
@@ -170,7 +181,7 @@ jobs:
           }
       - name: Tailscale reachability (read-only)
         continue-on-error: true
-        shell: pwsh
+        shell: powershell
         run: |
           $ts = Get-Command tailscale -ErrorAction SilentlyContinue
           if ($ts) { tailscale status 2>&1 | Select-Object -First 20 }
