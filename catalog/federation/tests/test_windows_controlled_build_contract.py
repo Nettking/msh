@@ -62,13 +62,60 @@ def test_windows_build_requires_exact_image_identity_before_success() -> None:
     text = _read("scripts/windows/fcp_host_build.ps1")
 
     assert "function Assert-CoreImageCommits" in text
-    assert "'compose', 'images', '-q', $service" in text
+    assert "function Resolve-CoreImageReference" in text
+    assert "'compose', 'config', '--images', $Service" in text
+    assert "$references.Count -ne 1" in text
+    assert "StdOut" in text
     assert 'no.fcp.build_commit' in text
     assert "built_image_identity_unavailable" in text
     assert "built_image_identity_mismatch" in text
     assert text.index("Invoke-ControlledCoreBuild $backingPath") < text.index(
         "Assert-CoreImageCommits $commit"
     ) < text.index("Write-AtomicText $OutputFile $commit")
+
+
+def test_windows_image_identity_is_precontainer_and_service_scoped() -> None:
+    text = _read("scripts/windows/fcp_host_build.ps1")
+    resolver = text[text.index("function Resolve-CoreImageReference") : text.index("function Assert-CoreImageCommits")]
+    identity = text[text.index("function Assert-CoreImageCommits") : text.index("function Assert-DiskPreflight")]
+
+    assert "'compose', 'config', '--images', $Service" in resolver
+    assert "'compose', 'images', '-q'" not in resolver
+    assert "if ($resolved.ExitCode -ne 0)" in resolver
+    assert "$references.Count -ne 1" in resolver
+    assert "resolved.StdOut" in resolver
+    assert "resolved.StdErr" not in resolver
+    assert "Invoke-BoundedDockerResult" in identity
+    assert "'image', 'inspect'" in identity
+    assert "inspection.StdOut" in identity
+    assert "inspection.StdErr" not in identity
+    assert "Resolve-CoreImageReference $service" in identity
+    assert "@('relay', 'flask', 'recorder')" in identity
+
+
+def test_windows_image_identity_fails_closed_for_missing_or_wrong_artifacts() -> None:
+    text = _read("scripts/windows/fcp_host_build.ps1")
+    identity = text[text.index("function Assert-CoreImageCommits") : text.index("function Assert-DiskPreflight")]
+
+    assert identity.count("throw 'built_image_identity_unavailable'") >= 4
+    assert "throw 'built_image_identity_mismatch'" in identity
+    assert "$inspection.ExitCode -ne 0" in identity
+    assert "$lines.Count -ne 1" in identity
+    assert "$label -ne $Commit" in identity
+
+
+def test_windows_machine_values_never_promote_stderr_to_image_or_label() -> None:
+    text = _read("scripts/windows/fcp_host_build.ps1")
+    bounded = text[text.index("function Invoke-BoundedDockerResult") : text.index("function Get-FcpBuilderName")]
+    resolver = text[text.index("function Resolve-CoreImageReference") : text.index("function Assert-CoreImageCommits")]
+    identity = text[text.index("function Assert-CoreImageCommits") : text.index("function Assert-DiskPreflight")]
+
+    assert "StdOut =" in bounded
+    assert "StdErr =" in bounded
+    assert "resolved.StdOut" in resolver
+    assert "resolved.Output" not in resolver
+    assert "inspection.StdOut" in identity
+    assert "inspection.Output" not in identity
 
 
 def test_windows_proxy_real_docker_override_is_private_to_controlled_build() -> None:

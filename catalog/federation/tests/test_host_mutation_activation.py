@@ -60,12 +60,18 @@ def test_windows_launcher_enters_same_mutex_before_checkout_and_compose_reads() 
     assert "-LeaseAlreadyHeld" in start
     assert "[switch]$LeaseAlreadyHeld" in build
     assert "host_mutation_lease_missing" in build
-
     mutex = "$mutexName = 'Global\\FCPHostMutation-' + (Get-PathHash $RepoRoot)"
     assert mutex in lease
     assert lease.index("WaitOne") < lease.index("& $env:ComSpec") < lease.index(
         "ReleaseMutex"
     )
+
+
+def test_windows_launcher_uses_dot_suffixed_repo_root_for_powershell_arguments() -> None:
+    start = (ROOT / "start.cmd").read_text(encoding="utf-8")
+
+    assert start.count('-RepoRoot "%~dp0."') == 4
+    assert '-RepoRoot "%~dp0"' not in start
 
 
 def test_launcher_owned_build_mode_fails_closed_without_the_lease_marker(

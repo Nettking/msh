@@ -115,6 +115,38 @@ function Invoke-DockerResult([string[]]$Arguments) {
     }
 }
 
+function ConvertTo-WindowsProcessArgument([AllowNull()][string]$Value) {
+    if ($null -eq $Value) { return '""' }
+
+    $builder = New-Object System.Text.StringBuilder
+    [void]$builder.Append('"')
+    $backslashes = 0
+    foreach ($character in $Value.ToCharArray()) {
+        if ($character -eq '\') {
+            $backslashes++
+            continue
+        }
+        if ($character -eq '"') {
+            for ($index = 0; $index -lt (2 * $backslashes + 1); $index++) {
+                [void]$builder.Append('\')
+            }
+            [void]$builder.Append('"')
+            $backslashes = 0
+            continue
+        }
+        for ($index = 0; $index -lt $backslashes; $index++) {
+            [void]$builder.Append('\')
+        }
+        $backslashes = 0
+        [void]$builder.Append($character)
+    }
+    for ($index = 0; $index -lt (2 * $backslashes); $index++) {
+        [void]$builder.Append('\')
+    }
+    [void]$builder.Append('"')
+    return $builder.ToString()
+}
+
 function Invoke-BoundedDockerResult(
     [string[]]$Arguments,
     [int]$TimeoutSeconds = $DockerLifecycleTimeoutSeconds
@@ -125,16 +157,25 @@ function Invoke-BoundedDockerResult(
     $process = $null
     $exitCode = 127
     $failure = $null
+    $stdoutLines = @()
+    $stderrLines = @()
     try {
         $stdoutPath = [System.IO.Path]::GetTempFileName()
         $stderrPath = [System.IO.Path]::GetTempFileName()
-        $process = Start-Process `
-            -FilePath $script:DockerExe `
-            -ArgumentList $Arguments `
-            -NoNewWindow `
-            -PassThru `
-            -RedirectStandardOutput $stdoutPath `
-            -RedirectStandardError $stderrPath
+        $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+        $startInfo.FileName = $script:DockerExe
+        $startInfo.Arguments = (($Arguments | ForEach-Object {
+            ConvertTo-WindowsProcessArgument $_
+        }) -join ' ')
+        $startInfo.UseShellExecute = $false
+        $startInfo.CreateNoWindow = $true
+        $startInfo.RedirectStandardOutput = $true
+        $startInfo.RedirectStandardError = $true
+        $process = New-Object System.Diagnostics.Process
+        $process.StartInfo = $startInfo
+        if (-not $process.Start()) { throw 'docker_process_start_failed' }
+        $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+        $stderrTask = $process.StandardError.ReadToEndAsync()
         if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
             try { & taskkill.exe /PID $process.Id /T /F 2>&1 | Out-Null } catch {}
             try { $process.WaitForExit(2000) | Out-Null } catch {}
@@ -147,6 +188,10 @@ function Invoke-BoundedDockerResult(
         else {
             $exitCode = [int]$process.ExitCode
         }
+        $stdoutText = $stdoutTask.GetAwaiter().GetResult()
+        $stderrText = $stderrTask.GetAwaiter().GetResult()
+        [System.IO.File]::WriteAllText($stdoutPath, $stdoutText)
+        [System.IO.File]::WriteAllText($stderrPath, $stderrText)
     }
     catch {
         $failure = $_.Exception.Message
@@ -159,13 +204,15 @@ function Invoke-BoundedDockerResult(
                 -not [string]::IsNullOrWhiteSpace([string]$stdoutPath) -and
                 (Test-Path -LiteralPath $stdoutPath)
             ) {
-                $output += @(Get-Content -LiteralPath $stdoutPath -ErrorAction SilentlyContinue)
+                $stdoutLines = @(Get-Content -LiteralPath $stdoutPath -ErrorAction SilentlyContinue)
+                $output += $stdoutLines
             }
             if (
                 -not [string]::IsNullOrWhiteSpace([string]$stderrPath) -and
                 (Test-Path -LiteralPath $stderrPath)
             ) {
-                $output += @(Get-Content -LiteralPath $stderrPath -ErrorAction SilentlyContinue)
+                $stderrLines = @(Get-Content -LiteralPath $stderrPath -ErrorAction SilentlyContinue)
+                $output += $stderrLines
             }
         }
         catch {}
@@ -181,6 +228,8 @@ function Invoke-BoundedDockerResult(
     }
     return [pscustomobject]@{
         Output = @($output | ForEach-Object { [string]$_ })
+        StdOut = @($stdoutLines | ForEach-Object { [string]$_ })
+        StdErr = @($stderrLines | ForEach-Object { [string]$_ })
         ExitCode = [int]$exitCode
     }
 }
@@ -563,22 +612,57 @@ function Invoke-ControlledCoreBuild([string]$BackingPath) {
     }
 }
 
+function Get-NonEmptyTextLines([object[]]$Values) {
+    $lines = @()
+    foreach ($value in @($Values)) {
+        $line = ([string]$value).Trim()
+        if (-not [string]::IsNullOrWhiteSpace($line)) {
+            $lines += $line
+        }
+    }
+    return @($lines)
+}
+
+function Resolve-CoreImageReference([string]$Service) {
+    if ($Service -notin @('relay', 'flask', 'recorder')) {
+        throw 'built_image_identity_unavailable'
+    }
+    $resolved = Invoke-BoundedDockerResult @('compose', 'config', '--images', $Service)
+    if ($resolved.ExitCode -ne 0) {
+        throw 'built_image_identity_unavailable'
+    }
+    $references = @(Get-NonEmptyTextLines $resolved.StdOut)
+    if ($references.Count -ne 1) {
+        throw 'built_image_identity_unavailable'
+    }
+    return [string]$references[0]
+}
+
 function Assert-CoreImageCommits([string]$Commit) {
     foreach ($service in @('relay', 'flask', 'recorder')) {
-        $image = Invoke-DockerResult @('compose', 'images', '-q', $service)
-        $imageId = (Last-Text $image.Output).Trim()
-        if ($image.ExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($imageId)) {
+        $reference = Resolve-CoreImageReference $service
+        $inspection = Invoke-BoundedDockerResult @(
+            'image', 'inspect',
+            $reference,
+            '--format', '{{.Id}}|{{ index .Config.Labels "no.fcp.build_commit" }}'
+        )
+        if ($inspection.ExitCode -ne 0) {
             throw 'built_image_identity_unavailable'
         }
-        $label = Invoke-DockerResult @(
-            'image', 'inspect',
-            '--format', '{{ index .Config.Labels "no.fcp.build_commit" }}',
-            $imageId
-        )
-        if (
-            $label.ExitCode -ne 0 -or
-            (Last-Text $label.Output).Trim().ToLowerInvariant() -ne $Commit
-        ) {
+        $lines = @(Get-NonEmptyTextLines $inspection.StdOut)
+        if ($lines.Count -ne 1) {
+            throw 'built_image_identity_unavailable'
+        }
+        $separator = $lines[0].IndexOf('|')
+        if ($separator -le 0) {
+            throw 'built_image_identity_unavailable'
+        }
+        $imageId = $lines[0].Substring(0, $separator).Trim()
+        $label = $lines[0].Substring($separator + 1).Trim().ToLowerInvariant()
+        if ([string]::IsNullOrWhiteSpace($imageId)) {
+            throw 'built_image_identity_unavailable'
+        }
+        if ($label -ne $Commit) {
             throw 'built_image_identity_mismatch'
         }
     }

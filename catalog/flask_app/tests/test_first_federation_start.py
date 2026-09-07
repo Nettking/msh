@@ -10,7 +10,6 @@ import pytest
 from scripts import first_federation_start as first
 from scripts import zero_touch_federation_start as zero_touch
 
-
 ROOT = Path(__file__).resolve().parents[3]
 
 
@@ -294,7 +293,8 @@ def test_windows_build_commit_resolution_delegates_to_serialized_host_build() ->
     )[0]
 
     assert "scripts\\windows\\fcp_host_build.ps1" in resolver
-    assert "-RepoRoot \"%~dp0\"" in resolver
+    assert '-RepoRoot "%~dp0."' in resolver
+    assert '-RepoRoot "%~dp0"' not in resolver
     assert "-OutputFile \"%FCP_BUILD_RESULT%\"" in resolver
     assert "FCP_BUILD_COMMIT" in resolver
     assert "git rev-parse" not in resolver
