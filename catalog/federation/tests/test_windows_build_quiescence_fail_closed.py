@@ -31,6 +31,21 @@ def test_windows_buildx_lifecycle_calls_are_bounded() -> None:
     assert "$pruned = Invoke-BoundedDockerResult @(" in text
 
 
+def test_windows_bounded_docker_result_preserves_native_exit_codes() -> None:
+    text = _read("scripts/windows/fcp_host_build.ps1")
+    bounded = text[text.index("function Invoke-BoundedDockerResult") : text.index("function Get-FcpBuilderName")]
+
+    assert "System.Diagnostics.ProcessStartInfo" in bounded
+    assert "$startInfo.UseShellExecute = $false" in bounded
+    assert "$process.Start()" in bounded
+    assert "ReadToEndAsync()" in bounded
+    assert "$exitCode = [int]$process.ExitCode" in bounded
+    assert "$exitCode = 124" in bounded
+    assert "$exitCode = 127" in bounded
+    assert "taskkill.exe /PID $process.Id /T /F" in bounded
+    assert "Start-Process" not in bounded
+
+
 def test_windows_existing_builder_is_reproved_quiescent_before_reuse() -> None:
     text = _read("scripts/windows/fcp_host_build.ps1")
     ensure = text[text.index("function Ensure-FcpControllableBuilder") : text.index("function Invoke-BuildCachePrune")]

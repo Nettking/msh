@@ -115,6 +115,38 @@ function Invoke-DockerResult([string[]]$Arguments) {
     }
 }
 
+function ConvertTo-WindowsProcessArgument([AllowNull()][string]$Value) {
+    if ($null -eq $Value) { return '""' }
+
+    $builder = New-Object System.Text.StringBuilder
+    [void]$builder.Append('"')
+    $backslashes = 0
+    foreach ($character in $Value.ToCharArray()) {
+        if ($character -eq '\') {
+            $backslashes++
+            continue
+        }
+        if ($character -eq '"') {
+            for ($index = 0; $index -lt (2 * $backslashes + 1); $index++) {
+                [void]$builder.Append('\')
+            }
+            [void]$builder.Append('"')
+            $backslashes = 0
+            continue
+        }
+        for ($index = 0; $index -lt $backslashes; $index++) {
+            [void]$builder.Append('\')
+        }
+        $backslashes = 0
+        [void]$builder.Append($character)
+    }
+    for ($index = 0; $index -lt (2 * $backslashes); $index++) {
+        [void]$builder.Append('\')
+    }
+    [void]$builder.Append('"')
+    return $builder.ToString()
+}
+
 function Invoke-BoundedDockerResult(
     [string[]]$Arguments,
     [int]$TimeoutSeconds = $DockerLifecycleTimeoutSeconds
@@ -128,13 +160,20 @@ function Invoke-BoundedDockerResult(
     try {
         $stdoutPath = [System.IO.Path]::GetTempFileName()
         $stderrPath = [System.IO.Path]::GetTempFileName()
-        $process = Start-Process `
-            -FilePath $script:DockerExe `
-            -ArgumentList $Arguments `
-            -NoNewWindow `
-            -PassThru `
-            -RedirectStandardOutput $stdoutPath `
-            -RedirectStandardError $stderrPath
+        $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+        $startInfo.FileName = $script:DockerExe
+        $startInfo.Arguments = (($Arguments | ForEach-Object {
+            ConvertTo-WindowsProcessArgument $_
+        }) -join ' ')
+        $startInfo.UseShellExecute = $false
+        $startInfo.CreateNoWindow = $true
+        $startInfo.RedirectStandardOutput = $true
+        $startInfo.RedirectStandardError = $true
+        $process = New-Object System.Diagnostics.Process
+        $process.StartInfo = $startInfo
+        if (-not $process.Start()) { throw 'docker_process_start_failed' }
+        $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+        $stderrTask = $process.StandardError.ReadToEndAsync()
         if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
             try { & taskkill.exe /PID $process.Id /T /F 2>&1 | Out-Null } catch {}
             try { $process.WaitForExit(2000) | Out-Null } catch {}
@@ -147,6 +186,10 @@ function Invoke-BoundedDockerResult(
         else {
             $exitCode = [int]$process.ExitCode
         }
+        $stdoutText = $stdoutTask.GetAwaiter().GetResult()
+        $stderrText = $stderrTask.GetAwaiter().GetResult()
+        [System.IO.File]::WriteAllText($stdoutPath, $stdoutText)
+        [System.IO.File]::WriteAllText($stderrPath, $stderrText)
     }
     catch {
         $failure = $_.Exception.Message
