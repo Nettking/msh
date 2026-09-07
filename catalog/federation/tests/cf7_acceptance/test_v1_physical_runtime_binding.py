@@ -17,6 +17,7 @@ from scripts.acceptance import v1_physical_campaign as campaign
 from scripts.acceptance import v1_physical_probes as probes
 from scripts.acceptance import v1_physical_runner as runner
 from scripts.acceptance import v1_physical_runtime_binding as binding
+from scripts.acceptance.v1_physical_automation import ProbeBinding
 
 from .test_v1_physical_runner import COMMIT, ready
 
@@ -100,7 +101,11 @@ def test_running_identity_rejects_wrong_sha_and_missing_labels(
     monkeypatch.setattr(
         probes,
         "_container_label",
-        lambda _context, container, _label: labels[container],
+        lambda _context, container, label: (
+            str(runtime.compose_working_directory)
+            if label == "com.docker.compose.project.working_dir"
+            else labels[container]
+        ),
     )
     outcome = probes._probe_running_commit_identity(
         probes.ProbeContext(
@@ -220,3 +225,78 @@ def test_external_harness_report_does_not_require_candidate_checkout(
     )
     assert result["candidate_sha"] == COMMIT
     assert campaign._load_json(root / "campaign.json")["harness_sha"] == HARNESS
+
+
+def test_external_harness_skips_local_checkout_probe(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime = binding.RuntimeBinding(
+        host_id="nitro",
+        target_candidate_sha=COMMIT,
+        acceptance_harness_sha=HARNESS,
+        harness_checkout=tmp_path,
+        kind="compose",
+        compose_project="external-fcp",
+        compose_working_directory=tmp_path,
+        compose_config_files=(tmp_path / "docker-compose.yml",),
+    )
+    calls: list[str] = []
+
+    def execute(spec: probes.ProbeSpec, _context: probes.ProbeContext) -> probes.ProbeOutcome:
+        calls.append(spec.probe_id)
+        return probes.ProbeOutcome(spec.probe_id, probes.PASS, "stubbed", {})
+
+    monkeypatch.setattr(probes, "execute", execute)
+    runner.run_bindings(
+        tmp_path,
+        tmp_path / "evidence",
+        commit=COMMIT,
+        record={
+            "__runtime_binding": runtime,
+            "host_id": "nitro",
+            "os_category": "posix",
+            "profile": "school-control",
+        },
+        scenario="P01",
+        assertion="windows-runtime-state",
+        run_id=None,
+        bindings=(ProbeBinding("checkout-identity"), ProbeBinding("service-health")),
+        overrides={},
+    )
+    assert calls == ["service-health"]
+
+
+def test_compose_binding_excludes_container_from_another_working_directory(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime = binding.RuntimeBinding(
+        host_id="nitro",
+        target_candidate_sha=COMMIT,
+        acceptance_harness_sha=HARNESS,
+        harness_checkout=tmp_path,
+        kind="compose",
+        compose_project="external-fcp",
+        compose_working_directory=tmp_path,
+        compose_config_files=(tmp_path / "docker-compose.yml",),
+    )
+    context = probes.ProbeContext(
+        checkout=tmp_path,
+        evidence_root=tmp_path / "evidence",
+        commit=COMMIT,
+        host_id="nitro",
+        os_category="posix",
+        profile="school-control",
+        scenario="P01",
+        assertion="posix-runtime-state",
+        runtime_binding=runtime,
+    )
+    monkeypatch.setattr(
+        probes,
+        "_container_label",
+        lambda *_args: str(tmp_path / "other-deployment"),
+    )
+    assert probes._container_matches_runtime_binding(context, "container-id") is False
+    monkeypatch.setattr(probes, "_container_label", lambda *_args: str(tmp_path))
+    assert probes._container_matches_runtime_binding(context, "container-id") is True

@@ -327,6 +327,26 @@ def _container_label(context: ProbeContext, container: str, label: str) -> str:
     return value[-1].strip() if value else ""
 
 
+def _container_matches_runtime_binding(
+    context: ProbeContext,
+    container: str,
+) -> bool:
+    binding = context.runtime_binding
+    if binding is None or binding.kind != "compose":
+        return True
+    expected = binding.compose_working_directory
+    if expected is None:
+        return True
+    observed = _container_label(
+        context,
+        container,
+        "com.docker.compose.project.working_dir",
+    )
+    if not observed:
+        return True
+    return observed.rstrip("\\/").casefold() == str(expected).rstrip("\\/").casefold()
+
+
 def _probe_running_commit_identity(context: ProbeContext) -> ProbeOutcome:
     detail: dict[str, object] = {"candidate_sha": context.commit}
     if not _docker_available():
@@ -352,6 +372,16 @@ def _probe_running_commit_identity(context: ProbeContext) -> ProbeOutcome:
         identifier = str(container.get("ID") or container.get("Name") or "")
         state = str(container.get("State") or "")
         if not identifier:
+            continue
+        if not _container_matches_runtime_binding(context, identifier):
+            observed.append(
+                {
+                    "service": service,
+                    "state": state,
+                    "candidate_component": False,
+                    "excluded_as_unbound_compose_container": True,
+                }
+            )
             continue
         commit = _container_label(context, identifier, BUILD_COMMIT_LABEL).casefold()
         matches = commit == context.commit

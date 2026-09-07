@@ -256,14 +256,22 @@ def run_bindings(
     bindings: Sequence[ProbeBinding],
     overrides: Mapping[str, str],
 ) -> list[probes.ProbeOutcome]:
+    external_harness = isinstance(
+        record.get("__runtime_binding"), runtime_binding.RuntimeBinding
+    )
+    selected_bindings = tuple(
+        binding
+        for binding in bindings
+        if not (external_harness and binding.probe_id == "checkout-identity")
+    )
     require_operator_options(
-        bindings,
+        selected_bindings,
         overrides,
         scenario=scenario,
         assertion=assertion,
     )
     outcomes: list[probes.ProbeOutcome] = []
-    for binding in bindings:
+    for binding in selected_bindings:
         spec = probes.probe_spec(binding.probe_id)
         context = _context(
             checkout,
