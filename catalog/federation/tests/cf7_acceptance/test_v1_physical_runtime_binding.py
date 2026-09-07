@@ -186,3 +186,37 @@ def test_external_harness_gate_does_not_require_harness_checkout_to_be_candidate
     assert expected == COMMIT
     assert record["__runtime_binding"] is runtime
     assert campaign._load_json(root / "campaign.json")["harness_sha"] == HARNESS
+
+
+def test_external_harness_report_does_not_require_candidate_checkout(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, root = ready(monkeypatch, tmp_path)
+    runtime = binding.RuntimeBinding(
+        host_id="nitro",
+        target_candidate_sha=COMMIT,
+        acceptance_harness_sha=HARNESS,
+        harness_checkout=tmp_path / "tooling-checkout",
+        kind="compose",
+        compose_project="external-fcp",
+        compose_working_directory=tmp_path,
+        compose_config_files=(tmp_path / "docker-compose.yml",),
+    )
+    monkeypatch.setattr(binding, "load", lambda *_args, **_kwargs: runtime)
+    monkeypatch.setattr(
+        campaign,
+        "verify_checkout",
+        lambda *_args, **_kwargs: pytest.fail(
+            "external harness must not be checked as candidate"
+        ),
+    )
+    result = runner.report(
+        checkout,
+        root,
+        commit=COMMIT,
+        host="nitro",
+        runtime_binding_file=tmp_path / "binding.json",
+    )
+    assert result["candidate_sha"] == COMMIT
+    assert campaign._load_json(root / "campaign.json")["harness_sha"] == HARNESS

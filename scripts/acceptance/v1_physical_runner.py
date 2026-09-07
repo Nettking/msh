@@ -949,9 +949,29 @@ def report(
     *,
     commit: str,
     host: str | None = None,
+    runtime_binding_file: Path | None = None,
 ) -> dict[str, object]:
     expected = campaign.require_commit(commit)
-    campaign.load_campaign(checkout, root, expected)
+    bound = None
+    if runtime_binding_file is not None:
+        if host is None:
+            raise RunnerError("--runtime-binding requires --host for report")
+        bound = runtime_binding.load(
+            runtime_binding_file,
+            host_id=host,
+            target_candidate_sha=expected,
+        )
+        campaign.bind_harness(
+            root,
+            commit=expected,
+            harness_sha=bound.acceptance_harness_sha,
+        )
+    campaign.load_campaign(
+        checkout,
+        root,
+        expected,
+        verify_checkout_identity=bound is None,
+    )
     hosts = [
         campaign._load_json(path)
         for path in sorted((root / "hosts").glob("*.json"))
@@ -1250,6 +1270,7 @@ def main(argv: list[str] | None = None) -> int:
                 root,
                 commit=args.commit,
                 host=args.host,
+                runtime_binding_file=binding_file,
             )
     except (
         RunnerError,
