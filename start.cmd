@@ -305,7 +305,7 @@ if not exist "%~dp0scripts\windows\fcp_host_activation_lease.ps1" (
 set "FCP_LEASE_MODE=normal"
 if "%FCP_FRESH_INSTALL%"=="1" set "FCP_LEASE_MODE=fresh"
 if "%FCP_RESUME_EXISTING%"=="1" set "FCP_LEASE_MODE=resume"
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\fcp_host_activation_lease.ps1" -RepoRoot "%~dp0" -Mode "%FCP_LEASE_MODE%"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\fcp_host_activation_lease.ps1" -RepoRoot "%~dp0." -Mode "%FCP_LEASE_MODE%"
 exit /b %ERRORLEVEL%
 
 :maybe_pause
@@ -336,7 +336,7 @@ set "FCP_BUILD_RESULT=%TEMP%\fcp-host-build-%RANDOM%-%RANDOM%.txt"
 if exist "%FCP_BUILD_RESULT%" del /q "%FCP_BUILD_RESULT%" >nul 2>&1
 set "FCP_BUILD_LEASE_ARG="
 if "%FCP_HOST_MUTATION_LEASE_ACTIVE%"=="1" set "FCP_BUILD_LEASE_ARG=-LeaseAlreadyHeld"
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\fcp_host_build.ps1" -RepoRoot "%~dp0" -OutputFile "%FCP_BUILD_RESULT%" %FCP_BUILD_LEASE_ARG%
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\fcp_host_build.ps1" -RepoRoot "%~dp0." -OutputFile "%FCP_BUILD_RESULT%" %FCP_BUILD_LEASE_ARG%
 set "FCP_BUILD_EXIT=%ERRORLEVEL%"
 if not "%FCP_BUILD_EXIT%"=="0" (
     if exist "%FCP_BUILD_RESULT%" del /q "%FCP_BUILD_RESULT%" >nul 2>&1
@@ -368,7 +368,7 @@ set "FCP_LEASE_ACTIVE_SAVED=%FCP_HOST_MUTATION_LEASE_ACTIVE%"
 set "FCP_LEASE_OWNER_SAVED=%FCP_HOST_MUTATION_LEASE_OWNER_PID%"
 set "FCP_HOST_MUTATION_LEASE_ACTIVE="
 set "FCP_HOST_MUTATION_LEASE_OWNER_PID="
-start "FCP Update Agent" /b powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "%~dp0scripts\windows\fcp_update_agent.ps1" -RepoRoot "%~dp0" -DataDirectory "%FCP_DATA_DIR%" >nul 2>&1
+start "FCP Update Agent" /b powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "%~dp0scripts\windows\fcp_update_agent.ps1" -RepoRoot "%~dp0." -DataDirectory "%FCP_DATA_DIR%" >nul 2>&1
 set "FCP_AGENT_START_EXIT=%ERRORLEVEL%"
 set "FCP_HOST_MUTATION_LEASE_ACTIVE=%FCP_LEASE_ACTIVE_SAVED%"
 set "FCP_HOST_MUTATION_LEASE_OWNER_PID=%FCP_LEASE_OWNER_SAVED%"
@@ -446,7 +446,7 @@ for /f "usebackq delims=" %%M in (`docker compose run --rm --no-deps --entrypoin
 if not defined FCP_AI_MODEL_RESOLVED set "FCP_AI_MODEL_RESOLVED=llama3.2:3b"
 
 echo Ensuring optional Ollama model through host resource admission: %FCP_AI_MODEL_RESOLVED%
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\fcp_model_pull.ps1" -RepoRoot "%~dp0" -Model "%FCP_AI_MODEL_RESOLVED%" -Target ollama
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\fcp_model_pull.ps1" -RepoRoot "%~dp0." -Model "%FCP_AI_MODEL_RESOLVED%" -Target ollama
 set "FCP_MODEL_PULL_EXIT=%ERRORLEVEL%"
 if "%FCP_MODEL_PULL_EXIT%"=="0" (
     echo Ollama model is installed and verified.
