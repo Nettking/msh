@@ -1,0 +1,134 @@
+name: Mixed SHA check (read-only)
+
+# Section 7 of the physical acceptance instruction: reconfirm the product
+# runtime SHA on the reachable product hosts WITHOUT mutating anything.
+#
+# This workflow is strictly read-only. It runs no product process, changes no
+# checkout, writes no host config, and performs no docker prune, volume
+# deletion or state reset. Git ownership is handled per command with an exact
+# path (`git -c safe.directory=<exact-path>`), never a global config write and
+# never a wildcard.
+#
+# It deliberately does NOT touch protected recorder data, and it does not go
+# near Beast, which remains DO NOT TOUCH.
+#
+# MSH Recorder is absent here because no self-hosted runner exists for it on
+# any branch of this repository; that host cannot be reached from CI and its
+# row must be established by the physical operator.
+
+on:
+  push:
+    branches:
+      - claude/pr-435-final-merge-k01mfi
+    paths:
+      - '.github/workflows/mixed-sha-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mixed-sha-check
+  cancel-in-progress: false
+
+env:
+  TARGET_PRODUCT_SHA: 1004b274c198018161658cd1379d6cb4a20dbc82
+  PREVIOUS_KNOWN_SHA: 6101c86d94294c70db47d1a8053cac93b9a41356
+
+jobs:
+  posix-hosts:
+    name: "Runtime SHA: ${{ matrix.host }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - host: Nettking-Linux
+            label: nettking-linux
+          - host: Nitro
+            label: fcp-linux
+    runs-on: ${{ matrix.label }}
+    timeout-minutes: 15
+    steps:
+      - name: Host identity
+        shell: bash
+        run: |
+          echo "HOST         : ${{ matrix.host }}"
+          echo "runner       : ${RUNNER_NAME:-unknown}"
+          echo "hostname     : $(hostname)"
+          echo "user         : $(id -un)"
+          echo "TARGET_SHA   : ${TARGET_PRODUCT_SHA}"
+
+      - name: Deployment checkout HEAD (read-only)
+        continue-on-error: true
+        shell: bash
+        run: |
+          FOUND=0
+          for d in /home/martin/fcp "$HOME"/fcp "$HOME"/msh /opt/msh /srv/msh /mnt/c/wsl/msh; do
+            [ -d "$d/.git" ] || continue
+            FOUND=1
+            HEAD_SHA="$(git -c safe.directory="$d" -C "$d" rev-parse HEAD 2>/dev/null || echo unreadable)"
+            echo "CHECKOUT     : $d"
+            echo "  HEAD       : ${HEAD_SHA}"
+            echo "  branch     : $(git -c safe.directory="$d" -C "$d" rev-parse --abbrev-ref HEAD 2>/dev/null || echo unreadable)"
+            echo "  dirty      : $(git -c safe.directory="$d" -C "$d" status --porcelain 2>/dev/null | wc -l)"
+            if [ "${HEAD_SHA}" = "${TARGET_PRODUCT_SHA}" ]; then
+              echo "  MATCH      : YES (on target)"
+            else
+              echo "  MATCH      : NO (expected ${TARGET_PRODUCT_SHA})"
+            fi
+          done
+          [ "$FOUND" = "1" ] || echo "CHECKOUT     : none found in the searched roots"
+
+      - name: Running container build identity (read-only)
+        continue-on-error: true
+        shell: bash
+        run: |
+          if ! command -v docker >/dev/null 2>&1; then
+            echo "docker       : not present"; exit 0
+          fi
+          echo "--- running containers ---"
+          docker ps --format '  {{.Names}}\t{{.Image}}\t{{.Status}}' 2>/dev/null || echo "  (cannot list)"
+          echo "--- build-commit labels on running containers ---"
+          for c in $(docker ps -q 2>/dev/null); do
+            NAME="$(docker inspect -f '{{.Name}}' "$c" 2>/dev/null | sed 's#^/##')"
+            COMMIT="$(docker inspect -f '{{index .Config.Labels "no.fcp.build_commit"}}' "$c" 2>/dev/null)"
+            [ -z "${COMMIT}" ] && COMMIT="$(docker inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$c" 2>/dev/null)"
+            echo "  ${NAME}: ${COMMIT:-<no build-commit label>}"
+          done
+
+  windows-host:
+    name: "Runtime SHA: Nettking (Windows)"
+    runs-on: fcp-windows
+    timeout-minutes: 15
+    steps:
+      - name: Host identity
+        shell: cmd
+        run: |
+          echo HOST       : Nettking (Windows)
+          echo runner     : %RUNNER_NAME%
+          echo hostname   : %COMPUTERNAME%
+          echo user       : %USERNAME%
+          echo TARGET_SHA : %TARGET_PRODUCT_SHA%
+          exit /b 0
+
+      - name: Deployment checkout HEAD (read-only)
+        continue-on-error: true
+        shell: cmd
+        run: |
+          REM Exact-path, per-command safe.directory only. No global git config
+          REM is written and no wildcard is used. The checkout is owned by
+          REM Nettking\Martin while this job runs as NETWORK SERVICE.
+          echo === C:\wsl\msh ===
+          if exist "C:\wsl\msh\.git" git -c safe.directory=C:/wsl/msh -C "C:\wsl\msh" rev-parse HEAD
+          if exist "C:\wsl\msh\.git" git -c safe.directory=C:/wsl/msh -C "C:\wsl\msh" rev-parse --abbrev-ref HEAD
+          if exist "C:\wsl\msh\.git" git -c safe.directory=C:/wsl/msh -C "C:\wsl\msh" status --porcelain
+          if not exist "C:\wsl\msh\.git" echo   (absent)
+          exit /b 0
+
+      - name: Running container build identity (read-only)
+        continue-on-error: true
+        shell: cmd
+        run: |
+          docker ps --format "  {{.Names}} {{.Image}} {{.Status}}" 2>NUL
+          if errorlevel 1 echo   (docker not available to this account)
+          exit /b 0
