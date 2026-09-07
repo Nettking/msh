@@ -968,6 +968,8 @@ def sample_resources(
     run_id: str | None = None,
     extras: Mapping[str, object] | None = None,
     allow_external_harness: bool = False,
+    data_root: Path | None = None,
+    results_root: Path | None = None,
 ) -> Path:
     load_campaign(
         checkout,
@@ -998,11 +1000,33 @@ def sample_resources(
     )
     if run_id:
         packet["run_id"] = run_id
-    resources: dict[str, object] = {"checkout": _disk_snapshot(checkout)}
-    for name in ("data", "results"):
-        path = checkout / name
-        if path.exists():
+    # P12 growth is measured by differencing the used_bytes of every entry in
+    # ``resources`` across two samples.  When the harness runs from its own
+    # checkout on another filesystem, folding that checkout in would let
+    # harness-side churn masquerade as product growth, and reading
+    # ``checkout/data`` would measure a directory the deployment never writes.
+    # So an explicitly bound root replaces the checkout-relative surface
+    # outright rather than supplementing it.
+    resources: dict[str, object] = {}
+    bound_roots = {
+        name: value
+        for name, value in (("data", data_root), ("results", results_root))
+        if value is not None
+    }
+    if bound_roots:
+        for name, path in bound_roots.items():
+            if not path.exists():
+                raise CampaignError(
+                    f"bound {name}_root does not exist on this host, so the "
+                    "sample would understate runtime growth"
+                )
             resources[name] = _disk_snapshot(path)
+    else:
+        resources["checkout"] = _disk_snapshot(checkout)
+        for name in ("data", "results"):
+            path = checkout / name
+            if path.exists():
+                resources[name] = _disk_snapshot(path)
     docker: dict[str, object] = {
         "available": shutil.which("docker") is not None
     }
@@ -1035,6 +1059,11 @@ def sample_resources(
         {
             "label": redact_text(label, cwd=checkout),
             "resources": resources,
+            # Which surface was measured, without naming it.  The roots
+            # themselves stay local: only this boolean and the byte/inode
+            # counts reach portable evidence.
+            "resource_roots_bound": bool(bound_roots),
+            "resource_roots_measured": sorted(resources),
             "docker": docker,
         }
     )

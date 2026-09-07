@@ -9,6 +9,7 @@ identities; no arbitrary container or data-root scan is permitted.
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -300,3 +301,456 @@ def test_compose_binding_excludes_container_from_another_working_directory(
     assert probes._container_matches_runtime_binding(context, "container-id") is False
     monkeypatch.setattr(probes, "_container_label", lambda *_args: str(tmp_path))
     assert probes._container_matches_runtime_binding(context, "container-id") is True
+
+
+# ---------------------------------------------------------------------------
+# P1 review findings: each of the four is pinned by an adversarial case that
+# fails on the pre-correction code.
+# ---------------------------------------------------------------------------
+
+
+def _init_repo(path: Path) -> str:
+    """Create a real one-commit git repository and return its HEAD SHA."""
+
+    path.mkdir(parents=True, exist_ok=True)
+
+    def run(*args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["git", *args], cwd=path, check=True, capture_output=True, text=True
+        )
+
+    run("init", "--quiet")
+    run("config", "user.email", "cf7@example.invalid")
+    run("config", "user.name", "CF7")
+    (path / "harness.txt").write_text("harness\n", encoding="utf-8")
+    run("add", "-A")
+    run("commit", "--quiet", "-m", "harness")
+    return run("rev-parse", "HEAD").stdout.strip()
+
+
+def _binding_file(tmp_path: Path, document: dict[str, object]) -> Path:
+    target = tmp_path / "binding.json"
+    target.write_text(json.dumps(document), encoding="utf-8")
+    return target
+
+
+def _native_document(
+    harness: Path, harness_sha: str, status: Path, data: Path
+) -> dict[str, object]:
+    return {
+        "schema": binding.BINDING_SCHEMA,
+        "host_id": "nitro",
+        "target_candidate_sha": COMMIT,
+        "acceptance_harness_sha": harness_sha,
+        "harness_checkout": str(harness),
+        "runtime_kind": "native-recorder",
+        "runtime": {"recorder_status_file": str(status), "data_root": str(data)},
+    }
+
+
+# --- P1 finding 1: a dirty external harness must be refused ---------------
+
+
+def test_a_clean_external_harness_at_the_declared_sha_is_accepted(
+    tmp_path: Path,
+) -> None:
+    harness = tmp_path / "harness"
+    harness_sha = _init_repo(harness)
+    status = tmp_path / "runtime" / "status.json"
+    data = tmp_path / "runtime" / "data"
+    path = _binding_file(
+        tmp_path, _native_document(harness, harness_sha, status, data)
+    )
+    loaded = binding.load(path, host_id="nitro", target_candidate_sha=COMMIT)
+    assert loaded.acceptance_harness_sha == harness_sha
+
+
+def test_an_external_harness_with_uncommitted_changes_is_refused(
+    tmp_path: Path,
+) -> None:
+    harness = tmp_path / "harness"
+    harness_sha = _init_repo(harness)
+    # HEAD still reports the reviewed SHA, so identity alone still passes.
+    # The probe code that would actually execute is no longer that commit.
+    (harness / "harness.txt").write_text("tampered\n", encoding="utf-8")
+    status = tmp_path / "runtime" / "status.json"
+    data = tmp_path / "runtime" / "data"
+    path = _binding_file(
+        tmp_path, _native_document(harness, harness_sha, status, data)
+    )
+    with pytest.raises(binding.RuntimeBindingError, match="uncommitted"):
+        binding.load(path, host_id="nitro", target_candidate_sha=COMMIT)
+
+
+def test_an_untracked_file_in_the_external_harness_is_refused(
+    tmp_path: Path,
+) -> None:
+    harness = tmp_path / "harness"
+    harness_sha = _init_repo(harness)
+    (harness / "extra_probe.py").write_text("# smuggled\n", encoding="utf-8")
+    status = tmp_path / "runtime" / "status.json"
+    data = tmp_path / "runtime" / "data"
+    path = _binding_file(
+        tmp_path, _native_document(harness, harness_sha, status, data)
+    )
+    with pytest.raises(binding.RuntimeBindingError, match="uncommitted"):
+        binding.load(path, host_id="nitro", target_candidate_sha=COMMIT)
+
+
+def test_a_harness_checkout_that_is_not_a_repository_is_refused(
+    tmp_path: Path,
+) -> None:
+    harness = tmp_path / "not-a-repo"
+    harness.mkdir()
+    status = tmp_path / "runtime" / "status.json"
+    data = tmp_path / "runtime" / "data"
+    path = _binding_file(tmp_path, _native_document(harness, "c" * 40, status, data))
+    with pytest.raises(binding.RuntimeBindingError):
+        binding.load(path, host_id="nitro", target_candidate_sha=COMMIT)
+
+
+# --- P1 finding 2: samples must measure the bound runtime roots -----------
+
+
+def test_a_bound_sample_measures_the_runtime_roots_and_not_the_harness_checkout(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    checkout, root = ready(monkeypatch, tmp_path)
+    data = tmp_path / "runtime" / "data"
+    results = tmp_path / "runtime" / "results"
+    data.mkdir(parents=True)
+    results.mkdir(parents=True)
+    # A checkout-relative surface exists too. It must be ignored entirely,
+    # because folding harness storage into the series would let harness churn
+    # register as product growth.
+    (checkout / "data").mkdir(exist_ok=True)
+    (checkout / "results").mkdir(exist_ok=True)
+
+    seen: list[Path] = []
+    real_snapshot = campaign._disk_snapshot
+
+    def recording_snapshot(path: Path) -> dict[str, object]:
+        seen.append(path)
+        return real_snapshot(path)
+
+    monkeypatch.setattr(campaign, "_disk_snapshot", recording_snapshot)
+    written = campaign.sample_resources(
+        checkout,
+        root,
+        commit=COMMIT,
+        host="nitro",
+        scenario="P04",
+        label="bound-sample",
+        allow_external_harness=True,
+        data_root=data,
+        results_root=results,
+    )
+    packet = json.loads(written.read_text(encoding="utf-8"))
+    assert packet["resource_roots_bound"] is True
+    assert sorted(packet["resources"]) == ["data", "results"]
+    assert "checkout" not in packet["resources"]
+    assert set(seen) == {data, results}
+    assert checkout / "data" not in seen
+    assert checkout not in seen
+
+
+def test_an_unbound_sample_keeps_the_checkout_relative_surface(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    checkout, root = ready(monkeypatch, tmp_path)
+    (checkout / "data").mkdir(exist_ok=True)
+    written = campaign.sample_resources(
+        checkout,
+        root,
+        commit=COMMIT,
+        host="nitro",
+        scenario="P04",
+        label="local-sample",
+    )
+    packet = json.loads(written.read_text(encoding="utf-8"))
+    assert packet["resource_roots_bound"] is False
+    assert "checkout" in packet["resources"]
+
+
+def test_a_bound_root_that_does_not_exist_fails_closed_instead_of_measuring_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    checkout, root = ready(monkeypatch, tmp_path)
+    with pytest.raises(campaign.CampaignError, match="bound data_root"):
+        campaign.sample_resources(
+            checkout,
+            root,
+            commit=COMMIT,
+            host="nitro",
+            scenario="P04",
+            label="missing-root",
+            allow_external_harness=True,
+            data_root=tmp_path / "runtime" / "absent",
+        )
+
+
+def test_a_bound_sample_publishes_no_absolute_paths(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    checkout, root = ready(monkeypatch, tmp_path)
+    data = tmp_path / "private" / "runtime-data"
+    data.mkdir(parents=True)
+    written = campaign.sample_resources(
+        checkout,
+        root,
+        commit=COMMIT,
+        host="nitro",
+        scenario="P04",
+        label="privacy-sample",
+        allow_external_harness=True,
+        data_root=data,
+    )
+    serialized = written.read_text(encoding="utf-8")
+    assert str(data) not in serialized
+    assert "private" not in serialized
+
+
+def test_the_baseline_drops_the_harness_checkout_anchor_when_roots_are_bound(
+    tmp_path: Path,
+) -> None:
+    harness = tmp_path / "harness"
+    harness.mkdir()
+    data = tmp_path / "runtime" / "data"
+    data.mkdir(parents=True)
+    runtime = binding.RuntimeBinding.from_mapping(
+        _native_document(harness, HARNESS, tmp_path / "s.json", data)
+    )
+    bound = probes.ProbeContext(
+        checkout=harness,
+        evidence_root=tmp_path / "evidence",
+        commit=COMMIT,
+        host_id="nitro",
+        os_category="posix",
+        profile="cnc-recorder",
+        scenario="P12",
+        assertion="host-resource-baseline",
+        runtime_binding=runtime,
+    )
+    assert bound.roots_are_bound is True
+    assert "checkout" not in probes._baseline_anchors(bound)
+    unbound = probes.ProbeContext(
+        checkout=harness,
+        evidence_root=tmp_path / "evidence",
+        commit=COMMIT,
+        host_id="nitro",
+        os_category="posix",
+        profile="cnc-recorder",
+        scenario="P12",
+        assertion="host-resource-baseline",
+    )
+    assert unbound.roots_are_bound is False
+    assert "checkout" in probes._baseline_anchors(unbound)
+
+
+def test_a_missing_bound_data_root_fails_the_storage_anchor_rather_than_falling_back(
+    tmp_path: Path,
+) -> None:
+    harness = tmp_path / "harness"
+    harness.mkdir()
+    runtime = binding.RuntimeBinding.from_mapping(
+        _native_document(
+            harness, HARNESS, tmp_path / "s.json", tmp_path / "runtime" / "absent"
+        )
+    )
+    context = probes.ProbeContext(
+        checkout=harness,
+        evidence_root=tmp_path / "evidence",
+        commit=COMMIT,
+        host_id="nitro",
+        os_category="posix",
+        profile="cnc-recorder",
+        scenario="P12",
+        assertion="inode-capacity",
+        runtime_binding=runtime,
+    )
+    assert context.storage_anchor() is None
+    assert probes._probe_inode_capacity(context).status == probes.FAIL
+
+
+# --- P1 finding 3: native-recorder identity without Docker ---------------
+
+
+def _native_context(
+    tmp_path: Path, status: Path, *, assertion: str = "running-commit-identity"
+) -> probes.ProbeContext:
+    harness = tmp_path / "harness"
+    harness.mkdir(exist_ok=True)
+    data = tmp_path / "runtime" / "data"
+    data.mkdir(parents=True, exist_ok=True)
+    runtime = binding.RuntimeBinding.from_mapping(
+        _native_document(harness, HARNESS, status, data)
+    )
+    return probes.ProbeContext(
+        checkout=harness,
+        evidence_root=tmp_path / "evidence",
+        commit=COMMIT,
+        host_id="nitro",
+        os_category="posix",
+        profile="cnc-recorder",
+        scenario="P04",
+        assertion=assertion,
+        runtime_binding=runtime,
+    )
+
+
+def _write_status(path: Path, payload: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def test_a_native_recorder_proves_identity_with_no_docker_present(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    status = tmp_path / "runtime" / "status.json"
+    _write_status(status, {"native_runtime": {"build_commit": COMMIT}})
+
+    def refuse() -> bool:
+        raise AssertionError("native-recorder identity must not consult Docker")
+
+    monkeypatch.setattr(probes, "_docker_available", refuse)
+    monkeypatch.setattr(
+        probes,
+        "_compose_containers",
+        lambda *_a, **_k: (_ for _ in ()).throw(
+            AssertionError("native-recorder identity must not list containers")
+        ),
+    )
+    outcome = probes._probe_running_commit_identity(_native_context(tmp_path, status))
+    assert outcome.status == probes.PASS
+    assert outcome.detail["runtime_kind"] == "native-recorder"
+    assert outcome.detail["build_commit_matches_candidate"] is True
+
+
+def test_a_native_recorder_without_a_build_identity_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    status = tmp_path / "runtime" / "status.json"
+    _write_status(status, {"native_runtime": {"state": "running"}})
+    monkeypatch.setattr(probes, "_docker_available", lambda: False)
+    outcome = probes._probe_running_commit_identity(_native_context(tmp_path, status))
+    assert outcome.status == probes.FAIL
+    assert outcome.detail["build_commit_present"] is False
+
+
+def test_a_native_recorder_on_another_commit_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    status = tmp_path / "runtime" / "status.json"
+    _write_status(status, {"native_runtime": {"build_commit": "d" * 40}})
+    monkeypatch.setattr(probes, "_docker_available", lambda: False)
+    outcome = probes._probe_running_commit_identity(_native_context(tmp_path, status))
+    assert outcome.status == probes.FAIL
+    assert outcome.detail["build_commit_matches_candidate"] is False
+
+
+def test_a_native_recorder_with_no_status_surface_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    status = tmp_path / "runtime" / "status.json"
+    monkeypatch.setattr(probes, "_docker_available", lambda: False)
+    outcome = probes._probe_running_commit_identity(_native_context(tmp_path, status))
+    assert outcome.status == probes.FAIL
+
+
+def test_a_native_recorder_without_a_native_runtime_block_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    status = tmp_path / "runtime" / "status.json"
+    _write_status(status, {"state": "running"})
+    monkeypatch.setattr(probes, "_docker_available", lambda: False)
+    outcome = probes._probe_running_commit_identity(_native_context(tmp_path, status))
+    assert outcome.status == probes.FAIL
+
+
+def test_native_identity_evidence_names_no_private_path(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    status = tmp_path / "private" / "status.json"
+    _write_status(status, {"native_runtime": {"build_commit": COMMIT}})
+    monkeypatch.setattr(probes, "_docker_available", lambda: False)
+    outcome = probes._probe_running_commit_identity(_native_context(tmp_path, status))
+    serialized = json.dumps(outcome.detail)
+    assert str(status) not in serialized
+    assert "private" not in serialized
+
+
+# --- P1 finding 4: recorder status must follow the bound surface ----------
+
+
+def test_recorder_status_reads_the_bound_file_not_the_harness_checkout(
+    tmp_path: Path,
+) -> None:
+    bound_status = tmp_path / "runtime" / "status.json"
+    context = _native_context(tmp_path, bound_status, assertion="service-health")
+    # A decoy at the checkout-relative location the harness used to read.
+    decoy = context.data_dir / "source_state" / "mtconnect_recorder_status.json"
+    _write_status(decoy, {"state": "decoy"})
+    assert probes._recorder_status_path(context) == bound_status
+    assert probes._recorder_status_path(context) != decoy
+
+
+def test_recorder_status_falls_back_to_the_data_root_only_without_a_bound_file(
+    tmp_path: Path,
+) -> None:
+    context = probes.ProbeContext(
+        checkout=tmp_path / "harness",
+        evidence_root=tmp_path / "evidence",
+        commit=COMMIT,
+        host_id="nitro",
+        os_category="posix",
+        profile="cnc-recorder",
+        scenario="P04",
+        assertion="service-health",
+    )
+    assert probes._recorder_status_path(context) == (
+        context.data_dir / "source_state" / "mtconnect_recorder_status.json"
+    )
+
+
+def test_health_continuity_and_sample_paths_all_use_the_bound_status_surface(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    bound_status = tmp_path / "runtime" / "status.json"
+    _write_status(
+        bound_status,
+        {
+            "present": True,
+            "state": "running",
+            "build_commit": COMMIT,
+            "native_runtime": {"build_commit": COMMIT},
+        },
+    )
+    context = _native_context(tmp_path, bound_status, assertion="service-health")
+    decoy = context.data_dir / "source_state" / "mtconnect_recorder_status.json"
+    _write_status(decoy, {"present": False, "state": "decoy"})
+
+    read: list[Path] = []
+    original = probes._recorder_status_path
+
+    def recording(ctx: probes.ProbeContext) -> Path:
+        resolved = original(ctx)
+        read.append(resolved)
+        return resolved
+
+    monkeypatch.setattr(probes, "_recorder_status_path", recording)
+    probes._recorder_status(context)
+    probes._probe_running_commit_identity(context)
+    assert read, "no recorder status path was resolved"
+    assert set(read) == {bound_status}
+    assert decoy not in read

@@ -819,10 +819,8 @@ def sample(
     )
     scenario_id = campaign.require_scenario(scenario)
     binding = record.get("__runtime_binding")
-    extras = probes.collect_sample_extras(
-        checkout,
-        binding if isinstance(binding, runtime_binding.RuntimeBinding) else None,
-    )
+    bound = binding if isinstance(binding, runtime_binding.RuntimeBinding) else None
+    extras = probes.collect_sample_extras(checkout, bound)
     path = campaign.sample_resources(
         checkout,
         root,
@@ -833,6 +831,10 @@ def sample(
         run_id=run_id,
         extras=extras,
         allow_external_harness=runtime_binding_file is not None,
+        # The bound runtime surfaces, not this harness checkout, are what the
+        # soak series has to measure.
+        data_root=bound.data_root if bound is not None else None,
+        results_root=bound.results_root if bound is not None else None,
     )
     return {
         "scenario": scenario_id,

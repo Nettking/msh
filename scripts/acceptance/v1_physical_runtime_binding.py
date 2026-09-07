@@ -130,10 +130,29 @@ class RuntimeBinding:
         return binding
 
     def verify_harness_checkout(self) -> None:
+        """Prove the external harness is the exact declared SHA, and clean.
+
+        Identity alone is not enough.  ``rev-parse HEAD`` still reports the
+        declared commit when the worktree carries uncommitted edits, so a
+        harness proven only by HEAD can execute probe code that exists in no
+        commit while the evidence claims a reviewed SHA.  Both halves are
+        therefore required and both fail closed: an unreadable checkout is
+        refused exactly like a mismatched or dirty one.
+        """
+
         code, output = _git(self.harness_checkout, "rev-parse", "HEAD")
         if code != 0 or output.strip().casefold() != self.acceptance_harness_sha:
             raise RuntimeBindingError(
                 "acceptance harness checkout does not match acceptance_harness_sha"
+            )
+        code, output = _git(self.harness_checkout, "status", "--porcelain")
+        if code != 0:
+            raise RuntimeBindingError(
+                "acceptance harness checkout cleanliness could not be proven"
+            )
+        if output.strip():
+            raise RuntimeBindingError(
+                "acceptance harness checkout has uncommitted changes"
             )
 
     def compose_prefix(self) -> list[str]:
@@ -156,6 +175,14 @@ class RuntimeBinding:
 
 
 def _git(cwd: Path, *args: str) -> tuple[int, str]:
+    """Run git in ``cwd`` and return its exit code and standard output.
+
+    Standard error is deliberately not folded into the returned text.  The
+    cleanliness gate below compares the output of ``status --porcelain``
+    against the empty string, and a git advisory printed to stderr on an
+    otherwise clean tree would masquerade as a modified file.
+    """
+
     try:
         result = subprocess.run(
             ["git", *args],
@@ -169,7 +196,7 @@ def _git(cwd: Path, *args: str) -> tuple[int, str]:
         )
     except (OSError, subprocess.SubprocessError):
         return 126, ""
-    return result.returncode, (result.stdout or "") + (result.stderr or "")
+    return result.returncode, result.stdout or ""
 
 
 def load(path: Path, *, host_id: str, target_candidate_sha: str) -> RuntimeBinding:
