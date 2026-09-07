@@ -27,6 +27,7 @@ PRIVATE_RE: Final[tuple[re.Pattern[str], ...]] = (
     re.compile(r"\b(?:https?|wss?)://", re.IGNORECASE),
     re.compile(r"(?<![0-9])(?:[0-9]{1,3}\.){3}[0-9]{1,3}(?![0-9])"),
     re.compile(r"(?i)\b[a-z]:[\\/][^\r\n\t\"']+"),
+    re.compile(r"(?<![A-Za-z0-9])/(?:[A-Za-z0-9._-]+/)+[A-Za-z0-9._-]+(?:[ \t][^\r\n\t\"']*)?"),
 )
 
 CASE_CONTRACT: Final[dict[str, dict[str, object]]] = {
@@ -163,7 +164,10 @@ def _require_verification(packet: Mapping[str, object], expected_candidate: str)
         raise ContractError("a packet cannot pass without verification provenance")
     if _sha(verification.get("candidate_sha"), "verification.candidate_sha") != expected_candidate:
         raise ContractError("verification candidate SHA differs from packet candidate")
-    _host(verification.get("host_id"), "verification.host_id")
+    verification_host = _host(verification.get("host_id"), "verification.host_id")
+    packet_host = _host(packet.get("host_id"))
+    if verification_host != packet_host:
+        raise ContractError("verification host differs from packet host")
     _timestamp(verification.get("verified_at"))
     digest = _text(verification.get("evidence_sha256"), "verification.evidence_sha256").lower()
     if re.fullmatch(r"[0-9a-f]{64}", digest) is None:
@@ -194,6 +198,57 @@ def _require_b03(packet: Mapping[str, object]) -> None:
     for field in ("nonpublic_payload", "nonpublic_property", "private_address_leakage"):
         if _bool(packet.get(field), field):
             raise ContractError(f"B03 recorded a prohibited {field}")
+
+
+def _require_string_list(
+    packet: Mapping[str, object],
+    field: str,
+    *,
+    minimum: int,
+    exact: int | None = None,
+) -> list[str]:
+    value = packet.get(field)
+    if not isinstance(value, list):
+        raise ContractError(f"{field} must be a list")
+    if exact is not None and len(value) != exact:
+        raise ContractError(f"{field} must contain exactly {exact} items")
+    if len(value) < minimum:
+        raise ContractError(f"{field} must contain at least {minimum} items")
+    result = [_text(item, f"{field}[{index}]") for index, item in enumerate(value)]
+    if len(set(result)) != len(result):
+        raise ContractError(f"{field} must contain unique items")
+    return result
+
+
+def _require_b01(packet: Mapping[str, object]) -> None:
+    _require_string_list(packet, "recorder_ids", minimum=2, exact=2)
+    if not _bool(packet.get("admission_observed"), "admission_observed"):
+        raise ContractError("B01 requires observed dual-recorder admission")
+
+
+def _require_b02(packet: Mapping[str, object]) -> None:
+    _require_string_list(packet, "recorder_ids", minimum=2)
+    if not _bool(packet.get("identities_unique"), "identities_unique"):
+        raise ContractError("B02 requires unique recorder identities")
+
+
+def _require_restart_case(packet: Mapping[str, object], case_id: str) -> None:
+    for field in ("restart_observed", "rejoined"):
+        if not _bool(packet.get(field), field):
+            raise ContractError(f"{case_id} requires {field}")
+
+
+def _require_b06(packet: Mapping[str, object]) -> None:
+    for field in ("restart_observed", "replay_converged"):
+        if not _bool(packet.get(field), field):
+            raise ContractError(f"B06 requires {field}")
+
+
+def _require_convergence_case(packet: Mapping[str, object], case_id: str, state_field: str) -> None:
+    if not _bool(packet.get(state_field), state_field):
+        raise ContractError(f"{case_id} requires {state_field}")
+    if not _bool(packet.get("converged"), "converged"):
+        raise ContractError(f"{case_id} requires converged")
 
 
 def _require_b09(packet: Mapping[str, object], expected_candidate: str) -> None:
@@ -244,8 +299,20 @@ def validate_packet(
         raise ContractError("packet contains private endpoint, address, or path material")
     if status == "pass":
         _require_verification(packet, candidate)
+        if case_id == "B01":
+            _require_b01(packet)
+        if case_id == "B02":
+            _require_b02(packet)
         if case_id == "B03":
             _require_b03(packet)
+        if case_id in {"B04", "B05"}:
+            _require_restart_case(packet, case_id)
+        if case_id == "B06":
+            _require_b06(packet)
+        if case_id == "B07":
+            _require_convergence_case(packet, case_id, "legacy_state_present")
+        if case_id == "B08":
+            _require_convergence_case(packet, case_id, "stale_state_present")
         if case_id == "B09":
             _require_b09(packet, candidate)
     return {
@@ -288,13 +355,18 @@ def validate_campaign(
         for case_id in CASE_IDS
         if not any(item["case_id"] == case_id for item in safe)
     ]
+    passing_cases = {
+        str(item["case_id"])
+        for item in safe
+        if item["status"] == "pass"
+    }
     return {
         "schema": SCHEMA,
         "candidate_sha": require_commit(expected_candidate),
         "packet_count": len(safe),
         "cases_seen": sorted({str(item["case_id"]) for item in safe}),
         "missing_cases": missing,
-        "complete": not missing,
+        "complete": not missing and len(passing_cases) == len(CASE_IDS),
     }
 
 

@@ -51,6 +51,16 @@ def packet(case_id: str = "B01", **updates: object) -> dict[str, object]:
                 "private_address_leakage": False,
             }
         )
+    if case_id == "B02":
+        value.update({"recorder_ids": ["recorder-a", "recorder-b"], "identities_unique": True})
+    if case_id in {"B04", "B05"}:
+        value.update({"restart_observed": True, "rejoined": True})
+    if case_id == "B06":
+        value.update({"restart_observed": True, "replay_converged": True})
+    if case_id == "B07":
+        value.update({"legacy_state_present": True, "converged": True})
+    if case_id == "B08":
+        value.update({"stale_state_present": True, "converged": True})
     if case_id == "B09":
         value.update(
             {
@@ -79,6 +89,15 @@ def test_wrong_candidate_is_rejected() -> None:
 def test_wrong_host_is_rejected() -> None:
     with pytest.raises(contract.ContractError, match="outside"):
         contract.validate_packet(packet(host_id="beast"), expected_candidate=CANDIDATE, expected_hosts={"nitro"}, now=NOW)
+
+
+def test_verification_host_must_match_packet_host() -> None:
+    with pytest.raises(contract.ContractError, match="verification host"):
+        contract.validate_packet(
+            packet("B03", verification={**verification(), "host_id": "beast"}),
+            expected_candidate=CANDIDATE,
+            now=NOW,
+        )
 
 
 def test_b03_requires_one_target_and_rejects_cross_target_report() -> None:
@@ -126,6 +145,35 @@ def test_private_paths_endpoints_and_addresses_are_rejected() -> None:
         contract.validate_packet(unsafe, expected_candidate=CANDIDATE, now=NOW)
 
 
+@pytest.mark.parametrize("value", ["/home/martin/private/state", "/tmp/fcp-evidence", "/var/lib/fcp/state"])
+def test_posix_absolute_paths_are_rejected(value: str) -> None:
+    with pytest.raises(contract.ContractError, match="private"):
+        contract.validate_packet(packet(operator_note=value), expected_candidate=CANDIDATE, now=NOW)
+
+
+def test_benign_identifiers_remain_allowed() -> None:
+    result = contract.validate_packet(packet("B03", operator_note="node/one"), expected_candidate=CANDIDATE, now=NOW)
+    assert result["status"] == "pass"
+
+
+@pytest.mark.parametrize(
+    ("case_id", "updates", "message"),
+    [
+        ("B01", {"recorder_ids": [], "admission_observed": True}, "recorder_ids"),
+        ("B01", {"recorder_ids": ["recorder-a", "recorder-b"], "admission_observed": False}, "admission"),
+        ("B02", {"recorder_ids": ["recorder-a", "recorder-a"], "identities_unique": True}, "unique"),
+        ("B04", {"restart_observed": False, "rejoined": True}, "restart_observed"),
+        ("B05", {"restart_observed": True, "rejoined": False}, "rejoined"),
+        ("B06", {"restart_observed": True, "replay_converged": False}, "replay_converged"),
+        ("B07", {"legacy_state_present": False, "converged": True}, "legacy_state_present"),
+        ("B08", {"stale_state_present": True, "converged": False}, "converged"),
+    ],
+)
+def test_case_specific_success_semantics_are_strict(case_id: str, updates: dict[str, object], message: str) -> None:
+    with pytest.raises(contract.ContractError, match=message):
+        contract.validate_packet(packet(case_id, **updates), expected_candidate=CANDIDATE, now=NOW)
+
+
 def test_b09_rejects_accidental_contact_with_old_candidate() -> None:
     unsafe = packet("B09", contact_observed=True)
     with pytest.raises(contract.ContractError, match="contact"):
@@ -151,3 +199,15 @@ def test_valid_b03_is_accepted_but_campaign_remains_incomplete_without_all_cases
     )
     assert campaign["complete"] is False
     assert "B03" in campaign["cases_seen"]
+
+
+def test_campaign_with_all_required_cases_but_one_blocked_is_incomplete() -> None:
+    packets = [packet(case_id) for case_id in contract.CASE_IDS]
+    packets[-1]["status"] = "blocked"
+    result = contract.validate_campaign(
+        packets,
+        expected_candidate=CANDIDATE,
+        expected_hosts={"nitro"},
+        now=NOW,
+    )
+    assert result["complete"] is False
