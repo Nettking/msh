@@ -61,6 +61,10 @@ MEBIBYTE: Final = 1024 * 1024
 GIBIBYTE: Final = 1024 * MEBIBYTE
 
 CORE_COMPOSE_SERVICES: Final = ("web", "relay")
+CANDIDATE_COMPOSE_SERVICES: Final = frozenset({"flask", "recorder", "relay"})
+PINNED_EXTERNAL_IMAGE_RE: Final = re.compile(
+    r"@sha256:[0-9a-f]{64}(?:$|[/?])", re.IGNORECASE
+)
 BUILD_COMMIT_LABEL: Final = "no.fcp.build_commit"
 
 
@@ -371,6 +375,24 @@ def _container_matches_runtime_binding(
     return observed.rstrip("\\/").casefold() == str(expected).rstrip("\\/").casefold()
 
 
+def _compose_container_class(container: Mapping[str, object]) -> str:
+    """Classify one bound Compose row without relying on container names.
+
+    Candidate-built services are identified by their stable Compose service
+    names. A service outside that set is external only when Docker reports an
+    immutable digest-pinned image; everything else is intentionally unknown so
+    an unlabeled row cannot silently certify a candidate deployment.
+    """
+
+    service = str(container.get("Service") or "").strip().casefold()
+    if service in CANDIDATE_COMPOSE_SERVICES:
+        return "candidate"
+    image = str(container.get("Image") or "").strip()
+    if PINNED_EXTERNAL_IMAGE_RE.search(image) is not None:
+        return "external"
+    return "unknown"
+
+
 def _recorder_status_path(context: ProbeContext) -> Path:
     """The recorder status surface, preferring the explicitly bound file.
 
@@ -475,8 +497,9 @@ def _probe_running_commit_identity(context: ProbeContext) -> ProbeOutcome:
     observed: list[dict[str, object]] = []
     mismatched = 0
     running = 0
+    candidate_services_seen: set[str] = set()
     for container in containers:
-        service = str(container.get("Service") or container.get("Name") or "")
+        service = str(container.get("Service") or "")
         identifier = str(container.get("ID") or container.get("Name") or "")
         state = str(container.get("State") or "")
         if not identifier:
@@ -491,6 +514,32 @@ def _probe_running_commit_identity(context: ProbeContext) -> ProbeOutcome:
                 }
             )
             continue
+        container_class = _compose_container_class(container)
+        if container_class == "external":
+            if state.casefold() == "running":
+                running += 1
+            observed.append(
+                {
+                    "service": service,
+                    "state": state,
+                    "candidate_component": False,
+                    "external_component": True,
+                    "classification": "pinned-external-image",
+                }
+            )
+            continue
+        if container_class == "unknown":
+            mismatched += 1
+            observed.append(
+                {
+                    "service": service,
+                    "state": state,
+                    "candidate_component": False,
+                    "classification": "unknown-unclassified",
+                }
+            )
+            continue
+        candidate_services_seen.add(service.strip().casefold())
         commit = _container_label(context, identifier, BUILD_COMMIT_LABEL).casefold()
         matches = commit == context.commit
         if state.casefold() == "running":
@@ -505,8 +554,14 @@ def _probe_running_commit_identity(context: ProbeContext) -> ProbeOutcome:
                 "build_commit_present": bool(commit),
             }
         )
+    missing_candidate_services = sorted(
+        CANDIDATE_COMPOSE_SERVICES - candidate_services_seen
+    )
+    if missing_candidate_services:
+        mismatched += len(missing_candidate_services)
     detail["containers"] = observed
     detail["running_containers"] = running
+    detail["missing_candidate_services"] = missing_candidate_services
 
     status_file = _recorder_status_path(context)
     payload = _load_json(status_file)

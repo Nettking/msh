@@ -60,7 +60,7 @@ def test_alternate_compose_project_is_used_instead_of_checkout_cwd(
 
     def fake_run(command, *, cwd, timeout=60.0):
         calls.append((list(command), cwd))
-        return 0, json.dumps([{"Name": "fcp-new-web-1", "Service": "web", "State": "running", "ID": "c1"}])
+        return 0, json.dumps([{"Name": "fcp-new-flask-1", "Service": "flask", "State": "running", "ID": "c1"}])
 
     monkeypatch.setattr(probes, "_run", fake_run)
     containers = probes._compose_containers(
@@ -94,11 +94,12 @@ def test_running_identity_rejects_wrong_sha_and_missing_labels(
         probes,
         "_compose_containers",
         lambda _context: [
-            {"Name": "web", "Service": "web", "State": "running", "ID": "wrong"},
+            {"Name": "flask", "Service": "flask", "State": "running", "ID": "wrong"},
             {"Name": "relay", "Service": "relay", "State": "running", "ID": "missing"},
+            {"Name": "recorder", "Service": "recorder", "State": "running", "ID": "recorder"},
         ],
     )
-    labels = {"wrong": "c" * 40, "missing": ""}
+    labels = {"wrong": "c" * 40, "missing": "", "recorder": COMMIT}
     monkeypatch.setattr(
         probes,
         "_container_label",
@@ -122,7 +123,163 @@ def test_running_identity_rejects_wrong_sha_and_missing_labels(
         )
     )
     assert outcome.status == probes.FAIL
-    assert all(not item["build_commit_matches_candidate"] for item in outcome.detail["containers"])
+    matches = {
+        item["service"]: item["build_commit_matches_candidate"]
+        for item in outcome.detail["containers"]
+    }
+    assert matches == {"flask": False, "relay": False, "recorder": True}
+
+
+def _compose_identity_context(tmp_path: Path) -> probes.ProbeContext:
+    runtime = binding.RuntimeBinding.from_mapping(compose_document(tmp_path))
+    return probes.ProbeContext(
+        checkout=tmp_path,
+        evidence_root=tmp_path,
+        commit=COMMIT,
+        host_id="nitro",
+        os_category="posix",
+        profile="school-control",
+        scenario="P01",
+        assertion="posix-runtime-state",
+        runtime_binding=runtime,
+    )
+
+
+def _patch_identity_runtime(
+    monkeypatch: pytest.MonkeyPatch,
+    containers: list[dict[str, object]],
+    labels: dict[str, str],
+) -> None:
+    monkeypatch.setattr(probes, "_docker_available", lambda: True)
+    monkeypatch.setattr(probes, "_compose_containers", lambda _context: containers)
+    monkeypatch.setattr(
+        probes,
+        "_container_label",
+        lambda context, container, label: (
+            str(context.runtime_binding.compose_working_directory)
+            if label == "com.docker.compose.project.working_dir"
+            else labels[container]
+        ),
+    )
+
+
+def _candidate_containers() -> list[dict[str, object]]:
+    return [
+        {"Service": service, "State": "running", "ID": service}
+        for service in ("flask", "recorder", "relay")
+    ]
+
+
+def test_running_identity_accepts_candidate_services_plus_pinned_external_ollama(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    containers = _candidate_containers()
+    containers.append(
+        {
+            "Service": "ollama",
+            "State": "running",
+            "ID": "ollama",
+            "Image": "ollama/ollama:0.32.6@sha256:" + "a" * 64,
+        }
+    )
+    _patch_identity_runtime(monkeypatch, containers, {service: COMMIT for service in ("flask", "recorder", "relay")})
+
+    outcome = probes._probe_running_commit_identity(_compose_identity_context(tmp_path))
+
+    assert outcome.status == probes.PASS
+    assert any(
+        item.get("classification") == "pinned-external-image"
+        for item in outcome.detail["containers"]
+    )
+
+
+def test_running_identity_rejects_unlabeled_candidate_service_even_with_external_image(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    containers = _candidate_containers()
+    containers.append(
+        {
+            "Service": "ollama",
+            "State": "running",
+            "ID": "ollama",
+            "Image": "ollama/ollama:0.32.6@sha256:" + "a" * 64,
+        }
+    )
+    _patch_identity_runtime(
+        monkeypatch,
+        containers,
+        {"flask": "", "recorder": COMMIT, "relay": COMMIT},
+    )
+
+    outcome = probes._probe_running_commit_identity(_compose_identity_context(tmp_path))
+
+    assert outcome.status == probes.FAIL
+
+
+def test_running_identity_rejects_missing_candidate_service_even_with_external_image(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    containers = [
+        {"Service": service, "State": "running", "ID": service}
+        for service in ("recorder", "relay")
+    ]
+    containers.append(
+        {
+            "Service": "ollama",
+            "State": "running",
+            "ID": "ollama",
+            "Image": "ollama/ollama:0.32.6@sha256:" + "a" * 64,
+        }
+    )
+    _patch_identity_runtime(
+        monkeypatch,
+        containers,
+        {"recorder": COMMIT, "relay": COMMIT},
+    )
+
+    outcome = probes._probe_running_commit_identity(_compose_identity_context(tmp_path))
+
+    assert outcome.status == probes.FAIL
+    assert outcome.detail["missing_candidate_services"] == ["flask"]
+
+
+@pytest.mark.parametrize("service", ["relay", "recorder"])
+def test_running_identity_rejects_wrong_candidate_service_sha(
+    service: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    labels = {name: COMMIT for name in ("flask", "recorder", "relay")}
+    labels[service] = "d" * 40
+    _patch_identity_runtime(monkeypatch, _candidate_containers(), labels)
+
+    outcome = probes._probe_running_commit_identity(_compose_identity_context(tmp_path))
+
+    assert outcome.status == probes.FAIL
+
+
+def test_running_identity_fails_closed_for_unknown_unpinned_service(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    containers = _candidate_containers()
+    containers.append({"Service": "mystery", "State": "running", "ID": "mystery"})
+    _patch_identity_runtime(
+        monkeypatch,
+        containers,
+        {service: COMMIT for service in ("flask", "recorder", "relay")},
+    )
+
+    outcome = probes._probe_running_commit_identity(_compose_identity_context(tmp_path))
+
+    assert outcome.status == probes.FAIL
+    assert any(
+        item.get("classification") == "unknown-unclassified"
+        for item in outcome.detail["containers"]
+    )
 
 
 def test_native_binding_uses_external_status_and_data_root_without_leaking_paths(
