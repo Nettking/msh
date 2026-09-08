@@ -2,7 +2,7 @@
 
 Status: **current administrator guide**
 
-Reviewed: **2026-09-02 Europe/Amsterdam**
+Reviewed: **2026-09-08 Europe/Oslo**
 
 This guide defines the supported Federation v1 backup and recovery boundary. It is intentionally conservative: recovery must preserve authority rather than manufacture a replacement identity that merely looks like the failed device.
 
@@ -12,7 +12,7 @@ FCP distinguishes three cases:
 
 1. **Same-installation recovery** — restore the same FCP device only when its cryptographic identity remains usable.
 2. **Replacement member** — a permanently lost ordinary member is replaced by a fresh FCP identity, then paired/rejoined and reconfigured.
-3. **Creator loss** — the Federation creator is special because creator provenance and human credential authority do not transfer to the current operational leader.
+3. **Creator/coordinator loss** — creator provenance is immutable. Recovery depends on whether the installation uses the legacy single coordinator or the configured replicated authority and private credential-continuity path described below.
 
 Portable identity cloning is not a Federation v1 feature.
 
@@ -24,13 +24,16 @@ For the default deployment, protect these items together:
 | --- | --- | --- |
 | Device identity, Federation/member state, recorder/source configuration, checkpoints, recorded/imported data and local capability state | effective `data/` bind | Critical |
 | Human account database and authentication secrets | `data/auth/` | Critical, especially on the creator/credential-authority installation |
-| Federation coordinator authority database | retained `relay_state` Docker volume | Critical on the coordinator/creator installation |
+| Federation coordinator state | retained `relay_state` Docker volume | Critical; in configured replicated mode the local coordinator database is a materialized view, not an independent replacement for the committed authority log |
+| Configured replicated authority and private credential state | configured replica database and sibling `human_credentials_replica.sqlite3`, voter identity, deployment configuration and transport-secret paths | Critical when replicated control-plane mode is enabled; determine actual paths and backup coverage explicitly |
 | Local deployment settings | `.env` when present | Important when non-default paths, binds or service settings are used |
 | Workflow and analysis results | effective `results/` bind | Optional historical state; preserve when results must survive |
 | Ollama/provider model volumes | Docker volumes | Re-downloadable; not required for authority recovery |
 | Docker images | local Docker cache | Rebuildable; not required for authority recovery |
 
 The supported backup command resolves the effective Compose bind and volume sources rather than assuming repository-local defaults. Human-authentication files are one recovery unit. In particular, back up `users.sqlite3`, `flask-secret`, and `password-salt` together. Restoring only part of that set can invalidate passwords or browser sessions and can create contradictory authentication state.
+
+The configured replicated deployment does not make backups unnecessary. Its encrypted credential snapshots intentionally omit browser session secrets, and its authority replicas do not replace a physically independent backup. Inspect the backup manifest against the actual configured replica, credential, voter-identity, and secret paths. A path outside the resolved backup sources is not included merely because it is named in control-plane configuration. Do not claim complete replicated-state recovery until those paths and their quiescence/restore procedure have been verified. A native voter or Recorder outside Compose must be explicitly quiesced before copying its writable state; the backup command does not automatically stop unsupervised native processes.
 
 ## Windows identity portability rule
 
@@ -202,13 +205,15 @@ Do **not** copy the old member's identity/Federation state into the replacement 
 
 ## Creator and credential-authority loss
 
-The Federation creator is not equivalent to the current operational leader. Operational leader failover does not transfer immutable creator provenance or the creator-backed human password database.
+The Federation creator is not equivalent to the current operational leader. No recovery path transfers creator provenance, impersonates its private key, or rewrites the old creator identity. The availability and credential-recovery paths depend on deployment mode.
 
-To recover the same Federation after creator-host failure, the recovery must retain usable creator identity material, the creator's human-authentication state, and the authoritative Federation coordinator state required by that deployment.
+**Legacy single coordinator:** safe same-installation recovery requires the usable identity, human-authentication state, and authoritative coordinator state required by that installation. Operational leader promotion alone does not replicate the missing coordinator or human password database.
 
-If the creator's cryptographic identity is irrecoverably lost, Federation v1 does not provide a mechanism for another member to impersonate or rewrite the old creator. If the existing authority cannot be recovered safely, create a new Federation, generate fresh device identities where required, re-enrol trusted devices, and recreate human accounts on the new credential authority. Do not edit databases or identity files to manufacture continuity.
+**Configured replicated authority:** with the fixed three-voter deployment, an eligible surviving coordinator and a two-vote quorum can recover the same Federation from committed replicated authority without taking over the creator's private identity. The new leader can restore the last quorum-certified encrypted snapshot of the human-auth database and password salt. Browser session secrets are excluded, sessions may be invalidated, and changes not yet committed in a credential snapshot are outside that guarantee. The voter-only Recorder cannot become the operational coordinator. Quorum loss or missing certified recovery state must fail closed.
 
-This limitation is intentional and should be treated as an operator-visible disaster-recovery boundary, not bypassed by broadening node or human authority.
+The implemented existing-Federation migration also requires quorum-witnessed history and recoverable credential state where human accounts exist; one copied legacy database is not sufficient authority. This does not promise recovery after loss of all voters, their decryption/identity material, or the only valid backups. If the existing authority cannot be recovered safely, use an explicitly planned new Federation and fresh enrollment rather than editing databases or identity files to manufacture continuity. Preserve historical Recorder data through the reviewed data recovery path.
+
+Exact-candidate physical coordinator-loss, credential-continuity, and backup/restore rehearsal remains **PENDING** until separate physical evidence is accepted. Software regression names or a configured quorum do not establish that the physical backup covers every required path.
 
 ## Release-candidate recovery rehearsal
 
@@ -238,7 +243,7 @@ Release evidence must remain redacted: never commit private keys, passwords, has
 Federation v1 does not promise:
 
 - portable cloning of a Windows DPAPI-protected node identity to arbitrary hardware/users;
-- automatic transfer of creator or human credential authority to a promoted operational leader;
+- transfer or impersonation of immutable creator identity, or credential recovery without the configured certified snapshot/recovery prerequisites;
 - online/hot copying of active SQLite/relay state;
 - automatic quiescence of a live unsupervised native recorder;
 - automatic restart after backup; or

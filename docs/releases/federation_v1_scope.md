@@ -19,6 +19,7 @@ Current release state:
 - standalone recorder Federation bootstrap/publication and bounded remote recorder control: merged;
 - MTConnect operational segmentation S1-S7 and read-only closeout validation: merged;
 - Federation-scoped human sign-in with leader-held credentials and signed member assertions: implemented;
+- configured three-voter replicated authority and private quorum-certified credential continuity: implemented; exact-candidate physical validation pending;
 - complete physical CF7 evidence: not accepted;
 - Federation v1 end-to-end acceptance: false;
 - release tag: not created.
@@ -58,6 +59,12 @@ The former role-first installed-product runtime is not part of the current produ
 The current browser pairing flow issues signed one-use `FCP1-...` codes valid for up to 10 minutes and permits a fresh code to be generated when another join attempt is needed.
 
 The user-facing `federation_id` maps to the existing internal `session_id` compatibility boundary. Removing or renaming the internal boundary requires a separate protocol-major migration.
+
+### Configured replicated authority
+
+When `FCP_REPLICATED_CONTROL_PLANE_CONFIG` selects the replicated product runtime, a fixed three-voter command log requires a two-vote quorum for authority commits. Authenticated/encrypted peer transport, durable terms, catch-up/snapshots, readiness sealing, and fencing support recovery by an eligible surviving coordinator while preserving the same Federation identity, creator provenance, membership, revocations, and capability ownership. Coordinator databases are local materialized views; this is not SQLite/WAL page replication.
+
+The dedicated Recorder voter contributes durability without becoming an operational coordinator or writing into protected Recorder data. Continued operation requires quorum and an eligible coordinator. Legacy deployments without this configuration retain the single-coordinator availability boundary. Voter-set reconfiguration and Byzantine-fault tolerance are outside v1. These are implemented boundaries; physical acceptance remains pending as stated above.
 
 ### Transport
 
@@ -164,7 +171,7 @@ boundary.
 
 ### Manual Federation-wide software updates
 
-The coordinator/session creator may explicitly run **Check for updates** and **Update all devices** for normal updater-capable FCP installations.
+The current operational leader may explicitly run **Check for updates** and **Update all devices** for normal updater-capable FCP installations.
 
 The v1 update boundary includes:
 
@@ -185,11 +192,12 @@ A standalone recorder launched directly through `python start_recorder.py` does 
 ### Human authentication and authorization
 
 - browser users sign in with human accounts that never reuse Federation node IDs, pairing grants, recorder keys, or device identities;
-- the Federation creator/leader is the human credential authority for a connected Federation;
-- passwords and password hashes remain only in the leader's local authentication database and are never replicated through Federation state;
+- the authoritative human sign-in service resolves the current fenced leader in the configured replicated deployment; legacy installations retain their creator-backed credential boundary;
+- passwords, password hashes, and salts never enter public Federation state, discovery, or session events; configured voters privately retain encrypted human-auth database/password-salt snapshots with quorum-signed commit certificates, allowing an eligible new leader to restore the last certified snapshot;
+- browser session secrets are excluded from credential replication, existing sessions may be invalidated after failover, and credential changes not yet snapshot-committed are outside that recovery guarantee; backups remain required;
 - trusted member devices use a browser redirect to the leader and accept only short-lived Ed25519-signed assertions bound to the Federation session, target node, human subject, roles, active state, random browser state, and expiry;
 - non-secret human authorization metadata (`email`, `active`, and role names), the leader's public sign-in identity/origin, and each member's own browser origin are carried on authenticated Federation session events;
-- coordinator policy permits only the Federation creator to publish human authority/user state, while members may advertise only their own browser endpoint;
+- coordinator policy restricts human authority/user publication to the authorized credential authority, while members may advertise only their own browser endpoint;
 - `viewer`, `operator`, and `admin` map onto a central server-side permission policy that routes check by permission rather than by role name;
 - `/admin/users` is authoritative on the leader; member user-administration requests redirect to the leader or fail closed for unsafe writes;
 - member-local password login is disabled by default, including during Federation outages, so an old local credential store cannot silently bypass Federation revocation; and
@@ -245,7 +253,7 @@ V1 does not claim:
 - public anonymous participation;
 - arbitrary untrusted provider execution;
 - Byzantine-fault tolerance;
-- decentralized consensus without stable coordination;
+- authority progress without the configured quorum and an eligible coordinator, or dynamic voter-set reconfiguration;
 - transparent distributed SQL;
 - multi-primary storage across intermittently connected devices;
 - safe public exposure of internal service ports; or

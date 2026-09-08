@@ -13,7 +13,7 @@ FCP separates three concepts that older documentation sometimes treated as one:
 
 - **Federation creator** — immutable creation provenance.
 - **Current operational leader** — the member holding the current coordinator-authored monotonic leadership term.
-- **Authoritative coordinator/relay service** — the durable service/database that validates membership and leadership transitions.
+- **Authoritative coordinator/relay service** — the service that validates membership and leadership transitions. In the configured replicated deployment, its local database is a materialized view of the committed authority log.
 
 The Federation overview exposes creator, current leader, and leadership term so operators can see which device currently owns leader-only product controls.
 
@@ -30,7 +30,14 @@ After a valid transition:
 
 If no connected successor exists, FCP fails closed rather than inventing a leader.
 
-This is **not** replicated coordinator/quorum failover. If the machine holding the authoritative coordinator database/relay is unavailable, leader promotion cannot replace that missing coordinator service.
+The availability boundary depends on deployment mode:
+
+- **Legacy single coordinator:** without `FCP_REPLICATED_CONTROL_PLANE_CONFIG`, the relay uses the established coordinator service. Operational leader promotion cannot replace an unavailable authoritative coordinator database/relay.
+- **Configured replicated authority:** the product relay runs a fixed three-voter control plane with a two-vote commit quorum, authenticated/encrypted peer messages, durable terms, follower catch-up, and quorum-loss fencing. An eligible surviving coordinator can recover the same Federation and materialize its committed authority state. Creator identity remains immutable provenance; recovery does not impersonate the creator or create a replacement Federation.
+
+The Recorder can run the dedicated voter-only process. It persists authenticated authority and private credential-replica messages but never starts an election, opens the product relay, or materializes coordinator state. Its writable state must be outside protected Recorder data. Two available voters are necessary for authority commits; an eligible coordinator is also required for product leadership. Loss of quorum fails closed. This fixed trusted-voter deployment does not provide Byzantine-fault tolerance, dynamic voter membership, or unrestricted availability during partitions.
+
+The replicated runtime and its software regressions are implemented. Exact-candidate physical leader-loss, reconnect, credential, and Recorder-preservation acceptance remains **PENDING** until the separate physical evidence is accepted. A local-socket regression is not physical multi-host evidence.
 
 ### Clock prerequisite for storage authority
 
@@ -47,7 +54,7 @@ prove the host's absolute NTP offset by itself.
 
 ### Human credential authority is separate
 
-Operational leader transfer does not move the human password database. The immutable Federation creator remains the human credential/password authority used by Federation SSO. See [Human users, sign-in, and permissions](human-authentication.md).
+In legacy deployments, operational leader transfer does not supply replicated human credentials. In the configured replicated deployment, the current fenced leader can restore the last quorum-certified encrypted snapshot of the human-auth database and password salt. Public Federation events still carry no passwords, password hashes, or salts. Browser session secrets are excluded, so existing sessions may be invalidated. Changes not yet committed in a credential snapshot are not covered by that recovery guarantee; independently verified backups remain necessary. See [Human users, sign-in, and permissions](human-authentication.md) and [Backup and recovery](backup_recovery.md).
 
 ## Pair another FCP device
 

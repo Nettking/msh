@@ -1,0 +1,10 @@
+{
+  "schema": "fcp.icse-synthetic-readings.v1",
+  "dataset_id": "synthetic-mill-01",
+  "origin": "invented demonstration data; no physical measurement",
+  "observations": [
+    {"sequence": 1, "spindle_rpm": 1200, "feed_mm_per_min": 100},
+    {"sequence": 2, "spindle_rpm": 1250, "feed_mm_per_min": 105},
+    {"sequence": 3, "spindle_rpm": 1300, "feed_mm_per_min": 110}
+  ]
+}
