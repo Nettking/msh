@@ -1,17 +1,23 @@
-"""Human-auth authority resolution for replicated Federation leader failover.
+"""Human-auth integration for replicated Federation leader failover.
 
-The base SSO service retains legacy creator-backed semantics for standalone and
-non-replicated coordinators.  This subclass follows the durable current
-operational leader whenever the connected coordinator exposes
-``session_leadership``.  Immutable creator provenance remains in the session
-row and is never rewritten.
+Legacy/standalone installations retain creator-backed semantics. When a
+coordinator exposes durable leadership, credential/sign-in authority follows
+the current fenced operational leader while immutable creator provenance stays
+unchanged.
 """
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
+from flask import current_app
+
+from catalog.federation.control_plane_runtime import AUTH_GENERATION_FILE
 from catalog.federation.errors import FederationOperationError
 
 from .federation import FederationHumanAuthService
+from .models import db
 
 
 class CurrentLeaderFederationHumanAuthService(FederationHumanAuthService):
@@ -44,4 +50,66 @@ class CurrentLeaderFederationHumanAuthService(FederationHumanAuthService):
         return super()._leader_node_id(context)
 
 
-__all__ = ["CurrentLeaderFederationHumanAuthService"]
+class HumanAuthReplicaGenerationWatcher:
+    """Refresh Flask auth state after the relay restores a credential snapshot."""
+
+    def __init__(
+        self,
+        generation_file: Path | str = Path("/var/lib/fcp-relay") / AUTH_GENERATION_FILE,
+        password_salt_file: Path | str = "/app/data/auth/password-salt",
+    ) -> None:
+        self.generation_file = Path(generation_file)
+        self.password_salt_file = Path(password_salt_file)
+        self._generation: tuple[int, str] | None = None
+
+    def _read_generation(self) -> tuple[int, str] | None:
+        try:
+            value = json.loads(self.generation_file.read_text(encoding="utf-8"))
+        except (FileNotFoundError, OSError, UnicodeDecodeError, json.JSONDecodeError):
+            return None
+        if (
+            not isinstance(value, dict)
+            or value.get("schema") != "fcp.human-auth.replica-generation.v1"
+            or isinstance(value.get("version"), bool)
+            or not isinstance(value.get("version"), int)
+            or value["version"] < 0
+            or not isinstance(value.get("snapshot_id"), str)
+            or not value["snapshot_id"]
+        ):
+            return None
+        return int(value["version"]), str(value["snapshot_id"])
+
+    def refresh_if_changed(self) -> bool:
+        generation = self._read_generation()
+        if generation is None:
+            return False
+        if self._generation is None:
+            self._generation = generation
+            return False
+        if generation == self._generation:
+            return False
+
+        try:
+            salt = self.password_salt_file.read_text(encoding="utf-8").strip()
+        except OSError as exc:
+            raise FederationOperationError(
+                "human-auth-replica-salt-unavailable",
+                "the restored human-auth password salt is unavailable",
+            ) from exc
+        if len(salt) < 32:
+            raise FederationOperationError(
+                "human-auth-replica-salt-invalid",
+                "the restored human-auth password salt is invalid",
+            )
+
+        db.session.remove()
+        db.engine.dispose()
+        current_app.config["SECURITY_PASSWORD_SALT"] = salt
+        self._generation = generation
+        return True
+
+
+__all__ = [
+    "CurrentLeaderFederationHumanAuthService",
+    "HumanAuthReplicaGenerationWatcher",
+]
