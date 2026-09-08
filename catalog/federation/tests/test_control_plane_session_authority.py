@@ -78,6 +78,19 @@ def test_real_committed_unsealed_bootstrap_cannot_grant_session_authority(
         assert not original.ready
         with pytest.raises((ControlPlaneError, FederationOperationError)):
             coordinator.session_authority(session_id=SESSION, actor_node_id=actor)
+        # A real quorum leader must still refuse mutations before the seal;
+        # checking quorum first must not create even a local enrollment grant.
+        before_journal = _journal(original)
+        before_commit = original.node.store.commit_index
+        with original.local.store.read_transaction() as database:
+            before_grants = database.execute("SELECT COUNT(*) FROM enrollment_tokens").fetchone()[0]
+        with pytest.raises(ControlPlaneError, match="readiness seal"):
+            coordinator.create_enrollment_token()
+        with original.local.store.read_transaction() as database:
+            assert database.execute("SELECT COUNT(*) FROM enrollment_tokens").fetchone()[0] == before_grants
+        assert _journal(original) == before_journal
+        assert original.node.store.commit_index == before_commit
+        assert original.journal._pending() is None
         observed["refused"] = True
         original._stop.set()
         raise RuntimeError("injected pre-seal interruption")

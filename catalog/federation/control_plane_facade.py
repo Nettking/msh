@@ -17,7 +17,11 @@ def _journal_operation(method):
     def guarded(self, *args, **kwargs):
         journal = getattr(self.runtime, "journal", None)
         if journal is not None and not self.runtime.ready:
-            raise ControlPlaneError("product authority has not completed its readiness seal")
+            # Preserve the public leader/quorum rejection before reporting an
+            # unsealed leader. Neither refusal may enter the journal transaction.
+            self.runtime.require_quorum_leader()
+            if not self.runtime.ready:
+                raise ControlPlaneError("product authority has not completed its readiness seal")
         with journal.operation() if journal is not None else nullcontext():
             return method(self, *args, **kwargs)
     return guarded
