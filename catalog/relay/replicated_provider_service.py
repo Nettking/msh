@@ -1,9 +1,14 @@
 """Product relay entrypoint with optional replicated C03 authority.
 
 When ``FCP_REPLICATED_CONTROL_PLANE_CONFIG`` is absent this module delegates
-verbatim to the established provider relay service. When configured, all three
-voter hosts run the authenticated consensus/credential endpoints and the
-existing WebSocket provider relay against a quorum-fenced coordinator facade.
+verbatim to the established provider relay service. When configured, product
+voters run the authenticated consensus/credential endpoints and the existing
+WebSocket provider relay against a quorum-fenced coordinator facade.
+
+Existing pre-C03 Federations are migrated through the quorum-witnessed legacy
+runtime. The legacy member databases are read-only evidence; they are never
+rewritten or copied as authority, and protected recorder measurement data is not
+part of this path.
 """
 
 from __future__ import annotations
@@ -19,6 +24,9 @@ from pathlib import Path
 
 from catalog.federation.control_plane_facade import (
     PhysicalReadyReplicatedSessionCoordinator,
+)
+from catalog.federation.control_plane_legacy_migration import (
+    OfflineCreatorRecoverableRuntime,
 )
 from catalog.federation.control_plane_product import ReplicatedControlPlaneDeployment
 from catalog.federation.control_plane_replication import ControlPlaneError
@@ -51,8 +59,12 @@ from catalog.relay.service import (
 CONFIG_ENV = "FCP_REPLICATED_CONTROL_PLANE_CONFIG"
 BOOTSTRAP_FEDERATION_ENV = "FCP_C03_BOOTSTRAP_FEDERATION_ID"
 BOOTSTRAP_SESSION_ENV = "FCP_C03_BOOTSTRAP_SESSION_ID"
+LEGACY_NODE_STATE_ENV = "FCP_C03_LEGACY_NODE_STATE_DATABASE"
+LEGACY_PAIRING_STATE_ENV = "FCP_C03_LEGACY_PAIRING_STATE_PATH"
 DEFAULT_AUTH_DATABASE = "/app/data/auth/users.sqlite3"
 DEFAULT_AUTH_SALT = "/app/data/auth/password-salt"
+DEFAULT_LEGACY_NODE_STATE = "/app/data/federation/device/node_state.sqlite3"
+DEFAULT_LEGACY_PAIRING_STATE = "/app/data/federation/onboarding/remote_pairing.json"
 STATUS_INTERVAL_SECONDS = 1.0
 
 
@@ -91,7 +103,7 @@ async def _serve_replicated(args, config_path: Path) -> None:
             "relay database must match replicated control-plane coordinator_database"
         )
 
-    runtime = PhysicalReadyReplicatedFederationRuntime(
+    runtime = OfflineCreatorRecoverableRuntime(
         deployment,
         human_auth_database=Path(
             os.getenv("FCP_AUTH_DATABASE", DEFAULT_AUTH_DATABASE)
@@ -101,6 +113,12 @@ async def _serve_replicated(args, config_path: Path) -> None:
         ),
         bootstrap_federation_id=_optional_env(BOOTSTRAP_FEDERATION_ENV),
         bootstrap_session_id=_optional_env(BOOTSTRAP_SESSION_ENV),
+        legacy_node_state_database=Path(
+            os.getenv(LEGACY_NODE_STATE_ENV, DEFAULT_LEGACY_NODE_STATE)
+        ),
+        legacy_pairing_state_path=Path(
+            os.getenv(LEGACY_PAIRING_STATE_ENV, DEFAULT_LEGACY_PAIRING_STATE)
+        ),
     )
     coordinator = PhysicalReadyReplicatedSessionCoordinator(runtime)
     relay = ProviderAuthorityRelayServer(
