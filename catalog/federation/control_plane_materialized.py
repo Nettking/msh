@@ -1,14 +1,9 @@
 """Non-destructive materialized coordinator view for replicated C03 authority.
 
-The first integration bridge intentionally made replicated state authoritative,
-but a full delete/rebuild of ``session_events`` would also delete unrelated
-product history (software-update, storage, human-auth metadata, jobs, etc.).
-This deployment runtime therefore materializes only the durable authority
-columns C03 owns and appends missing leadership evidence without truncating any
-other session events.
-
-The replicated log remains the authority.  This SQLite view exists solely for
-compatibility with existing relay/product readers.
+The replicated command log is authoritative.  The existing coordinator SQLite
+schema remains a compatibility projection for product readers and is updated
+without truncating unrelated session history (software updates, storage,
+human-auth metadata, jobs, etc.).
 """
 
 from __future__ import annotations
@@ -24,6 +19,7 @@ from .control_plane_product import (
     _stamp,
 )
 from .control_plane_replication import ControlPlaneError
+from .session_leadership import LEADERSHIP_SCHEMA
 
 
 def _canonical(value: object) -> str:
@@ -162,62 +158,82 @@ class MaterializedReplicatedFederationRuntime(ReplicatedFederationRuntime):
                             ),
                         )
 
-                # Leadership is the one C03 public event existing product code
-                # consumes as an authorization proof. Append exactly one event
-                # for each replicated monotonic term, leaving all other event
-                # types and revisions untouched.
+                # Leadership ----------------------------------------------------------
+                # SessionLeadershipService starts from immutable creator/term 1 and
+                # trusts only coordinator-authored, schema-valid, contiguous term
+                # transitions. Materialize every C03 transition in order; never
+                # invent a missing intermediate term and never emit a synthetic
+                # term-1 change event.
                 authority = state["leaders"].get(session_id)
                 if authority is not None:
                     target_term = int(authority["term"])
                     target_leader = str(authority["leader_node_id"])
-                    rows = database.execute(
-                        """
-                        SELECT payload_json FROM session_events
-                        WHERE session_id=? AND event_type='session.leader.changed'
-                        ORDER BY revision DESC
-                        """,
-                        (session_id,),
-                    ).fetchall()
-                    existing_terms: set[tuple[int, str]] = set()
-                    for row in rows:
-                        try:
-                            payload = json.loads(row["payload_json"])
-                            existing_terms.add(
-                                (int(payload.get("term", -1)), str(payload.get("leader_node_id", "")))
-                            )
-                        except (TypeError, ValueError, json.JSONDecodeError):
+                    creator = str(authority["creator_node_id"])
+                    c03_transitions: dict[int, dict[str, Any]] = {}
+                    for event in state["session_events"].get(session_id, []):
+                        if event.get("event_type") != "session.leader.changed":
                             continue
-                    if (target_term, target_leader) not in existing_terms:
+                        payload = event.get("payload")
+                        if not isinstance(payload, dict):
+                            raise ControlPlaneError(
+                                "replicated leadership event payload is malformed"
+                            )
+                        term = payload.get("term")
+                        if isinstance(term, bool) or not isinstance(term, int) or term < 2:
+                            raise ControlPlaneError(
+                                "replicated leadership term is malformed"
+                            )
+                        if term in c03_transitions:
+                            raise ControlPlaneError(
+                                "replicated leadership term appears more than once"
+                            )
+                        c03_transitions[term] = {
+                            "event": event,
+                            "payload": payload,
+                        }
+
+                    expected_leader = creator
+                    for term in range(2, target_term + 1):
+                        transition = c03_transitions.get(term)
+                        if transition is None:
+                            raise ControlPlaneError(
+                                "replicated leadership history has a term gap"
+                            )
+                        source = transition["payload"]
+                        previous = str(source.get("previous_leader_node_id", ""))
+                        leader_id = str(source.get("leader_node_id", ""))
+                        if previous != expected_leader or not leader_id:
+                            raise ControlPlaneError(
+                                "replicated leadership history is not contiguous"
+                            )
+                        expected_leader = leader_id
+
+                        digest = _event_digest(session_id, term, leader_id)
+                        existing = database.execute(
+                            "SELECT 1 FROM session_events WHERE event_id=?",
+                            (f"c03-{digest[:32]}",),
+                        ).fetchone()
+                        if existing is not None:
+                            continue
                         revision = int(
                             database.execute(
                                 "SELECT revision FROM sessions WHERE session_id=?",
                                 (session_id,),
                             ).fetchone()[0]
                         ) + 1
-                        # Recover the previous leader from the nearest preceding
-                        # C03 event when possible; genesis uses creator provenance.
-                        previous = str(authority["creator_node_id"])
-                        c03_events = state["session_events"].get(session_id, [])
-                        for event in reversed(c03_events):
-                            if (
-                                event.get("event_type") == "session.leader.changed"
-                                and int(event.get("payload", {}).get("term", -1)) == target_term
-                            ):
-                                previous = str(
-                                    event.get("payload", {}).get(
-                                        "previous_leader_node_id", previous
-                                    )
-                                )
-                                break
                         payload = {
+                            "schema": LEADERSHIP_SCHEMA,
                             "session_id": session_id,
                             "previous_leader_node_id": previous,
-                            "leader_node_id": target_leader,
-                            "term": target_term,
-                            "reason": "replicated-authority-materialization",
+                            "leader_node_id": leader_id,
+                            "term": term,
+                            "reason": str(
+                                source.get("reason")
+                                or "replicated-authority-materialization"
+                            )[:128],
                         }
                         payload_json = _canonical(payload)
-                        digest = _event_digest(session_id, target_term, target_leader)
+                        event_value = transition["event"]
                         database.execute(
                             """
                             INSERT INTO session_events(
@@ -231,7 +247,7 @@ class MaterializedReplicatedFederationRuntime(ReplicatedFederationRuntime):
                                 f"c03-{digest[:32]}",
                                 f"sha256:{digest}",
                                 "session.leader.changed",
-                                now_text,
+                                _event_time(event_value.get("occurred_at"), now_text),
                                 REPLICATED_COORDINATOR_ID,
                                 payload_json,
                                 f"sha256:{hashlib.sha256(payload_json.encode('utf-8')).hexdigest()}",
@@ -240,6 +256,10 @@ class MaterializedReplicatedFederationRuntime(ReplicatedFederationRuntime):
                         database.execute(
                             "UPDATE sessions SET revision=? WHERE session_id=?",
                             (revision, session_id),
+                        )
+                    if expected_leader != target_leader:
+                        raise ControlPlaneError(
+                            "replicated leadership projection disagrees with current leader"
                         )
 
                 # Capability authority ------------------------------------------------
@@ -275,11 +295,9 @@ class MaterializedReplicatedFederationRuntime(ReplicatedFederationRuntime):
                             now_text,
                         ),
                     )
-                # Do not delete pre-existing rows here. A host being migrated to
-                # C03 may contain valid capabilities announced before replicated
-                # authority was enabled. Withdrawals are applied only after the
-                # corresponding capability has been admitted to C03, avoiding a
-                # destructive first materialization.
+                # Do not delete pre-existing rows on first C03 materialization.
+                # A migration may contain valid capability rows announced before
+                # replicated authority was enabled.
 
 
 __all__ = ["MaterializedReplicatedFederationRuntime"]
