@@ -19,6 +19,8 @@ from catalog.federation.errors import FederationOperationError
 from .federation import FederationHumanAuthService
 from .models import db
 
+_SHARED_AUTH_DIRECTORY = Path("/app/data/auth")
+
 
 class CurrentLeaderFederationHumanAuthService(FederationHumanAuthService):
     """Resolve credential/sign-in authority from durable Federation leadership."""
@@ -55,8 +57,8 @@ class HumanAuthReplicaGenerationWatcher:
 
     def __init__(
         self,
-        generation_file: Path | str = Path("/var/lib/fcp-relay") / AUTH_GENERATION_FILE,
-        password_salt_file: Path | str = "/app/data/auth/password-salt",
+        generation_file: Path | str = _SHARED_AUTH_DIRECTORY / AUTH_GENERATION_FILE,
+        password_salt_file: Path | str = _SHARED_AUTH_DIRECTORY / "password-salt",
     ) -> None:
         self.generation_file = Path(generation_file)
         self.password_salt_file = Path(password_salt_file)
