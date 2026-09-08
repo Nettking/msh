@@ -25,19 +25,14 @@ from pathlib import Path
 from catalog.federation.control_plane_facade import (
     PhysicalReadyReplicatedSessionCoordinator,
 )
-from catalog.federation.control_plane_legacy_migration import (
-    OfflineCreatorRecoverableRuntime,
-)
 from catalog.federation.control_plane_product import ReplicatedControlPlaneDeployment
 from catalog.federation.control_plane_replication import ControlPlaneError
-from catalog.federation.control_plane_runtime import (
-    PhysicalReadyReplicatedFederationRuntime,
-)
 from catalog.federation.control_plane_status import (
     CONTROL_PLANE_STATUS_FILE,
     write_status,
 )
 from catalog.federation.errors import FederationOperationError, FederationValidationError
+from catalog.federation.federation_v1_runtime import FederationV1Runtime
 from catalog.federation.service_incarnation import (
     STOP_COMPLETED,
     STOP_FAILURE,
@@ -74,7 +69,7 @@ def _optional_env(name: str) -> str | None:
 
 
 async def _publish_control_plane_status(
-    runtime: PhysicalReadyReplicatedFederationRuntime,
+    runtime: FederationV1Runtime,
     status_path: Path,
 ) -> None:
     """Keep one public-safe C03 status surface current for acceptance probes."""
@@ -103,7 +98,7 @@ async def _serve_replicated(args, config_path: Path) -> None:
             "relay database must match replicated control-plane coordinator_database"
         )
 
-    runtime = OfflineCreatorRecoverableRuntime(
+    runtime = FederationV1Runtime(
         deployment,
         human_auth_database=Path(
             os.getenv("FCP_AUTH_DATABASE", DEFAULT_AUTH_DATABASE)
