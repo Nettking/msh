@@ -275,16 +275,11 @@ class MaterializedReplicatedFederationRuntime(ReplicatedFederationRuntime):
                             now_text,
                         ),
                     )
-                # A capability missing from replicated authority is withdrawn.
-                # Only delete rows whose identity is one of the C03-tracked
-                # capabilities; unrelated application-local capability history
-                # cannot accidentally be manufactured into authority.
-                for capability_id in existing_caps:
-                    if capability_id not in authoritative_caps:
-                        database.execute(
-                            "DELETE FROM capabilities WHERE session_id=? AND capability_id=?",
-                            (session_id, capability_id),
-                        )
+                # Do not delete pre-existing rows here. A host being migrated to
+                # C03 may contain valid capabilities announced before replicated
+                # authority was enabled. Withdrawals are applied only after the
+                # corresponding capability has been admitted to C03, avoiding a
+                # destructive first materialization.
 
 
 __all__ = ["MaterializedReplicatedFederationRuntime"]
