@@ -1,7 +1,7 @@
 """Product relay entrypoint with optional replicated C03 authority.
 
 When ``FCP_REPLICATED_CONTROL_PLANE_CONFIG`` is absent this module delegates
-verbatim to the established provider relay service.  When configured, all three
+verbatim to the established provider relay service. When configured, all three
 voter hosts run the authenticated consensus/credential endpoints and the
 existing WebSocket provider relay against a quorum-fenced coordinator facade.
 """
@@ -45,8 +45,15 @@ from catalog.relay.service import (
 )
 
 CONFIG_ENV = "FCP_REPLICATED_CONTROL_PLANE_CONFIG"
+BOOTSTRAP_FEDERATION_ENV = "FCP_C03_BOOTSTRAP_FEDERATION_ID"
+BOOTSTRAP_SESSION_ENV = "FCP_C03_BOOTSTRAP_SESSION_ID"
 DEFAULT_AUTH_DATABASE = "/app/data/auth/users.sqlite3"
 DEFAULT_AUTH_SALT = "/app/data/auth/password-salt"
+
+
+def _optional_env(name: str) -> str | None:
+    value = os.getenv(name, "").strip()
+    return value or None
 
 
 async def _serve_replicated(args, config_path: Path) -> None:
@@ -64,6 +71,8 @@ async def _serve_replicated(args, config_path: Path) -> None:
         human_auth_password_salt=Path(
             os.getenv("FCP_AUTH_PASSWORD_SALT_FILE", DEFAULT_AUTH_SALT)
         ),
+        bootstrap_federation_id=_optional_env(BOOTSTRAP_FEDERATION_ENV),
+        bootstrap_session_id=_optional_env(BOOTSTRAP_SESSION_ENV),
     )
     coordinator = PhysicalReadyReplicatedSessionCoordinator(runtime)
     relay = ProviderAuthorityRelayServer(
