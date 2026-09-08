@@ -43,8 +43,8 @@ def _event_digest(session_id: str, term: int, leader_id: str) -> str:
 class MaterializedReplicatedFederationRuntime(ReplicatedFederationRuntime):
     """Replicated runtime whose local coordinator projection is non-destructive."""
 
-    def materialize(self) -> None:
-        state = self.node.state
+    def materialize(self, *, state: dict[str, Any] | None = None) -> None:
+        state = self.node.state if state is None else state
         if state.get("federation_id") is None:
             return
         now_text = _stamp(self.clock())
@@ -165,7 +165,7 @@ class MaterializedReplicatedFederationRuntime(ReplicatedFederationRuntime):
                 # for every replicated monotonic term, leaving unrelated event
                 # types and revisions untouched.
                 authority = state["leaders"].get(session_id)
-                if authority is not None:
+                if authority is not None and not getattr(self, "_canonical_product_journal", False):
                     target_term = int(authority["term"])
                     target_leader = str(authority["leader_node_id"])
                     creator = str(authority["creator_node_id"])

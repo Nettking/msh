@@ -941,19 +941,13 @@ class PairingAwareCapabilityOnboardingService(CapabilityOnboardingService):
         )
         return refreshed
 
-    def create_pairing_code(
+    def _host_pairing_material(
         self,
         *,
-        relay_url: str,
-        ttl_seconds: int = DEFAULT_PAIRING_TTL_SECONDS,
-        remember: bool = True,
-    ) -> str:
-        if self.remote_store.load() is not None:
-            raise FederationOperationError(
-                "pairing-host-must-be-local-authority",
-                "a remotely paired device cannot issue a new host code",
-                "binding",
-            )
+        ttl_seconds: int,
+    ) -> tuple[AuthorizedOnboardingContext, dict[str, Any], dict[str, Any]]:
+        """Retain standalone authority; configured services override this seam."""
+
         context = super().authorized_context()
         if context is None:
             raise FederationOperationError(
@@ -971,6 +965,24 @@ class PairingAwareCapabilityOnboardingService(CapabilityOnboardingService):
             ttl_seconds=ttl_seconds,
             max_uses=1,
             request_id=f"pairing-invite-{os.urandom(12).hex()}",
+        )
+        return context, enrollment, invitation
+
+    def create_pairing_code(
+        self,
+        *,
+        relay_url: str,
+        ttl_seconds: int = DEFAULT_PAIRING_TTL_SECONDS,
+        remember: bool = True,
+    ) -> str:
+        if self.remote_store.load() is not None:
+            raise FederationOperationError(
+                "pairing-host-must-be-local-authority",
+                "a remotely paired device cannot issue a new host code",
+                "binding",
+            )
+        context, enrollment, invitation = self._host_pairing_material(
+            ttl_seconds=ttl_seconds,
         )
         code = self.pairing_codec.encode(
             credentials=context.credentials,

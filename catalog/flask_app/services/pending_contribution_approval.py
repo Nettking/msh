@@ -1,288 +1,32 @@
-"""Leader-only product composition for capability-first pending contributions.
-
-Capability-first contribution announcements use ``REGISTERING`` while the local
-member waits for an existing runtime/control-plane authority. Core F8.1 provider
-enrollment historically accepted only ``READY`` announcements, which made the
-leader UI unable to record an explicit approval for those pending candidates.
-
-This module keeps the F8.1 authority model and durability intact while adding one
-narrow product rule: the session creator may approve an already-requested
-``REGISTERING`` capability-first candidate. The resulting enrollment is APPROVED
-but remains ineligible for resource binding until the member later advertises
-``READY``.
-
-Storage and logical storage-control capabilities stay entirely outside this
-provider-enrollment authority. Their assignment and leadership are owned by the
-separate storage control plane.
-"""
+"""Local product composition for explicit pending provider approval."""
 
 from __future__ import annotations
 
-from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 
 from flask import Flask, current_app
 
-from catalog.capabilities.operator_surface import (
-    ProviderActivationState,
-    ProviderOperatorAction,
-    ProviderOperatorSurface,
+from catalog.capabilities.operator_surface import ProviderOperatorSurface
+from catalog.capabilities.product_provider_operator import (
+    CapabilityFirstProviderEnrollmentService,
+    CapabilityFirstProviderOperatorSurface,
 )
-from catalog.capabilities.provider_enrollment import (
-    ProviderEnrollmentRecord,
-    ProviderEnrollmentState,
-    SQLiteProviderEnrollmentStore,
-)
+from catalog.capabilities.provider_enrollment import SQLiteProviderEnrollmentStore
 from catalog.capabilities.provider_health import (
     FederatedProviderHealthService,
-    ProviderHealthState,
     SQLiteProviderHealthStore,
 )
 from catalog.federation.coordinator import SessionCoordinator
-from catalog.federation.errors import (
-    FederationOperationError,
-    FederationValidationError,
-)
-from catalog.federation.models import CapabilityAnnouncement, CapabilityStatus
 
-from .federation_active_leader_provider_runtime import (
-    ActiveLeaderProviderEnrollmentService,
-    ActiveLeaderProviderOperatorSurface,
+from .c03_provider_operator import (
+    c03_provider_operator_surface,
+    uses_c03_provider_authority,
 )
 
 _EXTENSION_KEY = "capability_first_provider_operator_surface"
 _DEFAULT_ENROLLMENT_NAME = "provider_enrollment.sqlite3"
 _DEFAULT_HEALTH_NAME = "provider_health.sqlite3"
-_CAPABILITY_FIRST_KIND = "capability-first-candidate"
-_STORAGE_SEPARATE_TYPES = frozenset({"storage", "storage-control"})
-
-
-def _utc(value: datetime) -> datetime:
-    if value.tzinfo is None or value.utcoffset() is None:
-        raise FederationValidationError(
-            "invalid-provider-approval-clock",
-            "clock",
-            "must be timezone-aware",
-        )
-    return value.astimezone(timezone.utc)
-
-
-def _is_capability_first_pending(announcement: CapabilityAnnouncement) -> bool:
-    properties = announcement.properties
-    return (
-        announcement.status is CapabilityStatus.REGISTERING
-        and isinstance(properties, dict)
-        and properties.get("kind") == _CAPABILITY_FIRST_KIND
-    )
-
-
-def _is_storage_separate(announcement: CapabilityAnnouncement) -> bool:
-    return announcement.type.strip().casefold() in _STORAGE_SEPARATE_TYPES
-
-
-class CapabilityFirstProviderEnrollmentService(ActiveLeaderProviderEnrollmentService):
-    """F8.1 enrollment with explicit approval of capability-first REGISTERING.
-
-    The exception is intentionally narrower than generic provider enrollment:
-    unrelated REGISTERING announcements keep the frozen F8.1 READY-only approval
-    rule. The core store also keeps ``eligible_for_resource_binding`` strict:
-    APPROVED is not sufficient; the reconciled announcement must also be READY.
-
-    Storage and storage-control are rejected here because generic provider
-    enrollment is not an authority path for logical storage.
-    """
-
-    def request(
-        self,
-        *,
-        session_id: str,
-        capability_id: str,
-        actor_node_id: str,
-        command_id: str,
-    ) -> ProviderEnrollmentRecord:
-        # Requests remain member-owned. Only the leader may make approval
-        # decisions, but a trusted member must still be able to request its own
-        # ordinary provider enrollment through the existing F8.1 path.
-        announcement = self._announcement(
-            session_id=session_id,
-            capability_id=capability_id,
-            actor_node_id=actor_node_id,
-        )
-        if _is_storage_separate(announcement):
-            raise FederationOperationError(
-                "provider-enrollment-not-applicable",
-                "storage authority is managed by the separate storage control plane",
-                "capability_id",
-            )
-        return super().request(
-            session_id=session_id,
-            capability_id=capability_id,
-            actor_node_id=actor_node_id,
-            command_id=command_id,
-        )
-
-    def approve(
-        self,
-        *,
-        session_id: str,
-        capability_id: str,
-        actor_node_id: str,
-        command_id: str,
-        expected_revision: int,
-    ) -> ProviderEnrollmentRecord:
-        self._require_session_owner(
-            session_id=session_id,
-            actor_node_id=actor_node_id,
-        )
-        announcement = self._announcement(
-            session_id=session_id,
-            capability_id=capability_id,
-            actor_node_id=actor_node_id,
-        )
-        if _is_storage_separate(announcement):
-            raise FederationOperationError(
-                "provider-enrollment-not-applicable",
-                "storage authority is managed by the separate storage control plane",
-                "capability_id",
-            )
-        if not _is_capability_first_pending(announcement):
-            return super().approve(
-                session_id=session_id,
-                capability_id=capability_id,
-                actor_node_id=actor_node_id,
-                command_id=command_id,
-                expected_revision=expected_revision,
-            )
-
-        announcement = self.store._validated_announcement(announcement)
-        now = _utc(self._clock())
-        payload = {
-            "session_id": announcement.session_id,
-            "capability_id": announcement.capability_id,
-            "announcement": announcement.to_dict(),
-            "expected_revision": expected_revision,
-            "target_state": ProviderEnrollmentState.APPROVED.value,
-            "reason_code": "explicitly-approved",
-        }
-        fingerprint = self.store._command_fingerprint("approve", payload)
-
-        with self.store.transaction() as database:
-            replay = self.store._replay_command(
-                database,
-                actor_node_id=actor_node_id,
-                command_id=command_id,
-                operation="approve",
-                fingerprint=fingerprint,
-            )
-            if replay is not None:
-                return replay
-
-            current = self.store._current(
-                database,
-                session_id=announcement.session_id,
-                capability_id=announcement.capability_id,
-            )
-            if current is None:
-                raise FederationOperationError(
-                    "unknown-provider-enrollment",
-                    "provider must be requested before a decision",
-                    "capability_id",
-                )
-            self.store._assert_expected_revision(current, expected_revision)
-            if current.state is ProviderEnrollmentState.REVOKED:
-                raise FederationOperationError(
-                    "provider-enrollment-revoked",
-                    "revoked provider enrollment cannot be reopened",
-                    "capability_id",
-                )
-
-            changes = self.store._announcement_changes(current, announcement)
-            changes.update(
-                {
-                    "state": ProviderEnrollmentState.APPROVED,
-                    "approved_by_node_id": actor_node_id,
-                    "reason_code": "explicitly-approved",
-                    "revision": current.revision + 1,
-                    "updated_at": now,
-                }
-            )
-            record = replace(current, **changes)
-            self.store._write_record(database, record)
-            self.store._record_command(
-                database,
-                actor_node_id=actor_node_id,
-                command_id=command_id,
-                operation="approve",
-                fingerprint=fingerprint,
-                record=record,
-                now=now,
-            )
-            self.store._audit(
-                database,
-                operation="approve",
-                outcome="accepted",
-                reason_code="explicitly-approved",
-                actor_node_id=actor_node_id,
-                session_id=record.session_id,
-                capability_id=record.capability_id,
-                record=record,
-                occurred_at=now,
-            )
-            return record
-
-
-class CapabilityFirstProviderOperatorSurface(ActiveLeaderProviderOperatorSurface):
-    """Keep storage status visible without exposing generic provider controls."""
-
-    @staticmethod
-    def _allowed_actions(
-        *,
-        is_owner: bool,
-        announcement: CapabilityAnnouncement | None,
-        enrollment: ProviderEnrollmentRecord | None,
-    ) -> tuple[ProviderOperatorAction, ...]:
-        capability_type = (
-            announcement.type
-            if announcement is not None
-            else (None if enrollment is None else enrollment.capability_type)
-        )
-        if (
-            isinstance(capability_type, str)
-            and capability_type.strip().casefold() in _STORAGE_SEPARATE_TYPES
-        ):
-            return ()
-        return ProviderOperatorSurface._allowed_actions(
-            is_owner=is_owner,
-            announcement=announcement,
-            enrollment=enrollment,
-        )
-
-    def _activation(
-        self,
-        *,
-        capability_id: str,
-        capability_type: str,
-        health_state: ProviderHealthState,
-        enrollment: ProviderEnrollmentRecord | None,
-    ) -> tuple[ProviderActivationState, str, bool | None]:
-        normalized = capability_type.strip().casefold()
-        if normalized in _STORAGE_SEPARATE_TYPES:
-            return (
-                ProviderActivationState.NOT_APPLICABLE,
-                (
-                    "storage-control-plane-separate"
-                    if normalized == "storage"
-                    else "logical-storage-authority-separate"
-                ),
-                None,
-            )
-        return super()._activation(
-            capability_id=capability_id,
-            capability_type=capability_type,
-            health_state=health_state,
-            enrollment=enrollment,
-        )
 
 
 def _authority_database_path(
@@ -349,6 +93,8 @@ def local_provider_operator_available(app: Flask | None = None) -> bool:
     """Report leader approval availability without creating authority databases."""
 
     selected = _selected_app(app)
+    if uses_c03_provider_authority(selected):
+        return c03_provider_operator_surface(selected) is not None
     if isinstance(
         selected.config.get("PROVIDER_OPERATOR_SURFACE"),
         ProviderOperatorSurface,
@@ -401,6 +147,8 @@ def get_local_provider_operator_surface(
     """
 
     selected = _selected_app(app)
+    if uses_c03_provider_authority(selected):
+        return c03_provider_operator_surface(selected)
     configured_value = selected.config.get("PROVIDER_OPERATOR_SURFACE")
     configured = (
         configured_value
