@@ -1,0 +1,57 @@
+# Federation v1 C03 product wiring.
+#
+# Docker Compose loads this file automatically beside docker-compose.yml. The
+# replicated relay wrapper delegates verbatim to the established provider
+# service when FCP_REPLICATED_CONTROL_PLANE_CONFIG is empty, so ordinary
+# standalone deployments keep their current behavior. Provisioning a config
+# activates the fixed three-voter encrypted control plane.
+services:
+  relay:
+    command:
+      - python
+      - -m
+      - catalog.relay.replicated_provider_service
+      - serve
+      - --database
+      - /var/lib/fcp-relay/control.sqlite3
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8765"
+      - --unsafe-development-plaintext
+    environment:
+      - FCP_REPLICATED_CONTROL_PLANE_CONFIG=${FCP_REPLICATED_CONTROL_PLANE_CONFIG:-}
+      # Exact pre-C03 identities used only for one-time migration. Empty means
+      # an uninitialized voter set remains fail-closed and cannot invent a new
+      # Federation. Migration is quorum-witnessed by surviving trusted voters;
+      # the historical creator does not need to be online.
+      - FCP_C03_BOOTSTRAP_FEDERATION_ID=${FCP_C03_BOOTSTRAP_FEDERATION_ID:-}
+      - FCP_C03_BOOTSTRAP_SESSION_ID=${FCP_C03_BOOTSTRAP_SESSION_ID:-}
+      - FCP_C03_LEGACY_NODE_STATE_DATABASE=${FCP_C03_LEGACY_NODE_STATE_DATABASE:-/app/data/federation/device/node_state.sqlite3}
+      - FCP_C03_LEGACY_PAIRING_STATE_PATH=${FCP_C03_LEGACY_PAIRING_STATE_PATH:-/app/data/federation/onboarding/remote_pairing.json}
+      - FCP_AUTH_DATABASE=${FCP_AUTH_DATABASE:-/app/data/auth/users.sqlite3}
+      - FCP_AUTH_PASSWORD_SALT_FILE=${FCP_AUTH_PASSWORD_SALT_FILE:-/app/data/auth/password-salt}
+    ports:
+      - "${FCP_CONTROL_PLANE_BIND:-127.0.0.1}:${FCP_CONTROL_PLANE_PORT:-8875}:8875"
+      - "${FCP_CONTROL_PLANE_BIND:-127.0.0.1}:${FCP_CREDENTIAL_REPLICA_PORT:-8876}:8876"
+      - "${FCP_CONTROL_PLANE_BIND:-127.0.0.1}:${FCP_LEGACY_MIGRATION_PORT:-8877}:8877"
+    volumes:
+      # Human credentials are private replicated state; browser-session secrets
+      # remain local and may be invalidated on failover.
+      - type: bind
+        source: ${FCP_DATA_DIR:-./data}/auth
+        target: /app/data/auth
+      # Pre-C03 member state is evidence only. Mount Federation metadata read-only
+      # so migration cannot rewrite the surviving member journal or pairing state.
+      # This path intentionally excludes recorder measurement `record data/`.
+      - type: bind
+        source: ${FCP_DATA_DIR:-./data}/federation
+        target: /app/data/federation
+        read_only: true
+
+  flask:
+    environment:
+      # The Flask container does not open voter sockets. This variable is
+      # surfaced only so operator diagnostics can identify C03-enabled hosts;
+      # leader/auth decisions come from the shared materialized coordinator DB.
+      - FCP_REPLICATED_CONTROL_PLANE_CONFIG=${FCP_REPLICATED_CONTROL_PLANE_CONFIG:-}

@@ -23,6 +23,7 @@
 /evidence/
 /cf7-physical.local.json
 /cf7-topology.local.json
+/.acceptance/
 
 # Python / environment
 /.env

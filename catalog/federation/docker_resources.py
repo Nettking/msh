@@ -32,17 +32,20 @@ def _run_docker_info(
     format_string: str,
     *,
     env: Mapping[str, str] | None = None,
-) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["docker", "info", "--format", format_string],
-        cwd=root,
-        env=_subprocess_env(env),
-        shell=False,
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=30.0,
-    )
+) -> subprocess.CompletedProcess[str] | None:
+    try:
+        return subprocess.run(
+            ["docker", "info", "--format", format_string],
+            cwd=root,
+            env=_subprocess_env(env),
+            shell=False,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30.0,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
 
 
 def docker_backing_resource_path(
@@ -80,7 +83,7 @@ def docker_backing_resource_path(
             "{{.OSType}}|{{.DockerRootDir}}",
             env=environment,
         )
-        if info.returncode != 0:
+        if info is None or info.returncode != 0:
             return None
         parts = info.stdout.strip().split("|", maxsplit=1)
         if len(parts) != 2 or parts[0].strip().casefold() != "windows":
@@ -120,7 +123,7 @@ def docker_backing_resource_path(
         return None
 
     info = _run_docker_info(resolved_root, "{{.DockerRootDir}}", env=environment)
-    if info.returncode != 0:
+    if info is None or info.returncode != 0:
         return None
     raw = info.stdout.strip()
     if not raw:

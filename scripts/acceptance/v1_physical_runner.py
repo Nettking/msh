@@ -30,6 +30,7 @@ from typing import Final
 from scripts.acceptance import v1_physical_campaign as campaign
 from scripts.acceptance import v1_physical_campaign_strict as strict
 from scripts.acceptance import v1_physical_probes as probes
+from scripts.acceptance import v1_physical_runtime_binding as runtime_binding
 from scripts.acceptance.v1_physical_automation import (
     AUTOMATED,
     FAULT_INJECTION,
@@ -104,11 +105,30 @@ def _gate(
     *,
     commit: str,
     host: str,
+    runtime_binding_file: Path | None = None,
 ) -> tuple[str, dict[str, object]]:
     """Verify candidate, checkout cleanliness and host identity, in that order."""
 
     expected = campaign.require_commit(commit)
-    campaign.load_campaign(checkout, root, expected)
+    binding = None
+    if runtime_binding_file is not None:
+        binding = runtime_binding.load(
+            runtime_binding_file,
+            host_id=host,
+            target_candidate_sha=expected,
+        )
+    campaign.load_campaign(
+        checkout,
+        root,
+        expected,
+        verify_checkout_identity=binding is None,
+    )
+    if binding is not None:
+        campaign.bind_harness(
+            root,
+            commit=expected,
+            harness_sha=binding.acceptance_harness_sha,
+        )
     record = resolve_host(checkout, root, commit=expected, host=host)
     profile = campaign.host_profile_of(record)
     if profile == "unspecified":
@@ -116,6 +136,9 @@ def _gate(
             f"host {host} has no declared profile; re-register it with --profile "
             "so probe applicability can be decided"
         )
+    if binding is not None:
+        record = dict(record)
+        record["__runtime_binding"] = binding
     return expected, record
 
 
@@ -179,6 +202,16 @@ def _context(
         assertion=assertion,
         run_id=run_id,
         options=options,
+        runtime_binding=(
+            record.get("__runtime_binding")
+            if isinstance(record.get("__runtime_binding"), runtime_binding.RuntimeBinding)
+            else None
+        ),
+        harness_sha=(
+            str(record.get("__runtime_binding").acceptance_harness_sha)
+            if isinstance(record.get("__runtime_binding"), runtime_binding.RuntimeBinding)
+            else None
+        ),
     )
 
 
@@ -223,14 +256,22 @@ def run_bindings(
     bindings: Sequence[ProbeBinding],
     overrides: Mapping[str, str],
 ) -> list[probes.ProbeOutcome]:
+    external_harness = isinstance(
+        record.get("__runtime_binding"), runtime_binding.RuntimeBinding
+    )
+    selected_bindings = tuple(
+        binding
+        for binding in bindings
+        if not (external_harness and binding.probe_id == "checkout-identity")
+    )
     require_operator_options(
-        bindings,
+        selected_bindings,
         overrides,
         scenario=scenario,
         assertion=assertion,
     )
     outcomes: list[probes.ProbeOutcome] = []
-    for binding in bindings:
+    for binding in selected_bindings:
         spec = probes.probe_spec(binding.probe_id)
         context = _context(
             checkout,
@@ -284,6 +325,13 @@ def _detail(
     return detail
 
 
+def _binding_detail(record: Mapping[str, object]) -> dict[str, object]:
+    bound = record.get("__runtime_binding")
+    if not isinstance(bound, runtime_binding.RuntimeBinding):
+        return {"runtime_binding": {"explicit": False}}
+    return {"runtime_binding": runtime_binding.public_summary(bound)}
+
+
 def _record_verdict(
     checkout: Path,
     root: Path,
@@ -297,6 +345,7 @@ def _record_verdict(
     note: str,
     detail: Mapping[str, object],
     source: str,
+    allow_external_harness: bool = False,
 ) -> Path:
     if run_id:
         return strict.timed_observe(
@@ -311,6 +360,7 @@ def _record_verdict(
             note=note,
             detail=detail,
             source=source,
+            allow_external_harness=allow_external_harness,
         )
     return campaign.observe(
         checkout,
@@ -323,6 +373,7 @@ def _record_verdict(
         note=note,
         detail=detail,
         source=source,
+        allow_external_harness=allow_external_harness,
     )
 
 
@@ -343,8 +394,12 @@ def probe_assertion(
     assertion: str,
     run_id: str | None,
     overrides: Mapping[str, str],
+    runtime_binding_file: Path | None = None,
 ) -> dict[str, object]:
-    expected, record = _gate(checkout, root, commit=commit, host=host)
+    expected, record = _gate(
+        checkout, root, commit=commit, host=host,
+        runtime_binding_file=runtime_binding_file,
+    )
     scenario_id, _spec = campaign._assertion_contract(
         root,
         commit=expected,
@@ -408,8 +463,9 @@ def probe_assertion(
         run_id=active,
         status=verdict,
         note=_summary_note(outcomes),
-        detail=_detail(outcomes),
+        detail=_detail(outcomes, extra=_binding_detail(record)),
         source="automated-probe",
+        allow_external_harness=runtime_binding_file is not None,
     )
     result["recorded"] = True
     result["evidence"] = campaign._display_path(path, checkout, root)
@@ -426,8 +482,12 @@ def prepare_assertion(
     assertion: str,
     run_id: str | None,
     overrides: Mapping[str, str],
+    runtime_binding_file: Path | None = None,
 ) -> dict[str, object]:
-    expected, record = _gate(checkout, root, commit=commit, host=host)
+    expected, record = _gate(
+        checkout, root, commit=commit, host=host,
+        runtime_binding_file=runtime_binding_file,
+    )
     scenario_id, _spec = campaign._assertion_contract(
         root,
         commit=expected,
@@ -462,6 +522,7 @@ def prepare_assertion(
     detail = _detail(
         outcomes,
         extra={
+            **_binding_detail(record),
             "prepare_verdict": _verdict(outcomes),
             "harness_performed_fault": False,
         },
@@ -475,6 +536,7 @@ def prepare_assertion(
         assertion=assertion,
         operator_action=plan.operator_action,
         detail=detail,
+        allow_external_harness=runtime_binding_file is not None,
     )
     return {
         "scenario": scenario_id,
@@ -511,8 +573,12 @@ def record_action(
     assertion: str,
     prepare_id: str,
     note: str,
+    runtime_binding_file: Path | None = None,
 ) -> dict[str, object]:
-    expected, _record = _gate(checkout, root, commit=commit, host=host)
+    expected, _record = _gate(
+        checkout, root, commit=commit, host=host,
+        runtime_binding_file=runtime_binding_file,
+    )
     scenario_id = campaign.require_scenario(scenario)
     path = campaign.record_operator_action(
         checkout,
@@ -523,6 +589,7 @@ def record_action(
         assertion=assertion,
         prepare_id=prepare_id,
         note=note,
+        allow_external_harness=runtime_binding_file is not None,
     )
     return {
         "scenario": scenario_id,
@@ -548,8 +615,12 @@ def verify_assertion(
     prepare_id: str,
     run_id: str | None,
     overrides: Mapping[str, str],
+    runtime_binding_file: Path | None = None,
 ) -> dict[str, object]:
-    expected, record = _gate(checkout, root, commit=commit, host=host)
+    expected, record = _gate(
+        checkout, root, commit=commit, host=host,
+        runtime_binding_file=runtime_binding_file,
+    )
     scenario_id, _spec = campaign._assertion_contract(
         root,
         commit=expected,
@@ -640,12 +711,14 @@ def verify_assertion(
         detail=_detail(
             outcomes,
             extra={
+                **_binding_detail(record),
                 "prepare_id": identifier,
                 "operator_action_recorded_at": str(action["recorded_at"]),
                 "harness_performed_fault": False,
             },
         ),
         source="operator-fault-injection-verify",
+        allow_external_harness=runtime_binding_file is not None,
     )
     result["recorded"] = True
     result["evidence"] = campaign._display_path(path, checkout, root)
@@ -661,10 +734,14 @@ def run_scenario(
     scenario: str,
     run_id: str | None,
     overrides: Mapping[str, str],
+    runtime_binding_file: Path | None = None,
 ) -> dict[str, object]:
     """Run every automated assertion this host is allowed to close."""
 
-    expected, record = _gate(checkout, root, commit=commit, host=host)
+    expected, record = _gate(
+        checkout, root, commit=commit, host=host,
+        runtime_binding_file=runtime_binding_file,
+    )
     scenario_id = campaign.require_scenario(scenario)
     spec = campaign.SCENARIOS[scenario_id]
     host_os = str(record["os_category"])
@@ -710,6 +787,7 @@ def run_scenario(
                 assertion=assertion,
                 run_id=run_id,
                 overrides=overrides,
+                runtime_binding_file=runtime_binding_file,
             )
         )
     return {
@@ -731,12 +809,18 @@ def sample(
     scenario: str,
     label: str,
     run_id: str | None,
+    runtime_binding_file: Path | None = None,
 ) -> dict[str, object]:
     """Record one resource sample enriched with the soak series P12 requires."""
 
-    expected, _record = _gate(checkout, root, commit=commit, host=host)
+    expected, record = _gate(
+        checkout, root, commit=commit, host=host,
+        runtime_binding_file=runtime_binding_file,
+    )
     scenario_id = campaign.require_scenario(scenario)
-    extras = probes.collect_sample_extras(checkout)
+    binding = record.get("__runtime_binding")
+    bound = binding if isinstance(binding, runtime_binding.RuntimeBinding) else None
+    extras = probes.collect_sample_extras(checkout, bound)
     path = campaign.sample_resources(
         checkout,
         root,
@@ -746,6 +830,11 @@ def sample(
         label=label,
         run_id=run_id,
         extras=extras,
+        allow_external_harness=runtime_binding_file is not None,
+        # The bound runtime surfaces, not this harness checkout, are what the
+        # soak series has to measure.
+        data_root=bound.data_root if bound is not None else None,
+        results_root=bound.results_root if bound is not None else None,
     )
     return {
         "scenario": scenario_id,
@@ -870,9 +959,29 @@ def report(
     *,
     commit: str,
     host: str | None = None,
+    runtime_binding_file: Path | None = None,
 ) -> dict[str, object]:
     expected = campaign.require_commit(commit)
-    campaign.load_campaign(checkout, root, expected)
+    bound = None
+    if runtime_binding_file is not None:
+        if host is None:
+            raise RunnerError("--runtime-binding requires --host for report")
+        bound = runtime_binding.load(
+            runtime_binding_file,
+            host_id=host,
+            target_candidate_sha=expected,
+        )
+        campaign.bind_harness(
+            root,
+            commit=expected,
+            harness_sha=bound.acceptance_harness_sha,
+        )
+    campaign.load_campaign(
+        checkout,
+        root,
+        expected,
+        verify_checkout_identity=bound is None,
+    )
     hosts = [
         campaign._load_json(path)
         for path in sorted((root / "hosts").glob("*.json"))
@@ -1017,6 +1126,14 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         default=Path("evidence/v1-physical"),
     )
+    parser.add_argument(
+        "--runtime-binding",
+        type=Path,
+        help=(
+            "ignored local manifest naming the deployed Compose/native runtime; "
+            "never copied into portable evidence"
+        ),
+    )
     sub = parser.add_subparsers(dest="command_name", required=True)
 
     classify = sub.add_parser(
@@ -1062,6 +1179,9 @@ def main(argv: list[str] | None = None) -> int:
     root = args.evidence_root
     if not root.is_absolute():
         root = checkout / root
+    binding_file = args.runtime_binding
+    if binding_file is not None and not binding_file.is_absolute():
+        binding_file = checkout / binding_file
 
     try:
         overrides = probes.parse_options(getattr(args, "option", []) or [])
@@ -1093,6 +1213,7 @@ def main(argv: list[str] | None = None) -> int:
                 assertion=args.assertion,
                 run_id=args.run_id,
                 overrides=overrides,
+                runtime_binding_file=binding_file,
             )
         elif args.command_name == "scenario":
             result = run_scenario(
@@ -1103,6 +1224,7 @@ def main(argv: list[str] | None = None) -> int:
                 scenario=args.scenario,
                 run_id=args.run_id,
                 overrides=overrides,
+                runtime_binding_file=binding_file,
             )
         elif args.command_name == "prepare":
             result = prepare_assertion(
@@ -1114,6 +1236,7 @@ def main(argv: list[str] | None = None) -> int:
                 assertion=args.assertion,
                 run_id=args.run_id,
                 overrides=overrides,
+                runtime_binding_file=binding_file,
             )
         elif args.command_name == "action":
             result = record_action(
@@ -1125,6 +1248,7 @@ def main(argv: list[str] | None = None) -> int:
                 assertion=args.assertion,
                 prepare_id=args.prepare_id,
                 note=args.note,
+                runtime_binding_file=binding_file,
             )
         elif args.command_name == "verify":
             result = verify_assertion(
@@ -1137,6 +1261,7 @@ def main(argv: list[str] | None = None) -> int:
                 prepare_id=args.prepare_id,
                 run_id=args.run_id,
                 overrides=overrides,
+                runtime_binding_file=binding_file,
             )
         elif args.command_name == "sample":
             result = sample(
@@ -1147,6 +1272,7 @@ def main(argv: list[str] | None = None) -> int:
                 scenario=args.scenario,
                 label=args.label,
                 run_id=args.run_id,
+                runtime_binding_file=binding_file,
             )
         else:
             result = report(
@@ -1154,6 +1280,7 @@ def main(argv: list[str] | None = None) -> int:
                 root,
                 commit=args.commit,
                 host=args.host,
+                runtime_binding_file=binding_file,
             )
     except (
         RunnerError,

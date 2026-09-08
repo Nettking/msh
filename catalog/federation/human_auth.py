@@ -31,13 +31,18 @@ def enforce_human_auth_event_authority(
     actor_node_id: str,
     event_type: str,
     payload: dict[str, Any],
+    authority_node_id: str | None = None,
 ) -> None:
     """Fail closed when human-auth control metadata exceeds node authority.
 
     Human credentials never enter this event family. These events contain only
     public sign-in routing metadata and non-secret user authorization state.
-    The Federation creator is the human-sign-in authority; ordinary members may
-    advertise only their own browser callback endpoint.
+
+    ``session.created_by_node_id`` remains immutable creator provenance. When a
+    durable leadership service is available, callers pass its current fenced
+    leader as ``authority_node_id`` so human sign-in authority can survive a
+    creator/coordinator host loss. Legacy callers omit it and preserve the
+    original creator-backed rule.
     """
 
     if event_type not in _SUPPORTED_EVENTS:
@@ -50,10 +55,15 @@ def enforce_human_auth_event_authority(
             f"expected {expected_schema}",
         )
     if event_type in _LEADER_ONLY_EVENTS:
-        if actor_node_id != session.created_by_node_id:
+        expected_authority = authority_node_id or session.created_by_node_id
+        if actor_node_id != expected_authority:
             raise AuthorizationError(
                 "human-auth-authority-required",
-                "only the Federation creator may publish human-auth authority or user state",
+                (
+                    "only the Federation creator may publish authority or user state"
+                    if authority_node_id is None
+                    else "only the current Federation human-auth authority may publish authority or user state"
+                ),
                 "actor_node_id",
             )
         return

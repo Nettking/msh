@@ -3,6 +3,8 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+import pytest
+
 from catalog.federation import docker_resources
 
 
@@ -20,7 +22,9 @@ def _use_posix_logic(monkeypatch) -> None:
     monkeypatch.setattr(docker_resources, "_HOST_PLATFORM", "linux")
 
 
-def test_native_posix_uses_docker_reported_data_root(monkeypatch, tmp_path: Path) -> None:
+def test_native_posix_uses_docker_reported_data_root(
+    monkeypatch, tmp_path: Path
+) -> None:
     docker_root = tmp_path / "docker-root"
     docker_root.mkdir()
     calls: list[str] = []
@@ -60,3 +64,27 @@ def test_native_posix_fails_closed_when_docker_info_fails(
     )
 
     assert docker_resources.docker_backing_resource_path(tmp_path) is None
+
+
+@pytest.mark.parametrize("host_os", ["nt", "posix"])
+@pytest.mark.parametrize(
+    "failure",
+    [
+        FileNotFoundError("docker unavailable"),
+        subprocess.TimeoutExpired(["docker", "info"], 30.0),
+    ],
+)
+def test_missing_or_unresponsive_docker_has_no_proven_backing_resource(
+    monkeypatch,
+    tmp_path: Path,
+    host_os,
+    failure,
+) -> None:
+    monkeypatch.setattr(docker_resources, "_HOST_OS_NAME", host_os)
+    monkeypatch.setattr(docker_resources, "_HOST_PLATFORM", "linux")
+
+    def fail(*args, **kwargs):
+        raise failure
+
+    monkeypatch.setattr(subprocess, "run", fail)
+    assert docker_resources.docker_backing_resource_path(tmp_path, env={}) is None
