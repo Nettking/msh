@@ -42,6 +42,7 @@ from scripts.acceptance.cf7_physical_readiness import (
     sanitize_text,
     verify_checkout,
 )
+from scripts.acceptance.v1_physical_runtime_binding import RuntimeBinding
 
 PASS: Final = "pass"
 FAIL: Final = "fail"
@@ -60,6 +61,10 @@ MEBIBYTE: Final = 1024 * 1024
 GIBIBYTE: Final = 1024 * MEBIBYTE
 
 CORE_COMPOSE_SERVICES: Final = ("web", "relay")
+CANDIDATE_COMPOSE_SERVICES: Final = frozenset({"flask", "recorder", "relay"})
+PINNED_EXTERNAL_IMAGE_RE: Final = re.compile(
+    r"@sha256:[0-9a-f]{64}(?:$|[/?])", re.IGNORECASE
+)
 BUILD_COMMIT_LABEL: Final = "no.fcp.build_commit"
 
 
@@ -81,6 +86,8 @@ class ProbeContext:
     assertion: str
     run_id: str | None = None
     options: Mapping[str, str] = field(default_factory=dict)
+    runtime_binding: RuntimeBinding | None = None
+    harness_sha: str | None = None
 
     def option(self, name: str, default: str = "") -> str:
         return str(self.options.get(name, default))
@@ -108,11 +115,39 @@ class ProbeContext:
 
     @property
     def data_dir(self) -> Path:
+        if self.runtime_binding and self.runtime_binding.data_root is not None:
+            return self.runtime_binding.data_root
         return self.checkout / "data"
 
     @property
     def results_dir(self) -> Path:
+        if self.runtime_binding and self.runtime_binding.results_root is not None:
+            return self.runtime_binding.results_root
         return self.checkout / "results"
+
+    @property
+    def roots_are_bound(self) -> bool:
+        """True when the operator named the runtime data/results surfaces.
+
+        When they did, the harness checkout is a different filesystem with
+        different free space, so falling back to it does not approximate the
+        runtime -- it measures something else entirely and must fail closed
+        instead.
+        """
+
+        binding = self.runtime_binding
+        return binding is not None and (
+            binding.data_root is not None or binding.results_root is not None
+        )
+
+    def storage_anchor(self) -> Path | None:
+        """The path whose filesystem carries runtime storage, if provable."""
+
+        if self.data_dir.exists():
+            return self.data_dir
+        if self.roots_are_bound:
+            return None
+        return self.checkout
 
 
 @dataclass(frozen=True)
@@ -265,9 +300,17 @@ def _probe_checkout_identity(context: ProbeContext) -> ProbeOutcome:
 
 
 def _compose_containers(context: ProbeContext) -> list[dict[str, object]]:
+    if context.runtime_binding is not None and context.runtime_binding.kind != "compose":
+        return []
+    command = ["docker", "compose"]
+    cwd = context.checkout
+    if context.runtime_binding is not None:
+        command = context.runtime_binding.compose_prefix()
+        cwd = context.runtime_binding.compose_working_directory or cwd
+    command.extend(["ps", "--format", "json"])
     code, output = _run(
-        ["docker", "compose", "ps", "--format", "json"],
-        cwd=context.checkout,
+        command,
+        cwd=cwd,
     )
     if code != 0 or not output.strip():
         return []
@@ -293,6 +336,9 @@ def _compose_containers(context: ProbeContext) -> list[dict[str, object]]:
 
 
 def _container_label(context: ProbeContext, container: str, label: str) -> str:
+    cwd = context.checkout
+    if context.runtime_binding is not None:
+        cwd = context.runtime_binding.compose_working_directory or cwd
     code, output = _run(
         [
             "docker",
@@ -301,7 +347,7 @@ def _container_label(context: ProbeContext, container: str, label: str) -> str:
             f'{{{{index .Config.Labels "{label}"}}}}',
             container,
         ],
-        cwd=context.checkout,
+        cwd=cwd,
     )
     if code != 0:
         return ""
@@ -309,8 +355,130 @@ def _container_label(context: ProbeContext, container: str, label: str) -> str:
     return value[-1].strip() if value else ""
 
 
+def _container_matches_runtime_binding(
+    context: ProbeContext,
+    container: str,
+) -> bool:
+    binding = context.runtime_binding
+    if binding is None or binding.kind != "compose":
+        return True
+    expected = binding.compose_working_directory
+    if expected is None:
+        return True
+    observed = _container_label(
+        context,
+        container,
+        "com.docker.compose.project.working_dir",
+    )
+    if not observed:
+        return True
+    return observed.rstrip("\\/").casefold() == str(expected).rstrip("\\/").casefold()
+
+
+def _compose_container_class(container: Mapping[str, object]) -> str:
+    """Classify one bound Compose row without relying on container names.
+
+    Candidate-built services are identified by their stable Compose service
+    names. A service outside that set is external only when Docker reports an
+    immutable digest-pinned image; everything else is intentionally unknown so
+    an unlabeled row cannot silently certify a candidate deployment.
+    """
+
+    service = str(container.get("Service") or "").strip().casefold()
+    if service in CANDIDATE_COMPOSE_SERVICES:
+        return "candidate"
+    image = str(container.get("Image") or "").strip()
+    if PINNED_EXTERNAL_IMAGE_RE.search(image) is not None:
+        return "external"
+    return "unknown"
+
+
+def _recorder_status_path(context: ProbeContext) -> Path:
+    """The recorder status surface, preferring the explicitly bound file.
+
+    Every recorder health, continuity and sample path routes through here.  A
+    bound deployment keeps its status file outside the harness checkout, so
+    reading the checkout-relative path would silently answer about a recorder
+    this campaign is not testing -- stale, absent, or belonging to another
+    deployment entirely.
+    """
+
+    binding = context.runtime_binding
+    if binding is not None and binding.recorder_status_file is not None:
+        return binding.recorder_status_file
+    return context.data_dir / "source_state" / "mtconnect_recorder_status.json"
+
+
+def _native_recorder_commit_identity(
+    context: ProbeContext, detail: dict[str, object]
+) -> ProbeOutcome:
+    """Prove runtime identity for a recorder that runs without Docker.
+
+    A native recorder has no container to carry a build label, so the bound
+    status surface is the only identity it publishes.  Every failure mode here
+    is closed: an unreadable surface, an absent native_runtime block, and a
+    build commit that is missing, empty or different all FAIL.  Treating a
+    missing identity as UNAVAILABLE would let an unidentifiable recorder pass
+    the gate that exists to identify it.
+    """
+
+    status_file = _recorder_status_path(context)
+    detail["runtime_kind"] = "native-recorder"
+    detail["status_surface_bound"] = bool(
+        context.runtime_binding is not None
+        and context.runtime_binding.recorder_status_file is not None
+    )
+    payload = _load_json(status_file)
+    if not isinstance(payload, dict):
+        return _outcome(
+            "running-commit-identity",
+            FAIL,
+            "the bound recorder status surface is missing or unreadable",
+            detail,
+        )
+    runtime = payload.get("native_runtime")
+    if not isinstance(runtime, dict):
+        return _outcome(
+            "running-commit-identity",
+            FAIL,
+            "the recorder status surface publishes no native runtime identity",
+            detail,
+        )
+    recorder_commit = str(runtime.get("build_commit") or "").strip().casefold()
+    detail["build_commit_present"] = bool(recorder_commit)
+    state = runtime.get("state") or payload.get("state")
+    if state is not None:
+        detail["recorder_state"] = str(state)
+    if not recorder_commit:
+        return _outcome(
+            "running-commit-identity",
+            FAIL,
+            "the native recorder does not publish a usable build identity",
+            detail,
+        )
+    detail["build_commit_matches_candidate"] = recorder_commit == context.commit
+    if recorder_commit != context.commit:
+        return _outcome(
+            "running-commit-identity",
+            FAIL,
+            "the native recorder does not carry the candidate build commit",
+            detail,
+        )
+    return _outcome(
+        "running-commit-identity",
+        PASS,
+        "the native recorder carries the candidate build commit",
+        detail,
+    )
+
+
 def _probe_running_commit_identity(context: ProbeContext) -> ProbeOutcome:
     detail: dict[str, object] = {"candidate_sha": context.commit}
+    binding = context.runtime_binding
+    if binding is not None and binding.kind == "native-recorder":
+        # Deliberately before the Docker probe: a native recorder must be
+        # provable on a host that has no Docker or Compose at all.
+        return _native_recorder_commit_identity(context, detail)
     if not _docker_available():
         return _outcome(
             "running-commit-identity",
@@ -329,12 +497,49 @@ def _probe_running_commit_identity(context: ProbeContext) -> ProbeOutcome:
     observed: list[dict[str, object]] = []
     mismatched = 0
     running = 0
+    candidate_services_seen: set[str] = set()
     for container in containers:
-        service = str(container.get("Service") or container.get("Name") or "")
+        service = str(container.get("Service") or "")
         identifier = str(container.get("ID") or container.get("Name") or "")
         state = str(container.get("State") or "")
         if not identifier:
             continue
+        if not _container_matches_runtime_binding(context, identifier):
+            observed.append(
+                {
+                    "service": service,
+                    "state": state,
+                    "candidate_component": False,
+                    "excluded_as_unbound_compose_container": True,
+                }
+            )
+            continue
+        container_class = _compose_container_class(container)
+        if container_class == "external":
+            if state.casefold() == "running":
+                running += 1
+            observed.append(
+                {
+                    "service": service,
+                    "state": state,
+                    "candidate_component": False,
+                    "external_component": True,
+                    "classification": "pinned-external-image",
+                }
+            )
+            continue
+        if container_class == "unknown":
+            mismatched += 1
+            observed.append(
+                {
+                    "service": service,
+                    "state": state,
+                    "candidate_component": False,
+                    "classification": "unknown-unclassified",
+                }
+            )
+            continue
+        candidate_services_seen.add(service.strip().casefold())
         commit = _container_label(context, identifier, BUILD_COMMIT_LABEL).casefold()
         matches = commit == context.commit
         if state.casefold() == "running":
@@ -349,10 +554,16 @@ def _probe_running_commit_identity(context: ProbeContext) -> ProbeOutcome:
                 "build_commit_present": bool(commit),
             }
         )
+    missing_candidate_services = sorted(
+        CANDIDATE_COMPOSE_SERVICES - candidate_services_seen
+    )
+    if missing_candidate_services:
+        mismatched += len(missing_candidate_services)
     detail["containers"] = observed
     detail["running_containers"] = running
+    detail["missing_candidate_services"] = missing_candidate_services
 
-    status_file = context.data_dir / "source_state" / "mtconnect_recorder_status.json"
+    status_file = _recorder_status_path(context)
     payload = _load_json(status_file)
     if isinstance(payload, dict):
         runtime = payload.get("native_runtime")
@@ -615,11 +826,15 @@ def _measure(path: Path) -> dict[str, object] | None:
 
 def _baseline_anchors(context: ProbeContext) -> dict[str, Path]:
     anchors: dict[str, Path] = {
-        "checkout": context.checkout,
         "data": context.data_dir,
         "results": context.results_dir,
         "logs": context.data_dir / "source_state",
     }
+    # The harness checkout is only a baseline resource when it is also where
+    # the runtime lives.  Under an explicit binding it is separate storage and
+    # measuring it would report headroom the product cannot use.
+    if not context.roots_are_bound:
+        anchors["checkout"] = context.checkout
     backing = _docker_backing_path(context)
     if backing is not None:
         anchors["docker"] = backing
@@ -642,7 +857,12 @@ def _probe_host_resource_baseline(context: ProbeContext) -> ProbeOutcome:
         result["exists"] = path.exists()
         measured[name] = result
     detail: dict[str, object] = {"resources": measured}
-    required = ("checkout", "data", "results", "logs")
+    detail["runtime_roots_bound"] = context.roots_are_bound
+    required = (
+        ("data", "results", "logs")
+        if context.roots_are_bound
+        else ("checkout", "data", "results", "logs")
+    )
     unavailable = [
         name
         for name in required
@@ -684,7 +904,14 @@ def _probe_host_resource_baseline(context: ProbeContext) -> ProbeOutcome:
 
 
 def _probe_inode_capacity(context: ProbeContext) -> ProbeOutcome:
-    anchor = context.data_dir if context.data_dir.exists() else context.checkout
+    anchor = context.storage_anchor()
+    if anchor is None:
+        return _outcome(
+            "inode-capacity",
+            FAIL,
+            "the bound data root does not exist, so inode capacity is unproven",
+            {"bound_data_root_present": False},
+        )
     result = _measure(anchor)
     if result is None:
         return _outcome(
@@ -730,7 +957,14 @@ def _probe_safe_storage_refusal(context: ProbeContext) -> ProbeOutcome:
             "the resource admission surface is not importable",
             {},
         )
-    anchor = context.data_dir if context.data_dir.exists() else context.checkout
+    anchor = context.storage_anchor()
+    if anchor is None:
+        return _outcome(
+            "safe-storage-refusal",
+            FAIL,
+            "the bound data root does not exist, so admission cannot be exercised",
+            {"bound_data_root_present": False},
+        )
     admission = ProcessResourceAdmission()
     before = admission.assessment(anchor)
     detail: dict[str, object] = {
@@ -1099,7 +1333,7 @@ def _recorder_status(context: ProbeContext) -> dict[str, object] | None:
         from catalog.mtconnect_recorder.native_update import read_recorder_status
     except ImportError:  # pragma: no cover - product package always present
         return None
-    status_file = context.data_dir / "source_state" / "mtconnect_recorder_status.json"
+    status_file = _recorder_status_path(context)
     if not status_file.is_file():
         return None
     status = read_recorder_status(status_file)
@@ -1333,7 +1567,7 @@ def _probe_recorder_path_containment(context: ProbeContext) -> ProbeOutcome:
             "recorder storage confinement is not importable",
             {},
         )
-    root = context.checkout / "data" / "raw"
+    root = context.data_dir / "raw"
     hostile = (
         ("..", "escaped.json"),
         ("../..", "escaped.json"),
@@ -1545,7 +1779,10 @@ def _probe_corpus_size(context: ProbeContext) -> ProbeOutcome:
     )
 
 
-def collect_sample_extras(checkout: Path) -> dict[str, object]:
+def collect_sample_extras(
+    checkout: Path,
+    runtime_binding: RuntimeBinding | None = None,
+) -> dict[str, object]:
     """Gather the extra series a P12 soak sample must carry.
 
     This is deliberately the same read-only material the individual probes use,
@@ -1561,6 +1798,7 @@ def collect_sample_extras(checkout: Path) -> dict[str, object]:
         profile="unspecified",
         scenario="P12",
         assertion="storage-series",
+        runtime_binding=runtime_binding,
     )
     extras: dict[str, object] = {}
 
