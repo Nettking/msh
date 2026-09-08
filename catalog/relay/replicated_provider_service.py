@@ -32,7 +32,7 @@ from catalog.federation.control_plane_status import (
     write_status,
 )
 from catalog.federation.errors import FederationOperationError, FederationValidationError
-from catalog.federation.federation_v1_runtime import FederationV1Runtime
+from catalog.federation.federation_v1_release_runtime import FederationV1ReleaseRuntime
 from catalog.federation.service_incarnation import (
     STOP_COMPLETED,
     STOP_FAILURE,
@@ -69,7 +69,7 @@ def _optional_env(name: str) -> str | None:
 
 
 async def _publish_control_plane_status(
-    runtime: FederationV1Runtime,
+    runtime: FederationV1ReleaseRuntime,
     status_path: Path,
 ) -> None:
     """Keep one public-safe C03 status surface current for acceptance probes."""
@@ -83,10 +83,6 @@ async def _publish_control_plane_status(
                 voter_only=False,
             )
         except OSError as exc:
-            # Status is evidence/diagnostics only. A transient filesystem error
-            # must not manufacture authority or stop an otherwise healthy
-            # quorum-fenced relay; physical acceptance will fail closed if the
-            # surface stays absent.
             logging.warning("C03 status publication unavailable (%s)", type(exc).__name__)
         await asyncio.sleep(STATUS_INTERVAL_SECONDS)
 
@@ -98,7 +94,7 @@ async def _serve_replicated(args, config_path: Path) -> None:
             "relay database must match replicated control-plane coordinator_database"
         )
 
-    runtime = FederationV1Runtime(
+    runtime = FederationV1ReleaseRuntime(
         deployment,
         human_auth_database=Path(
             os.getenv("FCP_AUTH_DATABASE", DEFAULT_AUTH_DATABASE)
@@ -170,15 +166,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not configured:
         return legacy_main(values)
     if not values or values[0] != "serve":
-        # Administrative one-shot commands still use the established service;
-        # they do not silently acquire replicated leader authority.
         return legacy_main(values)
 
     parser = _build_parser()
     args = parser.parse_args(values)
     if args.tls_key_password_prompt:
-        # Keep the established interactive encrypted-key path rather than
-        # duplicating terminal-secret handling here.
         return legacy_main(values)
 
     config_path = Path(configured)
