@@ -912,6 +912,17 @@ class AuthorityStateMachine:
             if command.issued_by != owner:
                 raise ControlPlaneError("issued_by does not own the capability")
             _require_member(next_state, session_id, owner, "owner_node_id")
+            from .control_plane_readiness import (
+                BOOTSTRAP_SEAL_CAPABILITY_ID,
+                BOOTSTRAP_SEAL_CAPABILITY_TYPE,
+            )
+
+            if capability_id == BOOTSTRAP_SEAL_CAPABILITY_ID and (
+                payload["capability_type"] != BOOTSTRAP_SEAL_CAPABILITY_TYPE
+                or owner not in self.configuration.voter_ids
+                or owner != next_state["leaders"][session_id]["leader_node_id"]
+            ):
+                raise ControlPlaneError("bootstrap seal requires the operational voter leader")
             capabilities = next_state["capabilities"].setdefault(session_id, {})
             candidate = {
                 "capability_id": capability_id,
@@ -2055,14 +2066,14 @@ class ReplicaNode:
             term = self.store.current_term
             if not self._still_leader(term):
                 raise StaleTerm("only the current leader may replicate authority")
-            matched = 0
+            matched = []
             for target in self.peers:
                 if self._replicate_to(target, transport, term=term):
-                    matched += 1
+                    matched.append(target)
             self._advance_commit(term)
             self.apply_committed()
-            self._publish_commit(transport, term=term)
-            return matched
+            self._publish_commit(transport, term=term, targets=matched)
+            return len(matched)
 
     def _advance_commit(self, term: int) -> int:
         """Commit the highest index a quorum stores from the current term."""
@@ -2080,9 +2091,14 @@ class ReplicaNode:
                 return candidate
             return commit_index
 
-    def _publish_commit(self, transport: ReplicationTransport, *, term: int) -> None:
+    def _publish_commit(
+        self, transport: ReplicationTransport, *, term: int, targets: list[str]
+    ) -> None:
         commit_index = self.store.commit_index
-        for target in self.peers:
+        # A peer that failed replication in this round needs catch-up on the
+        # next round, not a second blocking attempt before healthy peers learn
+        # the commit index.
+        for target in targets:
             match = self._match_index.get(target, 0)
             if match <= 0:
                 continue
@@ -2170,8 +2186,10 @@ class ReplicaNode:
                 entry = LogEntry(self.store.last_log_index() + 1, term, command)
                 self.store.append_local(entry)
 
+            matched = []
             for target in self.peers:
-                self._replicate_to(target, transport, term=term)
+                if self._replicate_to(target, transport, term=term):
+                    matched.append(target)
 
             # Finding 5: revalidate the captured term and role after every
             # transport call before treating anything as committed.
@@ -2184,7 +2202,7 @@ class ReplicaNode:
                     "authority command was not committed by quorum"
                 )
             emitted = self.apply_committed()
-            self._publish_commit(transport, term=term)
+            self._publish_commit(transport, term=term, targets=matched)
             return entry, emitted
 
     # -- snapshots ---------------------------------------------------------

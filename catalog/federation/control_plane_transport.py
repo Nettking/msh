@@ -37,9 +37,10 @@ import sqlite3
 import struct
 import threading
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Self
 
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives import hashes
@@ -60,8 +61,8 @@ from .control_plane_replication import (
     ReplicationTransport,
     Snapshot,
     SnapshotResponse,
-    VoteResponse,
     VoterConfiguration,
+    VoteResponse,
 )
 
 TRANSPORT_SCHEMA = "fcp.control-plane.secure-rpc.v1"
@@ -419,6 +420,7 @@ class SecureSocketReplicationTransport(ReplicationTransport):
         endpoints: Mapping[str, VoterEndpoint],
         *,
         timeout_seconds: float = DEFAULT_SOCKET_TIMEOUT_SECONDS,
+        connect_timeout_seconds: float | None = None,
     ) -> None:
         if not isinstance(timeout_seconds, (int, float)) or isinstance(timeout_seconds, bool) or timeout_seconds <= 0:
             raise TransportSecurityError("socket timeout must be positive")
@@ -429,6 +431,11 @@ class SecureSocketReplicationTransport(ReplicationTransport):
         self.codec = codec
         self.endpoints = endpoint_map
         self.timeout_seconds = float(timeout_seconds)
+        self.connect_timeout_seconds = (
+            self.timeout_seconds if connect_timeout_seconds is None else float(connect_timeout_seconds)
+        )
+        if self.connect_timeout_seconds <= 0:
+            raise TransportSecurityError("connect timeout must be positive")
 
     @staticmethod
     def _recv_exact(sock: socket.socket, size: int) -> bytes:
@@ -449,7 +456,7 @@ class SecureSocketReplicationTransport(ReplicationTransport):
             raise OSError("secure control-plane voter endpoint unavailable") from exc
         sealed = self.codec.seal(target, rpc, payload)
         with socket.create_connection(
-            (endpoint.host, endpoint.port), timeout=self.timeout_seconds
+            (endpoint.host, endpoint.port), timeout=self.connect_timeout_seconds
         ) as connection:
             connection.settimeout(self.timeout_seconds)
             connection.sendall(_HEADER.pack(len(sealed.wire)) + sealed.wire)
@@ -706,7 +713,7 @@ class SecureReplicationServer:
         if self._thread is not None:
             self._thread.join(timeout=5.0)
 
-    def __enter__(self) -> "SecureReplicationServer":
+    def __enter__(self) -> Self:
         self.start()
         return self
 

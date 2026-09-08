@@ -92,6 +92,12 @@ class ObservedReplicaNode(ReplicaNode):
             self._mark_leader_contact()
         return response
 
+    def receive_vote_request(self, **request: Any):
+        response = super().receive_vote_request(**request)
+        if response.granted:
+            self._mark_leader_contact()
+        return response
+
     def receive_install_snapshot(self, **request: Any):
         response = super().receive_install_snapshot(**request)
         if response.success:
@@ -180,7 +186,9 @@ class PhysicalReadyReplicatedFederationRuntime(
             for peer in deployment.peers
             if peer.voter_id != deployment.local_voter_id
         }
-        self.transport = SecureSocketReplicationTransport(self.codec, endpoints)
+        self.transport = SecureSocketReplicationTransport(
+            self.codec, endpoints, connect_timeout_seconds=float(heartbeat_seconds) / 2
+        )
         self.local = SessionCoordinator(
             CoordinatorStore(
                 deployment.coordinator_database,
@@ -259,6 +267,7 @@ class PhysicalReadyReplicatedFederationRuntime(
         self.election_stagger_seconds = float(election_stagger_seconds)
         self.credential_sync_seconds = float(credential_sync_seconds)
         self._stop = threading.Event()
+        self._lifecycle_lock = threading.RLock()
         self._lifecycle_thread: threading.Thread | None = None
         self._quorum_failures = 0
         self._next_election_at = self._election_deadline()
@@ -316,14 +325,20 @@ class PhysicalReadyReplicatedFederationRuntime(
                 self._next_election_at = self._election_deadline()
 
     def _lifecycle_round(self) -> None:
+        with self._lifecycle_lock:
+            self._drive_lifecycle_round()
+
+    def _drive_lifecycle_round(self) -> None:
         self.node.apply_committed()
-        self.materialize()
+        applied = self.node.store.last_applied
+        if applied != getattr(self, "_last_lifecycle_materialized_index", None):
+            self.materialize()
+            self._last_lifecycle_materialized_index = applied
         state = self.node.state
 
         # No unsealed authority is allowed to participate in ordinary failover.
-        # This covers both completely empty stores and a crash halfway through
-        # an existing-Federation migration. Only the immutable creator can resume
-        # that deterministic import and commit the final readiness seal.
+        # This covers empty stores and interrupted migration. Recovery must use
+        # the validated bootstrap path and commit the final readiness seal.
         if not authority_ready(state):
             self._attempt_existing_federation_bootstrap()
             return
@@ -343,8 +358,7 @@ class PhysicalReadyReplicatedFederationRuntime(
             return
 
         if (
-            self.node.leader_id is not None
-            and time.monotonic() - self.node.last_leader_contact
+            time.monotonic() - self.node.last_leader_contact
             <= self.election_timeout_seconds
         ):
             self._next_election_at = self._election_deadline()
@@ -407,10 +421,9 @@ class PhysicalReadyReplicatedFederationRuntime(
         if str(session["created_by_node_id"]) != self.node.voter_id:
             self._next_election_at = self._election_deadline()
             return
-        if self.node.role != ReplicaNode.LEADER:
-            if not self.node.start_election(self.transport):
-                self._next_election_at = self._election_deadline()
-                return
+        if self.node.role != ReplicaNode.LEADER and not self.node.start_election(self.transport):
+            self._next_election_at = self._election_deadline()
+            return
         self._bootstrap_existing_federation(
             federation_id=self.bootstrap_federation_id,
             session_id=self.bootstrap_session_id,
@@ -671,6 +684,10 @@ class PhysicalReadyReplicatedFederationRuntime(
         self.node.propose(command, self.transport)
 
     def _promote_operational_sessions(self) -> None:
+        with self._lifecycle_lock:
+            self._drive_operational_promotions()
+
+    def _drive_operational_promotions(self) -> None:
         state = self.node.state
         if not authority_ready(state):
             return
@@ -683,11 +700,38 @@ class PhysicalReadyReplicatedFederationRuntime(
             leadership = state["leaders"][session_id]
             if leadership["leader_node_id"] == self.node.voter_id:
                 continue
+            command_id = (
+                f"auto-recover-leader-{session_id}-"
+                f"{int(leadership['term']) + 1}-{self.node.voter_id}"
+            )
+            pending = self.node.store.entry_for_command(command_id)
+            if pending is not None and pending.log_term < self.node.store.current_term:
+                # Raft cannot commit an inherited entry directly. Commit an
+                # idempotent enrollment of this already-enrolled voter in the
+                # new consensus term; that real quorum commit also commits the
+                # inherited prefix, including the pending leadership change.
+                local_node = state["nodes"][self.node.voter_id]
+                barrier = AuthorityCommand(
+                    command_id=f"promotion-barrier-{self.node.store.current_term}-{command_id}",
+                    command_type="NODE_ENROLL",
+                    cluster_id=self.node.configuration.cluster_id,
+                    issued_by=self.node.voter_id,
+                    payload={
+                        "node_id": self.node.voter_id,
+                        "display_name": local_node["display_name"],
+                        "public_key": local_node["public_key"],
+                    },
+                )
+                self.node.propose(barrier, self.transport)
+                state = self.node.state
+                continue
+            occurred_at = (
+                pending.command.payload["occurred_at"]
+                if pending is not None
+                else _stamp(self.clock())
+            )
             command = AuthorityCommand(
-                command_id=(
-                    f"auto-recover-leader-{session_id}-"
-                    f"{int(leadership['term']) + 1}-{self.node.voter_id}"
-                ),
+                command_id=command_id,
                 command_type="LEADER_TRANSITION",
                 cluster_id=self.node.configuration.cluster_id,
                 issued_by=self.node.voter_id,
@@ -696,7 +740,7 @@ class PhysicalReadyReplicatedFederationRuntime(
                     "previous_leader_node_id": leadership["leader_node_id"],
                     "leader_node_id": self.node.voter_id,
                     "term": int(leadership["term"]) + 1,
-                    "occurred_at": _stamp(self.clock()),
+                    "occurred_at": occurred_at,
                     "reason": "replicated-quorum-auto-recovery",
                 },
             )

@@ -56,7 +56,8 @@ def test_update_cmd_exits_without_external_dependencies(tmp_path: Path) -> None:
 
     completed = subprocess.run(
         ["cmd.exe", "/d", "/c", "update.cmd"],
-        cwd=root,
+        # CMD rejects extended-path syntax even for a short local directory.
+        cwd=str(root).removeprefix("\\\\?\\"),
         check=False,
         capture_output=True,
         text=True,

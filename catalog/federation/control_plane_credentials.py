@@ -32,10 +32,11 @@ import struct
 import tempfile
 import threading
 import zlib
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives import hashes
@@ -48,7 +49,6 @@ from .control_plane_replication import ControlPlaneError, ReplicaNode
 from .control_plane_transport import (
     MAX_WIRE_BYTES,
     SecureEnvelopeCodec,
-    TransportSecurityError,
     VoterEndpoint,
     VoterIdentityRegistry,
 )
@@ -204,7 +204,7 @@ class CredentialSnapshot:
         }
 
     @classmethod
-    def from_dict(cls, value: object) -> "CredentialSnapshot":
+    def from_dict(cls, value: object) -> CredentialSnapshot:
         if not isinstance(value, dict) or value.get("schema") != CREDENTIAL_SNAPSHOT_SCHEMA:
             raise CredentialReplicationError("unsupported credential snapshot schema")
         allowed = {
@@ -257,7 +257,7 @@ class CredentialReceipt:
         }
 
     @classmethod
-    def from_dict(cls, value: object) -> "CredentialReceipt":
+    def from_dict(cls, value: object) -> CredentialReceipt:
         if not isinstance(value, dict) or value.get("schema") != CREDENTIAL_RECEIPT_SCHEMA:
             raise CredentialReplicationError("unsupported credential receipt schema")
         return cls(
@@ -291,7 +291,7 @@ class CredentialCommitCertificate:
         }
 
     @classmethod
-    def from_dict(cls, value: object) -> "CredentialCommitCertificate":
+    def from_dict(cls, value: object) -> CredentialCommitCertificate:
         if not isinstance(value, dict) or value.get("schema") != CREDENTIAL_CERTIFICATE_SCHEMA:
             raise CredentialReplicationError("unsupported credential certificate schema")
         receipts = value.get("receipts")

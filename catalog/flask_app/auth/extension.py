@@ -11,7 +11,7 @@ from pathlib import Path
 import click
 from email_validator import EmailNotValidError, validate_email
 from flask import Flask, current_app, request
-from flask_security import SQLAlchemyUserDatastore, Security, hash_password
+from flask_security import Security, SQLAlchemyUserDatastore, hash_password
 from flask_wtf.csrf import CSRFProtect
 
 from .federation import (
@@ -261,7 +261,6 @@ def init_human_auth(app: Flask) -> None:
         # No generation file means no replicated credential restore. The
         # watcher is therefore a no-op for every legacy/standalone deployment.
         replica_watcher.refresh_if_changed()
-        return None
 
     # Refresh a signed-in member's federated authorization before the normal
     # permission gate. Then prevent member-local passwords/change-password from
@@ -275,13 +274,13 @@ def init_human_auth(app: Flask) -> None:
     @app.before_request
     def protect_human_auth_forms():
         if not current_app.config.get("WTF_CSRF_ENABLED", True):
-            return None
+            return
         if (
             request.method in _UNSAFE_METHODS
             and request.blueprint in _HUMAN_CSRF_BLUEPRINTS
         ):
             csrf.protect()
-        return None
+        return
 
     with app.app_context():
         db.create_all()

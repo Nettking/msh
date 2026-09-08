@@ -19,12 +19,11 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
-import os
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from catalog.federation.coordinator import SessionCoordinator
 from catalog.federation.errors import AuthorizationError, FederationOperationError
@@ -142,7 +141,7 @@ class ReplicatedControlPlaneDeployment:
     peers: tuple[DeploymentPeer, ...]
 
     @classmethod
-    def from_file(cls, path: Path | str) -> "ReplicatedControlPlaneDeployment":
+    def from_file(cls, path: Path | str) -> ReplicatedControlPlaneDeployment:
         config_path = Path(path)
         raw = config_path.read_bytes()
         if not raw or len(raw) > MAX_DEPLOYMENT_CONFIG_BYTES:
@@ -559,7 +558,7 @@ class ReplicatedFederationRuntime:
                         actor = REPLICATED_COORDINATOR_ID
                     payload_json = _canonical(event.get("payload", {})).decode("utf-8")
                     stable = hashlib.sha256(
-                        f"{session_id}:{revision}:{event_type}".encode("utf-8")
+                        f"{session_id}:{revision}:{event_type}".encode()
                     ).hexdigest()
                     database.execute(
                         """

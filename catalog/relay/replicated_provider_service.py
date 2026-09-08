@@ -31,7 +31,10 @@ from catalog.federation.control_plane_status import (
     CONTROL_PLANE_STATUS_FILE,
     write_status,
 )
-from catalog.federation.errors import FederationOperationError, FederationValidationError
+from catalog.federation.errors import (
+    FederationOperationError,
+    FederationValidationError,
+)
 from catalog.federation.federation_v1_release_runtime import FederationV1ReleaseRuntime
 from catalog.federation.service_incarnation import (
     STOP_COMPLETED,
@@ -43,6 +46,8 @@ from catalog.federation.service_incarnation import (
 )
 from catalog.relay.provider_service import (
     ProviderAuthorityRelayServer,
+)
+from catalog.relay.provider_service import (
     main as legacy_main,
 )
 from catalog.relay.service import (
@@ -83,7 +88,9 @@ async def _publish_control_plane_status(
                 voter_only=False,
             )
         except OSError as exc:
-            logging.warning("C03 status publication unavailable (%s)", type(exc).__name__)
+            logging.getLogger(__name__).warning(
+                "C03 status publication unavailable (%s)", type(exc).__name__
+            )
         await asyncio.sleep(STATUS_INTERVAL_SECONDS)
 
 

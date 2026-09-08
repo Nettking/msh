@@ -368,7 +368,8 @@ def test_start_cmd_expands_reachable_client_base_url(
     )
 
     completed = subprocess.run(
-        ["cmd.exe", "/d", "/c", str(batch_file)],
+        # Python supports extended temp paths; CMD requires the local DOS path.
+        ["cmd.exe", "/d", "/c", str(batch_file).removeprefix("\\\\?\\")],
         check=False,
         capture_output=True,
         text=True,

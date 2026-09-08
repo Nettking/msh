@@ -27,9 +27,13 @@ from typing import Any
 from .control_plane_legacy_migration import (
     LegacyMigrationError,
     OfflineCreatorRecoverableRuntime,
-    _canonical as _migration_canonical,
     _provenance_stub,
     _read_event_journal,
+)
+from .control_plane_legacy_migration import (
+    _canonical as _migration_canonical,
+)
+from .control_plane_legacy_migration import (
     _text as _migration_text,
 )
 from .control_plane_product import _stamp
@@ -69,6 +73,22 @@ class FederationV1Runtime(OfflineCreatorRecoverableRuntime):
         )
 
     def bootstrap_new_federation(
+        self,
+        *,
+        federation_id: str,
+        session_id: str,
+        creator_node_id: str,
+        display_name: str,
+    ) -> None:
+        with self._lifecycle_lock:
+            self._bootstrap_new_federation(
+                federation_id=federation_id,
+                session_id=session_id,
+                creator_node_id=creator_node_id,
+                display_name=display_name,
+            )
+
+    def _bootstrap_new_federation(
         self,
         *,
         federation_id: str,
@@ -221,7 +241,7 @@ class FederationV1Runtime(OfflineCreatorRecoverableRuntime):
         # active-member list therefore includes a revoked member until the
         # revocation event is considered. Require exact agreement after applying
         # the revocations covered by the same signed history digest.
-        expected_active = set(str(item) for item in signed_active) - set(revocations)
+        expected_active = {str(item) for item in signed_active} - set(revocations)
         if active != expected_active:
             raise LegacyMigrationError("legacy membership summary disagrees with history")
 
@@ -470,9 +490,7 @@ class FederationV1Runtime(OfflineCreatorRecoverableRuntime):
         """Stable diagnostic identity; contains no secret or credential material."""
 
         return "sha256:" + hashlib.sha256(
-            f"{self.node.configuration.cluster_id}:{federation_id}:{session_id}".encode(
-                "utf-8"
-            )
+            f"{self.node.configuration.cluster_id}:{federation_id}:{session_id}".encode()
         ).hexdigest()
 
 

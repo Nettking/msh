@@ -26,6 +26,10 @@ class FederationV1ReleaseRuntime(FederationV1Runtime):
             )
 
     def _attempt_existing_federation_bootstrap(self) -> None:
+        with self._lifecycle_lock:
+            self._resume_witnessed_bootstrap()
+
+    def _resume_witnessed_bootstrap(self) -> None:
         if self.bootstrap_federation_id is None or self.bootstrap_session_id is None:
             return
         existing_id = self.node.state.get("federation_id")
@@ -33,7 +37,7 @@ class FederationV1ReleaseRuntime(FederationV1Runtime):
             raise LegacyMigrationError(
                 "configured migration Federation ID conflicts with replicated authority"
             )
-        if existing_id is not None:
+        if self.ready:
             return
 
         # A transient voter-socket startup race is not authority. Every retry

@@ -59,7 +59,11 @@ def enforce_human_auth_event_authority(
         if actor_node_id != expected_authority:
             raise AuthorizationError(
                 "human-auth-authority-required",
-                "only the current Federation human-auth authority may publish authority or user state",
+                (
+                    "only the Federation creator may publish authority or user state"
+                    if authority_node_id is None
+                    else "only the current Federation human-auth authority may publish authority or user state"
+                ),
                 "actor_node_id",
             )
         return

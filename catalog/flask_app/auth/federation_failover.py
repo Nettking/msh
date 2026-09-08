@@ -35,7 +35,7 @@ class CurrentLeaderFederationHumanAuthService(FederationHumanAuthService):
                 leadership = resolver(session_id)
             except FederationOperationError:
                 raise
-            except Exception as exc:  # noqa: BLE001 - authority resolution must fail closed
+            except Exception as exc:
                 raise FederationOperationError(
                     "human-auth-leadership-unavailable",
                     "the current Federation human-auth authority cannot be resolved",

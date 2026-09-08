@@ -19,14 +19,15 @@ NOW = datetime(2026, 9, 8, tzinfo=timezone.utc)
 SECRET = bytes(range(32))
 
 
-def _free_port_triple() -> int:
+def _free_port_triple(used: set[int]) -> int:
     """Reserve-test consecutive control/credential/migration ports."""
     for _ in range(100):
         first = socket.socket()
         first.bind(("127.0.0.1", 0))
         port = int(first.getsockname()[1])
         first.close()
-        if port >= 65533:
+        candidates = {port, port + 1, port + 2}
+        if port >= 65533 or candidates & used:
             continue
         sockets: list[socket.socket] = []
         try:
@@ -39,6 +40,7 @@ def _free_port_triple() -> int:
         finally:
             for sock in sockets:
                 sock.close()
+        used.update(candidates)
         return port
     raise RuntimeError("could not allocate consecutive test ports")
 
@@ -46,10 +48,11 @@ def _free_port_triple() -> int:
 def _deployments(root: Path):
     credentials = []
     ports = []
+    used: set[int] = set()
     for name in ("a", "b", "c"):
         identity_dir = root / f"identity-{name}"
         credentials.append(IdentityStore(identity_dir, display_name=name).create(now=NOW))
-        ports.append(_free_port_triple())
+        ports.append(_free_port_triple(used))
 
     secret_file = root / "control-plane.secret"
     secret_file.write_bytes(SECRET)

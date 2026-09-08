@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import socket
 import sqlite3
 from datetime import datetime, timedelta, timezone
@@ -9,7 +10,10 @@ from pathlib import Path
 
 import pytest
 
-from catalog.federation.control_plane_legacy_migration import LegacyMigrationError
+from catalog.federation.control_plane_legacy_migration import (
+    LegacyMigrationError,
+    _read_event_journal,
+)
 from catalog.federation.control_plane_product import (
     DeploymentPeer,
     ReplicatedControlPlaneDeployment,
@@ -363,3 +367,55 @@ def test_offline_creator_migration_rejects_gap_in_local_witness_journal(
         runtime.legacy_witness_server._server.server_close()
         runtime.credential_server._server.server_close()
         runtime.server._server.server_close()
+
+
+def test_interrupted_witnessed_bootstrap_resumes_after_voter_restart(tmp_path, monkeypatch):
+    deployments = _topology(tmp_path)
+    voter_ids = tuple(item.local_voter_id for item in deployments)
+    events = _legacy_events(voter_ids)
+    first_db, first_pairing = _write_member_witness(tmp_path, voter_id=voter_ids[0], events=events)
+    second_db, second_pairing = _write_member_witness(tmp_path, voter_id=voter_ids[1], events=events)
+    protected = tmp_path / "protected"
+    protected.mkdir()
+    sentinel = protected / "measurements.jsonl"
+    sentinel.write_bytes(b"preserve-me\n")
+    first = _runtime(deployments[0], first_db, first_pairing)
+    second = _runtime(deployments[1], second_db, second_pairing)
+    recorder = RecorderControlPlaneVoter(deployments[2], protected_record_data=protected)
+    for runtime in (first, second, recorder):
+        runtime.start()
+    try:
+        propose = first.node.propose
+        def interrupt(command, transport):
+            result = propose(command, transport)
+            if command.command_type == "FEDERATION_GENESIS":
+                raise RuntimeError("bootstrap process interrupted")
+            return result
+        monkeypatch.setattr(first.node, "propose", interrupt)
+        with pytest.raises(RuntimeError, match="process interrupted"):
+            first._attempt_existing_federation_bootstrap()
+        assert first.node.state["federation_id"] == FEDERATION
+        assert not first.ready
+        first.close()
+        first = _runtime(deployments[0], first_db, first_pairing)
+        first.start()
+        first._attempt_existing_federation_bootstrap()
+        assert first.ready
+        assert first.node.state["sessions"][SESSION]["creator_node_id"] == CREATOR
+        assert HISTORICAL_REVOKED in first.node.state["revocations"]
+        assert first.node.state["memberships"][SESSION][CREATOR] is False
+        assert sentinel.read_bytes() == b"preserve-me\n"
+    finally:
+        for runtime in (first, second, recorder):
+            runtime.close()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows extended filesystem path")
+def test_legacy_witness_reads_extended_windows_path_without_modifying_history(tmp_path):
+    events = _legacy_events(("voter-a", "voter-b", "voter-c"))
+    database, _ = _write_member_witness(tmp_path, voter_id="voter-a", events=events)
+    original = database.read_bytes()
+    raw = str(database.resolve())
+    extended = Path(raw if raw.startswith("\\\\?\\") else "\\\\?\\" + raw)
+    assert _read_event_journal(extended, SESSION) == events
+    assert database.read_bytes() == original

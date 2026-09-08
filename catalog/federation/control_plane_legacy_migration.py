@@ -30,9 +30,11 @@ import socketserver
 import sqlite3
 import struct
 import threading
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
+from urllib.parse import quote
 
 from catalog.federation.human_auth import AUTHORITY_EVENT, USER_EVENT
 from catalog.federation.models import SessionEvent
@@ -45,7 +47,6 @@ from .control_plane_runtime import PhysicalReadyReplicatedFederationRuntime
 from .control_plane_transport import (
     MAX_WIRE_BYTES,
     SecureEnvelopeCodec,
-    TransportSecurityError,
     VoterEndpoint,
 )
 
@@ -89,7 +90,10 @@ def _text(value: object, field: str) -> str:
 def _read_event_journal(database: Path, session_id: str) -> tuple[SessionEvent, ...]:
     if not database.is_file():
         raise LegacyMigrationError("legacy member NodeState database is absent")
-    uri = database.resolve().as_uri() + "?mode=ro"
+    # Encode a filesystem name, not a URL authority. Windows extended paths
+    # are valid SQLite filenames, but as_uri() turns their prefix into an
+    # invalid URI hostname. Keep the legacy database strictly read-only.
+    uri = "file:" + quote(str(database.resolve())) + "?mode=ro"
     try:
         connection = sqlite3.connect(uri, uri=True, timeout=5.0)
         connection.row_factory = sqlite3.Row
@@ -252,7 +256,7 @@ class LegacyMigrationAttestation:
         }
 
     @classmethod
-    def from_dict(cls, value: object) -> "LegacyMigrationAttestation":
+    def from_dict(cls, value: object) -> LegacyMigrationAttestation:
         if not isinstance(value, dict) or value.get("schema") != MIGRATION_ATTESTATION_SCHEMA:
             raise LegacyMigrationError("legacy migration attestation schema is invalid")
         manifest = value.get("manifest")
@@ -511,10 +515,9 @@ class OfflineCreatorRecoverableRuntime(PhysicalReadyReplicatedFederationRuntime)
             )
         if existing_id is not None:
             return
-        if self.node.role != ReplicaNode.LEADER:
-            if not self.node.start_election(self.transport):
-                self._next_election_at = self._election_deadline()
-                return
+        if self.node.role != ReplicaNode.LEADER and not self.node.start_election(self.transport):
+            self._next_election_at = self._election_deadline()
+            return
         manifest = self._matching_witness_quorum(
             self.bootstrap_federation_id,
             self.bootstrap_session_id,
@@ -578,14 +581,15 @@ class OfflineCreatorRecoverableRuntime(PhysicalReadyReplicatedFederationRuntime)
             raise LegacyMigrationError(
                 "legacy Federation has active non-voter members whose cryptographic identity cannot be reconstructed"
             )
-        if manifest.get("human_auth_present") is True:
-            # Pre-C03 member journals intentionally contain no password hashes.
-            # A pre-existing replicated credential snapshot is the only safe
-            # continuation; otherwise refusing is preferable to resetting users.
-            if self.credential_manager.best_committed() is None:
-                raise LegacyMigrationError(
-                    "legacy Federation contains human-auth users but no recoverable quorum-certified credential snapshot"
-                )
+        # Pre-C03 journals contain no passwords; recovery requires an existing
+        # quorum-certified snapshot instead of resetting the users.
+        if (
+            manifest.get("human_auth_present") is True
+            and self.credential_manager.best_committed() is None
+        ):
+            raise LegacyMigrationError(
+                "legacy Federation contains human-auth users but no recoverable quorum-certified credential snapshot"
+            )
 
         chain_raw = manifest.get("leadership_chain")
         if not isinstance(chain_raw, list):

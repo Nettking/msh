@@ -12,11 +12,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import signal
 import sys
 import threading
-import time
 from pathlib import Path
 from typing import Any
 
@@ -189,8 +189,10 @@ class RecorderControlPlaneVoter:
             try:
                 self.node.apply_committed()
                 self._write_status()
-            except Exception:  # noqa: BLE001 - status cannot widen voter authority
-                continue
+            except Exception as exc:  # noqa: BLE001 - status cannot widen voter authority
+                logging.getLogger(__name__).warning(
+                    "Recorder voter status publication failed (%s)", type(exc).__name__
+                )
 
     def start(self) -> None:
         self.server.start()

@@ -36,14 +36,14 @@ def _canonical(value: object) -> str:
 
 def _event_digest(session_id: str, term: int, leader_id: str) -> str:
     return hashlib.sha256(
-        f"c03-leadership:{session_id}:{term}:{leader_id}".encode("utf-8")
+        f"c03-leadership:{session_id}:{term}:{leader_id}".encode()
     ).hexdigest()
 
 
 class MaterializedReplicatedFederationRuntime(ReplicatedFederationRuntime):
     """Replicated runtime whose local coordinator projection is non-destructive."""
 
-    def materialize(self) -> None:  # noqa: C901 - one atomic projection transaction
+    def materialize(self) -> None:
         state = self.node.state
         if state.get("federation_id") is None:
             return

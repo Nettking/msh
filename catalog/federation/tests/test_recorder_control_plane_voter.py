@@ -24,13 +24,14 @@ NOW = datetime(2026, 9, 8, tzinfo=timezone.utc)
 SECRET = bytes(range(32))
 
 
-def _free_triple() -> int:
+def _free_triple(used: set[int]) -> int:
     for _ in range(100):
         probe = socket.socket()
         probe.bind(("127.0.0.1", 0))
         port = int(probe.getsockname()[1])
         probe.close()
-        if port >= 65533:
+        candidates = {port, port + 1, port + 2}
+        if port >= 65533 or candidates & used:
             continue
         sockets: list[socket.socket] = []
         try:
@@ -43,6 +44,7 @@ def _free_triple() -> int:
         finally:
             for sock in sockets:
                 sock.close()
+        used.update(candidates)
         return port
     raise RuntimeError("could not allocate test port triple")
 
@@ -51,10 +53,11 @@ def _topology(root: Path):
     names = ("nettking", "nitro", "msh-recorder")
     credentials = []
     ports = []
+    used: set[int] = set()
     for name in names:
         identity = root / f"identity-{name}"
         credentials.append(IdentityStore(identity, display_name=name).create(now=NOW))
-        ports.append(_free_triple())
+        ports.append(_free_triple(used))
     secret = root / "transport.secret"
     secret.write_bytes(SECRET)
     peers = tuple(
