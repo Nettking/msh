@@ -1,9 +1,10 @@
 """Non-destructive materialized coordinator view for replicated C03 authority.
 
-The replicated command log is authoritative.  The existing coordinator SQLite
-schema remains a compatibility projection for product readers and is updated
-without truncating unrelated session history (software updates, storage,
-human-auth metadata, jobs, etc.).
+The replicated log remains authoritative. This SQLite view exists solely for
+compatibility with established relay/product readers. Materialization updates
+only C03-owned durable authority and never truncates unrelated session history.
+The internal bootstrap readiness seal remains private to the control-plane state
+machine and is deliberately excluded from normal product capability surfaces.
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ from .control_plane_product import (
     _event_time,
     _stamp,
 )
+from .control_plane_readiness import BOOTSTRAP_SEAL_CAPABILITY_ID
 from .control_plane_replication import ControlPlaneError
 from .session_leadership import LEADERSHIP_SCHEMA
 
@@ -158,19 +160,18 @@ class MaterializedReplicatedFederationRuntime(ReplicatedFederationRuntime):
                             ),
                         )
 
-                # Leadership ----------------------------------------------------------
-                # SessionLeadershipService starts from immutable creator/term 1 and
-                # trusts only coordinator-authored, schema-valid, contiguous term
-                # transitions. Materialize every C03 transition in order; never
-                # invent a missing intermediate term and never emit a synthetic
-                # term-1 change event.
+                # Leadership is the one C03 public event existing product code
+                # consumes as an authorization proof. Append exactly one event
+                # for every replicated monotonic term, leaving unrelated event
+                # types and revisions untouched.
                 authority = state["leaders"].get(session_id)
                 if authority is not None:
                     target_term = int(authority["term"])
                     target_leader = str(authority["leader_node_id"])
                     creator = str(authority["creator_node_id"])
+                    c03_events = state["session_events"].get(session_id, [])
                     c03_transitions: dict[int, dict[str, Any]] = {}
-                    for event in state["session_events"].get(session_id, []):
+                    for event in c03_events:
                         if event.get("event_type") != "session.leader.changed":
                             continue
                         payload = event.get("payload")
@@ -263,13 +264,27 @@ class MaterializedReplicatedFederationRuntime(ReplicatedFederationRuntime):
                         )
 
                 # Capability authority ------------------------------------------------
-                authoritative_caps = state["capabilities"].get(session_id, {})
+                # The readiness seal is an internal durability marker, not an
+                # end-user/product capability. Never surface or persist it in the
+                # ordinary capability table.
+                authoritative_caps = {
+                    capability_id: capability
+                    for capability_id, capability in state["capabilities"].get(
+                        session_id, {}
+                    ).items()
+                    if capability_id != BOOTSTRAP_SEAL_CAPABILITY_ID
+                }
                 rows = database.execute(
                     "SELECT * FROM capabilities WHERE session_id=?", (session_id,)
                 ).fetchall()
                 existing_caps: dict[str, Any] = {
                     str(row["capability_id"]): row for row in rows
                 }
+                # Remove a seal persisted by an earlier development revision.
+                database.execute(
+                    "DELETE FROM capabilities WHERE session_id=? AND capability_id=?",
+                    (session_id, BOOTSTRAP_SEAL_CAPABILITY_ID),
+                )
                 for capability_id, capability in sorted(authoritative_caps.items()):
                     row = existing_caps.get(capability_id)
                     database.execute(
