@@ -19,12 +19,17 @@ from .federation import (
     federation_login_context,
     get_federated_human_auth_service,
     guard_member_local_password_login,
+    install_federated_human_auth_service,
     redirect_member_password_change,
     sync_federated_human_user,
 )
 from .federation_enrollment import (
     federation_enrollment,
     fresh_discovered_federations,
+)
+from .federation_failover import (
+    CurrentLeaderFederationHumanAuthService,
+    HumanAuthReplicaGenerationWatcher,
 )
 from .models import Role, User, db
 from .policy import ROLE_PERMISSIONS, audit_route_policy, enforce_human_authorization
@@ -246,6 +251,18 @@ def init_human_auth(app: Flask) -> None:
     app.register_blueprint(federated_human_auth)
     app.register_blueprint(federation_enrollment)
 
+    replica_watcher = HumanAuthReplicaGenerationWatcher(
+        password_salt_file=_secret_directory() / "password-salt"
+    )
+    app.extensions["fcp_human_auth_replica_watcher"] = replica_watcher
+
+    @app.before_request
+    def refresh_restored_human_auth_database():
+        # No generation file means no replicated credential restore. The
+        # watcher is therefore a no-op for every legacy/standalone deployment.
+        replica_watcher.refresh_if_changed()
+        return None
+
     # Refresh a signed-in member's federated authorization before the normal
     # permission gate. Then prevent member-local passwords/change-password from
     # bypassing the Federation authority. Public login/callback routes remain
@@ -269,4 +286,10 @@ def init_human_auth(app: Flask) -> None:
     with app.app_context():
         db.create_all()
         _seed_policy(datastore)
+        install_federated_human_auth_service(
+            CurrentLeaderFederationHumanAuthService()
+        )
+        # Baseline the generation observed when SQLAlchemy opened the database.
+        # A later absent->present marker transition is then treated as a restore.
+        replica_watcher.prime()
     _register_cli(app, datastore)
