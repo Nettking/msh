@@ -21,6 +21,11 @@ services:
       - --unsafe-development-plaintext
     environment:
       - FCP_REPLICATED_CONTROL_PLANE_CONFIG=${FCP_REPLICATED_CONTROL_PLANE_CONFIG:-}
+      # Exact pre-C03 identities used only for one-time migration. Empty means
+      # an uninitialized voter set remains fail-closed and cannot invent a new
+      # Federation. Only the immutable creator may successfully import them.
+      - FCP_C03_BOOTSTRAP_FEDERATION_ID=${FCP_C03_BOOTSTRAP_FEDERATION_ID:-}
+      - FCP_C03_BOOTSTRAP_SESSION_ID=${FCP_C03_BOOTSTRAP_SESSION_ID:-}
       - FCP_AUTH_DATABASE=${FCP_AUTH_DATABASE:-/app/data/auth/users.sqlite3}
       - FCP_AUTH_PASSWORD_SALT_FILE=${FCP_AUTH_PASSWORD_SALT_FILE:-/app/data/auth/password-salt}
     ports:
