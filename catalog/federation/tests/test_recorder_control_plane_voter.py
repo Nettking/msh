@@ -13,9 +13,7 @@ from catalog.federation.control_plane_product import (
     ReplicatedControlPlaneDeployment,
 )
 from catalog.federation.control_plane_replication import ControlPlaneError, ReplicaNode
-from catalog.federation.control_plane_runtime import (
-    PhysicalReadyReplicatedFederationRuntime,
-)
+from catalog.federation.federation_v1_runtime import FederationV1Runtime
 from catalog.federation.recorder_control_plane_voter import (
     RecorderControlPlaneVoter,
     validate_recorder_voter_isolation,
@@ -26,23 +24,27 @@ NOW = datetime(2026, 9, 8, tzinfo=timezone.utc)
 SECRET = bytes(range(32))
 
 
-def _free_pair() -> int:
+def _free_triple() -> int:
     for _ in range(100):
-        first = socket.socket()
-        first.bind(("127.0.0.1", 0))
-        port = int(first.getsockname()[1])
-        first.close()
-        if port >= 65534:
+        probe = socket.socket()
+        probe.bind(("127.0.0.1", 0))
+        port = int(probe.getsockname()[1])
+        probe.close()
+        if port >= 65533:
             continue
-        second = socket.socket()
+        sockets: list[socket.socket] = []
         try:
-            second.bind(("127.0.0.1", port + 1))
+            for candidate in (port, port + 1, port + 2):
+                sock = socket.socket()
+                sock.bind(("127.0.0.1", candidate))
+                sockets.append(sock)
         except OSError:
-            second.close()
             continue
-        second.close()
+        finally:
+            for sock in sockets:
+                sock.close()
         return port
-    raise RuntimeError("could not allocate test port pair")
+    raise RuntimeError("could not allocate test port triple")
 
 
 def _topology(root: Path):
@@ -52,7 +54,7 @@ def _topology(root: Path):
     for name in names:
         identity = root / f"identity-{name}"
         credentials.append(IdentityStore(identity, display_name=name).create(now=NOW))
-        ports.append(_free_pair())
+        ports.append(_free_triple())
     secret = root / "transport.secret"
     secret.write_bytes(SECRET)
     peers = tuple(
@@ -85,7 +87,7 @@ def _topology(root: Path):
 
 
 def _product_runtime(deployment: ReplicatedControlPlaneDeployment):
-    return PhysicalReadyReplicatedFederationRuntime(
+    return FederationV1Runtime(
         deployment,
         heartbeat_seconds=0.1,
         election_timeout_seconds=60.0,
