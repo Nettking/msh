@@ -1,22 +1,19 @@
 """Physical-ready replicated Federation runtime.
 
 This module turns the reviewed C03 state machine into a continuously operating
-three-voter product authority.  It adds only lifecycle concerns above the
-consensus core:
+three-voter product authority. It adds lifecycle concerns above the consensus
+core: authenticated heartbeats, deterministic elections, quorum-loss fencing,
+non-destructive follower materialization, safe existing-Federation bootstrap,
+and private human-credential continuity.
 
-* periodic authenticated AppendEntries heartbeats;
-* deterministic staggered election after leader silence;
-* fail-closed step-down after repeated quorum loss;
-* non-destructive materialization of committed authority on followers;
-* automatic operational-leader transition after a quorum election; and
-* private quorum-certified human-credential snapshot publication/restoration.
-
-The consensus log remains the authority.  No SQLite/WAL page replication is
-performed and no replacement Federation is created during recovery.
+The consensus log remains the authority. No SQLite/WAL page replication is
+performed and recovery never creates a replacement Federation.
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import threading
 import time
@@ -25,13 +22,13 @@ from typing import Any
 
 from catalog.federation.coordinator import SessionCoordinator
 from catalog.federation.persistence import CoordinatorStore
+from catalog.federation.session_leadership import LEADERSHIP_SCHEMA
 from catalog.node.identity import IdentityStore
 
 from .control_plane_credentials import (
     CredentialQuorumManager,
     CredentialReplicaServer,
     CredentialReplicaTransport,
-    CredentialReplicationError,
     CredentialSnapshot,
     CredentialSnapshotStore,
     credential_endpoints_from_control,
@@ -118,13 +115,15 @@ class PhysicalReadyReplicatedFederationRuntime(
         clock: Any = None,
         human_auth_database: Path | str | None = None,
         human_auth_password_salt: Path | str | None = None,
+        bootstrap_federation_id: str | None = None,
+        bootstrap_session_id: str | None = None,
         heartbeat_seconds: float = DEFAULT_HEARTBEAT_SECONDS,
         election_timeout_seconds: float = DEFAULT_ELECTION_TIMEOUT_SECONDS,
         election_stagger_seconds: float = DEFAULT_ELECTION_STAGGER_SECONDS,
         credential_sync_seconds: float = DEFAULT_CREDENTIAL_SYNC_SECONDS,
     ) -> None:
-        # Rebuild the small parent constructor here so the product runtime can
-        # use ObservedReplicaNode without modifying the reviewed Phase-1 core.
+        # Rebuild the small parent constructor here so this runtime can use the
+        # observed node without modifying the reviewed Phase-1 implementation.
         self.deployment = deployment
         from datetime import datetime, timezone
 
@@ -219,6 +218,21 @@ class PhysicalReadyReplicatedFederationRuntime(
             if human_auth_password_salt is not None
             else None
         )
+        self.bootstrap_federation_id = (
+            bootstrap_federation_id.strip()
+            if isinstance(bootstrap_federation_id, str)
+            and bootstrap_federation_id.strip()
+            else None
+        )
+        self.bootstrap_session_id = (
+            bootstrap_session_id.strip()
+            if isinstance(bootstrap_session_id, str) and bootstrap_session_id.strip()
+            else None
+        )
+        if (self.bootstrap_federation_id is None) != (self.bootstrap_session_id is None):
+            raise ControlPlaneError(
+                "bootstrap federation and session IDs must be configured together"
+            )
         self._auth_generation_path = (
             Path(deployment.coordinator_database).parent / AUTH_GENERATION_FILE
         )
@@ -286,10 +300,8 @@ class PhysicalReadyReplicatedFederationRuntime(
             try:
                 self._lifecycle_round()
                 self._last_error = None
-            except Exception as exc:  # noqa: BLE001 - fail closed and retry bounded round
+            except Exception as exc:  # noqa: BLE001 - bounded fail-closed driver
                 self._last_error = type(exc).__name__
-                # A lifecycle exception must never leave an isolated node
-                # believing it can continue leader-only product mutations.
                 if self.node.role == ReplicaNode.LEADER:
                     self.node.force_follower()
                 self._next_election_at = self._election_deadline()
@@ -297,6 +309,14 @@ class PhysicalReadyReplicatedFederationRuntime(
     def _lifecycle_round(self) -> None:
         self.node.apply_committed()
         self.materialize()
+        state = self.node.state
+
+        # Never manufacture a new Federation from three empty replica stores.
+        # Existing-Federation bootstrap is allowed only on the immutable creator
+        # and only when explicit federation/session IDs were provisioned.
+        if state.get("federation_id") is None:
+            self._attempt_existing_federation_bootstrap()
+            return
 
         if self.node.role == ReplicaNode.LEADER:
             matched = self.node.synchronize(self.transport)
@@ -312,8 +332,6 @@ class PhysicalReadyReplicatedFederationRuntime(
                 self._sync_human_credentials_if_due()
             return
 
-        # A valid leader heartbeat updates ObservedReplicaNode.  Do not start a
-        # competing election while that contact is within the timeout window.
         if (
             self.node.leader_id is not None
             and time.monotonic() - self.node.last_leader_contact
@@ -334,6 +352,259 @@ class PhysicalReadyReplicatedFederationRuntime(
         self.materialize()
         self._restore_human_credentials_if_available()
         self._sync_human_credentials_if_due(force=True)
+
+    def _attempt_existing_federation_bootstrap(self) -> None:
+        if self.bootstrap_federation_id is None or self.bootstrap_session_id is None:
+            return
+        if time.monotonic() < self._next_election_at:
+            return
+        with self.local.store.read_transaction() as database:
+            session = database.execute(
+                "SELECT created_by_node_id FROM sessions WHERE session_id=?",
+                (self.bootstrap_session_id,),
+            ).fetchone()
+        if session is None:
+            raise ControlPlaneError("configured bootstrap session does not exist locally")
+        if str(session["created_by_node_id"]) != self.node.voter_id:
+            # Only the immutable creator may import the pre-C03 authority.
+            self._next_election_at = self._election_deadline()
+            return
+        if not self.node.start_election(self.transport):
+            self._next_election_at = self._election_deadline()
+            return
+        self._bootstrap_existing_federation(
+            federation_id=self.bootstrap_federation_id,
+            session_id=self.bootstrap_session_id,
+        )
+        self.node.synchronize(self.transport)
+        self.materialize()
+        self._sync_human_credentials_if_due(force=True)
+
+    def _bootstrap_existing_federation(
+        self, *, federation_id: str, session_id: str
+    ) -> None:
+        if self.node.role != ReplicaNode.LEADER:
+            raise ControlPlaneError("existing-Federation bootstrap requires quorum leader")
+        if self.node.state.get("federation_id") is not None:
+            return
+
+        with self.local.store.read_transaction() as database:
+            session = database.execute(
+                "SELECT * FROM sessions WHERE session_id=?", (session_id,)
+            ).fetchone()
+            if session is None:
+                raise ControlPlaneError("bootstrap session does not exist")
+            creator = str(session["created_by_node_id"])
+            if creator != self.node.voter_id:
+                raise ControlPlaneError(
+                    "only the immutable Federation creator may bootstrap C03"
+                )
+            old_coordinator_id = str(session["coordinator_id"])
+            node_rows = database.execute(
+                """
+                SELECT node_id,display_name,public_key,revoked_at,revocation_reason
+                FROM nodes ORDER BY node_id
+                """
+            ).fetchall()
+            membership_rows = database.execute(
+                """
+                SELECT node_id,removed_at,removal_reason FROM session_memberships
+                WHERE session_id=? ORDER BY node_id
+                """,
+                (session_id,),
+            ).fetchall()
+            capability_rows = database.execute(
+                """
+                SELECT capability_id,node_id,type FROM capabilities
+                WHERE session_id=? ORDER BY capability_id
+                """,
+                (session_id,),
+            ).fetchall()
+            leadership_rows = database.execute(
+                """
+                SELECT actor_node_id,payload_json,occurred_at FROM session_events
+                WHERE session_id=? AND event_type='session.leader.changed'
+                ORDER BY revision
+                """,
+                (session_id,),
+            ).fetchall()
+
+        nodes = [
+            {
+                "node_id": str(row["node_id"]),
+                "display_name": str(row["display_name"]),
+                "public_key": str(row["public_key"]),
+            }
+            for row in node_rows
+        ]
+        known_nodes = {item["node_id"] for item in nodes}
+        active_members = [
+            str(row["node_id"])
+            for row in membership_rows
+            if row["removed_at"] is None
+        ]
+        removed_members = [
+            (str(row["node_id"]), str(row["removal_reason"] or "pre-c03-removal"))
+            for row in membership_rows
+            if row["removed_at"] is not None
+        ]
+        active_set = set(active_members)
+        revoked = {
+            str(row["node_id"]): str(row["revocation_reason"] or "legacy-revocation")
+            for row in node_rows
+            if row["revoked_at"] is not None
+        }
+        for voter_id in self.node.configuration.voter_ids:
+            if voter_id not in known_nodes:
+                raise ControlPlaneError("C03 voter is not enrolled in the existing Federation")
+            if voter_id not in active_set or voter_id in revoked:
+                raise ControlPlaneError("C03 voter is not an active existing Federation member")
+
+        genesis = AuthorityCommand(
+            command_id=(
+                "migration-genesis-"
+                + hashlib.sha256(f"{federation_id}:{session_id}".encode()).hexdigest()
+            ),
+            command_type="FEDERATION_GENESIS",
+            cluster_id=self.node.configuration.cluster_id,
+            issued_by=creator,
+            payload={
+                "federation_id": federation_id,
+                "session_id": session_id,
+                "creator_node_id": creator,
+                "display_name": str(session["display_name"]),
+                "voter_ids": list(self.node.configuration.voter_ids),
+                "nodes": nodes,
+                "members": active_members,
+                "occurred_at": str(session["created_at"]),
+            },
+        )
+        self.node.propose(genesis, self.transport)
+
+        # Preserve pre-C03 operational leadership exactly. Ordinary member
+        # events with the same name are ignored; only the previous coordinator
+        # identity is trusted as legacy leadership authority.
+        leader = creator
+        term = 1
+        transitions: list[tuple[str, str, int, str]] = []
+        for row in leadership_rows:
+            if str(row["actor_node_id"]) != old_coordinator_id:
+                continue
+            try:
+                payload = json.loads(row["payload_json"])
+            except json.JSONDecodeError as exc:
+                raise ControlPlaneError("legacy leadership history is malformed") from exc
+            next_term = payload.get("term")
+            next_leader = payload.get("leader_node_id")
+            previous = payload.get("previous_leader_node_id")
+            if (
+                payload.get("schema") != LEADERSHIP_SCHEMA
+                or previous != leader
+                or isinstance(next_term, bool)
+                or not isinstance(next_term, int)
+                or next_term != term + 1
+                or not isinstance(next_leader, str)
+                or next_leader not in active_set
+            ):
+                raise ControlPlaneError(
+                    "legacy leadership history is not a contiguous active-member chain"
+                )
+            transitions.append(
+                (leader, next_leader, next_term, str(row["occurred_at"]))
+            )
+            leader = next_leader
+            term = next_term
+
+        for previous, next_leader, next_term, occurred_at in transitions:
+            command = AuthorityCommand(
+                command_id=f"migration-leader-{session_id}-{next_term}-{next_leader}",
+                command_type="LEADER_TRANSITION",
+                cluster_id=self.node.configuration.cluster_id,
+                issued_by=previous,
+                payload={
+                    "session_id": session_id,
+                    "previous_leader_node_id": previous,
+                    "leader_node_id": next_leader,
+                    "term": next_term,
+                    "occurred_at": occurred_at,
+                    "reason": "pre-c03-leadership-import",
+                },
+            )
+            self.node.propose(command, self.transport)
+
+        # Import current capability ownership before historical removals/revokes.
+        for row in capability_rows:
+            owner = str(row["node_id"])
+            if owner not in active_set or owner in revoked:
+                continue
+            command = AuthorityCommand(
+                command_id=(
+                    "migration-capability-"
+                    + hashlib.sha256(
+                        f"{session_id}:{row['capability_id']}:{owner}".encode()
+                    ).hexdigest()
+                ),
+                command_type="CAPABILITY_DECLARE",
+                cluster_id=self.node.configuration.cluster_id,
+                issued_by=owner,
+                payload={
+                    "session_id": session_id,
+                    "capability_id": str(row["capability_id"]),
+                    "capability_type": str(row["type"]),
+                    "owner_node_id": owner,
+                    "occurred_at": _stamp(self.clock()),
+                },
+            )
+            self.node.propose(command, self.transport)
+
+        # Preserve explicit removed-membership state for enrolled nodes. The
+        # state machine requires add-before-remove, so historical removed nodes
+        # are admitted then immediately removed under creator authority.
+        for node_id, reason in removed_members:
+            if node_id not in known_nodes or node_id in revoked:
+                continue
+            add = AuthorityCommand(
+                command_id=f"migration-member-add-{session_id}-{node_id}",
+                command_type="SESSION_MEMBER_ADD",
+                cluster_id=self.node.configuration.cluster_id,
+                issued_by=creator,
+                payload={
+                    "session_id": session_id,
+                    "node_id": node_id,
+                    "occurred_at": _stamp(self.clock()),
+                },
+            )
+            self.node.propose(add, self.transport)
+            remove = AuthorityCommand(
+                command_id=f"migration-member-remove-{session_id}-{node_id}",
+                command_type="SESSION_MEMBER_REMOVE",
+                cluster_id=self.node.configuration.cluster_id,
+                issued_by=creator,
+                payload={
+                    "session_id": session_id,
+                    "node_id": node_id,
+                    "reason": reason,
+                    "occurred_at": _stamp(self.clock()),
+                },
+            )
+            self.node.propose(remove, self.transport)
+
+        for node_id, reason in sorted(revoked.items()):
+            command = AuthorityCommand(
+                command_id=f"migration-revoke-{node_id}",
+                command_type="NODE_REVOKE",
+                cluster_id=self.node.configuration.cluster_id,
+                issued_by=creator,
+                payload={
+                    "node_id": node_id,
+                    "reason": reason,
+                    "occurred_at": _stamp(self.clock()),
+                },
+            )
+            self.node.propose(command, self.transport)
+
+        if self.node.state.get("federation_id") != federation_id:
+            raise ControlPlaneError("existing Federation identity changed during C03 bootstrap")
 
     def _promote_operational_sessions(self) -> None:
         state = self.node.state
@@ -397,8 +668,6 @@ class PhysicalReadyReplicatedFederationRuntime(
         return tuple(values)
 
     def _record_auth_generation(self, snapshot: CredentialSnapshot) -> None:
-        import json
-
         payload = json.dumps(
             {
                 "schema": "fcp.human-auth.replica-generation.v1",
@@ -467,8 +736,6 @@ class PhysicalReadyReplicatedFederationRuntime(
             return None
         assert self.human_auth_database is not None
         assert self.human_auth_password_salt is not None
-        # Synchronize first so every reachable credential server has observed
-        # this leader/term before accepting a private prepare.
         matched = self.node.synchronize(self.transport)
         if matched + 1 < self.node.quorum:
             raise QuorumUnavailable(
