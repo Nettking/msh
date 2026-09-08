@@ -71,6 +71,7 @@ def _genesis() -> AuthorityCommand:
             "display_name": "Acceptance Federation",
             "nodes": nodes,
             "members": list(VOTERS),
+            "voter_configuration": CONFIGURATION.to_dict(),
         },
     )
 
@@ -129,23 +130,27 @@ def test_voter_votes_once_per_term_and_rejects_old_term(tmp_path: Path) -> None:
     assert replicas["voter-b"].store.voted_for == "voter-a"
     assert replicas["voter-c"].store.voted_for == "voter-a"
     assert (
-        replicas["voter-b"].receive_vote_request(
+        replicas["voter-b"]
+        .receive_vote_request(
             candidate_id="voter-c",
             term=1,
             last_log_index=0,
             last_log_term=0,
             cluster_id=CONFIGURATION.cluster_id,
         )
+        .granted
         is False
     )
     assert (
-        replicas["voter-b"].receive_vote_request(
+        replicas["voter-b"]
+        .receive_vote_request(
             candidate_id="voter-c",
             term=0,
             last_log_index=0,
             last_log_term=0,
             cluster_id=CONFIGURATION.cluster_id,
         )
+        .granted
         is False
     )
 
@@ -160,7 +165,7 @@ def test_outdated_candidate_log_cannot_win(tmp_path: Path) -> None:
             last_log_index=0,
             last_log_term=0,
             cluster_id=CONFIGURATION.cluster_id,
-        )
+        ).granted
         is False
     )
     assert candidate.store.current_term == 2
@@ -255,7 +260,7 @@ def test_divergent_uncommitted_suffix_is_replaced(tmp_path: Path) -> None:
         entries=(replacement,),
         leader_commit=1,
         cluster_id=CONFIGURATION.cluster_id,
-    )
+    ).success
     assert follower.store.entries(after=1)[0].command.command_id == "new-suffix"
 
 
