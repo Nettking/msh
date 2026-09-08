@@ -76,11 +76,13 @@ jobs:
       - name: Run E1-E4 directly
         env:
           FCP_BUILD_COMMIT: ${{ github.sha }}
-        run: python -m demo.icse.run --output icse-summary.json
+        run: >-
+          python -m demo.icse.run
+          --output "${{ runner.temp }}/fcp-icse-components-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}/icse-summary.json"
       - uses: actions/upload-artifact@v4
         with:
           name: icse-summary-${{ matrix.os }}
-          path: icse-summary.json
+          path: ${{ runner.temp }}/fcp-icse-components-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}/icse-summary.json
       - name: Run independent-node network demonstration
         run: >-
           python -B -m demo.icse.network.run
