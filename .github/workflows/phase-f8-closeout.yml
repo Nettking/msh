@@ -3,6 +3,7 @@ name: Phase F8 trusted provider closeout
 on:
   pull_request:
     paths:
+      - ".github/actions/**"
       - "catalog/capabilities/**"
       - "catalog/ai/**"
       - "catalog/relay/provider_service.py"
@@ -28,6 +29,7 @@ on:
   push:
     branches: [main]
     paths:
+      - ".github/actions/**"
       - "catalog/capabilities/**"
       - "catalog/ai/**"
       - "catalog/relay/provider_service.py"
@@ -63,17 +65,25 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+        include:
+          - os: Linux
+            runner: fcp-linux-fast
+            shell: bash
+          - os: Windows
+            runner: fcp-windows
+            shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+    runs-on: [self-hosted, "${{ matrix.runner }}"]
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: ./.github/actions/self-hosted-python
         with:
           python-version: "3.12"
-          cache: pip
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -103,6 +113,9 @@ jobs:
           catalog/relay/tests/test_phase_f86_reconciliation.py
           catalog/relay/tests/test_phase_f87_trusted_provider_closeout.py
       - name: Complete F8 and affected F7 acceptance matrix
+        env:
+          TEMP: ${{ runner.os == 'Windows' && '\\?\C:\fcp-qtmp' || runner.temp }}
+          TMP: ${{ runner.os == 'Windows' && '\\?\C:\fcp-qtmp' || runner.temp }}
         run: >-
           python -m pytest -o addopts= -q
           catalog/capabilities/tests

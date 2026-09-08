@@ -78,7 +78,7 @@ jobs:
             python: "3.12.13"
           - os: Windows
             runner: fcp-windows
-            shell: powershell
+            shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
             python: "3.12.10"
     runs-on: [self-hosted, "${{ matrix.runner }}"]
     defaults:

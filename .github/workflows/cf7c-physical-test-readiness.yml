@@ -70,7 +70,7 @@ jobs:
             shell: bash
           - os: Windows
             runner: fcp-windows
-            shell: powershell
+            shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
     runs-on: [self-hosted, "${{ matrix.runner }}"]
     defaults:
       run:
@@ -128,7 +128,7 @@ jobs:
 
       - name: Validate Windows wrapper and fresh-shutdown helper
         if: runner.os == 'Windows'
-        shell: powershell
+        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
         run: |
           foreach ($script in @(
             'scripts/acceptance/cf7_prepare_windows.ps1',

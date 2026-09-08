@@ -24,7 +24,7 @@ runs:
         echo "TMPDIR=${RUNNER_TEMP}/fcp-test-tmp" >> "$GITHUB_ENV"
     - name: Prepare Windows Python and native shells
       if: runner.os == 'Windows'
-      shell: powershell
+      shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
       env:
         REQUIRED_PYTHON: ${{ inputs.python-version }}
       run: |

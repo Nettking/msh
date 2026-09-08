@@ -15,8 +15,10 @@ The Python action checks the exact platform version and creates a new virtual
 environment under the job's temporary directory. Existing workflow dependency
 and tool pins remain authoritative. Linux test temporary files use disk storage;
 Windows uses the short `C:\fcp-qtmp` path, with the extended path form only for the
-two release groups that require it. Native Windows PowerShell modules and Git
-Bash are made available explicitly. No acceptance threshold changes.
+release and broad capability groups that require it. Native Windows PowerShell modules and Git
+Bash are made available explicitly. CI wrapper scripts set their execution
+policy for that PowerShell process only; machine and user policy are unchanged.
+No acceptance threshold changes.
 
 The PostgreSQL action creates a job-owned PostgreSQL 16 container with an
 ephemeral data directory and an automatically allocated loopback port. Every
