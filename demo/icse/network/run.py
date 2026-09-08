@@ -351,8 +351,6 @@ def campaign(args: argparse.Namespace) -> int:
             return None
 
         initial = wait_until(all_ready, "three-voter bootstrap")
-        old_term = initial["voter-a"]["control_plane"]["consensus_term"]
-        old_leadership_term = initial["voter-a"]["control_plane"]["sessions"][0]["leadership_term"]
         summary["checks"]["authenticated_quorum_bootstrap"] = "PASS"
         observe("02 — One Federation committed by the voter quorum", initial)
         relay_url = creator.startup["relay_url"]
@@ -414,7 +412,13 @@ def campaign(args: argparse.Namespace) -> int:
             return current
 
         before = wait_until(fully_replicated, "committed membership and capability replication")
-        before_commit = before["voter-a"]["control_plane"]["commit_index"]
+        original = before["voter-a"]["control_plane"]
+        require(original["role"] == ReplicaNode.LEADER, "original voter is no longer the leader before the fault")
+        require(original["consensus_leader_id"] == ids["voter-a"], "original voter no longer owns consensus leadership")
+        require(original["sessions"][0]["leader_node_id"] == ids["voter-a"], "original voter no longer owns session leadership")
+        old_term = original["consensus_term"]
+        old_leadership_term = original["sessions"][0]["leadership_term"]
+        before_commit = original["commit_index"]
         creator.stop(force=True)
         observe("06 — The original leader process has actually exited", {
             "stopped_pid": creator.process.pid, "exit_code": creator.process.returncode,
@@ -461,13 +465,16 @@ def campaign(args: argparse.Namespace) -> int:
 
         # Return the old process from its actual durable files, without copying a
         # database or forcing a role, election, materialization or term.
+        latest_successor = children[successor].rpc("status")["control_plane"]
+        require(latest_successor["role"] == ReplicaNode.LEADER, "successor lost leadership before former voter return")
+        require(latest_successor["consensus_leader_id"] == ids[successor], "successor consensus identity changed before return")
         children["voter-a"] = Child("voter-a", configs["voter-a"])
-        successor_term = after[successor]["control_plane"]["consensus_term"]
+        successor_term = latest_successor["consensus_term"]
 
         def returned_follower():
             item = children["voter-a"].rpc("status")
             control = item["control_plane"]
-            if control["role"] == ReplicaNode.FOLLOWER and control["consensus_term"] >= successor_term and control["last_applied"] >= after[successor]["control_plane"]["commit_index"]:
+            if control["role"] == ReplicaNode.FOLLOWER and control["consensus_term"] >= successor_term and control["last_applied"] >= latest_successor["commit_index"]:
                 return item
             return None
 

@@ -25,7 +25,7 @@ For the default deployment, protect these items together:
 | Device identity, Federation/member state, recorder/source configuration, checkpoints, recorded/imported data and local capability state | effective `data/` bind | Critical |
 | Human account database and authentication secrets | `data/auth/` | Critical, especially on the creator/credential-authority installation |
 | Federation coordinator state | retained `relay_state` Docker volume | Critical; in configured replicated mode the local coordinator database is a materialized view, not an independent replacement for the committed authority log |
-| Configured replicated authority and private credential state | configured replica database and sibling `human_credentials_replica.sqlite3`, voter identity, deployment configuration and transport-secret paths | Critical when replicated control-plane mode is enabled; determine actual paths and backup coverage explicitly |
+| Configured replicated authority and private credential state | configured replica database and sibling `human_credentials_replica.sqlite3` and `product_journal_pending.sqlite3`, voter identity, deployment configuration and transport-secret paths | Critical when replicated control-plane mode is enabled; determine actual paths and backup coverage explicitly |
 | Local deployment settings | `.env` when present | Important when non-default paths, binds or service settings are used |
 | Workflow and analysis results | effective `results/` bind | Optional historical state; preserve when results must survive |
 | Ollama/provider model volumes | Docker volumes | Re-downloadable; not required for authority recovery |

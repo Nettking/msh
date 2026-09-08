@@ -252,6 +252,31 @@ jobs:
           catalog/federation/tests/test_phase_e72_former_primary_transfer.py
           catalog/federation/tests/test_phase_e78_former_primary_completion.py
 
+      - name: Windows replicated journal and reviewer artifact regressions
+        if: runner.os == 'Windows'
+        env:
+          TEMP: C:/fcp-qtmp
+          TMP: C:/fcp-qtmp
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/federation/tests/test_control_plane_bootstrap_proposal.py
+          catalog/federation/tests/test_control_plane_journal_private.py
+          catalog/federation/tests/test_control_plane_journal_projection.py
+          catalog/federation/tests/test_control_plane_journal_runtime.py
+          catalog/federation/tests/test_control_plane_journal_store.py
+          catalog/federation/tests/test_control_plane_product_journal.py
+          catalog/federation/tests/test_control_plane_product_transactions.py
+          catalog/federation/tests/test_control_plane_public_journal.py
+          catalog/federation/tests/test_control_plane_release_bootstrap_recovery.py
+          catalog/federation/tests/test_control_plane_witnessed_chunk_recovery.py
+          catalog/federation/tests/test_control_plane_session_authority.py
+          catalog/flask_app/tests/test_c03_pairing_onboarding.py
+          catalog/flask_app/tests/test_c03_session_authority.py
+          catalog/federation/tests/test_c03_offline_creator_migration.py
+          catalog/federation/tests/test_control_plane_runtime_retry.py
+          catalog/federation/tests/test_icse_network_provenance.py
+          catalog/federation/tests/test_icse_artifact_bundle.py
+
       - name: Go direct peer sidecar tests
         working-directory: cmd/fcp-peer-sidecar
         run: |

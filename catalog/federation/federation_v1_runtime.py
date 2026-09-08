@@ -126,7 +126,7 @@ class FederationV1Runtime(OfflineCreatorRecoverableRuntime):
                 "occurred_at": _stamp(self.clock()),
             },
         )
-        self.node.propose(command, self.transport)
+        self._propose_bootstrap_command(command)
         self.materialize()
 
         self._seal_authority(
@@ -247,6 +247,9 @@ class FederationV1Runtime(OfflineCreatorRecoverableRuntime):
 
         return active, revocations, capabilities
 
+    def _propose_bootstrap_command(self, command: AuthorityCommand):
+        return self.node.propose(command, self.transport)
+
     def _bootstrap_from_witness_manifest(self, manifest: Mapping[str, Any]) -> None:
         """Migrate the same Federation, including witnessed security authority."""
 
@@ -351,10 +354,10 @@ class FederationV1Runtime(OfflineCreatorRecoverableRuntime):
                 "occurred_at": created_at,
             },
         )
-        self.node.propose(genesis, self.transport)
+        self._propose_bootstrap_command(genesis)
 
         for item in chain:
-            self.node.propose(
+            self._propose_bootstrap_command(
                 AuthorityCommand(
                     command_id=(
                         f"witnessed-migration-leader-{session_id}-"
@@ -372,13 +375,13 @@ class FederationV1Runtime(OfflineCreatorRecoverableRuntime):
                         "reason": "quorum-witnessed-pre-c03-history",
                     },
                 ),
-                self.transport,
             )
 
+        self._before_witnessed_migration_promotion(manifest)
         current = self.node.state["leaders"][session_id]
         if current["leader_node_id"] != self.node.voter_id:
             next_term = int(current["term"]) + 1
-            self.node.propose(
+            self._propose_bootstrap_command(
                 AuthorityCommand(
                     command_id=(
                         f"witnessed-migration-failover-{session_id}-"
@@ -396,7 +399,6 @@ class FederationV1Runtime(OfflineCreatorRecoverableRuntime):
                         "reason": "legacy-coordinator-unavailable-c03-quorum-recovery",
                     },
                 ),
-                self.transport,
             )
 
         # Reconstruct durable capability ownership from the quorum-witnessed
@@ -405,7 +407,7 @@ class FederationV1Runtime(OfflineCreatorRecoverableRuntime):
             owner = capability["owner_node_id"]
             if owner not in voter_set or owner not in active or owner in revocations:
                 continue
-            self.node.propose(
+            self._propose_bootstrap_command(
                 AuthorityCommand(
                     command_id=(
                         "witnessed-migration-capability-"
@@ -427,7 +429,6 @@ class FederationV1Runtime(OfflineCreatorRecoverableRuntime):
                         "occurred_at": capability["occurred_at"],
                     },
                 ),
-                self.transport,
             )
 
         # Historical-only nodes existed solely to replay exact provenance. They
@@ -441,7 +442,7 @@ class FederationV1Runtime(OfflineCreatorRecoverableRuntime):
                 else "historical-provenance-only-no-authentication-key"
             )
             occurred_at = evidence["occurred_at"] if evidence is not None else created_at
-            self.node.propose(
+            self._propose_bootstrap_command(
                 AuthorityCommand(
                     command_id=f"witnessed-migration-remove-{session_id}-{node_id}",
                     command_type="SESSION_MEMBER_REMOVE",
@@ -454,9 +455,8 @@ class FederationV1Runtime(OfflineCreatorRecoverableRuntime):
                         "occurred_at": occurred_at,
                     },
                 ),
-                self.transport,
             )
-            self.node.propose(
+            self._propose_bootstrap_command(
                 AuthorityCommand(
                     command_id=f"witnessed-migration-revoke-{node_id}",
                     command_type="NODE_REVOKE",
@@ -468,7 +468,6 @@ class FederationV1Runtime(OfflineCreatorRecoverableRuntime):
                         "occurred_at": occurred_at,
                     },
                 ),
-                self.transport,
             )
 
         self._seal_authority(
@@ -485,6 +484,9 @@ class FederationV1Runtime(OfflineCreatorRecoverableRuntime):
             raise LegacyMigrationError("creator provenance changed during witnessed migration")
         if leadership.get("leader_node_id") != self.node.voter_id:
             raise LegacyMigrationError("witnessed migration did not promote the C03 quorum leader")
+
+    def _before_witnessed_migration_promotion(self, manifest: Mapping[str, Any]) -> None:
+        """Allow the release composition to finish an interrupted public prefix."""
 
     def bootstrap_command_identity(self, federation_id: str, session_id: str) -> str:
         """Stable diagnostic identity; contains no secret or credential material."""

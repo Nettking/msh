@@ -21,10 +21,12 @@ from typing import Any
 
 from catalog.federation.authoritative_replay import replay_authoritative_history
 from catalog.federation.errors import FederationOperationError
+from catalog.federation.models import Session
 from catalog.federation.session_leadership import (
     INITIAL_TERM,
     LEADER_CHANGED_EVENT,
     LEADERSHIP_SCHEMA,
+    SessionLeadership,
 )
 
 #: One authoritative leadership read stays within this bounded page budget.
@@ -90,6 +92,42 @@ def _replay_page(
 
 
 def resolve_federation_leader(context: Any) -> FederationLeaderAuthority:
+    authenticated_authority = getattr(
+        context.coordinator, "authenticated_session_authority", None
+    )
+    if callable(authenticated_authority):
+        # Configured C03 resolves witnessed legacy rows inside the single relay
+        # owner. Generic readers retain their existing coordinator-only replay
+        # policy; historical actor IDs are never globally trusted here.
+        session_id = context.binding.internal_session_id
+        session, leadership = authenticated_authority(
+            session_id=session_id,
+            actor_node_id=context.credentials.identity.node_id,
+        )
+        if (
+            not isinstance(session, Session)
+            or not isinstance(leadership, SessionLeadership)
+            or session.session_id != session_id
+            or leadership.session_id != session_id
+            or leadership.creator_node_id != session.created_by_node_id
+            or not isinstance(leadership.leader_node_id, str)
+            or not leadership.leader_node_id.strip()
+            or isinstance(leadership.term, bool)
+            or not isinstance(leadership.term, int)
+            or leadership.term < INITIAL_TERM
+            or not isinstance(leadership.leader_connected, bool)
+        ):
+            raise FederationOperationError(
+                "malformed-federation-leadership",
+                "authenticated session and leadership metadata disagree",
+            )
+        return FederationLeaderAuthority(
+            session_id=session_id,
+            creator_node_id=leadership.creator_node_id,
+            leader_node_id=leadership.leader_node_id,
+            term=leadership.term,
+        )
+
     session_id, coordinator, creator = _session(context)
     actor = context.credentials.identity.node_id
     coordinator_id = str(getattr(coordinator, "coordinator_id", "") or "")
@@ -196,9 +234,9 @@ def require_federation_leader(context: Any) -> FederationLeaderAuthority:
 
 
 __all__ = [
-    "FederationLeaderAuthority",
     "LEADERSHIP_REPLAY_PAGE_EVENTS",
     "MAX_LEADERSHIP_REPLAY_PAGES",
+    "FederationLeaderAuthority",
     "require_federation_leader",
     "resolve_federation_leader",
 ]
