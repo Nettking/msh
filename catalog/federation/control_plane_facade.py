@@ -9,6 +9,7 @@ from typing import Any
 
 from .control_plane_product import ReplicatedSessionCoordinator
 from .control_plane_replication import AuthorityCommand, ControlPlaneError, ReplicaNode
+from .errors import AuthorizationError
 from .persistence import _time
 
 
@@ -193,6 +194,12 @@ class PhysicalReadyReplicatedSessionCoordinator(ReplicatedSessionCoordinator):
                 with journal.operation():
                     self.runtime.require_quorum_leader()
                     return method(**kwargs)
+            except AuthorizationError as error:
+                # A peer election can step us down after the outer role check.
+                # Only that authority loss permits local-only health cleanup;
+                # unrelated authorization failures must still reach the caller.
+                if error.code != "federation-quorum-leader-required":
+                    raise
             except ControlPlaneError:
                 pass
         return method(**kwargs, emit_health_events=False)
