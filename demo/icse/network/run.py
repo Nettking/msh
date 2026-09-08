@@ -19,6 +19,8 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
+from catalog.federation.control_plane_replication import ReplicaNode
+
 from .provenance import verify_source
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -421,7 +423,7 @@ def campaign(args: argparse.Namespace) -> int:
 
         def successor_ready():
             current = snapshot(("voter-b", "voter-c"))
-            leaders = [label for label, item in current.items() if item["control_plane"]["role"] == "leader"]
+            leaders = [label for label, item in current.items() if item["control_plane"]["role"] == ReplicaNode.LEADER]
             if len(leaders) != 1:
                 return None
             label = leaders[0]
@@ -465,7 +467,7 @@ def campaign(args: argparse.Namespace) -> int:
         def returned_follower():
             item = children["voter-a"].rpc("status")
             control = item["control_plane"]
-            if control["role"] == "follower" and control["consensus_term"] >= successor_term and control["last_applied"] >= after[successor]["control_plane"]["commit_index"]:
+            if control["role"] == ReplicaNode.FOLLOWER and control["consensus_term"] >= successor_term and control["last_applied"] >= after[successor]["control_plane"]["commit_index"]:
                 return item
             return None
 
