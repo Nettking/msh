@@ -87,7 +87,9 @@ jobs:
         env:
           FCP_BUILD_COMMIT: ${{ github.sha }}
           FCP_ICSE_OUTPUT_DIR: ${{ github.workspace }}/demo/icse/evidence
-        run: docker compose -f demo/icse/docker-compose.yml run --build --rm --user "$(id -u):$(id -g)" demo --output /evidence/icse-summary.json
+        run: |
+          mkdir -p "$FCP_ICSE_OUTPUT_DIR"
+          docker compose -f demo/icse/docker-compose.yml run --build --rm demo --output /evidence/icse-summary.json
       - name: Validate retained Compose evidence
         run: python3 -m json.tool demo/icse/evidence/icse-summary.json > /dev/null
       - uses: actions/upload-artifact@v4

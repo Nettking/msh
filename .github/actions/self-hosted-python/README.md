@@ -32,8 +32,11 @@ are not used or removed.
 
 Hosted Ubuntu SDK cleanup is disabled on self-hosted runners; the product's own
 storage precondition still runs. ICSE Compose rebuilds the current source and
-writes evidence as the runner account to avoid stale images or root-owned files
-on a persistent runner.
+creates the evidence directory as the runner account before mounting it. The
+container retains its documented user so application result directories remain
+writable; its readable JSON output can be removed by the runner because the
+parent directory is runner-owned. This avoids stale images and root-owned mount
+directories on a persistent runner.
 
 Passing software gates does not replace the physical campaign. Freeze only the
 actual merged commit after all required jobs and the release verdict pass.
