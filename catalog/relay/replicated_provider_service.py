@@ -25,6 +25,10 @@ from catalog.federation.control_plane_replication import ControlPlaneError
 from catalog.federation.control_plane_runtime import (
     PhysicalReadyReplicatedFederationRuntime,
 )
+from catalog.federation.control_plane_status import (
+    CONTROL_PLANE_STATUS_FILE,
+    write_status,
+)
 from catalog.federation.errors import FederationOperationError, FederationValidationError
 from catalog.federation.service_incarnation import (
     STOP_COMPLETED,
@@ -49,11 +53,35 @@ BOOTSTRAP_FEDERATION_ENV = "FCP_C03_BOOTSTRAP_FEDERATION_ID"
 BOOTSTRAP_SESSION_ENV = "FCP_C03_BOOTSTRAP_SESSION_ID"
 DEFAULT_AUTH_DATABASE = "/app/data/auth/users.sqlite3"
 DEFAULT_AUTH_SALT = "/app/data/auth/password-salt"
+STATUS_INTERVAL_SECONDS = 1.0
 
 
 def _optional_env(name: str) -> str | None:
     value = os.getenv(name, "").strip()
     return value or None
+
+
+async def _publish_control_plane_status(
+    runtime: PhysicalReadyReplicatedFederationRuntime,
+    status_path: Path,
+) -> None:
+    """Keep one public-safe C03 status surface current for acceptance probes."""
+
+    while True:
+        try:
+            write_status(
+                status_path,
+                runtime.node,
+                ready=runtime.ready,
+                voter_only=False,
+            )
+        except OSError as exc:
+            # Status is evidence/diagnostics only. A transient filesystem error
+            # must not manufacture authority or stop an otherwise healthy
+            # quorum-fenced relay; physical acceptance will fail closed if the
+            # surface stays absent.
+            logging.warning("C03 status publication unavailable (%s)", type(exc).__name__)
+        await asyncio.sleep(STATUS_INTERVAL_SECONDS)
 
 
 async def _serve_replicated(args, config_path: Path) -> None:
@@ -102,7 +130,13 @@ async def _serve_replicated(args, config_path: Path) -> None:
             continue
         installed_signals.append(shutdown_signal)
 
+    status_path = deployment.coordinator_database.parent / CONTROL_PLANE_STATUS_FILE
     runtime.start()
+    write_status(status_path, runtime.node, ready=runtime.ready, voter_only=False)
+    status_task = asyncio.create_task(
+        _publish_control_plane_status(runtime, status_path),
+        name="fcp-c03-status",
+    )
     await relay.start()
     try:
         await _wait_for_relay_shutdown(relay, stop_requested)
@@ -110,6 +144,9 @@ async def _serve_replicated(args, config_path: Path) -> None:
         for shutdown_signal in installed_signals:
             with suppress(NotImplementedError, RuntimeError):
                 loop.remove_signal_handler(shutdown_signal)
+        status_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await status_task
         await relay.stop()
         runtime.close()
 
