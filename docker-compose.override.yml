@@ -1,0 +1,41 @@
+# Federation v1 C03 product wiring.
+#
+# Docker Compose loads this file automatically beside docker-compose.yml. The
+# replicated relay wrapper delegates verbatim to the established provider
+# service when FCP_REPLICATED_CONTROL_PLANE_CONFIG is empty, so ordinary
+# standalone deployments keep their current behavior. Provisioning a config
+# activates the fixed three-voter encrypted control plane.
+services:
+  relay:
+    command:
+      - python
+      - -m
+      - catalog.relay.replicated_provider_service
+      - serve
+      - --database
+      - /var/lib/fcp-relay/control.sqlite3
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8765"
+      - --unsafe-development-plaintext
+    environment:
+      - FCP_REPLICATED_CONTROL_PLANE_CONFIG=${FCP_REPLICATED_CONTROL_PLANE_CONFIG:-}
+      - FCP_AUTH_DATABASE=${FCP_AUTH_DATABASE:-/app/data/auth/users.sqlite3}
+      - FCP_AUTH_PASSWORD_SALT_FILE=${FCP_AUTH_PASSWORD_SALT_FILE:-/app/data/auth/password-salt}
+    ports:
+      - "${FCP_CONTROL_PLANE_BIND:-127.0.0.1}:${FCP_CONTROL_PLANE_PORT:-8875}:8875"
+      - "${FCP_CONTROL_PLANE_BIND:-127.0.0.1}:${FCP_CREDENTIAL_REPLICA_PORT:-8876}:8876"
+    volumes:
+      # Scope credential continuity to auth state only. The relay never mounts
+      # recorder data/ or any other product-data subtree through this override.
+      - type: bind
+        source: ${FCP_DATA_DIR:-./data}/auth
+        target: /app/data/auth
+
+  flask:
+    environment:
+      # The Flask container does not open voter sockets. This variable is
+      # surfaced only so operator diagnostics can identify C03-enabled hosts;
+      # leader/auth decisions come from the shared materialized coordinator DB.
+      - FCP_REPLICATED_CONTROL_PLANE_CONFIG=${FCP_REPLICATED_CONTROL_PLANE_CONFIG:-}
