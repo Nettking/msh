@@ -10,10 +10,10 @@ permissions:
 
 jobs:
   product-branding:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, fcp-linux-fast]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: ./.github/actions/self-hosted-python
         with:
           python-version: "3.12"
       - name: Enforce Federated Capability Platform identity

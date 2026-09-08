@@ -3,6 +3,7 @@ name: Phase F8.5 operator federation surface
 on:
   pull_request:
     paths:
+      - ".github/actions/**"
       - "start.cmd"
       - "update.cmd"
       - "docker-compose.yml"
@@ -23,6 +24,7 @@ on:
   push:
     branches: [main]
     paths:
+      - ".github/actions/**"
       - "start.cmd"
       - "update.cmd"
       - "docker-compose.yml"
@@ -53,17 +55,25 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+        include:
+          - os: Linux
+            runner: fcp-linux-fast
+            shell: bash
+          - os: Windows
+            runner: fcp-windows
+            shell: powershell
+    runs-on: [self-hosted, "${{ matrix.runner }}"]
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: ./.github/actions/self-hosted-python
         with:
           python-version: "3.12"
-          cache: pip
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip

@@ -1,0 +1,49 @@
+name: Isolated self-hosted PostgreSQL 16
+description: Start or remove only the disposable database owned by this job.
+inputs:
+  operation:
+    description: start or stop
+    default: start
+    required: false
+runs:
+  using: composite
+  steps:
+    - name: Start isolated PostgreSQL
+      if: inputs.operation == 'start'
+      shell: bash
+      run: |
+        set -euo pipefail
+        name="fcp-ci-pg-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${GITHUB_JOB}"
+        echo "FCP_CI_POSTGRES_CONTAINER=$name" >> "$GITHUB_ENV"
+        docker run --detach --rm --name "$name" \
+          --label "fcp.ci.run=${GITHUB_RUN_ID}" \
+          --publish 127.0.0.1::5432 \
+          --tmpfs /var/lib/postgresql/data:rw \
+          --env POSTGRES_USER=fcp --env POSTGRES_PASSWORD=fcp --env POSTGRES_DB=fcp_test \
+          --health-cmd 'pg_isready -U fcp -d fcp_test' \
+          --health-interval 5s --health-timeout 5s --health-retries 10 \
+          postgres:16-alpine
+        for attempt in $(seq 1 60); do
+          health=$(docker inspect --format '{{.State.Health.Status}}' "$name")
+          if [ "$health" = healthy ]; then
+            port=$(docker port "$name" 5432/tcp | sed -n 's/^127\.0\.0\.1://p')
+            test -n "$port"
+            echo "FCP_TEST_POSTGRES_DSN=postgresql://fcp:fcp@127.0.0.1:${port}/fcp_test" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          if [ "$health" = unhealthy ]; then break; fi
+          sleep 1
+        done
+        docker logs "$name"
+        exit 1
+    - name: Remove this job's disposable PostgreSQL
+      if: inputs.operation == 'stop'
+      shell: bash
+      run: |
+        set -euo pipefail
+        name="${FCP_CI_POSTGRES_CONTAINER:-}"
+        if [ -n "$name" ] && docker container inspect "$name" >/dev/null 2>&1; then
+          owner=$(docker inspect --format '{{index .Config.Labels "fcp.ci.run"}}' "$name")
+          test "$owner" = "$GITHUB_RUN_ID"
+          docker stop --time 5 "$name"
+        fi

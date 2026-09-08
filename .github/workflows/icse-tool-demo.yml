@@ -3,6 +3,7 @@ name: ICSE tool demonstration
 on:
   pull_request:
     paths:
+      - ".github/actions/**"
       - "CITATION.cff"
       - ".github/workflows/icse-tool-demo.yml"
       - "demo/icse/**"
@@ -19,6 +20,7 @@ on:
     tags:
       - "fcp-icse-tool-demo-v*"
     paths:
+      - ".github/actions/**"
       - "CITATION.cff"
       - ".github/workflows/icse-tool-demo.yml"
       - "demo/icse/**"
@@ -41,15 +43,23 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+        include:
+          - os: Linux
+            runner: fcp-linux-fast
+            shell: bash
+          - os: Windows
+            runner: fcp-windows
+            shell: powershell
+    runs-on: [self-hosted, "${{ matrix.runner }}"]
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: ./.github/actions/self-hosted-python
         with:
           python-version: "3.12"
-          cache: pip
       - name: Install runtime dependencies
         run: |
           python -m pip install --upgrade pip
@@ -69,7 +79,7 @@ jobs:
           path: icse-summary.json
 
   reviewer-compose:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, fcp-linux-fast]
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -77,7 +87,7 @@ jobs:
         env:
           FCP_BUILD_COMMIT: ${{ github.sha }}
           FCP_ICSE_OUTPUT_DIR: ${{ github.workspace }}/demo/icse/evidence
-        run: docker compose -f demo/icse/docker-compose.yml run --rm demo --output /evidence/icse-summary.json
+        run: docker compose -f demo/icse/docker-compose.yml run --build --rm --user "$(id -u):$(id -g)" demo --output /evidence/icse-summary.json
       - name: Validate retained Compose evidence
         run: python3 -m json.tool demo/icse/evidence/icse-summary.json > /dev/null
       - uses: actions/upload-artifact@v4
@@ -87,11 +97,11 @@ jobs:
 
   publication-bundle:
     needs: [reviewer-entrypoint, reviewer-compose]
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, fcp-linux-fast]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: ./.github/actions/self-hosted-python
         with:
           python-version: "3.12"
       - uses: actions/download-artifact@v4

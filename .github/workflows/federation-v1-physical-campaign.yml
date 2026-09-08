@@ -8,6 +8,7 @@ name: Federation v1 physical campaign tooling
 on:
   pull_request:
     paths:
+      - ".github/actions/**"
       - ".github/workflows/federation-v1-physical-campaign.yml"
       - "scripts/acceptance/v1_physical_campaign.py"
       - "scripts/acceptance/v1_physical_campaign_contract.py"
@@ -31,6 +32,7 @@ on:
   push:
     branches: [main]
     paths:
+      - ".github/actions/**"
       - ".github/workflows/federation-v1-physical-campaign.yml"
       - "scripts/acceptance/**"
       - "catalog/federation/tests/cf7_acceptance/test_v1_physical_*.py"
@@ -49,17 +51,25 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+        include:
+          - os: Linux
+            runner: fcp-linux-fast
+            shell: bash
+          - os: Windows
+            runner: fcp-windows
+            shell: powershell
+    runs-on: [self-hosted, "${{ matrix.runner }}"]
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
     timeout-minutes: 25
 
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - uses: ./.github/actions/self-hosted-python
         with:
           python-version: "3.12"
-          cache: pip
 
       - name: Install dependencies
         run: |

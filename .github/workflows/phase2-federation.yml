@@ -3,6 +3,7 @@ name: Phase 2 federation
 on:
   pull_request:
     paths:
+      - ".github/actions/**"
       - "catalog/federation/**"
       - "catalog/node/**"
       - "catalog/relay/**"
@@ -21,6 +22,7 @@ on:
   push:
     branches: [main]
     paths:
+      - ".github/actions/**"
       - "catalog/federation/**"
       - "catalog/node/**"
       - "catalog/relay/**"
@@ -46,32 +48,17 @@ concurrency:
 
 jobs:
   linux:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, fcp-linux-fast]
     timeout-minutes: 20
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: fcp
-          POSTGRES_PASSWORD: fcp
-          POSTGRES_DB: fcp_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U fcp -d fcp_test"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-    env:
-      FCP_TEST_POSTGRES_DSN: postgresql://fcp:fcp@127.0.0.1:5432/fcp_test
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - name: Start disposable PostgreSQL 16
+        uses: ./.github/actions/self-hosted-postgres
+      - uses: ./.github/actions/self-hosted-python
         with:
           python-version: "3.12"
-          cache: pip
       - uses: actions/setup-go@v5
         with:
           go-version-file: "cmd/fcp-peer-sidecar/go.mod"
@@ -151,17 +138,25 @@ jobs:
       - name: Diff hygiene
         run: git diff --check origin/${{ github.base_ref || 'main' }}...HEAD
 
+      - name: Remove disposable PostgreSQL 16
+        if: always()
+        uses: ./.github/actions/self-hosted-postgres
+        with:
+          operation: stop
+
   windows:
-    runs-on: windows-latest
+    runs-on: [self-hosted, fcp-windows]
+    defaults:
+      run:
+        shell: powershell
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: ./.github/actions/self-hosted-python
         with:
           python-version: "3.12"
-          cache: pip
       - uses: actions/setup-go@v5
         with:
           go-version-file: "cmd/fcp-peer-sidecar/go.mod"
