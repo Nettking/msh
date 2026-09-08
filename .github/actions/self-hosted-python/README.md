@@ -18,6 +18,10 @@ Windows uses the short `C:\fcp-qtmp` path, with the extended path form only for 
 release and broad capability groups that require it. Native Windows PowerShell modules and Git
 Bash are made available explicitly. CI wrapper scripts set their execution
 policy for that PowerShell process only; machine and user policy are unchanged.
+The Windows F8.5 job runs its three read-only SQLite assertions in a separate
+ordinary-path step because SQLite rejects extended-path URI authorities. The
+remaining F8.5 tests retain extended paths for nested artifact fixtures; every
+original test remains required, and Linux keeps the original combined suite.
 No acceptance threshold changes.
 
 The PostgreSQL action creates a job-owned PostgreSQL 16 container with an
