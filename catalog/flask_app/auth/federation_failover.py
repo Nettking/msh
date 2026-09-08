@@ -61,6 +61,7 @@ class HumanAuthReplicaGenerationWatcher:
         self.generation_file = Path(generation_file)
         self.password_salt_file = Path(password_salt_file)
         self._generation: tuple[int, str] | None = None
+        self._primed = False
 
     def _read_generation(self) -> tuple[int, str] | None:
         try:
@@ -79,14 +80,17 @@ class HumanAuthReplicaGenerationWatcher:
             return None
         return int(value["version"]), str(value["snapshot_id"])
 
+    def prime(self) -> None:
+        """Record the generation visible when the Flask app opens its DB."""
+        self._generation = self._read_generation()
+        self._primed = True
+
     def refresh_if_changed(self) -> bool:
+        if not self._primed:
+            self.prime()
+            return False
         generation = self._read_generation()
-        if generation is None:
-            return False
-        if self._generation is None:
-            self._generation = generation
-            return False
-        if generation == self._generation:
+        if generation is None or generation == self._generation:
             return False
 
         try:
@@ -102,6 +106,8 @@ class HumanAuthReplicaGenerationWatcher:
                 "the restored human-auth password salt is invalid",
             )
 
+        # SQLAlchemy can otherwise retain an open connection to the SQLite inode
+        # that was atomically replaced by credential recovery.
         db.session.remove()
         db.engine.dispose()
         current_app.config["SECURITY_PASSWORD_SALT"] = salt
