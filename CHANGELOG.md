@@ -16,6 +16,29 @@ trusted AI/compute contribution, durable federated analysis jobs, recorder
 capture/publication/control, deterministic MTConnect operational segmentation,
 human authentication/RBAC, and bounded manual Federation-wide updates.
 
+### Configured quorum authority and journal continuity
+
+The configured replicated deployment uses three authenticated voters and a
+two-vote commit quorum. Complete product operations commit their authority
+changes, exact public events and encrypted private pairing/request receipts
+before acknowledgment. An eligible successor can replay the same public event
+identities and revisions after leader loss; follower connectivity does not
+independently rewrite that history. Legacy single-coordinator deployments retain
+their existing availability boundary.
+
+Existing-Federation migration requires quorum-witnessed public history. After
+certified journal initialization, unrepresented legacy enrollment tokens,
+invitations and request receipts are invalidated, including on returning voters.
+Obtain fresh pairing grants and use new request IDs after this cutover. It does
+not modify the human-credential database, password salt, Recorder measurements,
+storage volumes or acceptance evidence. Human-credential recovery retains its
+separate certified-snapshot and backup requirements.
+
+See [C03 public journal continuity](docs/implementation/federation/active/c03_public_journal_continuity.md)
+for journal size bounds, capability reannouncement during migration, exact pending
+proposal recovery and required backup state. Physical validation remains subject
+to the release finalization contract below.
+
 ### MTConnect operational segmentation
 
 The v1 recorder pipeline includes a machine-neutral operational interpretation

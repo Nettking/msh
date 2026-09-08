@@ -13,6 +13,8 @@ on:
       - "catalog/capabilities/**"
       - "catalog/federation/**"
       - "catalog/flask_app/**"
+      - "catalog/relay/**"
+      - "catalog/node/**"
   push:
     branches:
       - main
@@ -30,6 +32,8 @@ on:
       - "catalog/capabilities/**"
       - "catalog/federation/**"
       - "catalog/flask_app/**"
+      - "catalog/relay/**"
+      - "catalog/node/**"
 
 permissions:
   contents: read
@@ -72,11 +76,23 @@ jobs:
       - name: Run E1-E4 directly
         env:
           FCP_BUILD_COMMIT: ${{ github.sha }}
-        run: python -m demo.icse.run --output icse-summary.json
+        run: >-
+          python -m demo.icse.run
+          --output "${{ runner.temp }}/fcp-icse-components-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}/icse-summary.json"
       - uses: actions/upload-artifact@v4
         with:
           name: icse-summary-${{ matrix.os }}
-          path: icse-summary.json
+          path: ${{ runner.temp }}/fcp-icse-components-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}/icse-summary.json
+      - name: Run independent-node network demonstration
+        run: >-
+          python -B -m demo.icse.network.run
+          --source-sha "${{ github.sha }}"
+          --output "${{ runner.temp }}/fcp-icse-network-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: icse-network-summary-${{ matrix.os }}
+          path: ${{ runner.temp }}/fcp-icse-network-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}/public/
+          if-no-files-found: error
 
   reviewer-compose:
     runs-on: [self-hosted, fcp-linux-fast]
@@ -110,6 +126,10 @@ jobs:
         with:
           pattern: icse-summary-*
           path: downloaded-evidence
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: icse-network-summary-*
+          path: downloaded-network-evidence
       - name: Build publication bundle
         env:
           ARTIFACT_VERSION: ${{ startsWith(github.ref, 'refs/tags/fcp-icse-tool-demo-v') && github.ref_name || 'candidate' }}
@@ -120,6 +140,7 @@ jobs:
             --workflow-run "$GITHUB_RUN_ID" \
             --version "$ARTIFACT_VERSION" \
             --evidence-root downloaded-evidence \
+            --network-evidence-root downloaded-network-evidence \
             --output publication-bundle
       - uses: actions/upload-artifact@v4
         with:

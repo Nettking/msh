@@ -1,22 +1,22 @@
 # Human users, Federation sign-in, and permissions
 
 Status: **current user and administrator guide**
-Reviewed: **2026-08-12**
+Reviewed: **2026-09-08**
 
 FCP has a separate account system for **people using the web application**. Human identity is deliberately separate from device identity, pairing credentials, recorder keys, and Federation membership.
 
 ## What is shared now?
 
-A standalone FCP installation still has a local human-account database. Once devices belong to a Federation, however, the **immutable Federation creator remains the human credential/password authority**:
+A standalone FCP installation has a local human-account database. Federation members use an authoritative human sign-in service:
 
 - human accounts are created and managed on that credential-authority installation;
 - the same account can sign in on trusted Federation member devices;
-- passwords and password hashes **never leave the credential authority**;
+- passwords, password hashes, and salts never enter public Federation events or discovery;
 - members authenticate by sending the browser to the authority and accepting a short-lived, Ed25519-signed login assertion targeted to that member device;
 - non-secret authorization metadata — email address, active state, and roles — is published through the authenticated Federation session log;
-- member devices keep only a local shadow account needed for the local Flask session and permission checks.
+- ordinary member devices keep a local shadow account needed for the local Flask session and permission checks.
 
-This is Federation SSO rather than password-database replication. A stolen member database therefore does not contain the authority's human password hashes.
+The ordinary member sign-in path uses Federation SSO, not a copy of the password database. The configured replicated control plane has an additional **private** credential-continuity channel: its fixed three-voter set stores encrypted snapshots of the human-auth database and password salt, with quorum-signed commit certificates. Those voter stores are sensitive recovery state and must not be treated as ordinary shadow-account databases or published as evidence.
 
 Device and human authority remain independent. An authenticated human `admin` can request a Federation administration action, but the underlying device/session operation still has to satisfy Federation membership and current device-side authority policy.
 
@@ -24,12 +24,15 @@ Device and human authority remain independent. An authenticated human `admin` ca
 
 The Federation creator and current operational leader are no longer necessarily the same device.
 
-- **Creator / human credential authority** — immutable Federation provenance and the installation that retains authoritative human passwords/password hashes.
+- **Creator** — immutable Federation creation provenance.
 - **Current operational leader** — the node holding the current coordinator-authored monotonic leadership term and reviewed leader-only product controls such as software updates, capability requests, member/invitation operations, pairing, and provider-management decisions.
+- **Human credential authority** — the authorized installation issuing human sign-in assertions and managing accounts. It is resolved from durable current leadership in the configured replicated deployment; the legacy creator-backed path remains available for installations without that replicated authority.
 
-A valid leader failover does **not** silently transfer human credential custody. Federation member sign-in continues to use the creator-backed human credential authority unless a future explicitly reviewed credential-migration mechanism changes that boundary.
+When `FCP_REPLICATED_CONTROL_PLANE_CONFIG` enables the replicated product runtime, an eligible new leader can restore the last quorum-certified credential snapshot for the same Federation/session. The payload is encrypted at rest and sent only through authenticated/encrypted voter endpoints. The password salt travels with its database; Flask refreshes its database connections and salt after a committed restore generation becomes visible. Missing leadership or an invalid restored salt does not authorize local sign-in.
 
-This separation is intentional: operational availability/failover does not automatically replicate or move password secrets.
+Browser session secrets are excluded from replication, so users may need to sign in again after failover. A credential update that has not reached a committed snapshot is not covered by the continuity guarantee. Quorum availability, an eligible coordinator, recoverable certified snapshots, and browser-reachable sign-in origins remain prerequisites. The voter-only Recorder cannot become the sign-in coordinator. Independently verified backups remain required.
+
+Without the configured replicated runtime, leader promotion alone does not provide credential-database replication. Do not manually move passwords or treat creator provenance as transferable authority. The implemented replicated path still requires exact-candidate physical sign-in/failover acceptance; that validation is **PENDING** until separate evidence is accepted.
 
 ## First-time setup: create the first administrator in the browser
 
@@ -74,7 +77,7 @@ A remotely paired Federation member may temporarily have zero local shadow accou
 
 ## Signing in on Federation members
 
-On a Federation member, `/login` shows **Sign in through Federation leader** instead of accepting the member's local password database as authoritative. The product wording may say “leader”, but the credential assertion still comes from the creator-backed human credential authority described above even if operational leadership has transferred.
+On a Federation member, `/login` shows **Sign in through Federation leader** instead of accepting the member's local password database as authoritative. The assertion must come from the credential authority resolved for that deployment, as described above; a local shadow account or an old password database does not grant that authority.
 
 The browser flow is:
 
@@ -116,7 +119,7 @@ Tailscale can provide a trusted private reachability path for those browser orig
 
 ## Add and manage users
 
-Human-user administration is Federation-scoped around the creator-backed credential authority. Manage accounts at:
+Human-user administration is Federation-scoped around the resolved credential authority. Manage accounts at:
 
 ```text
 /admin/users
@@ -176,7 +179,7 @@ Routes are authorized by permissions rather than by hard-coded role names.
 
 ## Password changes
 
-Passwords live only on the creator-backed human credential authority. Therefore a password change requested from a member is redirected to that authority. Unsafe member-side password-change requests are rejected.
+Password changes are handled by the resolved human credential authority. A change requested from an ordinary member is redirected there; unsafe member-side password-change requests are rejected. In configured replicated deployments, recovery of that change additionally depends on a committed private credential snapshot.
 
 A member shadow account is not an independent credential. Its purpose is to represent an already verified Federation human inside the member's local Flask session and permission model.
 
@@ -188,11 +191,11 @@ The durable Federation log can contain these human-auth control records:
 - `human_auth.member_endpoint.published` — a member's own browser base URL;
 - `human_auth.user.changed` — email, active state, and roles.
 
-Coordinator policy permits only the creator-backed credential authority to publish authority/user state. A member may advertise an endpoint only for its own authenticated node identity.
+Coordinator policy restricts authority/user publication to the authorized credential authority. A member may advertise an endpoint only for its own authenticated node identity.
 
 **Passwords, password hashes, password salts, Flask session secrets, pairing tokens, and device private keys are not placed in these events.**
 
-Operational `session.leader.changed` events do not rewrite this human-auth authority.
+In the configured replicated deployment, credential/sign-in authority follows the durable, fenced leadership state. A lookalike event from an ordinary member does not grant authority, and public leadership events never carry or restore password material. Private snapshot recovery is a separate operation.
 
 ## Local authentication data
 
@@ -204,9 +207,9 @@ data/auth/flask-secret
 data/auth/password-salt
 ```
 
-A member can also have `users.sqlite3`, but Federation-authenticated users there are shadow records rather than an authoritative password store.
+A member can also have `users.sqlite3`; an ordinary member's Federation-authenticated users are shadow records rather than an authoritative password store. A configured voter additionally retains the private `human_credentials_replica.sqlite3` store beside its configured replica database. An eligible promoted coordinator may restore certified credentials into its auth database. This does not authorize arbitrary members to promote their local accounts.
 
-Back up the credential-authority authentication database and its secrets together. Do not commit them to Git or copy them into documentation/logs.
+Back up the credential-authority authentication database and its secrets together. For configured replicated deployments, also protect the voter identities, deployment/transport secrets, and committed replica/credential stores needed for recovery; confirm their actual configured paths are covered by the backup plan. Replication is not a substitute for an independently verified backup. Do not commit these files to Git or copy them into documentation/logs. See [Backup and recovery](backup_recovery.md).
 
 Important consequences:
 
@@ -256,14 +259,14 @@ Human login, first-user bootstrap, user administration, and the member's Federat
 For an existing installation:
 
 1. update all Federation devices to a version containing Federation human SSO and browser first-user handling;
-2. ensure the creator-backed credential authority has the intended authoritative human accounts;
+2. ensure the current credential authority has the intended authoritative human accounts;
 3. give the authority and members browser-reachable `FCP_HUMAN_AUTH_BASE_URL` values when automatic request-origin discovery is not sufficient;
 4. load/sign in to the credential-authority FCP so its authority metadata is published;
 5. open a member `/login` and choose **Sign in through Federation leader**.
 
-Accounts that existed only on a member are **not automatically promoted to Federation credentials**, because that would let an arbitrary member create a Federation-wide human identity. Recreate any such account on the creator-backed credential authority if it should be Federation-wide.
+Accounts that existed only on an ordinary member are **not automatically promoted to Federation credentials**, because that would let an arbitrary member create a Federation-wide human identity. Create any such account through the authorized credential authority if it should be Federation-wide.
 
-If operational leadership later transfers, do not recreate/move passwords merely to match the new leader. Current leader and credential authority are separate by design.
+If operational leadership later transfers, do not recreate or manually move passwords merely to match the new leader. Configured replicated deployments use their certified private recovery path; legacy deployments do not acquire that path merely by promoting a leader. Existing-Federation migration must prove the required quorum-witnessed authority and recoverable credential state before becoming ready.
 
 ## Troubleshooting
 
@@ -281,9 +284,9 @@ That is intentional. Use Federation human sign-in. An empty local shadow-user ta
 
 ### A member says the Federation sign-in authority is unavailable
 
-Open the creator-backed credential-authority FCP web UI/login page and verify its Federation connection/browser reachability. For multi-host use, configure `FCP_HUMAN_AUTH_BASE_URL` to a browser-reachable authority origin rather than `localhost`.
+Open the resolved credential-authority FCP web UI/login page and verify its Federation connection/browser reachability. For multi-host use, configure `FCP_HUMAN_AUTH_BASE_URL` to a browser-reachable authority origin rather than `localhost`.
 
-If a different device is current operational leader, that does not move the credential authority.
+For a configured replicated deployment, verify the current fenced leader and certified credential recovery before expecting sign-in there. For a legacy deployment, leader promotion does not supply replicated credentials. Do not enable local fallback merely to hide a failed authority lookup.
 
 ### The browser is redirected to the wrong machine
 
@@ -295,7 +298,7 @@ Check the user's roles on the credential authority at `/admin/users`. Authentica
 
 ### I cannot use a member's old local password
 
-That is intentional. Federation members trust the creator-backed credential authority for human authentication. Use **Sign in through Federation leader**, or explicitly enable the emergency local fallback only when you understand the security trade-off.
+That is intentional. Federation members trust the resolved credential authority for human authentication. Use **Sign in through Federation leader**, or explicitly enable the emergency local fallback only when you understand the security trade-off.
 
 ## Related guides
 

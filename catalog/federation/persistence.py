@@ -616,7 +616,7 @@ class CoordinatorStore:
         else:
             where = "WHERE actor_node_id=?"
             arguments = (actor_node_id, limit)
-        with self._connect() as database:
+        with self.read_transaction() as database:
             rows = database.execute(
                 f"""
                 SELECT * FROM (
@@ -795,7 +795,7 @@ class CoordinatorStore:
         )
 
     def get_node(self, node_id: str) -> dict[str, Any] | None:
-        with self._connect() as database:
+        with self.read_transaction() as database:
             row = database.execute(
                 "SELECT * FROM nodes WHERE node_id=?", (node_id,)
             ).fetchone()
@@ -882,7 +882,7 @@ class CoordinatorStore:
         return row
 
     def require_membership(self, *, session_id: str, node_id: str) -> None:
-        with self._connect() as database:
+        with self.read_transaction() as database:
             self._require_membership(
                 database, session_id=session_id, node_id=node_id
             )
@@ -1302,7 +1302,7 @@ class CoordinatorStore:
         )
 
     def get_session(self, session_id: str) -> Session | None:
-        with self._connect() as database:
+        with self.read_transaction() as database:
             row = database.execute(
                 "SELECT * FROM sessions WHERE session_id=?", (session_id,)
             ).fetchone()
@@ -2082,7 +2082,7 @@ class CoordinatorStore:
         if clauses:
             query += " WHERE " + " AND ".join(clauses)
         query += " ORDER BY session_id,type,node_id,capability_id"
-        with self._connect() as database:
+        with self.read_transaction() as database:
             rows = database.execute(query, arguments).fetchall()
         return tuple(self._capability_from_row(row) for row in rows)
 
@@ -2140,7 +2140,8 @@ class CoordinatorStore:
             )
 
     def mark_disconnected(
-        self, *, node_id: str, now: datetime, error: str | None = None
+        self, *, node_id: str, now: datetime, error: str | None = None,
+        emit_health_events: bool = True,
     ) -> tuple[SessionEvent, ...]:
         summary = str(error)[:2048] if error else None
         events: list[SessionEvent] = []
@@ -2158,6 +2159,8 @@ class CoordinatorStore:
                 """,
                 ("error" if summary else "disconnected", _time(now), summary, node_id),
             )
+            if not emit_health_events:
+                return ()
             capabilities = database.execute(
                 """
                 SELECT * FROM capabilities
@@ -2213,7 +2216,7 @@ class CoordinatorStore:
             )
         return tuple(events)
 
-    def mark_all_disconnected(self, *, now: datetime) -> None:
+    def mark_all_disconnected(self, *, now: datetime, emit_health_events: bool = True) -> None:
         with self.transaction() as database:
             connected_nodes = database.execute(
                 """
@@ -2231,6 +2234,8 @@ class CoordinatorStore:
                 """,
                 (_time(now),),
             )
+            if not emit_health_events:
+                return
             for node in connected_nodes:
                 node_id = node["node_id"]
                 capabilities = database.execute(
@@ -2286,7 +2291,8 @@ class CoordinatorStore:
         return stale_nodes
 
     def sweep_stale_with_events(
-        self, *, now: datetime, heartbeat_timeout_seconds: float
+        self, *, now: datetime, heartbeat_timeout_seconds: float,
+        emit_health_events: bool = True,
     ) -> tuple[tuple[str, ...], tuple[SessionEvent, ...]]:
         if heartbeat_timeout_seconds <= 0:
             raise FederationValidationError(
@@ -2319,6 +2325,8 @@ class CoordinatorStore:
                     """,
                     (_time(now), node_id),
                 )
+                if not emit_health_events:
+                    continue
                 capabilities = database.execute(
                     """
                     SELECT * FROM capabilities

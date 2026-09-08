@@ -57,6 +57,10 @@ from catalog.federation.service_incarnation import (
     record_service_start,
     record_service_stop,
 )
+from catalog.relay.provider_operator import (
+    OPERATOR_MESSAGES,
+    dispatch_provider_operator,
+)
 from catalog.relay.service import (
     RelayConfigurationError,
     RelayServer,
@@ -200,6 +204,14 @@ class ProviderAuthorityRelayServer(RelayServer):
             return
 
         session_id = self._required_session(request)
+
+        if message_type in OPERATOR_MESSAGES:
+            payload = dispatch_provider_operator(self, record, request)
+            await self._accepted(
+                record, request, message_type=f"{message_type}.accepted",
+                payload=payload, session_id=session_id,
+            )
+            return
 
         if message_type == "provider.enrollment.request":
             capability_id = _payload_text(request.payload, "capability_id")

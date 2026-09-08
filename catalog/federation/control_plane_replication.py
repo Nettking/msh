@@ -226,6 +226,9 @@ _COMMAND_SCHEMAS: dict[str, tuple[dict[str, str], dict[str, str]]] = {
         },
         {"reason": _TEXT_FIELD},
     ),
+    # Their nested, closed schemas are validated by control_plane_journal.
+    "PRODUCT_TRANSACTION": ({}, {}),
+    "PRODUCT_JOURNAL_INITIALIZE": ({}, {}),
 }
 
 _COMMAND_TYPES = frozenset(_COMMAND_SCHEMAS)
@@ -285,6 +288,11 @@ def _event_list(value: object, field: str) -> list[dict[str, Any]]:
 
 def _validate_payload(command_type: str, payload: object) -> dict[str, Any]:
     """Reject anything that is not exactly this command type's schema."""
+    if command_type in {"PRODUCT_TRANSACTION", "PRODUCT_JOURNAL_INITIALIZE"}:
+        from .control_plane_journal import validate_product_payload
+
+        validate_product_payload(command_type, payload)
+        return payload
     if not isinstance(payload, dict):
         raise ControlPlaneError("command payload must be an object")
     required, optional = _COMMAND_SCHEMAS[command_type]
@@ -519,6 +527,9 @@ class Snapshot:
         _canonical(self.state, maximum=MAX_SNAPSHOT_BYTES)
         if self.digest != _state_digest(self.state):
             raise ControlPlaneError("snapshot digest mismatch")
+        from .control_plane_journal import validate_product_journal_state
+
+        validate_product_journal_state(self.state)
         receipts = tuple(self.command_receipts)
         if len(receipts) > MAX_COMMAND_RECEIPTS:
             raise ControlPlaneError("snapshot receipt window exceeds its bound")
@@ -709,6 +720,12 @@ class AuthorityStateMachine:
         self, state: Mapping[str, Any], command: AuthorityCommand
     ) -> tuple[dict[str, Any], tuple[dict[str, Any], ...]]:
         """Strict application; raises for domain-invalid commands."""
+        return self._apply_command(state, command, product_transaction=False)
+
+    def _apply_command(
+        self, state: Mapping[str, Any], command: AuthorityCommand,
+        *, product_transaction: bool,
+    ) -> tuple[dict[str, Any], tuple[dict[str, Any], ...]]:
         _require_state(state, self.configuration)
         if command.cluster_id != self.configuration.cluster_id:
             raise ControlPlaneError("command cluster identity mismatch")
@@ -716,6 +733,22 @@ class AuthorityStateMachine:
         emitted: list[dict[str, Any]] = []
         payload = command.payload
         kind = command.command_type
+
+        from .control_plane_journal import (
+            apply_product_command,
+            require_product_envelope,
+        )
+
+        if kind in {"PRODUCT_TRANSACTION", "PRODUCT_JOURNAL_INITIALIZE"}:
+            result, events = apply_product_command(
+                next_state, command, self.configuration,
+                lambda current, inner: self._apply_command(
+                    current, inner, product_transaction=True,
+                ),
+            )
+            return self._finish(result), events
+        if not product_transaction:
+            require_product_envelope(next_state, command)
 
         if kind == "FEDERATION_GENESIS":
             federation_id = payload["federation_id"]
@@ -901,6 +934,10 @@ class AuthorityStateMachine:
                     source=payload,
                 )
             )
+            if not product_transaction:
+                from .control_plane_journal import append_automatic_leadership_row
+
+                append_automatic_leadership_row(next_state, command)
 
         elif kind == "CAPABILITY_DECLARE":
             session_id = payload["session_id"]
