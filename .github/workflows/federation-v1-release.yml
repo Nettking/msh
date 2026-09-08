@@ -270,7 +270,9 @@ jobs:
           catalog/federation/tests/test_control_plane_release_bootstrap_recovery.py
           catalog/federation/tests/test_control_plane_witnessed_chunk_recovery.py
           catalog/federation/tests/test_control_plane_session_authority.py
+          catalog/federation/tests/test_control_plane_health_leadership_race.py
           catalog/flask_app/tests/test_c03_pairing_onboarding.py
+          catalog/flask_app/tests/test_c03_provider_operator.py
           catalog/flask_app/tests/test_c03_session_authority.py
           catalog/federation/tests/test_c03_offline_creator_migration.py
           catalog/federation/tests/test_control_plane_runtime_retry.py

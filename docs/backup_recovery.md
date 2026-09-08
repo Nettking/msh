@@ -205,13 +205,13 @@ Do **not** copy the old member's identity/Federation state into the replacement 
 
 ## Creator and credential-authority loss
 
-The Federation creator is not equivalent to the current operational leader. No recovery path transfers creator provenance, impersonates its private key, or rewrites the old creator identity. The availability and credential-recovery paths depend on deployment mode.
+The Federation creator is not equivalent to the current operational leader. Operational leader failover does not transfer immutable creator provenance. Federation v1 does not provide a mechanism for another member to impersonate or rewrite the old creator. The availability and credential-recovery paths depend on deployment mode.
 
 **Legacy single coordinator:** safe same-installation recovery requires the usable identity, human-authentication state, and authoritative coordinator state required by that installation. Operational leader promotion alone does not replicate the missing coordinator or human password database.
 
 **Configured replicated authority:** with the fixed three-voter deployment, an eligible surviving coordinator and a two-vote quorum can recover the same Federation from committed replicated authority without taking over the creator's private identity. The new leader can restore the last quorum-certified encrypted snapshot of the human-auth database and password salt. Browser session secrets are excluded, sessions may be invalidated, and changes not yet committed in a credential snapshot are outside that guarantee. The voter-only Recorder cannot become the operational coordinator. Quorum loss or missing certified recovery state must fail closed.
 
-The implemented existing-Federation migration also requires quorum-witnessed history and recoverable credential state where human accounts exist; one copied legacy database is not sufficient authority. This does not promise recovery after loss of all voters, their decryption/identity material, or the only valid backups. If the existing authority cannot be recovered safely, use an explicitly planned new Federation and fresh enrollment rather than editing databases or identity files to manufacture continuity. Preserve historical Recorder data through the reviewed data recovery path.
+The implemented existing-Federation migration also requires quorum-witnessed history and recoverable credential state where human accounts exist; one copied legacy database is not sufficient authority. This does not promise recovery after loss of all voters, their decryption/identity material, or the only valid backups. If the existing authority cannot be recovered safely, explicitly plan to create a new Federation with fresh enrollment rather than editing databases or identity files to manufacture continuity. Preserve historical Recorder data through the reviewed data recovery path.
 
 Exact-candidate physical coordinator-loss, credential-continuity, and backup/restore rehearsal remains **PENDING** until separate physical evidence is accepted. Software regression names or a configured quorum do not establish that the physical backup covers every required path.
 

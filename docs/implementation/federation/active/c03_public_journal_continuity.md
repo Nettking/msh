@@ -18,6 +18,17 @@ uses the authenticated current leader identity; the server does not accept a
 caller-supplied leader identity. Session and leadership reads share one committed
 database snapshot. Standalone mode retains its existing path.
 
+Configured provider operator views and actions also use this authenticated relay
+binding. The relay applies the existing operator policy to its own provider
+enrollment and health stores, using complete canonical capability declarations;
+redacted status is never reconstructed into approval authority. Membership,
+current leader, readiness, quorum, command identity and revision checks still
+apply. Manual approval of a capability-first `REGISTERING` candidate does not
+make it eligible before a matching `READY` announcement and reconciliation.
+Storage retains its separate authority. These provider sidecars are not part of
+the replicated product journal, so this binding does not promise automatic
+provider approval or health-state continuity after a leader change.
+
 ## Atomicity and recovery
 
 One outer SQLite stage contains the entire operation, including both halves of
