@@ -33,6 +33,9 @@ from websockets.asyncio.server import Server, ServerConnection, serve
 from websockets.exceptions import ConnectionClosed, ConnectionClosedError
 
 from catalog.common.federation_paths import DEFAULT_COORDINATOR_DATABASE
+from catalog.federation.control_plane_facade import (
+    PhysicalReadyReplicatedSessionCoordinator,
+)
 from catalog.federation.coordinator import SessionCoordinator
 from catalog.federation.errors import (
     AuthenticationError,
@@ -324,7 +327,7 @@ class RelayServer:
 
     def __init__(
         self,
-        coordinator: SessionCoordinator,
+        coordinator: SessionCoordinator | PhysicalReadyReplicatedSessionCoordinator,
         *,
         host: str = DEFAULT_HOST,
         port: int = DEFAULT_PORT,
@@ -341,8 +344,16 @@ class RelayServer:
         outbound_queue_size: int = DEFAULT_OUTBOUND_QUEUE_SIZE,
         max_connections: int = DEFAULT_MAX_CONNECTIONS,
     ) -> None:
-        if not isinstance(coordinator, SessionCoordinator):
-            raise TypeError("coordinator must be a SessionCoordinator")
+        # The configured C03 entrypoint deliberately keeps the quorum-fenced
+        # facade in the relay. Unwrapping it to its local materialized view
+        # would bypass durable-write fencing; arbitrary adapters stay rejected.
+        if not isinstance(
+            coordinator, (SessionCoordinator, PhysicalReadyReplicatedSessionCoordinator)
+        ):
+            raise TypeError(
+                "coordinator must be a SessionCoordinator or "
+                "PhysicalReadyReplicatedSessionCoordinator"
+            )
         if not isinstance(host, str) or not host.strip():
             raise RelayConfigurationError("host must be non-empty text")
         if isinstance(port, bool) or not isinstance(port, int) or not 0 <= port <= 65535:

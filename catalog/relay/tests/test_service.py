@@ -169,6 +169,55 @@ async def _authenticate(
     return AuthenticatedClient(websocket, credentials)
 
 
+def test_product_relay_starts_with_quorum_fenced_replicated_coordinator(
+    tmp_path: Path,
+) -> None:
+    from catalog.federation.control_plane_facade import (
+        PhysicalReadyReplicatedSessionCoordinator,
+    )
+    from catalog.federation.errors import AuthorizationError
+    from catalog.federation.federation_v1_release_runtime import FederationV1ReleaseRuntime
+    from catalog.federation.tests.test_control_plane_physical_runtime import _deployments
+    from catalog.relay.provider_service import ProviderAuthorityRelayServer
+
+    async def scenario() -> None:
+        # Exercise the exact runtime/facade/provider-relay composition used by
+        # replicated_provider_service, with a real provisioned voter and socket.
+        # Its two peers are absent: accepting the facade must not grant authority.
+        runtime = FederationV1ReleaseRuntime(_deployments(tmp_path)[0])
+        runtime.start()
+        relay = None
+        websocket = None
+        try:
+            coordinator = PhysicalReadyReplicatedSessionCoordinator(runtime)
+            relay = ProviderAuthorityRelayServer(coordinator, port=0)
+            assert relay.coordinator is coordinator
+            assert relay.coordinator is not runtime.local
+            with pytest.raises(AuthorizationError) as refused:
+                relay.coordinator.create_enrollment_token()
+            assert refused.value.code == "federation-quorum-leader-required"
+            assert runtime.ready is False
+            await relay.start()
+            websocket, challenge = await _challenge(relay)
+            assert challenge.message_type == "auth.challenge"
+        finally:
+            if websocket is not None:
+                await websocket.close()
+            if relay is not None:
+                await relay.stop()
+            runtime.close()
+
+    asyncio.run(scenario())
+
+
+def test_relay_rejects_arbitrary_and_unfenced_coordinator_adapters() -> None:
+    from catalog.federation.control_plane_product import ReplicatedSessionCoordinator
+
+    for coordinator in (object(), object.__new__(ReplicatedSessionCoordinator)):
+        with pytest.raises(TypeError, match="coordinator must be"):
+            RelayServer(coordinator, port=0)
+
+
 def test_relay_rejects_non_loopback_plaintext_by_default(tmp_path: Path) -> None:
     async def scenario() -> None:
         relay = RelayServer(
