@@ -152,7 +152,19 @@ def test_permanent_leader_loss_recovers_same_federation_and_fences_returning_hos
         # authority from its stale local state.
         restarted_old = _runtime(deployments[0])
         restarted_old.start()
-        _wait(lambda: successor.node.synchronize(successor.transport) >= 1)
+
+        def returning_host_has_converged() -> bool:
+            # An acknowledgement from the other survivor says nothing about
+            # the returning host. Require that host to receive the current
+            # term and committed prefix before checking its fenced state.
+            successor.node.synchronize(successor.transport)
+            return (
+                restarted_old.node.role == ReplicaNode.FOLLOWER
+                and restarted_old.node.store.current_term >= successor.node.store.current_term
+                and restarted_old.node.store.last_applied >= successor.node.store.commit_index
+            )
+
+        _wait(returning_host_has_converged)
         restarted_old.node.apply_committed()
         restarted_old.materialize()
         assert restarted_old.node.role == ReplicaNode.FOLLOWER
