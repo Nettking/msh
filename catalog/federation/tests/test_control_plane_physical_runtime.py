@@ -132,12 +132,26 @@ def test_permanent_leader_loss_recovers_same_federation_and_fences_returning_hos
         # two surviving authenticated voters retain quorum 2/3.
         old_runtime.close()
         time.sleep(0.25)
-        successor._next_election_at = 0.0
-        successor._lifecycle_round()
-        if successor.node.role != ReplicaNode.LEADER:
-            third._next_election_at = 0.0
-            third._lifecycle_round()
-            successor = third
+
+        def surviving_quorum_has_promoted_leader() -> bool:
+            nonlocal successor
+            # Background elections can finish between two manual lifecycle
+            # calls. Observe the actual automatic winner instead of assuming
+            # that the last voter nudged must have won the election.
+            leaders = [
+                runtime for runtime in runtimes[1:]
+                if runtime.node.role == ReplicaNode.LEADER
+            ]
+            if len(leaders) != 1:
+                return False
+            elected = leaders[0]
+            leadership = elected.node.state["leaders"]["session-survives-leader-loss"]
+            if leadership["leader_node_id"] != elected.node.voter_id:
+                return False
+            successor = elected
+            return True
+
+        _wait(surviving_quorum_has_promoted_leader)
 
         assert successor.node.role == ReplicaNode.LEADER
         assert successor.node.store.current_term > old_term
