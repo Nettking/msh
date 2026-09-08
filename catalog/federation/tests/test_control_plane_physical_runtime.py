@@ -12,31 +12,33 @@ from catalog.federation.control_plane_product import (
     ReplicatedControlPlaneDeployment,
 )
 from catalog.federation.control_plane_replication import ReplicaNode
-from catalog.federation.control_plane_runtime import (
-    PhysicalReadyReplicatedFederationRuntime,
-)
+from catalog.federation.federation_v1_runtime import FederationV1Runtime
 from catalog.node.identity import IdentityStore
 
 NOW = datetime(2026, 9, 8, tzinfo=timezone.utc)
 SECRET = bytes(range(32))
 
 
-def _free_port_pair() -> int:
-    """Reserve-test a consecutive control/credential port pair."""
+def _free_port_triple() -> int:
+    """Reserve-test consecutive control/credential/migration ports."""
     for _ in range(100):
         first = socket.socket()
         first.bind(("127.0.0.1", 0))
         port = int(first.getsockname()[1])
         first.close()
-        if port >= 65534:
+        if port >= 65533:
             continue
-        second = socket.socket()
+        sockets: list[socket.socket] = []
         try:
-            second.bind(("127.0.0.1", port + 1))
+            for candidate in (port, port + 1, port + 2):
+                sock = socket.socket()
+                sock.bind(("127.0.0.1", candidate))
+                sockets.append(sock)
         except OSError:
-            second.close()
             continue
-        second.close()
+        finally:
+            for sock in sockets:
+                sock.close()
         return port
     raise RuntimeError("could not allocate consecutive test ports")
 
@@ -47,7 +49,7 @@ def _deployments(root: Path):
     for name in ("a", "b", "c"):
         identity_dir = root / f"identity-{name}"
         credentials.append(IdentityStore(identity_dir, display_name=name).create(now=NOW))
-        ports.append(_free_port_pair())
+        ports.append(_free_port_triple())
 
     secret_file = root / "control-plane.secret"
     secret_file.write_bytes(SECRET)
@@ -82,7 +84,7 @@ def _deployments(root: Path):
 
 
 def _runtime(deployment: ReplicatedControlPlaneDeployment):
-    return PhysicalReadyReplicatedFederationRuntime(
+    return FederationV1Runtime(
         deployment,
         heartbeat_seconds=0.05,
         election_timeout_seconds=0.15,
@@ -161,14 +163,13 @@ def test_permanent_leader_loss_recovers_same_federation_and_fences_returning_hos
     finally:
         if restarted_old is not None:
             restarted_old.close()
-        # old_runtime was already closed above; close() is idempotent enough for
-        # the lifecycle thread but the underlying socket server is not, so only
-        # close the still-running survivors here.
+        # old_runtime was already closed above; close only the still-running
+        # survivors here because socket-server close is deliberately one-shot.
         for runtime in runtimes[1:]:
             runtime.close()
 
 
-def test_unsealed_replica_never_self_elects_without_creator_bootstrap(tmp_path: Path) -> None:
+def test_unsealed_replica_never_self_elects_without_proven_bootstrap(tmp_path: Path) -> None:
     deployments = _deployments(tmp_path)
     runtimes = [_runtime(item) for item in deployments]
     for runtime in runtimes:
