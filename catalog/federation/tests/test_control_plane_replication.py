@@ -69,6 +69,7 @@ def _genesis() -> AuthorityCommand:
             "session_id": "session-stable",
             "creator_node_id": "voter-a",
             "display_name": "Acceptance Federation",
+            "voter_ids": list(VOTERS),
             "nodes": nodes,
             "members": list(VOTERS),
         },
@@ -135,7 +136,7 @@ def test_voter_votes_once_per_term_and_rejects_old_term(tmp_path: Path) -> None:
             last_log_index=0,
             last_log_term=0,
             cluster_id=CONFIGURATION.cluster_id,
-        )
+        ).granted
         is False
     )
     assert (
@@ -145,7 +146,7 @@ def test_voter_votes_once_per_term_and_rejects_old_term(tmp_path: Path) -> None:
             last_log_index=0,
             last_log_term=0,
             cluster_id=CONFIGURATION.cluster_id,
-        )
+        ).granted
         is False
     )
 
@@ -160,7 +161,7 @@ def test_outdated_candidate_log_cannot_win(tmp_path: Path) -> None:
             last_log_index=0,
             last_log_term=0,
             cluster_id=CONFIGURATION.cluster_id,
-        )
+        ).granted
         is False
     )
     assert candidate.store.current_term == 2
@@ -255,7 +256,7 @@ def test_divergent_uncommitted_suffix_is_replaced(tmp_path: Path) -> None:
         entries=(replacement,),
         leader_commit=1,
         cluster_id=CONFIGURATION.cluster_id,
-    )
+    ).success
     assert follower.store.entries(after=1)[0].command.command_id == "new-suffix"
 
 
