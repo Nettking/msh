@@ -40,19 +40,16 @@ def test_shutdown_timeout_recovers_without_hanging(tmp_path: Path) -> None:
     docker = tmp_path / "docker.cmd"
     log = tmp_path / "docker.log"
     marker = tmp_path / "first-down.marker"
+    # Leading redirection keeps a final numeric argument (such as
+    # --timeout 5) from being parsed as CMD output handle 5.
     docker.write_text(
-        "\n".join(
-            [
-                "@echo off",
-                'echo %*>>"%FCP_TEST_DOCKER_LOG%"',
-                'if /I "%1 %2"=="compose down" if not exist "%FCP_TEST_DOCKER_MARKER%" (',
-                '  type nul > "%FCP_TEST_DOCKER_MARKER%"',
-                '  powershell -NoProfile -Command "Start-Sleep -Seconds 30"',
-                ")",
-                "exit /b 0",
-            ]
-        )
-        + "\n",
+        "@echo off\n"
+        '>>"%FCP_TEST_DOCKER_LOG%" echo %*\n'
+        'if /I "%1 %2"=="compose down" if not exist "%FCP_TEST_DOCKER_MARKER%" (\n'
+        '  type nul > "%FCP_TEST_DOCKER_MARKER%"\n'
+        '  powershell -NoProfile -Command "Start-Sleep -Seconds 30"\n'
+        ")\n"
+        "exit /b 0\n",
         encoding="utf-8",
     )
 
