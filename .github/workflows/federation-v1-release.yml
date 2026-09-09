@@ -335,7 +335,7 @@ jobs:
           retention-days: 7
   postgres-storage:
     name: PostgreSQL storage release check
-    runs-on: [self-hosted, fcp-linux-fast]
+    runs-on: [self-hosted, Linux, X64, fcp-docker-linux]
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4

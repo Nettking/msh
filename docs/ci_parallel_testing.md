@@ -10,7 +10,7 @@ same host share that host's resources.
 | Windows release regressions | 3 existing test groups | `fcp-test-windows` |
 | Compile, Go, lint, manifest and Compose configuration | 1 per OS | `fcp-test-linux` / `fcp-test-windows` |
 | Full-suite order independence | 2 complete runs, fixed and rotating seed | `fcp-test-linux` |
-| PostgreSQL integration | 1 disposable database job | `fcp-linux-fast` |
+| PostgreSQL integration | 1 disposable database job | `fcp-docker-linux` |
 
 `fcp-test-linux` and `fcp-test-windows` are shared execution pools, not host names.
 They require the interpreter and shell contract in
@@ -23,8 +23,10 @@ just to increase the job count.
 
 Windows test jobs do not start Docker containers. Nettking keeps its
 NetworkService account; its Docker daemon access is not changed. Compose
-configuration validation only uses the installed CLI. Docker integration remains
-on the existing Linux Docker pool.
+configuration validation only uses the installed CLI. `fcp-docker-linux` requires
+the same Linux contract plus successful Buildx and isolated PostgreSQL startup,
+query and cleanup in `CI test sharding`. Docker integration can then use either
+admitted Linux machine.
 
 ## Coverage and failure behavior
 

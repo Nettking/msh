@@ -66,3 +66,28 @@ jobs:
         run: python -m ruff check scripts/ci_pytest_shards.py catalog/common/tests/test_ci_pytest_shards.py
       - name: Verify complete coverage, stable allocation and failure propagation
         run: python -m pytest -o addopts= -q catalog/common/tests/test_ci_pytest_shards.py
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: cmd/fcp-peer-sidecar/go.mod
+          cache: false
+      - name: Verify Go and Compose prerequisites
+        run: |
+          go version
+          docker compose config --quiet
+      - name: Linux storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
+      - name: Linux Buildx prerequisite
+        if: runner.os == 'Linux'
+        run: docker buildx version
+      - name: Admit Linux Docker with an isolated disposable database
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/self-hosted-postgres
+      - name: Verify the disposable database
+        if: runner.os == 'Linux'
+        run: docker exec "$FCP_CI_POSTGRES_CONTAINER" psql -U fcp -d fcp_test -v ON_ERROR_STOP=1 -c 'SELECT 1'
+      - name: Remove only this job's database
+        if: always() && runner.os == 'Linux'
+        uses: ./.github/actions/self-hosted-postgres
+        with:
+          operation: stop
