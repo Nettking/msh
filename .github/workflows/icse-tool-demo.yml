@@ -3,6 +3,7 @@ name: ICSE tool demonstration
 on:
   pull_request:
     paths:
+      - ".github/actions/**"
       - "CITATION.cff"
       - ".github/workflows/icse-tool-demo.yml"
       - "demo/icse/**"
@@ -12,6 +13,8 @@ on:
       - "catalog/capabilities/**"
       - "catalog/federation/**"
       - "catalog/flask_app/**"
+      - "catalog/relay/**"
+      - "catalog/node/**"
   push:
     branches:
       - main
@@ -19,6 +22,7 @@ on:
     tags:
       - "fcp-icse-tool-demo-v*"
     paths:
+      - ".github/actions/**"
       - "CITATION.cff"
       - ".github/workflows/icse-tool-demo.yml"
       - "demo/icse/**"
@@ -28,6 +32,8 @@ on:
       - "catalog/capabilities/**"
       - "catalog/federation/**"
       - "catalog/flask_app/**"
+      - "catalog/relay/**"
+      - "catalog/node/**"
 
 permissions:
   contents: read
@@ -41,15 +47,23 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+        include:
+          - os: Linux
+            runner: fcp-linux-fast
+            shell: bash
+          - os: Windows
+            runner: fcp-windows
+            shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+    runs-on: [self-hosted, "${{ matrix.runner }}"]
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: ./.github/actions/self-hosted-python
         with:
           python-version: "3.12"
-          cache: pip
       - name: Install runtime dependencies
         run: |
           python -m pip install --upgrade pip
@@ -62,14 +76,26 @@ jobs:
       - name: Run E1-E4 directly
         env:
           FCP_BUILD_COMMIT: ${{ github.sha }}
-        run: python -m demo.icse.run --output icse-summary.json
+        run: >-
+          python -m demo.icse.run
+          --output "${{ runner.temp }}/fcp-icse-components-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}/icse-summary.json"
       - uses: actions/upload-artifact@v4
         with:
           name: icse-summary-${{ matrix.os }}
-          path: icse-summary.json
+          path: ${{ runner.temp }}/fcp-icse-components-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}/icse-summary.json
+      - name: Run independent-node network demonstration
+        run: >-
+          python -B -m demo.icse.network.run
+          --source-sha "${{ github.sha }}"
+          --output "${{ runner.temp }}/fcp-icse-network-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: icse-network-summary-${{ matrix.os }}
+          path: ${{ runner.temp }}/fcp-icse-network-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}/public/
+          if-no-files-found: error
 
   reviewer-compose:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, fcp-linux-fast]
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -77,7 +103,9 @@ jobs:
         env:
           FCP_BUILD_COMMIT: ${{ github.sha }}
           FCP_ICSE_OUTPUT_DIR: ${{ github.workspace }}/demo/icse/evidence
-        run: docker compose -f demo/icse/docker-compose.yml run --rm demo --output /evidence/icse-summary.json
+        run: |
+          mkdir -p "$FCP_ICSE_OUTPUT_DIR"
+          docker compose -f demo/icse/docker-compose.yml run --build --rm demo --output /evidence/icse-summary.json
       - name: Validate retained Compose evidence
         run: python3 -m json.tool demo/icse/evidence/icse-summary.json > /dev/null
       - uses: actions/upload-artifact@v4
@@ -87,17 +115,21 @@ jobs:
 
   publication-bundle:
     needs: [reviewer-entrypoint, reviewer-compose]
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, fcp-linux-fast]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: ./.github/actions/self-hosted-python
         with:
           python-version: "3.12"
       - uses: actions/download-artifact@v4
         with:
           pattern: icse-summary-*
           path: downloaded-evidence
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: icse-network-summary-*
+          path: downloaded-network-evidence
       - name: Build publication bundle
         env:
           ARTIFACT_VERSION: ${{ startsWith(github.ref, 'refs/tags/fcp-icse-tool-demo-v') && github.ref_name || 'candidate' }}
@@ -108,6 +140,7 @@ jobs:
             --workflow-run "$GITHUB_RUN_ID" \
             --version "$ARTIFACT_VERSION" \
             --evidence-root downloaded-evidence \
+            --network-evidence-root downloaded-network-evidence \
             --output publication-bundle
       - uses: actions/upload-artifact@v4
         with:

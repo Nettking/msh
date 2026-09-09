@@ -3,6 +3,7 @@ name: CF7-A acceptance harness
 on:
   pull_request:
     paths:
+      - ".github/actions/**"
       - ".github/workflows/cf7-acceptance-harness.yml"
       - "catalog/federation/tests/cf7_acceptance/**"
       - "docs/implementation/cf7_acceptance_harness.md"
@@ -47,6 +48,7 @@ on:
       - "agent/cfi5-*"
       - "agent/cfi6-*"
     paths:
+      - ".github/actions/**"
       - ".github/workflows/cf7-acceptance-harness.yml"
       - "catalog/federation/tests/cf7_acceptance/**"
       - "docs/implementation/cf7_acceptance_harness.md"
@@ -94,17 +96,25 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+        include:
+          - os: Linux
+            runner: fcp-linux-fast
+            shell: bash
+          - os: Windows
+            runner: fcp-windows
+            shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+    runs-on: [self-hosted, "${{ matrix.runner }}"]
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
     timeout-minutes: 55
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: ./.github/actions/self-hosted-python
         with:
           python-version: "3.12"
-          cache: pip
       - name: Install test dependencies
         run: |
           python -m pip install --upgrade pip

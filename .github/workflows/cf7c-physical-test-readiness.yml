@@ -3,6 +3,7 @@ name: CF7-C physical test readiness
 on:
   pull_request:
     paths:
+      - ".github/actions/**"
       - ".github/workflows/cf7c-physical-test-readiness.yml"
       - ".gitignore"
       - "start.cmd"
@@ -27,9 +28,11 @@ on:
       - "docs/implementation/federation/acceptance/cf7c_physical_test_readiness.md"
   push:
     branches:
+      - main
       - agent/cf7c-physical-test-readiness
       - fix/v1-physical-acceptance-blockers
     paths:
+      - ".github/actions/**"
       - ".github/workflows/cf7c-physical-test-readiness.yml"
       - ".gitignore"
       - "start.cmd"
@@ -61,16 +64,24 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+        include:
+          - os: Linux
+            runner: fcp-linux-fast
+            shell: bash
+          - os: Windows
+            runner: fcp-windows
+            shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+    runs-on: [self-hosted, "${{ matrix.runner }}"]
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - uses: ./.github/actions/self-hosted-python
         with:
           python-version: "3.12"
-          cache: pip
 
       - name: Install dependencies
         run: |
@@ -117,7 +128,7 @@ jobs:
 
       - name: Validate Windows wrapper and fresh-shutdown helper
         if: runner.os == 'Windows'
-        shell: powershell
+        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
         run: |
           foreach ($script in @(
             'scripts/acceptance/cf7_prepare_windows.ps1',

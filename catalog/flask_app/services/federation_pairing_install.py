@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
@@ -11,6 +12,7 @@ from flask import Flask, current_app, request
 
 from catalog.orchestrator.analysis_federation import DeviceFederationAuthority
 
+from .c03_pairing_onboarding import C03PairingOnboardingService
 from .capability_recovery_adapters import fresh_capability_inspection_adapters
 from .federated_ai_product_bridge import FederatedAIProductBridge
 from .federated_data_runtime import FederatedDataPairingRelayRuntime
@@ -89,6 +91,14 @@ def _session_owner(status: dict[str, Any], session_id: str) -> str | None:
     return None
 
 
+def _configured_local_relay_url(app: Flask) -> str:
+    for key in (_LOCAL_RELAY_CONFIG_KEY, _PAIRING_RELAY_CONFIG_KEY):
+        configured = app.config.get(key)
+        if configured is not None and (value := str(configured).strip()):
+            return value
+    return ""
+
+
 def _build_service(app: Flask) -> PairingAwareCapabilityOnboardingService:
     identity_directory = Path(app.config["CAPABILITY_ONBOARDING_IDENTITY_DIRECTORY"])
     state_database = Path(app.config["CAPABILITY_ONBOARDING_STATE_DATABASE"])
@@ -103,7 +113,19 @@ def _build_service(app: Flask) -> PairingAwareCapabilityOnboardingService:
         state_directory=identity_directory,
         display_name=device_name,
     )
-    return PairingAwareCapabilityOnboardingService(
+    configured_c03 = str(
+        app.config.get(
+            "FCP_REPLICATED_CONTROL_PLANE_CONFIG",
+            os.getenv("FCP_REPLICATED_CONTROL_PLANE_CONFIG", ""),
+        )
+        or ""
+    ).strip()
+    service_type = PairingAwareCapabilityOnboardingService
+    options: dict[str, Any] = {}
+    if configured_c03:
+        service_type = C03PairingOnboardingService
+        options["local_relay_url"] = lambda: _configured_local_relay_url(app)
+    return service_type(
         identity_directory=identity_directory,
         state_database=state_database,
         coordinator_database=app.config["CAPABILITY_ONBOARDING_COORDINATOR_DATABASE"],
@@ -114,6 +136,7 @@ def _build_service(app: Flask) -> PairingAwareCapabilityOnboardingService:
         ),
         remote_store=RemotePairingStore(remote_path),
         relay_runtime=runtime,
+        **options,
     )
 
 
@@ -368,11 +391,7 @@ class SavedFederationReconnectMonitor:
             return self._analysis_authority_generation
 
     def _local_relay_url(self) -> str:
-        for key in (_LOCAL_RELAY_CONFIG_KEY, _PAIRING_RELAY_CONFIG_KEY):
-            configured = self.app.config.get(key)
-            if configured is not None and (value := str(configured).strip()):
-                return value
-        return _DEFAULT_COMPOSE_LOCAL_RELAY_URL
+        return _configured_local_relay_url(self.app) or _DEFAULT_COMPOSE_LOCAL_RELAY_URL
 
     def _connected_state_and_context(self) -> tuple[RemotePairingState, object] | None:
         remote = self.service.remote_store.load()

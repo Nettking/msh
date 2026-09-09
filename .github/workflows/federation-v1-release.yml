@@ -3,6 +3,7 @@ name: Federation v1 release gate
 on:
   pull_request:
     paths:
+      - ".github/actions/**"
       - ".github/workflows/**"
       - ".env.example"
       - "CHANGELOG.md"
@@ -30,6 +31,7 @@ on:
   push:
     branches: [main]
     paths:
+      - ".github/actions/**"
       - ".github/workflows/**"
       - ".env.example"
       - "CHANGELOG.md"
@@ -70,11 +72,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: Linux
+            runner: fcp-linux-fast
+            shell: bash
             python: "3.12.13"
-          - os: windows-latest
+          - os: Windows
+            runner: fcp-windows
+            shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
             python: "3.12.10"
-    runs-on: ${{ matrix.os }}
+    runs-on: [self-hosted, "${{ matrix.runner }}"]
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
     timeout-minutes: 60
 
     steps:
@@ -82,10 +91,9 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - uses: ./.github/actions/self-hosted-python
         with:
           python-version: ${{ matrix.python }}
-          cache: pip
 
       - uses: actions/setup-go@v5
         with:
@@ -148,6 +156,9 @@ jobs:
 
       - name: Windows capability and product release regressions
         if: runner.os == 'Windows'
+        env:
+          TEMP: '\\?\C:\fcp-qtmp'
+          TMP: '\\?\C:\fcp-qtmp'
         run: >-
           python -m pytest -o addopts= -q
           catalog/capabilities/tests
@@ -195,6 +206,9 @@ jobs:
 
       - name: Windows transport, storage, and failover regressions
         if: runner.os == 'Windows'
+        env:
+          TEMP: '\\?\C:\fcp-qtmp'
+          TMP: '\\?\C:\fcp-qtmp'
         run: >-
           python -m pytest -o addopts= -q
           catalog/node/tests/test_identity.py
@@ -237,6 +251,33 @@ jobs:
           catalog/federation/tests/test_phase_e71_former_primary_recovery.py
           catalog/federation/tests/test_phase_e72_former_primary_transfer.py
           catalog/federation/tests/test_phase_e78_former_primary_completion.py
+
+      - name: Windows replicated journal and reviewer artifact regressions
+        if: runner.os == 'Windows'
+        env:
+          TEMP: C:/fcp-qtmp
+          TMP: C:/fcp-qtmp
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/federation/tests/test_control_plane_bootstrap_proposal.py
+          catalog/federation/tests/test_control_plane_journal_private.py
+          catalog/federation/tests/test_control_plane_journal_projection.py
+          catalog/federation/tests/test_control_plane_journal_runtime.py
+          catalog/federation/tests/test_control_plane_journal_store.py
+          catalog/federation/tests/test_control_plane_product_journal.py
+          catalog/federation/tests/test_control_plane_product_transactions.py
+          catalog/federation/tests/test_control_plane_public_journal.py
+          catalog/federation/tests/test_control_plane_release_bootstrap_recovery.py
+          catalog/federation/tests/test_control_plane_witnessed_chunk_recovery.py
+          catalog/federation/tests/test_control_plane_session_authority.py
+          catalog/federation/tests/test_control_plane_health_leadership_race.py
+          catalog/flask_app/tests/test_c03_pairing_onboarding.py
+          catalog/flask_app/tests/test_c03_provider_operator.py
+          catalog/flask_app/tests/test_c03_session_authority.py
+          catalog/federation/tests/test_c03_offline_creator_migration.py
+          catalog/federation/tests/test_control_plane_runtime_retry.py
+          catalog/federation/tests/test_icse_network_provenance.py
+          catalog/federation/tests/test_icse_artifact_bundle.py
 
       - name: Go direct peer sidecar tests
         working-directory: cmd/fcp-peer-sidecar
@@ -308,30 +349,15 @@ jobs:
 
   postgres-storage:
     name: PostgreSQL storage release check
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, fcp-linux-fast]
     timeout-minutes: 20
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: fcp
-          POSTGRES_PASSWORD: fcp
-          POSTGRES_DB: fcp_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U fcp -d fcp_test"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-    env:
-      FCP_TEST_POSTGRES_DSN: postgresql://fcp:fcp@127.0.0.1:5432/fcp_test
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Start disposable PostgreSQL 16
+        uses: ./.github/actions/self-hosted-postgres
+      - uses: ./.github/actions/self-hosted-python
         with:
           python-version: "3.12.13"
-          cache: pip
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip==26.2.1
@@ -345,17 +371,22 @@ jobs:
           python -m pytest -o addopts= -q
           catalog/federation/tests/test_phase_d2_postgres.py
 
+      - name: Remove disposable PostgreSQL 16
+        if: always()
+        uses: ./.github/actions/self-hosted-postgres
+        with:
+          operation: stop
+
   suite-order-independence:
     name: Clean-checkout suite order independence
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, fcp-linux-fast]
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - uses: ./.github/actions/self-hosted-python
         with:
           python-version: "3.12.13"
-          cache: pip
 
       - name: Install release dependencies
         run: |
@@ -387,7 +418,7 @@ jobs:
     name: Federation v1 automated release verdict
     if: always()
     needs: [release-matrix, postgres-storage, suite-order-independence]
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, fcp-linux-fast]
     steps:
       - name: Require every automated release job
         shell: bash

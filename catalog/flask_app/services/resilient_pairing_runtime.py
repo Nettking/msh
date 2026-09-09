@@ -11,22 +11,26 @@ from __future__ import annotations
 
 from typing import Any
 
+from catalog.federation.control_plane_product import REPLICATED_COORDINATOR_ID
 from catalog.federation.errors import (
     AuthenticationError,
     FederationOperationError,
+    FederationValidationError,
 )
-from catalog.federation.models import CapabilityAnnouncement, SessionEvent
+from catalog.federation.models import CapabilityAnnouncement, Session, SessionEvent
+from catalog.federation.onboarding_models import (
+    FederationConnectionState,
+    FederationSessionBinding,
+)
 from catalog.federation.recorder_storage_relay import RelayRecorderStorageClient
+from catalog.federation.session_leadership import LEADERSHIP_SCHEMA, SessionLeadership
 from catalog.federation.storage_catalog import (
     CommittedBatchDeltaPage,
     CommittedBatchPage,
     CommittedBatchReference,
 )
-from catalog.federation.onboarding_models import (
-    FederationConnectionState,
-    FederationSessionBinding,
-)
 from catalog.node.client import RelayRemoteError
+from catalog.node.state import EventApplyStatus
 
 from .federation_pairing_service import (
     PairingOffer,
@@ -62,6 +66,246 @@ class ResilientPairingRelayRuntime(PairingRelayRuntime):
                 "the paired relay is not connected",
             )
         return client
+
+    async def _bound_client(
+        self, state: RemotePairingState, session_id: str
+    ) -> PairingRelayNodeClient:
+        if session_id != state.binding.internal_session_id:
+            raise AuthenticationError(
+                "pairing-membership-mismatch",
+                "the request must use the paired Federation session",
+                "session_id",
+            )
+        await self._ensure_connected(state)
+        client = self._connected_client()
+        if client.node_id != state.binding.device_id:
+            raise AuthenticationError(
+                "pairing-actor-mismatch",
+                "the request must use the authenticated paired identity",
+                "actor_node_id",
+            )
+        return client
+
+    @staticmethod
+    def _authority_result(
+        result: dict[str, Any], *, session_id: str
+    ) -> tuple[Session, SessionLeadership]:
+        """Accept only the closed, typed C03 authority response for this session."""
+
+        def invalid() -> FederationOperationError:
+            return FederationOperationError(
+                "invalid-session-authority-response",
+                "relay did not return a consistent committed session authority",
+            )
+
+        if not isinstance(result, dict) or set(result) != {"session", "leadership"}:
+            raise invalid()
+        raw_session, raw_leader = result["session"], result["leadership"]
+        if not isinstance(raw_session, dict) or set(raw_session) != {
+            "schema", "session_id", "display_name", "state", "revision",
+            "created_at", "created_by_node_id", "coordinator_id",
+        }:
+            raise invalid()
+        try:
+            session = Session.from_dict(raw_session)
+        except FederationValidationError as exc:
+            raise invalid() from exc
+        if (
+            session.session_id != session_id
+            or session.coordinator_id != REPLICATED_COORDINATOR_ID
+            or not isinstance(raw_leader, dict)
+            or set(raw_leader) != {
+                "schema", "session_id", "creator_node_id", "leader_node_id",
+                "term", "leader_connected",
+            }
+            or raw_leader["schema"] != LEADERSHIP_SCHEMA
+            or raw_leader["session_id"] != session_id
+            or raw_leader["creator_node_id"] != session.created_by_node_id
+            or not isinstance(raw_leader["leader_node_id"], str)
+            or not raw_leader["leader_node_id"].strip()
+            or isinstance(raw_leader["term"], bool)
+            or not isinstance(raw_leader["term"], int)
+            or raw_leader["term"] < 1
+            or not isinstance(raw_leader["leader_connected"], bool)
+        ):
+            raise invalid()
+        leadership = SessionLeadership(
+            session_id=session_id,
+            creator_node_id=session.created_by_node_id,
+            leader_node_id=raw_leader["leader_node_id"],
+            term=raw_leader["term"],
+            leader_connected=raw_leader["leader_connected"],
+        )
+        return session, leadership
+
+    async def _session_authority(
+        self, state: RemotePairingState, *, session_id: str
+    ) -> tuple[Session, SessionLeadership]:
+        client = await self._bound_client(state, session_id)
+        result = await client.request(
+            "session.authority", session_id=session_id, payload={}
+        )
+        return self._authority_result(result, session_id=session_id)
+
+    def session_authority(
+        self, state: RemotePairingState, *, session_id: str
+    ) -> tuple[Session, SessionLeadership]:
+        return self._submit(self._session_authority(state, session_id=session_id))
+
+    @staticmethod
+    def _created_result(result: dict[str, Any]) -> bool:
+        created = result.get("created")
+        if not isinstance(created, bool):
+            raise FederationOperationError(
+                "invalid-mutation-response",
+                "relay did not return the accepted mutation disposition",
+            )
+        return created
+
+    async def _append_event_result(
+        self,
+        state: RemotePairingState,
+        *,
+        session_id: str,
+        event_type: str,
+        payload: dict[str, Any],
+        request_id: str,
+    ) -> tuple[SessionEvent, bool]:
+        client = await self._bound_client(state, session_id)
+        result = await client.request(
+            "event.append",
+            session_id=session_id,
+            payload={"event_type": event_type, "payload": payload},
+            request_id=request_id,
+        )
+        created = self._created_result(result)
+        event = SessionEvent.from_dict(result.get("event"))
+        if (
+            event.session_id != session_id
+            or event.actor_node_id != client.node_id
+            or event.event_type != event_type
+            or event.payload != payload
+        ):
+            raise FederationOperationError(
+                "event-append-response-mismatch",
+                "relay returned different event metadata than submitted",
+            )
+        applied = client.state.apply_event(event, now=self._clock())
+        if applied.status is EventApplyStatus.GAP:
+            await client.request_replay(session_id)
+        return event, created
+
+    def append_event_result(
+        self,
+        state: RemotePairingState,
+        *,
+        session_id: str,
+        event_type: str,
+        payload: dict[str, Any],
+        request_id: str,
+    ) -> tuple[SessionEvent, bool]:
+        """Preserve the coordinator's accepted event and idempotency result."""
+
+        return self._submit(
+            self._append_event_result(
+                state,
+                session_id=session_id,
+                event_type=event_type,
+                payload=payload,
+                request_id=request_id,
+            )
+        )
+
+    async def _announce_capability_result(
+        self,
+        state: RemotePairingState,
+        capability: CapabilityAnnouncement,
+        *,
+        request_id: str,
+    ) -> tuple[CapabilityAnnouncement, bool]:
+        client = await self._bound_client(state, capability.session_id)
+        if capability.node_id != client.node_id:
+            raise AuthenticationError(
+                "pairing-capability-binding-mismatch",
+                "capability metadata must use the authenticated paired identity",
+                "node_id",
+            )
+        result = await client.request(
+            "capability.announce",
+            session_id=capability.session_id,
+            payload={"announcement": capability.to_dict()},
+            request_id=request_id,
+        )
+        created = self._created_result(result)
+        accepted = CapabilityAnnouncement.from_dict(result.get("announcement"))
+        if accepted != capability:
+            raise FederationOperationError(
+                "capability-announcement-response-mismatch",
+                "relay returned different capability metadata than submitted",
+            )
+        client.state.save_capability(accepted, now=self._clock())
+        await client.request_replay(capability.session_id)
+        return accepted, created
+
+    def announce_capability_result(
+        self,
+        state: RemotePairingState,
+        capability: CapabilityAnnouncement,
+        *,
+        request_id: str,
+    ) -> tuple[CapabilityAnnouncement, bool]:
+        return self._submit(
+            self._announce_capability_result(
+                state, capability, request_id=request_id
+            )
+        )
+
+    async def _create_pairing_material(
+        self,
+        state: RemotePairingState,
+        *,
+        session_id: str,
+        ttl_seconds: int,
+        request_id: str,
+    ) -> dict[str, Any]:
+        client = await self._bound_client(state, session_id)
+        result = await client.request(
+            "session.pairing-material",
+            session_id=session_id,
+            payload={"ttl_seconds": ttl_seconds},
+            request_id=request_id,
+        )
+        for name in ("enrollment", "invitation"):
+            grant = result.get(name)
+            if (
+                not isinstance(grant, dict)
+                or not isinstance(grant.get("token"), str)
+                or not grant["token"]
+            ):
+                raise FederationOperationError(
+                    "invalid-pairing-material-response",
+                    "relay did not return the authorized pairing material",
+                )
+        return result
+
+    def create_pairing_material(
+        self,
+        state: RemotePairingState,
+        *,
+        session_id: str,
+        ttl_seconds: int,
+        request_id: str,
+    ) -> dict[str, Any]:
+        """Request bounded private grants as the authenticated session leader."""
+
+        return self._submit(
+            self._create_pairing_material(
+                state,
+                session_id=session_id,
+                ttl_seconds=ttl_seconds,
+                request_id=request_id,
+            )
+        )
 
     async def _session_events(
         self,

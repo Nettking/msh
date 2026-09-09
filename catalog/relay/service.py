@@ -33,6 +33,9 @@ from websockets.asyncio.server import Server, ServerConnection, serve
 from websockets.exceptions import ConnectionClosed, ConnectionClosedError
 
 from catalog.common.federation_paths import DEFAULT_COORDINATOR_DATABASE
+from catalog.federation.control_plane_facade import (
+    PhysicalReadyReplicatedSessionCoordinator,
+)
 from catalog.federation.coordinator import SessionCoordinator
 from catalog.federation.errors import (
     AuthenticationError,
@@ -52,11 +55,13 @@ from catalog.federation.protocol import (
     RelayEnvelope,
     utc_now,
 )
-from catalog.federation.redaction import redact_secrets
 from catalog.federation.recorder_control_events import (
     SCAN_EVENTS as RECORDER_CONTROL_SCAN_EVENTS,
+)
+from catalog.federation.recorder_control_events import (
     mask_recorder_control_scan_event_payload,
 )
+from catalog.federation.redaction import redact_secrets
 from catalog.federation.service_incarnation import (
     STOP_COMPLETED,
     STOP_FAILURE,
@@ -324,7 +329,7 @@ class RelayServer:
 
     def __init__(
         self,
-        coordinator: SessionCoordinator,
+        coordinator: SessionCoordinator | PhysicalReadyReplicatedSessionCoordinator,
         *,
         host: str = DEFAULT_HOST,
         port: int = DEFAULT_PORT,
@@ -341,8 +346,16 @@ class RelayServer:
         outbound_queue_size: int = DEFAULT_OUTBOUND_QUEUE_SIZE,
         max_connections: int = DEFAULT_MAX_CONNECTIONS,
     ) -> None:
-        if not isinstance(coordinator, SessionCoordinator):
-            raise TypeError("coordinator must be a SessionCoordinator")
+        # The configured C03 entrypoint deliberately keeps the quorum-fenced
+        # facade in the relay. Unwrapping it to its local materialized view
+        # would bypass durable-write fencing; arbitrary adapters stay rejected.
+        if not isinstance(
+            coordinator, (SessionCoordinator, PhysicalReadyReplicatedSessionCoordinator)
+        ):
+            raise TypeError(
+                "coordinator must be a SessionCoordinator or "
+                "PhysicalReadyReplicatedSessionCoordinator"
+            )
         if not isinstance(host, str) or not host.strip():
             raise RelayConfigurationError("host must be non-empty text")
         if isinstance(port, bool) or not isinstance(port, int) or not 0 <= port <= 65535:
@@ -1254,6 +1267,63 @@ class RelayServer:
                         "actor_node_id": record.node_id,
                         "validated_by": self.coordinator.coordinator_id,
                     },
+                ),
+            )
+            return
+
+        if request.message_type == "session.authority":
+            session_id = self._required_session(request)
+            if not isinstance(
+                self.coordinator, PhysicalReadyReplicatedSessionCoordinator
+            ):
+                raise FederationOperationError(
+                    "session-authority-unavailable",
+                    "this relay does not provide a replicated authority snapshot",
+                )
+            # The single replica owner materializes and reads both objects in
+            # one protected snapshot; the actor always comes from this socket.
+            session, leadership = self.coordinator.session_authority(
+                session_id=session_id, actor_node_id=record.node_id
+            )
+            await self._send_live(
+                record,
+                self._response_envelope(
+                    request,
+                    message_type="session.authority.accepted",
+                    payload={
+                        "session": session.to_dict(),
+                        "leadership": leadership.to_dict(),
+                    },
+                    authorization_context=self._membership_context(
+                        session_id, record.node_id
+                    ),
+                ),
+            )
+            return
+
+        if request.message_type == "session.pairing-material":
+            session_id = self._required_session(request)
+            ttl_seconds = _bounded_number(
+                request.payload.get("ttl_seconds", 600),
+                field="ttl_seconds",
+                minimum=1,
+                maximum=MAX_TOKEN_TTL_SECONDS,
+            )
+            material = self.coordinator.create_pairing_material(
+                session_id=session_id,
+                actor_node_id=record.node_id,
+                ttl_seconds=ttl_seconds,
+                request_id=request.request_id,
+            )
+            await self._send_live(
+                record,
+                self._response_envelope(
+                    request,
+                    message_type="session.pairing-material.accepted",
+                    payload=material,
+                    authorization_context=self._membership_context(
+                        session_id, record.node_id
+                    ),
                 ),
             )
             return

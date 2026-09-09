@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1480" height="1020" viewBox="0 0 1480 1020" role="img" aria-labelledby="title desc">
+  <title id="title">Federation v1: committed authority and independent capability owners</title>
+  <desc id="desc">An explanatory architecture diagram. A fixed three-voter control plane requires two voters to commit authority. Each host materializes its own coordinator view. Device membership, capability declaration, authorization, and execution have distinct boundaries. The portable ICSE demonstration runs three voter and relay processes plus a joining member on one machine. It exchanges a synthetic payload, terminates one leader, reconnects to the successor, and observes minority refusal. It does not execute compute, storage, or Recorder providers and is not physical acceptance evidence.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10Z" fill="#236775"/></marker>
+    <style>
+      text{font-family:Arial,Helvetica,sans-serif;fill:#152e3c} .heading{font-size:25px;font-weight:700} .label{font-size:22px;font-weight:700} .body{font-size:19px} .small{font-size:17px} .muted{fill:#496170} .line{stroke:#236775;stroke-width:3;fill:none;marker-end:url(#arrow)} .box{fill:#fff;stroke:#94b6bf;stroke-width:2} .chip{fill:#dceef1} .step{fill:#eaf2f6;stroke:#b5cbd5;stroke-width:1.5}
+    </style>
+  </defs>
+  <rect width="1480" height="1020" fill="#fff"/>
+  <text x="48" y="54" font-size="33" font-weight="700">Federation v1</text>
+  <text x="48" y="89" class="body muted">Committed authority · independent capability owners · explicit recovery boundaries</text>
+  <rect x="48" y="122" width="1384" height="340" rx="15" fill="#eef6f7" stroke="#b5cfd5" stroke-width="2"/>
+  <text x="72" y="159" class="heading">Configured C03 control plane</text>
+  <rect x="1050" y="137" width="356" height="34" rx="17" class="chip"/>
+  <text x="1072" y="160" class="small">Fixed membership: 2 of 3 to commit</text>
+  <g>
+    <rect x="76" y="190" width="420" height="163" rx="10" class="box"/>
+    <text x="98" y="225" class="label">Voter A</text>
+    <text x="98" y="255" class="body">Durable command log and fencing</text>
+    <text x="98" y="283" class="body">Host-local coordinator view</text>
+    <text x="98" y="324" class="small muted">Leadership may move between voters</text>
+    <rect x="530" y="190" width="420" height="163" rx="10" class="box"/>
+    <text x="552" y="225" class="label">Voter B</text>
+    <text x="552" y="255" class="body">Durable command log and fencing</text>
+    <text x="552" y="283" class="body">Host-local coordinator view</text>
+    <text x="552" y="324" class="small muted">Surviving quorum can elect a successor</text>
+    <rect x="984" y="190" width="420" height="163" rx="10" class="box"/>
+    <text x="1006" y="225" class="label">Voter C</text>
+    <text x="1006" y="255" class="body">Durable command log and fencing</text>
+    <text x="1006" y="283" class="body">Host-local coordinator view</text>
+    <text x="1006" y="324" class="small muted">A lone voter cannot authorize mutations</text>
+  </g>
+  <path d="M286 353V379H1194V353 M740 353V379" fill="none" stroke="#236775" stroke-width="3"/>
+  <text x="286" y="411" class="body">Authenticated, encrypted peer transport</text>
+  <text x="286" y="439" class="small muted">Public-safe authority records and private certified credential snapshots are separate.</text>
+  <path d="M740 462V497" class="line"/>
+  <rect x="48" y="506" width="1384" height="209" rx="15" fill="#faf8f2" stroke="#d4cbb4" stroke-width="2"/>
+  <text x="72" y="543" class="heading">Capability-oriented participation</text>
+  <g>
+    <rect x="76" y="564" width="284" height="119" rx="9" class="box"/>
+    <text x="96" y="596" class="label">Device membership</text>
+    <text x="96" y="624" class="small">Persistent identity; enrollment</text>
+    <text x="96" y="648" class="small">and session invitation</text>
+    <rect x="424" y="564" width="284" height="119" rx="9" class="box"/>
+    <text x="444" y="596" class="label">Owner declarations</text>
+    <text x="444" y="624" class="small">Discoverable capabilities;</text>
+    <text x="444" y="648" class="small">contribution intent</text>
+    <rect x="772" y="564" width="284" height="119" rx="9" class="box"/>
+    <text x="792" y="596" class="label">Specific authority</text>
+    <text x="792" y="624" class="small">Provider approval, assignment,</text>
+    <text x="792" y="648" class="small">fencing and leases</text>
+    <rect x="1120" y="564" width="284" height="119" rx="9" class="box"/>
+    <text x="1140" y="596" class="label">Local execution</text>
+    <text x="1140" y="624" class="small">Capability-specific adapters</text>
+    <text x="1140" y="648" class="small">and persistent data</text>
+    <path d="M360 623H414 M708 623H762 M1056 623H1110" class="line"/>
+  </g>
+  <text x="72" y="752" class="heading">Portable ICSE demonstration: one bounded network story</text>
+  <text x="72" y="781" class="body muted">Three voter/relay processes and one joining member; all run independently on one reviewer machine.</text>
+  <g>
+    <rect x="76" y="800" width="286" height="84" rx="9" class="step"/>
+    <text x="94" y="833" class="body">1  Enroll and discover</text>
+    <text x="94" y="862" class="small muted">Authenticate distinct owners</text>
+    <rect x="424" y="800" width="286" height="84" rx="9" class="step"/>
+    <text x="442" y="833" class="body">2  Exchange readings</text>
+    <text x="442" y="862" class="small muted">Synthetic payload over relay</text>
+    <rect x="772" y="800" width="286" height="84" rx="9" class="step"/>
+    <text x="790" y="833" class="body">3  Terminate one leader</text>
+    <text x="790" y="862" class="small muted">Elect, reconnect and repeat</text>
+    <rect x="1120" y="800" width="284" height="84" rx="9" class="step"/>
+    <text x="1138" y="833" class="body">4  Observe fencing</text>
+    <text x="1138" y="862" class="small muted">Return node; refuse minority</text>
+    <path d="M362 842H414 M710 842H762 M1058 842H1110" class="line"/>
+  </g>
+  <text x="72" y="920" class="small muted">Demo scope: owner declarations and authenticated generic payloads; provider execution is outside this story.</text>
+  <text x="72" y="947" class="small muted">Physical campaign: Beast controller + Nitro + Windows Recorder; Recorder may participate as a voter only.</text>
+  <text x="72" y="984" class="small muted">Architecture illustration, not measured evidence. Exact source identity and validation results belong to the release manifest.</text>
+</svg>

@@ -3,6 +3,7 @@ name: Phase F6 transport closeout
 on:
   pull_request:
     paths:
+      - ".github/actions/**"
       - "catalog/federation/adaptive_transport.py"
       - "catalog/federation/peer_stream.py"
       - "catalog/federation/peer_stream_verifier.py"
@@ -39,6 +40,7 @@ on:
   push:
     branches: [main]
     paths:
+      - ".github/actions/**"
       - "catalog/federation/adaptive_transport.py"
       - "catalog/federation/peer_stream.py"
       - "catalog/federation/peer_stream_verifier.py"
@@ -85,17 +87,25 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+        include:
+          - os: Linux
+            runner: fcp-linux-fast
+            shell: bash
+          - os: Windows
+            runner: fcp-windows
+            shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+    runs-on: [self-hosted, "${{ matrix.runner }}"]
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: ./.github/actions/self-hosted-python
         with:
           python-version: "3.12"
-          cache: pip
       - uses: actions/setup-go@v5
         with:
           go-version-file: "cmd/fcp-peer-sidecar/go.mod"
