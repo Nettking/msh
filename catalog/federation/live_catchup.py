@@ -13,6 +13,7 @@ import json
 import sqlite3
 import uuid
 from collections import Counter
+from contextlib import closing
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -651,7 +652,7 @@ class LiveCatchupStore:
     def __init__(self, database: Path | str) -> None:
         self.database = str(database)
         Path(self.database).parent.mkdir(parents=True, exist_ok=True)
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             connection.execute("PRAGMA journal_mode=WAL")
             connection.execute(
                 """CREATE TABLE IF NOT EXISTS storage_live_catchups (
@@ -671,13 +672,17 @@ class LiveCatchupStore:
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database, timeout=30)
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA busy_timeout=30000")
-        connection.execute("PRAGMA synchronous=FULL")
+        try:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA busy_timeout=30000")
+            connection.execute("PRAGMA synchronous=FULL")
+        except BaseException:
+            connection.close()
+            raise
         return connection
 
     def get(self, recovery_id: str) -> LiveCatchupRecord | None:
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             row = connection.execute(
                 "SELECT record_json FROM storage_live_catchups WHERE recovery_id=?",
                 (recovery_id,),
@@ -704,7 +709,7 @@ class LiveCatchupStore:
                 "recovery_id",
                 "durable recovery identity was reused with different bindings",
             )
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             connection.execute(
                 """INSERT INTO storage_live_catchups
                    (recovery_id, session_id, group_id, returning_provider_id,
@@ -1442,7 +1447,10 @@ class LiveFormerPrimaryCatchupCoordinator:
         group_id: str,
         returning_provider_id: str,
     ) -> LiveFailoverRecord:
-        with sqlite3.connect(self.failover_store.database, timeout=30) as connection:
+        with (
+            closing(sqlite3.connect(self.failover_store.database, timeout=30)) as connection,
+            connection,
+        ):
             connection.row_factory = sqlite3.Row
             rows = connection.execute(
                 """SELECT record_json FROM storage_live_failovers

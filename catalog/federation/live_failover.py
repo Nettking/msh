@@ -15,6 +15,7 @@ import json
 import sqlite3
 import uuid
 from collections.abc import Awaitable, Callable
+from contextlib import closing
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -419,7 +420,7 @@ class LiveFailoverStore:
     def __init__(self, database: Path | str) -> None:
         self.database = str(database)
         Path(self.database).parent.mkdir(parents=True, exist_ok=True)
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             connection.execute("PRAGMA journal_mode=WAL")
             connection.execute(
                 """CREATE TABLE IF NOT EXISTS storage_live_failovers (
@@ -443,9 +444,13 @@ class LiveFailoverStore:
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database, timeout=30)
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA busy_timeout=30000")
-        connection.execute("PRAGMA synchronous=FULL")
+        try:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA busy_timeout=30000")
+            connection.execute("PRAGMA synchronous=FULL")
+        except BaseException:
+            connection.close()
+            raise
         return connection
 
     @staticmethod
@@ -480,7 +485,7 @@ class LiveFailoverStore:
         group_id: str,
         failover_id: str,
     ) -> LiveFailoverRecord | None:
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             row = connection.execute(
                 """SELECT * FROM storage_live_failovers
                    WHERE session_id=? AND group_id=? AND failover_id=?""",
@@ -493,7 +498,7 @@ class LiveFailoverStore:
         session_id: str,
         group_id: str,
     ) -> LiveFailoverRecord | None:
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             rows = connection.execute(
                 """SELECT * FROM storage_live_failovers
                    WHERE session_id=? AND group_id=?
@@ -541,7 +546,7 @@ class LiveFailoverStore:
                     "failover_id",
                     "durable identity was reused with different inputs",
                 )
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             connection.execute(
                 """INSERT INTO storage_live_failovers
                    (session_id, group_id, failover_id, state,
