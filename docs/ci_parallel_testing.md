@@ -23,6 +23,14 @@ automatically admitted: its existing `fcp-linux` label alone does not establish
 the pinned Python 3.12.13 contract. Do not create duplicate runners on a machine
 just to increase the job count.
 
+The automatic `CI test sharding` checks use the shared pools, so an offline
+machine does not block them while another admitted runner is available. To
+validate a specific machine before admission, dispatch that workflow manually
+on the candidate branch with `target` set to `Nettking` or `Beast`. The Beast
+probe selects registrations 28/29 using their existing release labels, excluding
+the legacy registrations. Normal pull requests do not require every machine to
+be online and do not duplicate the same checks on both push and pull request.
+
 Windows test jobs do not start Docker containers. Nettking keeps its
 NetworkService account; its Docker daemon access is not changed. Compose
 configuration validation only uses the installed CLI. `fcp-docker-linux` requires

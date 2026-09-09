@@ -7,52 +7,45 @@ on:
       - .github/workflows/federation-v1-release.yml
       - scripts/ci_pytest_shards.py
       - catalog/common/tests/test_ci_pytest_shards.py
-  push:
-    branches: [codex/parallel-self-hosted-tests]
-    paths:
-      - .github/workflows/ci-test-sharding.yml
-      - .github/workflows/federation-v1-release.yml
-      - scripts/ci_pytest_shards.py
-      - catalog/common/tests/test_ci_pytest_shards.py
   workflow_dispatch:
+    inputs:
+      target:
+        description: Shared pool for routine checks, or a specific host for admission
+        type: choice
+        default: shared-pool
+        options: [shared-pool, Nettking, Beast]
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-test-sharding-${{ github.ref }}
+  group: ci-test-sharding-${{ github.ref }}-${{ inputs.target || 'shared-pool' }}
   cancel-in-progress: true
 
 jobs:
   shard-contract:
-    name: Shard contract (${{ matrix.host }}, ${{ matrix.os }})
+    name: Shard contract (${{ matrix.os }}, ${{ inputs.target || 'shared-pool' }})
     strategy:
       fail-fast: false
       matrix:
         include:
-          - host: Nettking
-            os: Windows
-            runner: [self-hosted, Windows, X64, nettking]
-            python: '3.12.10'
-            shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
-          - host: Nettking
-            os: Linux
-            runner: [self-hosted, Linux, X64, nettking-linux]
-            python: '3.12.13'
-            shell: bash
-          - host: Beast
-            os: Windows
+          - os: Windows
             # The broad beast-windows label also names a legacy, unprepared service.
-            runner: [self-hosted, Windows, X64, fcp-windows]
+            runner: >-
+              ${{ inputs.target == 'Beast' && '["self-hosted","Windows","X64","fcp-windows"]' ||
+                  inputs.target == 'Nettking' && '["self-hosted","Windows","X64","nettking"]' ||
+                  '["self-hosted","Windows","X64","fcp-test-windows"]' }}
             python: '3.12.10'
             shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
-          - host: Beast
-            os: Linux
+          - os: Linux
             # Exclude the older Beast-Linux registration without the release contract.
-            runner: [self-hosted, Linux, X64, beast-linux, fcp-linux-fast]
+            runner: >-
+              ${{ inputs.target == 'Beast' && '["self-hosted","Linux","X64","beast-linux","fcp-linux-fast"]' ||
+                  inputs.target == 'Nettking' && '["self-hosted","Linux","X64","nettking-linux"]' ||
+                  '["self-hosted","Linux","X64","fcp-test-linux"]' }}
             python: '3.12.13'
             shell: bash
-    runs-on: ${{ matrix.runner }}
+    runs-on: ${{ fromJSON(matrix.runner) }}
     timeout-minutes: 10
     defaults:
       run:
