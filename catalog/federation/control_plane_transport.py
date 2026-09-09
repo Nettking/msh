@@ -708,10 +708,13 @@ class SecureReplicationServer:
         self._thread.start()
 
     def close(self) -> None:
+        if self._thread is None:
+            self._server.server_close()
+            return
         self._server.shutdown()
         self._server.server_close()
-        if self._thread is not None:
-            self._thread.join(timeout=5.0)
+        self._thread.join(timeout=5.0)
+        self._thread = None
 
     def __enter__(self) -> Self:
         self.start()

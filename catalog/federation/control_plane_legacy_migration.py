@@ -31,6 +31,7 @@ import sqlite3
 import struct
 import threading
 from collections.abc import Mapping
+from contextlib import ExitStack
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -358,11 +359,13 @@ class LegacyMigrationWitnessServer:
         self._thread.start()
 
     def close(self) -> None:
+        if self._thread is None:
+            self._server.server_close()
+            return
         self._server.shutdown()
         self._server.server_close()
-        if self._thread is not None:
-            self._thread.join(timeout=5.0)
-            self._thread = None
+        self._thread.join(timeout=5.0)
+        self._thread = None
 
 
 class LegacyMigrationWitnessTransport:
@@ -450,26 +453,30 @@ class OfflineCreatorRecoverableRuntime(PhysicalReadyReplicatedFederationRuntime)
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
-        self.legacy_node_state_database = Path(legacy_node_state_database)
-        self.legacy_pairing_state_path = Path(legacy_pairing_state_path)
-        if self.deployment.listen_port > 65533:
-            raise LegacyMigrationError("control-plane port leaves no migration witness port")
-        peer_endpoints = {
-            peer.voter_id: VoterEndpoint(peer.host, peer.port)
-            for peer in self.deployment.peers
-            if peer.voter_id != self.node.voter_id
-        }
-        self.legacy_witness_server = LegacyMigrationWitnessServer(
-            self.codec,
-            node_state_database=self.legacy_node_state_database,
-            pairing_state_path=self.legacy_pairing_state_path,
-            host=self.deployment.listen_host,
-            port=self.deployment.listen_port + MIGRATION_PORT_OFFSET,
-        )
-        self.legacy_witness_transport = LegacyMigrationWitnessTransport(
-            self.codec,
-            _migration_endpoints(peer_endpoints),
-        )
+        with ExitStack() as construction:
+            construction.callback(super().close)
+            self.legacy_node_state_database = Path(legacy_node_state_database)
+            self.legacy_pairing_state_path = Path(legacy_pairing_state_path)
+            if self.deployment.listen_port > 65533:
+                raise LegacyMigrationError("control-plane port leaves no migration witness port")
+            peer_endpoints = {
+                peer.voter_id: VoterEndpoint(peer.host, peer.port)
+                for peer in self.deployment.peers
+                if peer.voter_id != self.node.voter_id
+            }
+            self.legacy_witness_server = LegacyMigrationWitnessServer(
+                self.codec,
+                node_state_database=self.legacy_node_state_database,
+                pairing_state_path=self.legacy_pairing_state_path,
+                host=self.deployment.listen_host,
+                port=self.deployment.listen_port + MIGRATION_PORT_OFFSET,
+            )
+            construction.callback(self.legacy_witness_server.close)
+            self.legacy_witness_transport = LegacyMigrationWitnessTransport(
+                self.codec,
+                _migration_endpoints(peer_endpoints),
+            )
+            construction.pop_all()
 
     def start(self) -> None:
         self.legacy_witness_server.start()

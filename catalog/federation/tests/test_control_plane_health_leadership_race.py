@@ -3,9 +3,15 @@
 from __future__ import annotations
 
 import copy
+import errno
 import hashlib
 import json
+import os
+import socket
+import socketserver
 import sqlite3
+import subprocess
+import sys
 from contextlib import ExitStack, contextmanager
 from dataclasses import replace
 from datetime import timedelta
@@ -42,12 +48,12 @@ def runtimes(tmp_path: Path):
                 legacy_node_state_database=state / "legacy.sqlite3",
                 legacy_pairing_state_path=state / "legacy.json",
             )
+            cleanup.callback(runtime.close)
             # Drive elections explicitly through the real authenticated transport
             # so the exact pre-lock interleaving is independent of timer speed.
             # No lifecycle clock, role, quorum response or durable state is faked.
             runtime.legacy_witness_server.start()
             runtime.server.start()
-            cleanup.callback(runtime.close)
             runtime.credential_server.start()
             replicas.append(runtime)
         leader = replicas[0]
@@ -323,3 +329,139 @@ def test_pending_proposal_does_not_block_local_connectivity_or_authorize_other_w
         facade.create_enrollment_token(max_uses=1)
     assert rejected.value.code == "federation-quorum-leader-required"
     assert_authority_unchanged()
+
+
+_OWNERSHIP_CASES = ("credential-bind", "witness-bind", "close-before-start")
+
+
+def _ownership_server_closed(server) -> None:
+    assert server._thread is None
+    assert server._server.socket.fileno() == -1
+
+
+def _ownership_rebind(port: int) -> None:
+    # No SO_REUSEADDR: this must not share a socket left open by the runtime.
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", port))
+        probe.listen(1)
+
+
+def _ownership_child(case: str, root: Path) -> None:
+    # These are real product classes and the existing real identity/deployment
+    # fixture. No lifecycle threads, RPC calls, elections or product mocks run.
+    from catalog.federation.control_plane_runtime import (
+        PhysicalReadyReplicatedFederationRuntime,
+    )
+    from catalog.federation.federation_v1_release_runtime import (
+        FederationV1ReleaseRuntime,
+    )
+    from catalog.federation.tests.test_control_plane_physical_runtime import (
+        _deployments,
+    )
+
+    deployment = _deployments(root)[0]
+    base = deployment.listen_port
+    kwargs = {
+        "legacy_node_state_database": root / "legacy.sqlite3",
+        "legacy_pairing_state_path": root / "legacy.json",
+    }
+    if case == "close-before-start":
+        runtime = FederationV1ReleaseRuntime(deployment, **kwargs)
+        servers = (
+            runtime.server, runtime.credential_server, runtime.legacy_witness_server,
+        )
+        assert all(server._thread is None for server in servers)
+        assert runtime._lifecycle_thread is None
+        print(json.dumps({
+            "case": case,
+            "stage": "before-close",
+            "server_threads_none": all(server._thread is None for server in servers),
+            "lifecycle_thread_none": runtime._lifecycle_thread is None,
+        }), file=sys.stderr, flush=True)
+        runtime.close()
+        runtime.close()
+        for server in servers:
+            _ownership_server_closed(server)
+        for port in (base, base + 1, base + 2):
+            _ownership_rebind(port)
+    else:
+        offset = {"credential-bind": 1, "witness-bind": 2}[case]
+        with socket.socket() as blocker:
+            if os.name == "nt":
+                blocker.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+            blocker.bind(("127.0.0.1", base + offset))
+            blocker.listen(1)
+            failure = None
+            try:
+                FederationV1ReleaseRuntime(deployment, **kwargs)
+            except OSError as exc:
+                failure = exc
+            assert failure is not None, "occupied required port must refuse construction"
+            if os.name == "nt":
+                assert failure.winerror in {10013, 10048}
+            else:
+                assert failure.errno == errno.EADDRINUSE
+
+            # Retain the exception, traceback and partial runtime throughout the
+            # assertions. Garbage collection cannot supply the missing cleanup.
+            frames = []
+            cursor = failure.__traceback__
+            while cursor is not None:
+                frames.append(cursor.tb_frame)
+                cursor = cursor.tb_next
+            assert any(
+                frame.f_code.co_name == "server_bind"
+                and isinstance(frame.f_locals.get("self"), socketserver.TCPServer)
+                and frame.f_locals["self"].server_address == ("127.0.0.1", base + offset)
+                for frame in frames
+            ), "the original socket bind exception must reach the caller"
+            partial = next(
+                frame.f_locals["self"]
+                for frame in frames
+                if isinstance(
+                    frame.f_locals.get("self"), PhysicalReadyReplicatedFederationRuntime,
+                )
+            )
+            print(json.dumps({
+                "case": case,
+                "original_bind_error": type(failure).__name__,
+                "errno": failure.errno,
+                "winerror": getattr(failure, "winerror", None),
+                "partial_control_socket_closed": partial.server._server.socket.fileno() == -1,
+            }), file=sys.stderr, flush=True)
+            _ownership_server_closed(partial.server)
+            _ownership_rebind(base)
+            if offset == 2:
+                _ownership_server_closed(partial.credential_server)
+                _ownership_rebind(base + 1)
+            assert failure.__traceback__ is not None
+    print(json.dumps({"case": case, "owned_socket_checks": "PASS"}), flush=True)
+
+
+@pytest.mark.parametrize("case", _OWNERSHIP_CASES)
+def test_owned_voter_sockets_close_without_start_or_successful_construction(
+    tmp_path: Path, case: str,
+) -> None:
+    # A regression may deadlock inside socketserver.shutdown before start. A
+    # separate child lets subprocess.run kill and wait for that one process at
+    # its deadline; no worker thread is stranded inside the pytest process.
+    completed = subprocess.run(
+        [
+            sys.executable, "-B", "-m",
+            "catalog.federation.tests.test_control_plane_health_leadership_race",
+            "--child", case, str(tmp_path),
+        ],
+        cwd=Path(__file__).resolve().parents[3],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    assert json.loads(completed.stdout) == {"case": case, "owned_socket_checks": "PASS"}
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 4 or sys.argv[1] != "--child" or sys.argv[2] not in _OWNERSHIP_CASES:
+        raise SystemExit("invalid owned-socket child arguments")
+    _ownership_child(sys.argv[2], Path(sys.argv[3]))
