@@ -7,11 +7,17 @@ services; those physical claims remain separate in ``physical_evidence.py``.
 
 from __future__ import annotations
 
+import builtins
+import sys
+import threading
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import pytest
+
 from catalog.capabilities.contributions import ContributionPolicyEvaluator
+from catalog.common import artifact_refresh
 from catalog.federation.coordinator import SessionCoordinator
 from catalog.federation.onboarding_discovery import (
     ConfiguredFederationDiscoveryAdapter,
@@ -26,6 +32,7 @@ from catalog.flask_app.capability_onboarding_routes import (
     _COMMAND_SESSION_KEY,
     _CSRF_SESSION_KEY,
 )
+from catalog.flask_app.services import catalog_service
 from catalog.flask_app.services.capability_benchmark_service import (
     CapabilityBenchmarkService,
 )
@@ -44,6 +51,9 @@ from catalog.flask_app.services.capability_onboarding_service import (
 from catalog.flask_app.services.capability_startup_transition_service import (
     CapabilityStartupTransitionService,
 )
+from catalog.flask_app.services.recorder_artifact_refresh import (
+    RECORDER_ARTIFACT_REFRESH_EXTENSION,
+)
 from catalog.flask_app.tests.test_capability_contribution_route import (
     AI_ID,
     BENCHMARK_ID,
@@ -54,6 +64,106 @@ from catalog.flask_app.tests.test_capability_contribution_route import (
 
 NOW = datetime(2026, 8, 3, 14, 30, tzinfo=timezone.utc)
 PRIVATE_RECORDER_SOURCE = "Fixture=http://10.20.30.40:5000"
+
+
+@pytest.fixture
+def owned_product_apps(monkeypatch):
+    """Finish these scenarios' real app workers before restoring their cwd."""
+    app_module = sys.modules[create_app.__module__]
+    original_catalog = app_module.ArtifactCatalog
+    original_install = app_module.install_recorder_artifact_refresh
+    original_threading = catalog_service.threading
+    owned_apps = []
+    owned_catalogs = set()
+    owned_catalog_threads = []
+    ownership_lock = threading.Lock()
+    with artifact_refresh._lock:
+        previous_refresh = artifact_refresh._refresh_callback
+
+    def make_catalog(*args, **kwargs):
+        catalog = original_catalog(*args, **kwargs)
+        with ownership_lock:
+            owned_catalogs.add(catalog)
+        return catalog
+
+    def install_monitor(app, *args, **kwargs):
+        # Register before later app configuration can fail. The installer keeps
+        # the real monitor in this app's extension before requests can start it.
+        owned_apps.append(app)
+        return original_install(app, *args, **kwargs)
+
+    class CatalogThreading:
+        """Observe only this module's real catalog threads, never global Thread."""
+
+        def __getattr__(self, name):
+            return getattr(original_threading, name)
+
+        def Thread(self, *args, **kwargs):
+            thread = original_threading.Thread(*args, **kwargs)
+            target = kwargs.get("target", args[1] if len(args) > 1 else None)
+            code = getattr(target, "__code__", None)
+            closure = getattr(target, "__closure__", None)
+            if code is not None and closure is not None and "self" in code.co_freevars:
+                owner = closure[code.co_freevars.index("self")].cell_contents
+                with ownership_lock:
+                    if owner in owned_catalogs:
+                        owned_catalog_threads.append(thread)
+            return thread
+
+    # Depending on monkeypatch makes this finalizer run before that fixture
+    # restores the process cwd/environment used by these real worker callbacks.
+    with monkeypatch.context() as patches:
+        patches.setattr(app_module, "ArtifactCatalog", make_catalog)
+        patches.setattr(app_module, "install_recorder_artifact_refresh", install_monitor)
+        patches.setattr(catalog_service, "threading", CatalogThreading())
+        try:
+            yield
+        finally:
+            failures = []
+            monitor_threads = []
+
+            def finish(operation, *args):
+                try:
+                    operation(*args)
+                except BaseException as error:  # noqa: BLE001 - finish all owned cleanup before reporting
+                    # One cleanup error must not skip the other owned workers
+                    # or prevent restoration of the process-global callback.
+                    failures.append(error)
+
+            for app in owned_apps:
+                monitor = app.extensions.get(RECORDER_ARTIFACT_REFRESH_EXTENSION)
+                if monitor is None:
+                    continue
+                thread = monitor._thread
+                if thread is not None:
+                    monitor_threads.append(thread)
+                finish(monitor.stop)
+
+            def restore_refresh():
+                with artifact_refresh._lock:
+                    artifact_refresh._refresh_callback = previous_refresh
+
+            finish(restore_refresh)
+            # stop() preserves a truthful 'stopping' state after its bounded
+            # join. Drain those exact handles before any fixture state changes.
+            for thread in monitor_threads:
+                if thread.ident is not None:
+                    finish(thread.join)
+            # No owned monitor/callback can enqueue another scan now. Capture
+            # all workers, including startup scans created inside create_app.
+            with ownership_lock:
+                catalog_threads = tuple(owned_catalog_threads)
+            for thread in catalog_threads:
+                if thread.ident is not None:
+                    finish(thread.join)
+            live_workers = [
+                thread.name for thread in (*monitor_threads, *catalog_threads)
+                if thread.is_alive()
+            ]
+            if live_workers:
+                failures.append(AssertionError(f"owned app workers survived cleanup: {live_workers}"))
+            if failures:
+                raise builtins.BaseExceptionGroup("CF7-B app cleanup failed", failures)
 
 
 @dataclass
@@ -300,6 +410,7 @@ def _candidate_for_existing_federation(
     )
 
 
+@pytest.mark.usefixtures("owned_product_apps")
 def test_fresh_product_flow_finishes_restarts_and_reruns_expired_evidence(
     monkeypatch,
     tmp_path: Path,
@@ -429,6 +540,7 @@ def test_fresh_product_flow_finishes_restarts_and_reruns_expired_evidence(
     assert len(restarted.benchmarks.list_results()) >= 2
 
 
+@pytest.mark.usefixtures("owned_product_apps")
 def test_three_device_federation_keeps_ai_compute_and_storage_authority_separate(
     monkeypatch,
     tmp_path: Path,
