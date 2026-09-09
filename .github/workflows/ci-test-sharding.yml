@@ -32,26 +32,27 @@ jobs:
         include:
           - host: Nettking
             os: Windows
-            label: nettking
+            runner: [self-hosted, Windows, X64, nettking]
             python: '3.12.10'
             shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
           - host: Nettking
             os: Linux
-            label: nettking-linux
+            runner: [self-hosted, Linux, X64, nettking-linux]
             python: '3.12.13'
             shell: bash
           - host: Beast
             os: Windows
             # The broad beast-windows label also names a legacy, unprepared service.
-            label: fcp-windows
+            runner: [self-hosted, Windows, X64, fcp-windows]
             python: '3.12.10'
             shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
           - host: Beast
             os: Linux
-            label: beast-linux
+            # Exclude the older Beast-Linux registration without the release contract.
+            runner: [self-hosted, Linux, X64, beast-linux, fcp-linux-fast]
             python: '3.12.13'
             shell: bash
-    runs-on: [self-hosted, '${{ matrix.os }}', X64, '${{ matrix.label }}']
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 10
     defaults:
       run:
