@@ -42,7 +42,8 @@ jobs:
             shell: bash
           - host: Beast
             os: Windows
-            label: beast-windows
+            # The broad beast-windows label also names a legacy, unprepared service.
+            label: fcp-windows
             python: '3.12.10'
             shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
           - host: Beast

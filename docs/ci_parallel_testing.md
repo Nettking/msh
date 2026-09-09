@@ -15,7 +15,9 @@ same host share that host's resources.
 `fcp-test-linux` and `fcp-test-windows` are shared execution pools, not host names.
 They require the interpreter and shell contract in
 `.github/actions/self-hosted-python/action.yml`. The currently intended members
-are Nettking and Beast on each OS. Add a machine only after the `CI test sharding`
+are Nettking (22/27) and the release runners Beast (28) and Beast-Linux-WSL (29).
+The older Beast-Windows registration (25) is not admitted just because it is
+online or has the broad `beast-windows` label. Add a machine only after the `CI test sharding`
 workflow passes there and its release prerequisites are checked. Nitro is not
 automatically admitted: its existing `fcp-linux` label alone does not establish
 the pinned Python 3.12.13 contract. Do not create duplicate runners on a machine
