@@ -1,6 +1,7 @@
 name: CF7-C physical test readiness
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - ".github/actions/**"
