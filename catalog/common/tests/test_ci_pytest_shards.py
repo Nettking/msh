@@ -92,6 +92,7 @@ def test_real_pytest_shards_cover_new_files_and_preserve_failure(tmp_path):
         ("source_sha", "different-candidate"),
         ("collected", []),
         ("selected", []),
+        ("executed", []),
         ("exit_code", 1),
         ("collection_complete", False),
         ("shard_index", 0),
@@ -149,3 +150,26 @@ def test_real_pytest_shards_cover_new_files_and_preserve_failure(tmp_path):
     )
     assert collect_only.returncode != 0
     assert json.loads(manifest_path.read_text())["collection_complete"] is False
+    setup_only = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "run",
+            "--index",
+            "0",
+            "--count",
+            "1",
+            "--manifest",
+            str(manifest_path),
+            "--",
+            "--setup-only",
+        ],
+        cwd=tmp_path,
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    assert setup_only.returncode != 0
+    assert json.loads(manifest_path.read_text())["executed"] == []

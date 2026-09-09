@@ -58,6 +58,8 @@ def verify(directory: Path, count: int, source_sha: str) -> int:
             )
         if sorted(manifest["selected"]) != sorted(expected[index]):
             raise ValueError(f"Shard {index} does not contain its exact assigned tests")
+        if manifest["executed"] != manifest["selected"]:
+            raise ValueError(f"Shard {index} did not execute every selected test")
         if covered.intersection(manifest["selected"]):
             raise ValueError("Tests executed by multiple shards")
         covered.update(manifest["selected"])
@@ -78,9 +80,12 @@ def run(index: int, count: int, manifest_path: Path, pytest_args: list[str]) -> 
         "source_sha": os.environ.get("GITHUB_SHA", ""),
         "collected": [],
         "selected": [],
+        "executed": [],
         "collection_complete": False,
         "exit_code": 2,
     }
+
+    executed: set[str] = set()
 
     class ShardPlugin:
         def pytest_configure(self, config):
@@ -107,11 +112,20 @@ def run(index: int, count: int, manifest_path: Path, pytest_args: list[str]) -> 
                 raise pytest.UsageError("Another plugin changed the assigned shard")
             manifest["collection_complete"] = True
 
+        def pytest_runtest_logreport(self, report):
+            # A test skipped during setup never produces a call-phase report.
+            if report.when == "call" or (report.when == "setup" and report.skipped):
+                executed.add(report.nodeid)
+
         def pytest_report_header(self):
             return f"CI shard {index + 1}/{count} (whole test files)"
 
     try:
         manifest["exit_code"] = int(pytest.main(pytest_args, plugins=[ShardPlugin()]))
+        manifest["executed"] = sorted(executed)
+        if manifest["exit_code"] == 0 and manifest["executed"] != manifest["selected"]:
+            print("Incomplete shard execution: some selected tests produced no result")
+            manifest["exit_code"] = 2
     finally:
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
         manifest_path.write_text(
