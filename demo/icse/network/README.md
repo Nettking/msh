@@ -87,7 +87,7 @@ are rejected. No executable, `__pycache__`, virtual environment or local helper
 is ignored. Use a fresh extraction if a prior command changed this tree.
 
 In archive mode, `--release-tag` can check **only the artifact tag** named by the
-embedded manifest's `source_ref`, such as `refs/tags/fcp-icse-tool-demo-v0.1.0`.
+embedded manifest's `source_ref`, such as `refs/tags/fcp-icse-tool-demo-v0.2.0`.
 It cannot verify a separate product tag such as `v1.0.0`. Omit this optional
 argument for a candidate artifact whose manifest names a branch or PR ref.
 The summary records `artifact_source_ref`, `artifact_tag_checked`, and the

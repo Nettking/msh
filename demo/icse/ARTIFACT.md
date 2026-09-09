@@ -3,7 +3,7 @@
 ## Artifact identity
 
 **Artifact:** FCP ICSE Tool Demonstration
-**Candidate version:** 0.1.0
+**Candidate version:** 0.2.0
 **Primary entrypoint:** `python -B -m demo.icse.network.run`
 **Supporting component entrypoint:** `demo/icse/docker-compose.yml`
 **Network evidence schema:** `fcp.icse-network-demo.v1`
@@ -207,8 +207,8 @@ self-contained publication ZIP.
 
 The publication ZIP contains the exact Git-tracked source tree directly under
 `source/` and the validated reviewer metadata/evidence under `artifact/`. A tag
-named `fcp-icse-tool-demo-v0.1.0` therefore produces
-`fcp-icse-tool-demo-0.1.0.zip`.
+named `fcp-icse-tool-demo-v0.2.0` therefore produces
+`fcp-icse-tool-demo-0.2.0.zip`.
 
 For the publication version, archive exactly the ZIP produced by the
 tag-triggered workflow for the release tag cited by the paper. Do not rebuild the
