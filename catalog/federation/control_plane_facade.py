@@ -202,7 +202,10 @@ class PhysicalReadyReplicatedSessionCoordinator(ReplicatedSessionCoordinator):
                     raise
             except ControlPlaneError:
                 pass
-        return method(**kwargs, emit_health_events=False)
+        # Resolving a retained authority proposal may require a quorum leader.
+        # Local cleanup must neither resolve it nor acquire write authority.
+        with journal.local_connectivity_operation():
+            return method(**kwargs, emit_health_events=False)
 
     def disconnected(self, *, node_id, error=None):
         return self._health(self.store.mark_disconnected, node_id=node_id, error=error, now=self.runtime.clock())

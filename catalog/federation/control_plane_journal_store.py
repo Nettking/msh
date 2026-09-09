@@ -27,6 +27,7 @@ from .persistence import COORDINATOR_ID, CoordinatorStore
 JOURNAL_WRITER_FUNCTION = "fcp_c03_journal_writer"
 JOURNAL_WRITE_REFUSED = "C03 public journal requires an owned transaction"
 ROLLBACK_ONLY_MESSAGE = "C03 journal transaction is rollback-only after a nested failure"
+LOCAL_CONNECTIVITY_COLUMNS = frozenset({"state", "connection_id", "disconnected_at", "last_error"})
 
 
 class JournalTransactionController(Protocol):
@@ -216,6 +217,41 @@ class JournalCoordinatorStore(CoordinatorStore):
         """Trusted materialization context; bypass controller under lifecycle lock."""
         with self.raw_transaction() as database:
             yield database
+
+    @contextmanager
+    def local_connectivity_transaction(self) -> Iterator[sqlite3.Connection]:
+        """Update only local liveness, without resolving pending authority work.
+
+        The caller holds the runtime lifecycle lock. This scope cannot inherit
+        an authority stage or grant its callbacks general projection permission.
+        Existing health methods reuse its connection through nested savepoints.
+        Any denied statement poisons the stage even if its exception is caught.
+        """
+        if self._active_connection() is not None:
+            raise RuntimeError("local connectivity cannot inherit an active transaction")
+
+        def authorize(action, table, column, database_name, trigger):
+            if action in (sqlite3.SQLITE_READ, sqlite3.SQLITE_SELECT, sqlite3.SQLITE_SAVEPOINT):
+                return sqlite3.SQLITE_OK
+            if (
+                action == sqlite3.SQLITE_UPDATE
+                and database_name == "main"
+                and table == "node_connectivity"
+                and column in LOCAL_CONNECTIVITY_COLUMNS
+                and trigger is None
+            ):
+                return sqlite3.SQLITE_OK
+            self._journal_context.rollback_only = True
+            return sqlite3.SQLITE_DENY
+
+        with self.raw_transaction() as database:
+            database.set_authorizer(authorize)
+            try:
+                yield database
+            finally:
+                # Restore before the owned transaction commits/rolls back and
+                # closes; the authorizer must not intercept that outer cleanup.
+                database.set_authorizer(None)
 
 
 __all__ = ["JournalCoordinatorStore", "JournalTransactionController"]
