@@ -1,0 +1,68 @@
+name: CI test sharding
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/ci-test-sharding.yml
+      - .github/workflows/federation-v1-release.yml
+      - scripts/ci_pytest_shards.py
+      - catalog/common/tests/test_ci_pytest_shards.py
+  push:
+    branches: [codex/parallel-self-hosted-tests]
+    paths:
+      - .github/workflows/ci-test-sharding.yml
+      - .github/workflows/federation-v1-release.yml
+      - scripts/ci_pytest_shards.py
+      - catalog/common/tests/test_ci_pytest_shards.py
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-test-sharding-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  shard-contract:
+    name: Shard contract (${{ matrix.host }}, ${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - host: Nettking
+            os: Windows
+            label: nettking
+            python: '3.12.10'
+            shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+          - host: Nettking
+            os: Linux
+            label: nettking-linux
+            python: '3.12.13'
+            shell: bash
+          - host: Beast
+            os: Windows
+            label: beast-windows
+            python: '3.12.10'
+            shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+          - host: Beast
+            os: Linux
+            label: beast-linux
+            python: '3.12.13'
+            shell: bash
+    runs-on: [self-hosted, '${{ matrix.os }}', X64, '${{ matrix.label }}']
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/self-hosted-python
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install CI tooling only
+        run: python -m pip install pytest==9.1.1 ruff==0.16.3
+      - name: Check shard tooling
+        run: python -m ruff check scripts/ci_pytest_shards.py catalog/common/tests/test_ci_pytest_shards.py
+      - name: Verify complete coverage, stable allocation and failure propagation
+        run: python -m pytest -o addopts= -q catalog/common/tests/test_ci_pytest_shards.py
