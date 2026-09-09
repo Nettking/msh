@@ -378,7 +378,10 @@ def test_three_machine_deployment_survives_normal_restart(tmp_path: Path) -> Non
             bootstrap_tasks.extend((primary_restart, replica_restart))
             await asyncio.gather(
                 _wait_for_control_waiting(primary, primary_restart),
-                asyncio.wait_for(replica_restart, TIMEOUT),
+                # A restart includes several individually bounded operations,
+                # including capability replay. Observe its completion under
+                # the existing bootstrap ceiling; keep product deadlines intact.
+                asyncio.wait_for(replica_restart, BOOTSTRAP_OBSERVATION_TIMEOUT),
             )
             await asyncio.wait_for(
                 primary.client.connected_event.wait(), TIMEOUT

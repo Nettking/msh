@@ -11,7 +11,13 @@ import json
 import os
 import sqlite3
 from collections.abc import Iterable, Iterator
-from contextlib import AbstractContextManager, ExitStack, contextmanager, nullcontext
+from contextlib import (
+    AbstractContextManager,
+    ExitStack,
+    closing,
+    contextmanager,
+    nullcontext,
+)
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
@@ -254,15 +260,19 @@ class FilesystemBatchStorageProvider:
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database_path)
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA foreign_keys = ON")
-        connection.execute("PRAGMA journal_mode = WAL")
-        # Keep the journal from growing without bound between ingest calls.
-        # The durable catalogue itself is retained for idempotency; its WAL is
-        # only an implementation journal and may be checkpointed safely.
-        connection.execute("PRAGMA synchronous = FULL")
-        connection.execute("PRAGMA wal_autocheckpoint = 100")
-        connection.execute("PRAGMA journal_size_limit = 1048576")
+        try:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON")
+            connection.execute("PRAGMA journal_mode = WAL")
+            # Keep the journal from growing without bound between ingest calls.
+            # The durable catalogue itself is retained for idempotency; its WAL is
+            # only an implementation journal and may be checkpointed safely.
+            connection.execute("PRAGMA synchronous = FULL")
+            connection.execute("PRAGMA wal_autocheckpoint = 100")
+            connection.execute("PRAGMA journal_size_limit = 1048576")
+        except BaseException:
+            connection.close()
+            raise
         return connection
 
     def _assert_resource_identity(
@@ -287,7 +297,7 @@ class FilesystemBatchStorageProvider:
                 )
 
     def _initialize(self) -> None:
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             ensure_sqlite_schema(
                 connection,
                 schema_name=STORAGE_INDEX_SCHEMA_NAME,
@@ -424,7 +434,7 @@ class FilesystemBatchStorageProvider:
         final_path.parent.mkdir(parents=True, exist_ok=True)
         self._assert_resource_identity(reservations, final_path.parent, self.root)
 
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             connection.execute("BEGIN IMMEDIATE")
             existing = self._by_idempotency(connection, request)
             if existing is not None:
@@ -603,7 +613,7 @@ class FilesystemBatchStorageProvider:
         group_id: str,
         batch_id: str,
     ) -> CommittedBatchIdentity | None:
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             row = connection.execute(
                 """SELECT dataset_id, dataset_schema_name,
                           dataset_schema_version, batch_id, idempotency_key,
@@ -626,7 +636,7 @@ class FilesystemBatchStorageProvider:
         )
 
     def read(self, *, session_id: str, group_id: str, batch_id: str) -> object | None:
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             row = connection.execute(
                 """SELECT dataset_id, dataset_schema_name,
                           dataset_schema_version, idempotency_key, content_hash,
@@ -667,7 +677,7 @@ class FilesystemBatchStorageProvider:
 
     def health(self) -> dict[str, object]:
         try:
-            with self._connect() as connection:
+            with closing(self._connect()) as connection, connection:
                 connection.execute("SELECT 1").fetchone()
             return {"status": "ready", "durable": True}
         except sqlite3.Error as exc:

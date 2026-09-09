@@ -1,6 +1,7 @@
 name: CF7-A acceptance harness
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - ".github/actions/**"
