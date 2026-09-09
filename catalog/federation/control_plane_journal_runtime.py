@@ -206,6 +206,12 @@ class ProductJournalController:
             yield database
 
     @contextmanager
+    def local_connectivity_operation(self) -> Iterator[sqlite3.Connection]:
+        """Permit only local liveness; leave any pending authority envelope intact."""
+        with self.runtime._lifecycle_lock, self.runtime.local.store.local_connectivity_transaction() as database:
+            yield database
+
+    @contextmanager
     def transaction(self, store: JournalCoordinatorStore) -> Iterator[sqlite3.Connection]:
         runtime = self.runtime
         with runtime._lifecycle_lock:

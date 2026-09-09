@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import copy
+import hashlib
+import json
+import sqlite3
 from contextlib import ExitStack, contextmanager
 from dataclasses import replace
 from datetime import timedelta
@@ -13,7 +16,7 @@ import pytest
 from catalog.federation.control_plane_facade import (
     PhysicalReadyReplicatedSessionCoordinator,
 )
-from catalog.federation.control_plane_replication import ReplicaNode
+from catalog.federation.control_plane_replication import ReplicaNode, StaleTerm
 from catalog.federation.errors import AuthorizationError
 from catalog.federation.federation_v1_release_runtime import FederationV1ReleaseRuntime
 from catalog.federation.models import CapabilityAnnouncement, CapabilityStatus
@@ -172,3 +175,151 @@ def test_health_does_not_swallow_unrelated_authorization_failure(runtimes) -> No
     assert leader.node.role == ReplicaNode.LEADER
     assert leader.node.store.commit_index == before_commit
     assert _history(leader) == before_history
+
+
+def _pending_row(runtime):
+    with sqlite3.connect(runtime.journal.pending_path) as database:
+        row = database.execute(
+            "SELECT command_json,reserved_index,proposing_term FROM pending WHERE slot=1",
+        ).fetchone()
+    return row
+
+
+def _private_digest(runtime):
+    # Assertions must never display private grants or request response bodies.
+    with runtime.local.store.read_transaction() as database:
+        encoded = json.dumps(runtime.journal.private.capture(database), sort_keys=True)
+    return hashlib.sha256(encoded.encode()).hexdigest()
+
+
+def test_pending_proposal_does_not_block_local_connectivity_or_authorize_other_writes(
+    runtimes, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    leader, successor, third = runtimes
+    facade = PhysicalReadyReplicatedSessionCoordinator(leader)
+    store = leader.local.store
+    node_id = third.node.voter_id
+    facade.create_enrollment_token(max_uses=1)
+    announcement = CapabilityAnnouncement(
+        capability_id="pending-health-capability", node_id=node_id,
+        session_id=SESSION, type="demo.pending-health", protocol="demo.pending-health",
+        protocol_version="1", status=CapabilityStatus.READY,
+        properties={"purpose": "pending local health regression"}, announced_at=leader.clock(),
+    )
+    facade.announce_capability(
+        announcement, actor_node_id=node_id, request_id="announce-pending-health",
+    )
+    for runtime in runtimes:
+        runtime.materialize()
+        store.mark_connected(
+            node_id=runtime.node.voter_id, connection_id=f"local-{runtime.node.voter_id}",
+            now=leader.clock() - timedelta(minutes=1) if runtime is third else leader.clock(),
+        )
+    before_history = _history(leader)
+    before_state = copy.deepcopy(leader.node.state)
+    before_commit = leader.node.store.commit_index
+    before_private = _private_digest(leader)
+    original_propose = leader.node.propose
+    proposed = []
+
+    def elect_after_outbox_save(command, transport):
+        assert command.command_type == "PRODUCT_TRANSACTION"
+        pending = _pending_row(leader)
+        assert pending is not None
+        assert pending[0].encode() == command.canonical_bytes()
+        assert successor.node.start_election(successor.transport)
+        assert successor.node.synchronize(successor.transport) == 2
+        assert leader.node.role == ReplicaNode.FOLLOWER
+        assert successor.node.role == ReplicaNode.LEADER
+        assert successor.node.store.current_term > pending[2]
+        proposed.append(command.command_id)
+        # The real old leader rejects the append; no consensus result is mocked.
+        return original_propose(command, transport)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(leader.node, "propose", elect_after_outbox_save)
+        with pytest.raises(StaleTerm, match="only the current leader"):
+            facade.create_enrollment_token(max_uses=1)
+    assert len(proposed) == 1
+    pending = _pending_row(leader)
+    assert pending is not None
+    assert leader.node.store.receipt_for_command(proposed[0]) is None
+    assert leader.node.store.entry_for_command(proposed[0]) is None
+    assert _private_digest(leader) == before_private
+
+    def assert_authority_unchanged():
+        assert _pending_row(leader) == pending
+        assert _private_digest(leader) == before_private
+        assert _history(leader) == before_history
+        for runtime in runtimes:
+            assert runtime.node.state == before_state
+            assert runtime.node.store.commit_index == before_commit
+            assert runtime.node.store.last_log_index() == before_commit
+            store.require_membership(session_id=SESSION, node_id=runtime.node.voter_id)
+        assert next(
+            item for item in store.list_capabilities(session_id=SESSION)
+            if item.capability_id == announcement.capability_id
+        ).status is CapabilityStatus.READY
+
+    assert facade.sweep_stale(heartbeat_timeout_seconds=30) == ((node_id,), ())
+    with store.read_transaction() as database:
+        assert tuple(database.execute(
+            "SELECT state,connection_id,last_error FROM node_connectivity WHERE node_id=?",
+            (node_id,),
+        ).fetchone()) == ("disconnected", None, "stale heartbeat")
+    assert facade.disconnected(node_id=successor.node.voter_id) == ()
+    assert facade.relay_started() is None
+    assert facade.sweep_stale(heartbeat_timeout_seconds=30) == ((), ())
+    with store.read_transaction() as database:
+        assert database.execute(
+            "SELECT COUNT(*) FROM node_connectivity WHERE state='connected'",
+        ).fetchone()[0] == 0
+    assert_authority_unchanged()
+
+    forbidden = (
+        "UPDATE session_events SET payload_json=payload_json",
+        "UPDATE enrollment_tokens SET use_count=use_count+1",
+        "UPDATE capabilities SET status='unavailable'",
+        "DELETE FROM session_memberships",
+        "UPDATE node_connectivity SET node_id=node_id",
+        "INSERT INTO node_connectivity(node_id,state) VALUES('foreign','connected')",
+        "DELETE FROM node_connectivity",
+        "CREATE TABLE forbidden_health_table(value TEXT)",
+        "DROP TRIGGER fcp_c03_journal_guard_update",
+        "ATTACH DATABASE ':memory:' AS forbidden_health_database",
+        "PRAGMA user_version=77",
+    )
+    for statement in forbidden:
+        with pytest.raises(sqlite3.DatabaseError, match="not authorized|prohibited"), leader.journal.local_connectivity_operation() as database:
+            database.execute(
+                "UPDATE node_connectivity SET state='connected' WHERE node_id=?", (node_id,),
+            )
+            database.execute(statement)
+        with store.read_transaction() as database:
+            assert database.execute(
+                "SELECT state FROM node_connectivity WHERE node_id=?", (node_id,),
+            ).fetchone()[0] == "disconnected"
+        assert_authority_unchanged()
+
+    with pytest.raises(RuntimeError, match="rollback-only"), leader.journal.local_connectivity_operation() as database:
+        database.execute(
+            "UPDATE node_connectivity SET state='connected' WHERE node_id=?", (node_id,),
+        )
+        with pytest.raises(sqlite3.DatabaseError, match="not authorized"):
+            database.execute("DELETE FROM session_memberships")
+    with store.read_transaction() as database:
+        assert database.execute(
+            "SELECT state FROM node_connectivity WHERE node_id=?", (node_id,),
+        ).fetchone()[0] == "disconnected"
+
+    with (
+        leader._lifecycle_lock,
+        store.raw_transaction(),
+        pytest.raises(RuntimeError, match="cannot inherit an active transaction"),
+        leader.journal.local_connectivity_operation(),
+    ):
+        pytest.fail("local-only context inherited an authority stage")
+    with pytest.raises(AuthorizationError) as rejected:
+        facade.create_enrollment_token(max_uses=1)
+    assert rejected.value.code == "federation-quorum-leader-required"
+    assert_authority_unchanged()
