@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import builtins
 import sqlite3
+import threading
 from contextlib import closing
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
@@ -10,6 +12,7 @@ from pathlib import Path
 
 import pytest
 
+from catalog.federation import live_catchup, live_failover, local_storage
 from catalog.federation.acknowledgement import AcknowledgementMode
 from catalog.federation.errors import FederationValidationError
 from catalog.federation.live_catchup import (
@@ -35,14 +38,23 @@ KINDS = ("filesystem", "catchup", "failover")
 
 
 class _Connections:
-    def __init__(self, connect):
+    def __init__(self, connect, database_root: Path):
         self.raw_connect = connect
+        self.database_root = database_root.resolve()
         self.opened: list[sqlite3.Connection] = []
         self.deny_configuration = False
 
-    def connect(self, *args, **kwargs):
+    def __getattr__(self, name):
+        return getattr(sqlite3, name)
+
+    def connect(self, database, *args, **kwargs):
+        # These stores use ordinary file paths. Observe only this test's databases;
+        # another caller of the same store module retains normal SQLite behavior.
+        owned = Path(database).resolve().is_relative_to(self.database_root)
+        connection = self.raw_connect(database, *args, **kwargs)
+        if not owned:
+            return connection
         # Real connections stay strongly reachable so GC cannot hide missing close().
-        connection = self.raw_connect(*args, **kwargs)
         self.opened.append(connection)
         if self.deny_configuration:
             connection.set_authorizer(
@@ -62,9 +74,11 @@ class _Connections:
 
 
 @pytest.fixture
-def connections(monkeypatch):
-    retained = _Connections(sqlite3.connect)
-    monkeypatch.setattr(sqlite3, "connect", retained.connect)
+def connections(monkeypatch, tmp_path):
+    retained = _Connections(sqlite3.connect, tmp_path)
+    # Replace each consumer's reference, never the process-wide sqlite3 module.
+    for module in (local_storage, live_catchup, live_failover):
+        monkeypatch.setattr(module, "sqlite3", retained)
     try:
         yield retained
     finally:
@@ -220,4 +234,48 @@ def test_connection_is_closed_when_sqlite_configuration_is_denied(
     with pytest.raises(sqlite3.DatabaseError, match="not authorized"):
         _create(kind, tmp_path)
     assert len(connections.opened) == 1
+    connections.assert_closed()
+
+
+@pytest.mark.parametrize("kind", ("raw", *KINDS))
+def test_connection_observer_preserves_unrelated_worker_databases(
+    kind, tmp_path, tmp_path_factory, connections,
+):
+    _create("filesystem", tmp_path)
+    connections.assert_closed()
+    owned_before = tuple(connections.opened)
+    connections.deny_configuration = True
+    unrelated_root = tmp_path_factory.mktemp("unrelated-sqlite-owner")
+    completed = []
+    failures = []
+
+    def exercise_unrelated_database():
+        try:
+            if kind == "raw":
+                database = unrelated_root / "ordinary.sqlite3"
+                with closing(sqlite3.connect(database)) as connection, connection:
+                    connection.execute("PRAGMA synchronous=FULL")
+                    connection.execute("CREATE TABLE probe(value INTEGER NOT NULL)")
+                    connection.execute("INSERT INTO probe VALUES (7)")
+                with closing(sqlite3.connect(database)) as connection:
+                    assert connection.execute("SELECT value FROM probe").fetchone()[0] == 7
+            else:
+                store, record, _database, _table = _create(kind, unrelated_root)
+                _save(kind, store, record)
+                _assert_stored(kind, store, record)
+            completed.append(True)
+        except BaseException as error:  # noqa: BLE001 - report the owned worker failure after joining it
+            failures.append(error)
+
+    worker = threading.Thread(
+        target=exercise_unrelated_database, name="unrelated-sqlite-owner",
+    )
+    worker.start()
+    worker.join()
+    assert not worker.is_alive()
+    if failures:
+        raise builtins.BaseExceptionGroup("unrelated SQLite worker failed", failures)
+    assert completed == [True]
+    assert sqlite3.connect is connections.raw_connect
+    assert tuple(connections.opened) == owned_before
     connections.assert_closed()
