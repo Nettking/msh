@@ -10,7 +10,12 @@ The publication metadata is now selected:
 - software license: **MIT**, with `LICENSE` at repository root;
 - sole scholarly creator: **Martin Arthur Andersen**;
 - ORCID: `0009-0004-9991-3578`;
-- artifact version: `0.1.0` unless intentionally changed before freeze.
+- candidate artifact version: `0.2.0`.
+
+The existing `fcp-icse-tool-demo-v0.1.0` tag records the earlier 2026-08-31
+artifact at commit `954faa357638b13d7291e69ea98fa620c0c3d637`. Preserve that
+tag unchanged. The upcoming artifact uses a new `0.2.0` version and tag;
+this version selection does not claim a completed release or physical acceptance.
 
 Before the public release, confirm that the artifact title and version still match
 the paper and keep the claim boundary in `README.md` and `ARTIFACT.md` aligned
@@ -36,7 +41,7 @@ and requires the corresponding qualification again.
 Create an immutable tag on the exact commit intended for publication:
 
 ```text
-fcp-icse-tool-demo-v0.1.0
+fcp-icse-tool-demo-v0.2.0
 ```
 
 Require this tag and the Federation `v1.0.0` tag to resolve to the same accepted
@@ -44,8 +49,9 @@ Require this tag and the Federation `v1.0.0` tag to resolve to the same accepted
 not introduce different source versions. Final source SHA and actual tag names
 remain pending until those release operations have succeeded.
 
-Do not move or reuse a published tag. If a post-release defect requires a code
-change, create a new patch release and tag instead.
+Do not move or reuse an existing tag, even if it has no GitHub Release. If a
+post-release defect requires a code change, create a new patch release and tag
+instead.
 
 ## 3. Require tag-triggered evidence
 
@@ -69,11 +75,11 @@ matching digests; no `private-state/` may be published. These artifact
 jobs complement the full Federation release and physical gates; they do not
 replace them.
 
-Download the publication bundle from that tag-triggered run. For version 0.1.0,
+Download the publication bundle from that tag-triggered run. For version 0.2.0,
 the canonical archival file is:
 
 ```text
-fcp-icse-tool-demo-0.1.0.zip
+fcp-icse-tool-demo-0.2.0.zip
 ```
 
 Verify it against `ZENODO_SHA256`. Also retain `artifact-manifest.json` and

@@ -122,7 +122,7 @@ the canonical file to attach to the GitHub Release and deposit as the Zenodo
 software artifact.
 
 Tags matching `fcp-icse-tool-demo-v*` trigger the same workflow. A tag such as
-`fcp-icse-tool-demo-v0.1.0` yields `fcp-icse-tool-demo-0.1.0.zip`. The paper must
+`fcp-icse-tool-demo-v0.2.0` yields `fcp-icse-tool-demo-0.2.0.zip`. The paper must
 cite the immutable release/tag and DOI whose tag-triggered run is green, not a
 moving draft branch or a pre-tag CI result.
 
