@@ -126,3 +126,26 @@ def test_real_pytest_shards_cover_new_files_and_preserve_failure(tmp_path):
     )
     assert failed.returncode == 1
     assert json.loads(manifest_path.read_text())["exit_code"] == 1
+    collect_only = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "run",
+            "--index",
+            "0",
+            "--count",
+            "1",
+            "--manifest",
+            str(manifest_path),
+            "--",
+            "--collect-only",
+        ],
+        cwd=tmp_path,
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    assert collect_only.returncode != 0
+    assert json.loads(manifest_path.read_text())["collection_complete"] is False

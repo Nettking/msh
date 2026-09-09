@@ -83,6 +83,12 @@ def run(index: int, count: int, manifest_path: Path, pytest_args: list[str]) -> 
     }
 
     class ShardPlugin:
+        def pytest_configure(self, config):
+            if config.option.collectonly:
+                raise pytest.UsageError(
+                    "Shard evidence requires executing tests, not collect-only"
+                )
+
         @pytest.hookimpl(trylast=True)
         def pytest_collection_modifyitems(self, config, items):
             nodeids = [item.nodeid for item in items]
