@@ -3,6 +3,7 @@ import shlex
 import subprocess
 from pathlib import Path
 
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 PHONE_SCRIPT = REPO_ROOT / "termux" / "fcp-phone.sh"
@@ -245,3 +246,65 @@ main update
         "git pull --ff-only",
         "setup restart=true termux/setup-phone.sh --update",
     ]
+
+
+@pytest.mark.parametrize("sample", ["absent", "readme-only", "synthetic-jsonl"])
+@pytest.mark.parametrize("command", ["setup", "demo-reset"])
+def test_phone_demo_handles_archives_without_telemetry(
+    tmp_path: Path, sample: str, command: str
+) -> None:
+    environment, _, _ = _setup_environment(tmp_path)
+    source = tmp_path / "source"
+    (source / "termux").mkdir(parents=True)
+    for relative in ("termux/setup-phone.sh", "termux/fcp-phone.sh", "Dockerfile", "requirements.txt"):
+        (source / relative).write_bytes((REPO_ROOT / relative).read_bytes())
+    environment["FCP_PHONE_STATE"] = str(source)
+    environment["FAKE_DEMO_ROOT"] = str(source)
+    if sample != "absent":
+        (source / "example-data").mkdir()
+        (source / "example-data/README.md").write_text("No public capture.\n", encoding="utf-8")
+    if sample == "synthetic-jsonl":
+        (source / "example-data/sample.jsonl").write_text('{"synthetic":true}\n', encoding="utf-8")
+
+    # Execute only the real guest copy command inside this disposable fixture.
+    # Other PRoot calls are capability probes/configuration stubs, as above.
+    _write_executable(
+        tmp_path / "setup-bin/proot-distro",
+        """#!/usr/bin/env bash
+if [[ "${1:-}" == "list" ]]; then
+    printf '%s\\n' 'fcp-phone'
+elif [[ "${1:-}" == "login" && "${!#}" == *'cp -a example-data/'* ]]; then
+    cd "$FAKE_DEMO_ROOT" || exit 1
+    exec bash -c "${!#}"
+fi
+exit 0
+""",
+    )
+    existing = source / "data/demo/existing.jsonl"
+    if command == "demo-reset":
+        existing.parent.mkdir(parents=True)
+        existing.write_text('{"preserve":true}\n', encoding="utf-8")
+    args = (
+        ["bash", str(source / "termux/setup-phone.sh"), "--update"]
+        if command == "setup"
+        else ["bash", str(source / "termux/fcp-phone.sh"), "demo-reset"]
+    )
+    result = subprocess.run(args, env=environment, capture_output=True, text=True, timeout=10, check=False)
+
+    if sample == "synthetic-jsonl":
+        assert result.returncode == 0, result.stderr
+        assert (source / "data/demo/sample.jsonl").read_text(encoding="utf-8") == '{"synthetic":true}\n'
+        assert not existing.exists()
+        expected_message = "Copied example data" if command == "setup" else "Demo data restored"
+        assert expected_message in result.stdout
+    elif command == "demo-reset":
+        assert result.returncode == 2
+        assert existing.read_text(encoding="utf-8") == '{"preserve":true}\n'
+        assert "existing demo data were preserved" in result.stderr
+        assert "Demo data restored" not in result.stdout
+    else:
+        assert result.returncode == 0, result.stderr
+        assert "Bundled telemetry is unavailable" in result.stdout
+        assert "Copied example data" not in result.stdout
+        assert not (source / "data/demo").exists()
+        assert (source / "demo-data.checked").is_file()

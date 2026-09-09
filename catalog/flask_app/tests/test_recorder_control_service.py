@@ -124,18 +124,18 @@ def test_status_keeps_configured_sources_visible_while_offline(tmp_path) -> None
     status = service.status(
         _config(
             sources=(
-                "M8015RW221N=http://192.168.200.101:5000;"
+                "DEMO01=http://192.168.200.101:5000;"
                 "MAZAK-M7ZDA13010Z=http://192.168.200.249:5000"
             )
         )
     )
 
     assert list(status["source_status"]) == [
-        "M8015RW221N",
+        "DEMO01",
         "MAZAK-M7ZDA13010Z",
     ]
-    assert status["source_status"]["M8015RW221N"]["state"] == "offline"
-    assert status["source_status"]["M8015RW221N"]["base_url"] == (
+    assert status["source_status"]["DEMO01"]["state"] == "offline"
+    assert status["source_status"]["DEMO01"]["base_url"] == (
         "http://192.168.200.101:5000"
     )
 

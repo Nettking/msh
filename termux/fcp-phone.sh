@@ -408,6 +408,11 @@ main() {
         ;;
     demo-reset)
         require_ready
+        if [[ ! -d "$ROOT/example-data" ]] ||
+            ! find "$ROOT/example-data" -type f -name '*.jsonl' -print -quit | grep -q .; then
+            echo "Bundled telemetry is unavailable; existing demo data were preserved." >&2
+            exit 2
+        fi
         rm -rf "$DATA_DIR/demo"
         "${login_base[@]}" "$CONTAINER" -- bash -lc \
             'mkdir -p data/demo && cp -a example-data/. data/demo/'

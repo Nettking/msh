@@ -34,7 +34,7 @@ def _write_legacy_recorder_settings(path: Path) -> None:
                 "ai_model": "llama3.2:3b",
                 "ollama_base_url": "http://ollama:11434",
                 "recorder_sources": (
-                    "M8015RW221N=http://192.168.200.101:5000;"
+                    "DEMO01=http://192.168.200.101:5000;"
                     "MAZAK-M7ZDA13010Z=http://192.168.200.249:5000"
                 ),
                 "recorder_poll_interval": "0.2",
@@ -54,7 +54,7 @@ def test_pre_fcp_recorder_settings_migrate_to_capability_config(tmp_path: Path) 
 
     assert migrated is not None
     assert migrated.recorder_sources == (
-        "M8015RW221N=http://192.168.200.101:5000;"
+        "DEMO01=http://192.168.200.101:5000;"
         "MAZAK-M7ZDA13010Z=http://192.168.200.249:5000"
     )
     assert migrated.recorder_poll_interval == "0.2"
@@ -122,9 +122,9 @@ def test_pre_fcp_checkpoint_load_preserves_exact_sequence_until_next_save(
                 "schema": _LEGACY_CHECKPOINT_SCHEMA,
                 "updated_at": "2026-08-10T22:10:03.885Z",
                 "sources": {
-                    "M8015RW221N": {
+                    "DEMO01": {
                         "base_url": "http://192.168.200.101:5000",
-                        "machine_id": "M8015RW221N",
+                        "machine_id": "DEMO01",
                         "agent_instance_id": 1786337757,
                         "next_sequence": 289148,
                         "probe_sha256": "abc123",
@@ -132,7 +132,7 @@ def test_pre_fcp_checkpoint_load_preserves_exact_sequence_until_next_save(
                         "last_raw_file": "data/raw.xml.gz",
                         "last_observation_file": "data/observations.ndjson",
                         "last_normalized_file": "data/batch.jsonl",
-                        "latest_values": {"M8015RW221N": {"x": 1}},
+                        "latest_values": {"DEMO01": {"x": 1}},
                         "updated_at": "2026-08-10T22:10:03.885Z",
                     },
                     "MAZAK-M7ZDA13010Z": {
@@ -155,7 +155,7 @@ def test_pre_fcp_checkpoint_load_preserves_exact_sequence_until_next_save(
     try:
         recorder.load_state()
 
-        assert recorder.checkpoints["M8015RW221N"].next_sequence == 289148
+        assert recorder.checkpoints["DEMO01"].next_sequence == 289148
         assert recorder.checkpoints["MAZAK-M7ZDA13010Z"].next_sequence == 65314
         untouched = json.loads(state_file.read_text(encoding="utf-8"))
         assert untouched["schema"] == _LEGACY_CHECKPOINT_SCHEMA
@@ -163,7 +163,7 @@ def test_pre_fcp_checkpoint_load_preserves_exact_sequence_until_next_save(
         recorder.save_state()
         migrated = json.loads(state_file.read_text(encoding="utf-8"))
         assert migrated["schema"] == "fcp.mtconnect_recorder.checkpoints.v3"
-        assert migrated["sources"]["M8015RW221N"]["next_sequence"] == 289148
+        assert migrated["sources"]["DEMO01"]["next_sequence"] == 289148
         assert migrated["sources"]["MAZAK-M7ZDA13010Z"]["next_sequence"] == 65314
         assert migrated["sources"]["MAZAK-M7ZDA13010Z"]["storage_aliases"] == [
             "Mazak"
