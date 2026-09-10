@@ -1,6 +1,7 @@
 name: Federation software update
 
 on:
+  workflow_dispatch:
   pull_request:
   push:
     branches:

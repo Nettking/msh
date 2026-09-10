@@ -1,6 +1,7 @@
 name: Phase F8.5 operator federation surface
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - ".github/actions/**"

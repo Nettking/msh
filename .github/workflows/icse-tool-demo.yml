@@ -1,6 +1,7 @@
 name: ICSE tool demonstration
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - ".github/actions/**"
