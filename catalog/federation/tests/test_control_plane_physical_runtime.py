@@ -22,10 +22,9 @@ SECRET = bytes(range(32))
 def _free_port_triple(used: set[int]) -> int:
     """Reserve-test consecutive control/credential/migration ports."""
     for _ in range(100):
-        first = socket.socket()
-        first.bind(("127.0.0.1", 0))
-        port = int(first.getsockname()[1])
-        first.close()
+        with socket.socket() as first:
+            first.bind(("127.0.0.1", 0))
+            port = int(first.getsockname()[1])
         candidates = {port, port + 1, port + 2}
         if port >= 65533 or candidates & used:
             continue
@@ -33,8 +32,8 @@ def _free_port_triple(used: set[int]) -> int:
         try:
             for candidate in (port, port + 1, port + 2):
                 sock = socket.socket()
-                sock.bind(("127.0.0.1", candidate))
                 sockets.append(sock)
+                sock.bind(("127.0.0.1", candidate))
         except OSError:
             continue
         finally:
