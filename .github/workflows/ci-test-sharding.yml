@@ -30,9 +30,10 @@ jobs:
       matrix:
         include:
           - os: Windows
-            # The broad beast-windows label also names a legacy, unprepared service.
+            # Both labels are needed: Nettking shares fcp-windows, while the
+            # legacy Beast service has beast-windows without fcp-windows.
             runner: >-
-              ${{ inputs.target == 'Beast' && '["self-hosted","Windows","X64","fcp-windows"]' ||
+              ${{ inputs.target == 'Beast' && '["self-hosted","Windows","X64","beast-windows","fcp-windows"]' ||
                   inputs.target == 'Nettking' && '["self-hosted","Windows","X64","nettking"]' ||
                   '["self-hosted","Windows","X64","fcp-test-windows"]' }}
             python: '3.12.10'
