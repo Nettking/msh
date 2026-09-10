@@ -17,6 +17,7 @@ import json
 import os
 import threading
 import time
+from contextlib import ExitStack
 from pathlib import Path
 from typing import Any
 
@@ -175,106 +176,110 @@ class PhysicalReadyReplicatedFederationRuntime(
             secret,
             PersistentReplayGuard(deployment.replay_database),
         )
-        self.server = SecureReplicationServer(
-            self.node,
-            self.codec,
-            host=deployment.listen_host,
-            port=deployment.listen_port,
-        )
-        endpoints = {
-            peer.voter_id: VoterEndpoint(peer.host, peer.port)
-            for peer in deployment.peers
-            if peer.voter_id != deployment.local_voter_id
-        }
-        self.transport = SecureSocketReplicationTransport(
-            self.codec, endpoints, connect_timeout_seconds=float(heartbeat_seconds) / 2
-        )
-        self.local = SessionCoordinator(
-            CoordinatorStore(
-                deployment.coordinator_database,
-                coordinator_id=REPLICATED_COORDINATOR_ID,
-            ),
-            clock=self.clock,
-        )
-
-        if deployment.listen_port >= 65535:
-            raise ControlPlaneError(
-                "control-plane listen port leaves no private credential port"
+        with ExitStack() as construction:
+            self.server = SecureReplicationServer(
+                self.node,
+                self.codec,
+                host=deployment.listen_host,
+                port=deployment.listen_port,
             )
-        credential_store_path = deployment.replica_database.with_name(
-            "human_credentials_replica.sqlite3"
-        )
-        self.credential_store = CredentialSnapshotStore(credential_store_path)
-        self.credential_transport = CredentialReplicaTransport(
-            self.codec,
-            credential_endpoints_from_control(endpoints),
-        )
-        self.credential_server = CredentialReplicaServer(
-            self.node,
-            self.codec,
-            self.credential_store,
-            host=deployment.listen_host,
-            port=deployment.listen_port + 1,
-        )
-        self.credential_manager = CredentialQuorumManager(
-            self.node,
-            self.codec,
-            self.credential_store,
-            self.credential_transport,
-            secret,
-        )
-        self.human_auth_database = (
-            Path(human_auth_database) if human_auth_database is not None else None
-        )
-        self.human_auth_password_salt = (
-            Path(human_auth_password_salt)
-            if human_auth_password_salt is not None
-            else None
-        )
-        self.bootstrap_federation_id = (
-            bootstrap_federation_id.strip()
-            if isinstance(bootstrap_federation_id, str)
-            and bootstrap_federation_id.strip()
-            else None
-        )
-        self.bootstrap_session_id = (
-            bootstrap_session_id.strip()
-            if isinstance(bootstrap_session_id, str) and bootstrap_session_id.strip()
-            else None
-        )
-        if (self.bootstrap_federation_id is None) != (self.bootstrap_session_id is None):
-            raise ControlPlaneError(
-                "bootstrap federation and session IDs must be configured together"
+            construction.callback(self.server.close)
+            endpoints = {
+                peer.voter_id: VoterEndpoint(peer.host, peer.port)
+                for peer in deployment.peers
+                if peer.voter_id != deployment.local_voter_id
+            }
+            self.transport = SecureSocketReplicationTransport(
+                self.codec, endpoints, connect_timeout_seconds=float(heartbeat_seconds) / 2
             )
-        self._auth_generation_path = (
-            Path(deployment.coordinator_database).parent / AUTH_GENERATION_FILE
-        )
+            self.local = SessionCoordinator(
+                CoordinatorStore(
+                    deployment.coordinator_database,
+                    coordinator_id=REPLICATED_COORDINATOR_ID,
+                ),
+                clock=self.clock,
+            )
 
-        for name, value in (
-            ("heartbeat_seconds", heartbeat_seconds),
-            ("election_timeout_seconds", election_timeout_seconds),
-            ("election_stagger_seconds", election_stagger_seconds),
-            ("credential_sync_seconds", credential_sync_seconds),
-        ):
-            if (
-                isinstance(value, bool)
-                or not isinstance(value, (int, float))
-                or value <= 0
+            if deployment.listen_port >= 65535:
+                raise ControlPlaneError(
+                    "control-plane listen port leaves no private credential port"
+                )
+            credential_store_path = deployment.replica_database.with_name(
+                "human_credentials_replica.sqlite3"
+            )
+            self.credential_store = CredentialSnapshotStore(credential_store_path)
+            self.credential_transport = CredentialReplicaTransport(
+                self.codec,
+                credential_endpoints_from_control(endpoints),
+            )
+            self.credential_server = CredentialReplicaServer(
+                self.node,
+                self.codec,
+                self.credential_store,
+                host=deployment.listen_host,
+                port=deployment.listen_port + 1,
+            )
+            construction.callback(self.credential_server.close)
+            self.credential_manager = CredentialQuorumManager(
+                self.node,
+                self.codec,
+                self.credential_store,
+                self.credential_transport,
+                secret,
+            )
+            self.human_auth_database = (
+                Path(human_auth_database) if human_auth_database is not None else None
+            )
+            self.human_auth_password_salt = (
+                Path(human_auth_password_salt)
+                if human_auth_password_salt is not None
+                else None
+            )
+            self.bootstrap_federation_id = (
+                bootstrap_federation_id.strip()
+                if isinstance(bootstrap_federation_id, str)
+                and bootstrap_federation_id.strip()
+                else None
+            )
+            self.bootstrap_session_id = (
+                bootstrap_session_id.strip()
+                if isinstance(bootstrap_session_id, str) and bootstrap_session_id.strip()
+                else None
+            )
+            if (self.bootstrap_federation_id is None) != (self.bootstrap_session_id is None):
+                raise ControlPlaneError(
+                    "bootstrap federation and session IDs must be configured together"
+                )
+            self._auth_generation_path = (
+                Path(deployment.coordinator_database).parent / AUTH_GENERATION_FILE
+            )
+
+            for name, value in (
+                ("heartbeat_seconds", heartbeat_seconds),
+                ("election_timeout_seconds", election_timeout_seconds),
+                ("election_stagger_seconds", election_stagger_seconds),
+                ("credential_sync_seconds", credential_sync_seconds),
             ):
-                raise ControlPlaneError(f"{name} must be positive")
-        self.heartbeat_seconds = float(heartbeat_seconds)
-        self.election_timeout_seconds = float(election_timeout_seconds)
-        self.election_stagger_seconds = float(election_stagger_seconds)
-        self.credential_sync_seconds = float(credential_sync_seconds)
-        self._stop = threading.Event()
-        self._lifecycle_lock = threading.RLock()
-        self._lifecycle_thread: threading.Thread | None = None
-        self._quorum_failures = 0
-        self._next_election_at = self._election_deadline()
-        self._last_credential_sync = 0.0
-        self._credential_fingerprint_value: tuple[tuple[int, int], ...] | None = None
-        self._last_restored_version = -1
-        self._last_error: str | None = None
+                if (
+                    isinstance(value, bool)
+                    or not isinstance(value, (int, float))
+                    or value <= 0
+                ):
+                    raise ControlPlaneError(f"{name} must be positive")
+            self.heartbeat_seconds = float(heartbeat_seconds)
+            self.election_timeout_seconds = float(election_timeout_seconds)
+            self.election_stagger_seconds = float(election_stagger_seconds)
+            self.credential_sync_seconds = float(credential_sync_seconds)
+            self._stop = threading.Event()
+            self._lifecycle_lock = threading.RLock()
+            self._lifecycle_thread: threading.Thread | None = None
+            self._quorum_failures = 0
+            self._next_election_at = self._election_deadline()
+            self._last_credential_sync = 0.0
+            self._credential_fingerprint_value: tuple[tuple[int, int], ...] | None = None
+            self._last_restored_version = -1
+            self._last_error: str | None = None
+            construction.pop_all()
 
     def _election_deadline(self) -> float:
         rank = self.node.configuration.voter_ids.index(self.node.voter_id)

@@ -128,7 +128,7 @@ def test_companion_reconnects_saved_membership_and_starts_control(
         control_factory=FakeControl,
         update_processor_factory=FakeUpdateProcessor,
         handoff_factory=FakeHandoff,
-        source_names_loader=lambda _path: ("M8015RW221N", "MAZAK-M7ZDA13010Z"),
+        source_names_loader=lambda _path: ("DEMO01", "MAZAK-M7ZDA13010Z"),
     )
 
     assert runtime.connect_once() == "connected"
@@ -144,7 +144,7 @@ def test_companion_reconnects_saved_membership_and_starts_control(
         if isinstance(value, tuple) and value[0] == "node"
     )
     kwargs = node_call[1]
-    assert kwargs["source_names"] == ("M8015RW221N", "MAZAK-M7ZDA13010Z")
+    assert kwargs["source_names"] == ("DEMO01", "MAZAK-M7ZDA13010Z")
 
     runtime.stop()
     assert runtime._node is None

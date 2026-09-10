@@ -236,14 +236,19 @@ main() {
     fi
 
     if [[ ! -f "$DEMO_READY_FILE" ]]; then
-        "${phone_login[@]}" "$CONTAINER" -- bash -lc '
-            set -e
-            if ! find data -type f -name "*.jsonl" -print -quit | grep -q .; then
-                mkdir -p data/demo
-                cp -a example-data/. data/demo/
-                echo "Copied example data into data/demo/."
-            fi
-        '
+        if [[ -d "$ROOT/example-data" ]] &&
+            find "$ROOT/example-data" -type f -name '*.jsonl' -print -quit | grep -q .; then
+            "${phone_login[@]}" "$CONTAINER" -- bash -lc '
+                set -e
+                if ! find data -type f -name "*.jsonl" -print -quit | grep -q .; then
+                    mkdir -p data/demo
+                    cp -a example-data/. data/demo/
+                    echo "Copied example data into data/demo/."
+                fi
+            '
+        else
+            echo "Bundled telemetry is unavailable; add your own authorized demo inputs."
+        fi
         touch "$DEMO_READY_FILE"
     fi
 

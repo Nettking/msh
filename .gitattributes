@@ -1,0 +1,4 @@
+# Retain the local capture, but do not redistribute telemetry without provenance.
+/example-data/2026-03-23.jsonl export-ignore
+# The analysis also contains identifiers and production details from a capture.
+/docs/implementation/digital_twin_from_recorder_data.md export-ignore

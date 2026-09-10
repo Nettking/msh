@@ -884,13 +884,21 @@ class RecorderFederationNode:
         outbox: SQLiteOutbox | None = None
         authority_node_id: str | None = None
         group_id: str | None = None
+        # Local enqueue ownership survives replacement of the remote route.
+        # It never authorizes queue delivery and is earned by a completed normal
+        # worker cycle, preserving startup backlog/probe ordering.
+        local_context: tuple[
+            IncrementalRecorderArchiveReconciler, SQLiteOutbox, str
+        ] | None = None
         failures = 0
         try:
             while not self._stop.is_set():
+                retry_stage = "connect"
                 try:
                     await self.runtime._ensure_connected(state)
                     client = self.runtime._connected_client()
                     if active_client_id != id(client):
+                        retry_stage = "client-close"
                         if storage_client is not None:
                             await storage_client.close()
                         storage_client = None
@@ -898,17 +906,30 @@ class RecorderFederationNode:
                         outbox = None
                         authority_node_id = None
                         group_id = None
+                        retry_stage = "announce"
                         await self._announce_connected(state)
                         # Mark success only after reconciliation completes, so
                         # a transient failure is retried before publication.
                         active_client_id = id(client)
 
+                    retry_stage = "status"
                     status = await client.coordinator_status()
+                    retry_stage = "selection"
+                    previous_local_context = local_context
+                    # A fresh response supersedes cached routing even when its
+                    # selection raises. Restore only a proven ready same group.
+                    local_context = None
                     selected = select_storage_authority(
                         status,
                         session_id=state.binding.internal_session_id,
                         requested_group=self.requested_storage_group,
                     )
+                    if (
+                        previous_local_context is not None
+                        and selected.state == "ready"
+                        and selected.group_id == previous_local_context[2]
+                    ):
+                        local_context = previous_local_context
                     if (
                         selected.authority_node_id is None
                         or selected.group_id is None
@@ -925,6 +946,7 @@ class RecorderFederationNode:
                         await asyncio.sleep(self.publication_poll_seconds)
                         continue
 
+                    retry_stage = "route-build"
                     if (
                         storage_client is None
                         or authority_node_id != selected.authority_node_id
@@ -972,12 +994,16 @@ class RecorderFederationNode:
                         group_id = selected.group_id
 
                     assert worker is not None and outbox is not None
+                    retry_stage = "delivery"
                     cycle = await worker.run_cycle()
+                    local_context = (worker.reconciler, outbox, group_id)
+                    retry_stage = "jsonl"
                     jsonl_result = await self._publish_jsonl_once(
                         state,
                         authority_node_id=authority_node_id,
                         group_id=group_id,
                     )
+                    retry_stage = "pending-read"
                     pending_snapshot = await asyncio.to_thread(outbox.pending)
                     storage_state, pending, delivery_error = (
                         _publication_cycle_status(
@@ -1005,6 +1031,28 @@ class RecorderFederationNode:
                     await asyncio.sleep(self.publication_poll_seconds)
                 except PUBLICATION_RETRY_ERRORS as exc:
                     failures += 1
+                    reported_error = exc
+                    if (
+                        local_context is not None
+                        and retry_stage in {"connect", "announce", "status"}
+                    ):
+                        try:
+                            # This is durable preparation only. A disconnected
+                            # cycle must not call run_cycle/run_once or consume
+                            # a new queue's one startup delivery probe.
+                            await asyncio.to_thread(local_context[0].reconcile)
+                        except PUBLICATION_RETRY_ERRORS as local_error:
+                            # Surface the actual local preparation failure;
+                            # retry visibility must not imply it succeeded.
+                            reported_error = local_error
+                    pending_outbox = outbox
+                    pending_group = group_id
+                    if local_context is not None:
+                        _, pending_outbox, pending_group = local_context
+                    elif retry_stage in {"connect", "announce", "status", "selection"}:
+                        # Fresh selection invalidated the previous group. Do not
+                        # relabel its inventory as the current route's count.
+                        pending_outbox = None
                     # Re-reading the backlog is how the count stays durable
                     # truth, but it reads the very store the cycle just failed
                     # on. Whatever the cycle retried, this read can raise
@@ -1013,10 +1061,10 @@ class RecorderFederationNode:
                     # last count this loop actually proved rather than being
                     # answered with an invented zero.
                     pending_batches = self.snapshot().pending_batches
-                    if outbox is not None:
+                    if pending_outbox is not None:
                         try:
                             pending_snapshot = await asyncio.to_thread(
-                                outbox.pending
+                                pending_outbox.pending
                             )
                         except PUBLICATION_RETRY_ERRORS:
                             pass
@@ -1027,7 +1075,7 @@ class RecorderFederationNode:
                                     session_id=(
                                         state.binding.internal_session_id
                                     ),
-                                    group_id=group_id or "",
+                                    group_id=pending_group or "",
                                 )
                             )
                     self._set_snapshot(
@@ -1036,7 +1084,7 @@ class RecorderFederationNode:
                         jsonl_state="backlogged",
                         pending_batches=pending_batches,
                         last_error_code=str(
-                            getattr(exc, "code", type(exc).__name__)
+                            getattr(reported_error, "code", type(reported_error).__name__)
                         ),
                     )
                     await asyncio.sleep(min(10.0, float(2 ** min(failures - 1, 3))))

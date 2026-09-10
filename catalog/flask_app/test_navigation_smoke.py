@@ -231,7 +231,7 @@ def test_recorder_configuration_does_not_scope_product_navigation(
     _patch_runtime(monkeypatch, requires_choice=True)
     config = replace(
         default_capability_config(),
-        recorder_sources="M8015RW221N=http://192.168.200.101:5000",
+        recorder_sources="DEMO01=http://192.168.200.101:5000",
     )
     _patch_setup(monkeypatch, config)
 
@@ -297,7 +297,7 @@ def test_recorder_live_status_endpoint_is_small_fresh_and_authority_scoped(
     _patch_runtime(monkeypatch, requires_choice=True)
     config = replace(
         default_capability_config(),
-        recorder_sources="M8015RW221N=http://192.168.200.101:5000",
+        recorder_sources="DEMO01=http://192.168.200.101:5000",
     )
     _patch_setup(monkeypatch, config, recorder_active=True)
 
@@ -322,8 +322,8 @@ def test_recorder_live_status_endpoint_is_small_fresh_and_authority_scoped(
                 "last_flush_at": "2026-07-28T12:45:10Z",
                 "sources": [
                     {
-                        "source_name": "M8015RW221N",
-                        "machine_id": "M8015RW221N",
+                        "source_name": "DEMO01",
+                        "machine_id": "DEMO01",
                         "base_url": "http://192.168.200.101:5000",
                         "last_success_at": "2026-07-28T12:45:10Z",
                         "next_sequence": 10932 + self.calls,
@@ -390,7 +390,7 @@ def test_recorder_live_status_endpoint_rejects_inactive_contribution(
     _patch_runtime(monkeypatch)
     config = replace(
         default_capability_config(),
-        recorder_sources="M8015RW221N=http://192.168.200.101:5000",
+        recorder_sources="DEMO01=http://192.168.200.101:5000",
     )
     _patch_setup(monkeypatch, config, recorder_active=False)
 
