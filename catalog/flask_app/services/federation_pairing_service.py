@@ -573,6 +573,10 @@ class PairingRelayRuntime:
         self._thread: threading.Thread | None = None
         self._client: PairingRelayNodeClient | None = None
         self._relay_url: str | None = None
+        # The thread lock only owns loop startup. Connection operations yield
+        # on that loop, so they also need one owner across authentication and
+        # initial replay before publishing the client for other callers.
+        self._connection_lock = asyncio.Lock()
 
     def _start_loop(self) -> asyncio.AbstractEventLoop:
         with self._lock:
@@ -617,14 +621,22 @@ class PairingRelayRuntime:
             ) from exc
 
     async def _disconnect_current(self) -> None:
+        async with self._connection_lock:
+            await self._disconnect_owned_client()
+
+    async def _disconnect_owned_client(self) -> None:
         client = self._client
         self._client = None
         self._relay_url = None
-        if client is not None and client.connected_event.is_set():
+        if client is not None:
             await client.disconnect()
 
     async def _redeem(self, offer: PairingOffer) -> FederationSessionBinding:
-        await self._disconnect_current()
+        async with self._connection_lock:
+            return await self._redeem_owned(offer)
+
+    async def _redeem_owned(self, offer: PairingOffer) -> FederationSessionBinding:
+        await self._disconnect_owned_client()
         client = PairingRelayNodeClient(
             state_directory=self.state_directory,
             relay_url=offer.relay_url,
@@ -671,13 +683,17 @@ class PairingRelayRuntime:
         return self._submit(self._redeem(offer))
 
     async def _ensure_connected(self, state: RemotePairingState) -> None:
+        async with self._connection_lock:
+            await self._ensure_connected_owned(state)
+
+    async def _ensure_connected_owned(self, state: RemotePairingState) -> None:
         if (
             self._client is not None
             and self._client.connected_event.is_set()
             and self._relay_url == state.relay_url
         ):
             return
-        await self._disconnect_current()
+        await self._disconnect_owned_client()
         client = PairingRelayNodeClient(
             state_directory=self.state_directory,
             relay_url=state.relay_url,
@@ -685,17 +701,25 @@ class PairingRelayRuntime:
             clock=self._clock,
             request_timeout=min(self.timeout_seconds, 60.0),
         )
-        await client.connect()
-        joined = {
-            item.session_id for item in client.state.joined_sessions()
-        }
-        if state.binding.internal_session_id not in joined:
-            await client.disconnect(error_code="pairing-membership-missing")
-            raise AuthenticationError(
-                "pairing-membership-missing",
-                "the saved remote federation membership is no longer active",
-                "binding",
+        try:
+            await client.connect()
+            joined = {
+                item.session_id for item in client.state.joined_sessions()
+            }
+            if state.binding.internal_session_id not in joined:
+                raise AuthenticationError(
+                    "pairing-membership-missing",
+                    "the saved remote federation membership is no longer active",
+                    "binding",
+                )
+        except BaseException as exc:
+            # A caller timeout can cancel us before the client is published.
+            # Neither another caller nor runtime shutdown can own that client
+            # yet, so this operation must close it before releasing the lock.
+            await client.disconnect(
+                error_code=getattr(exc, "code", None) or "pairing-connect-failed"
             )
+            raise
         self._client = client
         self._relay_url = state.relay_url
 
