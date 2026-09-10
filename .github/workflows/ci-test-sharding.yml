@@ -1,0 +1,88 @@
+name: CI test sharding
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/ci-test-sharding.yml
+      - .github/workflows/federation-v1-release.yml
+      - scripts/ci_pytest_shards.py
+      - catalog/common/tests/test_ci_pytest_shards.py
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Shared pool for routine checks, or a specific host for admission
+        type: choice
+        default: shared-pool
+        options: [shared-pool, Nettking, Beast]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-test-sharding-${{ github.ref }}-${{ inputs.target || 'shared-pool' }}
+  cancel-in-progress: true
+
+jobs:
+  shard-contract:
+    name: Shard contract (${{ matrix.os }}, ${{ inputs.target || 'shared-pool' }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: Windows
+            # The broad beast-windows label also names a legacy, unprepared service.
+            runner: >-
+              ${{ inputs.target == 'Beast' && '["self-hosted","Windows","X64","fcp-windows"]' ||
+                  inputs.target == 'Nettking' && '["self-hosted","Windows","X64","nettking"]' ||
+                  '["self-hosted","Windows","X64","fcp-test-windows"]' }}
+            python: '3.12.10'
+            shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+          - os: Linux
+            # Exclude the older Beast-Linux registration without the release contract.
+            runner: >-
+              ${{ inputs.target == 'Beast' && '["self-hosted","Linux","X64","beast-linux","fcp-linux-fast"]' ||
+                  inputs.target == 'Nettking' && '["self-hosted","Linux","X64","nettking-linux"]' ||
+                  '["self-hosted","Linux","X64","fcp-test-linux"]' }}
+            python: '3.12.13'
+            shell: bash
+    runs-on: ${{ fromJSON(matrix.runner) }}
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/self-hosted-python
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install CI tooling only
+        run: python -m pip install pytest==9.1.1 ruff==0.16.3
+      - name: Check shard tooling
+        run: python -m ruff check scripts/ci_pytest_shards.py catalog/common/tests/test_ci_pytest_shards.py
+      - name: Verify complete coverage, stable allocation and failure propagation
+        run: python -m pytest -o addopts= -q catalog/common/tests/test_ci_pytest_shards.py
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: cmd/fcp-peer-sidecar/go.mod
+          cache: false
+      - name: Verify Go and Compose prerequisites
+        run: |
+          go version
+          docker compose config --quiet
+      - name: Linux storage precondition
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/ubuntu-storage-precondition
+      - name: Linux Buildx prerequisite
+        if: runner.os == 'Linux'
+        run: docker buildx version
+      - name: Admit Linux Docker with an isolated disposable database
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/self-hosted-postgres
+      - name: Verify the disposable database
+        if: runner.os == 'Linux'
+        run: docker exec "$FCP_CI_POSTGRES_CONTAINER" psql -U fcp -d fcp_test -v ON_ERROR_STOP=1 -c 'SELECT 1'
+      - name: Remove only this job's database
+        if: always() && runner.os == 'Linux'
+        uses: ./.github/actions/self-hosted-postgres
+        with:
+          operation: stop
