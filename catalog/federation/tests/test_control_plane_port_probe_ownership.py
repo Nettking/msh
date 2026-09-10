@@ -12,11 +12,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from catalog.federation.tests import test_control_plane_health_leadership_race as health
 from catalog.federation.tests import test_control_plane_physical_runtime as physical
-
-# Use the original fixture and compose the original assertion body unchanged.
-runtimes = health.runtimes
 
 
 @contextmanager
@@ -111,49 +107,31 @@ def test_failed_real_probe_is_closed_before_garbage_collection(monkeypatch):
         )
 
 
-def test_real_probe_conflict_preserves_original_health_warning_assertion(
-    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch, recwarn,
-):
+def test_failed_real_probe_emits_no_resource_warning(monkeypatch, recwarn):
     with _real_second_probe_conflict(monkeypatch, retain=False) as observed:
-        try:
-            health.test_fixture_stops_after_two_real_listener_bind_conflicts(
-                request, monkeypatch, recwarn,
-            )
-        finally:
-            # This is post-call/unwind observation, not an assertion-time hook.
-            # Keep warning objects untouched and never retain the failed probe.
-            error = observed["native_error"]
-            blocker = observed["blocker"]
-            evidence = {
-                "diagnostic": "allocator-probe-ownership",
-                "stage": "actual-second-probe-bind-denied" if error else "probe-failure-not-reached",
-                "native_error": error,
-                "blocker_still_held": blocker is not None and blocker.fileno() >= 0,
-                "probe_binds": observed["probe_binds"],
-            }
-            records = tuple(recwarn)
-            evidence.update(
-                failed_probe_retained=False,
-                warning_count=len(records),
-                warning_categories=[record.category.__name__ for record in records],
-                warning_records=[
-                    {
-                        "category": record.category.__name__,
-                        "message": str(record.message),
-                        "filename": record.filename,
-                        "lineno": record.lineno,
-                    }
-                    for record in records
-                ],
-                resource_warning_count=sum(record.category is ResourceWarning for record in records),
-                retry_warning_count=sum(
-                    record.category is RuntimeWarning
-                    and str(record.message).startswith("Health fixture listener acquisition retry 1/1:")
-                    for record in records
-                ),
-                observation_stage="POST_CALL_UNWIND_BEFORE_FIXTURE_TEARDOWN",
-            )
-            print(json.dumps(evidence, sort_keys=True), file=sys.stderr, flush=True)
-        _native_conflict_evidence(observed)
-        assert len(recwarn) == 1
-        assert recwarn[0].category is RuntimeWarning
+        used = set()
+        port = physical._free_port_triple(used)
+        evidence = _native_conflict_evidence(observed)
+        assert used == {port, port + 1, port + 2}
+        assert observed["native_error"]["endpoint"][1] not in used
+        assert observed["retained_probe"] is None
+        records = tuple(recwarn)
+        evidence.update(
+            allocator_returned=True,
+            failed_probe_retained=False,
+            warning_count=len(records),
+            warning_categories=[record.category.__name__ for record in records],
+            warning_records=[
+                {
+                    "category": record.category.__name__,
+                    "message": str(record.message),
+                    "filename": record.filename,
+                    "lineno": record.lineno,
+                }
+                for record in records
+            ],
+            resource_warning_count=sum(record.category is ResourceWarning for record in records),
+            observation_stage="AT_ALLOCATOR_RETURN_BEFORE_BLOCKER_CLOSE",
+        )
+        print(json.dumps(evidence, sort_keys=True), file=sys.stderr, flush=True)
+        assert len(recwarn) == 0, "failed real allocation probe must not emit ResourceWarning"
