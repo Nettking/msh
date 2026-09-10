@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
-from contextlib import asynccontextmanager
+import json
+import warnings
+from contextlib import ExitStack, asynccontextmanager
 from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,6 +16,9 @@ from catalog.federation.control_plane_facade import (
 from catalog.federation.control_plane_replication import ReplicaNode
 from catalog.federation.federation_v1_release_runtime import FederationV1ReleaseRuntime
 from catalog.federation.models import CapabilityAnnouncement, CapabilityStatus
+from catalog.federation.tests.test_control_plane_health_leadership_race import (
+    _fixture_listener_conflict,
+)
 from catalog.federation.tests.test_control_plane_physical_runtime import _deployments
 from catalog.node.client import RelayNodeClient
 from catalog.relay.provider_service import ProviderAuthorityRelayServer
@@ -52,24 +57,54 @@ class _Cluster:
         self.clients = []
         self.running_runtimes: set[int] = set()
         self.running_relays: set[int] = set()
-        for index, deployment in enumerate(_deployments(root)):
-            # Sidecars use fixed sibling filenames. Each physical-equivalent
-            # runtime therefore needs its own directory, not just a distinct DB.
-            state = root / f"voter-{index}"
-            state.mkdir()
-            deployment = replace(
-                deployment,
-                replica_database=state / "replica.sqlite3",
-                replay_database=state / "replay.sqlite3",
-                coordinator_database=state / "coordinator.sqlite3",
-            )
-            runtime = FederationV1ReleaseRuntime(
-                deployment,
-                legacy_node_state_database=state / "legacy.sqlite3",
-                legacy_pairing_state_path=state / "legacy.json",
-            )
-            self.runtimes.append(runtime)
-            self.relays.append(self.relay_for(index))
+        # Probes do not reserve the later listeners. Own the complete unstarted
+        # acquisition and allow one fresh allocation only for a proven native
+        # constructor bind conflict. No serving/bootstrap/test body is retried.
+        for attempt in range(2):
+            attempt_root = root / f"listener-attempt-{attempt + 1}"
+            attempt_root.mkdir()
+            self.runtimes = []
+            self.relays = []
+            retry = False
+            with ExitStack() as cleanup:
+                for index, deployment in enumerate(_deployments(attempt_root)):
+                    # Sidecars use fixed sibling filenames, so each voter owns
+                    # its own directory even inside an unsuccessful attempt.
+                    state = attempt_root / f"voter-{index}"
+                    state.mkdir()
+                    deployment = replace(
+                        deployment,
+                        replica_database=state / "replica.sqlite3",
+                        replay_database=state / "replay.sqlite3",
+                        coordinator_database=state / "coordinator.sqlite3",
+                    )
+                    try:
+                        runtime = FederationV1ReleaseRuntime(
+                            deployment,
+                            legacy_node_state_database=state / "legacy.sqlite3",
+                            legacy_pairing_state_path=state / "legacy.json",
+                        )
+                    except OSError as error:
+                        conflict = _fixture_listener_conflict(error, deployment)
+                        if conflict is None or attempt == 1:
+                            raise
+                        warnings.warn(
+                            "Public journal fixture listener acquisition retry 1/1: "
+                            + json.dumps(conflict, sort_keys=True),
+                            RuntimeWarning,
+                            stacklevel=2,
+                        )
+                        retry = True
+                        break
+                    cleanup.callback(runtime.close)
+                    self.runtimes.append(runtime)
+                    self.relays.append(self.relay_for(index))
+                if retry:
+                    # ExitStack drains all owned voters before allocating again.
+                    # Any cleanup failure escapes and prevents another attempt.
+                    continue
+                cleanup.pop_all()
+                return
 
     def relay_for(self, index: int, **options) -> ProviderAuthorityRelayServer:
         return ProviderAuthorityRelayServer(
