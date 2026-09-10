@@ -1,6 +1,7 @@
 name: CF7-B product and physical acceptance
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - ".github/actions/**"

@@ -595,8 +595,8 @@ class ResilientPairingRelayRuntime(PairingRelayRuntime):
             )
         )
 
-    async def _redeem(self, offer: PairingOffer) -> FederationSessionBinding:
-        await self._disconnect_current()
+    async def _redeem_owned(self, offer: PairingOffer) -> FederationSessionBinding:
+        await self._disconnect_owned_client()
         client = PairingRelayNodeClient(
             state_directory=self.state_directory,
             relay_url=offer.relay_url,

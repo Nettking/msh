@@ -57,6 +57,7 @@ on:
       - "catalog/federation/onboarding_models.py"
       - "catalog/federation/onboarding_compat.py"
       - "catalog/federation/onboarding_discovery/**"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -70,17 +71,27 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+        include:
+          - os: Linux
+            runner: fcp-test-linux
+            shell: bash
+            python: "3.12.13"
+          - os: Windows
+            runner: fcp-test-windows
+            shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+            python: "3.12.10"
+    runs-on: [self-hosted, "${{ matrix.os }}", X64, "${{ matrix.runner }}"]
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: ./.github/actions/self-hosted-python
         with:
-          python-version: "3.12"
-          cache: pip
+          python-version: ${{ matrix.python }}
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip

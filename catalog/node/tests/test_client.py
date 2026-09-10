@@ -43,6 +43,47 @@ def _join_connected_session(
     client.state.join_session(session_id, now=now)
 
 
+def test_cancelled_authentication_closes_unpublished_websocket(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    async def scenario() -> None:
+        waiting = asyncio.Event()
+
+        class WebSocket:
+            closed = False
+
+            async def recv(self):
+                waiting.set()
+                await asyncio.Event().wait()
+
+            async def close(self):
+                self.closed = True
+
+        websocket = WebSocket()
+
+        async def connect(*args, **kwargs):
+            return websocket
+
+        monkeypatch.setattr(node_client_module, "connect", connect)
+        client = _client(tmp_path)
+        task = asyncio.create_task(client.connect())
+        try:
+            await asyncio.wait_for(waiting.wait(), timeout=2)
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+            assert websocket.closed
+            assert client._websocket is None
+            assert not client.connected_event.is_set()
+            assert client.state.status()["connection_state"] != "connecting"
+        finally:
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+            await websocket.close()
+
+    asyncio.run(scenario())
+
+
 def _gap_event(client: RelayNodeClient, session_id: str = "session-a") -> SessionEvent:
     return SessionEvent(
         session_id=session_id,

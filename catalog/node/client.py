@@ -273,6 +273,7 @@ class RelayNodeClient:
                     "relay did not complete authenticated enrollment",
                 )
         except (
+            asyncio.CancelledError,
             ConnectionClosed,
             OSError,
             TimeoutError,
@@ -293,7 +294,11 @@ class RelayNodeClient:
                 self.state.set_connection_state(
                     ConnectionState.ERROR,
                     now=self._clock(),
-                    error_code="connection-failed",
+                    error_code=(
+                        "connection-cancelled"
+                        if isinstance(error, asyncio.CancelledError)
+                        else "connection-failed"
+                    ),
                 )
             raise
 
