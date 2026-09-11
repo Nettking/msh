@@ -1649,3 +1649,11 @@ successfully. Other incomplete parents remain active; no failed jobs observed.
 Software-update34651625551 and phase234651637810 are the already-requested
 replacements. Next: retain only new native logs and verify source; no dispatch
 is currently justified for the still-active automatic release/ICSE parents.
+
+Seven new logs retained: five verify83955f65, two release logs prove synthetic
+68f6e72c. Required exact-head PASS now10/37 plus companion1/3. Harness, readiness
+and retirement are complete on both platforms. Review-comment count unchanged.
+Next: `poll_pr463_state.py` on the next state check, retaining only new terminal
+logs/review transitions. Preserve eleven dispatches and every valid result; wait
+for release/ICSE parent completion before resolving their source gaps. No merge,
+new candidate or physical action. Protected Recorder data remains untouched.
