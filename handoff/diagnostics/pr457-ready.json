@@ -1,0 +1,14 @@
+{
+  "pr": 457,
+  "head": "143fe7a9082193114af3d34dc437b85f845849a2",
+  "draft": false,
+  "updated_at": "2026-09-11T16:29:53Z",
+  "url": "https://github.com/Nettking/msh/pull/457",
+  "actual_main_verified": "63976fb3aa24fffd25d9ee407572e61180ab5315",
+  "verification": [
+    "git ls-remote",
+    "fresh Git ref API",
+    "fresh PR456 merged result"
+  ],
+  "base_metadata_stale": true
+}

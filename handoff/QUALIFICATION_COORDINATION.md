@@ -623,3 +623,9 @@ This is intermediate main, not a new candidate or qualified merged main. No
 explicit intermediate-main qualification will be dispatched. Next: refresh457
 head/findings, mark ready and merge it separately; preserve its exact-head PASS.
 Runtime/Recorder state unchanged, physical acceptance not restarted.
+
+PR457 metadata still reports the old base SHA, while git ls-remote, a fresh Git
+ref API read and PR456 merged record all confirm actual main63976fb3. This is
+metadata freshness, not a failed merge or product defect. Qualified457 head
+remains143fe7a9; no findings. PR457 marked ready at16:29:53UTC. Next: normal
+expected-head merge457 against actual current main; no head rewrite or gate bypass.
