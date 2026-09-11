@@ -1,0 +1,18 @@
+{
+  "observed_at": "2026-09-11T18:15:00Z",
+  "timestamp_precision": "minute estimate; command terminal receipt is authoritative",
+  "qualified_main": "9b286f931497bf6291e215f6340443c5162826b0",
+  "runtime_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
+  "host": "nitro",
+  "stage": "D04 controlled host remediation preconditions",
+  "procedure": "d04_controlled_responder_replacement.py via authenticated SSH native Python",
+  "observed": "AssertionError: Existing candidate secret required; never create/replace it here",
+  "expected": "Existing readable candidate secret at the verified Nitro campaign data mount",
+  "classification": "maintenance-precondition; not a demonstrated new product defect",
+  "state_changed": false,
+  "protected_recorder_data_untouched": true,
+  "stale_responder_stopped": false,
+  "new_responder_started": false,
+  "acceptance_impact": "No physical evidence; D04 remains pending",
+  "next_action": "Review whether campaign secret is absent versus unreadable; supported responder may create a missing Nitro-local secret as explicit controlled configuration, never overwrite an existing one"
+}

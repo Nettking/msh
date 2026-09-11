@@ -894,3 +894,14 @@ This resolves current host ownership without prematurely deploying M or rerunnin
 software. After local/real-peer ownership/health verification and persistence,
 freeze qualified M and run clean checked-in revalidation. M needs new runtime
 admission/verification before any physical evidence. No Recorder-host access.
+
+### D04 first control precondition stopped without mutation
+
+The controlled script stopped before SIGTERM or any write: the assumed existing
+Nitro campaign secret was absent or unreadable. [Exact guard evidence](diagnostics/d04-control-guard-attempt1.json).
+The earlier sweep's `secret_file_exists` concerned the legacy responder, not the
+current campaign. This is a maintenance precondition, not a new product defect.
+Next: distinguish missing versus unreadable candidate secret; if absent, review
+normal checked-in responder creation within the verified Nitro-only campaign
+mount as an explicit configuration step. Never copy the legacy identity/secret,
+overwrite an existing secret or touch Recorder-host data. D04 is still pending.
