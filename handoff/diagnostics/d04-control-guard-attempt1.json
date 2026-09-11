@@ -1,6 +1,6 @@
 {
-  "observed_at": "2026-09-11T18:15:00Z",
-  "timestamp_precision": "minute estimate; command terminal receipt is authoritative",
+  "observed_between_utc": ["2026-09-11T18:08:28Z", "2026-09-11T18:12:41Z"],
+  "timestamp_precision": "bounded by adjacent retained preflights; exact command time not recorded",
   "qualified_main": "9b286f931497bf6291e215f6340443c5162826b0",
   "runtime_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
   "host": "nitro",

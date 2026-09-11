@@ -1,0 +1,48 @@
+{
+  "observed_at": "2026-09-11T18:12:41.785683+00:00",
+  "host": "nitro",
+  "paths": [
+    {
+      "path": "/home/martin/fcp-v1-fba508-20260910/campaign/nitro-runtime/data",
+      "lexists": true,
+      "uid": 1000,
+      "mode": "0o700",
+      "symlink": false,
+      "is_file": false,
+      "readable": true,
+      "writable": true
+    },
+    {
+      "path": "/home/martin/fcp-v1-fba508-20260910/campaign/nitro-runtime/data/federation",
+      "lexists": true,
+      "uid": 1000,
+      "mode": "0o700",
+      "symlink": false,
+      "is_file": false,
+      "readable": true,
+      "writable": true
+    },
+    {
+      "path": "/home/martin/fcp-v1-fba508-20260910/campaign/nitro-runtime/data/federation/onboarding",
+      "lexists": true,
+      "uid": 1000,
+      "mode": "0o700",
+      "symlink": false,
+      "is_file": false,
+      "readable": true,
+      "writable": true
+    },
+    {
+      "path": "/home/martin/fcp-v1-fba508-20260910/campaign/nitro-runtime/data/federation/onboarding/auto_join_secret",
+      "lexists": false
+    },
+    {
+      "path": "/home/martin/fcp-v1-fba508-20260910/campaign/nitro-runtime/data/federation/onboarding/auto_join_responder.pid",
+      "lexists": false
+    }
+  ],
+  "app_custom_secret_path": "/app/data/federation/onboarding/auto_join_secret",
+  "app_custom_pid_path": null,
+  "state_changed": false,
+  "protected_recorder_data_untouched": true
+}

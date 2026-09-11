@@ -63,12 +63,15 @@ from federation_host_runner import load_host_module
 bridge = load_host_module('tailnet_join_bridge')
 secret = DATA / bridge.SECRET_RELATIVE
 pid_file = DATA / bridge.PID_RELATIVE
-assert secret.is_file() and bridge.read_secret(secret), 'Existing candidate secret required; never create/replace it here'
-secret_before = secret.stat()
-if pid_file.exists():
-    saved = json.loads(pid_file.read_text())
-    assert isinstance(saved, dict) and isinstance(saved.get('pid'), int)
-    assert not pathlib.Path('/proc', str(saved['pid'])).exists(), 'Existing campaign responder needs review'
+app_env = dict(v.split('=', 1) for v in flask['Config']['Env'] if '=' in v)
+assert app_env.get('FCP_AUTO_JOIN_SECRET_FILE') == '/app/data/' + bridge.SECRET_RELATIVE
+for directory in (DATA, DATA / 'federation', secret.parent):
+    assert directory.is_dir() and not directory.is_symlink() and directory.stat().st_uid == os.getuid()
+    assert directory.resolve() == directory
+# Fresh metadata proves both paths absent. Normal checked-in helper creation is
+# now an explicit Nitro-only configuration action; never copy legacy identity.
+assert not os.path.lexists(secret) and not os.path.lexists(secret.with_name(secret.name + '.tmp'))
+assert not os.path.lexists(pid_file), 'Reinspect any newly existing campaign responder state'
 expected = {'pid': OLD, 'ppid': 1, 'start_ticks': '120268097', 'uid': 1000,
             'cwd': '/home/martin/fcp', 'exe': '/usr/bin/python3.14 (deleted)',
             'argv_sha256': 'c0b224917a90d9b662818ce970624ffc461f8b84d3ab4f144bb84bec8046bfb5',
@@ -81,6 +84,7 @@ receipt = {'started_at': datetime.datetime.now(datetime.timezone.utc).isoformat(
     'status': 'PRECONDITIONS_VERIFIED', 'host': 'nitro', 'qualified_main': M,
     'runtime_sha': N, 'command': 'SIGTERM exact stale instance; checked-in N federation_host_runner.py tailnet_join_responder on tailnet5151',
     'previous': expected, 'state_changed': False, 'physical_acceptance': False,
+    'planned_state_writes': ['new Nitro-only shared host secret through checked-in ensure_secret', 'new Nitro-only canonical responder PID record', 'maintenance log/receipt'],
     'protected_recorder_data_untouched': True, 'enrollment_request_sent': False}
 
 def save():
@@ -122,13 +126,15 @@ try:
     after = containers()
     fields = lambda x: (x['Id'], x['Image'], x['State']['StartedAt'], x['RestartCount'])
     assert sorted(map(fields, before)) == sorted(map(fields, after))
-    assert secret.stat().st_mtime_ns == secret_before.st_mtime_ns and secret.stat().st_ino == secret_before.st_ino
+    assert secret.is_file() and not secret.is_symlink() and bridge.read_secret(secret)
+    assert secret.stat().st_uid == os.getuid() and secret.stat().st_mode & 0o777 == 0o600
     assert run(['git', 'rev-parse', 'HEAD']) == N and not run(['git', 'status', '--porcelain', '--untracked-files=all'])
     receipt.update(status='D04_CURRENT_RUNTIME_PORT_OWNERSHIP_VERIFIED', current=new,
         listener_inode=listeners[0], health={'status': 200, 'responder': body['responder'],
         'tailscale': body['tailscale'], 'elapsed_seconds': health_elapsed},
         no_stale_respawn_observed_seconds=10, core_container_identity_and_start_times_unchanged=True,
-        existing_secret_metadata_unchanged=True, source_clean=True,
+        new_nitro_shared_secret_created_by_checked_in_helper=True,
+        existing_secret_overwritten=False, legacy_identity_copied=False, source_clean=True,
         next_action='Verify real Nettking peer health; freeze qualified M, clean revalidation, then align owned responder and all campaign runtime with M before physical evidence')
 except Exception as exc:
     receipt.update(status='D04_REMEDIATION_INCOMPLETE_INSPECT_BEFORE_RETRY', error=str(exc))

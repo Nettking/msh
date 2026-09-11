@@ -905,3 +905,13 @@ Next: distinguish missing versus unreadable candidate secret; if absent, review
 normal checked-in responder creation within the verified Nitro-only campaign
 mount as an explicit configuration step. Never copy the legacy identity/secret,
 overwrite an existing secret or touch Recorder-host data. D04 is still pending.
+
+###18:12UTC — missing Nitro onboarding files isolated
+
+[Path metadata](diagnostics/d04-state-path-preconditions.json) proves both current
+campaign secret/PID files absent; their parent directories are private UID1000,
+and Flask resolves exactly the same mounted secret path. The procedure now
+explicitly permits normal checked-in helper creation of these absent Nitro-only
+files, while refusing any overwrite, symlink or legacy identity copy. This is
+controlled host configuration, not a product assertion/deadline change. Next:
+execute the persisted guarded procedure once, then retain exact results.
