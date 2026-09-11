@@ -1,35 +1,50 @@
 {
-  "observed_at": "2026-09-11T20:18:18.438284+00:00",
+  "observed_at": "2026-09-11T20:29:47.822722+00:00",
   "changes": {
     "463": [
+      {
+        "workflow": "phase2-federation.yml",
+        "run_id": 34640438781,
+        "event": "workflow_dispatch",
+        "status": "completed",
+        "conclusion": "success",
+        "jobs": [
+          {
+            "id": 103398519499,
+            "name": "windows",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
       {
         "workflow": "federation-v1-release.yml",
         "run_id": 34637251378,
         "event": "pull_request",
-        "status": "in_progress",
-        "conclusion": null,
+        "status": "completed",
+        "conclusion": "success",
         "jobs": [
-          {
-            "id": 103388045747,
-            "name": "Release checks (Windows)",
-            "status": "completed",
-            "conclusion": "success"
-          },
           {
             "id": 103388045776,
             "name": "Windows regressions (capability-product)",
-            "status": "in_progress",
-            "conclusion": null
-          },
-          {
-            "id": 103388045883,
-            "name": "Linux regression shard (1)",
             "status": "completed",
             "conclusion": "success"
           },
           {
-            "id": 103398147796,
-            "name": "Clean-checkout suite order independence",
+            "id": 103408682694,
+            "name": "Release matrix (Linux)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103408682700,
+            "name": "Release matrix (Windows)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103408808278,
+            "name": "Federation v1 automated release verdict",
             "status": "completed",
             "conclusion": "success"
           }
@@ -37,14 +52,20 @@
       },
       {
         "workflow": "ci-test-sharding.yml",
-        "run_id": 34637251420,
-        "event": "pull_request",
-        "status": "completed",
-        "conclusion": "success",
+        "run_id": 34643583922,
+        "event": "workflow_dispatch",
+        "status": "queued",
+        "conclusion": null,
         "jobs": [
           {
-            "id": 103388044756,
+            "id": 103408924333,
             "name": "Shard contract (Windows, shared-pool)",
+            "status": "queued",
+            "conclusion": null
+          },
+          {
+            "id": 103408924564,
+            "name": "Shard contract (Linux, shared-pool)",
             "status": "completed",
             "conclusion": "success"
           }
@@ -54,39 +75,27 @@
         "workflow": "icse-tool-demo.yml",
         "run_id": 34642522512,
         "event": "workflow_dispatch",
-        "status": "queued",
+        "status": "in_progress",
         "conclusion": null,
         "jobs": [
           {
-            "id": 103405438284,
-            "name": "reviewer-compose",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
-            "id": 103405438549,
-            "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
             "id": 103405438614,
             "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
-            "status": "queued",
+            "status": "in_progress",
             "conclusion": null
           }
         ]
       },
       {
-        "workflow": "phase-f85-operator-federation-surface.yml",
-        "run_id": 34637791132,
+        "workflow": "federation-software-update.yml",
+        "run_id": 34639396004,
         "event": "workflow_dispatch",
         "status": "completed",
         "conclusion": "success",
         "jobs": [
           {
-            "id": 103389836092,
-            "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+            "id": 103395113227,
+            "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
             "status": "completed",
             "conclusion": "success"
           }
