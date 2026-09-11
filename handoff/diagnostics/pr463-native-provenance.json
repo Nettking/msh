@@ -1,6 +1,6 @@
 {
   "source_commit": "7286f30d30e20c94c13cc9acebb2fd6d61bc1163",
-  "retained_at": "2026-09-11T20:56:45.572721+00:00",
+  "retained_at": "2026-09-11T21:07:42.772697+00:00",
   "records": [
     {
       "job_id": 103388045522,
@@ -786,6 +786,45 @@
       "conclusion": "success",
       "bytes": 59490,
       "sha256": "be1894b743edc31024bc8e65e1edf0aa90923d7424897c820561115782b0a2b1",
+      "checkout_commits": [
+        "7286f30d30e20c94c13cc9acebb2fd6d61bc1163"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103412772995,
+      "run_id": 34644764330,
+      "name": "Release checks (Windows)",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 57109,
+      "sha256": "706b49d60f2cf8aefd821ebf2c2f0c6a01be60533166dc2eed689125248e5893",
+      "checkout_commits": [
+        "7286f30d30e20c94c13cc9acebb2fd6d61bc1163"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103412773047,
+      "run_id": 34644764330,
+      "name": "Release checks (Linux)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 57100,
+      "sha256": "68dab1aea1969dfe8eeb9c27569082c338d2d811e695b110421a3587366d8a3d",
+      "checkout_commits": [
+        "7286f30d30e20c94c13cc9acebb2fd6d61bc1163"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103412773054,
+      "run_id": 34644764330,
+      "name": "Linux regression shard (1)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 60245,
+      "sha256": "d39c06b66f07cbef4aadb61b917592ce666672a97ad4e71cfb00b5a3cd93dd20",
       "checkout_commits": [
         "7286f30d30e20c94c13cc9acebb2fd6d61bc1163"
       ],

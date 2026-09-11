@@ -30,7 +30,7 @@ Preserve [D06 / issue462](diagnostics/D06.md). Repair is ready for review in PR4
 head7286f30d30e20c94c13cc9acebb2fd6d61bc1163, with focused development tests PASS.
 Next: review repair/native exact-head CI state. No dependent admission, physical
 retry workaround or PASS; no repair deployed and no new candidate frozen.
-PR463 is ready for review; qualification is active. Verified29/37 required native
+PR463 is ready for review; qualification is active. Verified32/37 required native
 checks plus CFI2/registry3/3 on its exact head. All13 workflows now have one
 justified exact-head dispatch recorded; the final release dispatch was20:32UTC.
 No more source-gap dispatches are needed. Use `diagnostics/poll_pr463_state.py`,
@@ -1522,3 +1522,10 @@ Head7286f30d unchanged. Release34644764330 now11/16 successful; parent remains
 active with no failed jobs observed. Other gates and ICSE review remain complete.
 Next: retain only new native logs and verify source/aggregate provenance before
 counting new qualification evidence. No duplicate jobs or physical action.
+
+All three new logs verify exact head7286f30d. Required PASS now32/37 plus
+companion3/3; native Linux and Windows release checks are both verified.
+All four Linux regression shards have completed. Preserve these proofs and ICSE
+review. Next state check: `poll_pr463_state.py`, retain only new terminal logs,
+then review final release aggregates/artifacts once the parent completes.
+No merge or candidate selection yet; physical admission remains stopped by D06.
