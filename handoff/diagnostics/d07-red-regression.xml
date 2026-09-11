@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="3" time="1.468" timestamp="2026-09-12T00:54:15.006254+02:00" hostname="Nettking"><testcase classname="catalog.capabilities.tests.test_analysis_content_store" name="test_publication_preserves_open_reader_snapshot[False]" time="0.202"><failure message="PermissionError: [WinError 5] Ingen tilgang: 'C:\\Users\\Martin\\AppData\\Local\\Temp\\pytest-of-Martin\\pytest-98\\test_publication_preserves_ope0\\artifacts\\.fcp-analysis-content-tmp\\fcp-analysis-artifact-3ff9bc582388dcc35659554ad1a77090.partial' -&gt; 'C:\\Users\\Martin\\AppData\\Local\\Temp\\pytest-of-Martin\\pytest-98\\test_publication_preserves_ope0\\artifacts\\analysis\\session\\work\\plan.json'">tmp_path = WindowsPath('C:/Users/Martin/AppData/Local/Temp/pytest-of-Martin/pytest-98/test_publication_preserves_ope0')
+same_content = False
+
+    @pytest.mark.parametrize("same_content", [True, False])
+    def test_publication_preserves_open_reader_snapshot(tmp_path, same_content):
+        store = LocalArtifactContentStore(tmp_path / "artifacts", chunk_size=1024)
+        key = "analysis/session/work/plan.json"
+        original = b"original" * 4096
+        replacement = original if same_content else b"replacement" * 8192
+        old_identity = store.write_bytes(key, original)
+    
+        with closing(store.stream(key, **vars(old_identity))) as reader:
+            first = next(reader)
+            # A suspended public reader owns a real open file; no sleep or injected
+            # sharing error is needed to reproduce the Windows replacement failure.
+&gt;           new_identity = store.write_bytes(key, replacement)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+catalog\capabilities\tests\test_analysis_content_store.py:25: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+catalog\capabilities\analysis\content_store.py:178: in write_bytes
+    return self._atomic_write(destination, (payload,))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+catalog\capabilities\analysis\content_store.py:138: in _atomic_write
+    temporary.path.replace(destination)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = WindowsPath('C:/Users/Martin/AppData/Local/Temp/pytest-of-Martin/pytest-98/test_publication_preserves_ope0/artifacts/.fcp-analysis-content-tmp/fcp-analysis-artifact-3ff9bc582388dcc35659554ad1a77090.partial')
+target = WindowsPath('C:/Users/Martin/AppData/Local/Temp/pytest-of-Martin/pytest-98/test_publication_preserves_ope0/artifacts/analysis/session/work/plan.json')
+
+    def replace(self, target):
+        """
+        Rename this path to the target path, overwriting if that path exists.
+    
+        The target path may be absolute or relative. Relative paths are
+        interpreted relative to the current working directory, *not* the
+        directory of the Path object.
+    
+        Returns the new Path instance pointing to the target path.
+        """
+&gt;       os.replace(self, target)
+E       PermissionError: [WinError 5] Ingen tilgang: 'C:\\Users\\Martin\\AppData\\Local\\Temp\\pytest-of-Martin\\pytest-98\\test_publication_preserves_ope0\\artifacts\\.fcp-analysis-content-tmp\\fcp-analysis-artifact-3ff9bc582388dcc35659554ad1a77090.partial' -&gt; 'C:\\Users\\Martin\\AppData\\Local\\Temp\\pytest-of-Martin\\pytest-98\\test_publication_preserves_ope0\\artifacts\\analysis\\session\\work\\plan.json'
+
+C:\Users\Martin\AppData\Local\Programs\Python\Python312\Lib\pathlib.py:1376: PermissionError</failure></testcase><testcase classname="catalog.capabilities.tests.test_analysis_content_store" name="test_publication_preserves_open_reader_snapshot[True]" time="0.039"><failure message="PermissionError: [WinError 5] Ingen tilgang: 'C:\\Users\\Martin\\AppData\\Local\\Temp\\pytest-of-Martin\\pytest-98\\test_publication_preserves_ope1\\artifacts\\.fcp-analysis-content-tmp\\fcp-analysis-artifact-7ad7d2509d4bbe76fbd0f69bebd9b92e.partial' -&gt; 'C:\\Users\\Martin\\AppData\\Local\\Temp\\pytest-of-Martin\\pytest-98\\test_publication_preserves_ope1\\artifacts\\analysis\\session\\work\\plan.json'">tmp_path = WindowsPath('C:/Users/Martin/AppData/Local/Temp/pytest-of-Martin/pytest-98/test_publication_preserves_ope1')
+same_content = True
+
+    @pytest.mark.parametrize("same_content", [True, False])
+    def test_publication_preserves_open_reader_snapshot(tmp_path, same_content):
+        store = LocalArtifactContentStore(tmp_path / "artifacts", chunk_size=1024)
+        key = "analysis/session/work/plan.json"
+        original = b"original" * 4096
+        replacement = original if same_content else b"replacement" * 8192
+        old_identity = store.write_bytes(key, original)
+    
+        with closing(store.stream(key, **vars(old_identity))) as reader:
+            first = next(reader)
+            # A suspended public reader owns a real open file; no sleep or injected
+            # sharing error is needed to reproduce the Windows replacement failure.
+&gt;           new_identity = store.write_bytes(key, replacement)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+catalog\capabilities\tests\test_analysis_content_store.py:25: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+catalog\capabilities\analysis\content_store.py:178: in write_bytes
+    return self._atomic_write(destination, (payload,))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+catalog\capabilities\analysis\content_store.py:138: in _atomic_write
+    temporary.path.replace(destination)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = WindowsPath('C:/Users/Martin/AppData/Local/Temp/pytest-of-Martin/pytest-98/test_publication_preserves_ope1/artifacts/.fcp-analysis-content-tmp/fcp-analysis-artifact-7ad7d2509d4bbe76fbd0f69bebd9b92e.partial')
+target = WindowsPath('C:/Users/Martin/AppData/Local/Temp/pytest-of-Martin/pytest-98/test_publication_preserves_ope1/artifacts/analysis/session/work/plan.json')
+
+    def replace(self, target):
+        """
+        Rename this path to the target path, overwriting if that path exists.
+    
+        The target path may be absolute or relative. Relative paths are
+        interpreted relative to the current working directory, *not* the
+        directory of the Path object.
+    
+        Returns the new Path instance pointing to the target path.
+        """
+&gt;       os.replace(self, target)
+E       PermissionError: [WinError 5] Ingen tilgang: 'C:\\Users\\Martin\\AppData\\Local\\Temp\\pytest-of-Martin\\pytest-98\\test_publication_preserves_ope1\\artifacts\\.fcp-analysis-content-tmp\\fcp-analysis-artifact-7ad7d2509d4bbe76fbd0f69bebd9b92e.partial' -&gt; 'C:\\Users\\Martin\\AppData\\Local\\Temp\\pytest-of-Martin\\pytest-98\\test_publication_preserves_ope1\\artifacts\\analysis\\session\\work\\plan.json'
+
+C:\Users\Martin\AppData\Local\Programs\Python\Python312\Lib\pathlib.py:1376: PermissionError</failure></testcase><testcase classname="catalog.capabilities.tests.test_analysis_content_store" name="test_replacement_does_not_relax_registered_identity" time="0.036" /></testsuite></testsuites>

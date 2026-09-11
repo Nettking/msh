@@ -1732,3 +1732,9 @@ already supports Windows delete sharing and stable POSIX handles. Next: add a
 deterministic public-stream replacement regression, retain its red result against
 unchanged M, then use this existing reader API for content-store reads. No physical
 deployment or change to PR463. Heartbeat now includes D07/#464 and this next action.
+
+22:54UTC: D07 regression against unchanged M product source is red: two deterministic
+real Windows open-stream replacement cases fail with WinError5 (identical and
+different payload); integrity-negative case passes. Native JUnit retained at
+diagnostics/d07-red-regression.xml. Next: implement shared-delete stable readers
+and bind size validation to the opened handle, then run focused regressions.
