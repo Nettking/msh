@@ -378,3 +378,9 @@ PR456 transport/storage Windows regressions are running. Next: retain three new
 native proofs, then retain/review only the newly completed exact461 ICSE artifacts.
 No merge or host action; runtime remains0536f03d67eb277e11573c2188d8e820399627e3,
 protected Recorder untouched, no physical PASS and no P07/P12 timers.
+
+New461 native proofs retained: both ICSE completions prove exact5b826c68,
+completing four native ICSE source proofs. Release capability/product proves
+synthetic e03addedbc4 and remains excluded. No test failure. Next: retain/review
+the exact ICSE bundle; do not inspect synthetic publication artifacts or rerun
+any qualification job.

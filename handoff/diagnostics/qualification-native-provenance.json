@@ -1553,9 +1553,48 @@
             "5b826c6806ab1bdb960412ba20ca78192971fb1d"
           ],
           "checkout_matches": true
+        },
+        {
+          "job_id": 103267381209,
+          "run_id": 34600817254,
+          "name": "Windows regressions (capability-product)",
+          "runner_name": "Nettking",
+          "conclusion": "success",
+          "bytes": 60142,
+          "sha256": "946d4a742ce97e2a125b662f4f587225ca9bb0fde16f1bca9566a3bd32053f7c",
+          "checkout_commits": [
+            "e03addedbc4d10e39e7c6a592977f45995ec6b8e"
+          ],
+          "checkout_matches": false
+        },
+        {
+          "job_id": 103287341780,
+          "run_id": 34606870244,
+          "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
+          "runner_name": "Nettking",
+          "conclusion": "success",
+          "bytes": 54437,
+          "sha256": "9eff5ac151372ba782c2da2186f9128306246adc030f597125dc0d688c10440b",
+          "checkout_commits": [
+            "5b826c6806ab1bdb960412ba20ca78192971fb1d"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103311460581,
+          "run_id": 34606870244,
+          "name": "publication-bundle",
+          "runner_name": "Nettking-Linux",
+          "conclusion": "success",
+          "bytes": 24752,
+          "sha256": "d7fa981f74043414bc966e947f491268b2f985f5e783f71e4664235882b8b872",
+          "checkout_commits": [
+            "5b826c6806ab1bdb960412ba20ca78192971fb1d"
+          ],
+          "checkout_matches": true
         }
       ],
-      "retained_at": "2026-09-11T14:57:52.839890+00:00"
+      "retained_at": "2026-09-11T15:09:27.043670+00:00"
     }
   }
 }
