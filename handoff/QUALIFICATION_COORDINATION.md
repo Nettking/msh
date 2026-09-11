@@ -169,3 +169,15 @@ Required gates are still pending across the fix set, including the newly
 dispatched exact461 phase2. No PR merge/candidate freeze yet. Runtime remains
 0536f03d67eb277e11573c2188d8e820399627e3; D04 deferred until final merged-main
 qualification; protected Recorder data untouched; P07/P12 not started.
+
+## September11 13:52UTC — new required job completions
+
+Heads unchanged; no new failures. PR457 capability/product Windows regressions
+completed successfully; transport/storage is now running. PR461 exact phase2
+run34605553188 has Linux success and Windows queued; exact harness34601191261
+is complete/success. Its prior synthetic CF7B34600817477 and ICSE34600817567
+are now complete/success. Detailed state delta is retained; remaining required
+gates still pending, no merge-ready verdict. Next: retain only new native proofs,
+then fill completed CF7B/ICSE exact-head gaps only if the proofs confirm mismatch
+and no exact run exists. No candidate, host or protected-data change; runtime
+remains0536f03d67eb277e11573c2188d8e820399627e3. P07/P12 not started.
