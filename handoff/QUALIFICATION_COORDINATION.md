@@ -1542,3 +1542,8 @@ Five final native logs retained: three source-bearing jobs verify exacthead7286f
 two expected no-checkout aggregates await dependency review. All38 source-bearing
 jobs (35 required plus3 companion) now have native exact-head proofs. Next: finish
 the two aggregate reviews and immutable release artifact review before verdict.
+
+21:19UTC: nine immutable release artifacts retained from34644764330, all GitHub
+digests match. Receipt `diagnostics/pr463-final-release-artifact-retention.json`.
+Next: run retained-artifact review against exacthead7286f30d, reconcile aggregates,
+test identities/skips and current review findings. No completed test is rerun.
