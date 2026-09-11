@@ -30,13 +30,14 @@ Preserve [D06 / issue462](diagnostics/D06.md). Repair is ready for review in PR4
 head7286f30d30e20c94c13cc9acebb2fd6d61bc1163, with focused development tests PASS.
 Next: review repair/native exact-head CI state. No dependent admission, physical
 retry workaround or PASS; no repair deployed and no new candidate frozen.
-PR463 is ready for review; required qualification is active. Six proven absent
-gates were dispatched once19:14UTC. Use `diagnostics/poll_pr463_state.py` only;
-preserve completed native logs and wait for existing parents before filling any
-synthetic-checkout gaps. No old-PR polling or qualification reruns.
+PR463 is ready for review; qualification is active. Verified18/37 required native
+checks plus CFI2/registry3/3 on its exact head. All13 workflows now have one
+justified exact-head dispatch recorded; the final release dispatch was20:32UTC.
+No more source-gap dispatches are needed. Use `diagnostics/poll_pr463_state.py`,
+then retain only newly completed logs. Preserve valid work; no old-PR polling.
 Nitro supported startup and actual M core image/env/repaired-source hashes are
-verified. Control identity preserved; LEADER/ready term9/index1553. Next replace
-the still-imported N host responder through the checked-in exact-process guard.
+verified. Control identity preserved; LEADER/ready term9/index1553. The attempted
+checked-in responder replacement exposed D06; no further physical startup now.
 
 Nettking and Nitro cores run M; Nitro responder replacement failed, current
 listener is absent: both old/new processes exited and5151 is free. Do not restart
@@ -1463,3 +1464,12 @@ All14 source jobs used syntheticbfec91c9. Synthetic Git object fetched for this
 read-only review; no checkout/runtime change. Guarded helper now accepts only
 these two explicitly reviewed aggregate IDs/digests for this run. Next: one
 release exact-head dispatch, preserving all native evidence and existing valid jobs.
+
+20:32UTC: final release exact-head replacement dispatched once (HTTP204), with
+14 native proofs and two reviewed aggregate dependencies. All13 qualification
+workflows now have one justified dispatch. No source gaps remain undispatched;
+do not repeat any dispatch. Next state check: `poll_pr463_state.py`, then retain
+only new native logs. Preserve18/37+3/3 exact-head PASS. Once all required jobs
+and release verdict pass, review exact-head artifacts and current correctness
+findings before normal merge; then qualify actual new merged main once.
+No new candidate or physical action before that sequence completes.
