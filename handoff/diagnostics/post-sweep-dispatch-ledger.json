@@ -1,0 +1,73 @@
+{
+  "dispatches": [
+    {
+      "pr": 461,
+      "sha": "5b826c6806ab1bdb960412ba20ca78192971fb1d",
+      "ref": "codex/tailnet-responder-port-propagation",
+      "workflow": "cf7-acceptance-harness.yml",
+      "requested_at": "2026-09-11T12:52:28.252528+00:00",
+      "reason": "No run exists",
+      "native_proof": [],
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "pr": 461,
+      "sha": "5b826c6806ab1bdb960412ba20ca78192971fb1d",
+      "ref": "codex/tailnet-responder-port-propagation",
+      "workflow": "cf7c-physical-test-readiness.yml",
+      "requested_at": "2026-09-11T12:52:30.334253+00:00",
+      "reason": "No run exists",
+      "native_proof": [],
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "pr": 461,
+      "sha": "5b826c6806ab1bdb960412ba20ca78192971fb1d",
+      "ref": "codex/tailnet-responder-port-propagation",
+      "workflow": "ci-test-sharding.yml",
+      "requested_at": "2026-09-11T12:52:32.329435+00:00",
+      "reason": "No run exists",
+      "native_proof": [],
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "pr": 457,
+      "sha": "143fe7a9082193114af3d34dc437b85f845849a2",
+      "ref": "codex/discovery-routing-budget",
+      "workflow": "federation-software-update.yml",
+      "requested_at": "2026-09-11T12:52:36.340341+00:00",
+      "reason": "Completed PR runs used another checkout SHA; native proof retained",
+      "native_proof": [
+        {
+          "job_id": 103246054995,
+          "run_id": 34594191426,
+          "checkout_commits": [
+            "3363b2c9bbcf3bc580256ba029045d4ca92b0174"
+          ],
+          "sha256": "cd0930e0141d5f2d346d2003c0c9ed0aeb6ebd746ae6f6fe1699a26f73d609b7"
+        },
+        {
+          "job_id": 103246055240,
+          "run_id": 34594191426,
+          "checkout_commits": [
+            "3363b2c9bbcf3bc580256ba029045d4ca92b0174"
+          ],
+          "sha256": "17531e328daf974cfec64dffe10cd588e49808256f0b0cfdfe5b715fa6f63fd7"
+        }
+      ],
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
+    }
+  ]
+}

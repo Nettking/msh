@@ -4,6 +4,13 @@
 `0536f03d67eb277e11573c2188d8e820399627e3`.
 **DIAGNOSTIC ONLY — NOT PHYSICAL ACCEPTANCE EVIDENCE.**
 
+Post-sweep progress: D05 was repaired and pushed as draft
+[#461](https://github.com/Nettking/msh/pull/461), exact head
+`5b826c6806ab1bdb960412ba20ca78192971fb1d`;50 focused tests passed with no skips.
+The [current handoff](FEDERATION_V1_DIAGNOSTIC_SWEEP.md) records the continuing
+exact-head qualification and source-proof gaps. The report below preserves the
+sweep conclusion and repair plan at its completion.
+
 Three independent product defects require the next fix set; one environment
 blocker must be resolved at admission. The detailed accumulating table, exact
 procedures, state effects and recovery information are in

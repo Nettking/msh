@@ -12,9 +12,33 @@ diagnostic checkpoint. The previous qualification-first handoff is superseded.
 **Current phase: diagnostic sweep COMPLETE, September11 12:44UTC.** Read the
 [sweep report](DIAGNOSTIC_SWEEP_REPORT.md) for the stop condition, coverage,
 smallest fix set and next action. Historical next-action paragraphs below are
-retained evidence history; the report supersedes them. Begin isolated D05 repair,
-then reconcile exact-head qualification without repeating valid work. Physical
+retained evidence history; the report supersedes them. D05 repair is now draft
+PR461, HEAD5b826c6806ab1bdb960412ba20ca78192971fb1d, with50 focused tests passed.
+Continue exact-head qualification without repeating valid work. Physical
 hosts remain unchanged and formal acceptance remains stopped.
+
+Latest post-sweep CI checkpoint: [source-specific native receipts and job state](diagnostics/post-sweep-qualification-checkpoint.json),
+[four justified dispatches](diagnostics/post-sweep-dispatch-ledger.json).
+At the snapshot456 had26 exact successful native logs,457 had20,461 had0;
+these counts include non-required evidence and are NOT the37-check verdict.
+PR457 software-update run34594191426 checked out3363b2c9, not143fe7a9, on both
+platforms, so its exact-head workflow was dispatched after preserving both logs.
+PR461 was missing cf7-acceptance-harness, cf7c-physical-test-readiness and
+ci-test-sharding, so those three were dispatched on5b826c68. No valid result was
+rerun. Other461 PR workflows are active/queued; its completed CFI2 Linux job used
+a synthetic merge checkout, so additional exact-head reconciliation remains.
+Do not cancel active jobs or infer qualification from the API head field.
+
+**Exact next action:** refresh each PR's `github_qualification.py snapshot`
+and `retain_qualification_logs.py <label>` using the local audit directory below;
+review only newly completed logs/artifacts, retain actual checkout proofs, then
+dispatch missing exact-head coverage only where current head/ref and existing
+runs prove a gap. Existing `advance_exact_head_qualification.py` accepts only
+readiness/discovery; do not falsely treat it as PR461 support. Wait for461 active
+synthetic jobs to finish or reconcile only wholly inactive queues; do not create
+duplicate runs. Required full exact-head gates, immutable image metadata and
+ICSE artifacts remain incomplete. No merge/new candidate/final-main qualification
+yet. Continue the existing automatic task follow-up; it was updated to this phase.
 
 ## Operating boundary
 

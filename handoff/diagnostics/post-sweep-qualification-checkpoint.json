@@ -1,0 +1,2060 @@
+{
+  "recorded_at": "2026-09-11T12:53:19.273793+00:00",
+  "phase": "post-sweep repair qualification in progress",
+  "runtime_candidate": "0536f03d67eb277e11573c2188d8e820399627e3",
+  "physical_acceptance": false,
+  "prs": [
+    {
+      "label": "pr456-head-1a0c634f",
+      "source_sha": "1a0c634f47f8a247b6d1d2d1a219f5c12590587d",
+      "snapshot_at": "2026-09-11T12:50:02.482063+00:00",
+      "snapshot_sha256": "6ee9ed27d443bae7b9021fbdc1cea3c848eb7eefbb15be9be6e6ae1dc9500ebc",
+      "native_receipt_sha256": "78a34eb4a6453f3d1f1590f321c0f6311cbb89e8df21b64c290868fc2274eb65",
+      "native_records": [
+        {
+          "job_id": 103248399023,
+          "run_id": 34594937633,
+          "name": "update-contracts (Linux, fcp-linux-fast, bash)",
+          "runner_name": "Nettking-Linux",
+          "conclusion": "success",
+          "bytes": 53364,
+          "sha256": "da7ffd4dfbead00cb95a98ae8e274f815370e6632b23880893e98939e84545fe",
+          "checkout_commits": [
+            "1a0c634f47f8a247b6d1d2d1a219f5c12590587d"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103248388895,
+          "run_id": 34594934409,
+          "name": "Shard contract (Linux, shared-pool)",
+          "runner_name": "AQG7NCC-Linux",
+          "conclusion": "success",
+          "bytes": 30283,
+          "sha256": "41fe43cb250cd5f520199fcfa304b541e75894bdf7383139dad9fea77c39d129",
+          "checkout_commits": [
+            "1a0c634f47f8a247b6d1d2d1a219f5c12590587d"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103248389159,
+          "run_id": 34594934409,
+          "name": "Shard contract (Windows, shared-pool)",
+          "runner_name": "Nettking",
+          "conclusion": "success",
+          "bytes": 25900,
+          "sha256": "0231b0f4c652dd4f4e19943278481b14a5ed4ed17d26741c77888728bf74d185",
+          "checkout_commits": [
+            "1a0c634f47f8a247b6d1d2d1a219f5c12590587d"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103249223941,
+          "run_id": 34595198159,
+          "name": "role-retirement (Linux, fcp-linux-fast, bash)",
+          "runner_name": "Nettking-Linux",
+          "conclusion": "success",
+          "bytes": 50804,
+          "sha256": "6888a88e8d61d8cff72b1ed9b6667fdfa324073826c7caa1498fbe004f5a169f",
+          "checkout_commits": [
+            "1a0c634f47f8a247b6d1d2d1a219f5c12590587d"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103249224067,
+          "run_id": 34595198159,
+          "name": "role-retirement (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+          "runner_name": "Nettking",
+          "conclusion": "success",
+          "bytes": 48683,
+          "sha256": "f5a8eb9da612872f6637e1f05cf6f324d807b5595c84715a2ec77f4a6c3453a4",
+          "checkout_commits": [
+            "1a0c634f47f8a247b6d1d2d1a219f5c12590587d"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103249213789,
+          "run_id": 34595194849,
+          "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
+          "runner_name": "Nettking",
+          "conclusion": "success",
+          "bytes": 54343,
+          "sha256": "61b2ac45531c18901294db96391f5045a75deeb56cb48e7d91c0a2c689e82ee7",
+          "checkout_commits": [
+            "1a0c634f47f8a247b6d1d2d1a219f5c12590587d"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103249235477,
+          "run_id": 34595201590,
+          "name": "operator-surface (Linux, fcp-linux-fast, bash)",
+          "runner_name": "Nettking-Linux",
+          "conclusion": "success",
+          "bytes": 107169,
+          "sha256": "3b847157e1e6fae7cd867164ed869afe9a2ecda2cfa68e5866cbd1dee16fbcfe",
+          "checkout_commits": [
+            "1a0c634f47f8a247b6d1d2d1a219f5c12590587d"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103249235760,
+          "run_id": 34595201590,
+          "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+          "runner_name": "Nettking",
+          "conclusion": "success",
+          "bytes": 107941,
+          "sha256": "4512b6c3e6e76e9cf37b18719d1136230ee42745bcdaebc6de14dcef05c30324",
+          "checkout_commits": [
+            "1a0c634f47f8a247b6d1d2d1a219f5c12590587d"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103249965313,
+          "run_id": 34595427316,
+          "name": "PostgreSQL storage release check",
+          "runner_name": "AQG7NCC-Linux",
+          "conclusion": "success",
+          "bytes": 43853,
+          "sha256": "0d9b0cb83b33e94ae2cfd62d47cab50d846ff24d15fc6270168db14b8e826fb4",
+          "checkout_commits": [
+            "1a0c634f47f8a247b6d1d2d1a219f5c12590587d"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103249965506,
+          "run_id": 34595427316,
+          "name": "Full-suite order (fixed)",
+          "runner_name": "AQG7NCC-Linux",
+          "conclusion": "success",
+          "bytes": 70417,
+          "sha256": "ea1fa6d09bc963a345db8e2dbfeebb7185a96abf49dcf17fdece99ec062d2998",
+          "checkout_commits": [
+            "1a0c634f47f8a247b6d1d2d1a219f5c12590587d"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103249965523,
+          "run_id": 34595427316,
+          "name": "Full-suite order (rotating)",
+          "runner_name": "Nettking-Linux",
+          "conclusion": "success",
+          "bytes": 70201,
+          "sha256": "49be8428753b2791afb38f51bfdc766aeec84d7b1d9aedcbfe6b651cc49fc32c",
+          "checkout_commits": [
+            "1a0c634f47f8a247b6d1d2d1a219f5c12590587d"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103249965533,
+          "run_id": 34595427316,
+          "name": "Linux regression shard (0)",
+          "runner_name": "AQG7NCC-Linux",
+          "conclusion": "success",
+          "bytes": 59328,
+          "sha256": "abc340a88b58b975daae6b7d85ed1ff98aba75d0ded014285d768d9ed0a2d092",
+          "checkout_commits": [
+            "1a0c634f47f8a247b6d1d2d1a219f5c12590587d"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103249965623,
+          "run_id": 34595427316,
+          "name": "Release checks (Linux)",
+          "runner_name": "AQG7NCC-Linux",
+          "conclusion": "success",
+          "bytes": 54157,
+          "sha256": "2de9427b5863080a144aaa46e2abbb9e11b660e568055fd12e65894fa006e93a",
+          "checkout_commits": [
+            "1a0c634f47f8a247b6d1d2d1a219f5c12590587d"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103249965649,
+          "run_id": 34595427316,
+          "name": "Linux regression shard (1)",
+          "runner_name": "AQG7NCC-Linux",
+          "conclusion": "success",
+          "bytes": 64838,
+          "sha256": "f26adb0892b9e461e649e3add71155047e04c6609feb634216e33fee0e4fcdf5",
+          "checkout_commits": [
+            "1a0c634f47f8a247b6d1d2d1a219f5c12590587d"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103249965796,
+          "run_id": 34595427316,
+          "name": "Linux regression shard (3)",
+          "runner_name": "AQG7NCC-Linux",
+          "conclusion": "success",
+          "bytes": 60225,
+          "sha256": "b4ba4ebf87aedea259c6984d1af25c92ac67bb7e8dac53c4ed3bac15992398dc",
+          "checkout_commits": [
+            "1a0c634f47f8a247b6d1d2d1a219f5c12590587d"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103249965813,
+          "run_id": 34595427316,
+          "name": "Linux regression shard (2)",
+          "runner_name": "Nettking-Linux",
+          "conclusion": "success",
+          "bytes": 61307,
+          "sha256": "021160d2781725b965e5b0ec0e6d56760c4eb8b5af9b5008270d1c1e1e36e5b1",
+          "checkout_commits": [
+            "1a0c634f47f8a247b6d1d2d1a219f5c12590587d"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103263379686,
+          "run_id": 34595427316,
+          "name": "Clean-checkout suite order independence",
+          "runner_name": "Nettking-Linux",
+          "conclusion": "success",
+          "bytes": 1101,
+          "sha256": "c29d6f0799dd8ebfe1080568c6c79be115626e3b877dc29b511c018d8b945f8c",
+          "checkout_commits": [],
+          "checkout_matches": null
+        },
+        {
+          "job_id": 103248409180,
+          "run_id": 34594940951,
+          "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
+          "runner_name": "Nettking",
+          "conclusion": "success",
+          "bytes": 72174,
+          "sha256": "cb9b7421d6b581ee671dbaf891d896a2c61cfe2e50c938f94e7e104eb3082947",
+          "checkout_commits": [
+            "1a0c634f47f8a247b6d1d2d1a219f5c12590587d"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103248409327,
+          "run_id": 34594940951,
+          "name": "acceptance (Linux, fcp-linux-fast, bash)",
+          "runner_name": "Nettking-Linux",
+          "conclusion": "success",
+          "bytes": 70554,
+          "sha256": "fda47841c6714983c03cf4caac26118cbc37d74e77f6fb109a919889800b376e",
+          "checkout_commits": [
+            "1a0c634f47f8a247b6d1d2d1a219f5c12590587d"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103245259654,
+          "run_id": 34593922113,
+          "name": "harness (Linux, fcp-linux-fast, bash)",
+          "runner_name": "Nettking-Linux",
+          "conclusion": "success",
+          "bytes": 62409,
+          "sha256": "e7e246b7695f40bf50026724d5125081af75e31f0ab1d420927213953a0523fd",
+          "checkout_commits": [
+            "1a0c634f47f8a247b6d1d2d1a219f5c12590587d"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103245259705,
+          "run_id": 34593922113,
+          "name": "harness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Byp...",
+          "runner_name": "Nettking",
+          "conclusion": "success",
+          "bytes": 63544,
+          "sha256": "16e848795239e701dbd931c15116d5b6c452f7d516bc5d0a0f7aab91b34e009c",
+          "checkout_commits": [
+            "1a0c634f47f8a247b6d1d2d1a219f5c12590587d"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103245230229,
+          "run_id": 34593925179,
+          "name": "linux",
+          "runner_name": "Nettking-Linux",
+          "conclusion": "success",
+          "bytes": 191695,
+          "sha256": "2bc08f4dc98b3908a9f3c4e37a1c732200c8e6ed0f03b235fea8f17a1b972347",
+          "checkout_commits": [
+            "1a0c634f47f8a247b6d1d2d1a219f5c12590587d"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103245233661,
+          "run_id": 34593927545,
+          "name": "readiness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy B...",
+          "runner_name": "Nettking",
+          "conclusion": "success",
+          "bytes": 49242,
+          "sha256": "7173bf3ddea241730172bf208bf40e764f365613c8fe28ffc085750ca82f1eba",
+          "checkout_commits": [
+            "1a0c634f47f8a247b6d1d2d1a219f5c12590587d"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103245233869,
+          "run_id": 34593927545,
+          "name": "readiness (Linux, fcp-linux-fast, bash)",
+          "runner_name": "Nettking-Linux",
+          "conclusion": "success",
+          "bytes": 45627,
+          "sha256": "c442b8db80a290c4519a6c9ea374df32bb9992dd0df5082fb131cf83bf7c7d56",
+          "checkout_commits": [
+            "1a0c634f47f8a247b6d1d2d1a219f5c12590587d"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103245241093,
+          "run_id": 34593929568,
+          "name": "onboarding (Linux, fcp-test-linux, bash, 3.12.13)",
+          "runner_name": "AQG7NCC-Linux",
+          "conclusion": "success",
+          "bytes": 56749,
+          "sha256": "1c0cd97b3e0b486a5e891eef5794576c8a1d278ec2a8fff4ff7e6c1b2df7cec8",
+          "checkout_commits": [
+            "1a0c634f47f8a247b6d1d2d1a219f5c12590587d"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103245241386,
+          "run_id": 34593929568,
+          "name": "onboarding (Windows, fcp-test-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+          "runner_name": "Nettking",
+          "conclusion": "success",
+          "bytes": 58031,
+          "sha256": "3cd2a8024bdf945bb065170aef90d7b3bbba46130721018dc84765e41b60a065",
+          "checkout_commits": [
+            "1a0c634f47f8a247b6d1d2d1a219f5c12590587d"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103245246285,
+          "run_id": 34593931824,
+          "name": "Verify immutable release image metadata",
+          "runner_name": "Nettking-Linux",
+          "conclusion": "success",
+          "bytes": 13314,
+          "sha256": "da1d1ecd79d4361357762d0b22a3faabb384e7cc1ece4a90007f4028d7d2cd5c",
+          "checkout_commits": [
+            "1a0c634f47f8a247b6d1d2d1a219f5c12590587d"
+          ],
+          "checkout_matches": true
+        }
+      ],
+      "missing_workflows": [],
+      "workflows": [
+        {
+          "workflow": "federation-software-update.yml",
+          "run_id": 34594937633,
+          "event": "workflow_dispatch",
+          "status": "queued",
+          "conclusion": null,
+          "jobs": [
+            {
+              "id": 103248398752,
+              "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T11:37:36Z",
+              "completed_at": null
+            },
+            {
+              "id": 103248399023,
+              "name": "update-contracts (Linux, fcp-linux-fast, bash)",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "runner_id": 27,
+              "started_at": "2026-09-11T12:43:52Z",
+              "completed_at": "2026-09-11T12:45:37Z"
+            }
+          ]
+        },
+        {
+          "workflow": "ci-test-sharding.yml",
+          "run_id": 34594934409,
+          "event": "workflow_dispatch",
+          "status": "completed",
+          "conclusion": "success",
+          "jobs": [
+            {
+              "id": 103248388895,
+              "name": "Shard contract (Linux, shared-pool)",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "AQG7NCC-Linux",
+              "runner_id": 31,
+              "started_at": "2026-09-11T11:43:58Z",
+              "completed_at": "2026-09-11T11:44:27Z"
+            },
+            {
+              "id": 103248389159,
+              "name": "Shard contract (Windows, shared-pool)",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking",
+              "runner_id": 22,
+              "started_at": "2026-09-11T12:04:21Z",
+              "completed_at": "2026-09-11T12:05:16Z"
+            }
+          ]
+        },
+        {
+          "workflow": "cf8-role-retirement.yml",
+          "run_id": 34595198159,
+          "event": "workflow_dispatch",
+          "status": "completed",
+          "conclusion": "success",
+          "jobs": [
+            {
+              "id": 103249223941,
+              "name": "role-retirement (Linux, fcp-linux-fast, bash)",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "runner_id": 27,
+              "started_at": "2026-09-11T11:59:47Z",
+              "completed_at": "2026-09-11T12:00:48Z"
+            },
+            {
+              "id": 103249224067,
+              "name": "role-retirement (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking",
+              "runner_id": 22,
+              "started_at": "2026-09-11T12:05:18Z",
+              "completed_at": "2026-09-11T12:09:03Z"
+            }
+          ]
+        },
+        {
+          "workflow": "icse-tool-demo.yml",
+          "run_id": 34595194849,
+          "event": "workflow_dispatch",
+          "status": "queued",
+          "conclusion": null,
+          "jobs": [
+            {
+              "id": 103249213618,
+              "name": "reviewer-compose",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T11:40:49Z",
+              "completed_at": null
+            },
+            {
+              "id": 103249213789,
+              "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking",
+              "runner_id": 22,
+              "started_at": "2026-09-11T11:57:39Z",
+              "completed_at": "2026-09-11T12:01:14Z"
+            },
+            {
+              "id": 103249213972,
+              "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T11:40:49Z",
+              "completed_at": null
+            }
+          ]
+        },
+        {
+          "workflow": "phase-f85-operator-federation-surface.yml",
+          "run_id": 34595201590,
+          "event": "workflow_dispatch",
+          "status": "completed",
+          "conclusion": "success",
+          "jobs": [
+            {
+              "id": 103249235477,
+              "name": "operator-surface (Linux, fcp-linux-fast, bash)",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "runner_id": 27,
+              "started_at": "2026-09-11T12:34:18Z",
+              "completed_at": "2026-09-11T12:37:32Z"
+            },
+            {
+              "id": 103249235760,
+              "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking",
+              "runner_id": 22,
+              "started_at": "2026-09-11T12:31:17Z",
+              "completed_at": "2026-09-11T12:39:03Z"
+            }
+          ]
+        },
+        {
+          "workflow": "federation-v1-release.yml",
+          "run_id": 34595427316,
+          "event": "workflow_dispatch",
+          "status": "queued",
+          "conclusion": null,
+          "jobs": [
+            {
+              "id": 103249965313,
+              "name": "PostgreSQL storage release check",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "AQG7NCC-Linux",
+              "runner_id": 31,
+              "started_at": "2026-09-11T11:46:06Z",
+              "completed_at": "2026-09-11T11:47:20Z"
+            },
+            {
+              "id": 103249965431,
+              "name": "Release checks (Windows)",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T11:43:48Z",
+              "completed_at": null
+            },
+            {
+              "id": 103249965506,
+              "name": "Full-suite order (fixed)",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "AQG7NCC-Linux",
+              "runner_id": 31,
+              "started_at": "2026-09-11T11:54:12Z",
+              "completed_at": "2026-09-11T12:12:53Z"
+            },
+            {
+              "id": 103249965523,
+              "name": "Full-suite order (rotating)",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "runner_id": 27,
+              "started_at": "2026-09-11T12:20:40Z",
+              "completed_at": "2026-09-11T12:34:16Z"
+            },
+            {
+              "id": 103249965533,
+              "name": "Linux regression shard (0)",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "AQG7NCC-Linux",
+              "runner_id": 31,
+              "started_at": "2026-09-11T12:14:16Z",
+              "completed_at": "2026-09-11T12:19:55Z"
+            },
+            {
+              "id": 103249965566,
+              "name": "Windows regressions (transport-storage)",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T11:43:48Z",
+              "completed_at": null
+            },
+            {
+              "id": 103249965623,
+              "name": "Release checks (Linux)",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "AQG7NCC-Linux",
+              "runner_id": 31,
+              "started_at": "2026-09-11T12:37:15Z",
+              "completed_at": "2026-09-11T12:38:23Z"
+            },
+            {
+              "id": 103249965630,
+              "name": "Windows regressions (journal-artifacts)",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T11:43:48Z",
+              "completed_at": null
+            },
+            {
+              "id": 103249965649,
+              "name": "Linux regression shard (1)",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "AQG7NCC-Linux",
+              "runner_id": 31,
+              "started_at": "2026-09-11T12:31:45Z",
+              "completed_at": "2026-09-11T12:37:11Z"
+            },
+            {
+              "id": 103249965655,
+              "name": "Windows regressions (capability-product)",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T11:43:48Z",
+              "completed_at": null
+            },
+            {
+              "id": 103249965796,
+              "name": "Linux regression shard (3)",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "AQG7NCC-Linux",
+              "runner_id": 31,
+              "started_at": "2026-09-11T12:38:28Z",
+              "completed_at": "2026-09-11T12:43:49Z"
+            },
+            {
+              "id": 103249965813,
+              "name": "Linux regression shard (2)",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "runner_id": 27,
+              "started_at": "2026-09-11T12:37:34Z",
+              "completed_at": "2026-09-11T12:42:14Z"
+            },
+            {
+              "id": 103263379686,
+              "name": "Clean-checkout suite order independence",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "runner_id": 27,
+              "started_at": "2026-09-11T12:42:29Z",
+              "completed_at": "2026-09-11T12:42:34Z"
+            }
+          ]
+        },
+        {
+          "workflow": "product-branding.yml",
+          "run_id": 34595429597,
+          "event": "workflow_dispatch",
+          "status": "queued",
+          "conclusion": null,
+          "jobs": [
+            {
+              "id": 103249972533,
+              "name": "product-branding",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T11:43:50Z",
+              "completed_at": null
+            }
+          ]
+        },
+        {
+          "workflow": "cf7b-product-physical-acceptance.yml",
+          "run_id": 34594940951,
+          "event": "workflow_dispatch",
+          "status": "completed",
+          "conclusion": "success",
+          "jobs": [
+            {
+              "id": 103248409180,
+              "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking",
+              "runner_id": 22,
+              "started_at": "2026-09-11T11:52:50Z",
+              "completed_at": "2026-09-11T11:57:37Z"
+            },
+            {
+              "id": 103248409327,
+              "name": "acceptance (Linux, fcp-linux-fast, bash)",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "runner_id": 27,
+              "started_at": "2026-09-11T12:45:39Z",
+              "completed_at": "2026-09-11T12:48:20Z"
+            }
+          ]
+        },
+        {
+          "workflow": "cf7-acceptance-harness.yml",
+          "run_id": 34593922113,
+          "event": "workflow_dispatch",
+          "status": "completed",
+          "conclusion": "success",
+          "jobs": [
+            {
+              "id": 103245259654,
+              "name": "harness (Linux, fcp-linux-fast, bash)",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "runner_id": 27,
+              "started_at": "2026-09-11T12:03:29Z",
+              "completed_at": "2026-09-11T12:06:17Z"
+            },
+            {
+              "id": 103245259705,
+              "name": "harness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Byp...",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking",
+              "runner_id": 22,
+              "started_at": "2026-09-11T11:47:33Z",
+              "completed_at": "2026-09-11T11:52:48Z"
+            }
+          ]
+        },
+        {
+          "workflow": "phase2-federation.yml",
+          "run_id": 34593925179,
+          "event": "workflow_dispatch",
+          "status": "queued",
+          "conclusion": null,
+          "jobs": [
+            {
+              "id": 103245230229,
+              "name": "linux",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "runner_id": 27,
+              "started_at": "2026-09-11T12:01:24Z",
+              "completed_at": "2026-09-11T12:03:27Z"
+            },
+            {
+              "id": 103245230356,
+              "name": "windows",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T11:25:11Z",
+              "completed_at": null
+            }
+          ]
+        },
+        {
+          "workflow": "cf7c-physical-test-readiness.yml",
+          "run_id": 34593927545,
+          "event": "workflow_dispatch",
+          "status": "completed",
+          "conclusion": "success",
+          "jobs": [
+            {
+              "id": 103245233661,
+              "name": "readiness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy B...",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking",
+              "runner_id": 22,
+              "started_at": "2026-09-11T12:39:04Z",
+              "completed_at": "2026-09-11T12:43:29Z"
+            },
+            {
+              "id": 103245233869,
+              "name": "readiness (Linux, fcp-linux-fast, bash)",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "runner_id": 27,
+              "started_at": "2026-09-11T11:54:50Z",
+              "completed_at": "2026-09-11T11:55:46Z"
+            }
+          ]
+        },
+        {
+          "workflow": "cfi2-onboarding-composition.yml",
+          "run_id": 34593929568,
+          "event": "workflow_dispatch",
+          "status": "completed",
+          "conclusion": "success",
+          "jobs": [
+            {
+              "id": 103245241093,
+              "name": "onboarding (Linux, fcp-test-linux, bash, 3.12.13)",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "AQG7NCC-Linux",
+              "runner_id": 31,
+              "started_at": "2026-09-11T11:41:56Z",
+              "completed_at": "2026-09-11T11:43:20Z"
+            },
+            {
+              "id": 103245241386,
+              "name": "onboarding (Windows, fcp-test-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking",
+              "runner_id": 22,
+              "started_at": "2026-09-11T12:09:05Z",
+              "completed_at": "2026-09-11T12:12:51Z"
+            }
+          ]
+        },
+        {
+          "workflow": "release-image-metadata.yml",
+          "run_id": 34593931824,
+          "event": "workflow_dispatch",
+          "status": "completed",
+          "conclusion": "success",
+          "jobs": [
+            {
+              "id": 103245246285,
+              "name": "Verify immutable release image metadata",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "runner_id": 27,
+              "started_at": "2026-09-11T12:48:22Z",
+              "completed_at": "2026-09-11T12:48:32Z"
+            }
+          ]
+        }
+      ],
+      "full_exact_head_qualification": "INCOMPLETE; do not infer PASS from API head SHA or focused tests",
+      "exact_successful_native_jobs": 26,
+      "other_checkout_jobs": 0
+    },
+    {
+      "label": "pr457-head-143fe7a9",
+      "source_sha": "143fe7a9082193114af3d34dc437b85f845849a2",
+      "snapshot_at": "2026-09-11T12:50:01.857415+00:00",
+      "snapshot_sha256": "607062f4d35190ba3a39222e7ad26632318cdd14ce5faaf56b9f778dbd899a4d",
+      "native_receipt_sha256": "d8cbc9c5a649255bf979d02ba55e1ef9803f6527afce261171d6b4d1bbebfe3e",
+      "native_records": [
+        {
+          "job_id": 103249382721,
+          "run_id": 34595245333,
+          "name": "harness (Linux, fcp-linux-fast, bash)",
+          "runner_name": "Nettking-Linux",
+          "conclusion": "success",
+          "bytes": 60082,
+          "sha256": "53e14bc40fb30f6667ba441682be07a1a586ceb673cba26b99f9a7b2a6b735ce",
+          "checkout_commits": [
+            "143fe7a9082193114af3d34dc437b85f845849a2"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103249383083,
+          "run_id": 34595245333,
+          "name": "harness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Byp...",
+          "runner_name": "Nettking",
+          "conclusion": "success",
+          "bytes": 63602,
+          "sha256": "491b9bcf77aced34c81a84692f96e2c7046e8d7746f54dd353beeae9c37dcc46",
+          "checkout_commits": [
+            "143fe7a9082193114af3d34dc437b85f845849a2"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103246054995,
+          "run_id": 34594191426,
+          "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+          "runner_name": "Nettking",
+          "conclusion": "success",
+          "bytes": 62750,
+          "sha256": "cd0930e0141d5f2d346d2003c0c9ed0aeb6ebd746ae6f6fe1699a26f73d609b7",
+          "checkout_commits": [
+            "3363b2c9bbcf3bc580256ba029045d4ca92b0174"
+          ],
+          "checkout_matches": false
+        },
+        {
+          "job_id": 103246055240,
+          "run_id": 34594191426,
+          "name": "update-contracts (Linux, fcp-linux-fast, bash)",
+          "runner_name": "Nettking-Linux",
+          "conclusion": "success",
+          "bytes": 52631,
+          "sha256": "17531e328daf974cfec64dffe10cd588e49808256f0b0cfdfe5b715fa6f63fd7",
+          "checkout_commits": [
+            "3363b2c9bbcf3bc580256ba029045d4ca92b0174"
+          ],
+          "checkout_matches": false
+        },
+        {
+          "job_id": 103249372583,
+          "run_id": 34595242291,
+          "name": "reviewer-compose",
+          "runner_name": "Nettking-Linux",
+          "conclusion": "success",
+          "bytes": 26918,
+          "sha256": "06e11ef46f28ce7b9bc36cc7c977fc4484863e722d829d18bdc91a97b42d992a",
+          "checkout_commits": [
+            "143fe7a9082193114af3d34dc437b85f845849a2"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103249372736,
+          "run_id": 34595242291,
+          "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
+          "runner_name": "Nettking",
+          "conclusion": "success",
+          "bytes": 54167,
+          "sha256": "277aced52fd76aa7e8cd044b4221849656718eae06fbd155cc288c5951b19327",
+          "checkout_commits": [
+            "143fe7a9082193114af3d34dc437b85f845849a2"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103249372837,
+          "run_id": 34595242291,
+          "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
+          "runner_name": "Nettking-Linux",
+          "conclusion": "success",
+          "bytes": 49323,
+          "sha256": "b0b15a4aa2aeb87615d84259a09407617d6e7ffa68977c9fe4be6ea672842069",
+          "checkout_commits": [
+            "143fe7a9082193114af3d34dc437b85f845849a2"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103249361696,
+          "run_id": 34595238876,
+          "name": "product-branding",
+          "runner_name": "Nettking-Linux",
+          "conclusion": "success",
+          "bytes": 14068,
+          "sha256": "0b8d5bf8e938cbac1448cdf579ae1e1a9b0f235af83a2c31ebf7d4edc122119e",
+          "checkout_commits": [
+            "143fe7a9082193114af3d34dc437b85f845849a2"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103249411255,
+          "run_id": 34595254012,
+          "name": "onboarding (Linux, fcp-test-linux, bash, 3.12.13)",
+          "runner_name": "AQG7NCC-Linux",
+          "conclusion": "success",
+          "bytes": 56499,
+          "sha256": "0c5f4bdcc98aad2841b091ca18eddc46abc52c5a5cb17e3312a6a610883eb099",
+          "checkout_commits": [
+            "143fe7a9082193114af3d34dc437b85f845849a2"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103248585125,
+          "run_id": 34594990947,
+          "name": "Windows regressions (journal-artifacts)",
+          "runner_name": "Nettking",
+          "conclusion": "success",
+          "bytes": 53711,
+          "sha256": "51f18df425819eec63577c869b69a33233b92dea9b3e1da7ac1bb70d6de7934b",
+          "checkout_commits": [
+            "143fe7a9082193114af3d34dc437b85f845849a2"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103248585204,
+          "run_id": 34594990947,
+          "name": "Linux regression shard (0)",
+          "runner_name": "Nettking-Linux",
+          "conclusion": "success",
+          "bytes": 56838,
+          "sha256": "a1d405da9ef46cac4478f5e8e96b41f651b8baadac3ab33fd265bb82266c975b",
+          "checkout_commits": [
+            "143fe7a9082193114af3d34dc437b85f845849a2"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103248585291,
+          "run_id": 34594990947,
+          "name": "Full-suite order (rotating)",
+          "runner_name": "Nettking-Linux",
+          "conclusion": "success",
+          "bytes": 69961,
+          "sha256": "65c222958e01ca3f6b5f7ba8322c11a0a82db60bb1e0c15a3714b2dff7342790",
+          "checkout_commits": [
+            "143fe7a9082193114af3d34dc437b85f845849a2"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103248585306,
+          "run_id": 34594990947,
+          "name": "Full-suite order (fixed)",
+          "runner_name": "Nettking-Linux",
+          "conclusion": "success",
+          "bytes": 67955,
+          "sha256": "95258d4cc544d7be84dba39c53117f177239b9f52f0554d0b831aef1d5bf91f6",
+          "checkout_commits": [
+            "143fe7a9082193114af3d34dc437b85f845849a2"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103248585326,
+          "run_id": 34594990947,
+          "name": "Linux regression shard (1)",
+          "runner_name": "AQG7NCC-Linux",
+          "conclusion": "success",
+          "bytes": 60970,
+          "sha256": "feb289cd2cede397b496c9995bb9f0ebcc3a68bdc94a9957cda2313e97ac15ad",
+          "checkout_commits": [
+            "143fe7a9082193114af3d34dc437b85f845849a2"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103248585342,
+          "run_id": 34594990947,
+          "name": "Release checks (Linux)",
+          "runner_name": "AQG7NCC-Linux",
+          "conclusion": "success",
+          "bytes": 56920,
+          "sha256": "579735779dcaf5cdf6b81dce0196da735c5949bf8af7e7fd33e44f0a3d571132",
+          "checkout_commits": [
+            "143fe7a9082193114af3d34dc437b85f845849a2"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103248585354,
+          "run_id": 34594990947,
+          "name": "Linux regression shard (3)",
+          "runner_name": "AQG7NCC-Linux",
+          "conclusion": "success",
+          "bytes": 63235,
+          "sha256": "c645962ce11d7519ee15251daf7d57d555cc0cf80cab3f4dc3998159e92fc020",
+          "checkout_commits": [
+            "143fe7a9082193114af3d34dc437b85f845849a2"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103248585360,
+          "run_id": 34594990947,
+          "name": "Linux regression shard (2)",
+          "runner_name": "AQG7NCC-Linux",
+          "conclusion": "success",
+          "bytes": 59015,
+          "sha256": "a71dd961d6bb42600bcaeeeea3192432d6350de8d94c094996d0b914412ca8c1",
+          "checkout_commits": [
+            "143fe7a9082193114af3d34dc437b85f845849a2"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103248585390,
+          "run_id": 34594990947,
+          "name": "PostgreSQL storage release check",
+          "runner_name": "AQG7NCC-Linux",
+          "conclusion": "success",
+          "bytes": 45507,
+          "sha256": "5a76d8f87defd6f324e7abf2d603660a5240459313d0e157f9ec1911090a3e15",
+          "checkout_commits": [
+            "143fe7a9082193114af3d34dc437b85f845849a2"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103259588601,
+          "run_id": 34594990947,
+          "name": "Clean-checkout suite order independence",
+          "runner_name": "AQG7NCC-Linux",
+          "conclusion": "success",
+          "bytes": 1107,
+          "sha256": "cfab4be8ad40fe9f1ca0d459ecb2a13ceba34612ca941e83272dab62bf654f39",
+          "checkout_commits": [],
+          "checkout_matches": null
+        },
+        {
+          "job_id": 103249421752,
+          "run_id": 34595257295,
+          "name": "Shard contract (Linux, shared-pool)",
+          "runner_name": "AQG7NCC-Linux",
+          "conclusion": "success",
+          "bytes": 32005,
+          "sha256": "015895074dd043982aeeb599f4f4e5fbaf1b532b3e35613152b96780c934ad11",
+          "checkout_commits": [
+            "143fe7a9082193114af3d34dc437b85f845849a2"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103246676927,
+          "run_id": 34594391897,
+          "name": "readiness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy B...",
+          "runner_name": "Nettking",
+          "conclusion": "success",
+          "bytes": 48608,
+          "sha256": "83a82947054d78d7052212f9d11ad096952b60f74d88361f83001890f55c60a7",
+          "checkout_commits": [
+            "143fe7a9082193114af3d34dc437b85f845849a2"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103246677068,
+          "run_id": 34594391897,
+          "name": "readiness (Linux, fcp-linux-fast, bash)",
+          "runner_name": "Nettking-Linux",
+          "conclusion": "success",
+          "bytes": 41362,
+          "sha256": "1eed203088f0ccb8924b049b0bcfb16e4bec4f66b981a7f3f5ac4b54c4954038",
+          "checkout_commits": [
+            "143fe7a9082193114af3d34dc437b85f845849a2"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103246681512,
+          "run_id": 34594394644,
+          "name": "Verify immutable release image metadata",
+          "runner_name": "Nettking-Linux",
+          "conclusion": "success",
+          "bytes": 14909,
+          "sha256": "9cbf9b1901de3b1f17fd8e45721ad1b89f4448fe3f5cec86dec2b0683d4f9bda",
+          "checkout_commits": [
+            "143fe7a9082193114af3d34dc437b85f845849a2"
+          ],
+          "checkout_matches": true
+        }
+      ],
+      "missing_workflows": [],
+      "workflows": [
+        {
+          "workflow": "phase2-federation.yml",
+          "run_id": 34595440682,
+          "event": "workflow_dispatch",
+          "status": "queued",
+          "conclusion": null,
+          "jobs": [
+            {
+              "id": 103250009493,
+              "name": "windows",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T11:44:00Z",
+              "completed_at": null
+            },
+            {
+              "id": 103250009666,
+              "name": "linux",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T11:44:00Z",
+              "completed_at": null
+            }
+          ]
+        },
+        {
+          "workflow": "cf7-acceptance-harness.yml",
+          "run_id": 34595245333,
+          "event": "workflow_dispatch",
+          "status": "completed",
+          "conclusion": "success",
+          "jobs": [
+            {
+              "id": 103249382721,
+              "name": "harness (Linux, fcp-linux-fast, bash)",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "runner_id": 27,
+              "started_at": "2026-09-11T11:57:21Z",
+              "completed_at": "2026-09-11T11:59:45Z"
+            },
+            {
+              "id": 103249383083,
+              "name": "harness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Byp...",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking",
+              "runner_id": 22,
+              "started_at": "2026-09-11T12:24:23Z",
+              "completed_at": "2026-09-11T12:31:16Z"
+            }
+          ]
+        },
+        {
+          "workflow": "federation-software-update.yml",
+          "run_id": 34594191426,
+          "event": "pull_request",
+          "status": "completed",
+          "conclusion": "success",
+          "jobs": [
+            {
+              "id": 103246054995,
+              "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking",
+              "runner_id": 22,
+              "started_at": "2026-09-11T11:37:59Z",
+              "completed_at": "2026-09-11T11:47:31Z"
+            },
+            {
+              "id": 103246055240,
+              "name": "update-contracts (Linux, fcp-linux-fast, bash)",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "runner_id": 27,
+              "started_at": "2026-09-11T11:55:47Z",
+              "completed_at": "2026-09-11T11:57:09Z"
+            }
+          ]
+        },
+        {
+          "workflow": "icse-tool-demo.yml",
+          "run_id": 34595242291,
+          "event": "workflow_dispatch",
+          "status": "queued",
+          "conclusion": null,
+          "jobs": [
+            {
+              "id": 103249372583,
+              "name": "reviewer-compose",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "runner_id": 27,
+              "started_at": "2026-09-11T12:00:50Z",
+              "completed_at": "2026-09-11T12:01:16Z"
+            },
+            {
+              "id": 103249372736,
+              "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking",
+              "runner_id": 22,
+              "started_at": "2026-09-11T12:43:31Z",
+              "completed_at": "2026-09-11T12:48:25Z"
+            },
+            {
+              "id": 103249372837,
+              "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "runner_id": 27,
+              "started_at": "2026-09-11T12:06:35Z",
+              "completed_at": "2026-09-11T12:08:11Z"
+            },
+            {
+              "id": 103267430331,
+              "name": "publication-bundle",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T12:48:25Z",
+              "completed_at": null
+            }
+          ]
+        },
+        {
+          "workflow": "product-branding.yml",
+          "run_id": 34595238876,
+          "event": "workflow_dispatch",
+          "status": "completed",
+          "conclusion": "success",
+          "jobs": [
+            {
+              "id": 103249361696,
+              "name": "product-branding",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "runner_id": 27,
+              "started_at": "2026-09-11T12:06:19Z",
+              "completed_at": "2026-09-11T12:06:33Z"
+            }
+          ]
+        },
+        {
+          "workflow": "cf8-role-retirement.yml",
+          "run_id": 34595249307,
+          "event": "workflow_dispatch",
+          "status": "in_progress",
+          "conclusion": null,
+          "jobs": [
+            {
+              "id": 103249396092,
+              "name": "role-retirement (Linux, fcp-linux-fast, bash)",
+              "status": "in_progress",
+              "conclusion": null,
+              "runner_name": "Nettking-Linux",
+              "runner_id": 27,
+              "started_at": "2026-09-11T12:48:34Z",
+              "completed_at": null
+            },
+            {
+              "id": 103249396372,
+              "name": "role-retirement (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+              "status": "in_progress",
+              "conclusion": null,
+              "runner_name": "Nettking",
+              "runner_id": 22,
+              "started_at": "2026-09-11T12:48:27Z",
+              "completed_at": null
+            }
+          ]
+        },
+        {
+          "workflow": "phase-f85-operator-federation-surface.yml",
+          "run_id": 34595437630,
+          "event": "workflow_dispatch",
+          "status": "queued",
+          "conclusion": null,
+          "jobs": [
+            {
+              "id": 103250000836,
+              "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T11:43:58Z",
+              "completed_at": null
+            },
+            {
+              "id": 103250000962,
+              "name": "operator-surface (Linux, fcp-linux-fast, bash)",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T11:43:58Z",
+              "completed_at": null
+            }
+          ]
+        },
+        {
+          "workflow": "cfi2-onboarding-composition.yml",
+          "run_id": 34595254012,
+          "event": "workflow_dispatch",
+          "status": "queued",
+          "conclusion": null,
+          "jobs": [
+            {
+              "id": 103249411007,
+              "name": "onboarding (Windows, fcp-test-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T11:41:36Z",
+              "completed_at": null
+            },
+            {
+              "id": 103249411255,
+              "name": "onboarding (Linux, fcp-test-linux, bash, 3.12.13)",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "AQG7NCC-Linux",
+              "runner_id": 31,
+              "started_at": "2026-09-11T11:44:32Z",
+              "completed_at": "2026-09-11T11:46:02Z"
+            }
+          ]
+        },
+        {
+          "workflow": "federation-v1-release.yml",
+          "run_id": 34594990947,
+          "event": "workflow_dispatch",
+          "status": "queued",
+          "conclusion": null,
+          "jobs": [
+            {
+              "id": 103248585125,
+              "name": "Windows regressions (journal-artifacts)",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking",
+              "runner_id": 22,
+              "started_at": "2026-09-11T12:12:52Z",
+              "completed_at": "2026-09-11T12:24:21Z"
+            },
+            {
+              "id": 103248585204,
+              "name": "Linux regression shard (0)",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "runner_id": 27,
+              "started_at": "2026-09-11T11:38:50Z",
+              "completed_at": "2026-09-11T11:43:35Z"
+            },
+            {
+              "id": 103248585286,
+              "name": "Windows regressions (capability-product)",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T11:38:20Z",
+              "completed_at": null
+            },
+            {
+              "id": 103248585291,
+              "name": "Full-suite order (rotating)",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "runner_id": 27,
+              "started_at": "2026-09-11T11:43:37Z",
+              "completed_at": "2026-09-11T11:54:48Z"
+            },
+            {
+              "id": 103248585302,
+              "name": "Release checks (Windows)",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T11:38:20Z",
+              "completed_at": null
+            },
+            {
+              "id": 103248585306,
+              "name": "Full-suite order (fixed)",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "runner_id": 27,
+              "started_at": "2026-09-11T12:08:20Z",
+              "completed_at": "2026-09-11T12:20:38Z"
+            },
+            {
+              "id": 103248585326,
+              "name": "Linux regression shard (1)",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "AQG7NCC-Linux",
+              "runner_id": 31,
+              "started_at": "2026-09-11T12:25:52Z",
+              "completed_at": "2026-09-11T12:30:59Z"
+            },
+            {
+              "id": 103248585329,
+              "name": "Windows regressions (transport-storage)",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T11:38:20Z",
+              "completed_at": null
+            },
+            {
+              "id": 103248585342,
+              "name": "Release checks (Linux)",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "AQG7NCC-Linux",
+              "runner_id": 31,
+              "started_at": "2026-09-11T12:12:57Z",
+              "completed_at": "2026-09-11T12:14:12Z"
+            },
+            {
+              "id": 103248585354,
+              "name": "Linux regression shard (3)",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "AQG7NCC-Linux",
+              "runner_id": 31,
+              "started_at": "2026-09-11T11:47:25Z",
+              "completed_at": "2026-09-11T11:53:24Z"
+            },
+            {
+              "id": 103248585360,
+              "name": "Linux regression shard (2)",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "AQG7NCC-Linux",
+              "runner_id": 31,
+              "started_at": "2026-09-11T12:20:23Z",
+              "completed_at": "2026-09-11T12:25:24Z"
+            },
+            {
+              "id": 103248585390,
+              "name": "PostgreSQL storage release check",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "AQG7NCC-Linux",
+              "runner_id": 31,
+              "started_at": "2026-09-11T11:40:58Z",
+              "completed_at": "2026-09-11T11:41:52Z"
+            },
+            {
+              "id": 103259588601,
+              "name": "Clean-checkout suite order independence",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "AQG7NCC-Linux",
+              "runner_id": 31,
+              "started_at": "2026-09-11T12:31:03Z",
+              "completed_at": "2026-09-11T12:31:20Z"
+            }
+          ]
+        },
+        {
+          "workflow": "ci-test-sharding.yml",
+          "run_id": 34595257295,
+          "event": "workflow_dispatch",
+          "status": "queued",
+          "conclusion": null,
+          "jobs": [
+            {
+              "id": 103249421517,
+              "name": "Shard contract (Windows, shared-pool)",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T11:41:38Z",
+              "completed_at": null
+            },
+            {
+              "id": 103249421752,
+              "name": "Shard contract (Linux, shared-pool)",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "AQG7NCC-Linux",
+              "runner_id": 31,
+              "started_at": "2026-09-11T11:43:24Z",
+              "completed_at": "2026-09-11T11:43:54Z"
+            }
+          ]
+        },
+        {
+          "workflow": "cf7b-product-physical-acceptance.yml",
+          "run_id": 34595260905,
+          "event": "workflow_dispatch",
+          "status": "queued",
+          "conclusion": null,
+          "jobs": [
+            {
+              "id": 103249431573,
+              "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T11:41:40Z",
+              "completed_at": null
+            },
+            {
+              "id": 103249431949,
+              "name": "acceptance (Linux, fcp-linux-fast, bash)",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T11:41:41Z",
+              "completed_at": null
+            }
+          ]
+        },
+        {
+          "workflow": "cf7c-physical-test-readiness.yml",
+          "run_id": 34594391897,
+          "event": "workflow_dispatch",
+          "status": "completed",
+          "conclusion": "success",
+          "jobs": [
+            {
+              "id": 103246676927,
+              "name": "readiness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy B...",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking",
+              "runner_id": 22,
+              "started_at": "2026-09-11T12:01:16Z",
+              "completed_at": "2026-09-11T12:04:19Z"
+            },
+            {
+              "id": 103246677068,
+              "name": "readiness (Linux, fcp-linux-fast, bash)",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "runner_id": 27,
+              "started_at": "2026-09-11T12:42:36Z",
+              "completed_at": "2026-09-11T12:43:50Z"
+            }
+          ]
+        },
+        {
+          "workflow": "release-image-metadata.yml",
+          "run_id": 34594394644,
+          "event": "workflow_dispatch",
+          "status": "completed",
+          "conclusion": "success",
+          "jobs": [
+            {
+              "id": 103246681512,
+              "name": "Verify immutable release image metadata",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "runner_id": 27,
+              "started_at": "2026-09-11T12:42:16Z",
+              "completed_at": "2026-09-11T12:42:27Z"
+            }
+          ]
+        }
+      ],
+      "full_exact_head_qualification": "INCOMPLETE; do not infer PASS from API head SHA or focused tests",
+      "exact_successful_native_jobs": 20,
+      "other_checkout_jobs": 2
+    },
+    {
+      "label": "pr461-head-5b826c68",
+      "source_sha": "5b826c6806ab1bdb960412ba20ca78192971fb1d",
+      "snapshot_at": "2026-09-11T12:50:00.125000+00:00",
+      "snapshot_sha256": "2dee30b45f222f0295dfd50433b1d5952899bcfb86a625cb1e6cd821b559eb48",
+      "native_receipt_sha256": "70c4bcc834b4b4d0180de9cbe622d64e2ef81b9e77d1848c243db67d4a4c792d",
+      "native_records": [
+        {
+          "job_id": 103267381199,
+          "run_id": 34600817433,
+          "name": "onboarding (Linux, fcp-test-linux, bash, 3.12.13)",
+          "runner_name": "AQG7NCC-Linux",
+          "conclusion": "success",
+          "bytes": 60125,
+          "sha256": "66a3b2ebbb3aea9930852e2a92d3038a0d7722e8713f91cb56d0bf4714fc490a",
+          "checkout_commits": [
+            "e03addedbc4d10e39e7c6a592977f45995ec6b8e"
+          ],
+          "checkout_matches": false
+        }
+      ],
+      "missing_workflows": [
+        "cf7-acceptance-harness.yml",
+        "cf7c-physical-test-readiness.yml",
+        "ci-test-sharding.yml"
+      ],
+      "workflows": [
+        {
+          "workflow": "federation-v1-release.yml",
+          "run_id": 34600817254,
+          "event": "pull_request",
+          "status": "queued",
+          "conclusion": null,
+          "jobs": [
+            {
+              "id": 103267380969,
+              "name": "PostgreSQL storage release check",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T12:48:15Z",
+              "completed_at": null
+            },
+            {
+              "id": 103267381052,
+              "name": "Release checks (Windows)",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T12:48:15Z",
+              "completed_at": null
+            },
+            {
+              "id": 103267381112,
+              "name": "Linux regression shard (2)",
+              "status": "in_progress",
+              "conclusion": null,
+              "runner_name": "AQG7NCC-Linux",
+              "runner_id": 31,
+              "started_at": "2026-09-11T12:49:53Z",
+              "completed_at": null
+            },
+            {
+              "id": 103267381131,
+              "name": "Linux regression shard (0)",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T12:48:15Z",
+              "completed_at": null
+            },
+            {
+              "id": 103267381209,
+              "name": "Windows regressions (capability-product)",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T12:48:15Z",
+              "completed_at": null
+            },
+            {
+              "id": 103267381213,
+              "name": "Linux regression shard (3)",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T12:48:15Z",
+              "completed_at": null
+            },
+            {
+              "id": 103267381216,
+              "name": "Windows regressions (journal-artifacts)",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T12:48:15Z",
+              "completed_at": null
+            },
+            {
+              "id": 103267381218,
+              "name": "Full-suite order (rotating)",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T12:48:15Z",
+              "completed_at": null
+            },
+            {
+              "id": 103267381219,
+              "name": "Release checks (Linux)",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T12:48:15Z",
+              "completed_at": null
+            },
+            {
+              "id": 103267381256,
+              "name": "Full-suite order (fixed)",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T12:48:15Z",
+              "completed_at": null
+            },
+            {
+              "id": 103267381282,
+              "name": "Linux regression shard (1)",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T12:48:15Z",
+              "completed_at": null
+            },
+            {
+              "id": 103267381420,
+              "name": "Windows regressions (transport-storage)",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T12:48:15Z",
+              "completed_at": null
+            }
+          ]
+        },
+        {
+          "workflow": "federation-software-update.yml",
+          "run_id": 34600817276,
+          "event": "pull_request",
+          "status": "queued",
+          "conclusion": null,
+          "jobs": [
+            {
+              "id": 103267380842,
+              "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T12:48:15Z",
+              "completed_at": null
+            },
+            {
+              "id": 103267380974,
+              "name": "update-contracts (Linux, fcp-linux-fast, bash)",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T12:48:15Z",
+              "completed_at": null
+            }
+          ]
+        },
+        {
+          "workflow": "release-image-metadata.yml",
+          "run_id": 34600817361,
+          "event": "pull_request",
+          "status": "queued",
+          "conclusion": null,
+          "jobs": [
+            {
+              "id": 103267380590,
+              "name": "Verify immutable release image metadata",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T12:48:15Z",
+              "completed_at": null
+            }
+          ]
+        },
+        {
+          "workflow": "phase2-federation.yml",
+          "run_id": 34600817414,
+          "event": "pull_request",
+          "status": "queued",
+          "conclusion": null,
+          "jobs": [
+            {
+              "id": 103267380831,
+              "name": "windows",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T12:48:15Z",
+              "completed_at": null
+            },
+            {
+              "id": 103267380959,
+              "name": "linux",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T12:48:15Z",
+              "completed_at": null
+            }
+          ]
+        },
+        {
+          "workflow": "cf8-role-retirement.yml",
+          "run_id": 34600817428,
+          "event": "pull_request",
+          "status": "queued",
+          "conclusion": null,
+          "jobs": [
+            {
+              "id": 103267381770,
+              "name": "role-retirement (Linux, fcp-linux-fast, bash)",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T12:48:15Z",
+              "completed_at": null
+            },
+            {
+              "id": 103267382042,
+              "name": "role-retirement (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T12:48:15Z",
+              "completed_at": null
+            }
+          ]
+        },
+        {
+          "workflow": "cfi2-onboarding-composition.yml",
+          "run_id": 34600817433,
+          "event": "pull_request",
+          "status": "queued",
+          "conclusion": null,
+          "jobs": [
+            {
+              "id": 103267381045,
+              "name": "onboarding (Windows, fcp-test-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T12:48:15Z",
+              "completed_at": null
+            },
+            {
+              "id": 103267381199,
+              "name": "onboarding (Linux, fcp-test-linux, bash, 3.12.13)",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "AQG7NCC-Linux",
+              "runner_id": 31,
+              "started_at": "2026-09-11T12:48:20Z",
+              "completed_at": "2026-09-11T12:49:48Z"
+            }
+          ]
+        },
+        {
+          "workflow": "product-branding.yml",
+          "run_id": 34600817455,
+          "event": "pull_request",
+          "status": "queued",
+          "conclusion": null,
+          "jobs": [
+            {
+              "id": 103267380630,
+              "name": "product-branding",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T12:48:15Z",
+              "completed_at": null
+            }
+          ]
+        },
+        {
+          "workflow": "cf7b-product-physical-acceptance.yml",
+          "run_id": 34600817477,
+          "event": "pull_request",
+          "status": "queued",
+          "conclusion": null,
+          "jobs": [
+            {
+              "id": 103267380965,
+              "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T12:48:15Z",
+              "completed_at": null
+            },
+            {
+              "id": 103267381288,
+              "name": "acceptance (Linux, fcp-linux-fast, bash)",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T12:48:15Z",
+              "completed_at": null
+            }
+          ]
+        },
+        {
+          "workflow": "icse-tool-demo.yml",
+          "run_id": 34600817567,
+          "event": "pull_request",
+          "status": "queued",
+          "conclusion": null,
+          "jobs": [
+            {
+              "id": 103267381236,
+              "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T12:48:15Z",
+              "completed_at": null
+            },
+            {
+              "id": 103267381660,
+              "name": "reviewer-compose",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T12:48:15Z",
+              "completed_at": null
+            },
+            {
+              "id": 103267381672,
+              "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T12:48:15Z",
+              "completed_at": null
+            }
+          ]
+        },
+        {
+          "workflow": "phase-f85-operator-federation-surface.yml",
+          "run_id": 34600817582,
+          "event": "pull_request",
+          "status": "queued",
+          "conclusion": null,
+          "jobs": [
+            {
+              "id": 103267385758,
+              "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T12:48:16Z",
+              "completed_at": null
+            },
+            {
+              "id": 103267386012,
+              "name": "operator-surface (Linux, fcp-linux-fast, bash)",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "runner_id": 0,
+              "started_at": "2026-09-11T12:48:16Z",
+              "completed_at": null
+            }
+          ]
+        }
+      ],
+      "full_exact_head_qualification": "INCOMPLETE; do not infer PASS from API head SHA or focused tests",
+      "exact_successful_native_jobs": 0,
+      "other_checkout_jobs": 1
+    }
+  ]
+}
