@@ -1,0 +1,50 @@
+{
+  "candidate_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
+  "host": "nettking",
+  "mode": "DIAGNOSTIC ONLY - NOT PHYSICAL ACCEPTANCE EVIDENCE",
+  "stage": "N Ollama adapter isolated provider execution; no P10/B/CF7 or enrollment",
+  "observed_at": "2026-09-11T12:29:05.619153+00:00",
+  "procedure": "import dataclasses,hashlib,json,pathlib,time\nfrom catalog.capabilities.benchmarking.adapters.ollama import OllamaProbeTarget,OllamaBenchmarkAdapter\nfrom catalog.capabilities.benchmarking.runner import BenchmarkExecutionContext\ntarget=OllamaProbeTarget(service_id='diagnostic-existing-ollama',display_label='Existing local Ollama',base_url='http://ollama:11434',model='llama3.2:3b')\nadapter=OllamaBenchmarkAdapter((target,),trusted_host_predicate=lambda host: host=='ollama')\nstart=time.monotonic()\nctx=BenchmarkExecutionContext(device_id='nettking-diagnostic-only',target_service_id=target.service_id,dependency_inputs=adapter.dependency_inputs(target.service_id),_deadline=start+adapter.definition.max_duration_seconds,_monotonic=time.monotonic,_cancelled=lambda:False)\nobservation=adapter.benchmark(ctx)\nprint(json.dumps({'elapsed_seconds':time.monotonic()-start,'target_timeout_seconds':target.request_timeout_seconds,'definition_max_seconds':adapter.definition.max_duration_seconds,'source_sha256':hashlib.sha256(pathlib.Path('/app/catalog/capabilities/benchmarking/adapters/ollama.py').read_bytes()).hexdigest(),'observation':dataclasses.asdict(observation)}))\n",
+  "containers": {
+    "/fcp-v1-73c779-nettking-flask-1": {
+      "id": "7468794b6dfc0e24aff14af91950bbc37a9ce5ae6ba912d1eec4632080a0e5a6",
+      "image": "sha256:336968cae8e28c2adce95954210904e2d6af8e44881b9cc327ee7877751d8b80"
+    },
+    "/fcp-v1-73c779-nettking-ollama-1": {
+      "id": "b18a34a67cc1faa14ae0850a7f0683e1e0e84d3aecd4140f4ec92c7ee6332a87",
+      "image": "sha256:b88c73ace3e115f8ec53dc8761ae1c0aabfa675406e3681786b98757ce050f42"
+    }
+  },
+  "prior_loaded_models": "NAME    ID    SIZE    PROCESSOR    CONTEXT    UNTIL \n",
+  "model_manifest": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72",
+  "state_changed": "Ephemeral model/GPU memory and owned logs only; no benchmark store, publication, authority, deployment or configuration change",
+  "protected_recorder_data_untouched": true,
+  "physical_acceptance": false,
+  "exit_code": 0,
+  "stderr": "",
+  "result": {
+    "elapsed_seconds": 103.54875097499462,
+    "target_timeout_seconds": 120.0,
+    "definition_max_seconds": 120,
+    "source_sha256": "1b609bff3341c88af152266dd3a278f0b7ceb1c9e25390c96e17e408d00a378f",
+    "observation": {
+      "metrics": {
+        "model_available": true,
+        "completion_present": true,
+        "response_latency_ms": 103545.295,
+        "response_bytes": 38,
+        "generated_tokens": 8,
+        "tokens_per_second": 80.279
+      },
+      "recommendation": "not-recommended",
+      "diagnostics": [
+        "AI benchmark evidence grants no compute or storage authority"
+      ],
+      "state": "passed"
+    }
+  },
+  "manifest_unchanged": true,
+  "loaded_models_after": "NAME           ID              SIZE      PROCESSOR    CONTEXT    UNTIL               \nllama3.2:3b    a80c4f17acd5    2.2 GB    100% GPU     1024       59 seconds from now    \n",
+  "gpu_after": "2279, 0\n",
+  "finished_at": "2026-09-11T12:30:52.521609+00:00"
+}

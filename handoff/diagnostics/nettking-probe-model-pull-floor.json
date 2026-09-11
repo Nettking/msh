@@ -1,0 +1,25 @@
+{
+  "candidate_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
+  "host": "nettking",
+  "stage": "independent unchanged probe: model-pull-floor",
+  "mode": "DIAGNOSTIC ONLY - NOT PHYSICAL ACCEPTANCE EVIDENCE",
+  "command": "run_nettking_probe.py model-pull-floor",
+  "checked_in_entrypoint": "scripts.acceptance.v1_physical_probes.execute",
+  "probe_source_sha256": "8e4f2efb81ccc459a08c72fd019c0004c6e06c614232da7ba50c439bff95f974",
+  "observed_at": "2026-09-11T12:29:30.865143+00:00",
+  "state_changed": false,
+  "protected_recorder_data_untouched": true,
+  "physical_acceptance": false,
+  "diagnostic_probe": {
+    "probe_id": "model-pull-floor",
+    "status": "pass",
+    "summary": "model-sized writes are refused before the host emergency floor",
+    "detail": {
+      "resource_alias": "6ac829469e82",
+      "pressure_level": 0,
+      "bytes_downloaded": 0,
+      "crossing_reservation_refused": true,
+      "refusal_code": "emergency_reserve"
+    }
+  }
+}

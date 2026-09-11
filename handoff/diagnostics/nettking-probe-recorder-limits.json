@@ -1,0 +1,32 @@
+{
+  "candidate_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
+  "host": "nettking",
+  "stage": "independent unchanged probe: recorder-limits",
+  "mode": "DIAGNOSTIC ONLY - NOT PHYSICAL ACCEPTANCE EVIDENCE",
+  "command": "run_nettking_probe.py recorder-limits",
+  "checked_in_entrypoint": "scripts.acceptance.v1_physical_probes.execute",
+  "probe_source_sha256": "8e4f2efb81ccc459a08c72fd019c0004c6e06c614232da7ba50c439bff95f974",
+  "observed_at": "2026-09-11T12:29:32.325372+00:00",
+  "state_changed": false,
+  "protected_recorder_data_untouched": true,
+  "physical_acceptance": false,
+  "diagnostic_probe": {
+    "probe_id": "recorder-limits",
+    "status": "pass",
+    "summary": "every recorder ingress and transaction bound is finite",
+    "detail": {
+      "declared_limits": {
+        "MAX_CURRENT_RESPONSE_BYTES": 8388608,
+        "MAX_PROBE_RESPONSE_BYTES": 16777216,
+        "MAX_SAMPLE_RESPONSE_BYTES": 16777216,
+        "MAX_REQUEST_DEADLINE_SECONDS": 60.0,
+        "MAX_OBSERVATIONS_PER_BATCH": 10000,
+        "MAX_SEQUENCE_SPAN": 10000,
+        "MAX_XML_ELEMENTS": 50000,
+        "MAX_XML_DEPTH": 64,
+        "MAX_OBSERVATION_ARCHIVE_BYTES": 33554432
+      },
+      "unbounded": []
+    }
+  }
+}
