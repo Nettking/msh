@@ -748,3 +748,9 @@ rotating suite and Windows harness are running. No new failure. Next: retain
 six new exact-source proofs; await complete artifacts/final gates. No duplicate
 qualification, host or protected Recorder action; runtime remains0536f03d,
 physical acceptance incomplete and candidate not frozen.
+
+All six new successful native logs prove exact final9b286f93. Nineteen final-main
+proofs are retained; no source mismatch or new failure. Next scheduled action:
+poll_merged_main_state.py, retaining only new results and reviewing ICSE once
+its publication job finishes. Preserve all prior qualification; no new dispatch,
+D04, candidate freeze or physical acceptance action while final gates remain.
