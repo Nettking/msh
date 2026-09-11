@@ -1,0 +1,31 @@
+{
+  "observed_at": "2026-09-11T18:39:05.273865+00:00",
+  "candidate": "9b286f931497bf6291e215f6340443c5162826b0",
+  "host": "nitro",
+  "source_clean": true,
+  "unexpected_to_audit_delta": [
+    {
+      "path": "/services/flask/environment/FCP_AUTO_JOIN_PORT",
+      "expected": "5151",
+      "actual": "5152"
+    },
+    {
+      "path": "/services/flask/environment/FCP_BUILD_COMMIT",
+      "expected": "9b286f931497bf6291e215f6340443c5162826b0",
+      "actual": null
+    },
+    {
+      "path": "/services/recorder/environment/FCP_BUILD_COMMIT",
+      "expected": "9b286f931497bf6291e215f6340443c5162826b0",
+      "actual": null
+    },
+    {
+      "path": "/services/relay/environment/FCP_BUILD_COMMIT",
+      "expected": "9b286f931497bf6291e215f6340443c5162826b0",
+      "actual": null
+    }
+  ],
+  "state_changed": false,
+  "protected_recorder_data_untouched": true,
+  "physical_acceptance": false
+}

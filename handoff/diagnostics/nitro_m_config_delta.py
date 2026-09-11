@@ -24,7 +24,7 @@ def walk(a,b,path=''):
  elif a!=b:
   def expose(v):
    if v is None or isinstance(v,(bool,int)):return v
-   if isinstance(v,str) and (v in (N,M,'5151') or v.startswith('fcp-v1-nitro-')):return v
+   if isinstance(v,str) and (v in (N,M,'5151') or v.startswith('fcp-v1-nitro-') or (v.isdecimal() and 1<=int(v)<=65535)):return v
    return {'type':type(v).__name__,'sha256':hashlib.sha256(json.dumps(v,sort_keys=True).encode()).hexdigest()}
   delta.append({'path':path,'expected':expose(a),'actual':expose(b)})
 walk(expected,new)

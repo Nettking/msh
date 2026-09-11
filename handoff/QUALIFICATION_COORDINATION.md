@@ -1133,3 +1133,16 @@ and compare against the actual checked-in image-ENV contract without inserting
 fictional Compose environment fields. Require the complete resolved config to
 match otherwise, preserve old operation/log, then run a separately named guarded
 continuation from clean M. No service startup or protected-data action occurred.
+
+###18:39UTC — guarded Nitro continuation prepared
+
+The private old host port is exactly5152. [Readable numeric delta](diagnostics/nitro-m-config-delta-readable-port.json).
+The new M environment explicitly aligns it to the D04-owned5151. Checked-in
+Dockerfile lines26–28 prove build SHA is inherited via image ENV/label, not a
+Compose environment entry. The separate `activate_nitro_m_guarded.py` preserves
+the first stopped controller/evidence, requires that exact guard result and clean
+M, compares the entire configuration allowing only actual candidate image/build
+changes and the explicit5152-to5151 host-port alignment, then starts unchanged M.
+No assertions, deadlines, authority or product source were weakened/changed.
+Next exact command: run `diagnostics/dispatch_nitro_m_guarded.py` once; inspect
+`supported-start-9b286f93-guarded.json` before any further action/retry.
