@@ -840,3 +840,9 @@ retain four new native proofs, audit complete native release artifacts and final
 gate/source/skip lineage, then persist the merged-main qualification verdict.
 Only after that may controlled D04 remediation proceed. No candidate freeze or
 physical acceptance inferred yet; runtime0536f03d and Recorder remain untouched.
+
+Four final native logs retained: Windows release checks and both matrices prove
+exact9b286f93; the successful verdict is checkout-free. All40 required/additional
+job records are now retained (38 source-running jobs, two dependency aggregates).
+No source mismatch or new failure. Next: final native artifact/gate review,
+using existing ICSE/registry proofs and without rerunning software.
