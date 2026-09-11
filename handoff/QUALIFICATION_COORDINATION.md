@@ -574,3 +574,15 @@ Seven new native proofs retained: five jobs prove exact5b826c68; the successful
 order/verdict jobs are the two known checkout-free dependency aggregates.
 No mismatch or new failure. Next: complete native release/artifact/gate review
 and current PR findings before recording461 qualification or merging.
+
+PR461 complete release artifact review: all9 native ZIP digests match; four
+shards cover4368 test identities and both full orders contain4368 cases. All
+JUnit failures/errors are zero. Current PR has no comments/reviews/findings.
+Manual source review confirms only one Compose environment line plus five
+real-render regression cases; default/custom ports preserve the shared resolver.
+No authority/storage change. Final gate/skip/test-identity audit is next.
+
+Branch-protection/rules metadata reads returned403 with the existing credential;
+this is an audit visibility limitation, not a product failure. Use normal merge
+APIs with expected-head guards and server enforcement; never bypass protections.
+Persisted snapshot: merge-branch-protection.json. No merge attempted yet.

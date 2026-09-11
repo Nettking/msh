@@ -1,0 +1,8 @@
+{
+  "/branches/main/protection": {
+    "http_status": 403
+  },
+  "/rules/branches/main": {
+    "http_status": 403
+  }
+}
