@@ -10,7 +10,7 @@ checked-in revalidation -> fresh formal physical acceptance.
 
 | PR | Intended exact head | Phase |
 |---|---|---|
-|456|1a0c634f47f8a247b6d1d2d1a219f5c12590587d|Qualification incomplete at previous checkpoint; refresh only state delta|
+|456|1a0c634f47f8a247b6d1d2d1a219f5c12590587d|Required exact-head qualification PASS; preserve evidence, hold for complete fix-set qualification and live premerge checks|
 |457|143fe7a9082193114af3d34dc437b85f845849a2|Required exact-head qualification PASS; preserve evidence, hold for complete fix-set qualification and live premerge checks|
 |461|5b826c6806ab1bdb960412ba20ca78192971fb1d|Draft repair;50 focused tests pass; required qualification pending|
 
@@ -461,3 +461,31 @@ manual comparison to intended1a0c634f shows only five workflow lines adding the
 focused POSIX readiness regression step, with no product change since that
 review. Next: reconcile final aggregate/test identities and expected skips,
 verify the new step's native results, and publish456 exact-head verdict.
+
+## September11 15:38UTC — PR456 required exact-head qualification PASS
+
+Exact1a0c634f47f8a247b6d1d2d1a219f5c12590587d has37/37 required jobs PASS,
+CFI2 both platforms and registry3/3 PASS, release-verdict PASS, reviewed complete
+release/ICSE artifacts, and both checkout-free aggregates bound to same-run
+successful source dependencies. Both full-suite orders match all4381 collected
+test identities. [Final receipt](diagnostics/pr456-final-qualification.json)
+and [verifier](diagnostics/finalize_pr456_qualification.py) preserve the result.
+
+Expected skip reconciliation:13 distinct cases have passing JUnit elsewhere;
+seven PostgreSQL cases are covered by its native11/11 job. Fourteen remaining
+POSIX exclusions retain their explicit unchanged Windows-only guards; no
+execution claim is made for skipped cases. No new code/test/guard change.
+Automated reviewa225a41 reported no findings; the only later change adds five
+workflow lines for readiness tests. That delta was manually reviewed and the
+exact native release steps prove18/18 readiness cases on both platforms.
+
+PR456 and457 are now qualified; preserve both unchanged heads and results.
+PR461 is the remaining required fix qualification, including the just-dispatched
+exact release and remaining software-update/CFI2/operator gates. Next scheduled
+action: poll_required_state.py, retain only new proof and dispatch only completed
+source-mismatch gaps. Complete461, then perform separate merges with live head/
+merge-gate/correctness checks and qualify actual final merged main once.
+
+No PR merged or new candidate selected in this check. Physical runtime remains
+0536f03d67eb277e11573c2188d8e820399627e3; D04 deferred, protected Recorder
+untouched, physical acceptance incomplete and P07/P12 not started.

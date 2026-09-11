@@ -1,0 +1,129 @@
+{
+  "matched": [
+    {
+      "job": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+      "id": 103248398752,
+      "modules": [
+        "catalog/flask_app/tests/test_windows_migration_script.py",
+        "catalog/flask_app/tests/test_windows_relay_volume_selector.py"
+      ],
+      "summaries": [
+        "2026-09-11T14:05:41.2319393Z 311 passed, 5 skipped, 1 warning in 217.59s (0:03:37)"
+      ],
+      "sha256": "0f0aea2da6ac40eb5730dfa5097f4002a9716c9cd903871ddc6c36e492be4cda"
+    },
+    {
+      "job": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+      "id": 103249235760,
+      "modules": [
+        "catalog/flask_app/tests/test_windows_start_script.py",
+        "catalog/flask_app/tests/test_windows_update_script.py",
+        "catalog/flask_app/tests/test_windows_volume_name_selection.py"
+      ],
+      "summaries": [
+        "2026-09-11T12:38:47.2307093Z 723 passed, 1 skipped, 44 warnings in 223.72s (0:03:43)"
+      ],
+      "sha256": "4512b6c3e6e76e9cf37b18719d1136230ee42745bcdaebc6de14dcef05c30324"
+    },
+    {
+      "job": "PostgreSQL storage release check",
+      "id": 103249965313,
+      "modules": [
+        "catalog/federation/tests/test_phase_d2_postgres.py"
+      ],
+      "summaries": [
+        "2026-09-11T11:47:14.1609947Z 11 passed in 0.68s"
+      ],
+      "sha256": "0d9b0cb83b33e94ae2cfd62d47cab50d846ff24d15fc6270168db14b8e826fb4"
+    },
+    {
+      "job": "Windows regressions (transport-storage)",
+      "id": 103249965566,
+      "modules": [
+        "catalog/node/tests/test_identity.py"
+      ],
+      "summaries": [
+        "2026-09-11T15:09:56.3929292Z 370 passed, 1 skipped in 112.35s (0:01:52)"
+      ],
+      "sha256": "d7bb7e4b02cdb0c2afc73566f347b6dd022e5ae3aa9d1c03da62a09526abe091"
+    },
+    {
+      "job": "Windows regressions (journal-artifacts)",
+      "id": 103249965630,
+      "modules": [
+        "catalog/federation/tests/test_c03_offline_creator_migration.py",
+        "catalog/federation/tests/test_icse_network_provenance.py"
+      ],
+      "summaries": [
+        "2026-09-11T15:19:18.6560697Z 297 passed, 1 skipped, 1 warning in 358.34s (0:05:58)"
+      ],
+      "sha256": "a212198c631395c087733f22002043714a0c390a493245366d085249c11fe66f"
+    },
+    {
+      "job": "Windows regressions (capability-product)",
+      "id": 103249965655,
+      "modules": [
+        "catalog/flask_app/tests/test_windows_start_script.py",
+        "catalog/flask_app/tests/test_windows_update_script.py",
+        "catalog/flask_app/tests/test_windows_volume_name_selection.py"
+      ],
+      "summaries": [
+        "2026-09-11T15:25:39.8165960Z 871 passed, 1 skipped, 44 warnings in 213.34s (0:03:33)"
+      ],
+      "sha256": "97440c696f2d3d790173bcebb90107807974e2fea068c7199dcb1e6d9464d387"
+    },
+    {
+      "job": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
+      "id": 103248409180,
+      "modules": [
+        "catalog/flask_app/tests/test_windows_start_script.py",
+        "catalog/flask_app/tests/test_windows_update_script.py",
+        "catalog/flask_app/tests/test_windows_volume_name_selection.py"
+      ],
+      "summaries": [
+        "2026-09-11T11:57:15.9749747Z 65 passed, 16 warnings in 8.45s"
+      ],
+      "sha256": "cb9b7421d6b581ee671dbaf891d896a2c61cfe2e50c938f94e7e104eb3082947"
+    },
+    {
+      "job": "windows",
+      "id": 103245230356,
+      "modules": [
+        "catalog/node/tests/test_identity.py"
+      ],
+      "summaries": [
+        "2026-09-11T13:33:14.5146900Z 381 passed, 1 skipped in 106.37s (0:01:46)"
+      ],
+      "sha256": "a407c3737024904827ab0a71b15d0742e695b81a229f4a43966ab2929c0b8c30"
+    },
+    {
+      "job": "readiness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy B...",
+      "id": 103245233661,
+      "modules": [
+        "catalog/flask_app/tests/test_windows_start_script.py"
+      ],
+      "summaries": [
+        "2026-09-11T12:43:09.6552517Z 43 passed, 2 warnings in 19.65s"
+      ],
+      "sha256": "7173bf3ddea241730172bf208bf40e764f365613c8fe28ffc085750ca82f1eba"
+    }
+  ],
+  "focused_readiness": [
+    {
+      "job": "Release checks (Windows)",
+      "id": 103249965431,
+      "summaries": [
+        "2026-09-11T13:20:07.9602003Z 18 passed in 22.02s"
+      ],
+      "sha256": "9d03b3dbac056534105fa3539da24472ee7d5d706881b4f7841a38b4b77b7353"
+    },
+    {
+      "job": "Release checks (Linux)",
+      "id": 103249965623,
+      "summaries": [
+        "2026-09-11T12:38:14.7786144Z 18 passed in 11.43s"
+      ],
+      "sha256": "2de9427b5863080a144aaa46e2abbb9e11b660e568055fd12e65894fa006e93a"
+    }
+  ]
+}

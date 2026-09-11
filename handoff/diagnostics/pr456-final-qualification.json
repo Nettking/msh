@@ -1,0 +1,177 @@
+{
+  "recorded_at": "2026-09-11T15:37:16.196833+00:00",
+  "source_commit": "1a0c634f47f8a247b6d1d2d1a219f5c12590587d",
+  "required_jobs": 37,
+  "additional_cfi2_registry_jobs": 3,
+  "workflows": [
+    {
+      "workflow": "cf7-acceptance-harness.yml",
+      "run_id": 34593922113,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "phase2-federation.yml",
+      "run_id": 34593925179,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "cf7b-product-physical-acceptance.yml",
+      "run_id": 34594940951,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "product-branding.yml",
+      "run_id": 34595429597,
+      "jobs": 1,
+      "result": "PASS"
+    },
+    {
+      "workflow": "federation-software-update.yml",
+      "run_id": 34594937633,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "cf7c-physical-test-readiness.yml",
+      "run_id": 34593927545,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "icse-tool-demo.yml",
+      "run_id": 34595194849,
+      "jobs": 4,
+      "result": "PASS"
+    },
+    {
+      "workflow": "cf8-role-retirement.yml",
+      "run_id": 34595198159,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "phase-f85-operator-federation-surface.yml",
+      "run_id": 34595201590,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "federation-v1-release.yml",
+      "run_id": 34595427316,
+      "jobs": 16,
+      "result": "PASS"
+    },
+    {
+      "workflow": "ci-test-sharding.yml",
+      "run_id": 34594934409,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "cfi2-onboarding-composition.yml",
+      "run_id": 34593929568,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "release-image-metadata.yml",
+      "run_id": 34593931824,
+      "jobs": 1,
+      "result": "PASS"
+    }
+  ],
+  "release_native_checkouts": 14,
+  "source_bound_aggregates": 2,
+  "collected_test_identities": 4381,
+  "full_orders_exact_test_identities": true,
+  "skips_with_pass_elsewhere": 13,
+  "skips_covered_by_native_nonartifact_log": 7,
+  "native_skip_map_sha256": "793f35c419c59bdc03d42dbf7d252ab5752888ea01dcde538f575d88fa1add5c",
+  "unchanged_intentional_posix_exclusions": [
+    {
+      "test": "catalog.federation.tests.test_host_mutation_activation.test_windows_activation_lease_has_valid_powershell_syntax",
+      "reason": "Windows PowerShell parser check"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_runtime_state_resolver.test_encoded_python_survives_windows_powershell_native_argument_forwarding",
+      "reason": "Windows PowerShell native argument check"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_fresh_url_output.test_fresh_onboarding_query_is_printed_without_executing_reset_fragment",
+      "reason": "Windows cmd metacharacter regression"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_model_resource_admission_paths.test_windows_model_pull_script_has_valid_powershell_syntax",
+      "reason": "Windows PowerShell parser check"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_first_federation_start.test_windows_scaffolding_repair_restores_real_dirty_checkout",
+      "reason": "requires real Windows cmd.exe and git"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_first_federation_start.test_windows_fresh_start_executes_real_batch_with_reset_stdin",
+      "reason": "requires real Windows cmd.exe"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_relay_volume_selector.test_selector_survives_missing_current_images_and_reuses_existing_relay_volume",
+      "reason": "Windows PowerShell regression"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_relay_volume_selector.test_selector_pulls_python_probe_and_identifies_pc3_identity",
+      "reason": "Windows PowerShell regression"
+    },
+    {
+      "test": "catalog.mtconnect_recorder.tests.test_tailscale_recorder_launcher.test_root_cmd_preserves_spaced_argument_and_nonzero_exit",
+      "reason": "Windows launcher execution"
+    },
+    {
+      "test": "catalog.mtconnect_recorder.tests.test_tailscale_recorder_launcher.test_windows_probe_rejects_runtime_that_cannot_import_exact_entrypoint",
+      "reason": "Windows launcher execution"
+    },
+    {
+      "test": "catalog.mtconnect_recorder.tests.test_tailscale_recorder_launcher.test_windows_wrapper_scrubs_legacy_secret_and_forwards_recorder_options",
+      "reason": "Windows launcher execution"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_fresh_shutdown.test_shutdown_timeout_recovers_without_hanging",
+      "reason": "Windows process-tree recovery contract"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_migration_script.test_windows_migration_fast_forwards_fake_legacy_checkout_and_resumes",
+      "reason": "Windows migration smoke"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_migration_script.test_windows_migration_script_has_valid_powershell_syntax",
+      "reason": "Windows PowerShell parser check"
+    }
+  ],
+  "release_artifact_sha256": "63fbf8f79dd95fe49d6cbef43891d971d5a753914fbbad0eebb4d7a976efa529",
+  "icse_review_sha256": "60812b2b76afa2e2b9f5497db6dce853970b71dda069c2002eaf87a641547034",
+  "no_reported_correctness_findings": true,
+  "prior_automated_review": "a225a41",
+  "manual_reviewed_workflow_only_delta": "diff --git a/.github/workflows/federation-v1-release.yml b/.github/workflows/federation-v1-release.yml\nindex 68524b71..fc1153be 100644\n--- a/.github/workflows/federation-v1-release.yml\n+++ b/.github/workflows/federation-v1-release.yml\n@@ -113,6 +113,11 @@ jobs:\n       - name: Compile maintained product packages\n         run: python -m compileall -q catalog\n \n+      - name: POSIX readiness redirect regressions\n+        run: >-\n+          python -m pytest -o addopts= -q\n+          catalog/flask_app/tests/test_posix_start_readiness.py\n+\n       - name: Validate acceptance manifest shape\n         run: >-\n           python -c \"import json, pathlib;\n",
+  "native_focused_readiness": [
+    {
+      "job": "Release checks (Windows)",
+      "id": 103249965431,
+      "summaries": [
+        "2026-09-11T13:20:07.9602003Z 18 passed in 22.02s"
+      ],
+      "sha256": "9d03b3dbac056534105fa3539da24472ee7d5d706881b4f7841a38b4b77b7353"
+    },
+    {
+      "job": "Release checks (Linux)",
+      "id": 103249965623,
+      "summaries": [
+        "2026-09-11T12:38:14.7786144Z 18 passed in 11.43s"
+      ],
+      "sha256": "2de9427b5863080a144aaa46e2abbb9e11b660e568055fd12e65894fa006e93a"
+    }
+  ],
+  "status": "QUALIFIED_REQUIRED_PR_HEAD_SCOPE",
+  "merge_boundary": "Hold for complete required fix-set qualification; recheck live head, branch gates and correctness findings immediately before the separate merge.",
+  "physical_acceptance": false
+}
