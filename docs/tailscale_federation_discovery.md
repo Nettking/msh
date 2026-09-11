@@ -83,6 +83,31 @@ The persisted snapshot is schema-bounded and contains only public-safe routing/d
 
 It contains no password, pairing code, invitation token, private key, or Tailscale credential.
 
+The advertisement reads the advertising host's existing local Federation
+projection. It does not contact the voter quorum, refresh membership or create
+authority. During an outage the routing/display information may be stale: a
+successful discovery GET therefore proves neither current leadership nor the
+ability to issue a grant. Missing, invalid or locally revoked bindings are not
+advertised; remotely paired members do not advertise as coordinators.
+
+Normal supported startup allows two seconds for each complete HTTP probe,
+including connection, headers and body. Up to eight peers are probed concurrently,
+with at most 32 online peers and four configured web ports. Ports on a peer are
+tried in configuration order. The entire probe phase has a ten-second deadline,
+in addition to the existing two-second Tailscale CLI deadline. With one default
+port, 32 unresponsive peers take at most four two-second probe waves plus local
+scheduling/cleanup. Additional ports and diagnostic timeouts share the same
+ten-second deadline; they do not multiply the total startup budget indefinitely.
+
+Discovery never follows HTTP redirects or uses an HTTP proxy. An absolute socket
+deadline also closes a responder that trickles headers or body bytes. If the
+whole scan exhausts its budget, it fails instead of returning partial results:
+an unvisited peer could advertise a different Federation. Supported joining or
+first-Federation initialization must not interpret that failure as a unique
+Federation or proof that none exists. The discovery CLI clears its output
+snapshot and exits nonzero on budget exhaustion. No grant or membership follows
+from a discovery result; the next authorization step can still refuse.
+
 ## Automatic joining trust boundary
 
 The responder runs on the host rather than inside Docker because Docker Desktop can rewrite the incoming source address before the application container sees it. Only the host can ask the local Tailscale daemon who the real connecting peer is.

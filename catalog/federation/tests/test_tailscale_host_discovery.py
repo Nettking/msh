@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 from catalog.federation.tailscale_host_discovery import (
     ADVERTISEMENT_SCHEMA,
+    DEFAULT_TIMEOUT_SECONDS,
     DISCOVERY_SCHEMA,
     discover,
     load_snapshot,
@@ -56,7 +57,7 @@ def test_discovery_uses_existing_tailscale_login_without_credentials() -> None:
         assert request.full_url == (
             "http://100.64.0.10:5000/onboarding/federation/discovery.json"
         )
-        assert timeout == 0.75
+        assert timeout == DEFAULT_TIMEOUT_SECONDS
         return _Response(
             {
                 "schema": ADVERTISEMENT_SCHEMA,

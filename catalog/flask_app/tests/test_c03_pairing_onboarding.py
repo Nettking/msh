@@ -24,6 +24,7 @@ from catalog.federation.tests.test_control_plane_public_journal import (
     _populate,
     _wait,
 )
+from catalog.flask_app import federation_pairing_routes
 from catalog.flask_app.services.c03_pairing_onboarding import (
     C03PairingOnboardingService,
     C03RelayCoordinatorFacade,
@@ -350,12 +351,22 @@ def test_pairing_material_uses_authenticated_leader_and_real_quorum(
 
                 await cluster.stop_runtime(1)
                 await cluster.stop_runtime(2)
+                before = _journal(leader)
+                app.config["CAPABILITY_ONBOARDING_SERVICE"] = service
+                with app.test_request_context("/onboarding/federation/discovery.json"):
+                    advertised = federation_pairing_routes._discovery_response()
+                assert advertised.status_code == 200
+                assert advertised.get_json()["pairing_required"] is True
+                assert "pairing_code" not in advertised.get_json()
+                assert _journal(leader) == before
                 with pytest.raises(FederationOperationError):
                     await asyncio.to_thread(
                         service.create_pairing_code,
                         relay_url=cluster.relays[0].url,
                         ttl_seconds=60,
                     )
+                assert service.last_pairing_code() is None
+                assert _journal(leader) == before
             finally:
                 await asyncio.to_thread(_close_runtime, service)
 

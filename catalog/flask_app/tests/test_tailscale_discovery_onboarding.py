@@ -70,25 +70,13 @@ def test_discovery_advertisement_is_the_only_public_pairing_exception() -> None:
 def test_discovery_advertisement_contains_no_enrollment_or_pairing_material(
     monkeypatch,
 ) -> None:
-    context = SimpleNamespace(
-        binding=SimpleNamespace(
-            federation_id="federation-secret-internal-id",
-            internal_session_id="internal-session",
-        ),
-        credentials=SimpleNamespace(
-            identity=SimpleNamespace(display_name="Coordinator PC")
-        ),
-        coordinator=SimpleNamespace(
-            store=SimpleNamespace(
-                get_session=lambda _session_id: SimpleNamespace(
-                    display_name="Workshop Federation"
-                )
-            )
-        ),
-    )
     fake_service = SimpleNamespace(
         remote_store=SimpleNamespace(load=lambda: None),
-        authorized_context=lambda: context,
+        discovery_metadata=lambda: {
+            "federation_id": "federation-secret-internal-id",
+            "federation_label": "Workshop Federation",
+            "device_name": "Coordinator PC",
+        },
     )
     monkeypatch.setattr(pairing_routes, "_pairing_service", lambda: fake_service)
 
