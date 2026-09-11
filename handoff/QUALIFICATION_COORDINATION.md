@@ -233,3 +233,16 @@ state delta is retained. Next: retain the three new native leaf proofs and
 assess remaining gates from the cached state. No new dispatch, merge or host
 change; runtime remains0536f03d67eb277e11573c2188d8e820399627e3; protected
 Recorder data untouched; P07/P12 not started.
+
+Three new successful native logs prove the exact intended heads (456 one,
+461 two); both461 CF7B/readiness now have platform proofs. No new failure.
+Cached remaining gates:456 three Windows release regressions;457 Windows
+software-update, release checks and shard contract;461 Windows phase2, ICSE
+and shard contract plus still-pending synthetic release/software-update/
+retirement/CFI2/operator workflows, which will need exact-head reconciliation
+after completion. No PR is merge-ready. Existing valid evidence is preserved.
+
+Next scheduled action: poll_required_state.py. Act on new completions/failures
+only; persist first, retain new proofs and dispatch demonstrated missing exact
+workflows without rerunning valid PASS. No new artifact review is actionable.
+Final-main qualification, D04 and physical acceptance remain deferred.
