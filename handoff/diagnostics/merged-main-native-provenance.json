@@ -377,7 +377,70 @@
         "9b286f931497bf6291e215f6340443c5162826b0"
       ],
       "checkout_matches": true
+    },
+    {
+      "job_id": 103345791974,
+      "run_id": 34622527886,
+      "name": "publication-bundle",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 26140,
+      "sha256": "ed42e1b2eb7476986f4c9d3512d33c415153e8eeff118fe6cc0da1dfe75d70bf",
+      "checkout_commits": [
+        "9b286f931497bf6291e215f6340443c5162826b0"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103339707831,
+      "run_id": 34622527937,
+      "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 64738,
+      "sha256": "ba1907eaed8df5b66d4e0743630382465abfae0d0ac257d2d0a3a7532d74eea7",
+      "checkout_commits": [
+        "9b286f931497bf6291e215f6340443c5162826b0"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103344769249,
+      "run_id": 34622528054,
+      "name": "Windows regressions (capability-product)",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 60687,
+      "sha256": "ef296c21d2b2217c3f0528c388e4aea5dab40b6168d9944110f2ac56259cd3b8",
+      "checkout_commits": [
+        "9b286f931497bf6291e215f6340443c5162826b0"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103344769461,
+      "run_id": 34622528054,
+      "name": "Linux regression shard (2)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 61855,
+      "sha256": "cded406885346446a166d643954de8e143cd93aac2443534db4aa459535dedaa",
+      "checkout_commits": [
+        "9b286f931497bf6291e215f6340443c5162826b0"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103354309713,
+      "run_id": 34622528054,
+      "name": "Clean-checkout suite order independence",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 1101,
+      "sha256": "905fd344c1ccc06db1486177c65f8fb2d12e2791c67eb64b030288808487e1a1",
+      "checkout_commits": [],
+      "checkout_matches": null
     }
   ],
-  "retained_at": "2026-09-11T17:24:25.094658+00:00"
+  "retained_at": "2026-09-11T17:35:56.580573+00:00"
 }

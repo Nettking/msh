@@ -793,3 +793,9 @@ capability/product, Linux shard2 and the order aggregate; Windows transport is
 running. No new failure. Next: retain five new native logs, then retain/review
 newly complete final-main ICSE artifacts. Preserve all prior PASS; no duplicate
 workflow, D04/host/protected Recorder action or physical acceptance claim.
+
+Five new logs retained: four prove exact9b286f93, while the successful suite-order
+aggregate has no independent checkout and will be bound to its same-run order
+jobs in final review.34 native records now retained. No mismatch/new error.
+Next: review the actual final-main ICSE bundle without rebuilding or rerunning
+software. Remaining release checks are still pending; no physical PASS inferred.
