@@ -149,6 +149,66 @@
       "response": {
         "http_status": 204
       }
+    },
+    {
+      "pr": 461,
+      "sha": "5b826c6806ab1bdb960412ba20ca78192971fb1d",
+      "ref": "codex/tailnet-responder-port-propagation",
+      "workflow": "federation-software-update.yml",
+      "native_proof": [
+        {
+          "job_id": 103267380842,
+          "run_id": 34600817276,
+          "checkout_commits": [
+            "e03addedbc4d10e39e7c6a592977f45995ec6b8e"
+          ],
+          "sha256": "89e84bb45237f52190af9202122bbc86ba63353059d1e0e9388f3dca76bb1188"
+        },
+        {
+          "job_id": 103267380974,
+          "run_id": 34600817276,
+          "checkout_commits": [
+            "e03addedbc4d10e39e7c6a592977f45995ec6b8e"
+          ],
+          "sha256": "96ec92fedf12f08f3f706c68d97bb8a5bd1b265cbae6c5af3225fcc95b1c30cb"
+        }
+      ],
+      "workflow_sha256": "f8bbf98f73d469a9272ca5e89090554906ca81933daac825972d352a1e13fa46",
+      "requested_at": "2026-09-11T14:46:21.424049+00:00",
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "pr": 461,
+      "sha": "5b826c6806ab1bdb960412ba20ca78192971fb1d",
+      "ref": "codex/tailnet-responder-port-propagation",
+      "workflow": "cf8-role-retirement.yml",
+      "native_proof": [
+        {
+          "job_id": 103267381770,
+          "run_id": 34600817428,
+          "checkout_commits": [
+            "e03addedbc4d10e39e7c6a592977f45995ec6b8e"
+          ],
+          "sha256": "a3941551b50e4587bd42df0d48ee1cfc6798bf6cd59d9d984f7021bc531e4648"
+        },
+        {
+          "job_id": 103267382042,
+          "run_id": 34600817428,
+          "checkout_commits": [
+            "e03addedbc4d10e39e7c6a592977f45995ec6b8e"
+          ],
+          "sha256": "1ef6ab42c62d4eb7208b35af9522020666634bcdc0332f4cb016de0bf52b62fb"
+        }
+      ],
+      "workflow_sha256": "c7a825604fe63bacf9e84408658121a97e3480d5b8d059a5d396f188f823bc5a",
+      "requested_at": "2026-09-11T14:46:24.370302+00:00",
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
     }
   ]
 }

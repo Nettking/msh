@@ -336,3 +336,17 @@ platforms. Software-update and retirement Windows leaves prove e03addedbc4;
 with retained Linux proofs, both completed workflows are demonstrated exact-head
 gaps. No test failure. Next: dispatch those two gaps only after live checks;
 retain current456/457 evidence and leave active release CI untouched.
+
+## September11 14:47UTC — two PR461 source gaps dispatched
+
+Exact software-update and retirement were dispatched on unchanged
+5b826c6806ab1bdb960412ba20ca78192971fb1d after live PR/ref and absence checks.
+Both prior workflows were complete; every leaf had native synthetic-source
+proof. completed-head-gap-dispatches.json retains proofs, workflow digests and
+204 receipts. No active job cancelled or valid exact-head PASS rerun.
+
+Next scheduled action: poll_required_state.py. Preserve457 qualification and
+all other valid evidence; retain only new completions. Remaining461 synthetic
+release/CFI2/operator paths need reconciliation after completion. No new ICSE
+review is actionable yet. Runtime and protected Recorder state remain unchanged;
+no merge/final-main qualification/D04 action/physical acceptance or P07/P12.

@@ -23,7 +23,8 @@ path=root/'completed-head-gap-dispatches.json'
 ledger=json.loads(path.read_text()) if path.exists() else dict(dispatches=[])
 runs=api('/actions/runs?head_sha='+sha+'&per_page=100')['workflow_runs']
 for workflow in ['product-branding.yml','release-image-metadata.yml','phase2-federation.yml',
-                 'cf7b-product-physical-acceptance.yml','icse-tool-demo.yml']:
+                 'cf7b-product-physical-acceptance.yml','icse-tool-demo.yml',
+                 'federation-software-update.yml','cf8-role-retirement.yml']:
     matching=[r for r in runs if r['path'].split('/')[-1]==workflow]
     if any(r['event']=='workflow_dispatch' for r in matching):continue
     if any(r['workflow']==workflow for r in ledger['dispatches']):continue
