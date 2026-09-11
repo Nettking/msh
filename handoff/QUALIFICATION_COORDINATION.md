@@ -1313,3 +1313,14 @@ automatic jobs succeeded; no failures observed. Exact-head qualification remains
 incomplete. [State/delta](diagnostics/pr463-qualification-last-transition.json).
 Next: retain only these newly completed native logs, verify actual checkout SHA,
 then await parent completion without duplicate dispatch. Physical state unchanged.
+
+Native log retention is complete for all seven completed jobs (five new), with
+digests in [cumulative provenance](diagnostics/pr463-native-provenance.json).
+All seven actually checked out synthetic `bfec91c9c0ab3581645bc4c575bf4a056b2b80c9`,
+not head7286f30d. Preserve this evidence; exact-head gaps now demonstrated for
+phase2, release, sharding, ICSE and CF7B. Their parents are still active, so do not
+dispatch replacements yet. Six explicit dispatches remain queued and unqualified.
+Next heartbeat: run `poll_pr463_state.py`; only on new terminal jobs run
+`retain_pr463_new_native_logs.py`. On parent completion, review required results
+and fill demonstrated exact-head gaps once. No product/runtime changes or physical
+claims. This is source provenance accounting, not a newly discovered product defect.
