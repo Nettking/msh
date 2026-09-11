@@ -1614,3 +1614,5 @@ next dispatch each exact-head gap once with fresh guards and persist each respon
 Other automatic parents remain active. Review-comment count is unchanged.
 
 21:42UTC: cf7b-product-physical-acceptance.yml exact-head83955f65 gap dispatched once (HTTP204); native proofs and fresh guards are in the ledger. Preserve valid work and do not repeat this dispatch.
+
+21:42UTC: product-branding.yml exact-head83955f65 gap dispatched once (HTTP204); native proofs and fresh guards are in the ledger. Preserve valid work and do not repeat this dispatch.
