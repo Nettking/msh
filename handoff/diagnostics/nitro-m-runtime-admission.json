@@ -1,0 +1,93 @@
+{
+  "observed_at": "2026-09-11T18:54:24.917845+00:00",
+  "candidate": "9b286f931497bf6291e215f6340443c5162826b0",
+  "host": "nitro",
+  "fingerprint": "ad885120af1f11cf",
+  "source_clean": true,
+  "services": [
+    {
+      "service": "flask",
+      "container_id": "8d96382f90c88235483e6297d4fe57f8f37177106fbc2b21bee6615f1811f74f",
+      "image_id": "sha256:bec1d95ace6f962c446c5e50f9888efad196a72ed0240382fd4a37d1cb3e9f32",
+      "image_commit": "9b286f931497bf6291e215f6340443c5162826b0",
+      "environment_commit": "9b286f931497bf6291e215f6340443c5162826b0",
+      "started_at": "2026-09-11T18:43:02.985082423Z",
+      "running": true,
+      "oom_killed": false,
+      "restarts": 0,
+      "mounts_preserved": true,
+      "repaired_source_hashes": {
+        "catalog/federation/tailscale_host_discovery.py": "be1769b1d6da7fcfaaa5e8f6e61daf6a3dda7cac5e69f5e317aed2979734f60f",
+        "catalog/flask_app/federation_pairing_routes.py": "acb46d1ca5833e9aac14fca727b2819362914435eaf85931f630c9ec4123270d",
+        "catalog/flask_app/services/capability_onboarding_service.py": "ff583e6adbf5a0e2cc17eb7ee993c64dc9390cc3847b92ff9b5136690d5b1320",
+        "catalog/flask_app/services/federation_pairing_service.py": "12f3ececaefde3ff5fd56e82d69a05fa42fc70df88620601ea15918eff373506"
+      },
+      "responder_port": 5151
+    },
+    {
+      "service": "relay",
+      "container_id": "1405bdf150efa568cc8ef7d7fac3ee05e45c934a67a5caf5da0d7035e31abeb9",
+      "image_id": "sha256:be14b918bb02d8f9109fb95ad4f796946d62314379445e7ef67bec6f5b70dd16",
+      "image_commit": "9b286f931497bf6291e215f6340443c5162826b0",
+      "environment_commit": "9b286f931497bf6291e215f6340443c5162826b0",
+      "started_at": "2026-09-11T18:42:24.185120696Z",
+      "running": true,
+      "oom_killed": false,
+      "restarts": 0,
+      "mounts_preserved": true,
+      "repaired_source_hashes": {
+        "catalog/federation/tailscale_host_discovery.py": "be1769b1d6da7fcfaaa5e8f6e61daf6a3dda7cac5e69f5e317aed2979734f60f",
+        "catalog/flask_app/federation_pairing_routes.py": "acb46d1ca5833e9aac14fca727b2819362914435eaf85931f630c9ec4123270d",
+        "catalog/flask_app/services/capability_onboarding_service.py": "ff583e6adbf5a0e2cc17eb7ee993c64dc9390cc3847b92ff9b5136690d5b1320",
+        "catalog/flask_app/services/federation_pairing_service.py": "12f3ececaefde3ff5fd56e82d69a05fa42fc70df88620601ea15918eff373506"
+      }
+    },
+    {
+      "service": "recorder",
+      "container_id": "6f9eaa9998cdd8795b27244be0f6a2701b7437827c25f7fd28f2f36dc7f7ce6b",
+      "image_id": "sha256:918a334436a8a4866330ae93c5082c2a81a71f716a20c3b30c9f4e4df0841e62",
+      "image_commit": "9b286f931497bf6291e215f6340443c5162826b0",
+      "environment_commit": "9b286f931497bf6291e215f6340443c5162826b0",
+      "started_at": "2026-09-11T18:42:24.2513943Z",
+      "running": true,
+      "oom_killed": false,
+      "restarts": 0,
+      "mounts_preserved": true,
+      "repaired_source_hashes": {
+        "catalog/federation/tailscale_host_discovery.py": "be1769b1d6da7fcfaaa5e8f6e61daf6a3dda7cac5e69f5e317aed2979734f60f",
+        "catalog/flask_app/federation_pairing_routes.py": "acb46d1ca5833e9aac14fca727b2819362914435eaf85931f630c9ec4123270d",
+        "catalog/flask_app/services/capability_onboarding_service.py": "ff583e6adbf5a0e2cc17eb7ee993c64dc9390cc3847b92ff9b5136690d5b1320",
+        "catalog/flask_app/services/federation_pairing_service.py": "12f3ececaefde3ff5fd56e82d69a05fa42fc70df88620601ea15918eff373506"
+      }
+    },
+    {
+      "service": "ollama",
+      "container_id": "9443f9e1a0ba48ce7f8c2a4ea02762f7d61b4e45d9a823fe6bd373e331af90cc",
+      "image_id": "sha256:b88c73ace3e115f8ec53dc8761ae1c0aabfa675406e3681786b98757ce050f42",
+      "image_commit": null,
+      "environment_commit": null,
+      "started_at": "2026-09-11T10:03:58.151763406Z",
+      "running": true,
+      "oom_killed": false,
+      "restarts": 0,
+      "mounts_preserved": true,
+      "version": "ollama version is 0.32.6",
+      "existing_model": [
+        "llama3.2:3b    a80c4f17acd5    2.0 GB    2 weeks ago"
+      ],
+      "manifest_sha256": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72"
+    }
+  ],
+  "control_identity_preserved": true,
+  "control": {
+    "role": "LEADER",
+    "ready": true,
+    "consensus_term": 9,
+    "commit_index": 1553,
+    "last_applied": 1553
+  },
+  "startup_log_sha256": "d2a39e1bef6ff635364f61cb123df1ba9be8f9862dfb7760b0ccf0068eba8cc0",
+  "physical_acceptance": false,
+  "protected_recorder_data_untouched": true,
+  "next_action": "Replace still-imported N host responder using checked-in exact process identity guard, then verify M responder and real peer health; Recorder M admission/membership remain pending"
+}

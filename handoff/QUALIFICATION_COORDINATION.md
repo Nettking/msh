@@ -26,11 +26,11 @@ Nettking supported activation and all three actual M core image/env/repaired-sou
 hashes are verified. [Runtime receipt](diagnostics/nettking-m-runtime-admission.json).
 Next: Nitro/owned Recorder runtime admission, responder and membership/topology
 verification. Fresh topology and operative-context checks remain before evidence.
-Nitro supported guarded startup completed exit0 at18:43:16UTC. Do not launch another.
-Next execute `diagnostics/verify_nitro_m_runtime.py` once, then persist actual
-image/env/source and recovery proof before replacing the still-imported N responder.
+Nitro supported startup and actual M core image/env/repaired-source hashes are
+verified. Control identity preserved; LEADER/ready term9/index1553. Next replace
+the still-imported N host responder through the checked-in exact-process guard.
 
-Nettking cores run M; Nitro cores/responder remain N0536f03d67eb277e11573c2188d8e820399627e3.
+Nettking and Nitro cores run M; Nitro host responder still imports N0536f03d.
 Recorder protected production6fb77c/separate voterfba508 have not been changed.
 No physical PASS; P07/P12
 not started. Protected Recorder data remains out of bounds. The user's latest
@@ -1173,3 +1173,14 @@ reviewed `verify_nitro_m_runtime.py` through authenticated Nitro native Python;
 verify actual M core source/images, preserved mounts/model and control recovery.
 This is admission, not physical PASS. Host responder still imports N until its
 separate checked-in guarded replacement; protected Recorder data unchanged.
+
+##18:54UTC — Nitro actual M runtime and control recovery verified
+
+[Runtime admission](diagnostics/nitro-m-runtime-admission.json) proves all three
+M core image/env commits and four repaired source hashes, clean M checkout,
+preserved mounts and existing pinned model manifest. Fingerprintad885120af1f11cf.
+Control cluster/federation/voter identity preserved; LEADER/ready term9,
+commit_index=last_applied1553. No OOM or protected Recorder action. No PASS claim.
+Next: bind a fresh M responder to the verified M app/5151 through the checked-in
+process-identity replacement; preserve the current shared secret and verify real
+peer health. Do not count old imported N responder bytes as M.
