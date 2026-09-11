@@ -1405,3 +1405,9 @@ CF7B34639368409 and readiness34637785139 completed successfully. No failed jobs
 observed. Other selected parents are active. Next: retain only new native logs,
 verify checkout source and fill the completed ICSE gap if all native proofs
 establish a mismatch. Keep valid gates and all active parents; physical stopped.
+
+Ten new native logs retained. Exact-head PASS now12/37 required jobs plus
+CFI2/registry3/3. CF7B, readiness and branding are fully verified and preserved.
+All four completed ICSE jobs, including publication-bundle, checked out
+syntheticbfec91c9; all mismatch proofs are retained. Next: dispatch ICSE exact-head
+once. Release/sharding parents remain active; do not duplicate them.
