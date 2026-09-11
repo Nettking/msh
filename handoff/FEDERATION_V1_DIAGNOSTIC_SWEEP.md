@@ -33,6 +33,26 @@ pressure, publish unfinished state and the exact next action before continuing.
 | D01 | Supported Nitro startup, before formal P01/P03 | Core activation succeeds; readiness follows `/onboarding` into stateful `/login`, times out, launcher exits 1 | product | Actual N observation and focused regression | Supported startup completion; updater start after this gate | YES: independent metadata, local provider and bounded diagnostics; no startup PASS | [#456](https://github.com/Nettking/msh/pull/456), direct-response readiness |
 | D02 | Ordinary tailnet discovery, before enrollment/P01 | Default 0.75 s probes time out; public advertisement requests fresh authority; later server 200 is too late | product | Three ordinary N timeouts; focused delayed-response and authority regressions | Ordinary discovery/zero-touch join; no longer-timeout workaround counts as fixed | YES: independently addressed metadata/provider checks and safe authority diagnostics | [#457](https://github.com/Nettking/msh/pull/457), local routing metadata and bounded total HTTP budget |
 | D03 | Nettking local AI provider before P10/B/CF7 | Audit 60 s timeout; actual unchanged 120 s adapter completes in 103.55 s, correctly recommends not-recommended | harness (audit deadline); environmental cold-load latency, no product defect established | Actual product-bound observation completed, 100% GPU; no retry needed | No independent deadline blocker; cold latency remains unsuitable by existing policy | YES: independent authority/status paths | [#458](https://github.com/Nettking/msh/issues/458); no product repair proposed |
+| D04 | Nitro host responder/runtime admission before joining | No responder from N campaign source; one legacy responder from /home/martin/fcp, age 630709 s, deleted Python3.14 executable | environment | /proc metadata; endpoint ownership still to verify | Cannot attribute responder/grant path to N; no N zero-touch join evidence | YES: read-only listener/health and independent negative authority checks; do not mutate legacy process | Issue follows immediate evidence push; no product repair proposed |
+
+## D04
+
+**Finding:** D04  
+**Status:** CONFIRMED (host process provenance mismatch; endpoint ownership not yet established)  
+**Candidate SHA:** `0536f03d67eb277e11573c2188d8e820399627e3`  
+**Host(s):** Nitro  
+**Physical stage:** Host-side responder/runtime admission before Federation joining  
+**Observed:** No responder process has the candidate source cwd. A broader read-only /proc inspection found PID 1422341 from `/home/martin/fcp`, elapsed 630709 s, executable `/usr/bin/python3.14 (deleted)`, no FCP_BUILD_COMMIT environment. Current clean N core containers do not establish that this older host daemon is N. Loopback health refused; actual tailnet bind/listener still needs identification.  
+**Expected:** Every process used for exact-N joining has provable N provenance and belongs to the owned campaign; no legacy service is silently used as N.  
+**Classification:** environment  
+**Acceptance impact:** Host responder/grant diagnostics cannot be presented as N until provenance/ownership is resolved. No grant request or membership mutation has been attempted. N `start-tailscale.sh` starts its responder only after `start.sh` succeeds; D01 prevents reaching that path. Legacy port conflict is a hypothesis, not yet proved.  
+**Safe continuation:** YES — read-only process/listener/health inspection and independently bounded unauthenticated app refusal. Do not kill, restart, reconfigure, or borrow the legacy responder; do not issue/redeem a grant through it.  
+**Evidence:** [N-source-only process search](diagnostics/nitro-responder-metadata.json), [broader process metadata](diagnostics/nitro-responder-all-cwds-metadata.json), [streamed audit procedure](diagnostics/collect_nitro_responder_metadata.py). The `source_sha` field in the latter is the campaign checkout, NOT the legacy process source. Process elapsed age and cwd are the contrary evidence.  
+**State changed:** None; /proc metadata and one health GET only. Secret content was not read.  
+**Protected Recorder data:** Untouched.  
+**GitHub artifact:** Publish issue immediately after this evidence push.  
+**Repair:** NONE; environment admission plan required after ownership check, no source defect established.  
+**Next diagnostic action:** On Nitro inspect PID 1422341 socket ownership and its explicit bind/port, reduce addresses to tailnet/loopback classification; read current legacy checkout SHA with a provenance caveat, perform one health GET to its actual bind. No service mutation.
 
 ## D03
 
