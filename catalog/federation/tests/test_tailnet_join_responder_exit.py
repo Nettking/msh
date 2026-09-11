@@ -127,10 +127,14 @@ def test_windows_exit_wait_uses_the_verified_handle(monkeypatch, wait_result) ->
     monkeypatch.setattr(ctypes, "WinDLL", lambda *args, **kwargs: kernel, raising=False)
     monkeypatch.setattr(responder, "_windows_start_token_from_handle", lambda h: "same")
     if wait_result == 0:
-        assert responder._terminate_windows_process_if_same_instance(42, "same")
+        assert responder._terminate_windows_process_if_same_instance(
+            42, "same", wait_for_exit=True
+        )
     else:
         with pytest.raises(responder.ResponderReplacementError):
-            responder._terminate_windows_process_if_same_instance(42, "same")
+            responder._terminate_windows_process_if_same_instance(
+                42, "same", wait_for_exit=True
+            )
     assert calls == [
         ("open", 0x00100000 | 0x1000 | 0x0001, False, 42),
         ("terminate", 73, 1),

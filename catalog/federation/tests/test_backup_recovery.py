@@ -303,6 +303,67 @@ def test_sqlite_backup_copy_must_pass_quick_check(tmp_path: Path) -> None:
     assert backup._integrity_checks(tmp_path) == ["state.sqlite3"]
 
 
+@pytest.mark.parametrize("exit_after", [7.0, None])
+def test_backup_retains_its_stop_deadline_and_controlled_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, exit_after: float | None
+) -> None:
+    import ctypes
+
+    from catalog.federation import tailnet_join_responder as responder
+
+    elapsed = [0.0]
+    calls = []
+
+    def advance(seconds):
+        elapsed[0] += seconds
+
+    def open_process(access, inherit, pid):
+        calls.append(("open", access))
+        return 73
+
+    def terminate(handle, code):
+        calls.append(("terminate", handle))
+        return True
+
+    def wait(handle, timeout):
+        calls.append(("wait", timeout))
+        return 0x102
+
+    def close(handle):
+        calls.append(("close", handle))
+        return True
+
+    kernel = SimpleNamespace(
+        OpenProcess=open_process,
+        TerminateProcess=terminate,
+        WaitForSingleObject=wait,
+        CloseHandle=close,
+    )
+    monkeypatch.setattr(ctypes, "WinDLL", lambda *a, **kw: kernel, raising=False)
+    monkeypatch.setattr(responder.os, "name", "nt")
+    monkeypatch.setattr(responder, "_windows_start_token_from_handle", lambda h: "same")
+    monkeypatch.setattr(backup, "_read_responder_record", lambda p: (42, "same"))
+    monkeypatch.setattr(
+        backup,
+        "process_start_token",
+        lambda pid: (
+            None if exit_after is not None and elapsed[0] >= exit_after else "same"
+        ),
+    )
+    monkeypatch.setattr(
+        backup, "time", SimpleNamespace(monotonic=lambda: elapsed[0], sleep=advance)
+    )
+
+    if exit_after is None:
+        with pytest.raises(backup.BackupError, match="responder_stop_unverified"):
+            backup._quiesce_responder(tmp_path)
+        assert 10 <= elapsed[0] < 10.1
+    else:
+        backup._quiesce_responder(tmp_path)
+        assert 7 <= elapsed[0] < 7.1
+    assert calls == [("open", 0x1000 | 0x0001), ("terminate", 73), ("close", 73)]
+
+
 def test_incomplete_backup_is_never_accepted(tmp_path: Path) -> None:
     backup_root = tmp_path / "backup"
     backup_root.mkdir()
