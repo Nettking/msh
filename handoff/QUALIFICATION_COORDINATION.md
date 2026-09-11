@@ -223,3 +223,13 @@ No additional exact-head gap became actionable in this check. Next scheduled
 action: poll_required_state.py; act only on material changes, preserve all valid
 PASS, and do not dispatch duplicates. Final merged-main/D04/physical acceptance
 remain deferred while required PR gates finish.
+
+## September11 14:16UTC — three required workflows completed
+
+Intended heads unchanged; no new failure. PR456 software-update34594937633
+completed successfully. PR461 exact CF7B34606865363 and readiness34601194107
+completed successfully. PR457 Windows software-update is running. Detailed
+state delta is retained. Next: retain the three new native leaf proofs and
+assess remaining gates from the cached state. No new dispatch, merge or host
+change; runtime remains0536f03d67eb277e11573c2188d8e820399627e3; protected
+Recorder data untouched; P07/P12 not started.

@@ -1,5 +1,5 @@
 {
-  "observed_at": "2026-09-11T14:03:47.893100+00:00",
+  "observed_at": "2026-09-11T14:15:22.679329+00:00",
   "prs": {
     "456": {
       "number": 456,
@@ -17,25 +17,25 @@
           "run_id": 34594937633,
           "event": "workflow_dispatch",
           "api_head_sha": "1a0c634f47f8a247b6d1d2d1a219f5c12590587d",
-          "status": "in_progress",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "attempt": 1,
           "required_count": 2,
           "signature": {
-            "status": "in_progress",
-            "conclusion": null,
+            "status": "completed",
+            "conclusion": "success",
             "run_attempt": 1,
-            "updated_at": "2026-09-11T13:59:37Z"
+            "updated_at": "2026-09-11T14:06:24Z"
           },
           "jobs": [
             {
               "id": 103248398752,
               "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
-              "status": "in_progress",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "runner_name": "Nettking",
               "started_at": "2026-09-11T13:59:36Z",
-              "completed_at": null
+              "completed_at": "2026-09-11T14:06:24Z"
             },
             {
               "id": 103248399023,
@@ -670,15 +670,15 @@
           "run_id": 34601202338,
           "event": "workflow_dispatch",
           "api_head_sha": "143fe7a9082193114af3d34dc437b85f845849a2",
-          "status": "queued",
+          "status": "in_progress",
           "conclusion": null,
           "attempt": 1,
           "required_count": 2,
           "signature": {
-            "status": "queued",
+            "status": "in_progress",
             "conclusion": null,
             "run_attempt": 1,
-            "updated_at": "2026-09-11T12:52:37Z"
+            "updated_at": "2026-09-11T14:14:01Z"
           },
           "jobs": [
             {
@@ -693,10 +693,10 @@
             {
               "id": 103268657187,
               "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
-              "status": "queued",
+              "status": "in_progress",
               "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T12:52:38Z",
+              "runner_name": "Nettking",
+              "started_at": "2026-09-11T14:14:00Z",
               "completed_at": null
             }
           ]
@@ -1512,15 +1512,15 @@
           "run_id": 34606865363,
           "event": "workflow_dispatch",
           "api_head_sha": "5b826c6806ab1bdb960412ba20ca78192971fb1d",
-          "status": "queued",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "attempt": 1,
           "required_count": 2,
           "signature": {
-            "status": "queued",
-            "conclusion": null,
+            "status": "completed",
+            "conclusion": "success",
             "run_attempt": 1,
-            "updated_at": "2026-09-11T13:53:05Z"
+            "updated_at": "2026-09-11T14:11:05Z"
           },
           "jobs": [
             {
@@ -1535,11 +1535,11 @@
             {
               "id": 103287329543,
               "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T13:53:06Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking",
+              "started_at": "2026-09-11T14:06:25Z",
+              "completed_at": "2026-09-11T14:11:04Z"
             }
           ]
         },
@@ -1665,25 +1665,25 @@
           "run_id": 34601194107,
           "event": "workflow_dispatch",
           "api_head_sha": "5b826c6806ab1bdb960412ba20ca78192971fb1d",
-          "status": "queued",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "attempt": 1,
           "required_count": 2,
           "signature": {
-            "status": "queued",
-            "conclusion": null,
+            "status": "completed",
+            "conclusion": "success",
             "run_attempt": 1,
-            "updated_at": "2026-09-11T12:52:31Z"
+            "updated_at": "2026-09-11T14:14:00Z"
           },
           "jobs": [
             {
               "id": 103268629566,
               "name": "readiness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy B...",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T12:52:33Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking",
+              "started_at": "2026-09-11T14:11:06Z",
+              "completed_at": "2026-09-11T14:13:59Z"
             },
             {
               "id": 103268629887,
