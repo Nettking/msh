@@ -1,127 +1,79 @@
 {
-  "observed_at": "2026-09-11T20:06:17.212670+00:00",
+  "observed_at": "2026-09-11T20:18:18.438284+00:00",
   "changes": {
     "463": [
       {
-        "workflow": "phase2-federation.yml",
-        "run_id": 34640438781,
-        "event": "workflow_dispatch",
-        "status": "queued",
+        "workflow": "federation-v1-release.yml",
+        "run_id": 34637251378,
+        "event": "pull_request",
+        "status": "in_progress",
         "conclusion": null,
         "jobs": [
           {
-            "id": 103398519432,
-            "name": "linux",
+            "id": 103388045747,
+            "name": "Release checks (Windows)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103388045776,
+            "name": "Windows regressions (capability-product)",
+            "status": "in_progress",
+            "conclusion": null
+          },
+          {
+            "id": 103388045883,
+            "name": "Linux regression shard (1)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103398147796,
+            "name": "Clean-checkout suite order independence",
             "status": "completed",
             "conclusion": "success"
           }
         ]
       },
       {
-        "workflow": "federation-v1-release.yml",
-        "run_id": 34637251378,
+        "workflow": "ci-test-sharding.yml",
+        "run_id": 34637251420,
         "event": "pull_request",
-        "status": "queued",
-        "conclusion": null,
+        "status": "completed",
+        "conclusion": "success",
         "jobs": [
           {
-            "id": 103388045756,
-            "name": "Windows regressions (journal-artifacts)",
+            "id": 103388044756,
+            "name": "Shard contract (Windows, shared-pool)",
             "status": "completed",
             "conclusion": "success"
-          },
-          {
-            "id": 103388045794,
-            "name": "Windows regressions (transport-storage)",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
-            "id": 103388045846,
-            "name": "Linux regression shard (3)",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
-            "id": 103388045883,
-            "name": "Linux regression shard (1)",
-            "status": "in_progress",
-            "conclusion": null
           }
         ]
       },
       {
         "workflow": "icse-tool-demo.yml",
-        "run_id": 34637251466,
-        "event": "pull_request",
-        "status": "completed",
-        "conclusion": "success",
-        "jobs": [
-          {
-            "id": 103398570130,
-            "name": "publication-bundle",
-            "status": "completed",
-            "conclusion": "success"
-          }
-        ]
-      },
-      {
-        "workflow": "product-branding.yml",
-        "run_id": 34641464390,
-        "event": "workflow_dispatch",
-        "status": "completed",
-        "conclusion": "success",
-        "jobs": [
-          {
-            "id": 103401945665,
-            "name": "product-branding",
-            "status": "completed",
-            "conclusion": "success"
-          }
-        ]
-      },
-      {
-        "workflow": "cf7b-product-physical-acceptance.yml",
-        "run_id": 34639368409,
-        "event": "workflow_dispatch",
-        "status": "completed",
-        "conclusion": "success",
-        "jobs": [
-          {
-            "id": 103395017816,
-            "name": "acceptance (Linux, fcp-linux-fast, bash)",
-            "status": "completed",
-            "conclusion": "success"
-          }
-        ]
-      },
-      {
-        "workflow": "federation-software-update.yml",
-        "run_id": 34639396004,
+        "run_id": 34642522512,
         "event": "workflow_dispatch",
         "status": "queued",
         "conclusion": null,
         "jobs": [
           {
-            "id": 103395112868,
-            "name": "update-contracts (Linux, fcp-linux-fast, bash)",
+            "id": 103405438284,
+            "name": "reviewer-compose",
             "status": "completed",
             "conclusion": "success"
-          }
-        ]
-      },
-      {
-        "workflow": "cf7c-physical-test-readiness.yml",
-        "run_id": 34637785139,
-        "event": "workflow_dispatch",
-        "status": "completed",
-        "conclusion": "success",
-        "jobs": [
+          },
           {
-            "id": 103389803152,
-            "name": "readiness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy B...",
+            "id": 103405438549,
+            "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
             "status": "completed",
             "conclusion": "success"
+          },
+          {
+            "id": 103405438614,
+            "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
+            "status": "queued",
+            "conclusion": null
           }
         ]
       },
@@ -129,18 +81,12 @@
         "workflow": "phase-f85-operator-federation-surface.yml",
         "run_id": 34637791132,
         "event": "workflow_dispatch",
-        "status": "in_progress",
-        "conclusion": null,
+        "status": "completed",
+        "conclusion": "success",
         "jobs": [
           {
             "id": 103389836092,
             "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
-            "status": "in_progress",
-            "conclusion": null
-          },
-          {
-            "id": 103389836217,
-            "name": "operator-surface (Linux, fcp-linux-fast, bash)",
             "status": "completed",
             "conclusion": "success"
           }
