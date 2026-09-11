@@ -1,0 +1,162 @@
+{
+  "recorded_at": "2026-09-11T16:26:44.635645+00:00",
+  "source_commit": "5b826c6806ab1bdb960412ba20ca78192971fb1d",
+  "required_jobs": 37,
+  "additional_cfi2_registry_jobs": 3,
+  "workflows": [
+    {
+      "workflow": "cf7-acceptance-harness.yml",
+      "run_id": 34601191261,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "phase2-federation.yml",
+      "run_id": 34605553188,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "cf7b-product-physical-acceptance.yml",
+      "run_id": 34606865363,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "product-branding.yml",
+      "run_id": 34602729385,
+      "jobs": 1,
+      "result": "PASS"
+    },
+    {
+      "workflow": "federation-software-update.yml",
+      "run_id": 34612126881,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "cf7c-physical-test-readiness.yml",
+      "run_id": 34601194107,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "icse-tool-demo.yml",
+      "run_id": 34606870244,
+      "jobs": 4,
+      "result": "PASS"
+    },
+    {
+      "workflow": "cf8-role-retirement.yml",
+      "run_id": 34612131170,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "phase-f85-operator-federation-surface.yml",
+      "run_id": 34618403669,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "federation-v1-release.yml",
+      "run_id": 34616905954,
+      "jobs": 16,
+      "result": "PASS"
+    },
+    {
+      "workflow": "ci-test-sharding.yml",
+      "run_id": 34601196761,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "cfi2-onboarding-composition.yml",
+      "run_id": 34618400138,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "release-image-metadata.yml",
+      "run_id": 34602732775,
+      "jobs": 1,
+      "result": "PASS"
+    }
+  ],
+  "release_native_checkouts": 14,
+  "source_bound_aggregates": 2,
+  "collected_test_identities": 4368,
+  "full_orders_exact_test_identities": true,
+  "skips_with_pass_elsewhere": 13,
+  "skips_covered_by_native_nonartifact_log": 7,
+  "native_skip_map_sha256": "fb2ec6dbca12ea73ea0328bac918b051b5fee5de84efdb7b07212ab1cb17df10",
+  "unchanged_intentional_posix_exclusions": [
+    {
+      "test": "catalog.flask_app.tests.test_first_federation_start.test_windows_fresh_start_executes_real_batch_with_reset_stdin",
+      "reason": "requires real Windows cmd.exe"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_first_federation_start.test_windows_scaffolding_repair_restores_real_dirty_checkout",
+      "reason": "requires real Windows cmd.exe and git"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_runtime_state_resolver.test_encoded_python_survives_windows_powershell_native_argument_forwarding",
+      "reason": "Windows PowerShell native argument check"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_model_resource_admission_paths.test_windows_model_pull_script_has_valid_powershell_syntax",
+      "reason": "Windows PowerShell parser check"
+    },
+    {
+      "test": "catalog.federation.tests.test_host_mutation_activation.test_windows_activation_lease_has_valid_powershell_syntax",
+      "reason": "Windows PowerShell parser check"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_fresh_shutdown.test_shutdown_timeout_recovers_without_hanging",
+      "reason": "Windows process-tree recovery contract"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_migration_script.test_windows_migration_script_has_valid_powershell_syntax",
+      "reason": "Windows PowerShell parser check"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_migration_script.test_windows_migration_fast_forwards_fake_legacy_checkout_and_resumes",
+      "reason": "Windows migration smoke"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_relay_volume_selector.test_selector_survives_missing_current_images_and_reuses_existing_relay_volume",
+      "reason": "Windows PowerShell regression"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_relay_volume_selector.test_selector_pulls_python_probe_and_identifies_pc3_identity",
+      "reason": "Windows PowerShell regression"
+    },
+    {
+      "test": "catalog.mtconnect_recorder.tests.test_tailscale_recorder_launcher.test_windows_probe_rejects_runtime_that_cannot_import_exact_entrypoint",
+      "reason": "Windows launcher execution"
+    },
+    {
+      "test": "catalog.mtconnect_recorder.tests.test_tailscale_recorder_launcher.test_root_cmd_preserves_spaced_argument_and_nonzero_exit",
+      "reason": "Windows launcher execution"
+    },
+    {
+      "test": "catalog.mtconnect_recorder.tests.test_tailscale_recorder_launcher.test_windows_wrapper_scrubs_legacy_secret_and_forwards_recorder_options",
+      "reason": "Windows launcher execution"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_fresh_url_output.test_fresh_onboarding_query_is_printed_without_executing_reset_fragment",
+      "reason": "Windows cmd metacharacter regression"
+    }
+  ],
+  "release_artifact_sha256": "7b207fdf2032fb8d54cc0a2ce0f7052f1e7da8997c0470389f65805f9bb133cc",
+  "icse_review_sha256": "f02afbb6ae6c4f8e1105b20381edc0d764017b884021cc5ac14dc2cdeda17344",
+  "no_reported_correctness_findings": true,
+  "manual_reviewed_files": [
+    "catalog/flask_app/tests/test_tailnet_join_compose.py",
+    "docker-compose.yml"
+  ],
+  "compose_regression_cases_per_full_order": 5,
+  "status": "QUALIFIED_REQUIRED_PR_HEAD_SCOPE",
+  "merge_boundary": "Hold for complete required fix-set qualification; recheck live head, branch gates and correctness findings immediately before the separate merge.",
+  "physical_acceptance": false
+}

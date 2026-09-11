@@ -1,0 +1,15 @@
+{
+  "matched": [
+    {
+      "job": "PostgreSQL storage release check",
+      "id": 103321004891,
+      "sha256": "b87b8cebea6c6a4733666279ecc8e5d5fca0f2b69634f7cdc2f2687cb01fcc81",
+      "modules": [
+        "catalog/federation/tests/test_phase_d2_postgres.py"
+      ],
+      "summaries": [
+        "2026-09-11T16:04:13.6646556Z 11 passed in 0.58s"
+      ]
+    }
+  ]
+}

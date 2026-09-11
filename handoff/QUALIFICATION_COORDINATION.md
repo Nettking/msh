@@ -12,7 +12,7 @@ checked-in revalidation -> fresh formal physical acceptance.
 |---|---|---|
 |456|1a0c634f47f8a247b6d1d2d1a219f5c12590587d|Required exact-head qualification PASS; preserve evidence, hold for complete fix-set qualification and live premerge checks|
 |457|143fe7a9082193114af3d34dc437b85f845849a2|Required exact-head qualification PASS; preserve evidence, hold for complete fix-set qualification and live premerge checks|
-|461|5b826c6806ab1bdb960412ba20ca78192971fb1d|Draft repair;50 focused tests pass; required qualification pending|
+|461|5b826c6806ab1bdb960412ba20ca78192971fb1d|Required exact-head qualification PASS; complete fix set qualified, live premerge checks next|
 
 Runtime remains0536f03d67eb277e11573c2188d8e820399627e3. No physical PASS; P07/P12
 not started. Protected Recorder data remains out of bounds. The user's latest
@@ -586,3 +586,25 @@ Branch-protection/rules metadata reads returned403 with the existing credential;
 this is an audit visibility limitation, not a product failure. Use normal merge
 APIs with expected-head guards and server enforcement; never bypass protections.
 Persisted snapshot: merge-branch-protection.json. No merge attempted yet.
+
+## September11 16:28UTC — complete required fix set qualified
+
+PR461 exact5b826c6806ab1bdb960412ba20ca78192971fb1d has37/37 required jobs PASS,
+CFI2/registry3/3 PASS, release-verdict PASS, reviewed ICSE/release artifacts and
+source-bound dependency aggregates. Both full orders match all4368 collected
+test identities; all five new Compose cases passed unskipped in each order.
+Expected skip reconciliation preserves13 cross-platform JUnit passes, seven
+PostgreSQL cases in its native11/11 job, and14 unchanged POSIX platform exclusions.
+Manual review of the two changed files found no correctness issue; no reported
+findings exist. [Final receipt](diagnostics/pr461-final-qualification.json) and
+[verifier](diagnostics/finalize_pr461_qualification.py) retain the result.
+
+All three intended PR heads are now qualified. Next: live expected-head and
+review checks; mark drafts ready and merge456,457,461 separately through normal
+GitHub enforcement, persisting each transition immediately. Do not update/rebase
+qualified PR heads or bypass required gates. Then use actual final merged main
+and its automatic push qualification, filling only genuinely missing required
+workflows once. No intermediate main is a candidate or physical evidence.
+
+Runtime remains0536f03d67eb277e11573c2188d8e820399627e3; no host/D04/Recorder
+action yet, no physical acceptance PASS and no P07/P12 timers.
