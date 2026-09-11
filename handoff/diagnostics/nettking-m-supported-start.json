@@ -1,0 +1,110 @@
+{
+  "started_at": "2026-09-11T18:23:37.396427+00:00",
+  "candidate": "9b286f931497bf6291e215f6340443c5162826b0",
+  "previous_candidate": "0536f03d67eb277e11573c2188d8e820399627e3",
+  "project": "fcp-v1-73c779-nettking",
+  "source_root": "C:\\wsl\\fcp-v1-73c779-nettking-runtime-20260910",
+  "before": [
+    {
+      "service": "flask",
+      "id": "7468794b6dfc0e24aff14af91950bbc37a9ce5ae6ba912d1eec4632080a0e5a6",
+      "image": "sha256:336968cae8e28c2adce95954210904e2d6af8e44881b9cc327ee7877751d8b80",
+      "started_at": "2026-09-11T09:50:03.38077273Z",
+      "mounts": [
+        {
+          "Type": "bind",
+          "Source": "C:\\wsl\\fcp-v1-fba508-nettking-20260910\\.acceptance\\nettking-73c779-runtime-control\\data",
+          "Destination": "/app/data",
+          "Mode": "rw",
+          "RW": true,
+          "Propagation": "rprivate"
+        },
+        {
+          "Type": "volume",
+          "Name": "fcp-v1-73c779-nettking-relay-state",
+          "Source": "/var/lib/docker/volumes/fcp-v1-73c779-nettking-relay-state/_data",
+          "Destination": "/var/lib/fcp-relay",
+          "Driver": "local",
+          "Mode": "rw",
+          "RW": true,
+          "Propagation": ""
+        },
+        {
+          "Type": "bind",
+          "Source": "C:\\wsl\\fcp-v1-fba508-nettking-20260910\\.acceptance\\nettking-73c779-runtime-control\\results",
+          "Destination": "/app/results",
+          "Mode": "rw",
+          "RW": true,
+          "Propagation": "rprivate"
+        }
+      ]
+    },
+    {
+      "service": "relay",
+      "id": "52254998e594b8fc7f15050830ceac53e3c406e5f1e1a117e04177048e195b93",
+      "image": "sha256:0416c9f831b101aca3658c1217044e6d3b9fd09e996b8ee31823c601e3a376e9",
+      "started_at": "2026-09-11T09:50:02.479341038Z",
+      "mounts": [
+        {
+          "Type": "volume",
+          "Name": "fcp-v1-73c779-nettking-relay-state",
+          "Source": "/var/lib/docker/volumes/fcp-v1-73c779-nettking-relay-state/_data",
+          "Destination": "/var/lib/fcp-relay",
+          "Driver": "local",
+          "Mode": "rw",
+          "RW": true,
+          "Propagation": ""
+        }
+      ]
+    },
+    {
+      "service": "recorder",
+      "id": "e6eab71be823ac9d31d39faea4e675a031bb8f8e213ff3235e6d0140428f77b9",
+      "image": "sha256:c6af91eb96be32bb6b1ef4e9c7e64152a4bd273ca4ffdcac4c8df835ccda8295",
+      "started_at": "2026-09-11T09:50:02.472433507Z",
+      "mounts": [
+        {
+          "Type": "bind",
+          "Source": "C:\\wsl\\fcp-v1-fba508-nettking-20260910\\.acceptance\\nettking-73c779-runtime-control\\data",
+          "Destination": "/app/data",
+          "Mode": "rw",
+          "RW": true,
+          "Propagation": "rprivate"
+        }
+      ]
+    },
+    {
+      "service": "ollama",
+      "id": "b18a34a67cc1faa14ae0850a7f0683e1e0e84d3aecd4140f4ec92c7ee6332a87",
+      "image": "sha256:b88c73ace3e115f8ec53dc8761ae1c0aabfa675406e3681786b98757ce050f42",
+      "started_at": "2026-09-11T09:50:04.236672292Z",
+      "mounts": [
+        {
+          "Type": "volume",
+          "Name": "fcp-v1-73c779-nettking-ollama-models",
+          "Source": "/var/lib/docker/volumes/fcp-v1-73c779-nettking-ollama-models/_data",
+          "Destination": "/root/.ollama",
+          "Driver": "local",
+          "Mode": "rw",
+          "RW": true,
+          "Propagation": ""
+        },
+        {
+          "Type": "bind",
+          "Source": "/run/desktop/mnt/host/c/Users/Martin/.ollama/models",
+          "Destination": "/root/.ollama/models",
+          "Mode": "ro",
+          "RW": false,
+          "Propagation": "rprivate"
+        }
+      ]
+    }
+  ],
+  "resolved_config_sha256": "1e28c00950856af2c5866422ee8b19793243e608c698356f6bf149c86253f884",
+  "safety_review_sha256": "9ba681326d97d85b61dfe5cd1654da4389dd2a18d6d6586db86f52e57863ff73",
+  "protected_recorder_operation": false,
+  "physical_pass": false,
+  "status": "RUNNING",
+  "source_and_launch_serialized": true,
+  "pid": 26896
+}

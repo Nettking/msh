@@ -22,8 +22,11 @@ D04 host remediation and local/real Nettking peer verification are complete on N
 issue459 is closed. AUTHORITATIVE_SHA is now frozen as
 `9b286f931497bf6291e215f6340443c5162826b0` (M).
 Clean checked-in revalidation and scenario side-effect review are complete.
-Next: [controlled owned runtime admission](PHYSICAL_M_ADMISSION.md).
-M is not yet deployed; fresh runtime/source/owner/topology checks remain required.
+Nettking controlled N-to-M activation is RUNNING, PID26896. Do not launch another.
+[Operation receipt](diagnostics/nettking-m-supported-start.json) and private native
+log/receipt identify the active work. Next: inspect completion and verify actual
+M images/source, then continue [owned runtime admission](PHYSICAL_M_ADMISSION.md).
+Fresh runtime/source/owner/topology checks remain required before evidence.
 
 Nettking/Nitro campaign core runtime remains0536f03d67eb277e11573c2188d8e820399627e3.
 Recorder protected production6fb77c/separate voterfba508 have not been changed.
@@ -1000,3 +1003,12 @@ host mutation mutex. No fresh/reset/volume prune; no other host change. Durable
 native receipt/log are under private `.acceptance/nettking-9b286f93-supported-start.*`.
 Inspect operation state before retrying, persist every transition, then verify
 actual M runtime before continuing Nitro/Recorder admission. Physical PASS0.
+
+### Nettking N-to-M activation started
+
+All preconditions passed. Native supported startup is running once as PID26896,
+after serialized source advancement, with the persisted original owned Compose
+configuration. [Operation receipt](diagnostics/nettking-m-supported-start.json).
+No second launch, timer or acceptance probe while activation is active. Next:
+read private `.acceptance/nettking-9b286f93-supported-start.json` on a completion
+transition and inspect the native log only if needed; then verify actual runtime.
