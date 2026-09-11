@@ -9,6 +9,13 @@ Its documentation commits are not new runtime candidates and must not be deploye
 GitHub's latest version of this file and its linked evidence are the authoritative
 diagnostic checkpoint. The previous qualification-first handoff is superseded.
 
+**Current phase: diagnostic sweep COMPLETE, September11 12:44UTC.** Read the
+[sweep report](DIAGNOSTIC_SWEEP_REPORT.md) for the stop condition, coverage,
+smallest fix set and next action. Historical next-action paragraphs below are
+retained evidence history; the report supersedes them. Begin isolated D05 repair,
+then reconcile exact-head qualification without repeating valid work. Physical
+hosts remain unchanged and formal acceptance remains stopped.
+
 ## Operating boundary
 
 Expose independent blockers before selecting the next candidate. Keep all live

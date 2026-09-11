@@ -1,0 +1,71 @@
+{
+  "candidate_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
+  "mode": "DIAGNOSTIC ONLY - NOT PHYSICAL ACCEPTANCE EVIDENCE",
+  "observed_at": "2026-09-11T12:43:42.559913+00:00",
+  "protected_container_metadata_exactly_unchanged": true,
+  "protected_data_content_inspected": false,
+  "protected_recorder_data_untouched": true,
+  "local_checkouts": [
+    {
+      "path": "C:/wsl/fcp-v1-0536f03d-nettking-20260911",
+      "sha": "0536f03d67eb277e11573c2188d8e820399627e3",
+      "clean": true
+    },
+    {
+      "path": "C:/wsl/fcp-v1-73c779-nettking-runtime-20260910",
+      "sha": "0536f03d67eb277e11573c2188d8e820399627e3",
+      "clean": true
+    }
+  ],
+  "containers": [
+    {
+      "service": "flask",
+      "same_id_image_start": true,
+      "running": true,
+      "oom_killed": false
+    },
+    {
+      "service": "relay",
+      "same_id_image_start": true,
+      "running": true,
+      "oom_killed": false
+    },
+    {
+      "service": "recorder",
+      "same_id_image_start": true,
+      "running": true,
+      "oom_killed": false
+    },
+    {
+      "service": "ollama",
+      "same_id_image_start": true,
+      "running": true,
+      "oom_killed": false
+    }
+  ],
+  "tailscale_backend": "Running",
+  "tailnet_hosts": {
+    "nettking": {
+      "online": true,
+      "os": "windows"
+    },
+    "nitro": {
+      "online": true,
+      "os": "linux"
+    },
+    "beast": {
+      "online": true,
+      "os": "windows"
+    },
+    "desktop-n5ki14r": {
+      "online": true,
+      "os": "windows"
+    }
+  },
+  "formal_p01_p12": "0/12 fresh acceptance; diagnostic observations only",
+  "formal_b01_b09": "0/9 fresh acceptance",
+  "cf7": "not physically accepted",
+  "p07": "not started",
+  "p12": "not started",
+  "state_changed": false
+}
