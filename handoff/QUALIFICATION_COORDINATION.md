@@ -30,13 +30,13 @@ Preserve [D06 / issue462](diagnostics/D06.md). Repair is ready for review in PR4
 head7286f30d30e20c94c13cc9acebb2fd6d61bc1163, with focused development tests PASS.
 Next: review repair/native exact-head CI state. No dependent admission, physical
 retry workaround or PASS; no repair deployed and no new candidate frozen.
-**PR463 MERGE BLOCKED by confirmed D06-R1 backup contract regression.** All37+3
-CI jobs succeeded on7286f30d and native artifacts are retained, but review found
-an uncaught5s replacement exception overriding backup's10s stop contract.
-Two isolated regressions confirm it; see `diagnostics/D06-R1.md` and PR463 comment.
-Next: narrow correction in the isolated repair branch, focused regressions, push
-the new head and qualify only as required for that changed head. Preserve7286f30d
-evidence as historical; never merge/deploy it or carry its results to a new SHA.
+**PR463 corrected head83955f65b7e6bb36de8e90f34608b97070fed33b pushed.** D06-R1
+is resolved in branch: signal-only boolean default restored, only replacement
+opts in to stable-handle exit waiting. Backup source/deadline/error unchanged.
+Focused Windows52PASS/8skips and isolated Linux11PASS; full new-head qualification
+pending. Preserve all7286f30d CI/native/artifact evidence as historical, including
+its review blocker; never carry those results to83955f65. Next: update PR review
+and qualification tracking to new head, then run only necessary exact-head gates.
 Nitro supported startup and actual M core image/env/repaired-source hashes are
 verified. Control identity preserved; LEADER/ready term9/index1553. The attempted
 checked-in responder replacement exposed D06; no further physical startup now.
@@ -1570,3 +1570,11 @@ Do not merge or deploy the reviewed head. Preserve all completed qualification.
 No physical execution/data access. Next: publish confirmation on existing PR463,
 then restore signal-only default helper semantics and opt in to5s exit waiting
 only at responder replacement. Backup's10s deadline/error contract stays unchanged.
+
+21:28UTC: correction pushed on existing PR463, head
+`83955f65b7e6bb36de8e90f34608b97070fed33b`. [Focused evidence](diagnostics/pr463-backup-contract-repair.json)
+records red-to-green backup tests and preserved real Linux exit-wait regressions.
+Only isolated source/test files changed; backup implementation is untouched.
+Old qualification state/delta/native proof archived under `pr463-head-7286f30d-*`.
+Next: publish correction on PR463, retarget checked-in polling/retention helpers,
+review new auto qualification state and absent gates. No merge/physical deployment.

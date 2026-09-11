@@ -1,0 +1,43 @@
+{
+  "recorded_at": "2026-09-11T21:27:57.022707+00:00",
+  "finding": "D06-R1",
+  "head": "83955f65b7e6bb36de8e90f34608b97070fed33b",
+  "previous_head": "7286f30d30e20c94c13cc9acebb2fd6d61bc1163",
+  "status": "RESOLVED-IN-BRANCH",
+  "tests": {
+    "red": {
+      "file": "pr463-backup-contract-red.xml",
+      "sha256": "94d2f2e463c71d3592096a12cf2c0b54fa3b23d2d8c889a5bebe2e0dbc822198",
+      "cases": 2,
+      "passed": 0,
+      "skipped": 0,
+      "failed": 2
+    },
+    "windows": {
+      "file": "pr463-backup-contract-green-windows.xml",
+      "sha256": "4af1097a43fffa55cf17617844cfa72e1855d2a8999c42550a0ff745924e1e3e",
+      "cases": 60,
+      "passed": 52,
+      "skipped": 8,
+      "failed": 0
+    },
+    "linux_isolated": {
+      "file": "pr463-backup-contract-green-linux-isolated.xml",
+      "sha256": "1dbe2c2359502bd9df39e24d889e5957ba0be493b070db501f7f21dc85ead9f2",
+      "cases": 11,
+      "passed": 11,
+      "skipped": 0,
+      "failed": 0
+    }
+  },
+  "ruff": "PASS",
+  "diff_hygiene": "PASS",
+  "post_test_changes": "Only restored unrelated original formatting before commit; test/source semantics unchanged.",
+  "scope": "Native Windows focused backup/responder tests and isolated byte-identical Linux host-loader exit tests. Not full exact-head qualification.",
+  "product_contract": "Signal-only boolean default preserved; only replacement opts in to bounded stable-handle exit wait. Backup source and10s/error contract unchanged.",
+  "physical_candidate": "9b286f931497bf6291e215f6340443c5162826b0",
+  "runtime_repair_deployed": false,
+  "protected_recorder_data_untouched": true,
+  "physical_acceptance": false,
+  "next_action": "Review new PR463 head and qualify only its required exact-head gates; archive old head proofs without carrying them forward."
+}
