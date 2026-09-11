@@ -441,3 +441,13 @@ is checkout-free. Combined461 release provenance has14 source-running leaves
 at the synthetic checkout and two dependency-only aggregates with no checkout.
 None qualifies5b826c68. Next: guarded exact461 release dispatch; preserve all456/
 457 proofs and perform no synthetic release artifact review.
+
+## September11 15:34UTC — exact PR461 release dispatched
+
+Exact release was dispatched on unchanged5b826c6806ab1bdb960412ba20ca78192971fb1d
+with current head/ref and absence checks. Completed prior release has14 proved
+synthetic source leaves and exactly two known checkout-free aggregates; all16
+native log digests are recorded in completed-head-gap-dispatches.json with the
+workflow digest and204 receipt. This fills a missing exact-head gate; no valid
+PASS was rerun and no active CI cancelled. Next: finalize456 using its completed
+native release artifacts and existing ICSE/registry evidence. Hosts unchanged.

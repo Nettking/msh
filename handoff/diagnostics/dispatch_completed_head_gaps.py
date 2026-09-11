@@ -24,7 +24,8 @@ ledger=json.loads(path.read_text()) if path.exists() else dict(dispatches=[])
 runs=api('/actions/runs?head_sha='+sha+'&per_page=100')['workflow_runs']
 for workflow in ['product-branding.yml','release-image-metadata.yml','phase2-federation.yml',
                  'cf7b-product-physical-acceptance.yml','icse-tool-demo.yml',
-                 'federation-software-update.yml','cf8-role-retirement.yml']:
+                 'federation-software-update.yml','cf8-role-retirement.yml',
+                 'federation-v1-release.yml']:
     matching=[r for r in runs if r['path'].split('/')[-1]==workflow]
     if any(r['event']=='workflow_dispatch' for r in matching):continue
     if any(r['workflow']==workflow for r in ledger['dispatches']):continue
@@ -35,8 +36,19 @@ for workflow in ['product-branding.yml','release-image-metadata.yml','phase2-fed
         assert jobs and all(j['status']=='completed' for j in jobs)
         for job in jobs:
             record=next(r for r in native['records'] if r['job_id']==job['id'])
-            assert record.get('checkout_matches') is False
+            if workflow=='federation-v1-release.yml' and job['name'] in {
+                    'Clean-checkout suite order independence',
+                    'Federation v1 automated release verdict'}:
+                # Dependency-only aggregates do not independently check out source.
+                assert record.get('checkout_matches') is None
+                assert record['checkout_commits']==[] and record['conclusion']=='success'
+            else:
+                assert record.get('checkout_matches') is False
             proof.append({k:record[k] for k in ['job_id','run_id','checkout_commits','sha256']})
+        if workflow=='federation-v1-release.yml':
+            assert len(jobs)==16
+            leaves=[p for p in proof if p['run_id']==run['id'] and p['checkout_commits']]
+            assert len(leaves)==14 and all(p['checkout_commits']==['e03addedbc4d10e39e7c6a592977f45995ec6b8e'] for p in leaves)
     definition=subprocess.check_output(['git','show',sha+':.github/workflows/'+workflow],cwd=repo)
     assert b'workflow_dispatch' in definition
     assert api('/git/ref/heads/'+ref)['object']['sha']==sha
