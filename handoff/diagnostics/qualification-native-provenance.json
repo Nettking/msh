@@ -468,9 +468,59 @@
             "1a0c634f47f8a247b6d1d2d1a219f5c12590587d"
           ],
           "checkout_matches": true
+        },
+        {
+          "job_id": 103249965655,
+          "run_id": 34595427316,
+          "name": "Windows regressions (capability-product)",
+          "runner_name": "Nettking",
+          "conclusion": "success",
+          "bytes": 60576,
+          "sha256": "97440c696f2d3d790173bcebb90107807974e2fea068c7199dcb1e6d9464d387",
+          "checkout_commits": [
+            "1a0c634f47f8a247b6d1d2d1a219f5c12590587d"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103318196526,
+          "run_id": 34595427316,
+          "name": "Release matrix (Linux)",
+          "runner_name": "Nettking-Linux",
+          "conclusion": "success",
+          "bytes": 15958,
+          "sha256": "9f392cff84f534daa29ddc5751992a62a392d3eed48450cb1978a5374e3a74a1",
+          "checkout_commits": [
+            "1a0c634f47f8a247b6d1d2d1a219f5c12590587d"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103318196670,
+          "run_id": 34595427316,
+          "name": "Release matrix (Windows)",
+          "runner_name": "Nettking-Linux",
+          "conclusion": "success",
+          "bytes": 15646,
+          "sha256": "1340f776c1a3b75637b8ea9444dd853f98906910550ba96ea1c0bdcf89f25c84",
+          "checkout_commits": [
+            "1a0c634f47f8a247b6d1d2d1a219f5c12590587d"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103318335476,
+          "run_id": 34595427316,
+          "name": "Federation v1 automated release verdict",
+          "runner_name": "Nettking-Linux",
+          "conclusion": "success",
+          "bytes": 1189,
+          "sha256": "958d1bf59c25b68c961a04e1a8384fcbc26bbdf519cf2d4d894b0712c9f37469",
+          "checkout_commits": [],
+          "checkout_matches": null
         }
       ],
-      "retained_at": "2026-09-11T15:21:52.555644+00:00"
+      "retained_at": "2026-09-11T15:33:35.495904+00:00"
     },
     "457": {
       "source_commit": "143fe7a9082193114af3d34dc437b85f845849a2",
@@ -1631,9 +1681,59 @@
             "5b826c6806ab1bdb960412ba20ca78192971fb1d"
           ],
           "checkout_matches": true
+        },
+        {
+          "job_id": 103267381420,
+          "run_id": 34600817254,
+          "name": "Windows regressions (transport-storage)",
+          "runner_name": "Nettking",
+          "conclusion": "success",
+          "bytes": 53984,
+          "sha256": "fcaf6560aae95c822e2733e7b2ed8735c4abd21f31d7ca9b8b84d45559128136",
+          "checkout_commits": [
+            "e03addedbc4d10e39e7c6a592977f45995ec6b8e"
+          ],
+          "checkout_matches": false
+        },
+        {
+          "job_id": 103319546154,
+          "run_id": 34600817254,
+          "name": "Release matrix (Windows)",
+          "runner_name": "Nettking-Linux",
+          "conclusion": "success",
+          "bytes": 15560,
+          "sha256": "0a1947ddf28bf1956fd54071b93418175bc84913536d76b8b8518d97f87d280f",
+          "checkout_commits": [
+            "e03addedbc4d10e39e7c6a592977f45995ec6b8e"
+          ],
+          "checkout_matches": false
+        },
+        {
+          "job_id": 103319546227,
+          "run_id": 34600817254,
+          "name": "Release matrix (Linux)",
+          "runner_name": "Nettking-Linux",
+          "conclusion": "success",
+          "bytes": 15018,
+          "sha256": "b7df2ff6ad01f355ce0f96e8e1f738b4b6574aaf7605a5da77290952ccc99362",
+          "checkout_commits": [
+            "e03addedbc4d10e39e7c6a592977f45995ec6b8e"
+          ],
+          "checkout_matches": false
+        },
+        {
+          "job_id": 103319683382,
+          "run_id": 34600817254,
+          "name": "Federation v1 automated release verdict",
+          "runner_name": "Nettking-Linux",
+          "conclusion": "success",
+          "bytes": 1189,
+          "sha256": "d64132674fc37ceb426d5d6ced880ee31ec1dbbee20f92452bdb63ec3e59eb05",
+          "checkout_commits": [],
+          "checkout_matches": null
         }
       ],
-      "retained_at": "2026-09-11T15:21:51.433007+00:00"
+      "retained_at": "2026-09-11T15:33:35.518174+00:00"
     }
   }
 }

@@ -434,3 +434,10 @@ used the synthetic checkout and no exact release run exists. Then complete456
 native release/artifact/correctness review. No merge or host action; runtime
 remains0536f03d67eb277e11573c2188d8e820399627e3, protected Recorder untouched,
 no physical PASS and no P07/P12 timers.
+
+Eight new native logs retained: three456 jobs prove exact1a0c634f and its final
+verdict is checkout-free; three461 leaves prove e03addedbc4 and its final verdict
+is checkout-free. Combined461 release provenance has14 source-running leaves
+at the synthetic checkout and two dependency-only aggregates with no checkout.
+None qualifies5b826c68. Next: guarded exact461 release dispatch; preserve all456/
+457 proofs and perform no synthetic release artifact review.
