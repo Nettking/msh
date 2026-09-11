@@ -1473,3 +1473,11 @@ only new native logs. Preserve18/37+3/3 exact-head PASS. Once all required jobs
 and release verdict pass, review exact-head artifacts and current correctness
 findings before normal merge; then qualify actual new merged main once.
 No new candidate or physical action before that sequence completes.
+
+##20:43UTC — only exact-head release remains active
+
+Head7286f30d unchanged. Sharding34643583922 and ICSE34642522512 completed
+successfully. Every selected workflow except release34644764330 is now complete;
+release has four successful jobs so far. No failed jobs. Next: retain new native
+logs, verify source and review completed ICSE artifacts while release proceeds.
+No duplicate jobs, merge, candidate selection or physical action.
