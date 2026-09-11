@@ -532,3 +532,10 @@ success; CFI2 run34618400138 is queued. No new failure. Next: retain six new
 native proofs, then await remaining gates; no duplicate dispatch or partial
 artifact review needed. Runtime remains0536f03d67eb277e11573c2188d8e820399627e3,
 protected Recorder untouched, no merge/candidate/physical acceptance action.
+
+All six newly retained successful native logs prove exact5b826c68. No mismatch
+or new failure. Next scheduled action: poll_required_state.py; retain only new
+results, finalize complete461 release artifacts when ready, then reconcile its
+full required gate verdict. Preserve qualified456/457 and existing461 ICSE/
+registry proofs. No further dispatch presently required; all hosts/protected
+Recorder data unchanged, P07/P12 absent and physical acceptance incomplete.
