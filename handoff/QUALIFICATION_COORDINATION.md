@@ -1537,3 +1537,8 @@ and companion3 jobs now report success. Native provenance/artifact review remain
 the final qualification step. Next: retain five new release logs, verify aggregate
 dependencies, retain/review immutable release artifacts, inspect current review
 findings and exact head before normal merge. Physical admission remains stopped.
+
+Five final native logs retained: three source-bearing jobs verify exacthead7286f30d;
+two expected no-checkout aggregates await dependency review. All38 source-bearing
+jobs (35 required plus3 companion) now have native exact-head proofs. Next: finish
+the two aggregate reviews and immutable release artifact review before verdict.
