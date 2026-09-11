@@ -41,12 +41,12 @@ pressure, publish unfinished state and the exact next action before continuing.
 | D02 | Ordinary tailnet discovery, before enrollment/P01 | Default 0.75 s probes time out; public advertisement requests fresh authority; later server 200 is too late | product | Three ordinary N timeouts; focused delayed-response and authority regressions | Ordinary discovery/zero-touch join; no longer-timeout workaround counts as fixed | YES: independently addressed metadata/provider checks and safe authority diagnostics | [#457](https://github.com/Nettking/msh/pull/457), local routing metadata and bounded total HTTP budget |
 | D03 | Nettking local AI provider before P10/B/CF7 | Audit 60 s timeout; actual unchanged 120 s adapter completes in 103.55 s, correctly recommends not-recommended | harness (audit deadline); environmental cold-load latency, no product defect established | Actual product-bound observation completed, 100% GPU; no retry needed | No independent deadline blocker; cold latency remains unsuitable by existing policy | YES: independent authority/status paths | [#458](https://github.com/Nettking/msh/issues/458); no product repair proposed |
 | D04 | Nitro host responder/runtime admission before joining | Legacy responder owns tailnet port5151; no N responder; legacy checkout5dfbcd1, deleted Python3.14 | environment | PID/socket ownership confirmed; actual-bind health timed out5.03s | N responder cannot bind default port; grant path is not N | YES: independent app/status checks; no legacy process mutation | [#459](https://github.com/Nettking/msh/issues/459); admission/ownership repair required |
-| D05 | Configured responder port / candidate admission | Host FCP_AUTO_JOIN_PORT=5152, rendered Flask omits it and advertises5151 | product (Compose propagation) | Unchanged N Compose render + N auto_join_port; no deployment | Supported non-default responder ports, including isolated admission around D04 | YES: read-only reconciliation; do not deploy local workaround | [#460](https://github.com/Nettking/msh/issues/460); narrow separate repair needed |
+| D05 | Configured responder port / candidate admission | Host FCP_AUTO_JOIN_PORT=5152, rendered Flask omits it and advertises5151 | product (Compose propagation) | Unchanged N render; 2 red non-default regressions, then50 focused green | Supported non-default responder ports, including isolated admission around D04 | YES: software repair/qualification after completed sweep; no deployment | [#461 draft](https://github.com/Nettking/msh/pull/461), tracks [#460](https://github.com/Nettking/msh/issues/460) |
 
 ## D05
 
 **Finding:** D05  
-**Status:** CONFIRMED  
+**Status:** RESOLVED-IN-BRANCH (candidate remains affected; repair not deployed)  
 **Candidate SHA:** `0536f03d67eb277e11573c2188d8e820399627e3`  
 **Host(s):** Nettking native Docker Compose rendering; applies to Windows/POSIX supported launchers; motivated by Nitro D04 port ownership  
 **Physical stage:** Runtime configuration/admission before joining, no formal P-test and no alternative-port deployment  
@@ -59,8 +59,8 @@ pressure, publish unfinished state and the exact next action before continuing.
 **State changed:** None; config rendered only. No containers created, ports bound, sources deployed or runtime env changed.  
 **Protected Recorder data:** Untouched.  
 **GitHub artifact:** https://github.com/Nettking/msh/issues/460  
-**Repair:** NONE yet; narrow separate Compose propagation and regression PR recommended, independent of D01/D02.  
-**Next diagnostic action:** Publish issue, then complete remaining safety/coverage reconciliation. Required regression: default5151 and non-default5152 render agree with host port, both supported launchers retain bounded validation, no authority or one-use grant behavior changes.
+**Repair:** Draft https://github.com/Nettking/msh/pull/461, branch `codex/tailnet-responder-port-propagation`, exact HEAD `5b826c6806ab1bdb960412ba20ca78192971fb1d`, checkout `C:\wsl\fcp-tailnet-responder-port-20260911`. One Compose environment entry plus real Compose-render regression. Pre-fix regression:3 passed/2 failed for non-default ports; after repair50 focused tests passed, zero skips. Ruff check/format and git diff --check passed. [Red log](diagnostics/D05-red.log), [red JUnit](diagnostics/D05-red-junit.xml), [green log](diagnostics/D05-green.log), [green JUnit](diagnostics/D05-green-junit.xml). Assertions were adjusted after the red run to show integer ports rather than environment dictionaries; behavior unchanged. No release qualification or deployment is claimed by these focused tests.  
+**Next diagnostic action:** Sweep is complete. Reconcile valid exact-head qualification of456/457/461 and dispatch only required missing work. Do not rerun already valid N or unchanged PR-head results. Keep D04 for post-qualification owned admission; all physical hosts remain unchanged.
 
 ## D04
 

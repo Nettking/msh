@@ -1,0 +1,17 @@
+.F..F                                                                    [100%]
+================================== FAILURES ===================================
+_________ test_advertised_join_port_matches_host_configuration[5152] __________
+catalog\flask_app\tests\test_tailnet_join_compose.py:68: in test_advertised_join_port_matches_host_configuration
+    assert auto_join_port(flask_environment) == auto_join_port(env)
+E   AssertionError: assert 5151 == 5152
+E    +  where 5151 = auto_join_port({'FCP_AI_MODEL': 'llama3.2:3b', 'FCP_AUTH_DATABASE': '/app/data/auth/users.sqlite3', 'FCP_AUTH_SECRET_DIR': '/app/data/auth', 'FCP_DEVELOPMENT': '0', ...})
+E    +  and   5152 = auto_join_port({'ALLUSERSPROFILE': 'C:\\ProgramData', 'APPDATA': 'C:\\Users\\Martin\\AppData\\Roaming', 'CHOCOLATEYINSTALL': 'C:\\ProgramData\\chocolatey', 'CHOCOLATEYLASTPATHUPDATE': '134329115765372973', ...})
+_________ test_advertised_join_port_matches_host_configuration[65535] _________
+catalog\flask_app\tests\test_tailnet_join_compose.py:68: in test_advertised_join_port_matches_host_configuration
+    assert auto_join_port(flask_environment) == auto_join_port(env)
+E   AssertionError: assert 5151 == 65535
+E    +  where 5151 = auto_join_port({'FCP_AI_MODEL': 'llama3.2:3b', 'FCP_AUTH_DATABASE': '/app/data/auth/users.sqlite3', 'FCP_AUTH_SECRET_DIR': '/app/data/auth', 'FCP_DEVELOPMENT': '0', ...})
+E    +  and   65535 = auto_join_port({'ALLUSERSPROFILE': 'C:\\ProgramData', 'APPDATA': 'C:\\Users\\Martin\\AppData\\Roaming', 'CHOCOLATEYINSTALL': 'C:\\ProgramData\\chocolatey', 'CHOCOLATEYLASTPATHUPDATE': '134329115765372973', ...})
+=========================== short test summary info ===========================
+FAILED catalog/flask_app/tests/test_tailnet_join_compose.py::test_advertised_join_port_matches_host_configuration[5152]
+FAILED catalog/flask_app/tests/test_tailnet_join_compose.py::test_advertised_join_port_matches_host_configuration[65535]
