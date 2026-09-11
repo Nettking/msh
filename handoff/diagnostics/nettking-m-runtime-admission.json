@@ -1,0 +1,96 @@
+{
+  "observed_at": "2026-09-11T18:27:11.120587+00:00",
+  "candidate": "9b286f931497bf6291e215f6340443c5162826b0",
+  "host": "nettking",
+  "fingerprint": "0efb6f56566ac0eb",
+  "source_and_harness_clean": true,
+  "services": [
+    {
+      "service": "flask",
+      "container_id": "662cc6f7f58fb2477a2027fd2d667a75eefc49a82e77c1a28d83a35dfeda6bfc",
+      "image_id": "sha256:e68d212604e6e2793ef8d58968324cb7a01377da2de6b9ae2f900d8ddd24752e",
+      "image_commit": "9b286f931497bf6291e215f6340443c5162826b0",
+      "environment_commit": "9b286f931497bf6291e215f6340443c5162826b0",
+      "running": true,
+      "oom_killed": false,
+      "started_at": "2026-09-11T18:24:45.319222668Z",
+      "mounts_preserved": true,
+      "runtime_process_probe": {
+        "python": "3.12.13",
+        "environment_commit": "9b286f931497bf6291e215f6340443c5162826b0",
+        "host_build_sha256": "803835eae0c83f94dd783a1e70963f7a99313f8af181b96c927449c6ee533017"
+      },
+      "repaired_source_hashes": {
+        "catalog/federation/tailscale_host_discovery.py": "17a982f46ac76852eb880f8137050e36218b4eb64a566f98641417b1ce1b5b5c",
+        "catalog/flask_app/federation_pairing_routes.py": "c7f539f29728c5f8a9fc5718d0f5daf04aa1978ade22c46a8fe4c1170b2ff5f5",
+        "catalog/flask_app/services/capability_onboarding_service.py": "7c6c1ee709103e4f9e86ff66e3863f45407133daab57cd26c99c7ae9016273a7",
+        "catalog/flask_app/services/federation_pairing_service.py": "db7bfe8cafebfe656b8a5b684e0b5ebbc54248f040c059d671f59d2196b773f9"
+      }
+    },
+    {
+      "service": "relay",
+      "container_id": "c81dad4821ba10b46f0bac0c33ed9fb30b8721be0ba9ed7da06cb3c4ab0f9867",
+      "image_id": "sha256:bd8e5494641634bc70e4e4a1301987eb6ac1ce8c5d321adbca94e4869df25956",
+      "image_commit": "9b286f931497bf6291e215f6340443c5162826b0",
+      "environment_commit": "9b286f931497bf6291e215f6340443c5162826b0",
+      "running": true,
+      "oom_killed": false,
+      "started_at": "2026-09-11T18:24:44.275078685Z",
+      "mounts_preserved": true,
+      "runtime_process_probe": {
+        "python": "3.12.13",
+        "environment_commit": "9b286f931497bf6291e215f6340443c5162826b0",
+        "host_build_sha256": "803835eae0c83f94dd783a1e70963f7a99313f8af181b96c927449c6ee533017"
+      },
+      "repaired_source_hashes": {
+        "catalog/federation/tailscale_host_discovery.py": "17a982f46ac76852eb880f8137050e36218b4eb64a566f98641417b1ce1b5b5c",
+        "catalog/flask_app/federation_pairing_routes.py": "c7f539f29728c5f8a9fc5718d0f5daf04aa1978ade22c46a8fe4c1170b2ff5f5",
+        "catalog/flask_app/services/capability_onboarding_service.py": "7c6c1ee709103e4f9e86ff66e3863f45407133daab57cd26c99c7ae9016273a7",
+        "catalog/flask_app/services/federation_pairing_service.py": "db7bfe8cafebfe656b8a5b684e0b5ebbc54248f040c059d671f59d2196b773f9"
+      }
+    },
+    {
+      "service": "recorder",
+      "container_id": "ec00e9e58aab61ab5aee5ddee4b0005b16038308d2e7cb436dd6808fbb09c581",
+      "image_id": "sha256:a98250176254366300589b09e6629d9361d3ddc97276269d0c95c7768fd7c465",
+      "image_commit": "9b286f931497bf6291e215f6340443c5162826b0",
+      "environment_commit": "9b286f931497bf6291e215f6340443c5162826b0",
+      "running": true,
+      "oom_killed": false,
+      "started_at": "2026-09-11T18:24:44.27031452Z",
+      "mounts_preserved": true,
+      "runtime_process_probe": {
+        "python": "3.12.13",
+        "environment_commit": "9b286f931497bf6291e215f6340443c5162826b0",
+        "host_build_sha256": "803835eae0c83f94dd783a1e70963f7a99313f8af181b96c927449c6ee533017"
+      },
+      "repaired_source_hashes": {
+        "catalog/federation/tailscale_host_discovery.py": "17a982f46ac76852eb880f8137050e36218b4eb64a566f98641417b1ce1b5b5c",
+        "catalog/flask_app/federation_pairing_routes.py": "c7f539f29728c5f8a9fc5718d0f5daf04aa1978ade22c46a8fe4c1170b2ff5f5",
+        "catalog/flask_app/services/capability_onboarding_service.py": "7c6c1ee709103e4f9e86ff66e3863f45407133daab57cd26c99c7ae9016273a7",
+        "catalog/flask_app/services/federation_pairing_service.py": "db7bfe8cafebfe656b8a5b684e0b5ebbc54248f040c059d671f59d2196b773f9"
+      }
+    },
+    {
+      "service": "ollama",
+      "container_id": "a108c4ed7ef453353191ed9dda1c41b0fd1a281f5a86c960e01a1e6284d65f0d",
+      "image_id": "sha256:b88c73ace3e115f8ec53dc8761ae1c0aabfa675406e3681786b98757ce050f42",
+      "image_commit": null,
+      "environment_commit": null,
+      "running": true,
+      "oom_killed": false,
+      "started_at": "2026-09-11T18:24:46.119870446Z",
+      "mounts_preserved": true,
+      "version": "ollama version is 0.32.6",
+      "existing_model": [
+        "llama3.2:3b             a80c4f17acd5    2.0 GB    7 weeks ago"
+      ]
+    }
+  ],
+  "runtime_admission": "EXACT_CANDIDATE_SERVICES_VERIFIED_MEMBERSHIP_PENDING",
+  "physical_pass": false,
+  "protected_recorder_operation": false,
+  "startup_log_sha256": "1d50b3b719e083d00612cd4c080d2313595dfc49f2699c06bf992e462359939f",
+  "model_redownloaded": false,
+  "mount_normalization": "Docker Desktop /run/desktop/mnt/host/c/ and C:/ are the same Windows backing path; original before metadata retained unchanged."
+}

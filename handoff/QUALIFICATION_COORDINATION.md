@@ -22,13 +22,12 @@ D04 host remediation and local/real Nettking peer verification are complete on N
 issue459 is closed. AUTHORITATIVE_SHA is now frozen as
 `9b286f931497bf6291e215f6340443c5162826b0` (M).
 Clean checked-in revalidation and scenario side-effect review are complete.
-Nettking controlled N-to-M activation completed with launcher exit0 at18:24:53UTC.
-[Operation receipt](diagnostics/nettking-m-supported-start.json) and private native
-log/receipt identify the completed work. Next: verify actual
-M images/source, then continue [owned runtime admission](PHYSICAL_M_ADMISSION.md).
-Fresh runtime/source/owner/topology checks remain required before evidence.
+Nettking supported activation and all three actual M core image/env/repaired-source
+hashes are verified. [Runtime receipt](diagnostics/nettking-m-runtime-admission.json).
+Next: Nitro/owned Recorder runtime admission, responder and membership/topology
+verification. Fresh topology and operative-context checks remain before evidence.
 
-Nettking/Nitro campaign core runtime remains0536f03d67eb277e11573c2188d8e820399627e3.
+Nettking cores run M; Nitro cores/responder remain N0536f03d67eb277e11573c2188d8e820399627e3.
 Recorder protected production6fb77c/separate voterfba508 have not been changed.
 No physical PASS; P07/P12
 not started. Protected Recorder data remains out of bounds. The user's latest
@@ -1028,3 +1027,19 @@ Windows Store-backed venv, which cannot launch under current SSH context.
 This does not yet establish a new independent defect: select the already documented
 N-native interpreter/context before diagnosis. Protected container invariant remains
 verified; no protected record files read, no service-account or host changes.
+
+##18:27UTC — Nettking actual M core runtime verified
+
+[Exact admission receipt](diagnostics/nettking-m-runtime-admission.json) proves
+all three running core images/env commits and four repaired source file hashes
+match M; runtime and harness checkouts are clean M. Actual Flask port5151 agrees.
+All data/model mounts are preserved, pinned Ollama model reused without download,
+no OOM. Fingerprint0efb6f56566ac0eb. A new explicit M runtime binding was created
+only after verification; old physical evidence was not relabeled. Membership and
+host responder admission remain pending, physical PASS0.
+
+Recorder context failure is narrowed to an audit selecting the legacy venv:
+the retained N-native provenance names the correct existing executable at
+`C:\Users\Utlån\fcp-v1-0536f03d-20260911\tooling\python312\python.exe`.
+Next: verify that existing operative interpreter, then stage exact M for Nitro
+and owned Recorder campaign source. Never modify protected production Recorder.
