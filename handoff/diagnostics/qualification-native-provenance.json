@@ -1939,9 +1939,96 @@
             "5b826c6806ab1bdb960412ba20ca78192971fb1d"
           ],
           "checkout_matches": true
+        },
+        {
+          "job_id": 103327658106,
+          "run_id": 34616905954,
+          "name": "Clean-checkout suite order independence",
+          "runner_name": "Nettking-Linux",
+          "conclusion": "success",
+          "bytes": 1101,
+          "sha256": "140a4c54f6a44cf95e8de87fec67fdbcae5aa4d630f1c090a0a44d59678d7048",
+          "checkout_commits": [],
+          "checkout_matches": null
+        },
+        {
+          "job_id": 103333033633,
+          "run_id": 34616905954,
+          "name": "Release matrix (Windows)",
+          "runner_name": "Nettking-Linux",
+          "conclusion": "success",
+          "bytes": 15675,
+          "sha256": "dabf5277353cbcc268cae5f05dc148562d7cbf4589b3a011c682d839f2e656f0",
+          "checkout_commits": [
+            "5b826c6806ab1bdb960412ba20ca78192971fb1d"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103333033635,
+          "run_id": 34616905954,
+          "name": "Release matrix (Linux)",
+          "runner_name": "Nettking-Linux",
+          "conclusion": "success",
+          "bytes": 17804,
+          "sha256": "5dc365a1f62d38630cb0e119c05f53bccda9912a0e3b11122bc83f456ac95be7",
+          "checkout_commits": [
+            "5b826c6806ab1bdb960412ba20ca78192971fb1d"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103333594837,
+          "run_id": 34616905954,
+          "name": "Federation v1 automated release verdict",
+          "runner_name": "Nettking-Linux",
+          "conclusion": "success",
+          "bytes": 1189,
+          "sha256": "7ab0b8a5334c3bd2bf225d540b1ff9b7e2638b1fc143dd903830c52037f344f1",
+          "checkout_commits": [],
+          "checkout_matches": null
+        },
+        {
+          "job_id": 103325957283,
+          "run_id": 34618400138,
+          "name": "onboarding (Linux, fcp-test-linux, bash, 3.12.13)",
+          "runner_name": "Nettking-Linux",
+          "conclusion": "success",
+          "bytes": 60008,
+          "sha256": "0795a6826278f791a0c9d06106f869572dfd3d761db0e1517cf0102bfe802960",
+          "checkout_commits": [
+            "5b826c6806ab1bdb960412ba20ca78192971fb1d"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103325957474,
+          "run_id": 34618400138,
+          "name": "onboarding (Windows, fcp-test-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+          "runner_name": "Nettking",
+          "conclusion": "success",
+          "bytes": 58287,
+          "sha256": "987297bde1f6ce596f45eee4984be188dde65532eb573e26da4c82cf0a2389a5",
+          "checkout_commits": [
+            "5b826c6806ab1bdb960412ba20ca78192971fb1d"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103325969234,
+          "run_id": 34618403669,
+          "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+          "runner_name": "Nettking",
+          "conclusion": "success",
+          "bytes": 107495,
+          "sha256": "70dc04f33c96039624e6f44453655d6632f9e97ceeeea6aafd98e07ee48d8618",
+          "checkout_commits": [
+            "5b826c6806ab1bdb960412ba20ca78192971fb1d"
+          ],
+          "checkout_matches": true
         }
       ],
-      "retained_at": "2026-09-11T16:12:31.555800+00:00"
+      "retained_at": "2026-09-11T16:24:10.524386+00:00"
     }
   }
 }

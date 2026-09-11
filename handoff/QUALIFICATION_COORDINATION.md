@@ -569,3 +569,8 @@ proceed to live premerge checks and the three separate merges, then qualify
 actual resulting main once. No head/result inference from synthetic runs.
 Runtime remains0536f03d67eb277e11573c2188d8e820399627e3; hosts and protected
 Recorder untouched, physical acceptance incomplete, P07/P12 absent.
+
+Seven new native proofs retained: five jobs prove exact5b826c68; the successful
+order/verdict jobs are the two known checkout-free dependency aggregates.
+No mismatch or new failure. Next: complete native release/artifact/gate review
+and current PR findings before recording461 qualification or merging.
