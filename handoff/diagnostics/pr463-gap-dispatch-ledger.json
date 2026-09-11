@@ -1,0 +1,82 @@
+{
+  "dispatches": [
+    {
+      "pr": 463,
+      "sha": "7286f30d30e20c94c13cc9acebb2fd6d61bc1163",
+      "ref": "codex/responder-replacement-exit-wait",
+      "workflow": "cf7-acceptance-harness.yml",
+      "requested_at": "2026-09-11T19:14:46.492336+00:00",
+      "reason": "No run exists",
+      "native_proof": [],
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "pr": 463,
+      "sha": "7286f30d30e20c94c13cc9acebb2fd6d61bc1163",
+      "ref": "codex/responder-replacement-exit-wait",
+      "workflow": "cf7c-physical-test-readiness.yml",
+      "requested_at": "2026-09-11T19:14:48.457778+00:00",
+      "reason": "No run exists",
+      "native_proof": [],
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "pr": 463,
+      "sha": "7286f30d30e20c94c13cc9acebb2fd6d61bc1163",
+      "ref": "codex/responder-replacement-exit-wait",
+      "workflow": "cf8-role-retirement.yml",
+      "requested_at": "2026-09-11T19:14:50.084110+00:00",
+      "reason": "No run exists",
+      "native_proof": [],
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "pr": 463,
+      "sha": "7286f30d30e20c94c13cc9acebb2fd6d61bc1163",
+      "ref": "codex/responder-replacement-exit-wait",
+      "workflow": "phase-f85-operator-federation-surface.yml",
+      "requested_at": "2026-09-11T19:14:52.053943+00:00",
+      "reason": "No run exists",
+      "native_proof": [],
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "pr": 463,
+      "sha": "7286f30d30e20c94c13cc9acebb2fd6d61bc1163",
+      "ref": "codex/responder-replacement-exit-wait",
+      "workflow": "cfi2-onboarding-composition.yml",
+      "requested_at": "2026-09-11T19:14:53.714241+00:00",
+      "reason": "No run exists",
+      "native_proof": [],
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "pr": 463,
+      "sha": "7286f30d30e20c94c13cc9acebb2fd6d61bc1163",
+      "ref": "codex/responder-replacement-exit-wait",
+      "workflow": "release-image-metadata.yml",
+      "requested_at": "2026-09-11T19:14:55.367668+00:00",
+      "reason": "No run exists",
+      "native_proof": [],
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
+    }
+  ]
+}

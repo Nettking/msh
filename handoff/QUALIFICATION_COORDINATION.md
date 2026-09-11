@@ -30,6 +30,10 @@ Preserve [D06 / issue462](diagnostics/D06.md). Repair is ready for review in PR4
 head7286f30d30e20c94c13cc9acebb2fd6d61bc1163, with focused development tests PASS.
 Next: review repair/native exact-head CI state. No dependent admission, physical
 retry workaround or PASS; no repair deployed and no new candidate frozen.
+PR463 is ready for review; required qualification is active. Six proven absent
+gates were dispatched once19:14UTC. Use `diagnostics/poll_pr463_state.py` only;
+preserve completed native logs and wait for existing parents before filling any
+synthetic-checkout gaps. No old-PR polling or qualification reruns.
 Nitro supported startup and actual M core image/env/repaired-source hashes are
 verified. Control identity preserved; LEADER/ready term9/index1553. Next replace
 the still-imported N host responder through the checked-in exact-process guard.
@@ -1286,3 +1290,17 @@ or duplicate them. Required absent harness/readiness/retirement/operator plus
 CFI2/registry can be dispatched now after fresh absence/head checks, independently
 of active parent runs. Exact-head release/sharding gap resolution waits until
 those parents complete and all relevant native proofs are retained.
+
+##19:14UTC — six proven absent PR463 gates dispatched once
+
+Fresh head/ref and run absence checks preceded each dispatch: acceptance harness,
+physical readiness, retirement, operator surface, CFI2 and registry. [Ledger](diagnostics/pr463-gap-dispatch-ledger.json)
+retains204 responses and timestamps. Existing seven automatic workflows remain
+untouched. Exact-head qualification is incomplete; no merge or new candidate.
+
+Next exact command: native audit Python runs `handoff/diagnostics/poll_pr463_state.py`.
+If unchanged, stay quiet. On newly completed jobs, retain only their full native
+logs and actual checkout commits. Preserve the two existing synthetic proofs.
+Resolve exact-head gaps only once a parent has finished and source mismatch is
+demonstrated. No physical runtime action; M cores stay running, Nitro5151 empty,
+protected Recorder data unchanged. P07/P12 unstarted and physical acceptance0.
