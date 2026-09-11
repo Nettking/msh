@@ -12,10 +12,17 @@ from types import SimpleNamespace
 
 import pytest
 
+from catalog.federation.tests import test_c03_offline_creator_migration as migration
 from catalog.federation.tests import test_control_plane_physical_runtime as physical
+from catalog.federation.tests import test_recorder_control_plane_voter as recorder
 
 
-def test_probe_triple_survives_an_os_selected_outgoing_client_port():
+@pytest.mark.parametrize("allocator", [
+    pytest.param(physical._free_port_triple, id="shared"),
+    pytest.param(migration._free_triple, id="offline-creator"),
+    pytest.param(recorder._free_triple, id="recorder-voter"),
+])
+def test_probe_triple_survives_an_os_selected_outgoing_client_port(allocator):
     """A normal outgoing connection must not consume a future voter listener."""
     import socketserver
 
@@ -28,7 +35,7 @@ def test_probe_triple_survives_an_os_selected_outgoing_client_port():
         sink.bind(("127.0.0.1", 0))
         sink.listen(1)
         sink.settimeout(3)
-        base = physical._free_port_triple(set())
+        base = allocator(set())
         client = cleanup.enter_context(socket.socket())
         if os.name == "nt":
             client.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
