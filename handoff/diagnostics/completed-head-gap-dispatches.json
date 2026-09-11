@@ -347,6 +347,66 @@
       "response": {
         "http_status": 204
       }
+    },
+    {
+      "pr": 461,
+      "sha": "5b826c6806ab1bdb960412ba20ca78192971fb1d",
+      "ref": "codex/tailnet-responder-port-propagation",
+      "workflow": "cfi2-onboarding-composition.yml",
+      "native_proof": [
+        {
+          "job_id": 103267381045,
+          "run_id": 34600817433,
+          "checkout_commits": [
+            "e03addedbc4d10e39e7c6a592977f45995ec6b8e"
+          ],
+          "sha256": "d75b060c8a2ed37cfe4df5706f18cd803e1f07f5a082d6a906783eaca8f2a866"
+        },
+        {
+          "job_id": 103267381199,
+          "run_id": 34600817433,
+          "checkout_commits": [
+            "e03addedbc4d10e39e7c6a592977f45995ec6b8e"
+          ],
+          "sha256": "66a3b2ebbb3aea9930852e2a92d3038a0d7722e8713f91cb56d0bf4714fc490a"
+        }
+      ],
+      "workflow_sha256": "a96153508c41bc25844e2a84282d753713a5a3c7d1a354c2bf482cbd7b114a8e",
+      "requested_at": "2026-09-11T15:49:22.492839+00:00",
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "pr": 461,
+      "sha": "5b826c6806ab1bdb960412ba20ca78192971fb1d",
+      "ref": "codex/tailnet-responder-port-propagation",
+      "workflow": "phase-f85-operator-federation-surface.yml",
+      "native_proof": [
+        {
+          "job_id": 103267385758,
+          "run_id": 34600817582,
+          "checkout_commits": [
+            "e03addedbc4d10e39e7c6a592977f45995ec6b8e"
+          ],
+          "sha256": "c6a3a71ec7d5ed29abd0504dd803d19bbb66babd5212acf9678fcc918de04d4b"
+        },
+        {
+          "job_id": 103267386012,
+          "run_id": 34600817582,
+          "checkout_commits": [
+            "e03addedbc4d10e39e7c6a592977f45995ec6b8e"
+          ],
+          "sha256": "eb2f2edbc04a4c7d2e8068f9f9c198967776c73a194389b413f623cee4b565b5"
+        }
+      ],
+      "workflow_sha256": "f47d1251ca9f41b4ceae15d49b933602e285dcc7eb35e203b9b4fc590c081813",
+      "requested_at": "2026-09-11T15:49:24.807552+00:00",
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
     }
   ]
 }

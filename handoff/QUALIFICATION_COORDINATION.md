@@ -506,3 +506,18 @@ Windows software-update; synthetic e03addedbc4 for Windows CFI2/operator.
 Together with their prior Linux proofs, both completed workflows are demonstrated
 exact-head gaps. Software-update is now proved on both platforms. Next: guarded
 CFI2/operator exact dispatches, preserving all qualified heads and active CI.
+
+## September11 15:50UTC — final PR461 source gaps dispatched
+
+CFI2 and operator surface were dispatched on unchanged5b826c6806ab1bdb960412ba20ca78192971fb1d
+after live head/ref/absence checks and proof that every prior completed leaf
+used the synthetic checkout. Ledger stores native/workflow digests and204
+receipts. Every required461 workflow now has an exact-head dispatch; no valid
+PASS rerun or active CI cancellation. No additional dispatch is presently needed.
+
+Next scheduled action: poll_required_state.py; retain only new required results.
+Await461 release/CFI2/operator completion, then reconcile complete release
+artifacts and final qualification using already retained ICSE/registry proofs.
+Preserve456/457 qualified verdicts. After461 qualification, separate merge batch
+with live checks, then actual final-main qualification once. Hosts/Recorder data
+remain untouched; no new candidate, D04 action or physical acceptance claim.
