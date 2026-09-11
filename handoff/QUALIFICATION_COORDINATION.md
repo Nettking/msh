@@ -1324,3 +1324,12 @@ Next heartbeat: run `poll_pr463_state.py`; only on new terminal jobs run
 `retain_pr463_new_native_logs.py`. On parent completion, review required results
 and fill demonstrated exact-head gaps once. No product/runtime changes or physical
 claims. This is source provenance accounting, not a newly discovered product defect.
+
+##19:30UTC — two automatic parents complete; review exact-head gaps
+
+PR463 head7286f30d is unchanged. CF7B34637251493 and software-update34637251568
+completed successfully. Other parents remain active; no failed jobs observed.
+New completed jobs are checkpointed in the state/delta. Next: retain only new
+native logs, verify source provenance, and dispatch an exact-head replacement
+only for a completed parent with a demonstrated mismatch and no existing dispatch.
+Physical admission remains stopped by D06; no runtime mutation or new candidate.
