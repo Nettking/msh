@@ -738,3 +738,13 @@ Thirteen final-main job proofs are now retained; required qualification remains
 pending. Next scheduled action: poll_merged_main_state.py; retain only new
 completions and review complete ICSE/release artifacts when available. No test
 reruns, further dispatches, D04 or physical acceptance actions are needed now.
+
+## September11 17:01UTC — final-main Windows gates advanced
+
+Actual main remains9b286f931497bf6291e215f6340443c5162826b0. CF7B, phase2 and
+readiness now complete/success on both platforms. New Linux successes: ICSE
+entrypoint, retirement and PostgreSQL release check. ICSE publication is queued;
+rotating suite and Windows harness are running. No new failure. Next: retain
+six new exact-source proofs; await complete artifacts/final gates. No duplicate
+qualification, host or protected Recorder action; runtime remains0536f03d,
+physical acceptance incomplete and candidate not frozen.
