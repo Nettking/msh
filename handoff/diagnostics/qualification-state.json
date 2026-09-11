@@ -1,5 +1,5 @@
 {
-  "observed_at": "2026-09-11T16:00:20.775513+00:00",
+  "observed_at": "2026-09-11T16:11:52.637850+00:00",
   "prs": {
     "456": {
       "number": 456,
@@ -1301,56 +1301,56 @@
             {
               "id": 103321004832,
               "name": "Linux regression shard (0)",
-              "status": "in_progress",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "runner_name": "Nettking-Linux",
               "started_at": "2026-09-11T16:00:00Z",
-              "completed_at": null
+              "completed_at": "2026-09-11T16:03:29Z"
             },
             {
               "id": 103321004873,
               "name": "Release checks (Linux)",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T15:34:20Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-11T16:10:19Z",
+              "completed_at": "2026-09-11T16:11:07Z"
             },
             {
               "id": 103321004880,
               "name": "Windows regressions (journal-artifacts)",
-              "status": "in_progress",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "runner_name": "Nettking",
               "started_at": "2026-09-11T16:00:01Z",
-              "completed_at": null
+              "completed_at": "2026-09-11T16:08:56Z"
             },
             {
               "id": 103321004891,
               "name": "PostgreSQL storage release check",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T15:34:20Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-11T16:03:31Z",
+              "completed_at": "2026-09-11T16:04:18Z"
             },
             {
               "id": 103321004900,
               "name": "Linux regression shard (3)",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T15:34:20Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-11T16:07:15Z",
+              "completed_at": "2026-09-11T16:10:18Z"
             },
             {
               "id": 103321004916,
               "name": "Linux regression shard (2)",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T15:34:20Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-11T16:04:20Z",
+              "completed_at": "2026-09-11T16:07:13Z"
             },
             {
               "id": 103327658106,
@@ -1359,6 +1359,24 @@
               "conclusion": null,
               "runner_name": "",
               "started_at": "2026-09-11T15:54:43Z",
+              "completed_at": null
+            },
+            {
+              "id": 103333033633,
+              "name": "Release matrix (Windows)",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": null,
+              "started_at": "2026-09-11T16:11:08Z",
+              "completed_at": null
+            },
+            {
+              "id": 103333033635,
+              "name": "Release matrix (Linux)",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": null,
+              "started_at": "2026-09-11T16:11:08Z",
               "completed_at": null
             }
           ]
@@ -1503,33 +1521,33 @@
           "run_id": 34618400138,
           "event": "workflow_dispatch",
           "api_head_sha": "5b826c6806ab1bdb960412ba20ca78192971fb1d",
-          "status": "queued",
+          "status": "in_progress",
           "conclusion": null,
           "attempt": 1,
           "required_count": null,
           "signature": {
-            "status": "queued",
+            "status": "in_progress",
             "conclusion": null,
             "run_attempt": 1,
-            "updated_at": "2026-09-11T15:49:23Z"
+            "updated_at": "2026-09-11T16:11:09Z"
           },
           "jobs": [
             {
               "id": 103325957283,
               "name": "onboarding (Linux, fcp-test-linux, bash, 3.12.13)",
-              "status": "queued",
+              "status": "in_progress",
               "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T15:49:25Z",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-11T16:11:09Z",
               "completed_at": null
             },
             {
               "id": 103325957474,
               "name": "onboarding (Windows, fcp-test-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
-              "status": "queued",
+              "status": "in_progress",
               "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T15:49:25Z",
+              "runner_name": "Nettking",
+              "started_at": "2026-09-11T16:08:58Z",
               "completed_at": null
             }
           ]

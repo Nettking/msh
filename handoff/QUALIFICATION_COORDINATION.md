@@ -539,3 +539,14 @@ results, finalize complete461 release artifacts when ready, then reconcile its
 full required gate verdict. Preserve qualified456/457 and existing461 ICSE/
 registry proofs. No further dispatch presently required; all hosts/protected
 Recorder data unchanged, P07/P12 absent and physical acceptance incomplete.
+
+## September11 16:12UTC — PR461 release regression leaves complete
+
+Heads unchanged;456/457 qualifications remain valid. Exact461 release
+34616905954 gained successful shards0/2/3, Linux release checks, PostgreSQL
+and Windows journal/artifacts. All regression leaves are now complete; release
+matrices/order aggregate/verdict remain pending. CFI2 runs on both platforms.
+No new failure. Next: retain six new native proofs, then await final gates before
+complete artifact/verdict review. No duplicate dispatch, merge or host action;
+runtime remains0536f03d67eb277e11573c2188d8e820399627e3, protected Recorder
+untouched, physical acceptance incomplete and P07/P12 absent.
