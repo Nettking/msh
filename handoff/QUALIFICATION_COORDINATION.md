@@ -26,10 +26,9 @@ Nettking supported activation and all three actual M core image/env/repaired-sou
 hashes are verified. [Runtime receipt](diagnostics/nettking-m-runtime-admission.json).
 Next: Nitro/owned Recorder runtime admission, responder and membership/topology
 verification. Fresh topology and operative-context checks remain before evidence.
-Nitro guarded continuation controller1211377 dispatched18:40UTC after the exact
-host port/image-ENV audit mismatch was resolved. Supported startup is now RUNNING
-as PID1211658 with complete configuration guard satisfied. Do not launch another. Inspect
-`supported-start-9b286f93-guarded.json` for actual current state; source is clean M.
+Nitro supported guarded startup completed exit0 at18:43:16UTC. Do not launch another.
+Next execute `diagnostics/verify_nitro_m_runtime.py` once, then persist actual
+image/env/source and recovery proof before replacing the still-imported N responder.
 
 Nettking cores run M; Nitro cores/responder remain N0536f03d67eb277e11573c2188d8e820399627e3.
 Recorder protected production6fb77c/separate voterfba508 have not been changed.
@@ -1165,3 +1164,12 @@ execute `verify_nitro_m_runtime.py` once and retain actual image/env/repaired-so
 hashes, unchanged mounts/model and recovered control identity/index. Do not claim
 host responder M yet: its imported N process must be replaced and verified next.
 No P07/P12 or physical PASS. Other voters/Recorder protected production untouched.
+
+##18:53UTC — Nitro supported startup completed successfully
+
+The operation finished18:43:16UTC with exit0. [Completed native operation](diagnostics/nitro-m-guarded-supported-start.current.json).
+No duplicate startup or software rerun. Next exact action: stream the already
+reviewed `verify_nitro_m_runtime.py` through authenticated Nitro native Python;
+verify actual M core source/images, preserved mounts/model and control recovery.
+This is admission, not physical PASS. Host responder still imports N until its
+separate checked-in guarded replacement; protected Recorder data unchanged.
