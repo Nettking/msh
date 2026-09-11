@@ -7,12 +7,75 @@ import json
 import os
 import socket
 import sys
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from types import SimpleNamespace
 
 import pytest
 
 from catalog.federation.tests import test_control_plane_physical_runtime as physical
+
+
+def test_probe_triple_survives_an_os_selected_outgoing_client_port():
+    """A normal outgoing connection must not consume a future voter listener."""
+    import socketserver
+
+    from catalog.federation.control_plane_credentials import _CredentialRPCServer
+    from catalog.federation.control_plane_legacy_migration import _WitnessTCPServer
+    from catalog.federation.control_plane_transport import _ThreadingRPCServer
+
+    with ExitStack() as cleanup:
+        sink = cleanup.enter_context(socket.socket())
+        sink.bind(("127.0.0.1", 0))
+        sink.listen(1)
+        sink.settimeout(3)
+        base = physical._free_port_triple(set())
+        client = cleanup.enter_context(socket.socket())
+        if os.name == "nt":
+            client.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        client.settimeout(3)
+        # No client.bind: the native TCP stack selects this source port.
+        client.connect(sink.getsockname())
+        accepted, _ = sink.accept()
+        cleanup.enter_context(accepted)
+        evidence = {
+            "diagnostic": "listener-triple-versus-native-client-port",
+            "listener_base": base,
+            "os_selected_client_port": client.getsockname()[1],
+            "client_port_explicitly_bound": False,
+        }
+        try:
+            for offset, cls in enumerate((
+                _ThreadingRPCServer, _CredentialRPCServer, _WitnessTCPServer,
+            )):
+                server = cls(("127.0.0.1", base + offset), socketserver.BaseRequestHandler)
+                cleanup.callback(server.server_close)
+        except OSError as error:
+            evidence.update(errno=error.errno, winerror=getattr(error, "winerror", None))
+            print(json.dumps(evidence, sort_keys=True), file=sys.stderr, flush=True)
+            raise
+        assert client.getsockname()[1] not in {base, base + 1, base + 2}
+        evidence["all_three_real_listeners_acquired"] = True
+        print(json.dumps(evidence, sort_keys=True), file=sys.stderr, flush=True)
+
+
+@pytest.mark.parametrize("native_output", [
+    "unrecognized output",
+    "Startport : 49152\n",
+    "Startport : 49152\nAntall porter : 0\n",
+    "Start Port : 65530\nNumber of Ports : 100\n",
+])
+def test_allocator_refuses_unverified_native_tcp_range(monkeypatch, native_output):
+    physical._tcp_dynamic_port_range.cache_clear()
+    try:
+        with monkeypatch.context() as patch:
+            patch.setattr(physical, "os", SimpleNamespace(name="nt"))
+            patch.setattr(physical, "subprocess", SimpleNamespace(
+                run=lambda *args, **kwargs: SimpleNamespace(stdout=native_output),
+            ))
+            with pytest.raises(RuntimeError):
+                physical._free_port_triple(set())
+    finally:
+        physical._tcp_dynamic_port_range.cache_clear()
 
 
 @contextmanager
