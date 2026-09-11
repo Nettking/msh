@@ -731,3 +731,10 @@ Next: retain ten new native proofs, preserving all completed evidence. Registry
 emits no artifact by design; its native exact-source successful verification
 is the evidence. No duplicate dispatch, host or protected Recorder action;
 runtime remains0536f03d, candidate not frozen, physical acceptance incomplete.
+
+All ten newly retained successful native logs prove actual final9b286f93,
+including both CFI2 platforms and registry. No source mismatch or new error.
+Thirteen final-main job proofs are now retained; required qualification remains
+pending. Next scheduled action: poll_merged_main_state.py; retain only new
+completions and review complete ICSE/release artifacts when available. No test
+reruns, further dispatches, D04 or physical acceptance actions are needed now.
