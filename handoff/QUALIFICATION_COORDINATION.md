@@ -1680,3 +1680,9 @@ phase234651637810, registry34649613062 and automatic ICSE34649416778 completed
 successfully. Other incomplete parents remain active; no failed jobs observed.
 Next: retain new native logs, verify source and resolve ICSE only if all four
 completed jobs prove a source mismatch. No duplicate jobs or physical action.
+
+Eleven new logs retained. Exact83955f65 PASS16/37 plus companion2/3; CF7B,
+branding and phase2 are fully verified, registry also verifies exact head.
+All four completed ICSE jobs prove synthetic68f6e72c. Next: dispatch the ICSE
+exact-head gap once. Release remains active; its new no-checkout aggregate
+is retained for later dependency review. Review-comment count unchanged.
