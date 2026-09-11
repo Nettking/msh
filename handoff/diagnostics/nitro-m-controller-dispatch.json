@@ -1,0 +1,14 @@
+{
+  "started_at": "2026-09-11T18:36:06.121447+00:00",
+  "status": "CONTROLLER_DISPATCHED_INSPECT_OPERATION_RECEIPT",
+  "host": "nitro",
+  "candidate": "9b286f931497bf6291e215f6340443c5162826b0",
+  "controller_pid": 1205079,
+  "controller_sha256": "fd20d511fe7c3ac468b815ea279ce1861d7be2be9bae9eb6784c17351bee55cd",
+  "controller_script": "/home/martin/fcp-v1-73c779-nitro-20260910/inputs/activate_nitro_m.py",
+  "operation_receipt": "/home/martin/fcp-v1-73c779-nitro-20260910/inputs/supported-start-9b286f93.json",
+  "controller_log": "/home/martin/fcp-v1-73c779-nitro-20260910/inputs/m-activation-controller.log",
+  "product_log": "/home/martin/fcp-v1-73c779-nitro-20260910/inputs/supported-start-9b286f93-native.log",
+  "protected_recorder_operation": false,
+  "physical_pass": false
+}

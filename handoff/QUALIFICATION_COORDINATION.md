@@ -26,6 +26,8 @@ Nettking supported activation and all three actual M core image/env/repaired-sou
 hashes are verified. [Runtime receipt](diagnostics/nettking-m-runtime-admission.json).
 Next: Nitro/owned Recorder runtime admission, responder and membership/topology
 verification. Fresh topology and operative-context checks remain before evidence.
+Nitro detached M activation controller1205079 was dispatched18:36UTC; do not
+start another. Inspect its persisted operation receipt before any further mutation.
 
 Nettking cores run M; Nitro cores/responder remain N0536f03d67eb277e11573c2188d8e820399627e3.
 Recorder protected production6fb77c/separate voterfba508 have not been changed.
@@ -1094,3 +1096,13 @@ until a separate guarded M replacement after core verification.
 The audit controller will run detached with a durable host receipt/log under
 Nitro inputs, so session loss does not discard the operation. Never relaunch if
 either the staged controller or receipt already exists; inspect it first.
+
+##18:36UTC — Nitro detached M activation controller dispatched
+
+[Dispatch receipt](diagnostics/nitro-m-controller-dispatch.json) binds controller
+PID1205079 and reviewed script SHA256fd20d511fe7c3ac468b815ea279ce1861d7be2be9bae9eb6784c17351bee55cd.
+It survives this session with native logs and operation receipt on Nitro inputs.
+Next exact read: `/home/martin/fcp-v1-73c779-nitro-20260910/inputs/supported-start-9b286f93.json`.
+If absent inspect `m-activation-controller.log` for precondition failure; otherwise
+react only to status transitions. Never duplicate the controller/startup. Fresh
+runtime and control identity/recovery verification remains before acceptance.
