@@ -1814,3 +1814,8 @@ PASS retained. No failures reported or review/head changes. Next actionable
 command on the next state check: python -B handoff/diagnostics/poll_pr465_state.py;
 then retain_pr465_new_native_logs.py only if new terminal jobs exist. PR463 and
 physical M unchanged; no physical acceptance PASS or active timers.
+
+23:26UTC: PR465 head4749ab66 unchanged, no reported failures. Branding exact-head
+replacement, CF7C and registry completed success; new Linux successes in CF7B
+and F85. Remaining workflows active/queued. Next: retain only newly terminal
+logs and verify source. No duplicate dispatch or physical state change.
