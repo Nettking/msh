@@ -1434,3 +1434,10 @@ order-independence aggregate has no checkout, as expected for an aggregate; reta
 its native log and review dependency provenance when its parent completes. Do not
 treat a missing checkout in an aggregate as a product failure or standalone proof.
 Next: guarded sharding dispatch once; release remains active.
+
+20:19UTC: sharding exact-head replacement dispatched once (HTTP204), with both
+native proofs persisted; twelve total dispatches for463. Next state check:
+`poll_pr463_state.py`, then retain only new terminal logs. Only the release parent
+still needs source-gap resolution after completion; its aggregates require
+dependency review before adapting the guarded dispatch helper. Preserve15/37+3/3
+verified exact-head PASS. No merge, physical restart or protected-data operation.
