@@ -1426,3 +1426,11 @@ successfully; no failed jobs observed. ICSE replacement34642522512 is active
 with two completed jobs. Release parent remains active. Next: retain new native
 logs and verify checkout provenance; resolve sharding only if its completed
 native proofs establish the expected source gap. Physical admission stays stopped.
+
+Seven new native logs retained. Exact-head PASS now15/37 required plus companion3/3.
+Operator both platforms and two ICSE jobs are verified. Both completed sharding
+jobs prove syntheticbfec91c9; exact-head replacement is justified. Release's
+order-independence aggregate has no checkout, as expected for an aggregate; retain
+its native log and review dependency provenance when its parent completes. Do not
+treat a missing checkout in an aggregate as a product failure or standalone proof.
+Next: guarded sharding dispatch once; release remains active.
