@@ -1,0 +1,14 @@
+{
+  "observed_at": "2026-09-11T18:33:11.645792+00:00",
+  "status": "EXACT_M_BUNDLE_STAGED_VERIFIED_NOT_DEPLOYED",
+  "host": "nitro",
+  "candidate": "9b286f931497bf6291e215f6340443c5162826b0",
+  "bundle_sha256": "af475a0f31a8aed6827feb6318ac3dd2d5e7ab218d753824db70bac424a83d29",
+  "bundle_bytes": 22304,
+  "remote_path": "/home/martin/fcp-v1-73c779-nitro-20260910/inputs/source-9b286f93-from-0536.bundle",
+  "current_source": "0536f03d67eb277e11573c2188d8e820399627e3",
+  "source_clean": true,
+  "runtime_changed": false,
+  "protected_recorder_data_untouched": true,
+  "physical_acceptance": false
+}

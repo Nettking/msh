@@ -1067,3 +1067,14 @@ observation; no independent product/environment defect is demonstrated. No host
 repair, identity copy or service-account change; protected data untouched.
 Next: stage the qualified M bundle for Nitro, then controlled source/build/start
 using the existing per-service image configuration and mutation lock.
+
+##18:33UTC — qualified M source bundle staged on Nitro
+
+[Bundle receipt](diagnostics/m-nitro-bundle-staged.json):22304bytes,
+SHA256af475a0f31a8aed6827feb6318ac3dd2d5e7ab218d753824db70bac424a83d29,
+Git verifies prerequisite N and exact HEAD M. Stored only under Nitro campaign
+inputs; its clean source/core/responder still N. No product/data mutation.
+Next: guarded source fast-forward under the checked-in host mutation lock,
+compare actual resolved Compose before/after (only candidate images/build args
+and new default responder port may differ), then supported normal startup.
+Preserve data/results/models/control identity; verify leader recovery afterward.
