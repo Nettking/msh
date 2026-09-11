@@ -8,8 +8,9 @@
     "143fe7a9082193114af3d34dc437b85f845849a2",
     "5b826c6806ab1bdb960412ba20ca78192971fb1d"
   ],
-  "final_merged_main_qualified": false,
+  "final_merged_main_qualified": true,
   "candidate_frozen": false,
   "runtime_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
-  "next_action": "Dispatch only missing harness/readiness/sharding; preserve automatic final push runs"
+  "next_action": "Read controlled D04 procedure, verify live Nitro responder ownership, remediate only that stale responder, persist evidence before candidate freeze/revalidation",
+  "qualification_receipt": "merged-main-final-qualification.json"
 }

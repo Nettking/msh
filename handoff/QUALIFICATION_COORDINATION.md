@@ -14,11 +14,12 @@ checked-in revalidation -> fresh formal physical acceptance.
 |457|143fe7a9082193114af3d34dc437b85f845849a2|Qualified37/37 plus CFI2/registry; merged as8948e953|
 |461|5b826c6806ab1bdb960412ba20ca78192971fb1d|Qualified37/37 plus CFI2/registry; merged as9b286f93|
 
-**Current stage:** qualify actual final merged main
-`9b286f931497bf6291e215f6340443c5162826b0` once. All fix heads are ancestors.
-Use `diagnostics/poll_merged_main_state.py` and
-`diagnostics/retain_merged_main_jobs.py`; PR qualification is complete and must
-not be repeated. Final main is not yet qualified or frozen as a physical candidate.
+**Current stage:** actual final merged main
+`9b286f931497bf6291e215f6340443c5162826b0` is qualified37/37 plus CFI2/registry,
+release-verdict and native artifact review. All fix heads are ancestors.
+Preserve `diagnostics/merged-main-final-qualification.json`; no software rerun.
+Next is controlled D04 Nitro host remediation/verification, then candidate freeze
+and clean checked-in revalidation. Final main is not yet frozen as a physical candidate.
 
 Runtime remains0536f03d67eb277e11573c2188d8e820399627e3. No physical PASS; P07/P12
 not started. Protected Recorder data remains out of bounds. The user's latest
@@ -856,3 +857,27 @@ cases. Exact-source artifact review and receipts are persisted. Next: final
 aggregate dependency/test-identity/skip reconciliation and37/37 qualification
 receipt, reusing verified ICSE and registry evidence. No tests rerun, no host
 changes or physical acceptance claim.
+
+## September11 18:03UTC — actual final merged-main qualification PASS
+
+Exact9b286f931497bf6291e215f6340443c5162826b0 is qualified:37/37 required jobs,
+CFI2/registry3/3 and release-verdict PASS.38 actual-source native proofs and two
+same-run dependency aggregates are reconciled. Four disjoint shards and both
+full orders match4420 test identities. Native readiness is18/18 on each platform;
+discovery boundary Windows145/145 covers the three platform skips on Linux.
+Expected remaining platform exclusions are recorded, not relabeled as passes.
+Complete release and ICSE artifact hashes/source/metadata/teardown are verified.
+Actual main ref, clean detached checkout and all three fix ancestors are verified.
+
+[Final qualification](diagnostics/merged-main-final-qualification.json) and
+[repeatable audit](diagnostics/finalize_merged_main_qualification.py) are durable.
+This completes the one actual final-main software qualification; do not rerun it.
+No new AUTHORITATIVE_SHA is frozen and no physical acceptance is claimed yet.
+
+Next highest-value action: controlled D04 Nitro responder remediation. Read the
+documented host procedure, verify current identity/port ownership, remove/disable
+only the stale5151 responder under the user's authorization, verify expected
+service/port/state and persist evidence. Then freeze exact9b286f93, run checked-in
+clean revalidation and restart fresh formal physical acceptance under scenario
+safety rules. Runtime remains0536f03d67eb277e11573c2188d8e820399627e3; protected
+Recorder data untouched, P07/P12 absent. No host mutation has occurred yet.
