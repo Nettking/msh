@@ -1618,3 +1618,9 @@ Other automatic parents remain active. Review-comment count is unchanged.
 21:42UTC: product-branding.yml exact-head83955f65 gap dispatched once (HTTP204); native proofs and fresh guards are in the ledger. Preserve valid work and do not repeat this dispatch.
 
 21:42UTC: ci-test-sharding.yml exact-head83955f65 gap dispatched once (HTTP204); native proofs and fresh guards are in the ledger. Preserve valid work and do not repeat this dispatch.
+
+Nine dispatches now recorded for83955f65. Preserve4/37 required and1/3 companion
+native exact-head PASS. Remaining automatic parents needing later source review:
+software-update, phase2, ICSE and release. Next exact action on next state check:
+`poll_pr463_state.py`, then only new native log/review transitions. No duplicate
+dispatch, old-head evidence carry-forward, merge or physical state change.
