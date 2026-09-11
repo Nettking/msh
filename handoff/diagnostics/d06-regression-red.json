@@ -1,0 +1,13 @@
+{
+  "recorded_at": "2026-09-11T19:05:00.956511+00:00",
+  "finding": "D06",
+  "product_source_sha": "9b286f931497bf6291e215f6340443c5162826b0",
+  "result": "1 failed; checked-in main signals old process then EADDRINUSE",
+  "test_sha256": "a916a97a541bbfd137ff9c1b8c41cb2dfd7ca7c447701c9995fb0aa0cd281c99",
+  "junit_sha256": "74624d7f26d867431e14312714448a797499cb59f01ab484672c21fe65194705",
+  "fixture": "real owned loopback socket, delayed SIGTERM exit200ms, automatic child cleanup",
+  "runtime": "Local WSL Python3.10.12 host-only loader; mechanism regression only, not release/physical qualification",
+  "initial_collection_error": "Repository package import requires typing.Self fromPython3.11; isolated byte-identical test avoids unrelated server package import",
+  "physical_acceptance": false,
+  "protected_recorder_data_untouched": true
+}
