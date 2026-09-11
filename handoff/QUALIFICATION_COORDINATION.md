@@ -1738,3 +1738,9 @@ real Windows open-stream replacement cases fail with WinError5 (identical and
 different payload); integrity-negative case passes. Native JUnit retained at
 diagnostics/d07-red-regression.xml. Next: implement shared-delete stable readers
 and bind size validation to the opened handle, then run focused regressions.
+
+22:56UTC: shared-delete reader-only experiment is insufficient: deterministic
+replacement cases still fail WinError5;60 other focused cases pass. Retained
+diagnostics/d07-reader-only-insufficient.xml. This refines D07, not a new blocker.
+Next: inspect Windows atomic replacement semantics before choosing a complete
+repair. Work-in-progress is isolated on the D07 worktree; no deployment or CI retry.
