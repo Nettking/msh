@@ -1,5 +1,5 @@
 {
-  "observed_at": "2026-09-11T14:26:57.664446+00:00",
+  "observed_at": "2026-09-11T14:45:18.683540+00:00",
   "prs": {
     "456": {
       "number": 456,
@@ -1274,10 +1274,10 @@
             {
               "id": 103267381216,
               "name": "Windows regressions (journal-artifacts)",
-              "status": "queued",
+              "status": "in_progress",
               "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T12:48:15Z",
+              "runner_name": "Nettking",
+              "started_at": "2026-09-11T14:42:51Z",
               "completed_at": null
             },
             {
@@ -1341,25 +1341,25 @@
           "run_id": 34600817276,
           "event": "pull_request",
           "api_head_sha": "5b826c6806ab1bdb960412ba20ca78192971fb1d",
-          "status": "queued",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "attempt": 1,
           "required_count": 2,
           "signature": {
-            "status": "queued",
-            "conclusion": null,
+            "status": "completed",
+            "conclusion": "success",
             "run_attempt": 1,
-            "updated_at": "2026-09-11T12:48:14Z"
+            "updated_at": "2026-09-11T14:42:50Z"
           },
           "jobs": [
             {
               "id": 103267380842,
               "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T12:48:15Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking",
+              "started_at": "2026-09-11T14:36:02Z",
+              "completed_at": "2026-09-11T14:42:49Z"
             },
             {
               "id": 103267380974,
@@ -1404,25 +1404,25 @@
           "run_id": 34605553188,
           "event": "workflow_dispatch",
           "api_head_sha": "5b826c6806ab1bdb960412ba20ca78192971fb1d",
-          "status": "queued",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "attempt": 1,
           "required_count": 2,
           "signature": {
-            "status": "queued",
-            "conclusion": null,
+            "status": "completed",
+            "conclusion": "success",
             "run_attempt": 1,
-            "updated_at": "2026-09-11T13:39:24Z"
+            "updated_at": "2026-09-11T14:36:01Z"
           },
           "jobs": [
             {
               "id": 103282990020,
               "name": "windows",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T13:39:26Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking",
+              "started_at": "2026-09-11T14:30:30Z",
+              "completed_at": "2026-09-11T14:36:00Z"
             },
             {
               "id": 103282990235,
@@ -1440,15 +1440,15 @@
           "run_id": 34600817428,
           "event": "pull_request",
           "api_head_sha": "5b826c6806ab1bdb960412ba20ca78192971fb1d",
-          "status": "in_progress",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "attempt": 1,
           "required_count": 2,
           "signature": {
-            "status": "in_progress",
-            "conclusion": null,
+            "status": "completed",
+            "conclusion": "success",
             "run_attempt": 1,
-            "updated_at": "2026-09-11T14:25:49Z"
+            "updated_at": "2026-09-11T14:30:29Z"
           },
           "jobs": [
             {
@@ -1463,11 +1463,11 @@
             {
               "id": 103267382042,
               "name": "role-retirement (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
-              "status": "in_progress",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "runner_name": "Nettking",
               "started_at": "2026-09-11T14:25:48Z",
-              "completed_at": null
+              "completed_at": "2026-09-11T14:30:28Z"
             }
           ]
         },

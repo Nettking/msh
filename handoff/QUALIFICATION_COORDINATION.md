@@ -320,3 +320,13 @@ only for head/merge changes); persist transitions and retain only new native
 proofs. Runtime remains0536f03d67eb277e11573c2188d8e820399627e3; no deployment,
 D04 action or protected Recorder data change. Physical acceptance remains
 incomplete; P07/P12 have not started.
+
+## September11 14:46UTC — PR461 workflow transitions
+
+Heads unchanged; PR457 qualification remains valid, no new failures. PR461 exact
+phase2 run34605553188 completed successfully. Prior synthetic software-update
+34600817276 and retirement34600817428 completed successfully; journal/artifacts
+Windows regressions are running. Next: retain three new native leaf proofs,
+then dispatch only demonstrated completed exact-head gaps after live absence/
+head checks. No merge, host or protected-data change; runtime remains
+0536f03d67eb277e11573c2188d8e820399627e3. P07/P12 not started.

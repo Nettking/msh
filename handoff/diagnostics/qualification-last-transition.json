@@ -1,16 +1,31 @@
 {
-  "observed_at": "2026-09-11T14:26:57.664446+00:00",
+  "observed_at": "2026-09-11T14:45:18.683540+00:00",
   "changes": {
-    "457": [
+    "461": [
+      {
+        "workflow": "federation-v1-release.yml",
+        "run_id": 34600817254,
+        "event": "pull_request",
+        "status": "queued",
+        "conclusion": null,
+        "jobs": [
+          {
+            "id": 103267381216,
+            "name": "Windows regressions (journal-artifacts)",
+            "status": "in_progress",
+            "conclusion": null
+          }
+        ]
+      },
       {
         "workflow": "federation-software-update.yml",
-        "run_id": 34601202338,
-        "event": "workflow_dispatch",
+        "run_id": 34600817276,
+        "event": "pull_request",
         "status": "completed",
         "conclusion": "success",
         "jobs": [
           {
-            "id": 103268657187,
+            "id": 103267380842,
             "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
             "status": "completed",
             "conclusion": "success"
@@ -18,67 +33,32 @@
         ]
       },
       {
-        "workflow": "federation-v1-release.yml",
-        "run_id": 34594990947,
+        "workflow": "phase2-federation.yml",
+        "run_id": 34605553188,
         "event": "workflow_dispatch",
         "status": "completed",
         "conclusion": "success",
         "jobs": [
           {
-            "id": 103248585302,
-            "name": "Release checks (Windows)",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
-            "id": 103297734106,
-            "name": "Release matrix (Linux)",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
-            "id": 103297734164,
-            "name": "Release matrix (Windows)",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
-            "id": 103297881449,
-            "name": "Federation v1 automated release verdict",
+            "id": 103282990020,
+            "name": "windows",
             "status": "completed",
             "conclusion": "success"
           }
         ]
       },
       {
-        "workflow": "ci-test-sharding.yml",
-        "run_id": 34595257295,
-        "event": "workflow_dispatch",
+        "workflow": "cf8-role-retirement.yml",
+        "run_id": 34600817428,
+        "event": "pull_request",
         "status": "completed",
         "conclusion": "success",
         "jobs": [
           {
-            "id": 103249421517,
-            "name": "Shard contract (Windows, shared-pool)",
-            "status": "completed",
-            "conclusion": "success"
-          }
-        ]
-      }
-    ],
-    "461": [
-      {
-        "workflow": "cf8-role-retirement.yml",
-        "run_id": 34600817428,
-        "event": "pull_request",
-        "status": "in_progress",
-        "conclusion": null,
-        "jobs": [
-          {
             "id": 103267382042,
             "name": "role-retirement (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
-            "status": "in_progress",
-            "conclusion": null
+            "status": "completed",
+            "conclusion": "success"
           }
         ]
       }
