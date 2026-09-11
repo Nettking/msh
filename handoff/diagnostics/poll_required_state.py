@@ -43,7 +43,9 @@ def poll(target):
     for name,run in selected.items():
         old_run=old_runs.get(run['id'],{})
         signature={k:run[k] for k in ['status','conclusion','run_attempt','updated_at']}
-        unchanged=old_run.get('signature')==signature
+        # Non-terminal jobs can progress while the parent remains queued.
+        # Reuse only terminal runs; never rely on parent timestamps as job events.
+        unchanged=run['status']=='completed' and old_run.get('signature')==signature
         if unchanged:
             jobs=old_run['jobs']
         else:

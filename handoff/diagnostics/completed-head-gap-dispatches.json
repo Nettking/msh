@@ -1,0 +1,48 @@
+{
+  "dispatches": [
+    {
+      "pr": 461,
+      "sha": "5b826c6806ab1bdb960412ba20ca78192971fb1d",
+      "ref": "codex/tailnet-responder-port-propagation",
+      "workflow": "product-branding.yml",
+      "native_proof": [
+        {
+          "job_id": 103267380630,
+          "run_id": 34600817455,
+          "checkout_commits": [
+            "e03addedbc4d10e39e7c6a592977f45995ec6b8e"
+          ],
+          "sha256": "36c770a1cf1c00aa5e673c776f2a6dd518a120165a9c7da8cb434a3102562208"
+        }
+      ],
+      "workflow_sha256": "9542021114bf68e7678f5359069518948fa9f339c612c84539df3e7c51443e0f",
+      "requested_at": "2026-09-11T13:09:30.016703+00:00",
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "pr": 461,
+      "sha": "5b826c6806ab1bdb960412ba20ca78192971fb1d",
+      "ref": "codex/tailnet-responder-port-propagation",
+      "workflow": "release-image-metadata.yml",
+      "native_proof": [
+        {
+          "job_id": 103267380590,
+          "run_id": 34600817361,
+          "checkout_commits": [
+            "e03addedbc4d10e39e7c6a592977f45995ec6b8e"
+          ],
+          "sha256": "de429d24c680a726fcbc7259d0297b94306576fc9a04bb7f954ec9659c42c8de"
+        }
+      ],
+      "workflow_sha256": "e56a36549dbcf7a9fb171a317f6b3a2db159d0d716afbe390c1beeecfc06c522",
+      "requested_at": "2026-09-11T13:09:32.359386+00:00",
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
+    }
+  ]
+}

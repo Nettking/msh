@@ -72,3 +72,22 @@ uses only newly completed jobs on subsequent polls.
 Next: dispatch branding and registry on the unchanged461 branch only if no exact
 run exists; both prior runs are complete and their source mismatch is proved.
 Other active/queued jobs remain untouched. No merge/D04/runtime action yet.
+
+## September11 13:11UTC — two proven PR461 gaps dispatched
+
+Branding and immutable registry metadata were dispatched on exact
+5b826c6806ab1bdb960412ba20ca78192971fb1d after rechecking PR/ref and absence of
+existing exact runs. Both previous runs had completed with proved synthetic
+checkout. [Dispatch ledger](diagnostics/completed-head-gap-dispatches.json)
+contains native proofs, workflow digests and204 receipts. No passing exact-head
+job was rerun; no active job cancelled. No PR is yet declared merge-ready.
+
+Next actionable trigger: completion/failure of required pending checks. Use
+poll_required_state.py; if material_change=false, return a minimal no-change
+status and stop substantial work. If true, first persist the transition, then
+retain_changed_jobs.py for only new completed logs. Terminal-run job lists are
+cached; non-terminal jobs are refreshed because the parent can remain queued
+while jobs progress. Continue exact-head gap reconciliation for461 after its
+remaining PR runs complete; preserve456/457 evidence. Do not touch D04 until
+final merged-main qualification is complete. The recurring follow-up remains
+active and quiet on unchanged state.
