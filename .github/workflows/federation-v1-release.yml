@@ -113,6 +113,11 @@ jobs:
       - name: Compile maintained product packages
         run: python -m compileall -q catalog
 
+      - name: POSIX readiness redirect regressions
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/flask_app/tests/test_posix_start_readiness.py
+
       - name: Validate acceptance manifest shape
         run: >-
           python -c "import json, pathlib;

@@ -208,8 +208,11 @@ fi
 BASE_URL="http://127.0.0.1:$FCP_WEB_PORT"
 DEADLINE=$(( $(date +%s) + 90 ))
 while :; do
+  # Probe the application's own response. Following its login redirect can
+  # publish human-user metadata and wait on voters during this readiness check.
+  # Federation authority and saved-state resume have their separate checks.
   if docker compose exec -T flask python -c \
-    "import urllib.request; r=urllib.request.urlopen('http://127.0.0.1:5000/onboarding', timeout=2); assert 200 <= r.status < 500" \
+    "import http.client; c=http.client.HTTPConnection('127.0.0.1', 5000, timeout=2); c.request('GET', '/onboarding'); r=c.getresponse(); ok=200 <= r.status < 300 or (r.status in (301,302,303,307,308) and r.getheader('Location')); c.close(); assert ok" \
     >/dev/null 2>&1; then
     break
   fi
