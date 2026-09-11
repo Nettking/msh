@@ -1850,3 +1850,9 @@ gaps before dispatch. Preserve required8/37 plus3/3 exact-head proofs.
 workflows each have both source proofs retained; no exact-head run exists for
 either. Next: guarded one-time dispatch of these two source gaps. Release remains
 active; preserve8/37 plus3/3 native PASS. No additional defect or physical change.
+
+23:50UTC: F85 and software-update exact-head4749ab66 dispatches succeeded
+(HTTP204), each bound to both native synthetic proofs in the ledger. Ten justified
+dispatches total. Next: poll_pr465_state.py at next state check; retain only new
+terminal evidence. Remaining automatic CF7B/ICSE/release still active at last
+check; no duplicate jobs, merge, deployment or physical acceptance claim.
