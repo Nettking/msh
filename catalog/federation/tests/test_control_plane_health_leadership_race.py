@@ -715,33 +715,49 @@ def test_fixture_stops_after_two_real_listener_bind_conflicts(
             _endpoint_assert_closed(attempt)
 
 
+@pytest.mark.parametrize("prestart_conflict", [False, True], ids=["fresh", "reallocated"])
 def test_fixture_does_not_retry_listener_bind_error_after_servers_start(
-    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch,
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch, prestart_conflict,
 ) -> None:
     original_deployments = _deployments
     original_runtime = FederationV1ReleaseRuntime
     allocations = []
     constructed = []
+    started = []
     with ExitStack() as blockers:
         def allocate(root):
             result = original_deployments(root)
-            allocations.append(result)
+            allocations.append({"deployments": result, "runtimes": []})
+            if prestart_conflict and len(allocations) == 1:
+                blocker = blockers.enter_context(socket.socket())
+                if os.name == "nt":
+                    blocker.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+                blocker.bind(("127.0.0.1", result[1].listen_port + 1))
+                blocker.listen(1)
             return result
 
         def construct(deployment, **kwargs):
             runtime = original_runtime(deployment, **kwargs)
             constructed.append(runtime)
+            allocations[-1]["runtimes"].append(runtime)
             return runtime
 
         def conflict_after_start(_leader, **_kwargs):
-            assert len(constructed) == 3
+            started.append(allocations[-1])
+            assert len(started) == 1
+            current = started[0]["runtimes"]
+            assert len(current) == 3
             assert all(
                 server._thread is not None and server._thread.is_alive()
-                for runtime in constructed for server in _endpoint_servers(runtime)
+                for runtime in current for server in _endpoint_servers(runtime)
             )
+            for previous in allocations[:-1]:
+                for runtime in previous["runtimes"]:
+                    for server in _endpoint_servers(runtime):
+                        _ownership_server_closed(server)
             # Use the final current deployment so even a wrongly broadened
             # constructor catch would otherwise recognize this exact endpoint.
-            target = constructed[-1]
+            target = current[-1]
             target.credential_server.close()
             blocker = blockers.enter_context(socket.socket())
             if os.name == "nt":
@@ -758,13 +774,20 @@ def test_fixture_does_not_retry_listener_bind_error_after_servers_start(
         monkeypatch.setattr(original_runtime, "bootstrap_new_federation", conflict_after_start)
         with pytest.raises(OSError) as rejected:
             request.getfixturevalue("runtimes")
-        assert len(allocations) == 1
-        assert len(constructed) == 3
-        target = constructed[-1]
+        # A permitted acquisition retry may precede serving. There must be no
+        # new allocation or second bootstrap after the serving-time bind error.
+        assert len(started) == 1
+        assert allocations[-1] is started[0]
+        assert len(allocations) in {1, 2}
+        if prestart_conflict:
+            assert len(allocations) == 2
+            assert len(allocations[0]["runtimes"]) == 1
+        assert len(started[0]["runtimes"]) == 3
+        target = started[0]["runtimes"][-1]
         _endpoint_bind_failure(rejected.value, target.deployment.listen_port + 1)
-        assert target.deployment.local_voter_id == allocations[0][-1].local_voter_id
+        assert target.deployment.local_voter_id == started[0]["deployments"][-1].local_voter_id
         assert target.deployment.listen_host == "127.0.0.1"
-        assert target.deployment.listen_port == allocations[0][-1].listen_port
+        assert target.deployment.listen_port == started[0]["deployments"][-1].listen_port
         for runtime in constructed:
             assert runtime._lifecycle_thread is None
             for server in _endpoint_servers(runtime):
