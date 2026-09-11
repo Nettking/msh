@@ -26,7 +26,7 @@ Nettking supported activation and all three actual M core image/env/repaired-sou
 hashes are verified. [Runtime receipt](diagnostics/nettking-m-runtime-admission.json).
 **PHYSICAL ADMISSION STOPPED: new confirmed D06 product defect on M.** Checked-in
 Nitro responder replacement stopped old instance then failed bind with EADDRINUSE.
-Preserve [D06](diagnostics/D06.md); publish its issue immediately, then isolated
+Preserve [D06 / issue462](diagnostics/D06.md); issue is published, proceed with isolated
 repair/regression work. No dependent admission, retry workaround or physical PASS.
 Nitro supported startup and actual M core image/env/repaired-source hashes are
 verified. Control identity preserved; LEADER/ready term9/index1553. Next replace
@@ -1210,3 +1210,10 @@ or repeated launch. Physical qualification stops; software PASS is not rerun.
 Next: publish durable issue linked here before substantial investigation, then
 one read-only process/socket snapshot and narrow isolated repair/regression.
 No protected Recorder data touched; no grant/enrollment request; P07/P12 absent.
+
+###18:58UTC — D06 durable issue published
+
+[Issue462](https://github.com/Nettking/msh/issues/462) contains exact evidence,
+source/stage/host, state effects and repair boundary. The accumulating blocker
+table now includes D06. Next read-only process/socket snapshot; then separate
+repair branch/draft PR and focused regression. Do not resume M physical admission.
