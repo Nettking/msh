@@ -1692,3 +1692,12 @@ all four source proofs in the ledger. Twelve dispatches now recorded for this
 head. Only automatic release still needs later source-gap resolution. Next:
 `poll_pr463_state.py` on next state check; retain only new terminal/review evidence.
 Preserve16/37+2/3 native PASS. No merge, candidate or physical state change.
+
+##22:40UTC — automatic Windows capability-product release job failed
+
+Head83955f65 unchanged. Automatic release34649416713 reports failed Windows
+regressions(capability-product); parent remains active. Other selected jobs show
+no failures. ICSE replacement34654263201 has two successful jobs. Failure is
+UNCLASSIFIED pending native evidence; do not modify product code or rerun jobs.
+Next: retain new native logs, inspect the failing job first and classify its
+mechanism/source before deciding safe qualification continuation. Physical stopped.
