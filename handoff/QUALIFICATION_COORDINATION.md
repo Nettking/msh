@@ -1709,3 +1709,8 @@ root cause unresolved, no product change justified yet. [Finding](diagnostics/D0
 Next: publish its issue before further investigation, then compare source and
 perform focused isolated reproduction. Two new ICSE successes verify83955f65;
 preserve required18/37 plus companion2/3. Physical/protected state unchanged.
+
+22:43UTC: D07 published as issue464. Next: read the failing concurrent test,
+content store and caller boundaries; compare their source identities againstM
+and83955f65, then reproduce only in disposable local test state. No product edit
+or CI retry until classification supports it. Existing independent CI may continue.
