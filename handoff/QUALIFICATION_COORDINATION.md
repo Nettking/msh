@@ -670,3 +670,12 @@ Next: guarded dispatch of those three missing workflows at current main9b286f93,
 then compact final-main polling and native source retention. PR-head software
 PASS remains separate. Final main is not yet qualified or frozen as a physical
 candidate. Runtime/Recorder unchanged; D04/P07/P12 not started.
+
+## September11 16:35UTC — final-main qualification gaps filled once
+
+Only missing harness, readiness and sharding were dispatched on verified actual
+main9b286f931497bf6291e215f6340443c5162826b0. Each dispatch rechecked main/ref and
+absence of any matching final-SHA run; ledger stores workflow digests and204
+receipts. Existing final push runs are preserved; no duplicate release job or
+intermediate-main qualification was requested. Next: compact final-main poll and
+new-only native retention, then final artifact/verdict review when complete.
