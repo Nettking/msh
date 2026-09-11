@@ -784,3 +784,12 @@ are retained. No mismatch or new failure. Next scheduled action:
 poll_merged_main_state.py; retain only new results and review complete ICSE/
 release artifacts when actionable. Preserve all prior PASS. No candidate freeze,
 physical acceptance/P07/P12 action or further workflow dispatch at this stage.
+
+## September11 17:36UTC — final-main ICSE and software-update complete
+
+Actual main remains9b286f931497bf6291e215f6340443c5162826b0. ICSE34622527886
+and software-update34622527937 completed successfully. Release gained Windows
+capability/product, Linux shard2 and the order aggregate; Windows transport is
+running. No new failure. Next: retain five new native logs, then retain/review
+newly complete final-main ICSE artifacts. Preserve all prior PASS; no duplicate
+workflow, D04/host/protected Recorder action or physical acceptance claim.

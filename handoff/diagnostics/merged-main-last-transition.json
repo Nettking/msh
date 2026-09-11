@@ -1,30 +1,16 @@
 {
-  "recorded_at": "2026-09-11T17:23:53.563133+00:00",
+  "recorded_at": "2026-09-11T17:35:26.135672+00:00",
   "source_commit": "9b286f931497bf6291e215f6340443c5162826b0",
   "changes": [
     {
-      "workflow": "phase-f85-operator-federation-surface.yml",
-      "run_id": 34622527917,
+      "workflow": "icse-tool-demo.yml",
+      "run_id": 34622527886,
       "status": "completed",
       "conclusion": "success",
       "jobs": [
         {
-          "id": 103339712571,
-          "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
-          "status": "completed",
-          "conclusion": "success"
-        }
-      ]
-    },
-    {
-      "workflow": "cf8-role-retirement.yml",
-      "run_id": 34622527924,
-      "status": "completed",
-      "conclusion": "success",
-      "jobs": [
-        {
-          "id": 103339948641,
-          "name": "role-retirement (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+          "id": 103345791974,
+          "name": "publication-bundle",
           "status": "completed",
           "conclusion": "success"
         }
@@ -33,14 +19,14 @@
     {
       "workflow": "federation-software-update.yml",
       "run_id": 34622527937,
-      "status": "in_progress",
-      "conclusion": null,
+      "status": "completed",
+      "conclusion": "success",
       "jobs": [
         {
           "id": 103339707831,
           "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
-          "status": "in_progress",
-          "conclusion": null
+          "status": "completed",
+          "conclusion": "success"
         }
       ]
     },
@@ -51,34 +37,28 @@
       "conclusion": null,
       "jobs": [
         {
-          "id": 103344769460,
-          "name": "Linux regression shard (0)",
+          "id": 103344769249,
+          "name": "Windows regressions (capability-product)",
           "status": "completed",
           "conclusion": "success"
         },
         {
           "id": 103344769461,
           "name": "Linux regression shard (2)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 103344769581,
+          "name": "Windows regressions (transport-storage)",
           "status": "in_progress",
           "conclusion": null
         },
         {
-          "id": 103344769516,
-          "name": "Release checks (Linux)",
-          "status": "completed",
-          "conclusion": "success"
-        },
-        {
-          "id": 103344769559,
-          "name": "Full-suite order (fixed)",
-          "status": "completed",
-          "conclusion": "success"
-        },
-        {
           "id": 103354309713,
           "name": "Clean-checkout suite order independence",
-          "status": "queued",
-          "conclusion": null
+          "status": "completed",
+          "conclusion": "success"
         }
       ]
     }
