@@ -1118,3 +1118,18 @@ protected Recorder action. This proves an audit configuration mismatch, not
 yet a product defect. Next: compare exact resolved N/M configurations and
 classify each changed key. Do not loosen checks or retry blindly. Main software
 qualification and all retained evidence remain valid; physical acceptance0.
+
+##18:38UTC — exact Nitro configuration discrepancy isolated
+
+[Resolved delta](diagnostics/nitro-m-config-delta.json) identifies only four audit
+expectation mismatches: three nonexistent Compose FCP_BUILD_COMMIT environment
+entries (runtime inherits that value from the checked-in Dockerfile image ENV),
+and the private host's old custom responder port. D05 now correctly propagates
+that value; current D04-owned responder uses5151. These are audit/configuration
+issues, not product regressions or reasons to rerun software qualification.
+
+Next: explicitly align the new M private host environment with owned port5151,
+and compare against the actual checked-in image-ENV contract without inserting
+fictional Compose environment fields. Require the complete resolved config to
+match otherwise, preserve old operation/log, then run a separately named guarded
+continuation from clean M. No service startup or protected-data action occurred.
