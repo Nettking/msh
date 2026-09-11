@@ -975,3 +975,28 @@ automate. Startup readiness and Compose port changes were separately reviewed.
 Next: fresh host/runtime/updater/pending-request and protected-container metadata,
 then stage exact-M source/configuration under existing mutation locks. Do not
 touch protected corpus, change voters or start timers before actual admission.
+
+##18:22UTC — Nettking activation preconditions and Recorder invariant
+
+[Nettking read-only metadata](diagnostics/m-nettking-admission-preflight.json):
+clean N source, all three exact-N cores running, no OOM/restarts, no ignored
+build files, no pending update request or configured capture workload. Existing
+model manifest unchanged;95.35GB free disk,6.21millionKiB free RAM, GPU currently
+idle. Windows launcher/updater sources are unchanged N-to-M; existing updater
+processes remain, so source advance/start will share their checked-in mutex.
+The process collector also matched its own PowerShell command; that self-match
+does not establish an actual responder or third updater.
+
+[Recorder metadata](diagnostics/m-recorder-admission-metadata.json) reverified
+the protected container/image/start/mount invariant without reading record files.
+Separate voter remains running FOLLOWER term8/index1551 on clean fba508 source.
+Its fingerprint field was not serialized correctly by this audit and must be
+rechecked; this is not evidence of a changed physical host or product defect.
+
+Next: run `diagnostics/launch_nettking_m_runtime.py` once. It rechecks source,
+owned resolved configuration/mounts/model/headroom, then executes unchanged
+checked-in `start.cmd` after a clean N-to-M fast-forward under the same Windows
+host mutation mutex. No fresh/reset/volume prune; no other host change. Durable
+native receipt/log are under private `.acceptance/nettking-9b286f93-supported-start.*`.
+Inspect operation state before retrying, persist every transition, then verify
+actual M runtime before continuing Nitro/Recorder admission. Physical PASS0.

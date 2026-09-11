@@ -1,0 +1,161 @@
+{
+  "observed_at": "2026-09-11T18:22:00.637112+00:00",
+  "target": "9b286f931497bf6291e215f6340443c5162826b0",
+  "current_source": "0536f03d67eb277e11573c2188d8e820399627e3",
+  "source_clean": true,
+  "fingerprint": "0efb6f56566ac0eb",
+  "services": [
+    {
+      "service": "flask",
+      "id": "7468794b6dfc0e24aff14af91950bbc37a9ce5ae6ba912d1eec4632080a0e5a6",
+      "image": "sha256:336968cae8e28c2adce95954210904e2d6af8e44881b9cc327ee7877751d8b80",
+      "image_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
+      "environment_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
+      "running": true,
+      "started_at": "2026-09-11T09:50:03.38077273Z",
+      "oom_killed": false,
+      "restarts": 0,
+      "mounts": [
+        {
+          "Type": "volume",
+          "Source": "/var/lib/docker/volumes/fcp-v1-73c779-nettking-relay-state/_data",
+          "Destination": "/var/lib/fcp-relay",
+          "RW": true
+        },
+        {
+          "Type": "bind",
+          "Source": "C:\\wsl\\fcp-v1-fba508-nettking-20260910\\.acceptance\\nettking-73c779-runtime-control\\results",
+          "Destination": "/app/results",
+          "RW": true
+        },
+        {
+          "Type": "bind",
+          "Source": "C:\\wsl\\fcp-v1-fba508-nettking-20260910\\.acceptance\\nettking-73c779-runtime-control\\data",
+          "Destination": "/app/data",
+          "RW": true
+        }
+      ]
+    },
+    {
+      "service": "relay",
+      "id": "52254998e594b8fc7f15050830ceac53e3c406e5f1e1a117e04177048e195b93",
+      "image": "sha256:0416c9f831b101aca3658c1217044e6d3b9fd09e996b8ee31823c601e3a376e9",
+      "image_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
+      "environment_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
+      "running": true,
+      "started_at": "2026-09-11T09:50:02.479341038Z",
+      "oom_killed": false,
+      "restarts": 0,
+      "mounts": [
+        {
+          "Type": "volume",
+          "Source": "/var/lib/docker/volumes/fcp-v1-73c779-nettking-relay-state/_data",
+          "Destination": "/var/lib/fcp-relay",
+          "RW": true
+        }
+      ]
+    },
+    {
+      "service": "recorder",
+      "id": "e6eab71be823ac9d31d39faea4e675a031bb8f8e213ff3235e6d0140428f77b9",
+      "image": "sha256:c6af91eb96be32bb6b1ef4e9c7e64152a4bd273ca4ffdcac4c8df835ccda8295",
+      "image_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
+      "environment_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
+      "running": true,
+      "started_at": "2026-09-11T09:50:02.472433507Z",
+      "oom_killed": false,
+      "restarts": 0,
+      "mounts": [
+        {
+          "Type": "bind",
+          "Source": "C:\\wsl\\fcp-v1-fba508-nettking-20260910\\.acceptance\\nettking-73c779-runtime-control\\data",
+          "Destination": "/app/data",
+          "RW": true
+        }
+      ]
+    },
+    {
+      "service": "ollama",
+      "id": "b18a34a67cc1faa14ae0850a7f0683e1e0e84d3aecd4140f4ec92c7ee6332a87",
+      "image": "sha256:b88c73ace3e115f8ec53dc8761ae1c0aabfa675406e3681786b98757ce050f42",
+      "image_sha": null,
+      "environment_sha": null,
+      "running": true,
+      "started_at": "2026-09-11T09:50:04.236672292Z",
+      "oom_killed": false,
+      "restarts": 0,
+      "mounts": [
+        {
+          "Type": "bind",
+          "Source": "/run/desktop/mnt/host/c/Users/Martin/.ollama/models",
+          "Destination": "/root/.ollama/models",
+          "RW": false
+        },
+        {
+          "Type": "volume",
+          "Source": "/var/lib/docker/volumes/fcp-v1-73c779-nettking-ollama-models/_data",
+          "Destination": "/root/.ollama",
+          "RW": true
+        }
+      ],
+      "version": "ollama version is 0.32.6",
+      "model_list": "NAME                    ID              SIZE      MODIFIED    \nllama3.2:3b             a80c4f17acd5    2.0 GB    7 weeks ago    \nqwen3.6:latest          07d35212591f    23 GB     7 weeks ago    \nqwen3-vl:8b-instruct    0533d74300e4    6.1 GB    7 weeks ago    \nqwen3-vl:8b             901cae732162    6.1 GB    7 weeks ago    \nqwen3-vl:4b             1343d82ebee3    3.3 GB    7 weeks ago",
+      "loaded_models": "NAME    ID    SIZE    PROCESSOR    CONTEXT    UNTIL"
+    }
+  ],
+  "host": {
+    "processes": [
+      {
+        "pid": 40032,
+        "is_responder": false,
+        "parent": 25816,
+        "created": "/Date(1789082322897)/",
+        "is_updater": true,
+        "executable": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
+      },
+      {
+        "pid": 24068,
+        "is_responder": false,
+        "parent": 40032,
+        "created": "/Date(1789082323180)/",
+        "is_updater": true,
+        "executable": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
+      },
+      {
+        "pid": 58220,
+        "is_responder": true,
+        "parent": 54720,
+        "created": "/Date(1789150918655)/",
+        "is_updater": true,
+        "executable": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
+      }
+    ],
+    "user": "Nettking\\Martin",
+    "total_kib": 33251384,
+    "free_kib": 6213836
+  },
+  "disk_free_bytes": 95353839616,
+  "gpu": "NVIDIA GeForce RTX 3070 Ti Laptop GPU, 8192 MiB, 0 MiB, 0 %, 581.42",
+  "model_manifest_sha256": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72",
+  "pending_update_request": false,
+  "configured_capture_file_exists": false,
+  "unchanged_windows_activation_scripts": [
+    "start.cmd",
+    "scripts/windows/fcp_update_agent.ps1",
+    "scripts/windows/fcp_update_agent_runner.ps1",
+    "scripts/windows/fcp_update_engine.ps1",
+    "scripts/windows/fcp_docker_build_proxy.cmd",
+    "scripts/windows/fcp_host_build.ps1"
+  ],
+  "ignored_build_files": [],
+  "tailscale_backend": "Running",
+  "tailnet_hosts": {
+    "Nettking": true,
+    "Nitro": true,
+    "Beast": true,
+    "DESKTOP-N5KI14R": true
+  },
+  "physical_acceptance": false,
+  "state_changed": false,
+  "protected_recorder_data_untouched": true
+}
