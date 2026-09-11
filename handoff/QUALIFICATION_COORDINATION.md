@@ -1554,3 +1554,11 @@ all artifact failures/errors0. Review persisted as
 `diagnostics/pr463-final-release-artifact-review.json`. Next: reconcile exact
 full-order identities, intentional/native-covered skips, aggregate logs and live
 PR review findings before recording qualification PASS and normal merge.
+
+21:21UTC: MERGE BLOCKED by unresolved correctness review on exacthead7286f30d.
+Review thread PRRT_kwDOPZM3cc6hmxQd reports that the new5s replacement exception
+changes backup_recovery's existing10s stop/error contract. This is a repair review
+finding, not physical evidence or a newly observed host failure. [Review input](diagnostics/pr463-review-input.json).
+All CI is green but does not resolve this finding. Next: inspect the helper's
+backup caller, reproduce safely in isolated tests, then repair PR463 if confirmed.
+Do not merge or deploy the reviewed head. Preserve all completed qualification.
