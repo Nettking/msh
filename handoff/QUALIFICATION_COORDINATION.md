@@ -799,3 +799,19 @@ aggregate has no independent checkout and will be bound to its same-run order
 jobs in final review.34 native records now retained. No mismatch/new error.
 Next: review the actual final-main ICSE bundle without rebuilding or rerunning
 software. Remaining release checks are still pending; no physical PASS inferred.
+
+## September11 17:37UTC — actual final-main ICSE artifacts verified
+
+ICSE run34622527886 at9b286f931497bf6291e215f6340443c5162826b0 has six retained
+native GitHub ZIPs with matching digests. Public source equals all1411 immutable
+Git export files; both checksum layers and nested metadata agree. Component
+results are4/4 on Linux, Windows and Compose; both native network results have
+all10 required checks and complete owned-process teardown. No rebuild or rerun.
+[Review](diagnostics/merged-main-icse-artifact-review.json),
+[receipts](diagnostics/merged-main-icse-artifact-retention.json), and
+[procedure](diagnostics/review_merged_main_icse.py) preserve the evidence.
+
+Next scheduled action: poll_merged_main_state.py. Remaining release leaves/
+matrices/verdict must complete before final release artifact/qualification review.
+Preserve verified ICSE and all existing PASS. No candidate freeze, D04/host/
+protected Recorder action or physical acceptance claim; P07/P12 not started.
