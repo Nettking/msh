@@ -9,8 +9,9 @@
     "5b826c6806ab1bdb960412ba20ca78192971fb1d"
   ],
   "final_merged_main_qualified": true,
-  "candidate_frozen": false,
+  "candidate_frozen": true,
   "runtime_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
-  "next_action": "Read controlled D04 procedure, verify live Nitro responder ownership, remediate only that stale responder, persist evidence before candidate freeze/revalidation",
-  "qualification_receipt": "merged-main-final-qualification.json"
+  "next_action": "Run checked-in physical_revalidation N-to-M from clean M; retain fail-closed result and require all fresh observations; review side effects then stage exact-M owned runtime admission",
+  "qualification_receipt": "merged-main-final-qualification.json",
+  "candidate_receipt": "authoritative-candidate-9b286f93.json"
 }

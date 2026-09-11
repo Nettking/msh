@@ -1,0 +1,17 @@
+{
+  "frozen_at": "2026-09-11T18:16:53.407088+00:00",
+  "AUTHORITATIVE_SHA": "9b286f931497bf6291e215f6340443c5162826b0",
+  "status": "FROZEN_QUALIFIED_CANDIDATE_PENDING_CLEAN_REVALIDATION_AND_RUNTIME_ADMISSION",
+  "clean_checkout": "C:\\wsl\\fcp-v1-9b286f93-merged-main-20260911",
+  "qualification_receipt": "merged-main-final-qualification.json",
+  "qualification_receipt_sha256": "126880c9379f309647a2d8835d0fc4785baed692672daae0ae51f76ddd0bbb94",
+  "d04": "Current-N host conflict resolved; issue459 closed; reverify M owner after admission",
+  "previous_campaign_runtime_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
+  "runtime_deployed_to_new_candidate": false,
+  "physical_acceptance": false,
+  "carry_forward_observations": [],
+  "P07": "NOT_STARTED",
+  "P12": "NOT_STARTED",
+  "protected_recorder_data_untouched": true,
+  "next_action": "Run checked-in physical_revalidation N-to-M from clean M; retain fail-closed result and require all fresh observations; review side effects then stage exact-M owned runtime admission"
+}

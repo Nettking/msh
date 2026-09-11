@@ -18,11 +18,15 @@ checked-in revalidation -> fresh formal physical acceptance.
 `9b286f931497bf6291e215f6340443c5162826b0` is qualified37/37 plus CFI2/registry,
 release-verdict and native artifact review. All fix heads are ancestors.
 Preserve `diagnostics/merged-main-final-qualification.json`; no software rerun.
-D04 host remediation and local/real Nettking peer verification are complete on N.
-Next is candidate freeze and clean checked-in revalidation. Final main is not yet
-frozen as a physical candidate. M still requires fresh runtime admission checks.
+D04 host remediation and local/real Nettking peer verification are complete on N;
+issue459 is closed. AUTHORITATIVE_SHA is now frozen as
+`9b286f931497bf6291e215f6340443c5162826b0` (M).
+Next: clean checked-in revalidation, side-effect review and owned runtime admission.
+M is not yet deployed; fresh runtime/source/owner/topology checks remain required.
 
-Runtime remains0536f03d67eb277e11573c2188d8e820399627e3. No physical PASS; P07/P12
+Nettking/Nitro campaign core runtime remains0536f03d67eb277e11573c2188d8e820399627e3.
+Recorder protected production6fb77c/separate voterfba508 have not been changed.
+No physical PASS; P07/P12
 not started. Protected Recorder data remains out of bounds. The user's latest
 D04 instruction authorizes controlled removal/disablement of the stale Nitro
 responder when that stage becomes actionable; this supersedes the earlier
@@ -941,3 +945,17 @@ Issue459 receives the durable evidence and is closed as environment remediation.
 M main still exactly9b286f93 on GitHub. Next: freeze that qualified SHA, then run
 the checked-in impact/revalidation procedure from its clean detached checkout.
 All physical observations must be fresh; P07/P12 remain unstarted.
+
+##18:16UTC — one qualified AUTHORITATIVE_SHA frozen
+
+Frozen M=`9b286f931497bf6291e215f6340443c5162826b0`, after all three exact-head
+qualifications/merges, the one final merged-main qualification and D04 resolution.
+GitHub main and clean detached local checkout reverified. [Freeze receipt](diagnostics/authoritative-candidate-9b286f93.json)
+binds the preserved final qualification digest. No software rerun, source repair
+or physical deployment. No old physical observations carried forward.
+
+Next exact action: native Python3.12 from clean M runs
+`-m catalog.federation.tests.cf7_acceptance.physical_revalidation --baseline 0536f03d67eb277e11573c2188d8e820399627e3 --candidate 9b286f931497bf6291e215f6340443c5162826b0 --repo-root .`.
+Retain planner output, including any fail-closed unknown paths. Then reconcile
+the checked-in scenario/precondition contract and stage state-preserving runtime
+admission. All M physical observations fresh; P07/P12 real durations remain.
