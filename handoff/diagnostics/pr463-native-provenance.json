@@ -1,6 +1,6 @@
 {
   "source_commit": "7286f30d30e20c94c13cc9acebb2fd6d61bc1163",
-  "retained_at": "2026-09-11T20:30:18.122395+00:00",
+  "retained_at": "2026-09-11T20:44:21.132115+00:00",
   "records": [
     {
       "job_id": 103388045522,
@@ -643,6 +643,97 @@
       "conclusion": "success",
       "bytes": 64980,
       "sha256": "5d4667136ca59ab96d00f8f5cc96136225ea67d38743baf2cb42e4fd7477486c",
+      "checkout_commits": [
+        "7286f30d30e20c94c13cc9acebb2fd6d61bc1163"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103412772839,
+      "run_id": 34644764330,
+      "name": "PostgreSQL storage release check",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 45268,
+      "sha256": "7550b1b97a370502a642d0bfe57ac20490ccf75234d02c8f7549c45620751bd3",
+      "checkout_commits": [
+        "7286f30d30e20c94c13cc9acebb2fd6d61bc1163"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103412772896,
+      "run_id": 34644764330,
+      "name": "Windows regressions (journal-artifacts)",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 51794,
+      "sha256": "97e53b8ede9d30d7958caf464f86c776eec8a38bccebee4345288d68cd9f2dfc",
+      "checkout_commits": [
+        "7286f30d30e20c94c13cc9acebb2fd6d61bc1163"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103412773030,
+      "run_id": 34644764330,
+      "name": "Linux regression shard (0)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 64243,
+      "sha256": "e4b86772441b4f60c364312736e1d4d039d7826a80a0f85750d548566cb8d59d",
+      "checkout_commits": [
+        "7286f30d30e20c94c13cc9acebb2fd6d61bc1163"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103412773068,
+      "run_id": 34644764330,
+      "name": "Linux regression shard (2)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 54366,
+      "sha256": "7952fa6dacefa168cfeeb7933e674919c6db10b08e0638f180b1e9882c16b810",
+      "checkout_commits": [
+        "7286f30d30e20c94c13cc9acebb2fd6d61bc1163"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103408924333,
+      "run_id": 34643583922,
+      "name": "Shard contract (Windows, shared-pool)",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 25525,
+      "sha256": "ed57e7a4c9034976273cafd4b89f375464b53846ae6ac9b0923d263801308807",
+      "checkout_commits": [
+        "7286f30d30e20c94c13cc9acebb2fd6d61bc1163"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103405438614,
+      "run_id": 34642522512,
+      "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 53106,
+      "sha256": "d6f58dcdc6f791469ef878b7c26c7a02c0be036d05fb7c60f20bb458e9844403",
+      "checkout_commits": [
+        "7286f30d30e20c94c13cc9acebb2fd6d61bc1163"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103412886075,
+      "run_id": 34642522512,
+      "name": "publication-bundle",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 22954,
+      "sha256": "894b7a15d6c89e522fda6c11f39311c896e4169fb536c7829e2b61322874072c",
       "checkout_commits": [
         "7286f30d30e20c94c13cc9acebb2fd6d61bc1163"
       ],
