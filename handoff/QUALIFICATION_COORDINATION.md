@@ -1340,3 +1340,7 @@ completed software-update jobs used syntheticbfec91c9; replacement dispatch for
 each completed parent is justified by source mismatch. Existing passing logs are
 preserved. Next: dispatch these two exact-head gaps once with fresh guards and
 persist each response; other active parents remain untouched.
+
+19:32UTC: CF7B exact-head replacement dispatched once (HTTP204), with both native
+source mismatch proofs in the dispatch ledger. Next: software-update completed
+gap through `dispatch_pr463_completed_gap.py federation-software-update.yml`.
