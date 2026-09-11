@@ -1,5 +1,8 @@
 # Federation v1 diagnostic sweep — recover here first
 
+**Current coordination:** [state-change-driven qualification](QUALIFICATION_COORDINATION.md)
+supersedes historical execution next-actions below. Read it before acting.
+
 **Mode: DIAGNOSTIC ONLY — NOT PHYSICAL ACCEPTANCE EVIDENCE.**
 
 Runtime candidate / AUTHORITATIVE_SHA:

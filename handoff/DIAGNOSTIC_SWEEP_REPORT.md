@@ -1,5 +1,8 @@
 # Federation v1 diagnostic sweep report
 
+For current execution, read [QUALIFICATION_COORDINATION.md](QUALIFICATION_COORDINATION.md).
+The sweep below is complete and must not be repeated.
+
 **Sweep complete: 2026-09-11, 12:44 UTC.** Candidate remains
 `0536f03d67eb277e11573c2188d8e820399627e3`.
 **DIAGNOSTIC ONLY — NOT PHYSICAL ACCEPTANCE EVIDENCE.**
