@@ -830,3 +830,13 @@ poll_merged_main_state.py. When final Windows release checks and dependent
 matrices/verdict complete, review complete release artifacts and final37/37
 qualification; reuse verified ICSE/registry evidence. Runtime0536f03d, protected
 Recorder data and P07/P12 state remain unchanged. No candidate freeze yet.
+
+## September11 17:59UTC — final merged-main workflows complete
+
+Actual main remains9b286f931497bf6291e215f6340443c5162826b0. Final release
+34622528054 completed/success, including Windows release checks, both matrices
+and verdict. Required workflow set is complete by API; no new failure. Next:
+retain four new native proofs, audit complete native release artifacts and final
+gate/source/skip lineage, then persist the merged-main qualification verdict.
+Only after that may controlled D04 remediation proceed. No candidate freeze or
+physical acceptance inferred yet; runtime0536f03d and Recorder remain untouched.

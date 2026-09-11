@@ -2,7 +2,7 @@
   "source_commit": "9b286f931497bf6291e215f6340443c5162826b0",
   "actual_main": "9b286f931497bf6291e215f6340443c5162826b0",
   "main_matches": true,
-  "recorded_at": "2026-09-11T17:47:55.453122+00:00",
+  "recorded_at": "2026-09-11T17:58:54.905042+00:00",
   "workflows": [
     {
       "workflow": "cf7b-product-physical-acceptance.yml",
@@ -306,15 +306,15 @@
       "run_id": 34622528054,
       "event": "push",
       "api_head_sha": "9b286f931497bf6291e215f6340443c5162826b0",
-      "status": "in_progress",
-      "conclusion": null,
+      "status": "completed",
+      "conclusion": "success",
       "attempt": 1,
       "required_count": 16,
       "signature": {
-        "status": "in_progress",
-        "conclusion": null,
+        "status": "completed",
+        "conclusion": "success",
         "run_attempt": 1,
-        "updated_at": "2026-09-11T17:45:49Z"
+        "updated_at": "2026-09-11T17:49:52Z"
       },
       "jobs": [
         {
@@ -392,11 +392,11 @@
         {
           "id": 103344769528,
           "name": "Release checks (Windows)",
-          "status": "in_progress",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "runner_name": "Nettking",
           "started_at": "2026-09-11T17:45:49Z",
-          "completed_at": null
+          "completed_at": "2026-09-11T17:49:20Z"
         },
         {
           "id": 103344769559,
@@ -433,6 +433,33 @@
           "runner_name": "Nettking-Linux",
           "started_at": "2026-09-11T17:27:24Z",
           "completed_at": "2026-09-11T17:27:30Z"
+        },
+        {
+          "id": 103363681055,
+          "name": "Release matrix (Linux)",
+          "status": "completed",
+          "conclusion": "success",
+          "runner_name": "Nettking-Linux",
+          "started_at": "2026-09-11T17:49:23Z",
+          "completed_at": "2026-09-11T17:49:33Z"
+        },
+        {
+          "id": 103363681108,
+          "name": "Release matrix (Windows)",
+          "status": "completed",
+          "conclusion": "success",
+          "runner_name": "Nettking-Linux",
+          "started_at": "2026-09-11T17:49:35Z",
+          "completed_at": "2026-09-11T17:49:45Z"
+        },
+        {
+          "id": 103363802949,
+          "name": "Federation v1 automated release verdict",
+          "status": "completed",
+          "conclusion": "success",
+          "runner_name": "Nettking-Linux",
+          "started_at": "2026-09-11T17:49:47Z",
+          "completed_at": "2026-09-11T17:49:52Z"
         }
       ]
     },

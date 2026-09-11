@@ -1,28 +1,34 @@
 {
-  "recorded_at": "2026-09-11T17:47:55.453122+00:00",
+  "recorded_at": "2026-09-11T17:58:54.905042+00:00",
   "source_commit": "9b286f931497bf6291e215f6340443c5162826b0",
   "changes": [
     {
       "workflow": "federation-v1-release.yml",
       "run_id": 34622528054,
-      "status": "in_progress",
-      "conclusion": null,
+      "status": "completed",
+      "conclusion": "success",
       "jobs": [
         {
           "id": 103344769528,
           "name": "Release checks (Windows)",
-          "status": "in_progress",
-          "conclusion": null
-        },
-        {
-          "id": 103344769581,
-          "name": "Windows regressions (transport-storage)",
           "status": "completed",
           "conclusion": "success"
         },
         {
-          "id": 103344769593,
-          "name": "Windows regressions (journal-artifacts)",
+          "id": 103363681055,
+          "name": "Release matrix (Linux)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 103363681108,
+          "name": "Release matrix (Windows)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 103363802949,
+          "name": "Federation v1 automated release verdict",
           "status": "completed",
           "conclusion": "success"
         }
