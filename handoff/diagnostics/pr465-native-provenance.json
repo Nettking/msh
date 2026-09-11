@@ -156,7 +156,72 @@
         "4749ab6689315a7ad953c11ce4b2ec942433d71a"
       ],
       "checkout_matches": true
+    },
+    {
+      "job_id": 103449514527,
+      "run_id": 34656348284,
+      "name": "operator-surface (Linux, fcp-linux-fast, bash)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 102270,
+      "sha256": "3f4b890899add0665f58114474063aa21091124ec8dfbcf22c59b271d083c613",
+      "checkout_commits": [
+        "2be67d18c2c58bde4b4be09c2f7b97b6a42dd83c"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103452693940,
+      "run_id": 34657414361,
+      "name": "product-branding",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 13444,
+      "sha256": "426c89c0a9cbdaa23eefde87dedf7e8f6e0f1521c658d20cf9ffacbaa13700bf",
+      "checkout_commits": [
+        "4749ab6689315a7ad953c11ce4b2ec942433d71a"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103449515262,
+      "run_id": 34656348375,
+      "name": "acceptance (Linux, fcp-linux-fast, bash)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 67946,
+      "sha256": "3833f5bcbfda37c7f05b9f0b39ef635f0f73ebf65f63c9c0db3cef04f1f9ea58",
+      "checkout_commits": [
+        "2be67d18c2c58bde4b4be09c2f7b97b6a42dd83c"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103450001845,
+      "run_id": 34656510631,
+      "name": "readiness (Linux, fcp-linux-fast, bash)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 41414,
+      "sha256": "3cac67363a3f7566bd361cfe79605d0fc20cb4933db9f0e8a04572d6527b9ef2",
+      "checkout_commits": [
+        "4749ab6689315a7ad953c11ce4b2ec942433d71a"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103450017218,
+      "run_id": 34656515424,
+      "name": "Verify immutable release image metadata",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 13070,
+      "sha256": "2808a55a02d09c24f13d27463687640b2613ee9e8ddac25dc4ae23e1421e5d31",
+      "checkout_commits": [
+        "4749ab6689315a7ad953c11ce4b2ec942433d71a"
+      ],
+      "checkout_matches": true
     }
   ],
-  "retained_at": "2026-09-11T23:15:43.234083+00:00"
+  "retained_at": "2026-09-11T23:27:15.135720+00:00"
 }

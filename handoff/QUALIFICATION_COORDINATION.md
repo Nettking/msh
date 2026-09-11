@@ -1819,3 +1819,9 @@ physical M unchanged; no physical acceptance PASS or active timers.
 replacement, CF7C and registry completed success; new Linux successes in CF7B
 and F85. Remaining workflows active/queued. Next: retain only newly terminal
 logs and verify source. No duplicate dispatch or physical state change.
+
+23:27UTC: five new native logs retained. Branding and CF7C-Linux verify4749ab66,
+bringing required proof to7/37; registry brings companions to3/3. CF7B/F85 Linux
+use synthetic2be67d18 and their parent runs remain incomplete. No new dispatch
+is justified yet. Next: poll_pr465_state.py at next state check; preserve all
+verified evidence, inspect only new completions/failures. Physical M unchanged.
