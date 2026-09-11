@@ -384,3 +384,20 @@ completing four native ICSE source proofs. Release capability/product proves
 synthetic e03addedbc4 and remains excluded. No test failure. Next: retain/review
 the exact ICSE bundle; do not inspect synthetic publication artifacts or rerun
 any qualification job.
+
+## September11 15:11UTC — PR461 ICSE artifacts verified
+
+Exact5b826c6806ab1bdb960412ba20ca78192971fb1d ICSE run34606870244 has six
+retained native ZIPs matching GitHub digests. Public source equals all1408
+immutable Git export files; both checksum layers and embedded metadata agree.
+Component evidence is4/4 on Linux, Windows and Compose; both native network
+results have all10 required checks and complete owned-process teardown.
+[Review](diagnostics/pr461-icse-artifact-review.json),
+[receipts](diagnostics/pr461-icse-artifact-retention.json), and
+[procedure](diagnostics/review_pr461_icse.py) retain the evidence. No rebuild,
+software rerun or physical acceptance claim.
+
+Next scheduled action: poll_required_state.py, preserving qualified457 and all
+other valid evidence. Await456 release and461 pending gates; reconcile remaining
+synthetic release/CFI2/operator workflows after completion. No new candidate or
+merge yet; no D04/host/protected Recorder action; P07/P12 not started.
