@@ -14,10 +14,12 @@ import json
 import math
 import os
 import re
+import sqlite3
 import ssl
 import tempfile
 import threading
 from collections.abc import Callable
+from contextlib import closing
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -903,6 +905,57 @@ class PairingAwareCapabilityOnboardingService(CapabilityOnboardingService):
     def binding_or_none(self) -> FederationSessionBinding | None:
         remote = self.remote_store.load()
         return remote.binding if remote is not None else super().binding_or_none()
+
+    def discovery_metadata(self) -> dict[str, str] | None:
+        """Read public routing hints, never current authority or a pairing grant.
+
+        The local coordinator's committed projection may be stale during an
+        outage. That is acceptable for reachability discovery, not for issuing
+        grants. C03 inherits this read-only path without constructing a writable
+        coordinator or consulting the relay/quorum. Remotely paired members
+        continue to advertise nothing.
+        """
+        if self.remote_store.load() is not None:
+            return None
+        credentials = self.identity_or_none()
+        binding = self.binding_store.load(read_only=True, timeout_seconds=0.1)
+        if (
+            credentials is None
+            or binding is None
+            or not binding.trusted
+            or binding.state is FederationConnectionState.REVOKED
+            or binding.device_id != credentials.identity.node_id
+            or not federation_id_matches_session(
+                binding.federation_id, binding.internal_session_id
+            )
+        ):
+            return None
+        # mode=ro cannot initialize, repair or create an authority database.
+        # Bound SQLite lock waits independently of the host's HTTP budget.
+        target = Path(self._coordinator_database).resolve().as_uri() + "?mode=ro"
+        with closing(sqlite3.connect(target, uri=True, timeout=0.1)) as database:
+            row = database.execute(
+                """
+                SELECT s.display_name FROM sessions AS s
+                JOIN session_memberships AS m ON m.session_id=s.session_id
+                JOIN nodes AS n ON n.node_id=m.node_id
+                WHERE s.session_id=? AND s.state='active'
+                  AND m.node_id=? AND m.removed_at IS NULL
+                  AND n.revoked_at IS NULL AND n.public_key=?
+                """,
+                (
+                    binding.internal_session_id,
+                    binding.device_id,
+                    credentials.identity.public_key,
+                ),
+            ).fetchone()
+        if row is None:
+            return None
+        return {
+            "federation_id": binding.federation_id,
+            "federation_label": str(row[0]),
+            "device_name": credentials.identity.display_name,
+        }
 
     def authorized_context(self) -> AuthorizedOnboardingContext | None:
         remote = self.remote_store.load()

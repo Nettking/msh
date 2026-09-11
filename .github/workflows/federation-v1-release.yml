@@ -203,6 +203,29 @@ jobs:
       - name: Validate Compose configuration
         run: docker compose config --quiet
 
+      - name: Discovery authority and bounded startup regressions
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/federation/tests/test_tailscale_discovery_budget.py
+          catalog/federation/tests/test_tailscale_host_discovery.py
+          catalog/federation/tests/test_tailscale_discovery_snapshot_roundtrip.py
+          catalog/federation/tests/test_tailnet_join_responder.py
+          catalog/federation/tests/test_tailnet_join_client.py
+          catalog/federation/tests/test_tailscale_peer_identity.py
+          catalog/flask_app/tests/test_discovery_read_only_metadata.py
+          catalog/flask_app/tests/test_tailscale_discovery_onboarding.py
+          catalog/flask_app/tests/test_tailnet_join_grant_route.py
+          catalog/flask_app/tests/test_tailnet_join_auto_redeem.py
+          catalog/flask_app/tests/test_tailnet_join_launcher.py
+          catalog/mtconnect_recorder/tests/test_tailscale_recorder_launcher.py
+
+      - name: Lint discovery boundary
+        run: >-
+          python -m ruff check
+          catalog/federation/tailscale_host_discovery.py
+          catalog/federation/tests/test_tailscale_discovery_budget.py
+          catalog/flask_app/tests/test_discovery_read_only_metadata.py
+
       - name: Diff hygiene
         shell: bash
         run: |

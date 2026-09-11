@@ -101,13 +101,8 @@ def _discovery_response() -> Response:
         # impersonate the coordinator during discovery.
         if service.remote_store.load() is not None:
             return Response(status=404)
-        context = service.authorized_context()
-        if context is None:
-            return Response(status=404)
-        federation = context.coordinator.store.get_session(
-            context.binding.internal_session_id
-        )
-        if federation is None:
+        metadata = service.discovery_metadata()
+        if metadata is None:
             return Response(status=404)
         relay_port = int(os.getenv("FCP_RELAY_PORT", "8765"))
         if not 1 <= relay_port <= 65_535:
@@ -115,15 +110,15 @@ def _discovery_response() -> Response:
         fingerprint = hashlib.sha256(
             (
                 "fcp-tailscale-discovery-v1\0"
-                + context.binding.federation_id
+                + metadata["federation_id"]
             ).encode("utf-8")
         ).hexdigest()[:32]
         response = jsonify(
             {
                 "schema": ADVERTISEMENT_SCHEMA,
-                "federation_label": str(federation.display_name),
+                "federation_label": metadata["federation_label"],
                 "federation_fingerprint": fingerprint,
-                "device_name": context.credentials.identity.display_name,
+                "device_name": metadata["device_name"],
                 "relay_port": relay_port,
                 "pairing_required": True,
                 # Where a joining host asks this device's responder. Routing

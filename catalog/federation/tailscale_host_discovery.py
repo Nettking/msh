@@ -9,28 +9,88 @@ invitation material and therefore grant no Federation authority.
 from __future__ import annotations
 
 import argparse
+import http.client
 import ipaddress
 import json
+import math
 import os
 import re
+import socket
 import subprocess
 import tempfile
+import threading
+import time
 from collections.abc import Callable, Iterable
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import contextmanager
+from itertools import islice
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.parse import urlsplit
+from urllib.request import Request
 
 DISCOVERY_SCHEMA = "fcp.federation.tailscale-discovery.v1"
 ADVERTISEMENT_SCHEMA = "fcp.federation.discovery-advertisement.v1"
 DEFAULT_WEB_PORT = 5000
 DEFAULT_AUTO_JOIN_PORT = 5151
-DEFAULT_TIMEOUT_SECONDS = 0.75
+DEFAULT_TIMEOUT_SECONDS = 2.0
 MAX_PEERS = 32
+MAX_WEB_PORTS = 4
+MAX_PROBE_WORKERS = 8
+MAX_DISCOVERY_SECONDS = 10.0
 MAX_RESPONSE_BYTES = 16_384
 MAX_SNAPSHOT_BYTES = 256 * 1024
 _FINGERPRINT = re.compile(r"^[0-9a-f]{32}$")
 _TAILSCALE_IPV4_NETWORK = ipaddress.IPv4Network("100.64.0.0/10")
+
+
+class DiscoveryBudgetExceeded(RuntimeError):
+    """An incomplete scan must not be mistaken for a unique/absent Federation."""
+
+
+@contextmanager
+def _open_probe(request: Request, *, timeout: float):
+    """Bound the whole numeric-host HTTP exchange, including trickled replies.
+
+    Socket inactivity timeouts alone restart as bytes arrive. The timer closes
+    this one socket at its absolute deadline. No proxy, DNS or redirect can send
+    a discovery probe beyond the already selected peer and port.
+    """
+    parsed = urlsplit(request.full_url)
+    ipaddress.IPv4Address(parsed.hostname or "")
+    if parsed.scheme != "http":
+        raise ValueError("discovery requires an IPv4 HTTP endpoint")
+    deadline = time.monotonic() + timeout
+    connection = http.client.HTTPConnection(parsed.hostname, parsed.port, timeout=timeout)
+    timer = None
+    response = None
+    try:
+        connection.connect()
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError("discovery HTTP budget exhausted")
+        peer_socket = connection.sock
+
+        def interrupt():
+            try:
+                peer_socket.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+
+        timer = threading.Timer(remaining, interrupt)
+        timer.daemon = True
+        timer.start()
+        connection.request("GET", parsed.path, headers=dict(request.header_items()))
+        response = connection.getresponse()
+        yield response
+    finally:
+        if timer is not None:
+            timer.cancel()
+            timer.join()
+        if response is not None:
+            response.close()
+        connection.close()
 
 
 def _empty_snapshot(*, tailscale_available: bool = False) -> dict[str, object]:
@@ -204,10 +264,14 @@ def _probe_peer(
     *,
     web_ports: Iterable[int],
     timeout_seconds: float,
-    opener: Callable[..., Any] = urlopen,
+    opener: Callable[..., Any] = _open_probe,
+    deadline: float | None = None,
 ) -> dict[str, object] | None:
     address = peer["address"]
     for port in web_ports:
+        remaining = timeout_seconds if deadline is None else deadline - time.monotonic()
+        if remaining <= 0:
+            raise DiscoveryBudgetExceeded("Tailscale discovery scan budget exhausted")
         url = f"http://{address}:{port}/onboarding/federation/discovery.json"
         request = Request(
             url,
@@ -218,13 +282,20 @@ def _probe_peer(
             method="GET",
         )
         try:
-            with opener(request, timeout=timeout_seconds) as response:
+            with opener(request, timeout=min(timeout_seconds, remaining)) as response:
+                if getattr(response, "status", 200) != 200:
+                    continue
                 content_type = str(response.headers.get("Content-Type", ""))
                 if "application/json" not in content_type.casefold():
                     continue
                 raw = response.read(MAX_RESPONSE_BYTES + 1)
-        except (HTTPError, URLError, TimeoutError, OSError, ValueError):
+        except (
+            HTTPError, URLError, TimeoutError, OSError, ValueError,
+            http.client.HTTPException,
+        ):
             continue
+        if deadline is not None and time.monotonic() >= deadline:
+            raise DiscoveryBudgetExceeded("Tailscale discovery scan budget exhausted")
         if len(raw) > MAX_RESPONSE_BYTES:
             continue
         try:
@@ -250,15 +321,33 @@ def discover(
     *,
     web_ports: Iterable[int] = (DEFAULT_WEB_PORT,),
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
+    total_timeout_seconds: float = MAX_DISCOVERY_SECONDS,
     runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
-    opener: Callable[..., Any] = urlopen,
+    opener: Callable[..., Any] = _open_probe,
 ) -> dict[str, object]:
     """Return a bounded, public-safe snapshot of FCP Federations in the tailnet."""
 
+    for name, value, maximum in (
+        ("timeout_seconds", timeout_seconds, 5.0),
+        ("total_timeout_seconds", total_timeout_seconds, MAX_DISCOVERY_SECONDS),
+    ):
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(value)
+            or not 0.05 <= value <= maximum
+        ):
+            raise ValueError(f"{name} must be between 0.05 and {maximum} seconds")
+    configured_ports = tuple(islice(web_ports, MAX_WEB_PORTS + 1))
+    if len(configured_ports) > MAX_WEB_PORTS:
+        raise ValueError(f"discovery accepts at most {MAX_WEB_PORTS} web ports")
     ports = tuple(
-        port
-        for port in web_ports
-        if isinstance(port, int) and not isinstance(port, bool) and 1 <= port <= 65_535
+        dict.fromkeys(
+            port
+            for port in configured_ports
+            if isinstance(port, int) and not isinstance(port, bool)
+            and 1 <= port <= 65_535
+        )
     )
     if not ports:
         ports = (DEFAULT_WEB_PORT,)
@@ -266,15 +355,33 @@ def discover(
     if peers is None:
         return _empty_snapshot()
 
+    deadline = time.monotonic() + total_timeout_seconds
+    pool = ThreadPoolExecutor(max_workers=MAX_PROBE_WORKERS, thread_name_prefix="fcp-discovery")
+    futures = []
+    advertisements = {}
+    try:
+        futures = [
+            pool.submit(
+                _probe_peer, peer, web_ports=ports, timeout_seconds=timeout_seconds,
+                opener=opener, deadline=deadline,
+            )
+            for peer in peers
+        ]
+        for future in as_completed(futures, timeout=max(0.0, deadline - time.monotonic())):
+            advertisements[future] = future.result()
+        if time.monotonic() >= deadline:
+            raise DiscoveryBudgetExceeded("Tailscale discovery scan budget exhausted")
+    except TimeoutError as exc:
+        raise DiscoveryBudgetExceeded("Tailscale discovery scan budget exhausted") from exc
+    finally:
+        # Running probes share the deadline and close their own sockets. Queued
+        # probes are cancelled; none may outlive this invocation's cleanup.
+        pool.shutdown(wait=True, cancel_futures=True)
+
     federations: list[dict[str, object]] = []
     seen_fingerprints: set[str] = set()
-    for peer in peers:
-        advertisement = _probe_peer(
-            peer,
-            web_ports=ports,
-            timeout_seconds=timeout_seconds,
-            opener=opener,
-        )
+    for future in futures:
+        advertisement = advertisements[future]
         if advertisement is None:
             continue
         fingerprint = str(advertisement["federation_fingerprint"])
@@ -404,10 +511,14 @@ def main(argv: list[str] | None = None) -> int:
     timeout = args.timeout
     if not isinstance(timeout, float) or not 0.05 <= timeout <= 5.0:
         raise SystemExit("--timeout must be between 0.05 and 5 seconds")
-    payload = discover(
-        web_ports=tuple(args.web_ports or (DEFAULT_WEB_PORT,)),
-        timeout_seconds=timeout,
-    )
+    try:
+        payload = discover(
+            web_ports=tuple(args.web_ports or (DEFAULT_WEB_PORT,)),
+            timeout_seconds=timeout,
+        )
+    except (DiscoveryBudgetExceeded, ValueError) as exc:
+        write_snapshot(args.output, _empty_snapshot())
+        raise SystemExit(str(exc)) from exc
     write_snapshot(args.output, payload)
     count = len(payload["federations"])
     if payload["tailscale_available"]:

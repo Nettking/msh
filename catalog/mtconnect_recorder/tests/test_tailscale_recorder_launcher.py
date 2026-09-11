@@ -239,6 +239,7 @@ def test_saved_membership_restarts_without_discovery(
     )
 
     assert launcher._pairing_key(["--data-dir", str(data_dir)]) is None
+    assert membership.read_text(encoding="utf-8") == "{}"
     assert "FCP_RECORDER_FEDERATION_KEY" not in os.environ
 
 

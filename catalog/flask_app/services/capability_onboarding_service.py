@@ -7,6 +7,7 @@ import json
 import sqlite3
 import threading
 from collections.abc import Callable, Iterable
+from contextlib import closing
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -57,10 +58,16 @@ class FederationBindingStore:
     def __init__(self, database: Path | str) -> None:
         self.database = Path(database)
 
-    def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(str(self.database), timeout=30)
+    def _connect(
+        self, *, read_only: bool = False, timeout_seconds: float = 30.0
+    ) -> sqlite3.Connection:
+        target = (
+            self.database.resolve().as_uri() + "?mode=ro"
+            if read_only else str(self.database)
+        )
+        connection = sqlite3.connect(target, timeout=timeout_seconds, uri=read_only)
         connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA busy_timeout=30000")
+        connection.execute(f"PRAGMA busy_timeout={int(timeout_seconds * 1000)}")
         connection.execute("PRAGMA synchronous=FULL")
         return connection
 
@@ -123,11 +130,16 @@ class FederationBindingStore:
                 "persisted binding does not satisfy the frozen CF1 contract",
             ) from exc
 
-    def load(self) -> FederationSessionBinding | None:
+    def load(
+        self, *, read_only: bool = False, timeout_seconds: float = 30.0
+    ) -> FederationSessionBinding | None:
         if not self.database.exists():
             return None
         try:
-            with self._connect() as connection:
+            opened = self._connect(read_only=read_only, timeout_seconds=timeout_seconds)
+            with closing(opened) if read_only else opened as connection:
+                if read_only:
+                    connection.execute("BEGIN")
                 tables = {
                     str(row["name"])
                     for row in connection.execute(

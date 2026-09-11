@@ -190,13 +190,13 @@ def test_host_and_container_resolve_the_same_shared_files() -> None:
     from catalog.federation.tailnet_join_bridge import grant_path, secret_path
 
     container = secret_path({})
-    assert str(container) == "data/federation/onboarding/auto_join_secret"
+    assert container.as_posix() == "data/federation/onboarding/auto_join_secret"
 
     host = secret_path({"FCP_DATA_DIR": "/srv/fcp-data"})
-    assert str(host) == "/srv/fcp-data/federation/onboarding/auto_join_secret"
+    assert host.as_posix() == "/srv/fcp-data/federation/onboarding/auto_join_secret"
     # Same suffix beneath the mounted directory, so both sides meet in the volume.
-    assert str(host).endswith(str(container).split("data/", 1)[1])
+    assert host.parts[-3:] == container.parts[-3:]
 
-    assert str(grant_path({"FCP_DATA_DIR": "/srv/fcp-data"})).startswith("/srv/fcp-data/")
+    assert grant_path({"FCP_DATA_DIR": "/srv/fcp-data"}).as_posix().startswith("/srv/fcp-data/")
     # An explicit override still wins on either side.
-    assert str(secret_path({"FCP_AUTO_JOIN_SECRET_FILE": "/x/y"})) == "/x/y"
+    assert secret_path({"FCP_AUTO_JOIN_SECRET_FILE": "/x/y"}).as_posix() == "/x/y"
