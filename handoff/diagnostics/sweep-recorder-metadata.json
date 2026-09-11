@@ -1,0 +1,46 @@
+{
+  "physical_acceptance": false,
+  "native": {
+    "python": "3.12.10",
+    "fingerprint": "8589698c32d44b1f"
+  },
+  "voter": {
+    "file_modified": "2026-09-11T12:13:24.0338889Z",
+    "term": null,
+    "last_applied": 1550,
+    "ready": null,
+    "role": "FOLLOWER",
+    "task_state": "Running",
+    "index": 1550
+  },
+  "protected_recorder_data_untouched": true,
+  "state_changed": false,
+  "host": "DESKTOP-N5KI14R",
+  "source_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
+  "source_clean": true,
+  "mode": "DIAGNOSTIC ONLY - NOT PHYSICAL ACCEPTANCE EVIDENCE",
+  "candidate_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
+  "observed_at": "2026-09-11T12:13:24.2497372+00:00",
+  "memory": {
+    "free_kib": 4462912,
+    "total_kib": 16492932
+  },
+  "protected_container": {
+    "id": "777cc74ab983786ee44c124ea57adef045a5d2f94f44c4eb43b5765117678ccd",
+    "mounts": [
+      {
+        "Type": "bind",
+        "Source": "C:\\msh\\git\\data",
+        "Destination": "/app/data",
+        "RW": true
+      }
+    ],
+    "build_commit": "6fb77c8419ead8a24af03bf6b9e6636c8664dcd8",
+    "running": true,
+    "image": "sha256:204976ddb98d3c3eea3a8ac05dcd7f99be7ba460d58fc4b8204d20255c934208",
+    "oom": false,
+    "started_at": "2026-09-09T19:24:27.823369204Z"
+  },
+  "original_local_sha256": "137bc9b4646c108f2015fd90e3a79ec6ca269c5e5bc8750017bc95dfbdbd4718",
+  "protected_metadata_invariant_verified": true
+}

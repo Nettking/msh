@@ -1,0 +1,349 @@
+{
+  "observed_at": "2026-09-11T12:15:58.489101+00:00",
+  "mode": "DIAGNOSTIC ONLY - NOT PHYSICAL ACCEPTANCE EVIDENCE",
+  "candidate_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
+  "host": "nitro",
+  "project": "fcp-v1-fba508-nitro",
+  "source_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
+  "source_clean": true,
+  "fingerprint": "ad885120af1f11cf",
+  "disk_free_bytes": 885305122816,
+  "services": [
+    {
+      "service": "flask",
+      "container_id": "f32a7f960cdcd19f0b60d2e03675c62baadadf2dead267176012c81fc1589026",
+      "image_id": "sha256:6b3e53b057ed9dca44c8ac3759cc4bed80a0c6956e6b3c929e39a3ba081685f5",
+      "image_commit": "0536f03d67eb277e11573c2188d8e820399627e3",
+      "environment_commit": "0536f03d67eb277e11573c2188d8e820399627e3",
+      "running": true,
+      "started_at": "2026-09-11T10:23:12.952894314Z",
+      "restart_count": 0,
+      "oom_killed": false,
+      "health": null,
+      "memory_limit_bytes": 0,
+      "device_requests": null,
+      "mounts": [
+        {
+          "Type": "bind",
+          "Source": "/home/martin/fcp-v1-fba508-20260910/campaign/nitro-runtime/data/federation/legacy-witness",
+          "Destination": "/app/data/federation/legacy-witness",
+          "RW": false
+        },
+        {
+          "Type": "volume",
+          "Source": "/var/lib/docker/volumes/fcp-v1-fba508-nitro-relay-state/_data",
+          "Destination": "/var/lib/fcp-relay",
+          "RW": true
+        },
+        {
+          "Type": "bind",
+          "Source": "/home/martin/fcp-v1-fba508-20260910/campaign/nitro-runtime/results",
+          "Destination": "/app/results",
+          "RW": true
+        },
+        {
+          "Type": "bind",
+          "Source": "/home/martin/fcp-v1-fba508-20260910/campaign/nitro-runtime/data",
+          "Destination": "/app/data",
+          "RW": true
+        }
+      ],
+      "runtime_source": {
+        "build_commit": "0536f03d67eb277e11573c2188d8e820399627e3",
+        "host_build_sha256": "74de3da093248c3e3770ba8eb70949d9972f989be7d21f7846a40f8bfbee3d5d"
+      }
+    },
+    {
+      "service": "relay",
+      "container_id": "02403a8e33b5c4aff118e549a7fede15fac1b11bb1ba65106122072acf9df900",
+      "image_id": "sha256:ca835b56190b79e078c5777919b98b098fbef99cb3b918779a4d5efa8a0df5dc",
+      "image_commit": "0536f03d67eb277e11573c2188d8e820399627e3",
+      "environment_commit": "0536f03d67eb277e11573c2188d8e820399627e3",
+      "running": true,
+      "started_at": "2026-09-11T10:01:47.100105633Z",
+      "restart_count": 0,
+      "oom_killed": false,
+      "health": null,
+      "memory_limit_bytes": 0,
+      "device_requests": null,
+      "mounts": [
+        {
+          "Type": "volume",
+          "Source": "/var/lib/docker/volumes/fcp-v1-fba508-nitro-relay-state/_data",
+          "Destination": "/var/lib/fcp-relay",
+          "RW": true
+        },
+        {
+          "Type": "bind",
+          "Source": "/home/martin/fcp-v1-fba508-20260910/campaign/nitro-runtime/data/auth",
+          "Destination": "/app/data/auth",
+          "RW": true
+        },
+        {
+          "Type": "bind",
+          "Source": "/home/martin/fcp-v1-fba508-20260910/campaign/nitro-runtime/data/federation",
+          "Destination": "/app/data/federation",
+          "RW": true
+        },
+        {
+          "Type": "bind",
+          "Source": "/home/martin/fcp-v1-fba508-20260910/campaign/nitro-runtime/data/federation/legacy-witness",
+          "Destination": "/app/data/federation/legacy-witness",
+          "RW": false
+        },
+        {
+          "Type": "bind",
+          "Source": "/home/martin/fcp-v1-fba508-20260910/campaign/nitro-runtime/tooling",
+          "Destination": "/run/fcp-provision",
+          "RW": false
+        },
+        {
+          "Type": "bind",
+          "Source": "/home/martin/fcp-v1-fba508-20260910/campaign/nitro-runtime/outputs",
+          "Destination": "/run/fcp-preparation-output",
+          "RW": true
+        }
+      ],
+      "runtime_source": {
+        "build_commit": "0536f03d67eb277e11573c2188d8e820399627e3",
+        "host_build_sha256": "74de3da093248c3e3770ba8eb70949d9972f989be7d21f7846a40f8bfbee3d5d"
+      },
+      "control": {
+        "schema": "fcp.control-plane.status.v1",
+        "role": "LEADER",
+        "ready": true,
+        "consensus_term": 8,
+        "commit_index": 1550,
+        "last_applied": 1550
+      },
+      "control_identity_sha256": "ad65d02d0312cc50c667c10cf3e198832e9179a9646d897419f35b74211c665f"
+    },
+    {
+      "service": "recorder",
+      "container_id": "e07a50189ca295b87cca5a194ac431118d5a5116bd121a55cd066e7fd9a1d71c",
+      "image_id": "sha256:7c1b4ef40d9a8f5d9d9f8d80d2789165a292eb275fc97a47b57ea2928e69f044",
+      "image_commit": "0536f03d67eb277e11573c2188d8e820399627e3",
+      "environment_commit": "0536f03d67eb277e11573c2188d8e820399627e3",
+      "running": true,
+      "started_at": "2026-09-11T10:01:47.022905508Z",
+      "restart_count": 0,
+      "oom_killed": false,
+      "health": null,
+      "memory_limit_bytes": 0,
+      "device_requests": null,
+      "mounts": [
+        {
+          "Type": "bind",
+          "Source": "/home/martin/fcp-v1-fba508-20260910/campaign/nitro-runtime/data",
+          "Destination": "/app/data",
+          "RW": true
+        }
+      ],
+      "runtime_source": {
+        "build_commit": "0536f03d67eb277e11573c2188d8e820399627e3",
+        "host_build_sha256": "74de3da093248c3e3770ba8eb70949d9972f989be7d21f7846a40f8bfbee3d5d"
+      }
+    },
+    {
+      "service": "ollama",
+      "container_id": "9443f9e1a0ba48ce7f8c2a4ea02762f7d61b4e45d9a823fe6bd373e331af90cc",
+      "image_id": "sha256:b88c73ace3e115f8ec53dc8761ae1c0aabfa675406e3681786b98757ce050f42",
+      "image_commit": null,
+      "environment_commit": null,
+      "running": true,
+      "started_at": "2026-09-11T10:03:58.151763406Z",
+      "restart_count": 0,
+      "oom_killed": false,
+      "health": "healthy",
+      "memory_limit_bytes": 0,
+      "device_requests": null,
+      "mounts": [
+        {
+          "Type": "volume",
+          "Source": "/var/lib/docker/volumes/fcp-v1-fba508-nitro-ollama-models/_data",
+          "Destination": "/root/.ollama",
+          "RW": true
+        },
+        {
+          "Type": "bind",
+          "Source": "/var/lib/docker/volumes/fcp_ollama_models/_data/models",
+          "Destination": "/root/.ollama/models",
+          "RW": false
+        }
+      ],
+      "version": "ollama version is 0.32.6",
+      "models": "NAME           ID              SIZE      MODIFIED    \nllama3.2:3b    a80c4f17acd5    2.0 GB    2 weeks ago",
+      "loaded_models": "NAME    ID    SIZE    PROCESSOR    CONTEXT    UNTIL"
+    }
+  ],
+  "state_changed": false,
+  "protected_recorder_data_untouched": true,
+  "physical_acceptance": false,
+  "memory": {
+    "MemTotal": "3418608 kB",
+    "MemAvailable": "1935572 kB",
+    "SwapFree": "2301420 kB"
+  },
+  "clock": "Stratum         : 3\nRef time (UTC)  : Fri Sep 11 11:59:10 2026\nSystem time     : 0.000045388 seconds slow of NTP time\nLast offset     : +0.000013845 seconds\nRMS offset      : 0.000089467 seconds\nFrequency       : 54.961 ppm fast\nResidual freq   : +0.000 ppm\nSkew            : 0.022 ppm\nRoot delay      : 0.029790347 seconds\nRoot dispersion : 0.001539023 seconds\nUpdate interval : 1038.9 seconds\nLeap status     : Normal",
+  "commands": [
+    [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    [
+      "git",
+      "status",
+      "--porcelain"
+    ],
+    [
+      "docker",
+      "ps",
+      "-q",
+      "--filter",
+      "label=com.docker.compose.project=fcp-v1-fba508-nitro",
+      "--filter",
+      "label=com.docker.compose.service=flask",
+      "--filter",
+      "label=com.docker.compose.oneoff=False"
+    ],
+    [
+      "docker",
+      "inspect",
+      "f32a7f960cdc"
+    ],
+    [
+      "docker",
+      "image",
+      "inspect",
+      "sha256:6b3e53b057ed9dca44c8ac3759cc4bed80a0c6956e6b3c929e39a3ba081685f5"
+    ],
+    [
+      "docker",
+      "exec",
+      "f32a7f960cdc",
+      "python",
+      "-B",
+      "-c",
+      "import hashlib,pathlib,os,json;print(json.dumps(dict(build_commit=os.getenv('FCP_BUILD_COMMIT'),host_build_sha256=hashlib.sha256(pathlib.Path('/app/catalog/federation/host_build.py').read_bytes()).hexdigest())))"
+    ],
+    [
+      "docker",
+      "ps",
+      "-q",
+      "--filter",
+      "label=com.docker.compose.project=fcp-v1-fba508-nitro",
+      "--filter",
+      "label=com.docker.compose.service=relay",
+      "--filter",
+      "label=com.docker.compose.oneoff=False"
+    ],
+    [
+      "docker",
+      "inspect",
+      "02403a8e33b5"
+    ],
+    [
+      "docker",
+      "image",
+      "inspect",
+      "sha256:ca835b56190b79e078c5777919b98b098fbef99cb3b918779a4d5efa8a0df5dc"
+    ],
+    [
+      "docker",
+      "exec",
+      "02403a8e33b5",
+      "python",
+      "-B",
+      "-c",
+      "import hashlib,pathlib,os,json;print(json.dumps(dict(build_commit=os.getenv('FCP_BUILD_COMMIT'),host_build_sha256=hashlib.sha256(pathlib.Path('/app/catalog/federation/host_build.py').read_bytes()).hexdigest())))"
+    ],
+    [
+      "docker",
+      "exec",
+      "02403a8e33b5",
+      "cat",
+      "/var/lib/fcp-relay/control-plane-status.json"
+    ],
+    [
+      "docker",
+      "ps",
+      "-q",
+      "--filter",
+      "label=com.docker.compose.project=fcp-v1-fba508-nitro",
+      "--filter",
+      "label=com.docker.compose.service=recorder",
+      "--filter",
+      "label=com.docker.compose.oneoff=False"
+    ],
+    [
+      "docker",
+      "inspect",
+      "e07a50189ca2"
+    ],
+    [
+      "docker",
+      "image",
+      "inspect",
+      "sha256:7c1b4ef40d9a8f5d9d9f8d80d2789165a292eb275fc97a47b57ea2928e69f044"
+    ],
+    [
+      "docker",
+      "exec",
+      "e07a50189ca2",
+      "python",
+      "-B",
+      "-c",
+      "import hashlib,pathlib,os,json;print(json.dumps(dict(build_commit=os.getenv('FCP_BUILD_COMMIT'),host_build_sha256=hashlib.sha256(pathlib.Path('/app/catalog/federation/host_build.py').read_bytes()).hexdigest())))"
+    ],
+    [
+      "docker",
+      "ps",
+      "-q",
+      "--filter",
+      "label=com.docker.compose.project=fcp-v1-fba508-nitro",
+      "--filter",
+      "label=com.docker.compose.service=ollama",
+      "--filter",
+      "label=com.docker.compose.oneoff=False"
+    ],
+    [
+      "docker",
+      "inspect",
+      "9443f9e1a0ba"
+    ],
+    [
+      "docker",
+      "image",
+      "inspect",
+      "sha256:b88c73ace3e115f8ec53dc8761ae1c0aabfa675406e3681786b98757ce050f42"
+    ],
+    [
+      "docker",
+      "exec",
+      "9443f9e1a0ba",
+      "ollama",
+      "--version"
+    ],
+    [
+      "docker",
+      "exec",
+      "9443f9e1a0ba",
+      "ollama",
+      "list"
+    ],
+    [
+      "docker",
+      "exec",
+      "9443f9e1a0ba",
+      "ollama",
+      "ps"
+    ],
+    [
+      "chronyc",
+      "tracking"
+    ]
+  ],
+  "original_local_sha256": "8f61df5829d96803262bf8b2ea7a5d0f965bb63ee53bcb9f33646c8dbd6fe603",
+  "control_identity_preserved": true
+}

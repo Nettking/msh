@@ -141,3 +141,14 @@ End when remaining paths depend on known failures or cannot be exercised safely.
 Then publish a sweep report and the smallest fix set before resuming the final
 candidate workflow. ICSE companion work remains outside product source; its
 four-page paper must continue to say physical acceptance is incomplete.
+
+
+## Metadata sweep checkpoint, September 11 12:18 UTC
+
+D01/D02 PRs are draft and cross-link this checkpoint (comments5634234400/5634234748). Nettking and Nitro retain clean N source and exact N core runtime bytes. Nettking GPU is idle with GPU requests configured for Ollama; existing3b model retained and provider RAM cap1536MiB. Native Windows RAM available7509740KiB during this wave. Time service now reports Sync and Last Sync Error0; H02 is not currently reproduced. No host-clock changes.
+
+Protected Recorder container/image/start/mount metadata exactly match baseline; no corpus read/write. Native fingerprint8589698c32d44b1f and separate clean N source confirmed. Separate voter FOLLOWER/index1550. consensus_term/ready are absent fields in its status schema, not failed invariants. Published metadata receipts are diagnostics/sweep-{nettking,nitro,recorder}-metadata.json.
+
+Nitro collector initially included three historical exited successful one-off setup containers alongside one running normal N relay. This is a resolved diagnostic selection error, not an independent candidate defect. Procedure and mechanism: diagnostics/sweep-nitro-collector-attempt1.json. The corrected collector selects running non-oneoff containers without changing them. Local stdout was CP1252 on Windows versus UTF8 from remote Linux; persisted JSON is normalized UTF8. No product script deployed: remote collector was streamed to existing Python stdin.
+
+Next exact action: independently exercise the existing Nettking Ollama container using its existing3b model with bounded short inference, record GPU/loaded-model/runtime observations; inspect unchanged N service-health/update/provenance probes against owned roots. Do not enumerate protected Recorder files. No formal acceptance assertions or additional qualification dispatches.

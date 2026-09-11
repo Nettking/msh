@@ -1,0 +1,303 @@
+{
+  "observed_at": "2026-09-11T12:12:27.816473+00:00",
+  "mode": "DIAGNOSTIC ONLY - NOT PHYSICAL ACCEPTANCE EVIDENCE",
+  "candidate_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
+  "host": "nettking",
+  "project": "fcp-v1-73c779-nettking",
+  "source_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
+  "source_clean": true,
+  "fingerprint": "0efb6f56566ac0eb",
+  "disk_free_bytes": 107834638336,
+  "services": [
+    {
+      "service": "flask",
+      "container_id": "7468794b6dfc0e24aff14af91950bbc37a9ce5ae6ba912d1eec4632080a0e5a6",
+      "image_id": "sha256:336968cae8e28c2adce95954210904e2d6af8e44881b9cc327ee7877751d8b80",
+      "image_commit": "0536f03d67eb277e11573c2188d8e820399627e3",
+      "environment_commit": "0536f03d67eb277e11573c2188d8e820399627e3",
+      "running": true,
+      "started_at": "2026-09-11T09:50:03.38077273Z",
+      "restart_count": 0,
+      "oom_killed": false,
+      "health": null,
+      "memory_limit_bytes": 0,
+      "device_requests": null,
+      "mounts": [
+        {
+          "Type": "bind",
+          "Source": "C:\\wsl\\fcp-v1-fba508-nettking-20260910\\.acceptance\\nettking-73c779-runtime-control\\results",
+          "Destination": "/app/results",
+          "RW": true
+        },
+        {
+          "Type": "bind",
+          "Source": "C:\\wsl\\fcp-v1-fba508-nettking-20260910\\.acceptance\\nettking-73c779-runtime-control\\data",
+          "Destination": "/app/data",
+          "RW": true
+        },
+        {
+          "Type": "volume",
+          "Source": "/var/lib/docker/volumes/fcp-v1-73c779-nettking-relay-state/_data",
+          "Destination": "/var/lib/fcp-relay",
+          "RW": true
+        }
+      ],
+      "runtime_source": {
+        "build_commit": "0536f03d67eb277e11573c2188d8e820399627e3",
+        "host_build_sha256": "803835eae0c83f94dd783a1e70963f7a99313f8af181b96c927449c6ee533017"
+      }
+    },
+    {
+      "service": "relay",
+      "container_id": "52254998e594b8fc7f15050830ceac53e3c406e5f1e1a117e04177048e195b93",
+      "image_id": "sha256:0416c9f831b101aca3658c1217044e6d3b9fd09e996b8ee31823c601e3a376e9",
+      "image_commit": "0536f03d67eb277e11573c2188d8e820399627e3",
+      "environment_commit": "0536f03d67eb277e11573c2188d8e820399627e3",
+      "running": true,
+      "started_at": "2026-09-11T09:50:02.479341038Z",
+      "restart_count": 0,
+      "oom_killed": false,
+      "health": null,
+      "memory_limit_bytes": 0,
+      "device_requests": null,
+      "mounts": [
+        {
+          "Type": "volume",
+          "Source": "/var/lib/docker/volumes/fcp-v1-73c779-nettking-relay-state/_data",
+          "Destination": "/var/lib/fcp-relay",
+          "RW": true
+        }
+      ],
+      "runtime_source": {
+        "build_commit": "0536f03d67eb277e11573c2188d8e820399627e3",
+        "host_build_sha256": "803835eae0c83f94dd783a1e70963f7a99313f8af181b96c927449c6ee533017"
+      }
+    },
+    {
+      "service": "recorder",
+      "container_id": "e6eab71be823ac9d31d39faea4e675a031bb8f8e213ff3235e6d0140428f77b9",
+      "image_id": "sha256:c6af91eb96be32bb6b1ef4e9c7e64152a4bd273ca4ffdcac4c8df835ccda8295",
+      "image_commit": "0536f03d67eb277e11573c2188d8e820399627e3",
+      "environment_commit": "0536f03d67eb277e11573c2188d8e820399627e3",
+      "running": true,
+      "started_at": "2026-09-11T09:50:02.472433507Z",
+      "restart_count": 0,
+      "oom_killed": false,
+      "health": null,
+      "memory_limit_bytes": 0,
+      "device_requests": null,
+      "mounts": [
+        {
+          "Type": "bind",
+          "Source": "C:\\wsl\\fcp-v1-fba508-nettking-20260910\\.acceptance\\nettking-73c779-runtime-control\\data",
+          "Destination": "/app/data",
+          "RW": true
+        }
+      ],
+      "runtime_source": {
+        "build_commit": "0536f03d67eb277e11573c2188d8e820399627e3",
+        "host_build_sha256": "803835eae0c83f94dd783a1e70963f7a99313f8af181b96c927449c6ee533017"
+      }
+    },
+    {
+      "service": "ollama",
+      "container_id": "b18a34a67cc1faa14ae0850a7f0683e1e0e84d3aecd4140f4ec92c7ee6332a87",
+      "image_id": "sha256:b88c73ace3e115f8ec53dc8761ae1c0aabfa675406e3681786b98757ce050f42",
+      "image_commit": null,
+      "environment_commit": null,
+      "running": true,
+      "started_at": "2026-09-11T09:50:04.236672292Z",
+      "restart_count": 0,
+      "oom_killed": false,
+      "health": "healthy",
+      "memory_limit_bytes": 1610612736,
+      "device_requests": [
+        {
+          "Driver": "",
+          "Count": -1,
+          "DeviceIDs": null,
+          "Capabilities": [
+            [
+              "gpu"
+            ]
+          ],
+          "Options": null
+        }
+      ],
+      "mounts": [
+        {
+          "Type": "volume",
+          "Source": "/var/lib/docker/volumes/fcp-v1-73c779-nettking-ollama-models/_data",
+          "Destination": "/root/.ollama",
+          "RW": true
+        },
+        {
+          "Type": "bind",
+          "Source": "/run/desktop/mnt/host/c/Users/Martin/.ollama/models",
+          "Destination": "/root/.ollama/models",
+          "RW": false
+        }
+      ],
+      "version": "ollama version is 0.32.6",
+      "models": "NAME                    ID              SIZE      MODIFIED    \nllama3.2:3b             a80c4f17acd5    2.0 GB    7 weeks ago    \nqwen3.6:latest          07d35212591f    23 GB     7 weeks ago    \nqwen3-vl:8b-instruct    0533d74300e4    6.1 GB    7 weeks ago    \nqwen3-vl:8b             901cae732162    6.1 GB    7 weeks ago    \nqwen3-vl:4b             1343d82ebee3    3.3 GB    7 weeks ago",
+      "loaded_models": "NAME    ID    SIZE    PROCESSOR    CONTEXT    UNTIL"
+    }
+  ],
+  "state_changed": false,
+  "protected_recorder_data_untouched": true,
+  "physical_acceptance": false,
+  "gpu": "NVIDIA GeForce RTX 3070 Ti Laptop GPU, 8192, 0, 0",
+  "clock_status": "Leap Indicator: 0(no warning)\nStratum: 5 (secondary reference - syncd by (S)NTP)\nPrecision: -23 (119.209ns per tick)\nRoot Delay: 0.0295234s\nRoot Dispersion: 0.3613308s\nLast Successful Sync Time: 11.09.2026 13:52:36\nSource: time.windows.com,0x9 \nPoll Interval: 12 (4096s)\n\nPhase Offset: 0.0016516s\nClockRate: 0.0156249s\nState Machine: 2 (Sync)\nTime Source Flags: 0 (None)\nServer Role: 0 (None)\nLast Sync Error: 0 (The command completed successfully.)\nTime since Last Good Sync Time: 1196.0339481s",
+  "commands": [
+    [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    [
+      "git",
+      "status",
+      "--porcelain"
+    ],
+    [
+      "docker",
+      "ps",
+      "-aq",
+      "--filter",
+      "label=com.docker.compose.project=fcp-v1-73c779-nettking",
+      "--filter",
+      "label=com.docker.compose.service=flask"
+    ],
+    [
+      "docker",
+      "inspect",
+      "7468794b6dfc"
+    ],
+    [
+      "docker",
+      "image",
+      "inspect",
+      "sha256:336968cae8e28c2adce95954210904e2d6af8e44881b9cc327ee7877751d8b80"
+    ],
+    [
+      "docker",
+      "exec",
+      "7468794b6dfc",
+      "python",
+      "-B",
+      "-c",
+      "import hashlib,pathlib,os,json;print(json.dumps(dict(build_commit=os.getenv('FCP_BUILD_COMMIT'),host_build_sha256=hashlib.sha256(pathlib.Path('/app/catalog/federation/host_build.py').read_bytes()).hexdigest())))"
+    ],
+    [
+      "docker",
+      "ps",
+      "-aq",
+      "--filter",
+      "label=com.docker.compose.project=fcp-v1-73c779-nettking",
+      "--filter",
+      "label=com.docker.compose.service=relay"
+    ],
+    [
+      "docker",
+      "inspect",
+      "52254998e594"
+    ],
+    [
+      "docker",
+      "image",
+      "inspect",
+      "sha256:0416c9f831b101aca3658c1217044e6d3b9fd09e996b8ee31823c601e3a376e9"
+    ],
+    [
+      "docker",
+      "exec",
+      "52254998e594",
+      "python",
+      "-B",
+      "-c",
+      "import hashlib,pathlib,os,json;print(json.dumps(dict(build_commit=os.getenv('FCP_BUILD_COMMIT'),host_build_sha256=hashlib.sha256(pathlib.Path('/app/catalog/federation/host_build.py').read_bytes()).hexdigest())))"
+    ],
+    [
+      "docker",
+      "ps",
+      "-aq",
+      "--filter",
+      "label=com.docker.compose.project=fcp-v1-73c779-nettking",
+      "--filter",
+      "label=com.docker.compose.service=recorder"
+    ],
+    [
+      "docker",
+      "inspect",
+      "e6eab71be823"
+    ],
+    [
+      "docker",
+      "image",
+      "inspect",
+      "sha256:c6af91eb96be32bb6b1ef4e9c7e64152a4bd273ca4ffdcac4c8df835ccda8295"
+    ],
+    [
+      "docker",
+      "exec",
+      "e6eab71be823",
+      "python",
+      "-B",
+      "-c",
+      "import hashlib,pathlib,os,json;print(json.dumps(dict(build_commit=os.getenv('FCP_BUILD_COMMIT'),host_build_sha256=hashlib.sha256(pathlib.Path('/app/catalog/federation/host_build.py').read_bytes()).hexdigest())))"
+    ],
+    [
+      "docker",
+      "ps",
+      "-aq",
+      "--filter",
+      "label=com.docker.compose.project=fcp-v1-73c779-nettking",
+      "--filter",
+      "label=com.docker.compose.service=ollama"
+    ],
+    [
+      "docker",
+      "inspect",
+      "b18a34a67cc1"
+    ],
+    [
+      "docker",
+      "image",
+      "inspect",
+      "sha256:b88c73ace3e115f8ec53dc8761ae1c0aabfa675406e3681786b98757ce050f42"
+    ],
+    [
+      "docker",
+      "exec",
+      "b18a34a67cc1",
+      "ollama",
+      "--version"
+    ],
+    [
+      "docker",
+      "exec",
+      "b18a34a67cc1",
+      "ollama",
+      "list"
+    ],
+    [
+      "docker",
+      "exec",
+      "b18a34a67cc1",
+      "ollama",
+      "ps"
+    ],
+    [
+      "nvidia-smi",
+      "--query-gpu=name,memory.total,memory.used,utilization.gpu",
+      "--format=csv,noheader,nounits"
+    ],
+    [
+      "w32tm",
+      "/query",
+      "/status",
+      "/verbose"
+    ]
+  ],
+  "original_local_sha256": "d1017148a07fb4e656cdd8a3632fb400b34dc26b688889cefed6078e225eb95f"
+}
