@@ -10,10 +10,13 @@ path. It denies all carry-forward and requires all12 fresh CF7 observations.
 This is the intended fail-closed decision, not a software qualification failure.
 No impact-map change is needed. There are zero previous valid physical passes.
 
-Current runtime: Nettking/Nitro cores and owned Nitro responder remain N0536f03d.
-Protected Recorder production6fb77c and separate voterfba508 remain unchanged.
-M is frozen but not deployed. D04/#459 is resolved for current N ownership;
-fresh M process/port/source health must be verified after admission.
+Current runtime: Nettking's three M cores are verified with actual image/env/source
+hashes and preserved mounts/model. Nitro source is M and guarded supported startup
+is running; last verified cores and host responder were N. Follow the current
+operation in QUALIFICATION_COORDINATION.md; never launch a duplicate. Protected
+Recorder production6fb77c and separate voterfba508 remain unchanged. Its operative
+Python3.12.10/fingerprint and staged clean N source are verified. D04/#459 is
+resolved for current N ownership; M responder provenance still needs verification.
 
 ## Automation decision
 
