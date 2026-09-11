@@ -603,12 +603,14 @@ def _verify_core_image_commits(
     for service in CORE_BUILD_SERVICES:
         image = _docker_run(
             root,
-            ["docker", "compose", "images", "-q", service],
+            ["docker", "compose", "config", "--images", service],
             env=env,
             timeout=30.0,
         )
-        image_id = image.stdout.strip().splitlines()[-1].strip() if image.returncode == 0 and image.stdout.strip() else ""
-        if not image_id:
+        # A fresh checkout has no containers; an update still has the old ones.
+        # Resolve the built service image before any container is replaced.
+        references = [line.strip() for line in image.stdout.splitlines() if line.strip()]
+        if image.returncode != 0 or len(references) != 1:
             raise RuntimeError("built_image_identity_unavailable")
         label = _docker_run(
             root,
@@ -617,13 +619,19 @@ def _verify_core_image_commits(
                 "image",
                 "inspect",
                 "--format",
-                '{{ index .Config.Labels "no.fcp.build_commit" }}',
-                image_id,
+                '{{.Id}}|{{ index .Config.Labels "no.fcp.build_commit" }}',
+                references[0],
             ],
             env=env,
             timeout=30.0,
         )
-        if label.returncode != 0 or label.stdout.strip().lower() != expected_commit:
+        lines = [line.strip() for line in label.stdout.splitlines() if line.strip()]
+        if label.returncode != 0 or len(lines) != 1:
+            raise RuntimeError("built_image_identity_unavailable")
+        image_id, separator, commit = lines[0].partition("|")
+        if not separator or not image_id.strip():
+            raise RuntimeError("built_image_identity_unavailable")
+        if commit.strip().lower() != expected_commit:
             raise RuntimeError("built_image_identity_mismatch")
 
 
