@@ -9,7 +9,7 @@ sys.path.insert(0, str(audit))
 from github_qualification import client
 
 root = pathlib.Path(__file__).resolve().parent
-sha = '7286f30d30e20c94c13cc9acebb2fd6d61bc1163'
+sha = '83955f65b7e6bb36de8e90f34608b97070fed33b'
 ref = 'codex/responder-replacement-exit-wait'
 allowed = {'phase2-federation.yml', 'federation-v1-release.yml', 'ci-test-sharding.yml',
            'icse-tool-demo.yml', 'product-branding.yml', 'cf7b-product-physical-acceptance.yml',

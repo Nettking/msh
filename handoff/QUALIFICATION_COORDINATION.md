@@ -1578,3 +1578,12 @@ Only isolated source/test files changed; backup implementation is untouched.
 Old qualification state/delta/native proof archived under `pr463-head-7286f30d-*`.
 Next: publish correction on PR463, retarget checked-in polling/retention helpers,
 review new auto qualification state and absent gates. No merge/physical deployment.
+
+21:29UTC: checked-in polling/retention/dispatch helpers now target83955f65.
+Seven automatic workflows exist and are active; no completed/failed jobs yet.
+Four required gates plus CFI2/registry are absent and may be dispatched once
+after fresh absence/ref guards. Old7286f30d ledger/receipts remain preserved.
+The addressed backup review thread is resolved after red-to-green verification
+and correction comment5640841676. Future polling now detects review-comment count
+changes so new correctness feedback is investigated before qualification finishes.
+Next: dispatch only the six proven absent gates for83955f65, then persist responses.

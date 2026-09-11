@@ -13,7 +13,7 @@ root=pathlib.Path(__file__).resolve().parent
 path=root/'pr463-qualification-state.json'
 previous=json.loads(path.read_text()) if path.exists() else {}
 api=client()
-targets=[(463,'7286f30d30e20c94c13cc9acebb2fd6d61bc1163')]
+targets=[(463,'83955f65b7e6bb36de8e90f34608b97070fed33b')]
 wanted=set(REQUIRED)|{'cfi2-onboarding-composition.yml','release-image-metadata.yml'}
 def poll(target):
     number,intended=target
@@ -25,9 +25,10 @@ def poll(target):
     head=pr['head']['sha']
     result=dict(number=number,head=head,intended_head=intended,head_matches=head==intended,
                 state=pr['state'],draft=pr['draft'],merged=pr['merged'],merge_commit=pr['merge_commit_sha'],
+                review_comment_count=pr.get('review_comments',0),
                 mergeable_state=pr.get('mergeable_state'),workflows=[])
     changes=[]
-    for key in ['head','state','draft','merged','merge_commit']:
+    for key in ['head','state','draft','merged','merge_commit','review_comment_count']:
         if key in old and old[key]!=result[key]:changes.append(dict(field=key,before=old[key],after=result[key]))
     runs=api('/actions/runs?head_sha='+head+'&per_page=100')['workflow_runs']
     selected={}

@@ -6,7 +6,7 @@ import sys
 
 root = pathlib.Path(__file__).resolve().parent
 audit = pathlib.Path('C:/wsl/fcp-v1-fba508-nettking-20260910/.acceptance')
-head = '7286f30d30e20c94c13cc9acebb2fd6d61bc1163'
+head = '83955f65b7e6bb36de8e90f34608b97070fed33b'
 state = json.loads((root / 'pr463-qualification-state.json').read_text())['prs']['463']
 if state['head'] != head:
     raise SystemExit('PR head changed: review before retaining qualification')
@@ -24,7 +24,7 @@ for workflow in state['workflows']:
 if not workflows:
     print(json.dumps(dict(new_logs=0)))
     raise SystemExit(0)
-label = 'pr463-head-7286f30d-delta'
+label = 'pr463-head-83955f65-delta'
 (audit / (label + '-qualification-latest.json')).write_text(
     json.dumps(dict(source_commit=head, workflows=workflows), indent=2) + '\n')
 result = subprocess.run([sys.executable, '-B', str(audit / 'retain_qualification_logs.py'), label],

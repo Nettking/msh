@@ -13,7 +13,7 @@ assert 'Sweep complete:' in (root.parent/'DIAGNOSTIC_SWEEP_REPORT.md').read_text
 out=root/'pr463-gap-dispatch-ledger.json'
 ledger=json.loads(out.read_text()) if out.exists() else dict(dispatches=[])
 api=client()
-targets=[(463,'7286f30d30e20c94c13cc9acebb2fd6d61bc1163','codex/responder-replacement-exit-wait', ['cf7-acceptance-harness.yml','cf7c-physical-test-readiness.yml','cf8-role-retirement.yml','phase-f85-operator-federation-surface.yml','cfi2-onboarding-composition.yml','release-image-metadata.yml'],False)]
+targets=[(463,'83955f65b7e6bb36de8e90f34608b97070fed33b','codex/responder-replacement-exit-wait', ['cf7-acceptance-harness.yml','cf7c-physical-test-readiness.yml','cf8-role-retirement.yml','phase-f85-operator-federation-surface.yml','cfi2-onboarding-composition.yml','release-image-metadata.yml'],False)]
 for number,sha,ref,workflows,require_merge_proof in targets:
     assert api('/pulls/'+str(number))['head']['sha']==sha
     assert api('/git/ref/heads/'+ref)['object']['sha']==sha
