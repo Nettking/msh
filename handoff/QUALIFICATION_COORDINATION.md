@@ -1724,3 +1724,11 @@ owner is unknown; reproduced mechanism matches its error. One existing-test pass
 does not dismiss the race. No protected state or source changed. Next: publish
 classification on464, then inspect existing platform helpers for a separate narrow
 repair. Keep PR463 separate and preserve valid qualification; no new candidate.
+
+22:50UTC: separate D07 repair worktree created from M at
+`C:/wsl/fcp-analysis-reader-sharing-20260912`, branch
+`codex/analysis-content-reader-sharing`. Existing `stable_directory().open_read()`
+already supports Windows delete sharing and stable POSIX handles. Next: add a
+deterministic public-stream replacement regression, retain its red result against
+unchanged M, then use this existing reader API for content-store reads. No physical
+deployment or change to PR463. Heartbeat now includes D07/#464 and this next action.
