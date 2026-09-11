@@ -40,3 +40,20 @@ Next exact action: read only current PR heads/state and required workflow job
 state; compare against diagnostics/post-sweep-qualification-checkpoint.json.
 Retain new completed evidence, classify failures before changing code, and
 dispatch only proven required gaps. Publish each meaningful transition here.
+
+## September11 13:06UTC — required CI advanced, no head change
+
+All three intended heads and main remain unchanged. Newly completed jobs are
+successful:456 ICSE Compose/Linux entrypoint;457 Windows phase2, both retirement
+jobs and Linux operator surface;461 three Linux release shards/PostgreSQL,
+registry metadata, branding and Linux acceptance harness. Other required jobs
+remain queued/in progress; no new failure observed. These are API states pending
+new native checkout proof, not an exact-head PASS declaration. Detailed delta:
+[qualification-last-transition.json](diagnostics/qualification-last-transition.json).
+
+State cache and [poll helper](diagnostics/poll_required_state.py) now constrain
+recurring reads to the requested PRs/workflows and skip unchanged job fetches.
+The existing ten-minute follow-up was updated to low-token state-driven rules
+and the user's controlled D04 procedure. Next: retain only newly completed native
+logs, then handle proven exact-head gaps for completed461 workflows; no duplicate
+dispatch, active-job cancellation, merge or host change.
