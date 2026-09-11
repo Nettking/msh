@@ -1375,3 +1375,12 @@ native mismatch proofs recorded. Nine dispatches now recorded for463; no repeats
 Next: `poll_pr463_state.py` on the next state check; only new completed jobs need
 `retain_pr463_new_native_logs.py`. Fill remaining gaps only after parent completion
 and native source verification. No merge, new candidate or physical restart yet.
+
+##19:54UTC — four dispatched gates and branding parent complete
+
+Head7286f30d unchanged. Harness34637782331, retirement34637788283,
+CFI2 34637793677, registry34637796846 and automatic branding34637251468
+completed successfully. Other selected parents remain active; no failed jobs.
+Phase2 replacement34640438781 is visible. Next: retain only newly completed
+native logs, verify exact source, preserve valid gates and fill branding only
+if its completed native proof establishes a mismatch. Physical admission stopped.
