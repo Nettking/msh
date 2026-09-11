@@ -1,32 +1,32 @@
 {
-  "observed_at": "2026-09-11T22:17:18.694090+00:00",
+  "observed_at": "2026-09-11T22:28:49.019559+00:00",
   "changes": {
     "463": [
       {
         "workflow": "cf7b-product-physical-acceptance.yml",
         "run_id": 34650691556,
         "event": "workflow_dispatch",
-        "status": "in_progress",
-        "conclusion": null,
+        "status": "completed",
+        "conclusion": "success",
         "jobs": [
           {
             "id": 103431902569,
             "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
-            "status": "in_progress",
-            "conclusion": null
+            "status": "completed",
+            "conclusion": "success"
           }
         ]
       },
       {
-        "workflow": "federation-software-update.yml",
-        "run_id": 34651625551,
+        "workflow": "product-branding.yml",
+        "run_id": 34650703317,
         "event": "workflow_dispatch",
         "status": "completed",
         "conclusion": "success",
         "jobs": [
           {
-            "id": 103434869851,
-            "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+            "id": 103431940317,
+            "name": "product-branding",
             "status": "completed",
             "conclusion": "success"
           }
@@ -40,47 +40,89 @@
         "conclusion": null,
         "jobs": [
           {
-            "id": 103427821272,
-            "name": "Full-suite order (fixed)",
-            "status": "completed",
-            "conclusion": "success"
+            "id": 103427821216,
+            "name": "Windows regressions (capability-product)",
+            "status": "in_progress",
+            "conclusion": null
           },
           {
-            "id": 103427821290,
-            "name": "Linux regression shard (1)",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
-            "id": 103427821296,
-            "name": "Linux regression shard (0)",
+            "id": 103427821239,
+            "name": "Windows regressions (transport-storage)",
             "status": "completed",
             "conclusion": "success"
           },
           {
             "id": 103427821320,
             "name": "Linux regression shard (2)",
-            "status": "in_progress",
-            "conclusion": null
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103427821401,
+            "name": "Linux regression shard (3)",
+            "status": "completed",
+            "conclusion": "success"
           },
           {
             "id": 103438225276,
             "name": "Clean-checkout suite order independence",
-            "status": "queued",
-            "conclusion": null
+            "status": "completed",
+            "conclusion": "success"
           }
         ]
       },
       {
-        "workflow": "phase-f85-operator-federation-surface.yml",
-        "run_id": 34649607489,
+        "workflow": "phase2-federation.yml",
+        "run_id": 34651637810,
         "event": "workflow_dispatch",
         "status": "completed",
         "conclusion": "success",
         "jobs": [
           {
-            "id": 103428432785,
-            "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+            "id": 103434910797,
+            "name": "linux",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103434910977,
+            "name": "windows",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
+      {
+        "workflow": "icse-tool-demo.yml",
+        "run_id": 34649416778,
+        "event": "pull_request",
+        "status": "completed",
+        "conclusion": "success",
+        "jobs": [
+          {
+            "id": 103427821741,
+            "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103440919806,
+            "name": "publication-bundle",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
+      {
+        "workflow": "release-image-metadata.yml",
+        "run_id": 34649613062,
+        "event": "workflow_dispatch",
+        "status": "completed",
+        "conclusion": "success",
+        "jobs": [
+          {
+            "id": 103428449253,
+            "name": "Verify immutable release image metadata",
             "status": "completed",
             "conclusion": "success"
           }

@@ -1672,3 +1672,11 @@ preserve them without counting against the PR head. Review-comment count unchang
 Next exact action: `poll_pr463_state.py` at the next state check, then retain only
 new terminal/review evidence. Release/ICSE source gaps wait for parent completion.
 No merge, candidate selection, physical restart or protected-data operation.
+
+##22:28UTC — more exact-head gates and automatic ICSE complete
+
+Head83955f65 unchanged. CF7B34650691556, branding34650703317,
+phase234651637810, registry34649613062 and automatic ICSE34649416778 completed
+successfully. Other incomplete parents remain active; no failed jobs observed.
+Next: retain new native logs, verify source and resolve ICSE only if all four
+completed jobs prove a source mismatch. No duplicate jobs or physical action.
