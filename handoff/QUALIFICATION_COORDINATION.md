@@ -1,12 +1,12 @@
 # Federation v1 qualification coordination
 
 **Current actionable checkpoint (2026-09-11 23:01UTC):** physical admission remains
-stopped on M9b286f93. D06 repair PR463 head83955f65 has18/37 required plus2/3
+stopped on M9b286f93. D06 repair PR463 head83955f65 has21/37 required plus3/3
 companion native exact-head PASS at last retained check; preserve them. D07/#464 is
 a separate pre-existing Windows product defect found in its automatic synthetic
 release run. Draft repair PR465 head4749ab6689315a7ad953c11ce4b2ec942433d71a is
-pushed with focused native Windows evidence. Next: review PR465/current qualification
-state and fill only absent exact-head gates; poll PR463 once for changes. Never
+pushed with focused native Windows evidence. PR465 qualification is active; six absent gates were dispatched once. Next: poll
+PR465 for state changes and retain only new native evidence. Never
 infer a retry from the red automatic aggregate. Neither fix deployed/merged;
 no physical PASS or timers. See the end of this document for chronological deltas.
 
@@ -1769,10 +1769,27 @@ Targeted current-head native regressions10 PASS/3 platform skips, lint/diff PASS
 Prior67-test evidence remains bound to f095f6cc. Updated D07 and accumulating table.
 Next: inspect current PR state, review, and start only absent required gates.
 
-23:04UTC: PR463 automatic release34649416713 completed failure; Windows capability
+23:02UTC: PR463 automatic release34649416713 completed failure; Windows capability
 D07 plus both release-matrix jobs and verdict are red. Do not assume aggregates
 are independent defects; next retain only new terminal native logs and inspect
 those failures. All other selected PR463 workflows now report success. PR465
 head4749ab66 has seven automatic workflows queued/pending, no review threads.
 Missing required workflows:CF7,CF7C,CF8,sharding; companions absent. Do not
 dispatch duplicates. State polls and exact next actions persisted before diagnosis.
+
+
+23:03UTC: new native logs verify PR463 sharding-Windows, ICSE-Windows/publication
+and CFI2-Windows at83955f65: preserve21/37 plus3/3. Both red release matrices
+explicitly see CHECKS=success,LINUX=success,WINDOWS=failure; verdict propagates
+that dependency. No independent aggregate defect. Receipt:
+diagnostics/pr463-d07-aggregate-classification.json. No release retry dispatched.
+
+PR465 head4749ab66 qualification has six absent gates dispatched once at23:02UTC:
+sharding,CF7,CF7C,CF8,CFI2,registry (all HTTP204); ledger persisted. Automatic
+workflows remain pending/queued at last check. Next exact command:
+python -B handoff/diagnostics/poll_pr465_state.py . Retain new completed logs and
+verify checkout before counting evidence. Preserve PR463 proofs. D07 must be in
+the required merged fix set before final merged-main qualification. Prefer
+qualifying/merging the independent465 repair first; resolve any463 source/head
+integration need from then-current checks/contracts, without retrying known
+broken source merely to get green. Physical admission remains stopped on M.

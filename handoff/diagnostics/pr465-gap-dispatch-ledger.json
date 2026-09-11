@@ -1,0 +1,82 @@
+{
+  "dispatches": [
+    {
+      "pr": 465,
+      "sha": "4749ab6689315a7ad953c11ce4b2ec942433d71a",
+      "ref": "codex/analysis-content-reader-sharing",
+      "workflow": "ci-test-sharding.yml",
+      "requested_at": "2026-09-11T23:02:35.667000+00:00",
+      "reason": "No run exists",
+      "native_proof": [],
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "pr": 465,
+      "sha": "4749ab6689315a7ad953c11ce4b2ec942433d71a",
+      "ref": "codex/analysis-content-reader-sharing",
+      "workflow": "cf7-acceptance-harness.yml",
+      "requested_at": "2026-09-11T23:02:37.241586+00:00",
+      "reason": "No run exists",
+      "native_proof": [],
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "pr": 465,
+      "sha": "4749ab6689315a7ad953c11ce4b2ec942433d71a",
+      "ref": "codex/analysis-content-reader-sharing",
+      "workflow": "cf7c-physical-test-readiness.yml",
+      "requested_at": "2026-09-11T23:02:38.716361+00:00",
+      "reason": "No run exists",
+      "native_proof": [],
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "pr": 465,
+      "sha": "4749ab6689315a7ad953c11ce4b2ec942433d71a",
+      "ref": "codex/analysis-content-reader-sharing",
+      "workflow": "cf8-role-retirement.yml",
+      "requested_at": "2026-09-11T23:02:40.581082+00:00",
+      "reason": "No run exists",
+      "native_proof": [],
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "pr": 465,
+      "sha": "4749ab6689315a7ad953c11ce4b2ec942433d71a",
+      "ref": "codex/analysis-content-reader-sharing",
+      "workflow": "cfi2-onboarding-composition.yml",
+      "requested_at": "2026-09-11T23:02:42.028934+00:00",
+      "reason": "No run exists",
+      "native_proof": [],
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "pr": 465,
+      "sha": "4749ab6689315a7ad953c11ce4b2ec942433d71a",
+      "ref": "codex/analysis-content-reader-sharing",
+      "workflow": "release-image-metadata.yml",
+      "requested_at": "2026-09-11T23:02:43.888281+00:00",
+      "reason": "No run exists",
+      "native_proof": [],
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
+    }
+  ]
+}

@@ -1,0 +1,76 @@
+{
+  "observed_at": "2026-09-11T23:04:18.0385018Z",
+  "pr_head": "83955f65b7e6bb36de8e90f34608b97070fed33b",
+  "actual_source_checkout": "68f6e72c45bf1b0f709efb4ac90ff05fbde37ec7",
+  "classification": "Red aggregates propagate the known D07 Windows capability-product failure; no independent aggregate defect",
+  "records": [
+    {
+      "job_id": "103446189436",
+      "run_id": 34649416713,
+      "native_sha256": "b73b4836ab26865e990d052adcea52442848cfe85795f1b871a21c73e3845495",
+      "relevant_tail": [
+        "2026-09-11T22:44:11.4736622Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)",
+        "2026-09-11T22:44:12.0406679Z Download action repository 'actions/download-artifact@v4' (SHA:d3f86a106a0bac45b974a628896c90dbdf5c8093)",
+        "2026-09-11T22:44:13.9260244Z Complete job name: Release matrix (Windows)",
+        "2026-09-11T22:44:14.0202844Z ##[group]Run test \"$CHECKS\" = success",
+        "2026-09-11T22:44:14.0204551Z \u001b[36;1mtest \"$CHECKS\" = success\u001b[0m",
+        "2026-09-11T22:44:14.0206244Z \u001b[36;1mtest \"$LINUX\" = success\u001b[0m",
+        "2026-09-11T22:44:14.0207492Z \u001b[36;1mtest \"$WINDOWS\" = success\u001b[0m",
+        "2026-09-11T22:44:14.0352475Z shell: /usr/bin/bash -e {0}",
+        "2026-09-11T22:44:14.0353923Z env:",
+        "2026-09-11T22:44:14.0354672Z   CHECKS: success",
+        "2026-09-11T22:44:14.0355392Z   LINUX: success",
+        "2026-09-11T22:44:14.0356112Z   WINDOWS: failure",
+        "2026-09-11T22:44:14.0356833Z ##[endgroup]",
+        "2026-09-11T22:44:14.0514353Z ##[error]Process completed with exit code 1.",
+        "2026-09-11T22:44:14.0756588Z Cleaning up orphan processes"
+      ]
+    },
+    {
+      "job_id": "103446189539",
+      "run_id": 34649416713,
+      "native_sha256": "1e0c9a8d76e888076580c29a8ea2c6e2b9b589ab7d380047fea0c2b209114a84",
+      "relevant_tail": [
+        "2026-09-11T22:44:20.8760852Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)",
+        "2026-09-11T22:44:21.4160076Z Download action repository 'actions/download-artifact@v4' (SHA:d3f86a106a0bac45b974a628896c90dbdf5c8093)",
+        "2026-09-11T22:44:22.2184559Z Complete job name: Release matrix (Linux)",
+        "2026-09-11T22:44:22.3387228Z ##[group]Run test \"$CHECKS\" = success",
+        "2026-09-11T22:44:22.3389676Z \u001b[36;1mtest \"$CHECKS\" = success\u001b[0m",
+        "2026-09-11T22:44:22.3391959Z \u001b[36;1mtest \"$LINUX\" = success\u001b[0m",
+        "2026-09-11T22:44:22.3393772Z \u001b[36;1mtest \"$WINDOWS\" = success\u001b[0m",
+        "2026-09-11T22:44:22.3423462Z shell: /usr/bin/bash -e {0}",
+        "2026-09-11T22:44:22.3425073Z env:",
+        "2026-09-11T22:44:22.3425980Z   CHECKS: success",
+        "2026-09-11T22:44:22.3426929Z   LINUX: success",
+        "2026-09-11T22:44:22.3427827Z   WINDOWS: failure",
+        "2026-09-11T22:44:22.3428728Z ##[endgroup]",
+        "2026-09-11T22:44:22.3577578Z ##[error]Process completed with exit code 1.",
+        "2026-09-11T22:44:22.3802193Z Cleaning up orphan processes"
+      ]
+    },
+    {
+      "job_id": "103446255097",
+      "run_id": 34649416713,
+      "native_sha256": "4a3b9d81f6ffe5b0dc3cbf0e21b503ede8a0f57460ec49c5be9a50a00716ac3f",
+      "relevant_tail": [
+        "2026-09-11T22:44:29.2102134Z Metadata: read",
+        "2026-09-11T22:44:29.2102633Z ##[endgroup]",
+        "2026-09-11T22:44:29.2105782Z Secret source: Actions",
+        "2026-09-11T22:44:29.2106850Z Cache mode: write",
+        "2026-09-11T22:44:29.2107493Z Prepare workflow directory",
+        "2026-09-11T22:44:29.2901405Z Prepare all required actions",
+        "2026-09-11T22:44:29.3074943Z Complete job name: Federation v1 automated release verdict",
+        "2026-09-11T22:44:29.5069368Z ##[group]Run test \"failure\" = \"success\"",
+        "2026-09-11T22:44:29.5070953Z \u001b[36;1mtest \"failure\" = \"success\"\u001b[0m",
+        "2026-09-11T22:44:29.5072154Z \u001b[36;1mtest \"success\" = \"success\"\u001b[0m",
+        "2026-09-11T22:44:29.5072926Z \u001b[36;1mtest \"success\" = \"success\"\u001b[0m",
+        "2026-09-11T22:44:29.5180003Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}",
+        "2026-09-11T22:44:29.5182609Z ##[endgroup]",
+        "2026-09-11T22:44:29.5691057Z ##[error]Process completed with exit code 1.",
+        "2026-09-11T22:44:29.6035691Z Cleaning up orphan processes"
+      ]
+    }
+  ],
+  "physical_runtime_changed": false,
+  "protected_recorder_untouched": true
+}
