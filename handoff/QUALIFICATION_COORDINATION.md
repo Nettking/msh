@@ -10,9 +10,15 @@ checked-in revalidation -> fresh formal physical acceptance.
 
 | PR | Intended exact head | Phase |
 |---|---|---|
-|456|1a0c634f47f8a247b6d1d2d1a219f5c12590587d|Required exact-head qualification PASS; preserve evidence, hold for complete fix-set qualification and live premerge checks|
-|457|143fe7a9082193114af3d34dc437b85f845849a2|Required exact-head qualification PASS; preserve evidence, hold for complete fix-set qualification and live premerge checks|
-|461|5b826c6806ab1bdb960412ba20ca78192971fb1d|Required exact-head qualification PASS; complete fix set qualified, live premerge checks next|
+|456|1a0c634f47f8a247b6d1d2d1a219f5c12590587d|Qualified37/37 plus CFI2/registry; merged as63976fb3|
+|457|143fe7a9082193114af3d34dc437b85f845849a2|Qualified37/37 plus CFI2/registry; merged as8948e953|
+|461|5b826c6806ab1bdb960412ba20ca78192971fb1d|Qualified37/37 plus CFI2/registry; merged as9b286f93|
+
+**Current stage:** qualify actual final merged main
+`9b286f931497bf6291e215f6340443c5162826b0` once. All fix heads are ancestors.
+Use `diagnostics/poll_merged_main_state.py` and
+`diagnostics/retain_merged_main_jobs.py`; PR qualification is complete and must
+not be repeated. Final main is not yet qualified or frozen as a physical candidate.
 
 Runtime remains0536f03d67eb277e11573c2188d8e820399627e3. No physical PASS; P07/P12
 not started. Protected Recorder data remains out of bounds. The user's latest
@@ -679,3 +685,17 @@ absence of any matching final-SHA run; ledger stores workflow digests and204
 receipts. Existing final push runs are preserved; no duplicate release job or
 intermediate-main qualification was requested. Next: compact final-main poll and
 new-only native retention, then final artifact/verdict review when complete.
+
+## September11 16:37UTC — final-main delta polling established
+
+The required final-main set is present: automatic push runs plus guarded
+harness34622777814/readiness34622782096/sharding34622786434 dispatches. Exact
+main remains9b286f93. New successful API results are ICSE Compose and Linux
+operator; branding was already successful in the initial snapshot. Final release
+34622528054 remains pending. Next: retain only these new completed native logs.
+
+Use poll_merged_main_state.py from now on; it reads only actual main and the
+selected final SHA's required workflows, caches terminal jobs and writes only
+material transitions. retain_merged_main_jobs.py preserves source-bound proof
+without rereading completed logs. No PR polling or duplicate qualification is
+needed. The automated follow-up will be updated to this stage after persistence.

@@ -1,0 +1,108 @@
+{
+  "recorded_at": "2026-09-11T16:36:09.874157+00:00",
+  "source_commit": "9b286f931497bf6291e215f6340443c5162826b0",
+  "changes": [
+    {
+      "workflow": "phase2-federation.yml",
+      "run_id": 34622527818,
+      "status": "queued",
+      "conclusion": null,
+      "jobs": [
+        {
+          "id": 103339712448,
+          "name": "linux",
+          "status": "in_progress",
+          "conclusion": null
+        }
+      ]
+    },
+    {
+      "workflow": "icse-tool-demo.yml",
+      "run_id": 34622527886,
+      "status": "queued",
+      "conclusion": null,
+      "jobs": [
+        {
+          "id": 103339712737,
+          "name": "reviewer-compose",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "workflow": "phase-f85-operator-federation-surface.yml",
+      "run_id": 34622527917,
+      "status": "queued",
+      "conclusion": null,
+      "jobs": [
+        {
+          "id": 103339712339,
+          "name": "operator-surface (Linux, fcp-linux-fast, bash)",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "workflow": "cf7-acceptance-harness.yml",
+      "run_id": 34622777814,
+      "status": "queued",
+      "conclusion": null,
+      "jobs": [
+        {
+          "id": 103340547592,
+          "name": "harness (Linux, fcp-linux-fast, bash)",
+          "status": "queued",
+          "conclusion": null
+        },
+        {
+          "id": 103340547805,
+          "name": "harness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Byp...",
+          "status": "queued",
+          "conclusion": null
+        }
+      ]
+    },
+    {
+      "workflow": "cf7c-physical-test-readiness.yml",
+      "run_id": 34622782096,
+      "status": "queued",
+      "conclusion": null,
+      "jobs": [
+        {
+          "id": 103340543683,
+          "name": "readiness (Linux, fcp-linux-fast, bash)",
+          "status": "queued",
+          "conclusion": null
+        },
+        {
+          "id": 103340544152,
+          "name": "readiness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy B...",
+          "status": "queued",
+          "conclusion": null
+        }
+      ]
+    },
+    {
+      "workflow": "ci-test-sharding.yml",
+      "run_id": 34622786434,
+      "status": "queued",
+      "conclusion": null,
+      "jobs": [
+        {
+          "id": 103340557258,
+          "name": "Shard contract (Linux, shared-pool)",
+          "status": "queued",
+          "conclusion": null
+        },
+        {
+          "id": 103340557562,
+          "name": "Shard contract (Windows, shared-pool)",
+          "status": "queued",
+          "conclusion": null
+        }
+      ]
+    }
+  ]
+}
