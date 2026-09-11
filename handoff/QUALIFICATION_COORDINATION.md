@@ -1304,3 +1304,12 @@ logs and actual checkout commits. Preserve the two existing synthetic proofs.
 Resolve exact-head gaps only once a parent has finished and source mismatch is
 demonstrated. No physical runtime action; M cores stay running, Nitro5151 empty,
 protected Recorder data unchanged. P07/P12 unstarted and physical acceptance0.
+
+##19:18UTC — dispatched gates visible; five additional jobs completed
+
+PR463 head is unchanged and ready for review. All13 expected workflows now have
+active parents, including the six dispatches recorded19:14UTC. Five additional
+automatic jobs succeeded; no failures observed. Exact-head qualification remains
+incomplete. [State/delta](diagnostics/pr463-qualification-last-transition.json).
+Next: retain only these newly completed native logs, verify actual checkout SHA,
+then await parent completion without duplicate dispatch. Physical state unchanged.

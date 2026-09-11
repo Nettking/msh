@@ -1,5 +1,5 @@
 {
-  "observed_at": "2026-09-11T19:12:01.564633+00:00",
+  "observed_at": "2026-09-11T19:18:50.932217+00:00",
   "prs": {
     "463": {
       "number": 463,
@@ -7,7 +7,7 @@
       "intended_head": "7286f30d30e20c94c13cc9acebb2fd6d61bc1163",
       "head_matches": true,
       "state": "open",
-      "draft": true,
+      "draft": false,
       "merged": false,
       "merge_commit": "bfec91c9c0ab3581645bc4c575bf4a056b2b80c9",
       "mergeable_state": "unstable",
@@ -40,11 +40,11 @@
             {
               "id": 103388044944,
               "name": "linux",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T19:08:57Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-11T19:13:04Z",
+              "completed_at": "2026-09-11T19:15:21Z"
             }
           ]
         },
@@ -76,11 +76,11 @@
             {
               "id": 103388045560,
               "name": "Release checks (Linux)",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T19:08:57Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-11T19:15:23Z",
+              "completed_at": "2026-09-11T19:16:50Z"
             },
             {
               "id": 103388045662,
@@ -94,10 +94,10 @@
             {
               "id": 103388045663,
               "name": "Linux regression shard (2)",
-              "status": "queued",
+              "status": "in_progress",
               "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T19:08:57Z",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-11T19:16:52Z",
               "completed_at": null
             },
             {
@@ -229,20 +229,20 @@
             {
               "id": 103388044399,
               "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
-              "status": "in_progress",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "runner_name": "Nettking",
               "started_at": "2026-09-11T19:08:58Z",
-              "completed_at": null
+              "completed_at": "2026-09-11T19:13:23Z"
             },
             {
               "id": 103388044589,
               "name": "reviewer-compose",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T19:08:57Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-11T19:12:36Z",
+              "completed_at": "2026-09-11T19:13:02Z"
             },
             {
               "id": 103388044662,
@@ -310,11 +310,11 @@
             {
               "id": 103388045297,
               "name": "acceptance (Linux, fcp-linux-fast, bash)",
-              "status": "in_progress",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "runner_name": "Nettking-Linux",
               "started_at": "2026-09-11T19:10:22Z",
-              "completed_at": null
+              "completed_at": "2026-09-11T19:12:35Z"
             }
           ]
         },
@@ -346,21 +346,223 @@
             {
               "id": 103388045328,
               "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+              "status": "in_progress",
+              "conclusion": null,
+              "runner_name": "Nettking",
+              "started_at": "2026-09-11T19:13:24Z",
+              "completed_at": null
+            }
+          ]
+        },
+        {
+          "workflow": "cf7-acceptance-harness.yml",
+          "run_id": 34637782331,
+          "event": "workflow_dispatch",
+          "api_head_sha": "7286f30d30e20c94c13cc9acebb2fd6d61bc1163",
+          "status": "queued",
+          "conclusion": null,
+          "attempt": 1,
+          "required_count": 2,
+          "signature": {
+            "status": "queued",
+            "conclusion": null,
+            "run_attempt": 1,
+            "updated_at": "2026-09-11T19:14:47Z"
+          },
+          "jobs": [
+            {
+              "id": 103389795136,
+              "name": "harness (Linux, fcp-linux-fast, bash)",
               "status": "queued",
               "conclusion": null,
               "runner_name": "",
-              "started_at": "2026-09-11T19:08:57Z",
+              "started_at": "2026-09-11T19:14:49Z",
+              "completed_at": null
+            },
+            {
+              "id": 103389795331,
+              "name": "harness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Byp...",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "started_at": "2026-09-11T19:14:49Z",
+              "completed_at": null
+            }
+          ]
+        },
+        {
+          "workflow": "cf7c-physical-test-readiness.yml",
+          "run_id": 34637785139,
+          "event": "workflow_dispatch",
+          "api_head_sha": "7286f30d30e20c94c13cc9acebb2fd6d61bc1163",
+          "status": "queued",
+          "conclusion": null,
+          "attempt": 1,
+          "required_count": 2,
+          "signature": {
+            "status": "queued",
+            "conclusion": null,
+            "run_attempt": 1,
+            "updated_at": "2026-09-11T19:14:49Z"
+          },
+          "jobs": [
+            {
+              "id": 103389802981,
+              "name": "readiness (Linux, fcp-linux-fast, bash)",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "started_at": "2026-09-11T19:14:51Z",
+              "completed_at": null
+            },
+            {
+              "id": 103389803152,
+              "name": "readiness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy B...",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "started_at": "2026-09-11T19:14:51Z",
+              "completed_at": null
+            }
+          ]
+        },
+        {
+          "workflow": "cf8-role-retirement.yml",
+          "run_id": 34637788283,
+          "event": "workflow_dispatch",
+          "api_head_sha": "7286f30d30e20c94c13cc9acebb2fd6d61bc1163",
+          "status": "queued",
+          "conclusion": null,
+          "attempt": 1,
+          "required_count": 2,
+          "signature": {
+            "status": "queued",
+            "conclusion": null,
+            "run_attempt": 1,
+            "updated_at": "2026-09-11T19:14:51Z"
+          },
+          "jobs": [
+            {
+              "id": 103389811519,
+              "name": "role-retirement (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "started_at": "2026-09-11T19:14:52Z",
+              "completed_at": null
+            },
+            {
+              "id": 103389811801,
+              "name": "role-retirement (Linux, fcp-linux-fast, bash)",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "started_at": "2026-09-11T19:14:53Z",
+              "completed_at": null
+            }
+          ]
+        },
+        {
+          "workflow": "phase-f85-operator-federation-surface.yml",
+          "run_id": 34637791132,
+          "event": "workflow_dispatch",
+          "api_head_sha": "7286f30d30e20c94c13cc9acebb2fd6d61bc1163",
+          "status": "queued",
+          "conclusion": null,
+          "attempt": 1,
+          "required_count": 2,
+          "signature": {
+            "status": "queued",
+            "conclusion": null,
+            "run_attempt": 1,
+            "updated_at": "2026-09-11T19:14:53Z"
+          },
+          "jobs": [
+            {
+              "id": 103389836092,
+              "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "started_at": "2026-09-11T19:14:57Z",
+              "completed_at": null
+            },
+            {
+              "id": 103389836217,
+              "name": "operator-surface (Linux, fcp-linux-fast, bash)",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "started_at": "2026-09-11T19:14:57Z",
+              "completed_at": null
+            }
+          ]
+        },
+        {
+          "workflow": "cfi2-onboarding-composition.yml",
+          "run_id": 34637793677,
+          "event": "workflow_dispatch",
+          "api_head_sha": "7286f30d30e20c94c13cc9acebb2fd6d61bc1163",
+          "status": "queued",
+          "conclusion": null,
+          "attempt": 1,
+          "required_count": null,
+          "signature": {
+            "status": "queued",
+            "conclusion": null,
+            "run_attempt": 1,
+            "updated_at": "2026-09-11T19:14:54Z"
+          },
+          "jobs": [
+            {
+              "id": 103389828283,
+              "name": "onboarding (Linux, fcp-test-linux, bash, 3.12.13)",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "started_at": "2026-09-11T19:14:56Z",
+              "completed_at": null
+            },
+            {
+              "id": 103389828467,
+              "name": "onboarding (Windows, fcp-test-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "started_at": "2026-09-11T19:14:56Z",
+              "completed_at": null
+            }
+          ]
+        },
+        {
+          "workflow": "release-image-metadata.yml",
+          "run_id": 34637796846,
+          "event": "workflow_dispatch",
+          "api_head_sha": "7286f30d30e20c94c13cc9acebb2fd6d61bc1163",
+          "status": "queued",
+          "conclusion": null,
+          "attempt": 1,
+          "required_count": null,
+          "signature": {
+            "status": "queued",
+            "conclusion": null,
+            "run_attempt": 1,
+            "updated_at": "2026-09-11T19:14:56Z"
+          },
+          "jobs": [
+            {
+              "id": 103389839602,
+              "name": "Verify immutable release image metadata",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "started_at": "2026-09-11T19:14:58Z",
               "completed_at": null
             }
           ]
         }
       ],
-      "missing_workflows": [
-        "cf7-acceptance-harness.yml",
-        "cf7c-physical-test-readiness.yml",
-        "cf8-role-retirement.yml",
-        "phase-f85-operator-federation-surface.yml"
-      ]
+      "missing_workflows": []
     }
   },
   "material_change": true
