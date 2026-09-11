@@ -1,70 +1,113 @@
 {
-  "observed_at": "2026-09-11T15:32:54.118696+00:00",
+  "observed_at": "2026-09-11T15:48:18.776863+00:00",
   "changes": {
-    "456": [
+    "461": [
       {
         "workflow": "federation-v1-release.yml",
-        "run_id": 34595427316,
+        "run_id": 34616905954,
+        "event": "workflow_dispatch",
+        "status": "queued",
+        "conclusion": null,
+        "jobs": [
+          {
+            "id": 103321004351,
+            "name": "Full-suite order (fixed)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103321004605,
+            "name": "Windows regressions (transport-storage)",
+            "status": "in_progress",
+            "conclusion": null
+          },
+          {
+            "id": 103321004710,
+            "name": "Release checks (Windows)",
+            "status": "queued",
+            "conclusion": null
+          },
+          {
+            "id": 103321004716,
+            "name": "Linux regression shard (1)",
+            "status": "queued",
+            "conclusion": null
+          },
+          {
+            "id": 103321004724,
+            "name": "Full-suite order (rotating)",
+            "status": "in_progress",
+            "conclusion": null
+          },
+          {
+            "id": 103321004795,
+            "name": "Windows regressions (capability-product)",
+            "status": "queued",
+            "conclusion": null
+          },
+          {
+            "id": 103321004832,
+            "name": "Linux regression shard (0)",
+            "status": "queued",
+            "conclusion": null
+          },
+          {
+            "id": 103321004873,
+            "name": "Release checks (Linux)",
+            "status": "queued",
+            "conclusion": null
+          },
+          {
+            "id": 103321004880,
+            "name": "Windows regressions (journal-artifacts)",
+            "status": "queued",
+            "conclusion": null
+          },
+          {
+            "id": 103321004891,
+            "name": "PostgreSQL storage release check",
+            "status": "queued",
+            "conclusion": null
+          },
+          {
+            "id": 103321004900,
+            "name": "Linux regression shard (3)",
+            "status": "queued",
+            "conclusion": null
+          },
+          {
+            "id": 103321004916,
+            "name": "Linux regression shard (2)",
+            "status": "queued",
+            "conclusion": null
+          }
+        ]
+      },
+      {
+        "workflow": "federation-software-update.yml",
+        "run_id": 34612126881,
         "event": "workflow_dispatch",
         "status": "completed",
         "conclusion": "success",
         "jobs": [
           {
-            "id": 103249965655,
-            "name": "Windows regressions (capability-product)",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
-            "id": 103318196526,
-            "name": "Release matrix (Linux)",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
-            "id": 103318196670,
-            "name": "Release matrix (Windows)",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
-            "id": 103318335476,
-            "name": "Federation v1 automated release verdict",
+            "id": 103304952736,
+            "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
             "status": "completed",
             "conclusion": "success"
           }
         ]
-      }
-    ],
-    "461": [
+      },
       {
-        "workflow": "federation-v1-release.yml",
-        "run_id": 34600817254,
+        "workflow": "cfi2-onboarding-composition.yml",
+        "run_id": 34600817433,
         "event": "pull_request",
         "status": "completed",
         "conclusion": "success",
         "jobs": [
           {
-            "id": 103267381420,
-            "name": "Windows regressions (transport-storage)",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
-            "id": 103319546154,
-            "name": "Release matrix (Windows)",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
-            "id": 103319546227,
-            "name": "Release matrix (Linux)",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
-            "id": 103319683382,
-            "name": "Federation v1 automated release verdict",
+            "id": 103267381045,
+            "name": "onboarding (Windows, fcp-test-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
             "status": "completed",
             "conclusion": "success"
           }
@@ -74,14 +117,14 @@
         "workflow": "phase-f85-operator-federation-surface.yml",
         "run_id": 34600817582,
         "event": "pull_request",
-        "status": "in_progress",
-        "conclusion": null,
+        "status": "completed",
+        "conclusion": "success",
         "jobs": [
           {
             "id": 103267385758,
             "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
-            "status": "in_progress",
-            "conclusion": null
+            "status": "completed",
+            "conclusion": "success"
           }
         ]
       }

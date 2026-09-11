@@ -489,3 +489,14 @@ merge-gate/correctness checks and qualify actual final merged main once.
 No PR merged or new candidate selected in this check. Physical runtime remains
 0536f03d67eb277e11573c2188d8e820399627e3; D04 deferred, protected Recorder
 untouched, physical acceptance incomplete and P07/P12 not started.
+
+## September11 15:49UTC — PR461 final source gaps became actionable
+
+Heads unchanged;456/457 qualification remains valid. Exact461 release
+34616905954 has fixed-order success and rotating/Windows transport running;
+other release leaves are queued. Exact software-update34612126881 completed
+successfully. Prior synthetic CFI2 run34600817433 and operator34600817582 are
+now complete/success. No new failure. Next: retain four new native proofs, then
+dispatch only demonstrated completed CFI2/operator exact-head gaps after live
+checks. No merge or host action; runtime remains0536f03d67eb277e11573c2188d8e820399627e3,
+protected Recorder untouched, physical acceptance incomplete, no P07/P12 timers.
