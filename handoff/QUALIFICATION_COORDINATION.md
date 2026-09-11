@@ -451,3 +451,13 @@ native log digests are recorded in completed-head-gap-dispatches.json with the
 workflow digest and204 receipt. This fills a missing exact-head gate; no valid
 PASS was rerun and no active CI cancelled. Next: finalize456 using its completed
 native release artifacts and existing ICSE/registry evidence. Hosts unchanged.
+
+PR456 complete release artifact review: all9 native ZIP digests match;
+four disjoint shards cover4381 tests and both full-suite orders contain4381
+cases. All JUnit failures/errors are zero. Windows groups contain872,371,298
+cases. Source proof and full artifact review/receipts are retained. No current
+inline findings or review objects. Automated review summary coversa225a41;
+manual comparison to intended1a0c634f shows only five workflow lines adding the
+focused POSIX readiness regression step, with no product change since that
+review. Next: reconcile final aggregate/test identities and expected skips,
+verify the new step's native results, and publish456 exact-head verdict.

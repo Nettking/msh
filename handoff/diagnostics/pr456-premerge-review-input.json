@@ -1,0 +1,22 @@
+{
+  "at": "2026-09-11T15:35:01.485915+00:00",
+  "head": "1a0c634f47f8a247b6d1d2d1a219f5c12590587d",
+  "base": "0536f03d67eb277e11573c2188d8e820399627e3",
+  "draft": true,
+  "mergeable": true,
+  "mergeable_state": "unstable",
+  "comments": [],
+  "reviews": [],
+  "issue_comments": [
+    {
+      "id": 5633444497,
+      "body": "<!-- codex-pull-request-review-summary -->\n\n## Codex Review Summary\n\nThis comment shows the latest Codex review activity on this pull request.\n\n| Review | Status | Commit | Review trigger |\n| --- | --- | --- | --- |\n| \ud83d\udcdd **Code Review** | \u2705 **Completed** <relative-time datetime=\"2026-09-11T11:02:01.763398Z\">2026-09-11T11:02:01.763398Z</relative-time> | `a225a41` | PR opened |\n\n\n\n<details> <summary>\u2139\ufe0f About Codex in GitHub</summary>\n<br/>\n\n[Your team has set up Codex to review pull requests in this repo](https://chatgpt.com/codex/cloud/settings/general). Reviews are triggered when you\n- Open a pull request for review\n- Mark a draft as ready\n- Comment \"@codex review\" or \"@codex security review\".\n\nCodex reacts with \ud83d\udc40 while any review is running, comments if it has suggestions, and reacts with \ud83d\udc4d once all reviews finish with no findings.\n\n</details>",
+      "html_url": "https://github.com/Nettking/msh/pull/456#issuecomment-5633444497"
+    },
+    {
+      "id": 5634234400,
+      "body": "Federation v1 is now in DIAGNOSTIC SWEEP MODE at runtime candidate `0536f03d67eb277e11573c2188d8e820399627e3`. This repair is withheld from deployment/merge pending the sweep; no additional full qualification should be triggered merely because a repair exists.\n\nD01 is persisted in the [authoritative blocker table and recovery handoff](https://github.com/Nettking/msh/blob/codex/federation-v1-diagnostic-sweep-20260911/handoff/FEDERATION_V1_DIAGNOSTIC_SWEEP.md#d01), with [exact source/host/procedure, observed timing, native error excerpt, original evidence digests and state effects](https://github.com/Nettking/msh/blob/codex/federation-v1-diagnostic-sweep-20260911/handoff/diagnostics/D01-readiness.json). Initial checkpoint commit: `b2b0e899`.\n\nAll subsequent physical exploration is DIAGNOSTIC ONLY \u2014 NOT PHYSICAL ACCEPTANCE EVIDENCE. Protected Recorder data remains untouched. Existing in-flight CI can finish and remain source-specific development evidence.",
+      "html_url": "https://github.com/Nettking/msh/pull/456#issuecomment-5634234400"
+    }
+  ]
+}
