@@ -1,25 +1,52 @@
 {
-  "observed_at": "2026-09-11T22:40:48.843248+00:00",
+  "observed_at": "2026-09-11T23:01:45.496149+00:00",
   "changes": {
     "463": [
+      {
+        "workflow": "ci-test-sharding.yml",
+        "run_id": 34650718445,
+        "event": "workflow_dispatch",
+        "status": "completed",
+        "conclusion": "success",
+        "jobs": [
+          {
+            "id": 103431984823,
+            "name": "Shard contract (Windows, shared-pool)",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
       {
         "workflow": "federation-v1-release.yml",
         "run_id": 34649416713,
         "event": "pull_request",
-        "status": "in_progress",
-        "conclusion": null,
+        "status": "completed",
+        "conclusion": "failure",
         "jobs": [
           {
-            "id": 103427821216,
-            "name": "Windows regressions (capability-product)",
+            "id": 103427821365,
+            "name": "Windows regressions (journal-artifacts)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103446189436,
+            "name": "Release matrix (Windows)",
             "status": "completed",
             "conclusion": "failure"
           },
           {
-            "id": 103427821365,
-            "name": "Windows regressions (journal-artifacts)",
-            "status": "in_progress",
-            "conclusion": null
+            "id": 103446189539,
+            "name": "Release matrix (Linux)",
+            "status": "completed",
+            "conclusion": "failure"
+          },
+          {
+            "id": 103446255097,
+            "name": "Federation v1 automated release verdict",
+            "status": "completed",
+            "conclusion": "failure"
           }
         ]
       },
@@ -27,24 +54,33 @@
         "workflow": "icse-tool-demo.yml",
         "run_id": 34654263201,
         "event": "workflow_dispatch",
-        "status": "queued",
-        "conclusion": null,
+        "status": "completed",
+        "conclusion": "success",
         "jobs": [
           {
             "id": 103443127277,
             "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
-            "status": "queued",
-            "conclusion": null
-          },
-          {
-            "id": 103443127425,
-            "name": "reviewer-compose",
             "status": "completed",
             "conclusion": "success"
           },
           {
-            "id": 103443127482,
-            "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
+            "id": 103447193101,
+            "name": "publication-bundle",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
+      {
+        "workflow": "cfi2-onboarding-composition.yml",
+        "run_id": 34649610197,
+        "event": "workflow_dispatch",
+        "status": "completed",
+        "conclusion": "success",
+        "jobs": [
+          {
+            "id": 103428443257,
+            "name": "onboarding (Windows, fcp-test-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
             "status": "completed",
             "conclusion": "success"
           }

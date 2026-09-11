@@ -1768,3 +1768,11 @@ minimum-size native rename buffers; added one-character artifact-name coverage.
 Targeted current-head native regressions10 PASS/3 platform skips, lint/diff PASS.
 Prior67-test evidence remains bound to f095f6cc. Updated D07 and accumulating table.
 Next: inspect current PR state, review, and start only absent required gates.
+
+23:04UTC: PR463 automatic release34649416713 completed failure; Windows capability
+D07 plus both release-matrix jobs and verdict are red. Do not assume aggregates
+are independent defects; next retain only new terminal native logs and inspect
+those failures. All other selected PR463 workflows now report success. PR465
+head4749ab66 has seven automatic workflows queued/pending, no review threads.
+Missing required workflows:CF7,CF7C,CF8,sharding; companions absent. Do not
+dispatch duplicates. State polls and exact next actions persisted before diagnosis.
