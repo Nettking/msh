@@ -1078,3 +1078,19 @@ Next: guarded source fast-forward under the checked-in host mutation lock,
 compare actual resolved Compose before/after (only candidate images/build args
 and new default responder port may differ), then supported normal startup.
 Preserve data/results/models/control identity; verify leader recovery afterward.
+
+### Controlled Nitro operation staged for reviewable execution
+
+`diagnostics/activate_nitro_m.py` rechecks clean N, native Python, exact current
+services, idle capture/update state, model mounts, current ready leader/index and
+qualified bundle. Under the existing Git-scoped mutation lock it fast-forwards
+to M and compares complete resolved Compose: only core candidate image/build/env
+SHA and Flask default5151 may differ. Then it runs checked-in normal `bash start.sh`.
+No fresh/reset/resume enrollment action. Owned services may briefly lose authority
+during restart; fail-closed behavior and fixed voter identities are preserved.
+No protected Recorder process/data action. The N responder remains explicitly N
+until a separate guarded M replacement after core verification.
+
+The audit controller will run detached with a durable host receipt/log under
+Nitro inputs, so session loss does not discard the operation. Never relaunch if
+either the staged controller or receipt already exists; inspect it first.
