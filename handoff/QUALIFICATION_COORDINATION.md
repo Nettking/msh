@@ -136,3 +136,10 @@ Next: retain only newly completed native logs, verify newly completed456 ICSE
 artifacts, then reconcile the completed461 phase2 source gap. Preserve all valid
 prior evidence and leave active CI untouched. Runtime remains0536f03d, protected
 Recorder data untouched; no host, D04, candidate or physical acceptance action.
+
+Native delta retained:16 new logs. Six successful jobs prove exact intended
+heads (456 two,457 two,461 two); nine461 leaves prove synthetic e03addedbc4
+and are excluded. Its suite-order aggregate has no independent checkout and
+cannot qualify the intended head. No new failures. Completed461 phase2 has
+both leaf proofs for the synthetic checkout, establishing a required exact-head
+gap; no exact phase2 run is presently recorded.
