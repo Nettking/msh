@@ -1,68 +1,84 @@
 {
-  "observed_at": "2026-09-11T14:15:22.679329+00:00",
+  "observed_at": "2026-09-11T14:26:57.664446+00:00",
   "changes": {
-    "456": [
-      {
-        "workflow": "federation-software-update.yml",
-        "run_id": 34594937633,
-        "event": "workflow_dispatch",
-        "status": "completed",
-        "conclusion": "success",
-        "jobs": [
-          {
-            "id": 103248398752,
-            "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
-            "status": "completed",
-            "conclusion": "success"
-          }
-        ]
-      }
-    ],
     "457": [
       {
         "workflow": "federation-software-update.yml",
         "run_id": 34601202338,
         "event": "workflow_dispatch",
-        "status": "in_progress",
-        "conclusion": null,
-        "jobs": [
-          {
-            "id": 103268657187,
-            "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
-            "status": "in_progress",
-            "conclusion": null
-          }
-        ]
-      }
-    ],
-    "461": [
-      {
-        "workflow": "cf7b-product-physical-acceptance.yml",
-        "run_id": 34606865363,
-        "event": "workflow_dispatch",
         "status": "completed",
         "conclusion": "success",
         "jobs": [
           {
-            "id": 103287329543,
-            "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
+            "id": 103268657187,
+            "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
             "status": "completed",
             "conclusion": "success"
           }
         ]
       },
       {
-        "workflow": "cf7c-physical-test-readiness.yml",
-        "run_id": 34601194107,
+        "workflow": "federation-v1-release.yml",
+        "run_id": 34594990947,
         "event": "workflow_dispatch",
         "status": "completed",
         "conclusion": "success",
         "jobs": [
           {
-            "id": 103268629566,
-            "name": "readiness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy B...",
+            "id": 103248585302,
+            "name": "Release checks (Windows)",
             "status": "completed",
             "conclusion": "success"
+          },
+          {
+            "id": 103297734106,
+            "name": "Release matrix (Linux)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103297734164,
+            "name": "Release matrix (Windows)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103297881449,
+            "name": "Federation v1 automated release verdict",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
+      {
+        "workflow": "ci-test-sharding.yml",
+        "run_id": 34595257295,
+        "event": "workflow_dispatch",
+        "status": "completed",
+        "conclusion": "success",
+        "jobs": [
+          {
+            "id": 103249421517,
+            "name": "Shard contract (Windows, shared-pool)",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      }
+    ],
+    "461": [
+      {
+        "workflow": "cf8-role-retirement.yml",
+        "run_id": 34600817428,
+        "event": "pull_request",
+        "status": "in_progress",
+        "conclusion": null,
+        "jobs": [
+          {
+            "id": 103267382042,
+            "name": "role-retirement (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+            "status": "in_progress",
+            "conclusion": null
           }
         ]
       }

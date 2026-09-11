@@ -246,3 +246,17 @@ Next scheduled action: poll_required_state.py. Act on new completions/failures
 only; persist first, retain new proofs and dispatch demonstrated missing exact
 workflows without rerunning valid PASS. No new artifact review is actionable.
 Final-main qualification, D04 and physical acceptance remain deferred.
+
+## September11 14:27UTC — PR457 required workflows complete
+
+PR457 software-update34601202338, release34594990947 (including both matrices
+and final verdict), and sharding34595257295 completed successfully. The cached
+required workflow set is now complete by API status; exact-head final proof and
+release artifact/correctness reconciliation remain required before merge.
+Heads unchanged, no new failure;461 Windows retirement is now running.
+
+Next: retain six new457 job logs, audit newly produced release artifacts and
+reconcile all required exact-head evidence plus unresolved release-relevant
+correctness findings. Do not infer merge readiness from API greens alone.
+Runtime remains0536f03d67eb277e11573c2188d8e820399627e3; no host/D04/physical
+change, protected Recorder data untouched, P07/P12 not started.
