@@ -1,5 +1,5 @@
 {
-  "observed_at": "2026-09-11T21:53:49.206040+00:00",
+  "observed_at": "2026-09-11T22:05:52.184114+00:00",
   "changes": {
     "463": [
       {
@@ -10,49 +10,28 @@
         "conclusion": null,
         "jobs": [
           {
-            "id": 103431902569,
-            "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
-            "status": "queued",
-            "conclusion": null
-          },
-          {
             "id": 103431902714,
             "name": "acceptance (Linux, fcp-linux-fast, bash)",
-            "status": "queued",
-            "conclusion": null
-          }
-        ]
-      },
-      {
-        "workflow": "product-branding.yml",
-        "run_id": 34650703317,
-        "event": "workflow_dispatch",
-        "status": "queued",
-        "conclusion": null,
-        "jobs": [
-          {
-            "id": 103431940317,
-            "name": "product-branding",
-            "status": "queued",
-            "conclusion": null
+            "status": "completed",
+            "conclusion": "success"
           }
         ]
       },
       {
         "workflow": "federation-software-update.yml",
-        "run_id": 34649416668,
-        "event": "pull_request",
-        "status": "completed",
-        "conclusion": "success",
+        "run_id": 34651625551,
+        "event": "workflow_dispatch",
+        "status": "in_progress",
+        "conclusion": null,
         "jobs": [
           {
-            "id": 103427820404,
+            "id": 103434869851,
             "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
-            "status": "completed",
-            "conclusion": "success"
+            "status": "in_progress",
+            "conclusion": null
           },
           {
-            "id": 103427820732,
+            "id": 103434869894,
             "name": "update-contracts (Linux, fcp-linux-fast, bash)",
             "status": "completed",
             "conclusion": "success"
@@ -67,16 +46,10 @@
         "conclusion": null,
         "jobs": [
           {
-            "id": 103431984823,
-            "name": "Shard contract (Windows, shared-pool)",
-            "status": "queued",
-            "conclusion": null
-          },
-          {
             "id": 103431985044,
             "name": "Shard contract (Linux, shared-pool)",
-            "status": "queued",
-            "conclusion": null
+            "status": "completed",
+            "conclusion": "success"
           }
         ]
       },
@@ -88,8 +61,20 @@
         "conclusion": null,
         "jobs": [
           {
+            "id": 103427821174,
+            "name": "Release checks (Windows)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
             "id": 103427821182,
             "name": "Full-suite order (rotating)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103427821272,
+            "name": "Full-suite order (fixed)",
             "status": "in_progress",
             "conclusion": null
           }
@@ -97,16 +82,22 @@
       },
       {
         "workflow": "phase2-federation.yml",
-        "run_id": 34649416744,
-        "event": "pull_request",
-        "status": "completed",
-        "conclusion": "success",
+        "run_id": 34651637810,
+        "event": "workflow_dispatch",
+        "status": "queued",
+        "conclusion": null,
         "jobs": [
           {
-            "id": 103427821467,
+            "id": 103434910797,
+            "name": "linux",
+            "status": "queued",
+            "conclusion": null
+          },
+          {
+            "id": 103434910977,
             "name": "windows",
-            "status": "completed",
-            "conclusion": "success"
+            "status": "queued",
+            "conclusion": null
           }
         ]
       },
@@ -114,27 +105,27 @@
         "workflow": "cf7c-physical-test-readiness.yml",
         "run_id": 34649602701,
         "event": "workflow_dispatch",
-        "status": "in_progress",
-        "conclusion": null,
+        "status": "completed",
+        "conclusion": "success",
         "jobs": [
           {
             "id": 103428419603,
             "name": "readiness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy B...",
-            "status": "in_progress",
-            "conclusion": null
+            "status": "completed",
+            "conclusion": "success"
           }
         ]
       },
       {
-        "workflow": "phase-f85-operator-federation-surface.yml",
-        "run_id": 34649607489,
+        "workflow": "cf8-role-retirement.yml",
+        "run_id": 34649604991,
         "event": "workflow_dispatch",
-        "status": "queued",
-        "conclusion": null,
+        "status": "completed",
+        "conclusion": "success",
         "jobs": [
           {
-            "id": 103428433245,
-            "name": "operator-surface (Linux, fcp-linux-fast, bash)",
+            "id": 103428425681,
+            "name": "role-retirement (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
             "status": "completed",
             "conclusion": "success"
           }

@@ -1641,3 +1641,11 @@ parents have full source-gap proof. Next: one guarded exact-head dispatch per ga
 21:54UTC: federation-software-update.yml exact-head83955f65 gap dispatched once (HTTP204); native proofs and fresh guards persisted in the ledger. Next state check uses poll_pr463_state.py; no duplicate dispatch or physical action.
 
 21:54UTC: phase2-federation.yml exact-head83955f65 gap dispatched once (HTTP204); native proofs and fresh guards persisted in the ledger. Next state check uses poll_pr463_state.py; no duplicate dispatch or physical action.
+
+##22:05UTC — readiness and retirement exact-head parents complete
+
+Head83955f65 unchanged. Readiness34649602701 and retirement34649604991 completed
+successfully. Other incomplete parents remain active; no failed jobs observed.
+Software-update34651625551 and phase234651637810 are the already-requested
+replacements. Next: retain only new native logs and verify source; no dispatch
+is currently justified for the still-active automatic release/ICSE parents.
