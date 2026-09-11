@@ -350,3 +350,14 @@ all other valid evidence; retain only new completions. Remaining461 synthetic
 release/CFI2/operator paths need reconciliation after completion. No new ICSE
 review is actionable yet. Runtime and protected Recorder state remain unchanged;
 no merge/final-main qualification/D04 action/physical acceptance or P07/P12.
+
+## September11 14:58UTC — PR461 exact retirement completed
+
+Heads unchanged;457 qualification remains valid. PR461 exact retirement
+34612131170 is complete/success on both platforms. Exact software-update
+34612126881 has Linux success and Windows queued. Synthetic release journal/
+artifacts completed successfully; capability/product is running. No new failure.
+Next: retain four new native logs; no new completed exact-head gap is actionable
+from this delta. Preserve all existing PASS. No merge or host action; runtime
+remains0536f03d67eb277e11573c2188d8e820399627e3, protected Recorder untouched,
+P07/P12 not started.

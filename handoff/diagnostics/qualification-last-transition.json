@@ -1,5 +1,5 @@
 {
-  "observed_at": "2026-09-11T14:45:18.683540+00:00",
+  "observed_at": "2026-09-11T14:57:19.986364+00:00",
   "changes": {
     "461": [
       {
@@ -10,38 +10,35 @@
         "conclusion": null,
         "jobs": [
           {
-            "id": 103267381216,
-            "name": "Windows regressions (journal-artifacts)",
+            "id": 103267381209,
+            "name": "Windows regressions (capability-product)",
             "status": "in_progress",
             "conclusion": null
-          }
-        ]
-      },
-      {
-        "workflow": "federation-software-update.yml",
-        "run_id": 34600817276,
-        "event": "pull_request",
-        "status": "completed",
-        "conclusion": "success",
-        "jobs": [
+          },
           {
-            "id": 103267380842,
-            "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+            "id": 103267381216,
+            "name": "Windows regressions (journal-artifacts)",
             "status": "completed",
             "conclusion": "success"
           }
         ]
       },
       {
-        "workflow": "phase2-federation.yml",
-        "run_id": 34605553188,
+        "workflow": "federation-software-update.yml",
+        "run_id": 34612126881,
         "event": "workflow_dispatch",
-        "status": "completed",
-        "conclusion": "success",
+        "status": "queued",
+        "conclusion": null,
         "jobs": [
           {
-            "id": 103282990020,
-            "name": "windows",
+            "id": 103304952736,
+            "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+            "status": "queued",
+            "conclusion": null
+          },
+          {
+            "id": 103304953149,
+            "name": "update-contracts (Linux, fcp-linux-fast, bash)",
             "status": "completed",
             "conclusion": "success"
           }
@@ -49,14 +46,20 @@
       },
       {
         "workflow": "cf8-role-retirement.yml",
-        "run_id": 34600817428,
-        "event": "pull_request",
+        "run_id": 34612131170,
+        "event": "workflow_dispatch",
         "status": "completed",
         "conclusion": "success",
         "jobs": [
           {
-            "id": 103267382042,
+            "id": 103304966448,
             "name": "role-retirement (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103304966897,
+            "name": "role-retirement (Linux, fcp-linux-fast, bash)",
             "status": "completed",
             "conclusion": "success"
           }
