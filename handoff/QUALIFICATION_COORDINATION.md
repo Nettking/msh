@@ -26,9 +26,9 @@ Nettking supported activation and all three actual M core image/env/repaired-sou
 hashes are verified. [Runtime receipt](diagnostics/nettking-m-runtime-admission.json).
 Next: Nitro/owned Recorder runtime admission, responder and membership/topology
 verification. Fresh topology and operative-context checks remain before evidence.
-Nitro activation stopped at complete Compose comparison before service start.
-Its source is clean M; cores/responder still N. Do not relaunch before inspecting
-the exact configuration delta in the failed audit guard.
+Nitro guarded continuation controller1211377 dispatched18:40UTC after the exact
+host port/image-ENV audit mismatch was resolved. Do not launch another. Inspect
+`supported-start-9b286f93-guarded.json` for actual current state; source is clean M.
 
 Nettking cores run M; Nitro cores/responder remain N0536f03d67eb277e11573c2188d8e820399627e3.
 Recorder protected production6fb77c/separate voterfba508 have not been changed.
@@ -1146,3 +1146,10 @@ changes and the explicit5152-to5151 host-port alignment, then starts unchanged M
 No assertions, deadlines, authority or product source were weakened/changed.
 Next exact command: run `diagnostics/dispatch_nitro_m_guarded.py` once; inspect
 `supported-start-9b286f93-guarded.json` before any further action/retry.
+
+##18:40UTC — guarded Nitro continuation dispatched
+
+[New controller receipt](diagnostics/nitro-m-guarded-controller-dispatch.json)
+binds PID1211377/script22c0c161b7ff2fc6b18acb5288062816cb708005ea870e72556b342942325b2c.
+The original stopped operation/evidence remain untouched. Next read only the
+new operation receipt and react to completion/failure; no duplicate startup.
