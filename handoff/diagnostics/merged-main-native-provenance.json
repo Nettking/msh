@@ -247,7 +247,72 @@
         "9b286f931497bf6291e215f6340443c5162826b0"
       ],
       "checkout_matches": true
+    },
+    {
+      "job_id": 103344769414,
+      "run_id": 34622528054,
+      "name": "Linux regression shard (3)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 64872,
+      "sha256": "24a60316fd81a404c24478d09f8be86a5264211e9f36e93469a161210d27f62b",
+      "checkout_commits": [
+        "9b286f931497bf6291e215f6340443c5162826b0"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103344769430,
+      "run_id": 34622528054,
+      "name": "Full-suite order (rotating)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 67725,
+      "sha256": "4ee17ac7b7620f93cc71034139e891ef21155e179b37dae36bf0b12be15a48dd",
+      "checkout_commits": [
+        "9b286f931497bf6291e215f6340443c5162826b0"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103344769467,
+      "run_id": 34622528054,
+      "name": "Linux regression shard (1)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 59504,
+      "sha256": "cfc3c01c35235375e8fc631d9f44c7d81a015421c415d83cc51dadef9949f42b",
+      "checkout_commits": [
+        "9b286f931497bf6291e215f6340443c5162826b0"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103340547805,
+      "run_id": 34622777814,
+      "name": "harness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Byp...",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 63401,
+      "sha256": "19cd49fef7b739c19beef9a043dd35fed2a21c758701762b918b5852a0a358a3",
+      "checkout_commits": [
+        "9b286f931497bf6291e215f6340443c5162826b0"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103340557562,
+      "run_id": 34622786434,
+      "name": "Shard contract (Windows, shared-pool)",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 25920,
+      "sha256": "94897d5b9f0dc56866486abd08c78f3878370817b17cd6162f7f22f7d947cf57",
+      "checkout_commits": [
+        "9b286f931497bf6291e215f6340443c5162826b0"
+      ],
+      "checkout_matches": true
     }
   ],
-  "retained_at": "2026-09-11T17:01:26.343934+00:00"
+  "retained_at": "2026-09-11T17:12:55.006013+00:00"
 }

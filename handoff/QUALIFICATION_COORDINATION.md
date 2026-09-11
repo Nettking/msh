@@ -763,3 +763,9 @@ finishing both workflows. Fixed order and Windows retirement are running.
 No new failure. Next: retain five new native proofs; await complete final gates
 and ICSE publication. Preserve all existing PASS, with no duplicate dispatch,
 D04/host/protected Recorder action or physical acceptance claim.
+
+Five new successful native logs prove exact final9b286f93;24 final-main proofs
+are retained. No mismatch or new failure. Next scheduled action remains
+poll_merged_main_state.py, followed by new-only retention and completed-artifact
+review when actionable. Runtime remains0536f03d; no candidate freeze or physical
+acceptance/P07/P12 action while required final qualification is pending.
