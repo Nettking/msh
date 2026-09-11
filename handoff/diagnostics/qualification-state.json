@@ -1,5 +1,5 @@
 {
-  "observed_at": "2026-09-11T13:51:58.236243+00:00",
+  "observed_at": "2026-09-11T14:03:47.893100+00:00",
   "prs": {
     "456": {
       "number": 456,
@@ -17,24 +17,24 @@
           "run_id": 34594937633,
           "event": "workflow_dispatch",
           "api_head_sha": "1a0c634f47f8a247b6d1d2d1a219f5c12590587d",
-          "status": "queued",
+          "status": "in_progress",
           "conclusion": null,
           "attempt": 1,
           "required_count": 2,
           "signature": {
-            "status": "queued",
+            "status": "in_progress",
             "conclusion": null,
             "run_attempt": 1,
-            "updated_at": "2026-09-11T11:37:35Z"
+            "updated_at": "2026-09-11T13:59:37Z"
           },
           "jobs": [
             {
               "id": 103248398752,
               "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
-              "status": "queued",
+              "status": "in_progress",
               "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T11:37:36Z",
+              "runner_name": "Nettking",
+              "started_at": "2026-09-11T13:59:36Z",
               "completed_at": null
             },
             {
@@ -972,11 +972,11 @@
             {
               "id": 103248585329,
               "name": "Windows regressions (transport-storage)",
-              "status": "in_progress",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "runner_name": "Nettking",
               "started_at": "2026-09-11T13:50:32Z",
-              "completed_at": null
+              "completed_at": "2026-09-11T13:55:02Z"
             },
             {
               "id": 103248585342,
@@ -1066,25 +1066,25 @@
           "run_id": 34595260905,
           "event": "workflow_dispatch",
           "api_head_sha": "143fe7a9082193114af3d34dc437b85f845849a2",
-          "status": "queued",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "attempt": 1,
           "required_count": 2,
           "signature": {
-            "status": "queued",
-            "conclusion": null,
+            "status": "completed",
+            "conclusion": "success",
             "run_attempt": 1,
-            "updated_at": "2026-09-11T11:41:39Z"
+            "updated_at": "2026-09-11T13:59:35Z"
           },
           "jobs": [
             {
               "id": 103249431573,
               "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T11:41:40Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking",
+              "started_at": "2026-09-11T13:55:03Z",
+              "completed_at": "2026-09-11T13:59:34Z"
             },
             {
               "id": 103249431949,
@@ -1509,91 +1509,82 @@
         },
         {
           "workflow": "cf7b-product-physical-acceptance.yml",
-          "run_id": 34600817477,
-          "event": "pull_request",
+          "run_id": 34606865363,
+          "event": "workflow_dispatch",
           "api_head_sha": "5b826c6806ab1bdb960412ba20ca78192971fb1d",
-          "status": "completed",
-          "conclusion": "success",
+          "status": "queued",
+          "conclusion": null,
           "attempt": 1,
           "required_count": 2,
           "signature": {
-            "status": "completed",
-            "conclusion": "success",
+            "status": "queued",
+            "conclusion": null,
             "run_attempt": 1,
-            "updated_at": "2026-09-11T13:50:31Z"
+            "updated_at": "2026-09-11T13:53:05Z"
           },
           "jobs": [
             {
-              "id": 103267380965,
-              "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
-              "status": "completed",
-              "conclusion": "success",
-              "runner_name": "Nettking",
-              "started_at": "2026-09-11T13:46:07Z",
-              "completed_at": "2026-09-11T13:50:30Z"
-            },
-            {
-              "id": 103267381288,
+              "id": 103287329268,
               "name": "acceptance (Linux, fcp-linux-fast, bash)",
               "status": "completed",
               "conclusion": "success",
               "runner_name": "Nettking-Linux",
-              "started_at": "2026-09-11T13:23:56Z",
-              "completed_at": "2026-09-11T13:26:44Z"
+              "started_at": "2026-09-11T13:53:08Z",
+              "completed_at": "2026-09-11T13:55:19Z"
+            },
+            {
+              "id": 103287329543,
+              "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "started_at": "2026-09-11T13:53:06Z",
+              "completed_at": null
             }
           ]
         },
         {
           "workflow": "icse-tool-demo.yml",
-          "run_id": 34600817567,
-          "event": "pull_request",
+          "run_id": 34606870244,
+          "event": "workflow_dispatch",
           "api_head_sha": "5b826c6806ab1bdb960412ba20ca78192971fb1d",
-          "status": "completed",
-          "conclusion": "success",
+          "status": "queued",
+          "conclusion": null,
           "attempt": 1,
           "required_count": 4,
           "signature": {
-            "status": "completed",
-            "conclusion": "success",
+            "status": "queued",
+            "conclusion": null,
             "run_attempt": 1,
-            "updated_at": "2026-09-11T13:38:33Z"
+            "updated_at": "2026-09-11T13:53:07Z"
           },
           "jobs": [
             {
-              "id": 103267381236,
-              "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
-              "status": "completed",
-              "conclusion": "success",
-              "runner_name": "Nettking",
-              "started_at": "2026-09-11T13:20:20Z",
-              "completed_at": "2026-09-11T13:25:06Z"
-            },
-            {
-              "id": 103267381660,
+              "id": 103287341416,
               "name": "reviewer-compose",
               "status": "completed",
               "conclusion": "success",
               "runner_name": "Nettking-Linux",
-              "started_at": "2026-09-11T13:37:38Z",
-              "completed_at": "2026-09-11T13:38:10Z"
+              "started_at": "2026-09-11T13:55:21Z",
+              "completed_at": "2026-09-11T13:55:47Z"
             },
             {
-              "id": 103267381672,
+              "id": 103287341780,
+              "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "started_at": "2026-09-11T13:53:09Z",
+              "completed_at": null
+            },
+            {
+              "id": 103287341872,
               "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
               "status": "completed",
               "conclusion": "success",
               "runner_name": "Nettking-Linux",
-              "started_at": "2026-09-11T13:34:51Z",
-              "completed_at": "2026-09-11T13:36:06Z"
-            },
-            {
-              "id": 103282595592,
-              "name": "publication-bundle",
-              "status": "completed",
-              "conclusion": "success",
-              "runner_name": "Nettking-Linux",
-              "started_at": "2026-09-11T13:38:12Z",
-              "completed_at": "2026-09-11T13:38:33Z"
+              "started_at": "2026-09-11T13:55:49Z",
+              "completed_at": "2026-09-11T13:57:04Z"
             }
           ]
         },

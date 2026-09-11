@@ -1,6 +1,23 @@
 {
-  "observed_at": "2026-09-11T13:51:58.236243+00:00",
+  "observed_at": "2026-09-11T14:03:47.893100+00:00",
   "changes": {
+    "456": [
+      {
+        "workflow": "federation-software-update.yml",
+        "run_id": 34594937633,
+        "event": "workflow_dispatch",
+        "status": "in_progress",
+        "conclusion": null,
+        "jobs": [
+          {
+            "id": 103248398752,
+            "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+            "status": "in_progress",
+            "conclusion": null
+          }
+        ]
+      }
+    ],
     "457": [
       {
         "workflow": "federation-v1-release.yml",
@@ -10,37 +27,8 @@
         "conclusion": null,
         "jobs": [
           {
-            "id": 103248585286,
-            "name": "Windows regressions (capability-product)",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
             "id": 103248585329,
             "name": "Windows regressions (transport-storage)",
-            "status": "in_progress",
-            "conclusion": null
-          }
-        ]
-      }
-    ],
-    "461": [
-      {
-        "workflow": "phase2-federation.yml",
-        "run_id": 34605553188,
-        "event": "workflow_dispatch",
-        "status": "queued",
-        "conclusion": null,
-        "jobs": [
-          {
-            "id": 103282990020,
-            "name": "windows",
-            "status": "queued",
-            "conclusion": null
-          },
-          {
-            "id": 103282990235,
-            "name": "linux",
             "status": "completed",
             "conclusion": "success"
           }
@@ -48,50 +36,64 @@
       },
       {
         "workflow": "cf7b-product-physical-acceptance.yml",
-        "run_id": 34600817477,
-        "event": "pull_request",
-        "status": "completed",
-        "conclusion": "success",
-        "jobs": [
-          {
-            "id": 103267380965,
-            "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
-            "status": "completed",
-            "conclusion": "success"
-          }
-        ]
-      },
-      {
-        "workflow": "icse-tool-demo.yml",
-        "run_id": 34600817567,
-        "event": "pull_request",
-        "status": "completed",
-        "conclusion": "success",
-        "jobs": [
-          {
-            "id": 103267381660,
-            "name": "reviewer-compose",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
-            "id": 103282595592,
-            "name": "publication-bundle",
-            "status": "completed",
-            "conclusion": "success"
-          }
-        ]
-      },
-      {
-        "workflow": "cf7-acceptance-harness.yml",
-        "run_id": 34601191261,
+        "run_id": 34595260905,
         "event": "workflow_dispatch",
         "status": "completed",
         "conclusion": "success",
         "jobs": [
           {
-            "id": 103268622226,
-            "name": "harness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Byp...",
+            "id": 103249431573,
+            "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      }
+    ],
+    "461": [
+      {
+        "workflow": "cf7b-product-physical-acceptance.yml",
+        "run_id": 34606865363,
+        "event": "workflow_dispatch",
+        "status": "queued",
+        "conclusion": null,
+        "jobs": [
+          {
+            "id": 103287329268,
+            "name": "acceptance (Linux, fcp-linux-fast, bash)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103287329543,
+            "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
+            "status": "queued",
+            "conclusion": null
+          }
+        ]
+      },
+      {
+        "workflow": "icse-tool-demo.yml",
+        "run_id": 34606870244,
+        "event": "workflow_dispatch",
+        "status": "queued",
+        "conclusion": null,
+        "jobs": [
+          {
+            "id": 103287341416,
+            "name": "reviewer-compose",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103287341780,
+            "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
+            "status": "queued",
+            "conclusion": null
+          },
+          {
+            "id": 103287341872,
+            "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
             "status": "completed",
             "conclusion": "success"
           }
