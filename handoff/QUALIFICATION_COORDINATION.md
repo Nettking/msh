@@ -1486,3 +1486,8 @@ Seven new native logs all verify exact head7286f30d. Required checks now25/37
 plus companion3/3; all21 non-release required jobs are complete and preserved.
 Release4/16 verified so far. Next: review completed exact-head ICSE artifacts;
 then continue on release job state changes only. Physical admission remains stopped.
+
+20:45UTC: six immutable ICSE artifact ZIPs retained from34642522512; every GitHub
+digest matches. [Retention receipt](diagnostics/pr463-icse-artifact-retention.json).
+Next: inspect the publication manifest, source export, checksums, native component
+and network evidence; do not rebuild artifacts or rerun completed jobs.
