@@ -1,5 +1,5 @@
 {
-  "observed_at": "2026-09-11T14:57:19.986364+00:00",
+  "observed_at": "2026-09-11T15:08:50.927994+00:00",
   "prs": {
     "456": {
       "number": 456,
@@ -274,10 +274,10 @@
             {
               "id": 103249965566,
               "name": "Windows regressions (transport-storage)",
-              "status": "queued",
+              "status": "in_progress",
               "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T11:43:48Z",
+              "runner_name": "Nettking",
+              "started_at": "2026-09-11T15:05:42Z",
               "completed_at": null
             },
             {
@@ -1256,11 +1256,11 @@
             {
               "id": 103267381209,
               "name": "Windows regressions (capability-product)",
-              "status": "in_progress",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "runner_name": "Nettking",
               "started_at": "2026-09-11T14:55:37Z",
-              "completed_at": null
+              "completed_at": "2026-09-11T15:02:20Z"
             },
             {
               "id": 103267381213,
@@ -1575,15 +1575,15 @@
           "run_id": 34606870244,
           "event": "workflow_dispatch",
           "api_head_sha": "5b826c6806ab1bdb960412ba20ca78192971fb1d",
-          "status": "queued",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "attempt": 1,
           "required_count": 4,
           "signature": {
-            "status": "queued",
-            "conclusion": null,
+            "status": "completed",
+            "conclusion": "success",
             "run_attempt": 1,
-            "updated_at": "2026-09-11T13:53:07Z"
+            "updated_at": "2026-09-11T15:06:06Z"
           },
           "jobs": [
             {
@@ -1598,11 +1598,11 @@
             {
               "id": 103287341780,
               "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T13:53:09Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking",
+              "started_at": "2026-09-11T15:02:22Z",
+              "completed_at": "2026-09-11T15:05:41Z"
             },
             {
               "id": 103287341872,
@@ -1612,6 +1612,15 @@
               "runner_name": "Nettking-Linux",
               "started_at": "2026-09-11T13:55:49Z",
               "completed_at": "2026-09-11T13:57:04Z"
+            },
+            {
+              "id": 103311460581,
+              "name": "publication-bundle",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-11T15:05:43Z",
+              "completed_at": "2026-09-11T15:06:05Z"
             }
           ]
         },

@@ -368,3 +368,13 @@ which remains excluded. No errors or new dispatch requirement. Next scheduled
 action: poll_required_state.py, preserving457 qualification and all exact PASS;
 retain only new completions and reconcile461 release/CFI2/operator after their
 prior runs complete. No physical evidence, candidate or host state changed.
+
+## September11 15:09UTC — PR461 exact ICSE completed
+
+Heads unchanged;457 qualification remains valid, no new failure. PR461 exact
+ICSE34606870244 completed successfully, including native Windows entrypoint and
+publication bundle. Synthetic release capability/product completed successfully.
+PR456 transport/storage Windows regressions are running. Next: retain three new
+native proofs, then retain/review only the newly completed exact461 ICSE artifacts.
+No merge or host action; runtime remains0536f03d67eb277e11573c2188d8e820399627e3,
+protected Recorder untouched, no physical PASS and no P07/P12 timers.
