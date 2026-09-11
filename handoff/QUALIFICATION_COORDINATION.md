@@ -1491,3 +1491,13 @@ then continue on release job state changes only. Physical admission remains stop
 digest matches. [Retention receipt](diagnostics/pr463-icse-artifact-retention.json).
 Next: inspect the publication manifest, source export, checksums, native component
 and network evidence; do not rebuild artifacts or rerun completed jobs.
+
+20:45UTC: [Exact-head ICSE artifact review](diagnostics/pr463-icse-artifact-review.json)
+PASS: all1412 exported source files byte-match Git head7286f30d; manifest/ref/run,
+19 checksums and publication digest verified. Native Linux/Windows/Compose each
+4/4; both network executions10 required checks with owned-process teardown.
+No artifact rebuild, source change or physical acceptance claim. Preserve this
+review and25/37+3/3 native qualification; only release remains active.
+Next exact action: audit Python runs `handoff/diagnostics/poll_pr463_state.py` on
+the next state check. On release completion retain only new logs, review its
+aggregates and native release artifacts, then assess exact-head merge readiness.
