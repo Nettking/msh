@@ -299,7 +299,59 @@
         "4749ab6689315a7ad953c11ce4b2ec942433d71a"
       ],
       "checkout_matches": true
+    },
+    {
+      "job_id": 103449514247,
+      "run_id": 34656348284,
+      "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 107002,
+      "sha256": "a7cf17fef4ff6eb204163a460f7104f3b93ed235bdef0d32fcf4091669b27c61",
+      "checkout_commits": [
+        "2be67d18c2c58bde4b4be09c2f7b97b6a42dd83c"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103449511893,
+      "run_id": 34656348383,
+      "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 66207,
+      "sha256": "f7dbc22657c9b09d2a89df3fa169446b7ca5c3588adea52295cf8c3b65470ec1",
+      "checkout_commits": [
+        "2be67d18c2c58bde4b4be09c2f7b97b6a42dd83c"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103453726152,
+      "run_id": 34656348410,
+      "name": "Linux regression shard (0)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 58891,
+      "sha256": "028d7486494818d1d22822de2e02fc2bcb0280dee6fb914ba586ea50095b5ec9",
+      "checkout_commits": [
+        "2be67d18c2c58bde4b4be09c2f7b97b6a42dd83c"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103453726153,
+      "run_id": 34656348410,
+      "name": "Full-suite order (rotating)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 69923,
+      "sha256": "2765db43c53d912167e2bc5ac3c7adc7649c4c4fc49aa5083278507a39c61026",
+      "checkout_commits": [
+        "2be67d18c2c58bde4b4be09c2f7b97b6a42dd83c"
+      ],
+      "checkout_matches": false
     }
   ],
-  "retained_at": "2026-09-11T23:38:14.314663+00:00"
+  "retained_at": "2026-09-11T23:49:43.911619+00:00"
 }

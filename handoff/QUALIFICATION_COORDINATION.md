@@ -1845,3 +1845,8 @@ retain only newly completed evidence. No new defect, merge or physical change.
 completed success; two additional release jobs succeeded. No failure reported.
 Next: retain newly terminal native logs; verify both completed workflow source
 gaps before dispatch. Preserve required8/37 plus3/3 exact-head proofs.
+
+23:50UTC: four new native logs prove synthetic2be67d18. Completed F85 and update
+workflows each have both source proofs retained; no exact-head run exists for
+either. Next: guarded one-time dispatch of these two source gaps. Release remains
+active; preserve8/37 plus3/3 native PASS. No additional defect or physical change.
