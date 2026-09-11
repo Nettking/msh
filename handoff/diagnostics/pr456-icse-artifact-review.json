@@ -1,0 +1,37 @@
+{
+  "recorded_at": "2026-09-11T13:40:39.378345+00:00",
+  "source_sha": "1a0c634f47f8a247b6d1d2d1a219f5c12590587d",
+  "icse_run": 34595194849,
+  "source_export_exact": true,
+  "source_files": 1408,
+  "outer_sha256": "72afc3d60c7d8176676f1103385bbf3f9e882b1da49a65c8bfcc13682f671c3c",
+  "publication_sha256": "50c9645c3af64fbc441cef7423989810eb33b00dae2fa13835e3686ce6235bb0",
+  "checksum_entries": 19,
+  "component": [
+    {
+      "execution": "Linux",
+      "passed": 4
+    },
+    {
+      "execution": "Windows",
+      "passed": 4
+    },
+    {
+      "execution": "compose",
+      "passed": 4
+    }
+  ],
+  "network": [
+    {
+      "execution": "Linux",
+      "required_checks_passed": 10,
+      "teardown": true
+    },
+    {
+      "execution": "Windows",
+      "required_checks_passed": 10,
+      "teardown": true
+    }
+  ],
+  "physical_acceptance": false
+}

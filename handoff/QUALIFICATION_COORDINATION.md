@@ -150,3 +150,22 @@ prior leaves. The updated completed-head-gap-dispatches.json records both
 proof digests, workflow digest and204 receipt. No active job was cancelled or
 valid exact-head PASS rerun. Next: retain/audit completed456 ICSE artifacts;
 remaining qualification awaits state changes.
+
+## September11 13:41UTC — PR456 ICSE artifacts verified
+
+Completed exact-head run34595194849 has six retained native GitHub ZIPs with
+matching API digests. The bundle source equals all1408 public immutable Git
+archive files at1a0c634f; both checksum layers and embedded metadata agree.
+Component evidence is4/4 on Linux, Windows and Compose; Linux/Windows network
+evidence has10 required checks each and complete owned-process teardown.
+[Review](diagnostics/pr456-icse-artifact-review.json),
+[artifact receipt](diagnostics/pr456-icse-artifact-retention.json), and
+[review procedure](diagnostics/review_pr456_icse.py) are retained. No rebuild,
+software rerun or physical acceptance claim.
+
+Next scheduled check: poll_required_state.py; preserve unchanged evidence and
+retain only new native job results after persisting meaningful transitions.
+Required gates are still pending across the fix set, including the newly
+dispatched exact461 phase2. No PR merge/candidate freeze yet. Runtime remains
+0536f03d67eb277e11573c2188d8e820399627e3; D04 deferred until final merged-main
+qualification; protected Recorder data untouched; P07/P12 not started.
