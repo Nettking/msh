@@ -1,0 +1,52 @@
+{
+  "observed_at": "2026-09-11T18:59:44.346173+00:00",
+  "candidate": "9b286f931497bf6291e215f6340443c5162826b0",
+  "source_clean": true,
+  "host": "nitro",
+  "processes": [
+    {
+      "pid": 1174977,
+      "exists": false
+    },
+    {
+      "pid": 1234730,
+      "exists": false
+    }
+  ],
+  "port5151_listeners": [],
+  "secret_mtime_utc": "2026-09-11T18:13:48.903634+00:00",
+  "services": [
+    {
+      "service": "flask",
+      "id": "8d96382f90c88235483e6297d4fe57f8f37177106fbc2b21bee6615f1811f74f",
+      "image": "sha256:bec1d95ace6f962c446c5e50f9888efad196a72ed0240382fd4a37d1cb3e9f32",
+      "started_at": "2026-09-11T18:43:02.985082423Z",
+      "restarts": 0
+    },
+    {
+      "service": "relay",
+      "id": "1405bdf150efa568cc8ef7d7fac3ee05e45c934a67a5caf5da0d7035e31abeb9",
+      "image": "sha256:be14b918bb02d8f9109fb95ad4f796946d62314379445e7ef67bec6f5b70dd16",
+      "started_at": "2026-09-11T18:42:24.185120696Z",
+      "restarts": 0
+    },
+    {
+      "service": "recorder",
+      "id": "6f9eaa9998cdd8795b27244be0f6a2701b7437827c25f7fd28f2f36dc7f7ce6b",
+      "image": "sha256:918a334436a8a4866330ae93c5082c2a81a71f716a20c3b30c9f4e4df0841e62",
+      "started_at": "2026-09-11T18:42:24.2513943Z",
+      "restarts": 0
+    },
+    {
+      "service": "ollama",
+      "id": "9443f9e1a0ba48ce7f8c2a4ea02762f7d61b4e45d9a823fe6bd373e331af90cc",
+      "image": "sha256:b88c73ace3e115f8ec53dc8761ae1c0aabfa675406e3681786b98757ce050f42",
+      "started_at": "2026-09-11T10:03:58.151763406Z",
+      "restarts": 0
+    }
+  ],
+  "native_log_sha256": "d136762f1f3e32a1436cd29b27656f51cf0fe3fe0c22fdd7fb48192fbad01afe",
+  "state_changed": false,
+  "protected_recorder_data_untouched": true,
+  "physical_acceptance": false
+}

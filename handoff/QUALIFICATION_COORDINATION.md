@@ -33,7 +33,8 @@ verified. Control identity preserved; LEADER/ready term9/index1553. Next replace
 the still-imported N host responder through the checked-in exact-process guard.
 
 Nettking and Nitro cores run M; Nitro responder replacement failed, current
-listener/process state requires a read-only snapshot before any further action.
+listener is absent: both old/new processes exited and5151 is free. Do not restart
+to hide D06. Core services remain M and stable; secret metadata unchanged.
 Recorder protected production6fb77c/separate voterfba508 have not been changed.
 No physical PASS; P07/P12
 not started. Protected Recorder data remains out of bounds. The user's latest
@@ -1217,3 +1218,12 @@ No protected Recorder data touched; no grant/enrollment request; P07/P12 absent.
 source/stage/host, state effects and repair boundary. The accumulating blocker
 table now includes D06. Next read-only process/socket snapshot; then separate
 repair branch/draft PR and focused regression. Do not resume M physical admission.
+
+##18:59UTC — D06 post-failure state preserved
+
+[Snapshot](diagnostics/d06-post-failure.json): both processes exited,5151 is now
+free, all M core identities/start times unchanged, shared secret mtime remains
+D04 creation18:13:48UTC. Exact native log digest matches. No listener retry.
+This supports the asynchronous signal/rebind mechanism. Next: isolated repair
+branch from M, real-process regression reproducing delayed exit, bounded exit
+wait on the same stable process handle, and draft PR linked to#462. No host deploy.
