@@ -1,0 +1,10 @@
+{
+  "pr": 457,
+  "qualified_head": "143fe7a9082193114af3d34dc437b85f845849a2",
+  "sha": "8948e953bd2f0cb063124ff2065ed5dd90f5f4a3",
+  "merged": true,
+  "message": "Pull Request successfully merged",
+  "intermediate_main_only": true,
+  "physical_runtime": "0536f03d67eb277e11573c2188d8e820399627e3",
+  "protected_recorder_touched": false
+}

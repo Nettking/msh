@@ -629,3 +629,11 @@ ref API read and PR456 merged record all confirm actual main63976fb3. This is
 metadata freshness, not a failed merge or product defect. Qualified457 head
 remains143fe7a9; no findings. PR457 marked ready at16:29:53UTC. Next: normal
 expected-head merge457 against actual current main; no head rewrite or gate bypass.
+
+## September11 16:30UTC — PR457 merged normally
+
+GitHub merged qualified143fe7a9 as8948e953bd2f0cb063124ff2065ed5dd90f5f4a3
+with expected-head guard and normal enforcement. Receipt: pr457-merge.json.
+This remains intermediate main. Next: fresh461 head/findings check, mark ready
+and merge separately; then verify actual final main and complete fix ancestry.
+No intermediate qualification dispatched; runtime/protected Recorder unchanged.
