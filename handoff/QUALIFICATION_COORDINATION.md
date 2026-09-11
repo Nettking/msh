@@ -1744,3 +1744,11 @@ replacement cases still fail WinError5;60 other focused cases pass. Retained
 diagnostics/d07-reader-only-insufficient.xml. This refines D07, not a new blocker.
 Next: inspect Windows atomic replacement semantics before choosing a complete
 repair. Work-in-progress is isolated on the D07 worktree; no deployment or CI retry.
+
+22:58UTC: D07 repair pushed as draft PR465, head
+f095f6cc96cc95c2a67d287b189e88267d95ae79. Complete fix uses shared-delete readers
+plus explicit native POSIX replacement; prior replacement callers unchanged.
+Focused native Windows tests67 PASS/3 platform skips in33.73s, receipt at
+diagnostics/d07-final-focused-regression.xml. No physical operation or full retry.
+Next: review the repair and required exact-head CI gaps; preserve PR463 proofs.
+Both fixes remain separate. Final merged main must be qualified once after merges.
