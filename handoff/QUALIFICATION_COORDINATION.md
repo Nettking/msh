@@ -1799,3 +1799,10 @@ reported failure. Sharding and CFI2 completed success; branding automatic run
 completed success. All required workflows now exist. Next: retain only new
 terminal native logs and verify checkout SHAs before counting; inspect any
 completed synthetic-only source gap once. No physical or PR463 state change.
+
+23:15UTC: native source verification retains PR465 required5/37 plus companion
+2/3 PASS on exact4749ab66. Twelve new terminal logs preserved with digests.
+Completed branding34656348285 proves synthetic2be67d18, not intended head.
+Other synthetic-source workflows still have active jobs. Next: dispatch only
+the completed branding exact-head gap once using the guarded helper; preserve
+all verified proof and wait for remaining independent CI. Review count unchanged.
