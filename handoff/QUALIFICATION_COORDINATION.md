@@ -1632,3 +1632,8 @@ completed successfully; other incomplete parents remain active, no failed jobs.
 The three21:42 exact-head replacements are visible. Next: retain newly completed
 logs, verify source and fill only demonstrated completed-parent gaps. Review
 comment count unchanged; no physical state change or merge.
+
+Four new logs retained. Operator Linux verifies exact83955f65, bringing required
+native PASS to5/37 plus companion1/3. Both software-update jobs and phase2 Windows
+prove synthetic68f6e72c; phase2 Linux proof was already retained. Both completed
+parents have full source-gap proof. Next: one guarded exact-head dispatch per gap.
