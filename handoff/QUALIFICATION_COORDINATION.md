@@ -637,3 +637,9 @@ with expected-head guard and normal enforcement. Receipt: pr457-merge.json.
 This remains intermediate main. Next: fresh461 head/findings check, mark ready
 and merge separately; then verify actual final main and complete fix ancestry.
 No intermediate qualification dispatched; runtime/protected Recorder unchanged.
+
+Fresh461 premerge snapshot confirms unchanged5b826c68, no findings, mergeable
+source and actual main8948e953. PR461 marked ready at16:31:22UTC. Receipts retain
+actual ref separately from stale PR base metadata. Next: normal expected-head
+merge461; then verify final main ancestry and select its qualification runs.
+No candidate or physical state change.
