@@ -1247,3 +1247,24 @@ Preserve all prior software evidence. Before any future physical restart, this
 new repair needs the required PR-head qualification, normal merge, actual new
 merged-main qualification and clean revalidation/candidate selection. Physical
 hosts stay on M cores; Nitro has no responder; Recorder protected data untouched.
+
+##19:12UTC — PR463 initial native CI state retained, source review complete
+
+Exact head remains7286f30d. [State cache](diagnostics/pr463-qualification-state.json)
+and [delta](diagnostics/pr463-qualification-last-transition.json) cover only463.
+Seven workflows auto-started; release guard and shard planning completed, other
+jobs queued/running. No failed job. Four required workflows were not triggered
+by paths: acceptance harness, physical readiness, retirement, operator surface.
+CFI2/registry are also absent. No jobs have been duplicated or manually dispatched.
+
+Source review finds no unresolved correctness issue: Linux poll retains the same
+pidfd through signal/exit confirmation, Windows retains the same verified handle
+with SYNCHRONIZE, both waits are bounded5s, failed wait refuses before bind/write,
+and all handles close in finally. PID mismatch/no strong handle remain fail-closed.
+Real process and timeout regressions plus native Windows handle tests support
+the narrow repair. Prior source/authority/deadline contracts remain unchanged.
+
+Next: mark463 ready for review; qualify this reviewed exact head under existing
+37-job/CFI2/registry contracts. First retain completed native checkout proofs,
+then dispatch only proven absent gates; let existing jobs finish before resolving
+any synthetic-checkout gaps. Do not qualify old candidates or deploy the repair.
