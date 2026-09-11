@@ -442,9 +442,35 @@
             "1a0c634f47f8a247b6d1d2d1a219f5c12590587d"
           ],
           "checkout_matches": true
+        },
+        {
+          "job_id": 103249965566,
+          "run_id": 34595427316,
+          "name": "Windows regressions (transport-storage)",
+          "runner_name": "Nettking",
+          "conclusion": "success",
+          "bytes": 54029,
+          "sha256": "d7bb7e4b02cdb0c2afc73566f347b6dd022e5ae3aa9d1c03da62a09526abe091",
+          "checkout_commits": [
+            "1a0c634f47f8a247b6d1d2d1a219f5c12590587d"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103249965630,
+          "run_id": 34595427316,
+          "name": "Windows regressions (journal-artifacts)",
+          "runner_name": "Nettking",
+          "conclusion": "success",
+          "bytes": 51919,
+          "sha256": "a212198c631395c087733f22002043714a0c390a493245366d085249c11fe66f",
+          "checkout_commits": [
+            "1a0c634f47f8a247b6d1d2d1a219f5c12590587d"
+          ],
+          "checkout_matches": true
         }
       ],
-      "retained_at": "2026-09-11T14:16:02.566302+00:00"
+      "retained_at": "2026-09-11T15:21:52.555644+00:00"
     },
     "457": {
       "source_commit": "143fe7a9082193114af3d34dc437b85f845849a2",
@@ -1592,9 +1618,22 @@
             "5b826c6806ab1bdb960412ba20ca78192971fb1d"
           ],
           "checkout_matches": true
+        },
+        {
+          "job_id": 103268639822,
+          "run_id": 34601196761,
+          "name": "Shard contract (Windows, shared-pool)",
+          "runner_name": "Nettking",
+          "conclusion": "success",
+          "bytes": 24807,
+          "sha256": "6ef4c583d01422e3855a1419a6673dd392cecc57ec55b1f669a611a559fc7a02",
+          "checkout_commits": [
+            "5b826c6806ab1bdb960412ba20ca78192971fb1d"
+          ],
+          "checkout_matches": true
         }
       ],
-      "retained_at": "2026-09-11T15:09:27.043670+00:00"
+      "retained_at": "2026-09-11T15:21:51.433007+00:00"
     }
   }
 }

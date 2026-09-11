@@ -411,3 +411,11 @@ successfully on both platforms. Next: retain three new native proofs; wait for
 456 release completion before its complete artifact review. No duplicate jobs,
 merge or host action; runtime remains0536f03d67eb277e11573c2188d8e820399627e3,
 protected Recorder untouched, no physical PASS and no P07/P12 timers.
+
+All three new successful native logs prove intended exact heads:456 two Windows
+release groups and461 Windows sharding. No mismatch or new failure. Preserve
+these proofs and457 qualification. Next scheduled action: poll_required_state.py;
+on456 release completion retain the remaining logs, review complete native
+release artifacts and reconcile its final required gate verdict. For461 retain
+new evidence and reconcile synthetic release/CFI2/operator only when complete.
+No host, protected-data or physical acceptance change.
