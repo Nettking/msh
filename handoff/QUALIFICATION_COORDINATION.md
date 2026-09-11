@@ -1411,3 +1411,10 @@ CFI2/registry3/3. CF7B, readiness and branding are fully verified and preserved.
 All four completed ICSE jobs, including publication-bundle, checked out
 syntheticbfec91c9; all mismatch proofs are retained. Next: dispatch ICSE exact-head
 once. Release/sharding parents remain active; do not duplicate them.
+
+20:07UTC: ICSE exact-head replacement dispatched once (HTTP204), with four native
+proofs in the ledger; eleven total dispatches now recorded for463. Next:
+`poll_pr463_state.py` on next state check, retain only new terminal logs. The only
+remaining synthetic-source parents are release and sharding; wait for completion
+and inspect their native/aggregate provenance before any justified replacement.
+Preserve12/37+3/3 exact-head PASS. No merge or physical state change.
