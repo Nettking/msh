@@ -1,0 +1,42 @@
+{
+  "finding": "D01",
+  "candidate_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
+  "hosts": [
+    "nitro",
+    "nettking"
+  ],
+  "mode": "DIAGNOSTIC ONLY — NOT PHYSICAL ACCEPTANCE EVIDENCE",
+  "stage": "supported startup before formal P01/P03",
+  "procedure": [
+    "Owned Nitro project and preserved private environment, checked-in N bash start.sh --resume",
+    "Direct HTTPConnection GET /onboarding, then original urllib.request.urlopen /onboarding timeout=2"
+  ],
+  "observed_at": "2026-09-11T10:07:57.003254+00:00",
+  "probe": {
+    "initial_status": 302,
+    "initial_seconds": 0.012786905048415065,
+    "location": "/login",
+    "follow_exception": "TimeoutError",
+    "follow_error": "timed out",
+    "follow_seconds": 2.0190453638788313
+  },
+  "startup_exit_code": 1,
+  "native_error": "The containers started, but FCP did not become ready.",
+  "expected": "Direct readiness response does not follow login or publish user metadata.",
+  "state_changed": "Historical supported activation changed owned Nitro containers; login GET may update owned human-user metadata. No source or topology change.",
+  "protected_recorder_data_untouched": true,
+  "physical_pass": false,
+  "originals": [
+    {
+      "local_name": "nitro-N-readiness-0536f03d-diagnostic.json",
+      "sha256": "81ec82bf6ceb4d434dd7f90e9c7b3dc5dd896d3ece5b746f0e5093d1e60ff53e",
+      "bytes": 6868
+    },
+    {
+      "local_name": "nitro-N-supported-start-0536f03d-distinct-images-native.log",
+      "sha256": "7006a8e82fa0a3e38de2c47ad238a24eb231ee88ba90366181086b9e422a9078",
+      "bytes": 11883
+    }
+  ],
+  "repair_pr": "https://github.com/Nettking/msh/pull/456"
+}

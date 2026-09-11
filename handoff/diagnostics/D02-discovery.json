@@ -1,0 +1,86 @@
+{
+  "finding": "D02",
+  "candidate_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
+  "hosts": [
+    "nettking",
+    "nitro"
+  ],
+  "mode": "DIAGNOSTIC ONLY — NOT PHYSICAL ACCEPTANCE EVIDENCE",
+  "stage": "ordinary discovery before enrollment",
+  "procedure": "Import N catalog/federation/tailscale_host_discovery.py; call _probe_peer against Nitro published Flask port, timeouts [0.75,0.75,5.0,0.75], actual urllib.request.urlopen.",
+  "observed_at": "2026-09-11T10:13:33.773751+00:00",
+  "runtime": {
+    "container": "f32a7f960cdcd19f0b60d2e03675c62baadadf2dead267176012c81fc1589026",
+    "image": "sha256:6b3e53b057ed9dca44c8ac3759cc4bed80a0c6956e6b3c929e39a3ba081685f5",
+    "commit": "0536f03d67eb277e11573c2188d8e820399627e3"
+  },
+  "module_sha256": "43f6dd9d6113cad0c275ccf2063e9dc10c3c96d993f44e9593e0731b72f360ad",
+  "observations": [
+    {
+      "at": "2026-09-11T10:13:27.061194+00:00",
+      "timeout_seconds": 0.75,
+      "valid_advertisement": false,
+      "elapsed_seconds": 0.8279999999795109,
+      "request_trace": [
+        {
+          "elapsed_seconds": 0.8279999999795109,
+          "error_type": "TimeoutError"
+        }
+      ]
+    },
+    {
+      "at": "2026-09-11T10:13:27.856162+00:00",
+      "timeout_seconds": 0.75,
+      "valid_advertisement": false,
+      "elapsed_seconds": 0.7970000000204891,
+      "request_trace": [
+        {
+          "elapsed_seconds": 0.7970000000204891,
+          "error_type": "TimeoutError"
+        }
+      ]
+    },
+    {
+      "at": "2026-09-11T10:13:32.930369+00:00",
+      "timeout_seconds": 5.0,
+      "valid_advertisement": false,
+      "elapsed_seconds": 5.077999999979511,
+      "request_trace": [
+        {
+          "elapsed_seconds": 5.077999999979511,
+          "error_type": "TimeoutError"
+        }
+      ]
+    },
+    {
+      "at": "2026-09-11T10:13:33.773751+00:00",
+      "timeout_seconds": 0.75,
+      "valid_advertisement": false,
+      "elapsed_seconds": 0.8429999999934807,
+      "request_trace": [
+        {
+          "elapsed_seconds": 0.8429999999934807,
+          "error_type": "TimeoutError"
+        }
+      ]
+    }
+  ],
+  "expected": "Normal default accepts ~1s valid reply with a bounded total scan; advertisement does not request fresh quorum.",
+  "state_changed": "HTTP requests and local diagnostic output only; server can refresh existing control observations.",
+  "protected_recorder_data_untouched": true,
+  "physical_pass": false,
+  "scope": "Targeted real HTTP peer-probe using unchanged production module; not full ordinary Recorder startup or physical PASS",
+  "originals": [
+    {
+      "local_name": "discovery-0536f03d-targeted-http.json",
+      "sha256": "7f193460744f5f7ac855dcce713918575a00d8de76c8b806f02813b37a3aa133",
+      "bytes": 2145
+    },
+    {
+      "local_name": "diagnose_discovery_0536_nettking.py",
+      "sha256": "15ea34d06d4177c68605f347b4059e4cd4c482829ab0c385af80c4c71dc1d4c3",
+      "bytes": 3282
+    }
+  ],
+  "repair_pr": "https://github.com/Nettking/msh/pull/457"
+}
