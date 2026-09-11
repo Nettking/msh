@@ -1606,3 +1606,9 @@ sharding34649416672 completed successfully; dispatched harness34649600106 also
 complete. Other parents remain active; no failed jobs observed. All six21:29
 dispatches are visible. Next: retain newly completed native logs, verify checkout
 SHA, and resolve only completed-parent source gaps. No physical action or merge.
+
+Fifteen native logs retained. Exact83955f65 PASS4/37 plus CFI2 Linux1/3 companion.
+Ten automatic job logs instead prove synthetic68f6e72c45bf1b0f709efb4ac90ff05fbde37ec7.
+Completed CF7B, branding and sharding parents have full source-mismatch proofs;
+next dispatch each exact-head gap once with fresh guards and persist each response.
+Other automatic parents remain active. Review-comment count is unchanged.
