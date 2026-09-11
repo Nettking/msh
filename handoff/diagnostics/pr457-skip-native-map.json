@@ -1,0 +1,68 @@
+{
+  "matched": [
+    {
+      "job": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+      "id": 103268657187,
+      "modules": [
+        "catalog/flask_app/tests/test_windows_migration_script.py",
+        "catalog/flask_app/tests/test_windows_relay_volume_selector.py"
+      ],
+      "summaries": [],
+      "sha256": "7d63742614111be6dbdaf1a882d36cc545fcc508f0789c0fa3708b47b03dbdf3"
+    },
+    {
+      "job": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+      "id": 103268657187,
+      "modules": [
+        "catalog/flask_app/tests/test_windows_migration_script.py",
+        "catalog/flask_app/tests/test_windows_relay_volume_selector.py"
+      ],
+      "summaries": [
+        "2026-09-11T14:20:28.4214739Z 311 passed, 5 skipped, 1 warning in 212.71s (0:03:32)"
+      ],
+      "sha256": "7d63742614111be6dbdaf1a882d36cc545fcc508f0789c0fa3708b47b03dbdf3"
+    },
+    {
+      "job": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+      "id": 103268657187,
+      "modules": [
+        "catalog/flask_app/tests/test_windows_migration_script.py",
+        "catalog/flask_app/tests/test_windows_relay_volume_selector.py"
+      ],
+      "summaries": [],
+      "sha256": "7d63742614111be6dbdaf1a882d36cc545fcc508f0789c0fa3708b47b03dbdf3"
+    },
+    {
+      "job": "Release checks (Windows)",
+      "id": 103248585302,
+      "modules": [
+        "catalog/mtconnect_recorder/tests/test_tailscale_recorder_launcher.py"
+      ],
+      "summaries": [
+        "2026-09-11T14:24:50.8607423Z 145 passed in 29.95s"
+      ],
+      "sha256": "b06033836c4a89113b6c2dc66ec08862c5e334731465d25c0b375210250d0690"
+    },
+    {
+      "job": "PostgreSQL storage release check",
+      "id": 103248585390,
+      "modules": [
+        "catalog/federation/tests/test_phase_d2_postgres.py"
+      ],
+      "summaries": [
+        "2026-09-11T11:41:46.1358199Z 11 passed in 0.61s"
+      ],
+      "sha256": "5a76d8f87defd6f324e7abf2d603660a5240459313d0e157f9ec1911090a3e15"
+    }
+  ],
+  "remaining_modules": [
+    "catalog/federation/tests/test_host_mutation_activation.py",
+    "catalog/flask_app/tests/test_first_federation_start.py",
+    "catalog/flask_app/tests/test_model_resource_admission_paths.py",
+    "catalog/flask_app/tests/test_windows_fresh_shutdown.py",
+    "catalog/flask_app/tests/test_windows_fresh_url_output.py",
+    "catalog/flask_app/tests/test_windows_migration_script.py",
+    "catalog/flask_app/tests/test_windows_relay_volume_selector.py",
+    "catalog/flask_app/tests/test_windows_runtime_state_resolver.py"
+  ]
+}

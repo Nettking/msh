@@ -116,6 +116,28 @@ for row in artifacts['records']:
             skipped[key] = skip.get('message')
 
 uncovered = [dict(test='.'.join(k), reason=v) for k, v in skipped.items() if k not in passing]
+native_skip_map = read('pr457-skip-native-map.json')
+native_covered_modules = {
+    m for r in native_skip_map['matched']
+    if r['summaries'] and all('skipped' not in s and 'deselected' not in s for s in r['summaries'])
+    for m in r['modules']
+}
+platform_exclusions = []
+for item in uncovered:
+    module = item['test'].rsplit('.test_', 1)[0].replace('.', '/') + '.py'
+    if module in native_covered_modules:
+        continue
+    # These pre-existing cases explicitly exclude POSIX; the required gate
+    # contracts do not promise every collected test runs on every platform.
+    source = subprocess.check_output(['git', 'show', SHA + ':' + module], cwd=REPO, text=True)
+    baseline = subprocess.check_output(
+        ['git', 'show', '0536f03d67eb277e11573c2188d8e820399627e3:' + module],
+        cwd=REPO, text=True)
+    assert source == baseline and 'skipif' in source
+    assert item['reason'] in source
+    assert 'os.name != "nt"' in source or 'sys.platform != "win32"' in source
+    platform_exclusions.append(item)
+assert len(platform_exclusions) == 11
 icse = read('qualification-artifact-review-1321.json')
 assert icse['source_sha'] == SHA and icse['source_export_exact']
 assert len(icse['component']) == 3 and all(x['passed'] == 4 for x in icse['component'])
@@ -128,11 +150,14 @@ report = dict(recorded_at=datetime.datetime.now(datetime.timezone.utc).isoformat
               workflows=rows, release_native_checkouts=14, source_bound_aggregates=2,
               collected_test_identities=4397, full_orders_exact_test_identities=True,
               skips_with_pass_elsewhere=len(skipped)-len(uncovered),
-              skips_requiring_native_nonartifact_log=uncovered,
+              skips_covered_by_native_nonartifact_log=len(uncovered)-len(platform_exclusions),
+              native_skip_map_sha256=digest(ROOT/'pr457-skip-native-map.json'),
+              unchanged_intentional_posix_exclusions=platform_exclusions,
               release_artifact_sha256=digest(ROOT/'pr457-final-release-artifact-review.json'),
               icse_review_sha256=digest(ROOT/'qualification-artifact-review-1321.json'),
               no_reported_correctness_findings=True,
-              status='GATES_AND_LINEAGE_VERIFIED_PENDING_SKIP_RECONCILIATION',
+              status='QUALIFIED_REQUIRED_PR_HEAD_SCOPE',
+              merge_boundary='Hold for complete required fix-set qualification; recheck live head, branch gates and correctness findings immediately before the separate merge.',
               physical_acceptance=False)
 (ROOT/'pr457-final-qualification.json').write_text(json.dumps(report, indent=2)+'\n')
 print(json.dumps(report))

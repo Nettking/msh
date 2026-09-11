@@ -11,7 +11,7 @@ checked-in revalidation -> fresh formal physical acceptance.
 | PR | Intended exact head | Phase |
 |---|---|---|
 |456|1a0c634f47f8a247b6d1d2d1a219f5c12590587d|Qualification incomplete at previous checkpoint; refresh only state delta|
-|457|143fe7a9082193114af3d34dc437b85f845849a2|Qualification incomplete at previous checkpoint; exact software-update dispatched|
+|457|143fe7a9082193114af3d34dc437b85f845849a2|Required exact-head qualification PASS; preserve evidence, hold for complete fix-set qualification and live premerge checks|
 |461|5b826c6806ab1bdb960412ba20ca78192971fb1d|Draft repair;50 focused tests pass; required qualification pending|
 
 Runtime remains0536f03d67eb277e11573c2188d8e820399627e3. No physical PASS; P07/P12
@@ -289,3 +289,34 @@ jobs before the final audit is closed. This is evidence review, not a newly
 confirmed defect or justification to rerun tests. The intermediate report and
 repeatable verifier are persisted. Next: inspect only retained native commands/
 results covering those named cases; keep all hosts unchanged.
+
+## September11 14:35UTC — PR457 required exact-head qualification PASS
+
+Exact143fe7a9082193114af3d34dc437b85f845849a2 has37/37 required jobs PASS,
+CFI2 both platforms PASS, immutable registry metadata PASS, release-verdict PASS,
+and reviewed release/ICSE artifacts. The two checkout-free aggregates are bound
+to verified same-run source dependencies. No reported correctness finding on
+the current head; review summary is completed. Full qualification receipt:
+[pr457-final-qualification.json](diagnostics/pr457-final-qualification.json).
+
+Skip reconciliation is complete within the existing required gate scope:
+13 distinct skipped cases pass in other JUnit results; seven PostgreSQL cases
+are covered by the dedicated11/11 native job, and three Recorder launcher cases
+by the Windows discovery boundary145/145 job. Eleven remaining POSIX exclusions
+have explicit unchanged Windows-only guards; no all-platform execution claim
+is made for them. Native update suite also includes migration/volume-selector
+modules (311 PASS, five skips). No skipped case was silently relabeled PASS,
+no assertion changed and no additional software execution was needed.
+
+Preserve this qualification; do not rerun unchanged457. Follow the requested
+sequence by completing456/461 qualification before the separate merge batch.
+Immediately before each merge recheck exact head, repository merge gates and
+relevant findings. Main pushes automatically trigger release CI, so do not
+intentionally qualify an intermediate main; reconcile the final push's actual
+main run once the full fix set is merged. No new candidate is selected now.
+
+Next scheduled action: compact poll for456/461 required job changes (457 state
+only for head/merge changes); persist transitions and retain only new native
+proofs. Runtime remains0536f03d67eb277e11573c2188d8e820399627e3; no deployment,
+D04 action or protected Recorder data change. Physical acceptance remains
+incomplete; P07/P12 have not started.

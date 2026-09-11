@@ -1,5 +1,5 @@
 {
-  "recorded_at": "2026-09-11T14:31:53.706833+00:00",
+  "recorded_at": "2026-09-11T14:34:07.369291+00:00",
   "source_commit": "143fe7a9082193114af3d34dc437b85f845849a2",
   "required_jobs": 37,
   "additional_cfi2_registry_jobs": 3,
@@ -88,7 +88,9 @@
   "collected_test_identities": 4397,
   "full_orders_exact_test_identities": true,
   "skips_with_pass_elsewhere": 13,
-  "skips_requiring_native_nonartifact_log": [
+  "skips_covered_by_native_nonartifact_log": 10,
+  "native_skip_map_sha256": "a1ee239306e7a21250e494d80b8f6fe83cf6a4dc1151493e821cb2fb59d00fc0",
+  "unchanged_intentional_posix_exclusions": [
     {
       "test": "catalog.flask_app.tests.test_windows_relay_volume_selector.test_selector_survives_missing_current_images_and_reuses_existing_relay_volume",
       "reason": "Windows PowerShell regression"
@@ -100,34 +102,6 @@
     {
       "test": "catalog.flask_app.tests.test_windows_runtime_state_resolver.test_encoded_python_survives_windows_powershell_native_argument_forwarding",
       "reason": "Windows PowerShell native argument check"
-    },
-    {
-      "test": "catalog.federation.tests.test_phase_d2_postgres.test_shared_provider_conformance[postgresql]",
-      "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
-    },
-    {
-      "test": "catalog.federation.tests.test_phase_d2_postgres.test_shared_provider_rejects_idempotency_conflict[postgresql]",
-      "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
-    },
-    {
-      "test": "catalog.federation.tests.test_phase_d2_postgres.test_shared_provider_rejects_dataset_identity_conflict[postgresql]",
-      "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
-    },
-    {
-      "test": "catalog.federation.tests.test_phase_d2_postgres.test_shared_provider_rejects_dataset_schema_conflict[postgresql]",
-      "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
-    },
-    {
-      "test": "catalog.federation.tests.test_phase_d2_postgres.test_postgresql_provider_survives_reconstruction",
-      "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
-    },
-    {
-      "test": "catalog.federation.tests.test_phase_d2_postgres.test_postgresql_provider_migrates_legacy_schema",
-      "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
-    },
-    {
-      "test": "catalog.federation.tests.test_phase_d2_postgres.test_postgresql_invalid_hash_is_not_committed",
-      "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
     },
     {
       "test": "catalog.flask_app.tests.test_model_resource_admission_paths.test_windows_model_pull_script_has_valid_powershell_syntax",
@@ -144,18 +118,6 @@
     {
       "test": "catalog.flask_app.tests.test_windows_migration_script.test_windows_migration_fast_forwards_fake_legacy_checkout_and_resumes",
       "reason": "Windows migration smoke"
-    },
-    {
-      "test": "catalog.mtconnect_recorder.tests.test_tailscale_recorder_launcher.test_windows_probe_rejects_runtime_that_cannot_import_exact_entrypoint",
-      "reason": "Windows launcher execution"
-    },
-    {
-      "test": "catalog.mtconnect_recorder.tests.test_tailscale_recorder_launcher.test_windows_wrapper_scrubs_legacy_secret_and_forwards_recorder_options",
-      "reason": "Windows launcher execution"
-    },
-    {
-      "test": "catalog.mtconnect_recorder.tests.test_tailscale_recorder_launcher.test_root_cmd_preserves_spaced_argument_and_nonzero_exit",
-      "reason": "Windows launcher execution"
     },
     {
       "test": "catalog.flask_app.tests.test_first_federation_start.test_windows_fresh_start_executes_real_batch_with_reset_stdin",
@@ -177,6 +139,7 @@
   "release_artifact_sha256": "0c6f8392845c5b98a1dabf7bc347001297f432842fa12cf31e2255fe010c1e9b",
   "icse_review_sha256": "f044960493542a0db5fdd15c4b925c63be3cb6c7aa9cd6bc3dc06959c5187f8d",
   "no_reported_correctness_findings": true,
-  "status": "GATES_AND_LINEAGE_VERIFIED_PENDING_SKIP_RECONCILIATION",
+  "status": "QUALIFIED_REQUIRED_PR_HEAD_SCOPE",
+  "merge_boundary": "Hold for complete required fix-set qualification; recheck live head, branch gates and correctness findings immediately before the separate merge.",
   "physical_acceptance": false
 }
