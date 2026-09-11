@@ -419,3 +419,18 @@ on456 release completion retain the remaining logs, review complete native
 release artifacts and reconcile its final required gate verdict. For461 retain
 new evidence and reconcile synthetic release/CFI2/operator only when complete.
 No host, protected-data or physical acceptance change.
+
+## September11 15:33UTC — PR456 release and PR461 synthetic release complete
+
+Heads unchanged;457 qualification preserved. PR456 exact release34595427316
+completed successfully, including both matrices and verdict. Its required set
+is now complete by API; final native/artifact/gate review remains before the
+qualification verdict. PR461 prior synthetic release34600817254 also completed
+successfully; Windows operator surface is running. No new failure.
+
+Next: retain eight new native logs and reconcile checkout-free aggregates.
+Dispatch461 exact release only after proving all source-running prior leaves
+used the synthetic checkout and no exact release run exists. Then complete456
+native release/artifact/correctness review. No merge or host action; runtime
+remains0536f03d67eb277e11573c2188d8e820399627e3, protected Recorder untouched,
+no physical PASS and no P07/P12 timers.

@@ -1,48 +1,87 @@
 {
-  "observed_at": "2026-09-11T15:21:22.741485+00:00",
+  "observed_at": "2026-09-11T15:32:54.118696+00:00",
   "changes": {
     "456": [
       {
         "workflow": "federation-v1-release.yml",
         "run_id": 34595427316,
         "event": "workflow_dispatch",
-        "status": "in_progress",
-        "conclusion": null,
+        "status": "completed",
+        "conclusion": "success",
         "jobs": [
-          {
-            "id": 103249965566,
-            "name": "Windows regressions (transport-storage)",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
-            "id": 103249965630,
-            "name": "Windows regressions (journal-artifacts)",
-            "status": "completed",
-            "conclusion": "success"
-          },
           {
             "id": 103249965655,
             "name": "Windows regressions (capability-product)",
-            "status": "in_progress",
-            "conclusion": null
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103318196526,
+            "name": "Release matrix (Linux)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103318196670,
+            "name": "Release matrix (Windows)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103318335476,
+            "name": "Federation v1 automated release verdict",
+            "status": "completed",
+            "conclusion": "success"
           }
         ]
       }
     ],
     "461": [
       {
-        "workflow": "ci-test-sharding.yml",
-        "run_id": 34601196761,
-        "event": "workflow_dispatch",
+        "workflow": "federation-v1-release.yml",
+        "run_id": 34600817254,
+        "event": "pull_request",
         "status": "completed",
         "conclusion": "success",
         "jobs": [
           {
-            "id": 103268639822,
-            "name": "Shard contract (Windows, shared-pool)",
+            "id": 103267381420,
+            "name": "Windows regressions (transport-storage)",
             "status": "completed",
             "conclusion": "success"
+          },
+          {
+            "id": 103319546154,
+            "name": "Release matrix (Windows)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103319546227,
+            "name": "Release matrix (Linux)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103319683382,
+            "name": "Federation v1 automated release verdict",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
+      {
+        "workflow": "phase-f85-operator-federation-surface.yml",
+        "run_id": 34600817582,
+        "event": "pull_request",
+        "status": "in_progress",
+        "conclusion": null,
+        "jobs": [
+          {
+            "id": 103267385758,
+            "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+            "status": "in_progress",
+            "conclusion": null
           }
         ]
       }
