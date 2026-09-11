@@ -1252,7 +1252,7 @@ hosts stay on M cores; Nitro has no responder; Recorder protected data untouched
 
 Exact head remains7286f30d. [State cache](diagnostics/pr463-qualification-state.json)
 and [delta](diagnostics/pr463-qualification-last-transition.json) cover only463.
-Seven workflows auto-started; release guard and shard planning completed, other
+Seven workflows auto-started; PostgreSQL release check and Linux shard contract completed, other
 jobs queued/running. No failed job. Four required workflows were not triggered
 by paths: acceptance harness, physical readiness, retirement, operator surface.
 CFI2/registry are also absent. No jobs have been duplicated or manually dispatched.
@@ -1276,3 +1276,13 @@ PR is open/unmerged and mergeable. Local source review and focused regressions
 are complete, so the required exact-head qualification is now the next gate.
 No physical deployment or merge yet. Retain existing jobs before filling only
 proven absent workflow gaps. No repeated old qualification or blanket dispatch.
+
+###19:14UTC — first463 native proofs retained; synthetic checkout identified
+
+The two completed successful jobs (PostgreSQL release check and Linux shard
+contract) actually checked out syntheticbfec91c9, not7286f30d. [Native receipts](diagnostics/pr463-initial-native-provenance.json).
+They cannot qualify the PR head. Their parent workflows still run; do not cancel
+or duplicate them. Required absent harness/readiness/retirement/operator plus
+CFI2/registry can be dispatched now after fresh absence/head checks, independently
+of active parent runs. Exact-head release/sharding gap resolution waits until
+those parents complete and all relevant native proofs are retained.

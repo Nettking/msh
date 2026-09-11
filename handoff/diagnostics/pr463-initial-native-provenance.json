@@ -1,0 +1,32 @@
+{
+  "source_commit": "7286f30d30e20c94c13cc9acebb2fd6d61bc1163",
+  "retained_at": "2026-09-11T19:13:56.893108+00:00",
+  "records": [
+    {
+      "job_id": 103388045522,
+      "run_id": 34637251378,
+      "name": "PostgreSQL storage release check",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 41135,
+      "sha256": "7620fe8f0efec9ebe694dfb10c3688622a1d0c3707307823bf847525aa4b4b73",
+      "checkout_commits": [
+        "bfec91c9c0ab3581645bc4c575bf4a056b2b80c9"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103388044341,
+      "run_id": 34637251420,
+      "name": "Shard contract (Linux, shared-pool)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 29477,
+      "sha256": "48e54d9477edd9b2c35f58177c90aadbfc4cc89c06d399ffb8a6e5a2470bced5",
+      "checkout_commits": [
+        "bfec91c9c0ab3581645bc4c575bf4a056b2b80c9"
+      ],
+      "checkout_matches": false
+    }
+  ]
+}
