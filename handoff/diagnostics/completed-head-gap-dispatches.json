@@ -43,6 +43,36 @@
       "response": {
         "http_status": 204
       }
+    },
+    {
+      "pr": 461,
+      "sha": "5b826c6806ab1bdb960412ba20ca78192971fb1d",
+      "ref": "codex/tailnet-responder-port-propagation",
+      "workflow": "phase2-federation.yml",
+      "native_proof": [
+        {
+          "job_id": 103267380831,
+          "run_id": 34600817414,
+          "checkout_commits": [
+            "e03addedbc4d10e39e7c6a592977f45995ec6b8e"
+          ],
+          "sha256": "9ee1b16ef9313c35b78f82da2f5deb5d2ce8ad67a79e4e56373a715a21aca4f1"
+        },
+        {
+          "job_id": 103267380959,
+          "run_id": 34600817414,
+          "checkout_commits": [
+            "e03addedbc4d10e39e7c6a592977f45995ec6b8e"
+          ],
+          "sha256": "dc735b6b8330ed5906fdaa999f75c42411eefc5acf015edb4b7b96602f8e1405"
+        }
+      ],
+      "workflow_sha256": "20b1ffdb6116552326f5b99cc31a14fb1621227cb7bd58992c81e344c2ede238",
+      "requested_at": "2026-09-11T13:39:23.188641+00:00",
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
     }
   ]
 }

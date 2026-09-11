@@ -143,3 +143,10 @@ and are excluded. Its suite-order aggregate has no independent checkout and
 cannot qualify the intended head. No new failures. Completed461 phase2 has
 both leaf proofs for the synthetic checkout, establishing a required exact-head
 gap; no exact phase2 run is presently recorded.
+
+PR461 exact phase2 was dispatched on unchanged5b826c68 after checking current
+PR/ref, absence of an exact run and native source mismatch in both completed
+prior leaves. The updated completed-head-gap-dispatches.json records both
+proof digests, workflow digest and204 receipt. No active job was cancelled or
+valid exact-head PASS rerun. Next: retain/audit completed456 ICSE artifacts;
+remaining qualification awaits state changes.
