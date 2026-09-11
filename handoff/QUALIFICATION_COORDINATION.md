@@ -1333,3 +1333,10 @@ New completed jobs are checkpointed in the state/delta. Next: retain only new
 native logs, verify source provenance, and dispatch an exact-head replacement
 only for a completed parent with a demonstrated mismatch and no existing dispatch.
 Physical admission remains stopped by D06; no runtime mutation or new candidate.
+
+Native provenance retained for six new jobs. Harness Windows and readiness Linux
+are the first two verified exact-head PASS jobs. Both completed CF7B jobs and both
+completed software-update jobs used syntheticbfec91c9; replacement dispatch for
+each completed parent is justified by source mismatch. Existing passing logs are
+preserved. Next: dispatch these two exact-head gaps once with fresh guards and
+persist each response; other active parents remain untouched.
