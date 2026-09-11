@@ -1,6 +1,6 @@
 {
   "source_commit": "7286f30d30e20c94c13cc9acebb2fd6d61bc1163",
-  "retained_at": "2026-09-11T20:44:21.132115+00:00",
+  "retained_at": "2026-09-11T20:56:45.572721+00:00",
   "records": [
     {
       "job_id": 103388045522,
@@ -734,6 +734,58 @@
       "conclusion": "success",
       "bytes": 22954,
       "sha256": "894b7a15d6c89e522fda6c11f39311c896e4169fb536c7829e2b61322874072c",
+      "checkout_commits": [
+        "7286f30d30e20c94c13cc9acebb2fd6d61bc1163"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103412772949,
+      "run_id": 34644764330,
+      "name": "Windows regressions (transport-storage)",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 53776,
+      "sha256": "6d8f49ee411bde90d8264eaf5483ab3645afd32185af4bb530d93f5f5ae0b499",
+      "checkout_commits": [
+        "7286f30d30e20c94c13cc9acebb2fd6d61bc1163"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103412772978,
+      "run_id": 34644764330,
+      "name": "Full-suite order (rotating)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 70076,
+      "sha256": "33a917bdc1b2496a4c88bf5f83032d67ec858eb18e6e49d90778b6c3816881d0",
+      "checkout_commits": [
+        "7286f30d30e20c94c13cc9acebb2fd6d61bc1163"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103412772989,
+      "run_id": 34644764330,
+      "name": "Windows regressions (capability-product)",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 59751,
+      "sha256": "8858e7d103ff89164ee34a1ed3f3a06e3daaddb4ba7de56f6b205094d8815384",
+      "checkout_commits": [
+        "7286f30d30e20c94c13cc9acebb2fd6d61bc1163"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103412773018,
+      "run_id": 34644764330,
+      "name": "Linux regression shard (3)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 59490,
+      "sha256": "be1894b743edc31024bc8e65e1edf0aa90923d7424897c820561115782b0a2b1",
       "checkout_commits": [
         "7286f30d30e20c94c13cc9acebb2fd6d61bc1163"
       ],
