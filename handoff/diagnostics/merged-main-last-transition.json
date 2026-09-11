@@ -1,66 +1,18 @@
 {
-  "recorded_at": "2026-09-11T17:00:56.360102+00:00",
+  "recorded_at": "2026-09-11T17:12:27.100672+00:00",
   "source_commit": "9b286f931497bf6291e215f6340443c5162826b0",
   "changes": [
     {
-      "workflow": "cf7b-product-physical-acceptance.yml",
-      "run_id": 34622527813,
-      "status": "completed",
-      "conclusion": "success",
-      "jobs": [
-        {
-          "id": 103339846342,
-          "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
-          "status": "completed",
-          "conclusion": "success"
-        }
-      ]
-    },
-    {
-      "workflow": "phase2-federation.yml",
-      "run_id": 34622527818,
-      "status": "completed",
-      "conclusion": "success",
-      "jobs": [
-        {
-          "id": 103339712746,
-          "name": "windows",
-          "status": "completed",
-          "conclusion": "success"
-        }
-      ]
-    },
-    {
-      "workflow": "icse-tool-demo.yml",
-      "run_id": 34622527886,
-      "status": "queued",
-      "conclusion": null,
-      "jobs": [
-        {
-          "id": 103339712938,
-          "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
-          "status": "completed",
-          "conclusion": "success"
-        },
-        {
-          "id": 103345791974,
-          "name": "publication-bundle",
-          "status": "queued",
-          "conclusion": null
-        }
-      ]
-    },
-    {
       "workflow": "cf8-role-retirement.yml",
       "run_id": 34622527924,
-      "status": "queued",
+      "status": "in_progress",
       "conclusion": null,
       "jobs": [
         {
-          "id": 103339948415,
-          "name": "role-retirement (Linux, fcp-linux-fast, bash)",
-          "status": "completed",
-          "conclusion": "success"
+          "id": 103339948641,
+          "name": "role-retirement (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+          "status": "in_progress",
+          "conclusion": null
         }
       ]
     },
@@ -71,42 +23,54 @@
       "conclusion": null,
       "jobs": [
         {
-          "id": 103344769430,
-          "name": "Full-suite order (rotating)",
-          "status": "in_progress",
-          "conclusion": null
-        },
-        {
-          "id": 103344769486,
-          "name": "PostgreSQL storage release check",
+          "id": 103344769414,
+          "name": "Linux regression shard (3)",
           "status": "completed",
           "conclusion": "success"
+        },
+        {
+          "id": 103344769430,
+          "name": "Full-suite order (rotating)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 103344769467,
+          "name": "Linux regression shard (1)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 103344769559,
+          "name": "Full-suite order (fixed)",
+          "status": "in_progress",
+          "conclusion": null
         }
       ]
     },
     {
       "workflow": "cf7-acceptance-harness.yml",
       "run_id": 34622777814,
-      "status": "in_progress",
-      "conclusion": null,
-      "jobs": [
-        {
-          "id": 103340547805,
-          "name": "harness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Byp...",
-          "status": "in_progress",
-          "conclusion": null
-        }
-      ]
-    },
-    {
-      "workflow": "cf7c-physical-test-readiness.yml",
-      "run_id": 34622782096,
       "status": "completed",
       "conclusion": "success",
       "jobs": [
         {
-          "id": 103340544152,
-          "name": "readiness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy B...",
+          "id": 103340547805,
+          "name": "harness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Byp...",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "workflow": "ci-test-sharding.yml",
+      "run_id": 34622786434,
+      "status": "completed",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "id": 103340557562,
+          "name": "Shard contract (Windows, shared-pool)",
           "status": "completed",
           "conclusion": "success"
         }

@@ -754,3 +754,12 @@ proofs are retained; no source mismatch or new failure. Next scheduled action:
 poll_merged_main_state.py, retaining only new results and reviewing ICSE once
 its publication job finishes. Preserve all prior qualification; no new dispatch,
 D04, candidate freeze or physical acceptance action while final gates remain.
+
+## September11 17:13UTC — final-main release and Windows checks advanced
+
+Actual main remains9b286f931497bf6291e215f6340443c5162826b0. New successes:
+Linux shards1/3 and rotating full order; Windows harness and sharding complete,
+finishing both workflows. Fixed order and Windows retirement are running.
+No new failure. Next: retain five new native proofs; await complete final gates
+and ICSE publication. Preserve all existing PASS, with no duplicate dispatch,
+D04/host/protected Recorder action or physical acceptance claim.
