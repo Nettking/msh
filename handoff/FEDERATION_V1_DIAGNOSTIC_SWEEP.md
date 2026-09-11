@@ -32,17 +32,17 @@ pressure, publish unfinished state and the exact next action before continuing.
 |---|---|---|---|---|---|---|---|
 | D01 | Supported Nitro startup, before formal P01/P03 | Core activation succeeds; readiness follows `/onboarding` into stateful `/login`, times out, launcher exits 1 | product | Actual N observation and focused regression | Supported startup completion; updater start after this gate | YES: independent metadata, local provider and bounded diagnostics; no startup PASS | [#456](https://github.com/Nettking/msh/pull/456), direct-response readiness |
 | D02 | Ordinary tailnet discovery, before enrollment/P01 | Default 0.75 s probes time out; public advertisement requests fresh authority; later server 200 is too late | product | Three ordinary N timeouts; focused delayed-response and authority regressions | Ordinary discovery/zero-touch join; no longer-timeout workaround counts as fixed | YES: independently addressed metadata/provider checks and safe authority diagnostics | [#457](https://github.com/Nettking/msh/pull/457), local routing metadata and bounded total HTTP budget |
-| D03 | Nettking local AI provider before P10/B/CF7 | Existing llama3.2:3b chat request exceeds unchanged 60 s client limit despite actual GPU activity | unresolved | One exact-N bounded physical request; root cause not established | Successful local AI response and subsequent same-device Recorder+AI claims | YES: read-only provider logs/resources and independent authority/status paths; no repeated inference yet | [#458](https://github.com/Nettking/msh/issues/458); NONE yet |
+| D03 | Nettking local AI provider before P10/B/CF7 | Existing llama3.2:3b load exceeds audit-selected 60 s; actual product budget is 120 s and remains untested | unresolved / suspected product impact | One diagnostic timeout; not yet a proven product deadline failure | Local AI success remains undemonstrated | YES: one actual-default 120 s adapter diagnostic after prior load canceled; independent status paths | [#458](https://github.com/Nettking/msh/issues/458); NONE yet |
 
 ## D03
 
 **Finding:** D03  
-**Status:** CONFIRMED (timeout observation; cause unresolved)  
+**Status:** SUSPECTED (60 s diagnostic timeout confirmed; product-default deadline failure unproven)  
 **Candidate SHA:** `0536f03d67eb277e11573c2188d8e820399627e3`  
 **Host(s):** Nettking, existing exact-N Flask and pinned Ollama containers  
 **Physical stage:** Independent local AI provider before P10/B/CF7; no formal scenario executed  
-**Observed:** A single synthetic eight-token chat request for the existing hash-verified `llama3.2:3b` exceeded the unchanged 60 s HTTP limit. N raised `OllamaProbeError: Ollama did not respond within the benchmark limit`, caused by `TimeoutError: timed out`. GPU memory reached 2273 MiB and utilization reached 99%, but no response completed within the deadline. Both containers remained running; manifest unchanged.  
-**Expected:** Existing local model returns a bounded synthetic response within the unchanged benchmark limit. GPU allocation alone does not establish successful inference.  
+**Observed:** A single synthetic eight-token chat request for existing hash-verified `llama3.2:3b` exceeded the audit-selected 60 s HTTP limit. N raised `OllamaProbeError: Ollama did not respond within the benchmark limit`, caused by `TimeoutError: timed out`. GPU memory reached 2273 MiB and utilization reached 99%; server canceled model loading when the client closed, returning HTTP 499 after 1m0s. Both containers remained running; manifest unchanged; no OOM.  
+**Expected:** The actual N adapter defaults/maxes at 120 s (`OllamaProbeTarget`, `OllamaBenchmarkAdapter.definition`), not 60 s. Corrected source review means the first request does not prove a product deadline failure. Successful inference within the actual bound still needs demonstration; GPU allocation alone is insufficient.  
 **Classification:** unresolved — investigate provider logs and resource limits before attributing to product or environment  
 **Acceptance impact:** Local AI response is not demonstrated; no P10/B/CF7 or same-device Recorder+AI evidence may be inferred.  
 **Safe continuation:** YES — bounded read-only provider/resource inspection and independent status/authority paths; do not stack inference requests, change limits, download models or bypass authority.  
@@ -51,7 +51,7 @@ pressure, publish unfinished state and the exact next action before continuing.
 **Protected Recorder data:** Untouched; no protected corpus access or container/task mutation.  
 **GitHub artifact:** https://github.com/Nettking/msh/issues/458  
 **Repair:** NONE  
-**Next diagnostic action:** Read only existing owned Ollama logs since 12:20:21Z, `ollama ps`, Docker memory/OOM metadata and checked-in N benchmark/provider limits; preserve findings without changing the provider.
+**Next diagnostic action:** Run the unchanged actual N adapter once with its default 120 s bound after confirmed canceled prior load, no persisted benchmark result or authority changes. [Read-only provider follow-up](diagnostics/D03-provider-followup.json) records empty `ollama ps`, no OOM, 1.5 GiB cgroup cap and load cancellation. This uses the product bound, not a deadline relaxation; no provider limits/configuration change.
 
 ## D01
 
