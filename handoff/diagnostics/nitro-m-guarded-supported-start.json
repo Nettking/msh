@@ -1,0 +1,166 @@
+{
+  "started_at": "2026-09-11T18:40:33.747677+00:00",
+  "candidate": "9b286f931497bf6291e215f6340443c5162826b0",
+  "previous_source": "0536f03d67eb277e11573c2188d8e820399627e3",
+  "status": "RUNNING",
+  "prior_guard_receipt": "supported-start-9b286f93.json",
+  "explicit_host_port_alignment": "5152 to owned5151; image ENV retains source SHA provenance",
+  "before": [
+    {
+      "service": "flask",
+      "id": "f32a7f960cdcd19f0b60d2e03675c62baadadf2dead267176012c81fc1589026",
+      "image": "sha256:6b3e53b057ed9dca44c8ac3759cc4bed80a0c6956e6b3c929e39a3ba081685f5",
+      "started_at": "2026-09-11T10:23:12.952894314Z",
+      "mounts": [
+        {
+          "Type": "volume",
+          "Name": "fcp-v1-fba508-nitro-relay-state",
+          "Source": "/var/lib/docker/volumes/fcp-v1-fba508-nitro-relay-state/_data",
+          "Destination": "/var/lib/fcp-relay",
+          "Driver": "local",
+          "Mode": "rw",
+          "RW": true,
+          "Propagation": ""
+        },
+        {
+          "Type": "bind",
+          "Source": "/home/martin/fcp-v1-fba508-20260910/campaign/nitro-runtime/results",
+          "Destination": "/app/results",
+          "Mode": "",
+          "RW": true,
+          "Propagation": "rprivate"
+        },
+        {
+          "Type": "bind",
+          "Source": "/home/martin/fcp-v1-fba508-20260910/campaign/nitro-runtime/data",
+          "Destination": "/app/data",
+          "Mode": "",
+          "RW": true,
+          "Propagation": "rprivate"
+        },
+        {
+          "Type": "bind",
+          "Source": "/home/martin/fcp-v1-fba508-20260910/campaign/nitro-runtime/data/federation/legacy-witness",
+          "Destination": "/app/data/federation/legacy-witness",
+          "Mode": "",
+          "RW": false,
+          "Propagation": "rprivate"
+        }
+      ]
+    },
+    {
+      "service": "relay",
+      "id": "02403a8e33b5c4aff118e549a7fede15fac1b11bb1ba65106122072acf9df900",
+      "image": "sha256:ca835b56190b79e078c5777919b98b098fbef99cb3b918779a4d5efa8a0df5dc",
+      "started_at": "2026-09-11T10:01:47.100105633Z",
+      "mounts": [
+        {
+          "Type": "volume",
+          "Name": "fcp-v1-fba508-nitro-relay-state",
+          "Source": "/var/lib/docker/volumes/fcp-v1-fba508-nitro-relay-state/_data",
+          "Destination": "/var/lib/fcp-relay",
+          "Driver": "local",
+          "Mode": "rw",
+          "RW": true,
+          "Propagation": ""
+        },
+        {
+          "Type": "bind",
+          "Source": "/home/martin/fcp-v1-fba508-20260910/campaign/nitro-runtime/data/auth",
+          "Destination": "/app/data/auth",
+          "Mode": "",
+          "RW": true,
+          "Propagation": "rprivate"
+        },
+        {
+          "Type": "bind",
+          "Source": "/home/martin/fcp-v1-fba508-20260910/campaign/nitro-runtime/data/federation",
+          "Destination": "/app/data/federation",
+          "Mode": "",
+          "RW": true,
+          "Propagation": "rprivate"
+        },
+        {
+          "Type": "bind",
+          "Source": "/home/martin/fcp-v1-fba508-20260910/campaign/nitro-runtime/data/federation/legacy-witness",
+          "Destination": "/app/data/federation/legacy-witness",
+          "Mode": "",
+          "RW": false,
+          "Propagation": "rprivate"
+        },
+        {
+          "Type": "bind",
+          "Source": "/home/martin/fcp-v1-fba508-20260910/campaign/nitro-runtime/tooling",
+          "Destination": "/run/fcp-provision",
+          "Mode": "",
+          "RW": false,
+          "Propagation": "rprivate"
+        },
+        {
+          "Type": "bind",
+          "Source": "/home/martin/fcp-v1-fba508-20260910/campaign/nitro-runtime/outputs",
+          "Destination": "/run/fcp-preparation-output",
+          "Mode": "",
+          "RW": true,
+          "Propagation": "rprivate"
+        }
+      ]
+    },
+    {
+      "service": "recorder",
+      "id": "e07a50189ca295b87cca5a194ac431118d5a5116bd121a55cd066e7fd9a1d71c",
+      "image": "sha256:7c1b4ef40d9a8f5d9d9f8d80d2789165a292eb275fc97a47b57ea2928e69f044",
+      "started_at": "2026-09-11T10:01:47.022905508Z",
+      "mounts": [
+        {
+          "Type": "bind",
+          "Source": "/home/martin/fcp-v1-fba508-20260910/campaign/nitro-runtime/data",
+          "Destination": "/app/data",
+          "Mode": "rw",
+          "RW": true,
+          "Propagation": "rprivate"
+        }
+      ]
+    },
+    {
+      "service": "ollama",
+      "id": "9443f9e1a0ba48ce7f8c2a4ea02762f7d61b4e45d9a823fe6bd373e331af90cc",
+      "image": "sha256:b88c73ace3e115f8ec53dc8761ae1c0aabfa675406e3681786b98757ce050f42",
+      "started_at": "2026-09-11T10:03:58.151763406Z",
+      "mounts": [
+        {
+          "Type": "volume",
+          "Name": "fcp-v1-fba508-nitro-ollama-models",
+          "Source": "/var/lib/docker/volumes/fcp-v1-fba508-nitro-ollama-models/_data",
+          "Destination": "/root/.ollama",
+          "Driver": "local",
+          "Mode": "rw",
+          "RW": true,
+          "Propagation": ""
+        },
+        {
+          "Type": "bind",
+          "Source": "/var/lib/docker/volumes/fcp_ollama_models/_data/models",
+          "Destination": "/root/.ollama/models",
+          "Mode": "",
+          "RW": false,
+          "Propagation": "rslave"
+        }
+      ]
+    }
+  ],
+  "project": "fcp-v1-fba508-nitro",
+  "source_root": "/home/martin/fcp-v1-73c779-nitro-20260910/source",
+  "command": [
+    "bash",
+    "start.sh"
+  ],
+  "physical_pass": false,
+  "protected_recorder_operation": false,
+  "no_active_capture_configured": true,
+  "expected_transient": "Owned Nitro services restart; authority may be unavailable during restart and must remain fail-closed. Fixed voters/data unchanged.",
+  "responder": "N responder remains until M cores verified, then replace through checked-in exact-process guard; never count its old imported source as M",
+  "environment_file": "/home/martin/fcp-v1-73c779-nitro-20260910/inputs/c03-activation/supported-start-9b286f93.environment.private.json",
+  "configuration_only_expected_delta": true,
+  "pid": 1211658
+}

@@ -27,7 +27,8 @@ hashes are verified. [Runtime receipt](diagnostics/nettking-m-runtime-admission.
 Next: Nitro/owned Recorder runtime admission, responder and membership/topology
 verification. Fresh topology and operative-context checks remain before evidence.
 Nitro guarded continuation controller1211377 dispatched18:40UTC after the exact
-host port/image-ENV audit mismatch was resolved. Do not launch another. Inspect
+host port/image-ENV audit mismatch was resolved. Supported startup is now RUNNING
+as PID1211658 with complete configuration guard satisfied. Do not launch another. Inspect
 `supported-start-9b286f93-guarded.json` for actual current state; source is clean M.
 
 Nettking cores run M; Nitro cores/responder remain N0536f03d67eb277e11573c2188d8e820399627e3.
@@ -1153,3 +1154,14 @@ Next exact command: run `diagnostics/dispatch_nitro_m_guarded.py` once; inspect
 binds PID1211377/script22c0c161b7ff2fc6b18acb5288062816cb708005ea870e72556b342942325b2c.
 The original stopped operation/evidence remain untouched. Next read only the
 new operation receipt and react to completion/failure; no duplicate startup.
+
+### Nitro supported M startup RUNNING; next completion action prepared
+
+[Operation state](diagnostics/nitro-m-guarded-supported-start.json) proves complete
+configuration equality and supported `bash start.sh` now running as PID1211658.
+New private environment explicitly uses M and port5151; old inputs untouched.
+No known product defect. Next read `read_nitro_m_guarded_operation.py`; if success,
+execute `verify_nitro_m_runtime.py` once and retain actual image/env/repaired-source
+hashes, unchanged mounts/model and recovered control identity/index. Do not claim
+host responder M yet: its imported N process must be replaced and verified next.
+No P07/P12 or physical PASS. Other voters/Recorder protected production untouched.
