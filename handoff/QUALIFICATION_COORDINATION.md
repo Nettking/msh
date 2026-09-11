@@ -1,5 +1,15 @@
 # Federation v1 qualification coordination
 
+**Current actionable checkpoint (2026-09-11 23:01UTC):** physical admission remains
+stopped on M9b286f93. D06 repair PR463 head83955f65 has18/37 required plus2/3
+companion native exact-head PASS at last retained check; preserve them. D07/#464 is
+a separate pre-existing Windows product defect found in its automatic synthetic
+release run. Draft repair PR465 head4749ab6689315a7ad953c11ce4b2ec942433d71a is
+pushed with focused native Windows evidence. Next: review PR465/current qualification
+state and fill only absent exact-head gates; poll PR463 once for changes. Never
+infer a retry from the red automatic aggregate. Neither fix deployed/merged;
+no physical PASS or timers. See the end of this document for chronological deltas.
+
 Current user direction, September 11 2026: execute on state changes, using this
 checkpoint and the completed diagnostic sweep report; do not repeat the sweep.
 
@@ -1752,3 +1762,9 @@ Focused native Windows tests67 PASS/3 platform skips in33.73s, receipt at
 diagnostics/d07-final-focused-regression.xml. No physical operation or full retry.
 Next: review the repair and required exact-head CI gaps; preserve PR463 proofs.
 Both fixes remain separate. Final merged main must be qualified once after merges.
+
+23:01UTC: PR465 current head4749ab6689315a7ad953c11ce4b2ec942433d71a handles
+minimum-size native rename buffers; added one-character artifact-name coverage.
+Targeted current-head native regressions10 PASS/3 platform skips, lint/diff PASS.
+Prior67-test evidence remains bound to f095f6cc. Updated D07 and accumulating table.
+Next: inspect current PR state, review, and start only absent required gates.
