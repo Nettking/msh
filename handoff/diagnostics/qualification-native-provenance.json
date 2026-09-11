@@ -1501,9 +1501,61 @@
             "e03addedbc4d10e39e7c6a592977f45995ec6b8e"
           ],
           "checkout_matches": false
+        },
+        {
+          "job_id": 103267381216,
+          "run_id": 34600817254,
+          "name": "Windows regressions (journal-artifacts)",
+          "runner_name": "Nettking",
+          "conclusion": "success",
+          "bytes": 52653,
+          "sha256": "a797b8d40365913b1aa25dd854ed3c2ffb8b3ae600c4b7a91e642e52b0e645a3",
+          "checkout_commits": [
+            "e03addedbc4d10e39e7c6a592977f45995ec6b8e"
+          ],
+          "checkout_matches": false
+        },
+        {
+          "job_id": 103304953149,
+          "run_id": 34612126881,
+          "name": "update-contracts (Linux, fcp-linux-fast, bash)",
+          "runner_name": "Nettking-Linux",
+          "conclusion": "success",
+          "bytes": 51321,
+          "sha256": "6b20e04c564612b3ab56a5418d1cf0591fe935689b7074d906c132f7905873c3",
+          "checkout_commits": [
+            "5b826c6806ab1bdb960412ba20ca78192971fb1d"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103304966448,
+          "run_id": 34612131170,
+          "name": "role-retirement (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+          "runner_name": "Nettking",
+          "conclusion": "success",
+          "bytes": 50640,
+          "sha256": "d6472c5ae715ccb107f0d1e70e98913f37a6405a86519c0492669584c7fe0e54",
+          "checkout_commits": [
+            "5b826c6806ab1bdb960412ba20ca78192971fb1d"
+          ],
+          "checkout_matches": true
+        },
+        {
+          "job_id": 103304966897,
+          "run_id": 34612131170,
+          "name": "role-retirement (Linux, fcp-linux-fast, bash)",
+          "runner_name": "Nettking-Linux",
+          "conclusion": "success",
+          "bytes": 50746,
+          "sha256": "b7acf0b5a803b591c17a905aee33d53a8a8f233820d2becb3adbb1e2b6c27bcc",
+          "checkout_commits": [
+            "5b826c6806ab1bdb960412ba20ca78192971fb1d"
+          ],
+          "checkout_matches": true
         }
       ],
-      "retained_at": "2026-09-11T14:45:52.663912+00:00"
+      "retained_at": "2026-09-11T14:57:52.839890+00:00"
     }
   }
 }

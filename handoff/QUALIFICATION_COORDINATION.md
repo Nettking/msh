@@ -361,3 +361,10 @@ Next: retain four new native logs; no new completed exact-head gap is actionable
 from this delta. Preserve all existing PASS. No merge or host action; runtime
 remains0536f03d67eb277e11573c2188d8e820399627e3, protected Recorder untouched,
 P07/P12 not started.
+
+Four new native proofs retained: exact5b826c68 for both retirement platforms
+and Linux software-update; synthetic e03addedbc4 for release journal/artifacts,
+which remains excluded. No errors or new dispatch requirement. Next scheduled
+action: poll_required_state.py, preserving457 qualification and all exact PASS;
+retain only new completions and reconcile461 release/CFI2/operator after their
+prior runs complete. No physical evidence, candidate or host state changed.
