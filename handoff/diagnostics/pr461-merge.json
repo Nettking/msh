@@ -1,0 +1,11 @@
+{
+  "pr": 461,
+  "qualified_head": "5b826c6806ab1bdb960412ba20ca78192971fb1d",
+  "sha": "9b286f931497bf6291e215f6340443c5162826b0",
+  "merged": true,
+  "message": "Pull Request successfully merged",
+  "final_main_qualification_pending": true,
+  "new_candidate_frozen": false,
+  "physical_runtime": "0536f03d67eb277e11573c2188d8e820399627e3",
+  "protected_recorder_touched": false
+}

@@ -643,3 +643,16 @@ source and actual main8948e953. PR461 marked ready at16:31:22UTC. Receipts retai
 actual ref separately from stale PR base metadata. Next: normal expected-head
 merge461; then verify final main ancestry and select its qualification runs.
 No candidate or physical state change.
+
+## September11 16:32UTC — all three required fixes merged
+
+GitHub merged qualified461 head5b826c68 as9b286f931497bf6291e215f6340443c5162826b0
+with expected-head guard and normal enforcement. All required fixes are merged
+separately; receipts retained for456/457/461. This final main still requires its
+own complete qualification; no new AUTHORITATIVE_SHA is frozen yet.
+
+Next: verify actual main and qualified-head ancestry, retain the automatic final
+push runs and dispatch only required workflows absent for this final SHA. Do not
+reuse individual PR PASS as merged-main qualification or qualify intermediate
+main intentionally. D04 remains deferred until final main qualifies. Runtime
+and protected Recorder unchanged; physical acceptance/P07/P12 not restarted.
