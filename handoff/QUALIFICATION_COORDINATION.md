@@ -1701,3 +1701,11 @@ no failures. ICSE replacement34654263201 has two successful jobs. Failure is
 UNCLASSIFIED pending native evidence; do not modify product code or rerun jobs.
 Next: retain new native logs, inspect the failing job first and classify its
 mechanism/source before deciding safe qualification continuation. Physical stopped.
+
+22:42UTC: independent failure D07 persisted with exact native trace/digests.
+The concurrent analysis scheduling test raises WinError5 at content_store.py:138
+while replacing plan.json in isolated CI temp state. Actual checkout68f6e72c;
+root cause unresolved, no product change justified yet. [Finding](diagnostics/D07.md).
+Next: publish its issue before further investigation, then compare source and
+perform focused isolated reproduction. Two new ICSE successes verify83955f65;
+preserve required18/37 plus companion2/3. Physical/protected state unchanged.
