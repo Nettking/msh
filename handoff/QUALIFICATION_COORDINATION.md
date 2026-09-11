@@ -1657,3 +1657,10 @@ Next: `poll_pr463_state.py` on the next state check, retaining only new terminal
 logs/review transitions. Preserve eleven dispatches and every valid result; wait
 for release/ICSE parent completion before resolving their source gaps. No merge,
 new candidate or physical action. Protected Recorder data remains untouched.
+
+##22:17UTC — software-update and operator exact-head parents complete
+
+Head83955f65 unchanged. Software-update34651625551 and operator34649607489
+completed successfully; other incomplete parents remain active with no failed
+jobs observed. Next: retain new native logs and verify source. Release/ICSE
+automatic parents remain active; no additional dispatch or physical action.
