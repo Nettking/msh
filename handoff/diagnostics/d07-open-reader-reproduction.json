@@ -1,0 +1,44 @@
+{
+  "recorded_at": "2026-09-11T22:45:31.245854+00:00",
+  "checked_in_sha": "83955f65b7e6bb36de8e90f34608b97070fed33b",
+  "host": "Nettking Windows / Martin",
+  "source_blobs": {
+    "catalog/capabilities/analysis/content_store.py": {
+      "83955f65b7e6bb36de8e90f34608b97070fed33b": "3a6e0e6132e9b1140a1caeb260393394dabf3c79",
+      "68f6e72c45bf1b0f709efb4ac90ff05fbde37ec7": "3a6e0e6132e9b1140a1caeb260393394dabf3c79",
+      "9b286f931497bf6291e215f6340443c5162826b0": "3a6e0e6132e9b1140a1caeb260393394dabf3c79"
+    },
+    "catalog/capabilities/analysis/scheduler.py": {
+      "83955f65b7e6bb36de8e90f34608b97070fed33b": "16c6e98077a6e4684449cf84a7dcdacda4c11906",
+      "68f6e72c45bf1b0f709efb4ac90ff05fbde37ec7": "16c6e98077a6e4684449cf84a7dcdacda4c11906",
+      "9b286f931497bf6291e215f6340443c5162826b0": "16c6e98077a6e4684449cf84a7dcdacda4c11906"
+    },
+    "catalog/capabilities/tests/test_analysis_scheduling.py": {
+      "83955f65b7e6bb36de8e90f34608b97070fed33b": "65d9453d63a6eda7bfd1d571ada58ecd21786c6e",
+      "68f6e72c45bf1b0f709efb4ac90ff05fbde37ec7": "65d9453d63a6eda7bfd1d571ada58ecd21786c6e",
+      "9b286f931497bf6291e215f6340443c5162826b0": "65d9453d63a6eda7bfd1d571ada58ecd21786c6e"
+    },
+    "catalog/common/managed_temporary.py": {
+      "83955f65b7e6bb36de8e90f34608b97070fed33b": "d7435536642c5366aa5be2d88bf80cc8f90128d1",
+      "68f6e72c45bf1b0f709efb4ac90ff05fbde37ec7": "d7435536642c5366aa5be2d88bf80cc8f90128d1",
+      "9b286f931497bf6291e215f6340443c5162826b0": "d7435536642c5366aa5be2d88bf80cc8f90128d1"
+    }
+  },
+  "physical_candidate": "9b286f931497bf6291e215f6340443c5162826b0",
+  "product_source_modified": false,
+  "protected_recorder_data_untouched": true,
+  "physical_acceptance": false,
+  "writer_with_active_reader": {
+    "type": "PermissionError",
+    "winerror": 5,
+    "errno": 13,
+    "message": "Ingen tilgang"
+  },
+  "original_content_preserved": true,
+  "writer_after_reader_closes": "success",
+  "owned_temporary_data_cleaned": true,
+  "existing_concurrent_test": {
+    "result": "1 passed in6.38s; single run does not disprove race",
+    "junit_sha256": "33aae338a4190aeb4fbf3b03d5d4a7c6201c6bdf7242d12477af5ccfae0dede5"
+  }
+}

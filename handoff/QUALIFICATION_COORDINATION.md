@@ -1714,3 +1714,13 @@ preserve required18/37 plus companion2/3. Physical/protected state unchanged.
 content store and caller boundaries; compare their source identities againstM
 and83955f65, then reproduce only in disposable local test state. No product edit
 or CI retry until classification supports it. Existing independent CI may continue.
+
+22:45UTC: D07 is a confirmed pre-existing product concurrency defect. On clean
+83955f65, a real public content-store stream held after first chunk prevents an
+identical-content write with WinError5; closing reader permits the same write.
+[Reproduction/source identity receipt](diagnostics/d07-open-reader-reproduction.json)
+proves affected files identical acrossM/head/synthetic checkout. Original CI handle
+owner is unknown; reproduced mechanism matches its error. One existing-test pass
+does not dismiss the race. No protected state or source changed. Next: publish
+classification on464, then inspect existing platform helpers for a separate narrow
+repair. Keep PR463 separate and preserve valid qualification; no new candidate.
