@@ -312,7 +312,72 @@
         "9b286f931497bf6291e215f6340443c5162826b0"
       ],
       "checkout_matches": true
+    },
+    {
+      "job_id": 103339712571,
+      "run_id": 34622527917,
+      "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 107345,
+      "sha256": "34bb3a635bea32fc49313749e452aee8008b94ae29d7f39f4f88f0703000c2d3",
+      "checkout_commits": [
+        "9b286f931497bf6291e215f6340443c5162826b0"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103339948641,
+      "run_id": 34622527924,
+      "name": "role-retirement (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 50600,
+      "sha256": "af629b72ea39539c4265fcce07bf07d4ece176fa1faaf190d1160feb60d69683",
+      "checkout_commits": [
+        "9b286f931497bf6291e215f6340443c5162826b0"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103344769460,
+      "run_id": 34622528054,
+      "name": "Linux regression shard (0)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 58487,
+      "sha256": "80f4e9b39ab9770944608d9b1699ad67396d54013c54e7813a5aab0a299d8609",
+      "checkout_commits": [
+        "9b286f931497bf6291e215f6340443c5162826b0"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103344769516,
+      "run_id": 34622528054,
+      "name": "Release checks (Linux)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 56501,
+      "sha256": "0d9b806a78cc10836f8a4b1fdf3240041ef10495cdabb881f02b5a4432dba33b",
+      "checkout_commits": [
+        "9b286f931497bf6291e215f6340443c5162826b0"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103344769559,
+      "run_id": 34622528054,
+      "name": "Full-suite order (fixed)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 69701,
+      "sha256": "c8bbfcd69afd813ec77a85a09b473ce7acc0764b0cc97fb99853f312288fd43a",
+      "checkout_commits": [
+        "9b286f931497bf6291e215f6340443c5162826b0"
+      ],
+      "checkout_matches": true
     }
   ],
-  "retained_at": "2026-09-11T17:12:55.006013+00:00"
+  "retained_at": "2026-09-11T17:24:25.094658+00:00"
 }

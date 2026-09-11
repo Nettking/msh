@@ -778,3 +778,9 @@ shard0, Linux release checks and fixed full order successes; shard2 and Windows
 software-update are running. No new failure. Next: retain five new native
 proofs, then await remaining gates/publication. No duplicate qualification or
 D04/host/protected Recorder action; runtime0536f03d remains unchanged.
+
+Five new successful native logs prove exact final9b286f93;29 final-main proofs
+are retained. No mismatch or new failure. Next scheduled action:
+poll_merged_main_state.py; retain only new results and review complete ICSE/
+release artifacts when actionable. Preserve all prior PASS. No candidate freeze,
+physical acceptance/P07/P12 action or further workflow dispatch at this stage.
