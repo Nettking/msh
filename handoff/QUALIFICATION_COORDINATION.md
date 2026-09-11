@@ -207,11 +207,19 @@ and protected Recorder state unchanged; no P07/P12 timer or physical PASS.
 ## September11 14:04UTC — qualification continues without new failures
 
 Heads unchanged. PR457 Windows transport/storage regressions and CF7B Windows
-completed successfully; CF7B34695260905 is not a run identifier (use actual
-34595260905 from the retained state). PR461 new exact CF7B34606865363 has Linux
+completed successfully; CF7B run34595260905 is complete. PR461 new exact
+CF7B34606865363 has Linux
 success; exact ICSE34606870244 has Compose/Linux success, Windows pending.
 PR456 Windows software-update is now running. Required gates remain pending.
 Next: retain only these five newly completed native proofs, then await the next
 required job transition. No merge, duplicate dispatch, candidate or host change;
 physical runtime remains0536f03d67eb277e11573c2188d8e820399627e3; protected
 Recorder data untouched; P07/P12 not started.
+
+All five newly retained successful native logs prove their intended exact PR
+heads (457 two,461 three); no mismatch or new failure. The accumulating
+qualification-native-provenance.json preserves log digests and source proof.
+No additional exact-head gap became actionable in this check. Next scheduled
+action: poll_required_state.py; act only on material changes, preserve all valid
+PASS, and do not dispatch duplicates. Final merged-main/D04/physical acceptance
+remain deferred while required PR gates finish.
