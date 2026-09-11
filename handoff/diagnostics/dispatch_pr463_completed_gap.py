@@ -32,12 +32,28 @@ if any(r['event'] == 'workflow_dispatch' for r in matching) or any(
 assert matching and all(r['status'] == 'completed' and r['conclusion'] == 'success'
                         for r in matching), 'Wait for completion or classify failure first'
 proof = []
+aggregate_review = None
+if workflow == 'federation-v1-release.yml':
+    aggregate_review = json.loads((root / 'pr463-release-aggregate-review.json').read_text())
+    assert aggregate_review['source_commit'] == sha
+    assert aggregate_review['workflow_identical_on_head_and_synthetic'] is True
+    assert aggregate_review['source_jobs'] == 14
 for run in matching:
     jobs = api('/actions/runs/' + str(run['id']) + '/jobs?per_page=100')['jobs']
     assert jobs
     for job in jobs:
         record = next((r for r in native['records'] if r['job_id'] == job['id']), None)
-        assert record and record.get('checkout_matches') is False, 'Preserve valid/unverified work'
+        assert record, 'Preserve unverified work'
+        if record.get('checkout_matches') is None:
+            assert aggregate_review and aggregate_review['run_id'] == run['id']
+            reviewed = next((r for r in aggregate_review['aggregates'] if r['job_id'] == job['id']), None)
+            assert reviewed and reviewed['name'] == record['name'] and reviewed['sha256'] == record['sha256']
+            assert record['checkout_commits'] == []
+            proof.append(dict(job_id=job['id'], run_id=run['id'], sha256=record['sha256'],
+                              aggregate_review='pr463-release-aggregate-review.json',
+                              dependency_job_ids=reviewed['dependency_job_ids']))
+            continue
+        assert record.get('checkout_matches') is False, 'Preserve valid work'
         assert record['conclusion'] == 'success'
         proof.append({k: record[k] for k in ['job_id', 'run_id', 'checkout_commits', 'sha256']})
 assert api('/git/ref/heads/' + ref)['object']['sha'] == sha

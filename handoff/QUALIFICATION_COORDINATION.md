@@ -1455,3 +1455,11 @@ phase2 and software-update both platforms verified. Release14 source-bearing job
 all prove syntheticbfec91c9, while two successful aggregates have no checkout.
 Next: inspect exact checked-in aggregate dependency definitions and native logs,
 persist that provenance review, then dispatch the demonstrated release source gap.
+
+20:31UTC: [Aggregate review](diagnostics/pr463-release-aggregate-review.json)
+confirms the actual synthetic workflow is byte-identical to head7286f30d; the
+two no-checkout aggregates only require the reviewed successful dependencies.
+All14 source jobs used syntheticbfec91c9. Synthetic Git object fetched for this
+read-only review; no checkout/runtime change. Guarded helper now accepts only
+these two explicitly reviewed aggregate IDs/digests for this run. Next: one
+release exact-head dispatch, preserving all native evidence and existing valid jobs.
