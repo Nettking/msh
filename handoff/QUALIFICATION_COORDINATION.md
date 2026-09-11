@@ -1830,3 +1830,8 @@ verified evidence, inspect only new completions/failures. Physical M unchanged.
 and CF7 exact-head runs completed; four automatic release jobs now success.
 Next: retain new terminal logs, verify source and fill only a proven completed
 phase2 source gap. All prior evidence preserved; no physical state change.
+
+23:38UTC: CF7-Windows native checkout verifies4749ab66: required8/37 plus3/3
+companions retained. Four release jobs and the final phase2 job prove synthetic
+2be67d18. Both phase2 jobs now have retained source mismatch proof; next dispatch
+its exact-head gap once. Release remains active; no release dispatch justified.
