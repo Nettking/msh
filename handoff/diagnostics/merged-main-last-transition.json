@@ -1,16 +1,44 @@
 {
-  "recorded_at": "2026-09-11T17:12:27.100672+00:00",
+  "recorded_at": "2026-09-11T17:23:53.563133+00:00",
   "source_commit": "9b286f931497bf6291e215f6340443c5162826b0",
   "changes": [
     {
+      "workflow": "phase-f85-operator-federation-surface.yml",
+      "run_id": 34622527917,
+      "status": "completed",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "id": 103339712571,
+          "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
       "workflow": "cf8-role-retirement.yml",
       "run_id": 34622527924,
-      "status": "in_progress",
-      "conclusion": null,
+      "status": "completed",
+      "conclusion": "success",
       "jobs": [
         {
           "id": 103339948641,
           "name": "role-retirement (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "workflow": "federation-software-update.yml",
+      "run_id": 34622527937,
+      "status": "in_progress",
+      "conclusion": null,
+      "jobs": [
+        {
+          "id": 103339707831,
+          "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
           "status": "in_progress",
           "conclusion": null
         }
@@ -23,56 +51,34 @@
       "conclusion": null,
       "jobs": [
         {
-          "id": 103344769414,
-          "name": "Linux regression shard (3)",
+          "id": 103344769460,
+          "name": "Linux regression shard (0)",
           "status": "completed",
           "conclusion": "success"
         },
         {
-          "id": 103344769430,
-          "name": "Full-suite order (rotating)",
-          "status": "completed",
-          "conclusion": "success"
+          "id": 103344769461,
+          "name": "Linux regression shard (2)",
+          "status": "in_progress",
+          "conclusion": null
         },
         {
-          "id": 103344769467,
-          "name": "Linux regression shard (1)",
+          "id": 103344769516,
+          "name": "Release checks (Linux)",
           "status": "completed",
           "conclusion": "success"
         },
         {
           "id": 103344769559,
           "name": "Full-suite order (fixed)",
-          "status": "in_progress",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 103354309713,
+          "name": "Clean-checkout suite order independence",
+          "status": "queued",
           "conclusion": null
-        }
-      ]
-    },
-    {
-      "workflow": "cf7-acceptance-harness.yml",
-      "run_id": 34622777814,
-      "status": "completed",
-      "conclusion": "success",
-      "jobs": [
-        {
-          "id": 103340547805,
-          "name": "harness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Byp...",
-          "status": "completed",
-          "conclusion": "success"
-        }
-      ]
-    },
-    {
-      "workflow": "ci-test-sharding.yml",
-      "run_id": 34622786434,
-      "status": "completed",
-      "conclusion": "success",
-      "jobs": [
-        {
-          "id": 103340557562,
-          "name": "Shard contract (Windows, shared-pool)",
-          "status": "completed",
-          "conclusion": "success"
         }
       ]
     }

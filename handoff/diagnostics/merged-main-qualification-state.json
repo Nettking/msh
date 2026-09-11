@@ -2,7 +2,7 @@
   "source_commit": "9b286f931497bf6291e215f6340443c5162826b0",
   "actual_main": "9b286f931497bf6291e215f6340443c5162826b0",
   "main_matches": true,
-  "recorded_at": "2026-09-11T17:12:27.100672+00:00",
+  "recorded_at": "2026-09-11T17:23:53.563133+00:00",
   "workflows": [
     {
       "workflow": "cf7b-product-physical-acceptance.yml",
@@ -171,15 +171,15 @@
       "run_id": 34622527917,
       "event": "push",
       "api_head_sha": "9b286f931497bf6291e215f6340443c5162826b0",
-      "status": "queued",
-      "conclusion": null,
+      "status": "completed",
+      "conclusion": "success",
       "attempt": 1,
       "required_count": 2,
       "signature": {
-        "status": "queued",
-        "conclusion": null,
+        "status": "completed",
+        "conclusion": "success",
         "run_attempt": 1,
-        "updated_at": "2026-09-11T16:31:57Z"
+        "updated_at": "2026-09-11T17:19:26Z"
       },
       "jobs": [
         {
@@ -194,11 +194,11 @@
         {
           "id": 103339712571,
           "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
-          "status": "queued",
-          "conclusion": null,
-          "runner_name": "",
-          "started_at": "2026-09-11T16:31:57Z",
-          "completed_at": null
+          "status": "completed",
+          "conclusion": "success",
+          "runner_name": "Nettking",
+          "started_at": "2026-09-11T17:14:10Z",
+          "completed_at": "2026-09-11T17:19:25Z"
         }
       ]
     },
@@ -207,15 +207,15 @@
       "run_id": 34622527924,
       "event": "push",
       "api_head_sha": "9b286f931497bf6291e215f6340443c5162826b0",
-      "status": "in_progress",
-      "conclusion": null,
+      "status": "completed",
+      "conclusion": "success",
       "attempt": 1,
       "required_count": 2,
       "signature": {
-        "status": "in_progress",
-        "conclusion": null,
+        "status": "completed",
+        "conclusion": "success",
         "run_attempt": 1,
-        "updated_at": "2026-09-11T17:10:52Z"
+        "updated_at": "2026-09-11T17:14:09Z"
       },
       "jobs": [
         {
@@ -230,11 +230,11 @@
         {
           "id": 103339948641,
           "name": "role-retirement (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
-          "status": "in_progress",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "runner_name": "Nettking",
           "started_at": "2026-09-11T17:10:51Z",
-          "completed_at": null
+          "completed_at": "2026-09-11T17:14:08Z"
         }
       ]
     },
@@ -243,24 +243,24 @@
       "run_id": 34622527937,
       "event": "push",
       "api_head_sha": "9b286f931497bf6291e215f6340443c5162826b0",
-      "status": "queued",
+      "status": "in_progress",
       "conclusion": null,
       "attempt": 1,
       "required_count": 2,
       "signature": {
-        "status": "queued",
+        "status": "in_progress",
         "conclusion": null,
         "run_attempt": 1,
-        "updated_at": "2026-09-11T16:31:55Z"
+        "updated_at": "2026-09-11T17:19:27Z"
       },
       "jobs": [
         {
           "id": 103339707831,
           "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
-          "status": "queued",
+          "status": "in_progress",
           "conclusion": null,
-          "runner_name": "",
-          "started_at": "2026-09-11T16:31:57Z",
+          "runner_name": "Nettking",
+          "started_at": "2026-09-11T17:19:27Z",
           "completed_at": null
         },
         {
@@ -347,19 +347,19 @@
         {
           "id": 103344769460,
           "name": "Linux regression shard (0)",
-          "status": "queued",
-          "conclusion": null,
-          "runner_name": "",
-          "started_at": "2026-09-11T16:48:02Z",
-          "completed_at": null
+          "status": "completed",
+          "conclusion": "success",
+          "runner_name": "Nettking-Linux",
+          "started_at": "2026-09-11T17:18:52Z",
+          "completed_at": "2026-09-11T17:22:08Z"
         },
         {
           "id": 103344769461,
           "name": "Linux regression shard (2)",
-          "status": "queued",
+          "status": "in_progress",
           "conclusion": null,
-          "runner_name": "",
-          "started_at": "2026-09-11T16:48:02Z",
+          "runner_name": "Nettking-Linux",
+          "started_at": "2026-09-11T17:23:33Z",
           "completed_at": null
         },
         {
@@ -383,11 +383,11 @@
         {
           "id": 103344769516,
           "name": "Release checks (Linux)",
-          "status": "queued",
-          "conclusion": null,
-          "runner_name": "",
-          "started_at": "2026-09-11T16:48:02Z",
-          "completed_at": null
+          "status": "completed",
+          "conclusion": "success",
+          "runner_name": "Nettking-Linux",
+          "started_at": "2026-09-11T17:22:09Z",
+          "completed_at": "2026-09-11T17:23:31Z"
         },
         {
           "id": 103344769528,
@@ -401,11 +401,11 @@
         {
           "id": 103344769559,
           "name": "Full-suite order (fixed)",
-          "status": "in_progress",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "runner_name": "Nettking-Linux",
           "started_at": "2026-09-11T17:08:34Z",
-          "completed_at": null
+          "completed_at": "2026-09-11T17:18:50Z"
         },
         {
           "id": 103344769581,
@@ -423,6 +423,15 @@
           "conclusion": null,
           "runner_name": "",
           "started_at": "2026-09-11T16:48:02Z",
+          "completed_at": null
+        },
+        {
+          "id": 103354309713,
+          "name": "Clean-checkout suite order independence",
+          "status": "queued",
+          "conclusion": null,
+          "runner_name": "",
+          "started_at": "2026-09-11T17:18:50Z",
           "completed_at": null
         }
       ]

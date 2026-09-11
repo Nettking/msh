@@ -769,3 +769,12 @@ are retained. No mismatch or new failure. Next scheduled action remains
 poll_merged_main_state.py, followed by new-only retention and completed-artifact
 review when actionable. Runtime remains0536f03d; no candidate freeze or physical
 acceptance/P07/P12 action while required final qualification is pending.
+
+## September11 17:24UTC — final-main operator/retirement completed
+
+Actual main remains9b286f931497bf6291e215f6340443c5162826b0. Operator surface
+and retirement now complete/success on both platforms. Release gained Linux
+shard0, Linux release checks and fixed full order successes; shard2 and Windows
+software-update are running. No new failure. Next: retain five new native
+proofs, then await remaining gates/publication. No duplicate qualification or
+D04/host/protected Recorder action; runtime0536f03d remains unchanged.
