@@ -26,8 +26,9 @@ Nettking supported activation and all three actual M core image/env/repaired-sou
 hashes are verified. [Runtime receipt](diagnostics/nettking-m-runtime-admission.json).
 Next: Nitro/owned Recorder runtime admission, responder and membership/topology
 verification. Fresh topology and operative-context checks remain before evidence.
-Nitro detached M activation controller1205079 was dispatched18:36UTC; do not
-start another. Inspect its persisted operation receipt before any further mutation.
+Nitro activation stopped at complete Compose comparison before service start.
+Its source is clean M; cores/responder still N. Do not relaunch before inspecting
+the exact configuration delta in the failed audit guard.
 
 Nettking cores run M; Nitro cores/responder remain N0536f03d67eb277e11573c2188d8e820399627e3.
 Recorder protected production6fb77c/separate voterfba508 have not been changed.
@@ -1106,3 +1107,14 @@ Next exact read: `/home/martin/fcp-v1-73c779-nitro-20260910/inputs/supported-sta
 If absent inspect `m-activation-controller.log` for precondition failure; otherwise
 react only to status transitions. Never duplicate the controller/startup. Fresh
 runtime and control identity/recovery verification remains before acceptance.
+
+###18:36UTC — Nitro configuration guard stopped before runtime mutation
+
+[Operation receipt](diagnostics/nitro-m-supported-start.json) reports
+`INSPECT_OPERATION_BEFORE_RETRY`: `Resolved deployment changes exceeded candidate image/build/env SHA and default5151`.
+The guarded source fetch/fast-forward reached M; supported startup was NOT
+launched (no child PID). Current cores/responder still N, no data reset or
+protected Recorder action. This proves an audit configuration mismatch, not
+yet a product defect. Next: compare exact resolved N/M configurations and
+classify each changed key. Do not loosen checks or retry blindly. Main software
+qualification and all retained evidence remain valid; physical acceptance0.
