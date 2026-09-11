@@ -1,0 +1,182 @@
+{
+  "recorded_at": "2026-09-11T14:31:53.706833+00:00",
+  "source_commit": "143fe7a9082193114af3d34dc437b85f845849a2",
+  "required_jobs": 37,
+  "additional_cfi2_registry_jobs": 3,
+  "workflows": [
+    {
+      "workflow": "cf7-acceptance-harness.yml",
+      "run_id": 34595245333,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "phase2-federation.yml",
+      "run_id": 34595440682,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "cf7b-product-physical-acceptance.yml",
+      "run_id": 34595260905,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "product-branding.yml",
+      "run_id": 34595238876,
+      "jobs": 1,
+      "result": "PASS"
+    },
+    {
+      "workflow": "federation-software-update.yml",
+      "run_id": 34601202338,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "cf7c-physical-test-readiness.yml",
+      "run_id": 34594391897,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "icse-tool-demo.yml",
+      "run_id": 34595242291,
+      "jobs": 4,
+      "result": "PASS"
+    },
+    {
+      "workflow": "cf8-role-retirement.yml",
+      "run_id": 34595249307,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "phase-f85-operator-federation-surface.yml",
+      "run_id": 34595437630,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "federation-v1-release.yml",
+      "run_id": 34594990947,
+      "jobs": 16,
+      "result": "PASS"
+    },
+    {
+      "workflow": "ci-test-sharding.yml",
+      "run_id": 34595257295,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "cfi2-onboarding-composition.yml",
+      "run_id": 34595254012,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "release-image-metadata.yml",
+      "run_id": 34594394644,
+      "jobs": 1,
+      "result": "PASS"
+    }
+  ],
+  "release_native_checkouts": 14,
+  "source_bound_aggregates": 2,
+  "collected_test_identities": 4397,
+  "full_orders_exact_test_identities": true,
+  "skips_with_pass_elsewhere": 13,
+  "skips_requiring_native_nonartifact_log": [
+    {
+      "test": "catalog.flask_app.tests.test_windows_relay_volume_selector.test_selector_survives_missing_current_images_and_reuses_existing_relay_volume",
+      "reason": "Windows PowerShell regression"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_relay_volume_selector.test_selector_pulls_python_probe_and_identifies_pc3_identity",
+      "reason": "Windows PowerShell regression"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_runtime_state_resolver.test_encoded_python_survives_windows_powershell_native_argument_forwarding",
+      "reason": "Windows PowerShell native argument check"
+    },
+    {
+      "test": "catalog.federation.tests.test_phase_d2_postgres.test_shared_provider_conformance[postgresql]",
+      "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
+    },
+    {
+      "test": "catalog.federation.tests.test_phase_d2_postgres.test_shared_provider_rejects_idempotency_conflict[postgresql]",
+      "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
+    },
+    {
+      "test": "catalog.federation.tests.test_phase_d2_postgres.test_shared_provider_rejects_dataset_identity_conflict[postgresql]",
+      "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
+    },
+    {
+      "test": "catalog.federation.tests.test_phase_d2_postgres.test_shared_provider_rejects_dataset_schema_conflict[postgresql]",
+      "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
+    },
+    {
+      "test": "catalog.federation.tests.test_phase_d2_postgres.test_postgresql_provider_survives_reconstruction",
+      "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
+    },
+    {
+      "test": "catalog.federation.tests.test_phase_d2_postgres.test_postgresql_provider_migrates_legacy_schema",
+      "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
+    },
+    {
+      "test": "catalog.federation.tests.test_phase_d2_postgres.test_postgresql_invalid_hash_is_not_committed",
+      "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_model_resource_admission_paths.test_windows_model_pull_script_has_valid_powershell_syntax",
+      "reason": "Windows PowerShell parser check"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_fresh_url_output.test_fresh_onboarding_query_is_printed_without_executing_reset_fragment",
+      "reason": "Windows cmd metacharacter regression"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_migration_script.test_windows_migration_script_has_valid_powershell_syntax",
+      "reason": "Windows PowerShell parser check"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_migration_script.test_windows_migration_fast_forwards_fake_legacy_checkout_and_resumes",
+      "reason": "Windows migration smoke"
+    },
+    {
+      "test": "catalog.mtconnect_recorder.tests.test_tailscale_recorder_launcher.test_windows_probe_rejects_runtime_that_cannot_import_exact_entrypoint",
+      "reason": "Windows launcher execution"
+    },
+    {
+      "test": "catalog.mtconnect_recorder.tests.test_tailscale_recorder_launcher.test_windows_wrapper_scrubs_legacy_secret_and_forwards_recorder_options",
+      "reason": "Windows launcher execution"
+    },
+    {
+      "test": "catalog.mtconnect_recorder.tests.test_tailscale_recorder_launcher.test_root_cmd_preserves_spaced_argument_and_nonzero_exit",
+      "reason": "Windows launcher execution"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_first_federation_start.test_windows_fresh_start_executes_real_batch_with_reset_stdin",
+      "reason": "requires real Windows cmd.exe"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_first_federation_start.test_windows_scaffolding_repair_restores_real_dirty_checkout",
+      "reason": "requires real Windows cmd.exe and git"
+    },
+    {
+      "test": "catalog.federation.tests.test_host_mutation_activation.test_windows_activation_lease_has_valid_powershell_syntax",
+      "reason": "Windows PowerShell parser check"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_fresh_shutdown.test_shutdown_timeout_recovers_without_hanging",
+      "reason": "Windows process-tree recovery contract"
+    }
+  ],
+  "release_artifact_sha256": "0c6f8392845c5b98a1dabf7bc347001297f432842fa12cf31e2255fe010c1e9b",
+  "icse_review_sha256": "f044960493542a0db5fdd15c4b925c63be3cb6c7aa9cd6bc3dc06959c5187f8d",
+  "no_reported_correctness_findings": true,
+  "status": "GATES_AND_LINEAGE_VERIFIED_PENDING_SKIP_RECONCILIATION",
+  "physical_acceptance": false
+}

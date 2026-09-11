@@ -1,0 +1,138 @@
+"""Reconcile retained exact-head qualification; no tests, dispatches or host actions."""
+from collections import Counter
+import datetime
+import hashlib
+import json
+from pathlib import Path
+import re
+import subprocess
+import sys
+import xml.etree.ElementTree as ET
+import zipfile
+
+ROOT = Path(__file__).resolve().parent
+A = Path('C:/wsl/fcp-v1-fba508-nettking-20260910/.acceptance')
+REPO = Path('C:/wsl/fcp-discovery-routing-budget-20260911')
+SHA = '143fe7a9082193114af3d34dc437b85f845849a2'
+sys.path.insert(0, str(A))
+from github_qualification import REQUIRED
+
+def read(name):
+    return json.loads((ROOT / name).read_text())
+
+def digest(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+state = read('qualification-state.json')['prs']['457']
+native = read('qualification-native-provenance.json')['prs']['457']
+assert state['head'] == native['source_commit'] == SHA
+assert not state['missing_workflows']
+proofs = {r['job_id']: r for r in native['records']}
+workflows = {w['workflow']: w for w in state['workflows']}
+aggregates = {'Clean-checkout suite order independence',
+              'Federation v1 automated release verdict'}
+required = dict(REQUIRED, **{'cfi2-onboarding-composition.yml': 2,
+                          'release-image-metadata.yml': 1})
+rows = []
+for name, count in required.items():
+    w = workflows[name]
+    assert w['event'] == 'workflow_dispatch'
+    assert w['api_head_sha'] == SHA and w['conclusion'] == 'success'
+    assert len(w['jobs']) == count
+    for j in w['jobs']:
+        r = proofs[j['id']]
+        assert j['status'] == 'completed' and j['conclusion'] == r['conclusion'] == 'success'
+        assert r['run_id'] == w['run_id'] and r['name'] == j['name']
+        if j['name'] in aggregates:
+            assert name == 'federation-v1-release.yml' and r['checkout_commits'] == []
+        else:
+            assert r['checkout_matches'] is True and r['checkout_commits'] == [SHA]
+    rows.append(dict(workflow=name, run_id=w['run_id'], jobs=count, result='PASS'))
+assert sum(REQUIRED.values()) == 37
+
+release = workflows['federation-v1-release.yml']
+jobs = {j['name']: j for j in release['jobs']}
+def log(name):
+    jid = jobs[name]['id']
+    paths = list(A.glob(f'pr457-head-143fe7a9*-native-logs/{jid}.log'))
+    assert paths, (name, jid)
+    path = next(p for p in paths if digest(p) == proofs[jid]['sha256'])
+    return re.sub(r'\x1b\[[0-9;]*m', '', path.read_text(encoding='utf-8'))
+
+workflow = subprocess.check_output(
+    ['git', 'show', SHA + ':.github/workflows/federation-v1-release.yml'],
+    cwd=REPO, text=True)
+def block(name):
+    found = re.findall(r'^  ' + re.escape(name) + r':\n(.*?)(?=^  [a-z][a-z0-9-]*:|\Z)',
+                       workflow, re.M | re.S)
+    assert len(found) == 1
+    return found[0]
+
+assert 'needs: [suite-order-runs]' in block('suite-order-independence')
+assert 'run: test "$RESULT" = success' in block('suite-order-independence')
+assert 'RESULT: success' in log('Clean-checkout suite order independence')
+assert 'needs: [release-checks, linux-regressions, windows-regressions]' in block('release-matrix')
+for name in ['Release matrix (Linux)', 'Release matrix (Windows)']:
+    output = log(name)
+    for marker in ['CHECKS: success', 'LINUX: success', 'WINDOWS: success',
+                   'Verified 4397 tests across 4 disjoint successful shards']:
+        assert marker in output, (name, marker)
+assert 'needs: [release-matrix, postgres-storage, suite-order-independence]' in block('release-verdict')
+for dependency in ['release-matrix', 'postgres-storage', 'suite-order-independence']:
+    assert 'test "${{ needs.' + dependency + '.result }}" = "success"' in block('release-verdict')
+assert sum(line.partition(' ')[2] == 'test "success" = "success"'
+           for line in log('Federation v1 automated release verdict').splitlines()) == 3
+
+artifacts = read('pr457-final-release-artifact-review.json')
+assert artifacts['source_commit'] == SHA and artifacts['run_id'] == release['run_id']
+assert artifacts['complete_artifact_set'] and not artifacts['missing_artifacts']
+assert artifacts['test_nodeids_covered'] == 4397 and len(artifacts['records']) == 9
+manifest = json.loads((A / 'pr457-head-143fe7a9-release-final-release-artifact-review/shards/shard-0.json').read_text())
+def identity(nodeid):
+    filename, sep, qualified = nodeid.partition('::')
+    assert sep and filename.endswith('.py')
+    base, paramsep, params = qualified.partition('[')
+    names = base.split('::')
+    return '.'.join([filename[:-3].replace('/', '.'), *names[:-1]]), names[-1] + (paramsep + params if paramsep else '')
+expected = Counter(identity(n) for n in manifest['collected'])
+assert manifest['source_sha'] == SHA and sum(expected.values()) == 4397
+passing = set()
+skipped = {}
+for row in artifacts['records']:
+    assert row['source_checkout_verified'] and row['failures'] == row['errors'] == 0
+    path = A / f"pr457-head-143fe7a9-release-final-raw-artifacts/{row['artifact_id']}.zip"
+    with zipfile.ZipFile(path) as archive:
+        xmls = [n for n in archive.namelist() if n.endswith('.xml')]
+        assert len(xmls) == 1
+        cases = list(ET.fromstring(archive.read(xmls[0])).iter('testcase'))
+    if row['name'].startswith('full-suite-order-'):
+        assert Counter((c.get('classname'), c.get('name')) for c in cases) == expected
+    for c in cases:
+        key = (c.get('classname'), c.get('name'))
+        skip = c.find('skipped')
+        if skip is None:
+            passing.add(key)
+        else:
+            skipped[key] = skip.get('message')
+
+uncovered = [dict(test='.'.join(k), reason=v) for k, v in skipped.items() if k not in passing]
+icse = read('qualification-artifact-review-1321.json')
+assert icse['source_sha'] == SHA and icse['source_export_exact']
+assert len(icse['component']) == 3 and all(x['passed'] == 4 for x in icse['component'])
+assert all(x['required_checks_passed'] == 10 and x['teardown'] for x in icse['network'])
+review = read('pr457-premerge-review-input.json')
+assert review['head'] == SHA and not review['comments'] and not review['reviews']
+assert any('Completed' in c['body'] and '143fe7a' in c['body'] for c in review['issue_comments'])
+report = dict(recorded_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              source_commit=SHA, required_jobs=37, additional_cfi2_registry_jobs=3,
+              workflows=rows, release_native_checkouts=14, source_bound_aggregates=2,
+              collected_test_identities=4397, full_orders_exact_test_identities=True,
+              skips_with_pass_elsewhere=len(skipped)-len(uncovered),
+              skips_requiring_native_nonartifact_log=uncovered,
+              release_artifact_sha256=digest(ROOT/'pr457-final-release-artifact-review.json'),
+              icse_review_sha256=digest(ROOT/'qualification-artifact-review-1321.json'),
+              no_reported_correctness_findings=True,
+              status='GATES_AND_LINEAGE_VERIFIED_PENDING_SKIP_RECONCILIATION',
+              physical_acceptance=False)
+(ROOT/'pr457-final-qualification.json').write_text(json.dumps(report, indent=2)+'\n')
+print(json.dumps(report))

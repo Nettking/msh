@@ -278,3 +278,14 @@ The live PR review snapshot has no inline correctness findings or review objects
 its review summary is complete at the intended head. Next: reconcile intentional
 platform skips and aggregate dependencies, then publish exact-head qualification
 verdict. No physical evidence or host state changed.
+
+PR457 gate graph and test identities are verified:37/37 required jobs plus
+CFI2 and registry3/3 are successful at the intended source; both checkout-free
+aggregates assert their successful same-run dependencies. Full-order JUnit test
+identities exactly match4397 collected shard identities. Thirteen skipped
+platform cases have explicit passing JUnit evidence elsewhere; remaining
+Windows-only/PostgreSQL skips need reconciliation against native non-artifact
+jobs before the final audit is closed. This is evidence review, not a newly
+confirmed defect or justification to rerun tests. The intermediate report and
+repeatable verifier are persisted. Next: inspect only retained native commands/
+results covering those named cases; keep all hosts unchanged.
