@@ -32,6 +32,26 @@ pressure, publish unfinished state and the exact next action before continuing.
 |---|---|---|---|---|---|---|---|
 | D01 | Supported Nitro startup, before formal P01/P03 | Core activation succeeds; readiness follows `/onboarding` into stateful `/login`, times out, launcher exits 1 | product | Actual N observation and focused regression | Supported startup completion; updater start after this gate | YES: independent metadata, local provider and bounded diagnostics; no startup PASS | [#456](https://github.com/Nettking/msh/pull/456), direct-response readiness |
 | D02 | Ordinary tailnet discovery, before enrollment/P01 | Default 0.75 s probes time out; public advertisement requests fresh authority; later server 200 is too late | product | Three ordinary N timeouts; focused delayed-response and authority regressions | Ordinary discovery/zero-touch join; no longer-timeout workaround counts as fixed | YES: independently addressed metadata/provider checks and safe authority diagnostics | [#457](https://github.com/Nettking/msh/pull/457), local routing metadata and bounded total HTTP budget |
+| D03 | Nettking local AI provider before P10/B/CF7 | Existing llama3.2:3b chat request exceeds unchanged 60 s client limit despite actual GPU activity | unresolved | One exact-N bounded physical request; root cause not established | Successful local AI response and subsequent same-device Recorder+AI claims | YES: read-only provider logs/resources and independent authority/status paths; no repeated inference yet | NONE; issue publication immediately follows this evidence checkpoint |
+
+## D03
+
+**Finding:** D03  
+**Status:** CONFIRMED (timeout observation; cause unresolved)  
+**Candidate SHA:** `0536f03d67eb277e11573c2188d8e820399627e3`  
+**Host(s):** Nettking, existing exact-N Flask and pinned Ollama containers  
+**Physical stage:** Independent local AI provider before P10/B/CF7; no formal scenario executed  
+**Observed:** A single synthetic eight-token chat request for the existing hash-verified `llama3.2:3b` exceeded the unchanged 60 s HTTP limit. N raised `OllamaProbeError: Ollama did not respond within the benchmark limit`, caused by `TimeoutError: timed out`. GPU memory reached 2273 MiB and utilization reached 99%, but no response completed within the deadline. Both containers remained running; manifest unchanged.  
+**Expected:** Existing local model returns a bounded synthetic response within the unchanged benchmark limit. GPU allocation alone does not establish successful inference.  
+**Classification:** unresolved — investigate provider logs and resource limits before attributing to product or environment  
+**Acceptance impact:** Local AI response is not demonstrated; no P10/B/CF7 or same-device Recorder+AI evidence may be inferred.  
+**Safe continuation:** YES — bounded read-only provider/resource inspection and independent status/authority paths; do not stack inference requests, change limits, download models or bypass authority.  
+**Evidence:** [Exact command, timing, traceback and GPU samples](diagnostics/nettking-existing-ollama-inference.json); [audit-only procedure](diagnostics/probe_existing_ollama.py). Command: `C:\wsl\fcp-v1-fba508-nettking-20260910\.venv\Scripts\python.exe -B handoff/diagnostics/probe_existing_ollama.py` from this documentation checkout. Request ran in the existing Flask container through unchanged N `_bounded_json_request`; HTTP timeout 60 s, response cap 32768 bytes. Observation 2026-09-11T12:20:21Z–12:21:24Z.  
+**State changed:** Ephemeral model/GPU memory and owned service logs only; no persistent configuration, model download, deployment or membership change.  
+**Protected Recorder data:** Untouched; no protected corpus access or container/task mutation.  
+**GitHub artifact:** Publication pending immediately after this evidence push; do not continue substantial investigation before adding the issue link.  
+**Repair:** NONE  
+**Next diagnostic action:** Read only existing owned Ollama logs since 12:20:21Z, `ollama ps`, Docker memory/OOM metadata and checked-in N benchmark/provider limits; preserve findings without changing the provider.
 
 ## D01
 
@@ -152,3 +172,7 @@ Protected Recorder container/image/start/mount metadata exactly match baseline; 
 Nitro collector initially included three historical exited successful one-off setup containers alongside one running normal N relay. This is a resolved diagnostic selection error, not an independent candidate defect. Procedure and mechanism: diagnostics/sweep-nitro-collector-attempt1.json. The corrected collector selects running non-oneoff containers without changing them. Local stdout was CP1252 on Windows versus UTF8 from remote Linux; persisted JSON is normalized UTF8. No product script deployed: remote collector was streamed to existing Python stdin.
 
 Next exact action: independently exercise the existing Nettking Ollama container using its existing3b model with bounded short inference, record GPU/loaded-model/runtime observations; inspect unchanged N service-health/update/provenance probes against owned roots. Do not enumerate protected Recorder files. No formal acceptance assertions or additional qualification dispatches.
+
+## Diagnostic checkpoint, September 11 12:22 UTC
+
+D03 supersedes the preceding next action: the inference timed out and must be published as an issue before further investigation. No acceptance PASS. The unchanged N diagnostic probes for running-commit-identity, service-health, host-resource-baseline and update-status completed and are stored under `diagnostics/nettking-probe-*.json`. Service-health observes running workers; local Recorder status is absent/stopped/not-started, so this does not prove active recording. Update-status ran against the clean detached N harness, correctly reported unsupported checkout with no network fetch, and does not test the live runtime updater. Storage roots share the C: backing resource; different directories alone cannot isolate a disk-pressure fault. These results are diagnostic observations only.

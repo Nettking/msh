@@ -1,0 +1,51 @@
+{
+  "candidate_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
+  "host": "nettking",
+  "stage": "independent unchanged probe: running-commit-identity",
+  "mode": "DIAGNOSTIC ONLY - NOT PHYSICAL ACCEPTANCE EVIDENCE",
+  "command": "run_nettking_probe.py running-commit-identity",
+  "checked_in_entrypoint": "scripts.acceptance.v1_physical_probes.execute",
+  "probe_source_sha256": "8e4f2efb81ccc459a08c72fd019c0004c6e06c614232da7ba50c439bff95f974",
+  "observed_at": "2026-09-11T12:18:28.571038+00:00",
+  "state_changed": false,
+  "protected_recorder_data_untouched": true,
+  "physical_acceptance": false,
+  "diagnostic_probe": {
+    "probe_id": "running-commit-identity",
+    "status": "pass",
+    "summary": "every running component carries the candidate build commit",
+    "detail": {
+      "candidate_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
+      "containers": [
+        {
+          "service": "flask",
+          "state": "running",
+          "build_commit_matches_candidate": true,
+          "build_commit_present": true
+        },
+        {
+          "service": "ollama",
+          "state": "running",
+          "candidate_component": false,
+          "external_component": true,
+          "classification": "pinned-external-image"
+        },
+        {
+          "service": "recorder",
+          "state": "running",
+          "build_commit_matches_candidate": true,
+          "build_commit_present": true
+        },
+        {
+          "service": "relay",
+          "state": "running",
+          "build_commit_matches_candidate": true,
+          "build_commit_present": true
+        }
+      ],
+      "running_containers": 4,
+      "missing_candidate_services": [],
+      "native_recorder_build_commit_matches": false
+    }
+  }
+}

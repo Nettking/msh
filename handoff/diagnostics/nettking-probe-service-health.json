@@ -1,0 +1,50 @@
+{
+  "candidate_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
+  "host": "nettking",
+  "stage": "independent unchanged probe: service-health",
+  "mode": "DIAGNOSTIC ONLY - NOT PHYSICAL ACCEPTANCE EVIDENCE",
+  "command": "run_nettking_probe.py service-health",
+  "checked_in_entrypoint": "scripts.acceptance.v1_physical_probes.execute",
+  "probe_source_sha256": "8e4f2efb81ccc459a08c72fd019c0004c6e06c614232da7ba50c439bff95f974",
+  "observed_at": "2026-09-11T12:18:54.396251+00:00",
+  "state_changed": false,
+  "protected_recorder_data_untouched": true,
+  "physical_acceptance": false,
+  "diagnostic_probe": {
+    "probe_id": "service-health",
+    "status": "pass",
+    "summary": "every observable core worker is alive and its health is visible",
+    "detail": {
+      "restart_states": {
+        "flask": {
+          "state": "stable",
+          "consecutive_unclean": 0
+        },
+        "recorder": {
+          "state": "stable",
+          "consecutive_unclean": 0
+        },
+        "relay": {
+          "state": "unknown",
+          "consecutive_unclean": 0
+        }
+      },
+      "recorder": {
+        "present": false,
+        "heartbeat_fresh": true,
+        "state": "stopped",
+        "federation_status": "not-started",
+        "build_commit_present": false
+      },
+      "compose_container_count": 4,
+      "running_services": [
+        "flask",
+        "ollama",
+        "recorder",
+        "relay"
+      ],
+      "not_running_services": [],
+      "crash_looping": []
+    }
+  }
+}
