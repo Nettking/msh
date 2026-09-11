@@ -1,6 +1,6 @@
 {
   "source_commit": "7286f30d30e20c94c13cc9acebb2fd6d61bc1163",
-  "retained_at": "2026-09-11T20:18:50.905660+00:00",
+  "retained_at": "2026-09-11T20:30:18.122395+00:00",
   "records": [
     {
       "job_id": 103388045522,
@@ -554,6 +554,95 @@
       "conclusion": "success",
       "bytes": 106226,
       "sha256": "4aa30526141fbbfa66b2b9f79eed7fa5305a32ea8dc8d53c0d69cc0986f7919b",
+      "checkout_commits": [
+        "7286f30d30e20c94c13cc9acebb2fd6d61bc1163"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103398519499,
+      "run_id": 34640438781,
+      "name": "windows",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 49095,
+      "sha256": "095a04b414d62cc1fae0ce1ebb5aa1f95beb69834d70e845ff3d91deb0d0afef",
+      "checkout_commits": [
+        "7286f30d30e20c94c13cc9acebb2fd6d61bc1163"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103388045776,
+      "run_id": 34637251378,
+      "name": "Windows regressions (capability-product)",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 57954,
+      "sha256": "52abd486a55bdf0b983aa45c88d33ce688d52efc88c2c7f6947345db5a07cb8e",
+      "checkout_commits": [
+        "bfec91c9c0ab3581645bc4c575bf4a056b2b80c9"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103408682694,
+      "run_id": 34637251378,
+      "name": "Release matrix (Linux)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 15014,
+      "sha256": "9fff85fa72456f6da7ff4994aef7984493e5779354b49a61cb2fe970d24314a6",
+      "checkout_commits": [
+        "bfec91c9c0ab3581645bc4c575bf4a056b2b80c9"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103408682700,
+      "run_id": 34637251378,
+      "name": "Release matrix (Windows)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 17414,
+      "sha256": "33b1072ab826f8870603a245b689d195f326829c87d5ef86befc8bef30d06c0c",
+      "checkout_commits": [
+        "bfec91c9c0ab3581645bc4c575bf4a056b2b80c9"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103408808278,
+      "run_id": 34637251378,
+      "name": "Federation v1 automated release verdict",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 1189,
+      "sha256": "8cf233f63813e86bb20444982c7fdfb1e931783a36a97f90715782436ef2f203",
+      "checkout_commits": [],
+      "checkout_matches": null
+    },
+    {
+      "job_id": 103408924564,
+      "run_id": 34643583922,
+      "name": "Shard contract (Linux, shared-pool)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 29181,
+      "sha256": "b50ad9ab5dc1f0605f3889f5613f7514c699c5035cad3418d9e3ac2479c5894d",
+      "checkout_commits": [
+        "7286f30d30e20c94c13cc9acebb2fd6d61bc1163"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103395113227,
+      "run_id": 34639396004,
+      "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 64980,
+      "sha256": "5d4667136ca59ab96d00f8f5cc96136225ea67d38743baf2cb42e4fd7477486c",
       "checkout_commits": [
         "7286f30d30e20c94c13cc9acebb2fd6d61bc1163"
       ],

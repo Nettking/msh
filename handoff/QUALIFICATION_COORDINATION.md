@@ -1449,3 +1449,9 @@ phase2 and software-update exact-head parents also completed successfully.
 No failed jobs observed. Sharding replacement34643583922 and ICSE remain active.
 Next: retain new native logs, then review release aggregate dependencies and all
 source proofs before dispatching its exact-head replacement once. Physical stopped.
+
+Seven new native logs retained. Exact-head PASS now18/37 required plus companion3/3;
+phase2 and software-update both platforms verified. Release14 source-bearing jobs
+all prove syntheticbfec91c9, while two successful aggregates have no checkout.
+Next: inspect exact checked-in aggregate dependency definitions and native logs,
+persist that provenance review, then dispatch the demonstrated release source gap.
