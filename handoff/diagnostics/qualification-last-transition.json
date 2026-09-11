@@ -1,61 +1,37 @@
 {
-  "observed_at": "2026-09-11T16:11:52.637850+00:00",
+  "observed_at": "2026-09-11T16:23:21.204385+00:00",
   "changes": {
     "461": [
       {
         "workflow": "federation-v1-release.yml",
         "run_id": 34616905954,
         "event": "workflow_dispatch",
-        "status": "queued",
-        "conclusion": null,
+        "status": "completed",
+        "conclusion": "success",
         "jobs": [
           {
-            "id": 103321004832,
-            "name": "Linux regression shard (0)",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
-            "id": 103321004873,
-            "name": "Release checks (Linux)",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
-            "id": 103321004880,
-            "name": "Windows regressions (journal-artifacts)",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
-            "id": 103321004891,
-            "name": "PostgreSQL storage release check",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
-            "id": 103321004900,
-            "name": "Linux regression shard (3)",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
-            "id": 103321004916,
-            "name": "Linux regression shard (2)",
+            "id": 103327658106,
+            "name": "Clean-checkout suite order independence",
             "status": "completed",
             "conclusion": "success"
           },
           {
             "id": 103333033633,
             "name": "Release matrix (Windows)",
-            "status": "queued",
-            "conclusion": null
+            "status": "completed",
+            "conclusion": "success"
           },
           {
             "id": 103333033635,
             "name": "Release matrix (Linux)",
-            "status": "queued",
-            "conclusion": null
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103333594837,
+            "name": "Federation v1 automated release verdict",
+            "status": "completed",
+            "conclusion": "success"
           }
         ]
       },
@@ -63,20 +39,35 @@
         "workflow": "cfi2-onboarding-composition.yml",
         "run_id": 34618400138,
         "event": "workflow_dispatch",
-        "status": "in_progress",
-        "conclusion": null,
+        "status": "completed",
+        "conclusion": "success",
         "jobs": [
           {
             "id": 103325957283,
             "name": "onboarding (Linux, fcp-test-linux, bash, 3.12.13)",
-            "status": "in_progress",
-            "conclusion": null
+            "status": "completed",
+            "conclusion": "success"
           },
           {
             "id": 103325957474,
             "name": "onboarding (Windows, fcp-test-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
-            "status": "in_progress",
-            "conclusion": null
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
+      {
+        "workflow": "phase-f85-operator-federation-surface.yml",
+        "run_id": 34618403669,
+        "event": "workflow_dispatch",
+        "status": "completed",
+        "conclusion": "success",
+        "jobs": [
+          {
+            "id": 103325969234,
+            "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+            "status": "completed",
+            "conclusion": "success"
           }
         ]
       }

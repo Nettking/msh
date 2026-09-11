@@ -557,3 +557,15 @@ CFI2/operator results, then finalize461 complete release artifacts and required
 qualification. Preserve456/457 PASS and existing461 ICSE/registry proofs.
 No additional workflow dispatch is needed. Runtime/protected Recorder state
 unchanged; no physical acceptance or P07/P12 action.
+
+## September11 16:24UTC — PR461 required workflows complete
+
+Heads unchanged;456/457 qualifications remain valid. Exact461 release34616905954
+completed successfully, including both matrices/order aggregate/verdict. CFI2
+34618400138 and operator34618403669 are complete/success. No new failure.
+Next: retain seven new native proofs, audit complete461 release artifacts and
+current correctness findings, reconcile final qualification. If complete,
+proceed to live premerge checks and the three separate merges, then qualify
+actual resulting main once. No head/result inference from synthetic runs.
+Runtime remains0536f03d67eb277e11573c2188d8e820399627e3; hosts and protected
+Recorder untouched, physical acceptance incomplete, P07/P12 absent.

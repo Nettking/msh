@@ -1,5 +1,5 @@
 {
-  "observed_at": "2026-09-11T16:11:52.637850+00:00",
+  "observed_at": "2026-09-11T16:23:21.204385+00:00",
   "prs": {
     "456": {
       "number": 456,
@@ -1233,15 +1233,15 @@
           "run_id": 34616905954,
           "event": "workflow_dispatch",
           "api_head_sha": "5b826c6806ab1bdb960412ba20ca78192971fb1d",
-          "status": "queued",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "attempt": 1,
           "required_count": 16,
           "signature": {
-            "status": "queued",
-            "conclusion": null,
+            "status": "completed",
+            "conclusion": "success",
             "run_attempt": 1,
-            "updated_at": "2026-09-11T15:34:15Z"
+            "updated_at": "2026-09-11T16:13:00Z"
           },
           "jobs": [
             {
@@ -1355,29 +1355,38 @@
             {
               "id": 103327658106,
               "name": "Clean-checkout suite order independence",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T15:54:43Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-11T16:12:23Z",
+              "completed_at": "2026-09-11T16:12:28Z"
             },
             {
               "id": 103333033633,
               "name": "Release matrix (Windows)",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": null,
-              "started_at": "2026-09-11T16:11:08Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-11T16:12:41Z",
+              "completed_at": "2026-09-11T16:12:52Z"
             },
             {
               "id": 103333033635,
               "name": "Release matrix (Linux)",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": null,
-              "started_at": "2026-09-11T16:11:08Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-11T16:12:30Z",
+              "completed_at": "2026-09-11T16:12:39Z"
+            },
+            {
+              "id": 103333594837,
+              "name": "Federation v1 automated release verdict",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-11T16:12:54Z",
+              "completed_at": "2026-09-11T16:12:59Z"
             }
           ]
         },
@@ -1521,34 +1530,34 @@
           "run_id": 34618400138,
           "event": "workflow_dispatch",
           "api_head_sha": "5b826c6806ab1bdb960412ba20ca78192971fb1d",
-          "status": "in_progress",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "attempt": 1,
           "required_count": null,
           "signature": {
-            "status": "in_progress",
-            "conclusion": null,
+            "status": "completed",
+            "conclusion": "success",
             "run_attempt": 1,
-            "updated_at": "2026-09-11T16:11:09Z"
+            "updated_at": "2026-09-11T16:12:22Z"
           },
           "jobs": [
             {
               "id": 103325957283,
               "name": "onboarding (Linux, fcp-test-linux, bash, 3.12.13)",
-              "status": "in_progress",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "runner_name": "Nettking-Linux",
               "started_at": "2026-09-11T16:11:09Z",
-              "completed_at": null
+              "completed_at": "2026-09-11T16:12:22Z"
             },
             {
               "id": 103325957474,
               "name": "onboarding (Windows, fcp-test-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
-              "status": "in_progress",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "runner_name": "Nettking",
               "started_at": "2026-09-11T16:08:58Z",
-              "completed_at": null
+              "completed_at": "2026-09-11T16:12:13Z"
             }
           ]
         },
@@ -1674,15 +1683,15 @@
           "run_id": 34618403669,
           "event": "workflow_dispatch",
           "api_head_sha": "5b826c6806ab1bdb960412ba20ca78192971fb1d",
-          "status": "queued",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "attempt": 1,
           "required_count": 2,
           "signature": {
-            "status": "queued",
-            "conclusion": null,
+            "status": "completed",
+            "conclusion": "success",
             "run_attempt": 1,
-            "updated_at": "2026-09-11T15:49:25Z"
+            "updated_at": "2026-09-11T16:17:21Z"
           },
           "jobs": [
             {
@@ -1697,11 +1706,11 @@
             {
               "id": 103325969234,
               "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T15:49:27Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking",
+              "started_at": "2026-09-11T16:12:15Z",
+              "completed_at": "2026-09-11T16:17:20Z"
             }
           ]
         },
