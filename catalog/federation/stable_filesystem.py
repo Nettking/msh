@@ -117,7 +117,7 @@ if os.name == "nt":
                 _FileRenameInformationEx if preserve_readers else _FileRenameInformation
             )
             offset = structure.FileName.offset
-            buffer = ctypes.create_string_buffer(offset + len(encoded))
+            buffer = ctypes.create_string_buffer(max(ctypes.sizeof(structure), offset + len(encoded)))
             info = structure.from_buffer(buffer)
             if preserve_readers:
                 info.Flags = (

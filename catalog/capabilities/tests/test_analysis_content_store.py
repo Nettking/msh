@@ -13,9 +13,9 @@ from catalog.federation.errors import FederationValidationError
 
 
 @pytest.mark.parametrize("same_content", [True, False])
-def test_publication_preserves_open_reader_snapshot(tmp_path, same_content):
+@pytest.mark.parametrize("key", ["analysis/session/work/plan.json", "x"])
+def test_publication_preserves_open_reader_snapshot(tmp_path, same_content, key):
     store = LocalArtifactContentStore(tmp_path / "artifacts", chunk_size=1024)
-    key = "analysis/session/work/plan.json"
     original = b"original" * 4096
     replacement = original if same_content else b"replacement" * 8192
     old_identity = store.write_bytes(key, original)
