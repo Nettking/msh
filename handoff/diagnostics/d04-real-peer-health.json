@@ -1,0 +1,22 @@
+{
+  "observed_at": "2026-09-11T18:14:56.259954+00:00",
+  "status": "D04_REAL_PEER_HEALTH_VERIFIED",
+  "from_host": "nettking",
+  "to_host": "nitro",
+  "fingerprint": "0efb6f56566ac0eb",
+  "current_nitro_runtime_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
+  "qualified_main": "9b286f931497bf6291e215f6340443c5162826b0",
+  "port": 5151,
+  "http_status": 200,
+  "response": {
+    "schema": "fcp.federation.tailnet-auto-join.v1",
+    "responder": "ready",
+    "tailscale": true
+  },
+  "elapsed_seconds": 0.15600000001722947,
+  "physical_acceptance": false,
+  "request_method": "GET",
+  "enrollment_or_grant_requested": false,
+  "state_changed": false,
+  "protected_recorder_data_untouched": true
+}

@@ -18,8 +18,9 @@ checked-in revalidation -> fresh formal physical acceptance.
 `9b286f931497bf6291e215f6340443c5162826b0` is qualified37/37 plus CFI2/registry,
 release-verdict and native artifact review. All fix heads are ancestors.
 Preserve `diagnostics/merged-main-final-qualification.json`; no software rerun.
-Next is controlled D04 Nitro host remediation/verification, then candidate freeze
-and clean checked-in revalidation. Final main is not yet frozen as a physical candidate.
+D04 host remediation and local/real Nettking peer verification are complete on N.
+Next is candidate freeze and clean checked-in revalidation. Final main is not yet
+frozen as a physical candidate. M still requires fresh runtime admission checks.
 
 Runtime remains0536f03d67eb277e11573c2188d8e820399627e3. No physical PASS; P07/P12
 not started. Protected Recorder data remains out of bounds. The user's latest
@@ -930,3 +931,13 @@ No enrollment/grant request and no Recorder-host access. Source remains clean N.
 Next: verify health from real Nettking peer, persist D04 resolution in#459 and
 freeze qualified9b286f93. New M runtime admission/verification remains required;
 this N host configuration observation is not M physical acceptance evidence.
+
+##18:14UTC — D04 environment blocker resolved on current runtime
+
+[Real Nettking peer](diagnostics/d04-real-peer-health.json) receives Nitro5151
+health200/ready/Tailscale in0.156s. Combined with exact new process/socket/source
+proof and unchanged core starts, this resolves the stale-listener host blocker.
+Issue459 receives the durable evidence and is closed as environment remediation.
+M main still exactly9b286f93 on GitHub. Next: freeze that qualified SHA, then run
+the checked-in impact/revalidation procedure from its clean detached checkout.
+All physical observations must be fresh; P07/P12 remain unstarted.

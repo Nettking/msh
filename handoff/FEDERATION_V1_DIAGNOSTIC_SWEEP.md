@@ -3,6 +3,14 @@
 **Current coordination:** [state-change-driven qualification](QUALIFICATION_COORDINATION.md)
 supersedes historical execution next-actions below. Read it before acting.
 
+Post-sweep D04 update18:14UTC: environment remediation complete on unchanged N.
+Exact stale process was replaced under the [controlled host procedure](D04_CONTROLLED_HOST_PROCEDURE.md).
+Current N responder owns5151; local and real Nettking peer health200 verified.
+[Host receipt](diagnostics/d04-controlled-replacement.json),
+[peer receipt](diagnostics/d04-real-peer-health.json). No product repair, legacy
+identity copy, enrollment request, Docker restart or protected Recorder access.
+M runtime admission must verify ownership again; no physical evidence carry-over.
+
 **Mode: DIAGNOSTIC ONLY — NOT PHYSICAL ACCEPTANCE EVIDENCE.**
 
 Runtime candidate / AUTHORITATIVE_SHA:
