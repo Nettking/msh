@@ -96,3 +96,6 @@ active and quiet on unchanged state.
 
 Heads unchanged. New successful completions:456 Windows release checks and branding;457 ICSE publication bundle, Windows operator/CFI2 and Linux CF7B;461 additional Linux release work, exact registry run34602732775 and Linux sharding. No new failure; required jobs still pending and no merge-ready verdict. The detailed state/delta are persisted. Next: retain only new logs, then verify newly completed registry/ICSE artifacts; no host action or duplicate dispatch.
 
+
+New native logs retained:8 additional successful exact-head proofs (456 two,457 four,461 two);4 further461 jobs used synthetic e03added and are excluded from exact-head qualification. Prior proofs remain preserved. No new failures. Registry461 and ICSE457 artifact review is next.
+
