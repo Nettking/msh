@@ -1,0 +1,15 @@
+{
+  "candidate": "9b286f931497bf6291e215f6340443c5162826b0",
+  "host": "DESKTOP-N5KI14R",
+  "status": "SUSPECTED_ADMISSION_CONTEXT_BLOCKER_NOT_INDEPENDENT_DEFECT_CONFIRMED",
+  "procedure": "m_recorder_operative_context.ps1 via ssh_campaign_script.py recorder --timeout 40",
+  "observed": "Outer read-only SSH invocation timed out after40 seconds with no returned result",
+  "expected": "Existing qualified operative native Python returns fingerprint and clean N staged-source metadata",
+  "classification": "unresolved audit/host/transport context; failing subcommand not isolated",
+  "error": "subprocess.TimeoutExpired: existing WSL SSH powershell encoded stdin loader timed out after40 seconds",
+  "state_changed": "No product/data mutation requested; read-only child process may remain and must be inspected before retry",
+  "protected_recorder_data_untouched": true,
+  "physical_acceptance": false,
+  "safe_independent_continuation": "YES: Nitro staging and Nettking review do not depend on this native audit",
+  "next_action": "Read metadata for the exact Recorder audit child process; isolate native-interpreter versus Git/transport wait without rerunning the combined probe or altering service accounts"
+}

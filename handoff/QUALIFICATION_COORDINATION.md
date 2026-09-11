@@ -1043,3 +1043,14 @@ the retained N-native provenance names the correct existing executable at
 `C:\Users\Utlån\fcp-v1-0536f03d-20260911\tooling\python312\python.exe`.
 Next: verify that existing operative interpreter, then stage exact M for Nitro
 and owned Recorder campaign source. Never modify protected production Recorder.
+
+### Recorder operative-context audit timed out; no new product defect established
+
+The probe using the documented portable native interpreter timed out at its
+outer40s SSH bound before returning a result. [Exact unresolved observation](diagnostics/m-recorder-context-timeout.json).
+It contains native fingerprint plus Git metadata, so the failing subcommand is
+not isolated. Do not repeatedly rerun it or alter service accounts. Next inspect
+only the audit child process metadata and distinguish interpreter/Git/transport.
+No product/data mutation was requested; check whether a read-only child remains.
+Nitro source staging can safely continue independently. M source bundle was
+created from clean M with N prerequisite and HEAD exactlyM; it is not deployed.
