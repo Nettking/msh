@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="2" time="0.457" timestamp="2026-09-11T23:22:18.594448+02:00" hostname="Nettking"><testcase classname="catalog.federation.tests.test_backup_recovery" name="test_backup_retains_its_stop_deadline_and_controlled_error[7.0]" time="0.010"><failure message="catalog.federation.tailnet_join_responder.ResponderReplacementError: previous responder exit was not confirmed">tmp_path = WindowsPath('C:/Users/Martin/AppData/Local/Temp/pytest-of-Martin/pytest-95/test_backup_retains_its_stop_d0')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x0000025ACA6CE030&gt;
+exit_after = 7.0
+
+    @pytest.mark.parametrize("exit_after", [7.0, None])
+    def test_backup_retains_its_stop_deadline_and_controlled_error(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch, exit_after: float | None
+    ) -&gt; None:
+        import ctypes
+    
+        from catalog.federation import tailnet_join_responder as responder
+    
+        elapsed = [0.0]
+        calls = []
+    
+        def advance(seconds):
+            elapsed[0] += seconds
+    
+        def open_process(access, inherit, pid):
+            calls.append(("open", access))
+            return 73
+    
+        def terminate(handle, code):
+            calls.append(("terminate", handle))
+            return True
+    
+        def wait(handle, timeout):
+            calls.append(("wait", timeout))
+            return 0x102
+    
+        def close(handle):
+            calls.append(("close", handle))
+            return True
+    
+        kernel = SimpleNamespace(OpenProcess=open_process, TerminateProcess=terminate,
+                                 WaitForSingleObject=wait, CloseHandle=close)
+        monkeypatch.setattr(ctypes, "WinDLL", lambda *a, **kw: kernel, raising=False)
+        monkeypatch.setattr(responder.os, "name", "nt")
+        monkeypatch.setattr(responder, "_windows_start_token_from_handle", lambda h: "same")
+        monkeypatch.setattr(backup, "_read_responder_record", lambda p: (42, "same"))
+        monkeypatch.setattr(backup, "process_start_token", lambda pid:
+                            None if exit_after is not None and elapsed[0] &gt;= exit_after else "same")
+        monkeypatch.setattr(backup, "time", SimpleNamespace(monotonic=lambda: elapsed[0], sleep=advance))
+    
+        if exit_after is None:
+            with pytest.raises(backup.BackupError, match="responder_stop_unverified"):
+                backup._quiesce_responder(tmp_path)
+            assert 10 &lt;= elapsed[0] &lt; 10.1
+        else:
+&gt;           backup._quiesce_responder(tmp_path)
+
+catalog\federation\tests\test_backup_recovery.py:351: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+catalog\federation\backup_recovery.py:526: in _quiesce_responder
+    if not terminate_process_if_same_instance(pid, token):
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+catalog\federation\tailnet_join_responder.py:447: in terminate_process_if_same_instance
+    return _terminate_windows_process_if_same_instance(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+pid = 42, expected_start_token = 'same'
+
+    def _terminate_windows_process_if_same_instance(
+        pid: int, expected_start_token: str
+    ) -&gt; bool:
+        import ctypes
+        from ctypes import wintypes
+    
+        process_terminate = 0x0001
+        process_query_limited_information = 0x1000
+        synchronize = 0x00100000
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+        kernel32.OpenProcess.restype = wintypes.HANDLE
+        kernel32.TerminateProcess.argtypes = (wintypes.HANDLE, wintypes.UINT)
+        kernel32.TerminateProcess.restype = wintypes.BOOL
+        kernel32.WaitForSingleObject.argtypes = (wintypes.HANDLE, wintypes.DWORD)
+        kernel32.WaitForSingleObject.restype = wintypes.DWORD
+        kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+        kernel32.CloseHandle.restype = wintypes.BOOL
+        handle = kernel32.OpenProcess(
+            process_query_limited_information | process_terminate | synchronize, False, pid
+        )
+        if not handle:
+            return False
+        try:
+            if _windows_start_token_from_handle(handle) != expected_start_token:
+                return False
+            if not kernel32.TerminateProcess(handle, 1):
+                return False
+            # TerminateProcess is asynchronous. Keep the same verified handle open
+            # until process exit, rather than racing its still-owned listener.
+            if (
+                kernel32.WaitForSingleObject(
+                    handle, int(PROCESS_EXIT_TIMEOUT_SECONDS * 1000)
+                )
+                != 0
+            ):
+&gt;               raise ResponderReplacementError("previous responder exit was not confirmed")
+E               catalog.federation.tailnet_join_responder.ResponderReplacementError: previous responder exit was not confirmed
+
+catalog\federation\tailnet_join_responder.py:337: ResponderReplacementError</failure></testcase><testcase classname="catalog.federation.tests.test_backup_recovery" name="test_backup_retains_its_stop_deadline_and_controlled_error[None]" time="0.004"><failure message="catalog.federation.tailnet_join_responder.ResponderReplacementError: previous responder exit was not confirmed">tmp_path = WindowsPath('C:/Users/Martin/AppData/Local/Temp/pytest-of-Martin/pytest-95/test_backup_retains_its_stop_d1')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x0000025ACA6CE2A0&gt;
+exit_after = None
+
+    @pytest.mark.parametrize("exit_after", [7.0, None])
+    def test_backup_retains_its_stop_deadline_and_controlled_error(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch, exit_after: float | None
+    ) -&gt; None:
+        import ctypes
+    
+        from catalog.federation import tailnet_join_responder as responder
+    
+        elapsed = [0.0]
+        calls = []
+    
+        def advance(seconds):
+            elapsed[0] += seconds
+    
+        def open_process(access, inherit, pid):
+            calls.append(("open", access))
+            return 73
+    
+        def terminate(handle, code):
+            calls.append(("terminate", handle))
+            return True
+    
+        def wait(handle, timeout):
+            calls.append(("wait", timeout))
+            return 0x102
+    
+        def close(handle):
+            calls.append(("close", handle))
+            return True
+    
+        kernel = SimpleNamespace(OpenProcess=open_process, TerminateProcess=terminate,
+                                 WaitForSingleObject=wait, CloseHandle=close)
+        monkeypatch.setattr(ctypes, "WinDLL", lambda *a, **kw: kernel, raising=False)
+        monkeypatch.setattr(responder.os, "name", "nt")
+        monkeypatch.setattr(responder, "_windows_start_token_from_handle", lambda h: "same")
+        monkeypatch.setattr(backup, "_read_responder_record", lambda p: (42, "same"))
+        monkeypatch.setattr(backup, "process_start_token", lambda pid:
+                            None if exit_after is not None and elapsed[0] &gt;= exit_after else "same")
+        monkeypatch.setattr(backup, "time", SimpleNamespace(monotonic=lambda: elapsed[0], sleep=advance))
+    
+        if exit_after is None:
+            with pytest.raises(backup.BackupError, match="responder_stop_unverified"):
+&gt;               backup._quiesce_responder(tmp_path)
+
+catalog\federation\tests\test_backup_recovery.py:348: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+catalog\federation\backup_recovery.py:526: in _quiesce_responder
+    if not terminate_process_if_same_instance(pid, token):
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+catalog\federation\tailnet_join_responder.py:447: in terminate_process_if_same_instance
+    return _terminate_windows_process_if_same_instance(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+pid = 42, expected_start_token = 'same'
+
+    def _terminate_windows_process_if_same_instance(
+        pid: int, expected_start_token: str
+    ) -&gt; bool:
+        import ctypes
+        from ctypes import wintypes
+    
+        process_terminate = 0x0001
+        process_query_limited_information = 0x1000
+        synchronize = 0x00100000
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+        kernel32.OpenProcess.restype = wintypes.HANDLE
+        kernel32.TerminateProcess.argtypes = (wintypes.HANDLE, wintypes.UINT)
+        kernel32.TerminateProcess.restype = wintypes.BOOL
+        kernel32.WaitForSingleObject.argtypes = (wintypes.HANDLE, wintypes.DWORD)
+        kernel32.WaitForSingleObject.restype = wintypes.DWORD
+        kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+        kernel32.CloseHandle.restype = wintypes.BOOL
+        handle = kernel32.OpenProcess(
+            process_query_limited_information | process_terminate | synchronize, False, pid
+        )
+        if not handle:
+            return False
+        try:
+            if _windows_start_token_from_handle(handle) != expected_start_token:
+                return False
+            if not kernel32.TerminateProcess(handle, 1):
+                return False
+            # TerminateProcess is asynchronous. Keep the same verified handle open
+            # until process exit, rather than racing its still-owned listener.
+            if (
+                kernel32.WaitForSingleObject(
+                    handle, int(PROCESS_EXIT_TIMEOUT_SECONDS * 1000)
+                )
+                != 0
+            ):
+&gt;               raise ResponderReplacementError("previous responder exit was not confirmed")
+E               catalog.federation.tailnet_join_responder.ResponderReplacementError: previous responder exit was not confirmed
+
+catalog\federation\tailnet_join_responder.py:337: ResponderReplacementError</failure></testcase></testsuite></testsuites>

@@ -1562,3 +1562,9 @@ finding, not physical evidence or a newly observed host failure. [Review input](
 All CI is green but does not resolve this finding. Next: inspect the helper's
 backup caller, reproduce safely in isolated tests, then repair PR463 if confirmed.
 Do not merge or deploy the reviewed head. Preserve all completed qualification.
+
+21:24UTC: review confirmed by two isolated red regressions at7286f30d;
+[D06-R1](diagnostics/D06-R1.md) records exact procedure, error, SHA and state boundary.
+No physical execution/data access. Next: publish confirmation on existing PR463,
+then restore signal-only default helper semantics and opt in to5s exit waiting
+only at responder replacement. Backup's10s deadline/error contract stays unchanged.
