@@ -91,3 +91,8 @@ while jobs progress. Continue exact-head gap reconciliation for461 after its
 remaining PR runs complete; preserve456/457 evidence. Do not touch D04 until
 final merged-main qualification is complete. The recurring follow-up remains
 active and quiet on unchanged state.
+
+## September11 13:21UTC — required checks advanced
+
+Heads unchanged. New successful completions:456 Windows release checks and branding;457 ICSE publication bundle, Windows operator/CFI2 and Linux CF7B;461 additional Linux release work, exact registry run34602732775 and Linux sharding. No new failure; required jobs still pending and no merge-ready verdict. The detailed state/delta are persisted. Next: retain only new logs, then verify newly completed registry/ICSE artifacts; no host action or duplicate dispatch.
+
