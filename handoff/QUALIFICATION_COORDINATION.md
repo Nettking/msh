@@ -30,11 +30,13 @@ Preserve [D06 / issue462](diagnostics/D06.md). Repair is ready for review in PR4
 head7286f30d30e20c94c13cc9acebb2fd6d61bc1163, with focused development tests PASS.
 Next: review repair/native exact-head CI state. No dependent admission, physical
 retry workaround or PASS; no repair deployed and no new candidate frozen.
-PR463 is ready for review; qualification is active. Verified32/37 required native
-checks plus CFI2/registry3/3 on its exact head. All13 workflows now have one
-justified exact-head dispatch recorded; the final release dispatch was20:32UTC.
-No more source-gap dispatches are needed. Use `diagnostics/poll_pr463_state.py`,
-then retain only newly completed logs. Preserve valid work; no old-PR polling.
+**PR463 MERGE BLOCKED by confirmed D06-R1 backup contract regression.** All37+3
+CI jobs succeeded on7286f30d and native artifacts are retained, but review found
+an uncaught5s replacement exception overriding backup's10s stop contract.
+Two isolated regressions confirm it; see `diagnostics/D06-R1.md` and PR463 comment.
+Next: narrow correction in the isolated repair branch, focused regressions, push
+the new head and qualify only as required for that changed head. Preserve7286f30d
+evidence as historical; never merge/deploy it or carry its results to a new SHA.
 Nitro supported startup and actual M core image/env/repaired-source hashes are
 verified. Control identity preserved; LEADER/ready term9/index1553. The attempted
 checked-in responder replacement exposed D06; no further physical startup now.
