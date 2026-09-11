@@ -1,0 +1,56 @@
+{
+  "recorded_at": "2026-09-11T13:24:09.083141+00:00",
+  "source_sha": "143fe7a9082193114af3d34dc437b85f845849a2",
+  "icse_run": 34595242291,
+  "source_export_exact": true,
+  "source_files": 1409,
+  "outer_sha256": "7a9b96d17cbc082f08bfad0b424b3adb82f9ee2ab46516b659c3fce8e5d578e1",
+  "publication_sha256": "1d8bac5b5705210d704e9a7b18a17dc687206b68958e07a60aaea2f127446fa9",
+  "checksum_entries": 19,
+  "component": [
+    {
+      "execution": "Linux",
+      "passed": 4
+    },
+    {
+      "execution": "Windows",
+      "passed": 4
+    },
+    {
+      "execution": "compose",
+      "passed": 4
+    }
+  ],
+  "network": [
+    {
+      "execution": "Linux",
+      "required_checks_passed": 10,
+      "teardown": true
+    },
+    {
+      "execution": "Windows",
+      "required_checks_passed": 10,
+      "teardown": true
+    }
+  ],
+  "registry461": {
+    "run_id": 34602732775,
+    "native_proof": {
+      "job_id": 103273721623,
+      "run_id": 34602732775,
+      "name": "Verify immutable release image metadata",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 11082,
+      "sha256": "5bfccd7c7a3e31c15939caac1f92d4ab6ff09ca68b1723283b6c56ea39f6fe9c",
+      "checkout_commits": [
+        "5b826c6806ab1bdb960412ba20ca78192971fb1d"
+      ],
+      "checkout_matches": true
+    },
+    "source_sha": "5b826c6806ab1bdb960412ba20ca78192971fb1d",
+    "artifacts_expected": false,
+    "verifier": "Both pinned Python/Ollama registry digests and amd64/arm64 checked by exact-head successful workflow"
+  },
+  "physical_acceptance": false
+}

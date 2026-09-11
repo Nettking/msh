@@ -99,3 +99,26 @@ Heads unchanged. New successful completions:456 Windows release checks and brand
 
 New native logs retained:8 additional successful exact-head proofs (456 two,457 four,461 two);4 further461 jobs used synthetic e03added and are excluded from exact-head qualification. Prior proofs remain preserved. No new failures. Registry461 and ICSE457 artifact review is next.
 
+
+## September11 13:24UTC — completed artifact review retained
+
+PR457 ICSE run34595242291 is verified against exact143fe7a9: the public source
+export matches all1409 immutable Git archive files; both ZIP/checksum layers,
+metadata and six retained GitHub artifact digests agree. Component results are
+4/4 on Linux, Windows and Compose; both native network results have all10
+required checks and complete owned-process teardown. No rebuild or test rerun.
+PR461 registry run34602732775 proves exact5b826c68 and successful pinned digest /
+architecture verification; this workflow intentionally emits no artifact.
+
+[Artifact review](diagnostics/qualification-artifact-review-1321.json),
+[artifact retention receipt](diagnostics/pr457-icse-artifact-retention.json), and
+[review procedure](diagnostics/review_completed_icse_registry.py) preserve the
+results. Required jobs remain pending; no merge-ready verdict, merged-main
+qualification, candidate freeze, D04 action or physical acceptance claim.
+
+Next actionable trigger: required job completion/failure or intended PR head
+change. Run poll_required_state.py on the next scheduled check, persist any
+meaningful transition first, then retain only new evidence. Preserve existing
+exact-head successes; no duplicate dispatch. Runtime remains
+0536f03d67eb277e11573c2188d8e820399627e3, protected Recorder data untouched,
+P07/P12 not started.
