@@ -1,0 +1,21 @@
+{
+  "started_at": "2026-09-11T18:56:42.591224+00:00",
+  "candidate": "9b286f931497bf6291e215f6340443c5162826b0",
+  "host": "nitro",
+  "stage": "Owned M responder activation",
+  "status": "RESPONDER_ADMISSION_FAILED_INSPECT_BEFORE_RETRY",
+  "previous_pid": 1174977,
+  "previous_runtime": "0536f03d67eb277e11573c2188d8e820399627e3",
+  "previous_listener_inode": "56386768",
+  "procedure": "Unmodified checked-in M federation_host_runner.py tailnet_join_responder; main performs exact-instance replacement",
+  "state_changed": true,
+  "physical_acceptance": false,
+  "protected_recorder_data_untouched": true,
+  "grant_or_enrollment_requested": false,
+  "pid": 1234730,
+  "error": "Checked-in responder exited 1",
+  "native_log": "tailnet-join responder: replaced earlier instance (pid 1174977)\ntailnet-join responder: could not listen on <nitro-tailnet-address>:5151 ([Errno 98] Address already in use). Automatic Federation joining is unavailable; manual pairing codes still work.\n",
+  "finished_at": "2026-09-11T18:56:42.825976+00:00",
+  "native_log_sha256": "d136762f1f3e32a1436cd29b27656f51cf0fe3fe0c22fdd7fb48192fbad01afe",
+  "redaction": "Tailnet address only; exact native log retained on Nitro and private local receipt"
+}

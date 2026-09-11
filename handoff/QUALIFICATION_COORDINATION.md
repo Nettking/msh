@@ -24,13 +24,16 @@ issue459 is closed. AUTHORITATIVE_SHA is now frozen as
 Clean checked-in revalidation and scenario side-effect review are complete.
 Nettking supported activation and all three actual M core image/env/repaired-source
 hashes are verified. [Runtime receipt](diagnostics/nettking-m-runtime-admission.json).
-Next: Nitro/owned Recorder runtime admission, responder and membership/topology
-verification. Fresh topology and operative-context checks remain before evidence.
+**PHYSICAL ADMISSION STOPPED: new confirmed D06 product defect on M.** Checked-in
+Nitro responder replacement stopped old instance then failed bind with EADDRINUSE.
+Preserve [D06](diagnostics/D06.md); publish its issue immediately, then isolated
+repair/regression work. No dependent admission, retry workaround or physical PASS.
 Nitro supported startup and actual M core image/env/repaired-source hashes are
 verified. Control identity preserved; LEADER/ready term9/index1553. Next replace
 the still-imported N host responder through the checked-in exact-process guard.
 
-Nettking and Nitro cores run M; Nitro host responder still imports N0536f03d.
+Nettking and Nitro cores run M; Nitro responder replacement failed, current
+listener/process state requires a read-only snapshot before any further action.
 Recorder protected production6fb77c/separate voterfba508 have not been changed.
 No physical PASS; P07/P12
 not started. Protected Recorder data remains out of bounds. The user's latest
@@ -1194,3 +1197,16 @@ its own checked-in stable-process-handle replacement guard. No manual pre-stop
 or alternative bind/retry workaround. Preserve secret, native log and receipt;
 on failure stop dependent admission and classify before any retry. No grants,
 enrollment, protected Recorder action or physical evidence claim.
+
+##18:56UTC — new confirmed D06 stops physical admission
+
+Unmodified M responder main reported successful exact-instance termination of
+N PID1174977, then its new PID1234730 exited1 with `[Errno98] Address already in use`
+on5151. [D06 full finding](diagnostics/D06.md) and [native receipt](diagnostics/nitro-m-responder-admission.json)
+preserve exact candidate, stage/procedure, before identity, result and native-log
+digest. This is a product asynchronous termination/rebind defect; no workaround
+or repeated launch. Physical qualification stops; software PASS is not rerun.
+
+Next: publish durable issue linked here before substantial investigation, then
+one read-only process/socket snapshot and narrow isolated repair/regression.
+No protected Recorder data touched; no grant/enrollment request; P07/P12 absent.
