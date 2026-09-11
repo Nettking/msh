@@ -656,3 +656,17 @@ push runs and dispatch only required workflows absent for this final SHA. Do not
 reuse individual PR PASS as merged-main qualification or qualify intermediate
 main intentionally. D04 remains deferred until final main qualifies. Runtime
 and protected Recorder unchanged; physical acceptance/P07/P12 not restarted.
+
+## September11 16:33UTC — actual final main verified; qualification in flight
+
+Git fetch confirms actual main9b286f931497bf6291e215f6340443c5162826b0. All three
+qualified PR heads are ancestors; final parent pair is8948e953 +5b826c68. A clean
+detached audit worktree exists atC:\wsl\fcp-v1-9b286f93-merged-main-20260911;
+no runtime deployment occurred. The final push already created release34622528054
+and nine other required/additional workflows. Preserve these; do not duplicate.
+
+The exact final snapshot lacks only harness, readiness and sharding workflows.
+Next: guarded dispatch of those three missing workflows at current main9b286f93,
+then compact final-main polling and native source retention. PR-head software
+PASS remains separate. Final main is not yet qualified or frozen as a physical
+candidate. Runtime/Recorder unchanged; D04/P07/P12 not started.
