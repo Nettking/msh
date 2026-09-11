@@ -1624,3 +1624,11 @@ native exact-head PASS. Remaining automatic parents needing later source review:
 software-update, phase2, ICSE and release. Next exact action on next state check:
 `poll_pr463_state.py`, then only new native log/review transitions. No duplicate
 dispatch, old-head evidence carry-forward, merge or physical state change.
+
+##21:53UTC — software-update and phase2 automatic parents complete
+
+Head83955f65 unchanged. Software-update34649416668 and phase234649416744
+completed successfully; other incomplete parents remain active, no failed jobs.
+The three21:42 exact-head replacements are visible. Next: retain newly completed
+logs, verify source and fill only demonstrated completed-parent gaps. Review
+comment count unchanged; no physical state change or merge.
