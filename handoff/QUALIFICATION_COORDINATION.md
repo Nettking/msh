@@ -881,3 +881,16 @@ service/port/state and persist evidence. Then freeze exact9b286f93, run checked-
 clean revalidation and restart fresh formal physical acceptance under scenario
 safety rules. Runtime remains0536f03d67eb277e11573c2188d8e820399627e3; protected
 Recorder data untouched, P07/P12 absent. No host mutation has occurred yet.
+
+## September11 18:08UTC — D04 exact stale instance reverified
+
+[Read-only preflight](diagnostics/d04-admission-preflight.json) proves the same
+Nitro PID1422341/start120268097/socket31225091, orphan session601, owning5151.
+Clean N source, fingerprint and all current core container starts are unchanged.
+No host mutation yet. [Controlled procedure](D04_CONTROLLED_HOST_PROCEDURE.md)
+rechecks process identity through a PID file descriptor, sends only SIGTERM,
+and starts the unchanged checked-in N responder with its existing campaign state.
+This resolves current host ownership without prematurely deploying M or rerunning
+software. After local/real-peer ownership/health verification and persistence,
+freeze qualified M and run clean checked-in revalidation. M needs new runtime
+admission/verification before any physical evidence. No Recorder-host access.

@@ -1,0 +1,92 @@
+{
+  "observed_at": "2026-09-11T18:08:28.781768+00:00",
+  "mode": "HOST REMEDIATION PREFLIGHT - NOT PHYSICAL ACCEPTANCE EVIDENCE",
+  "qualified_main": "9b286f931497bf6291e215f6340443c5162826b0",
+  "expected_current_runtime_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
+  "host": "nitro",
+  "fingerprint": "ad885120af1f11cf",
+  "source_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
+  "source_clean": true,
+  "listeners": [
+    {
+      "table": "tcp",
+      "port": 5151,
+      "socket_inode": "31225091",
+      "owners": [
+        {
+          "pid": 1422341,
+          "ppid": 1,
+          "start_ticks": "120268097",
+          "uid": 1000,
+          "cwd": "/home/martin/fcp",
+          "executable": "/usr/bin/python3.14 (deleted)",
+          "argv_sha256": "c0b224917a90d9b662818ce970624ffc461f8b84d3ab4f144bb84bec8046bfb5",
+          "is_responder": true,
+          "cgroup": [
+            "0::/user.slice/user-1000.slice/session-601.scope"
+          ]
+        }
+      ]
+    }
+  ],
+  "responders": [
+    {
+      "pid": 1422341,
+      "ppid": 1,
+      "start_ticks": "120268097",
+      "uid": 1000,
+      "cwd": "/home/martin/fcp",
+      "executable": "/usr/bin/python3.14 (deleted)",
+      "argv_sha256": "c0b224917a90d9b662818ce970624ffc461f8b84d3ab4f144bb84bec8046bfb5",
+      "is_responder": true,
+      "cgroup": [
+        "0::/user.slice/user-1000.slice/session-601.scope"
+      ]
+    }
+  ],
+  "parents": [],
+  "containers": [
+    {
+      "id": "9443f9e1a0ba48ce7f8c2a4ea02762f7d61b4e45d9a823fe6bd373e331af90cc",
+      "service": "ollama",
+      "image_id": "sha256:b88c73ace3e115f8ec53dc8761ae1c0aabfa675406e3681786b98757ce050f42",
+      "runtime_sha": null,
+      "started_at": "2026-09-11T10:03:58.151763406Z",
+      "running": true,
+      "restarts": 0,
+      "oom_killed": false
+    },
+    {
+      "id": "f32a7f960cdcd19f0b60d2e03675c62baadadf2dead267176012c81fc1589026",
+      "service": "flask",
+      "image_id": "sha256:6b3e53b057ed9dca44c8ac3759cc4bed80a0c6956e6b3c929e39a3ba081685f5",
+      "runtime_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
+      "started_at": "2026-09-11T10:23:12.952894314Z",
+      "running": true,
+      "restarts": 0,
+      "oom_killed": false
+    },
+    {
+      "id": "02403a8e33b5c4aff118e549a7fede15fac1b11bb1ba65106122072acf9df900",
+      "service": "relay",
+      "image_id": "sha256:ca835b56190b79e078c5777919b98b098fbef99cb3b918779a4d5efa8a0df5dc",
+      "runtime_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
+      "started_at": "2026-09-11T10:01:47.100105633Z",
+      "running": true,
+      "restarts": 0,
+      "oom_killed": false
+    },
+    {
+      "id": "e07a50189ca295b87cca5a194ac431118d5a5116bd121a55cd066e7fd9a1d71c",
+      "service": "recorder",
+      "image_id": "sha256:7c1b4ef40d9a8f5d9d9f8d80d2789165a292eb275fc97a47b57ea2928e69f044",
+      "runtime_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
+      "started_at": "2026-09-11T10:01:47.022905508Z",
+      "running": true,
+      "restarts": 0,
+      "oom_killed": false
+    }
+  ],
+  "state_changed": false,
+  "protected_recorder_data_untouched": true
+}
