@@ -122,3 +122,17 @@ meaningful transition first, then retain only new evidence. Preserve existing
 exact-head successes; no duplicate dispatch. Runtime remains
 0536f03d67eb277e11573c2188d8e820399627e3, protected Recorder data untouched,
 P07/P12 not started.
+
+## September11 13:38UTC — required checks advanced
+
+Intended PR heads are unchanged; no new failures. Completed required workflows:
+456 ICSE run34595194849 and phase2 run34593925179;457 phase2 run34595440682;
+461 exact branding run34602729385 and synthetic phase2 run34600817414.
+Additional successful leaf jobs are retained in qualification-last-transition.json;
+other required jobs remain pending. These new API results require native source
+proof before an exact-head verdict. No PR is yet declared merge-ready.
+
+Next: retain only newly completed native logs, verify newly completed456 ICSE
+artifacts, then reconcile the completed461 phase2 source gap. Preserve all valid
+prior evidence and leave active CI untouched. Runtime remains0536f03d, protected
+Recorder data untouched; no host, D04, candidate or physical acceptance action.

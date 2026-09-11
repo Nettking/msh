@@ -1,5 +1,5 @@
 {
-  "observed_at": "2026-09-11T13:21:21.848579+00:00",
+  "observed_at": "2026-09-11T13:37:50.123577+00:00",
   "prs": {
     "456": {
       "number": 456,
@@ -125,15 +125,15 @@
           "run_id": 34595194849,
           "event": "workflow_dispatch",
           "api_head_sha": "1a0c634f47f8a247b6d1d2d1a219f5c12590587d",
-          "status": "queued",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "attempt": 1,
           "required_count": 4,
           "signature": {
-            "status": "queued",
-            "conclusion": null,
+            "status": "completed",
+            "conclusion": "success",
             "run_attempt": 1,
-            "updated_at": "2026-09-11T13:05:35Z"
+            "updated_at": "2026-09-11T13:27:12Z"
           },
           "jobs": [
             {
@@ -166,11 +166,11 @@
             {
               "id": 103272520411,
               "name": "publication-bundle",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T13:05:34Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-11T13:26:46Z",
+              "completed_at": "2026-09-11T13:27:11Z"
             }
           ]
         },
@@ -449,15 +449,15 @@
           "run_id": 34593925179,
           "event": "workflow_dispatch",
           "api_head_sha": "1a0c634f47f8a247b6d1d2d1a219f5c12590587d",
-          "status": "queued",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "attempt": 1,
           "required_count": 2,
           "signature": {
-            "status": "queued",
-            "conclusion": null,
+            "status": "completed",
+            "conclusion": "success",
             "run_attempt": 1,
-            "updated_at": "2026-09-11T11:25:11Z"
+            "updated_at": "2026-09-11T13:33:22Z"
           },
           "jobs": [
             {
@@ -472,11 +472,11 @@
             {
               "id": 103245230356,
               "name": "windows",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T11:25:11Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking",
+              "started_at": "2026-09-11T13:28:39Z",
+              "completed_at": "2026-09-11T13:33:21Z"
             }
           ]
         },
@@ -598,15 +598,15 @@
           "run_id": 34595440682,
           "event": "workflow_dispatch",
           "api_head_sha": "143fe7a9082193114af3d34dc437b85f845849a2",
-          "status": "queued",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "attempt": 1,
           "required_count": 2,
           "signature": {
-            "status": "queued",
-            "conclusion": null,
+            "status": "completed",
+            "conclusion": "success",
             "run_attempt": 1,
-            "updated_at": "2026-09-11T11:43:58Z"
+            "updated_at": "2026-09-11T13:31:41Z"
           },
           "jobs": [
             {
@@ -621,11 +621,11 @@
             {
               "id": 103250009666,
               "name": "linux",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T11:44:00Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-11T13:29:35Z",
+              "completed_at": "2026-09-11T13:31:40Z"
             }
           ]
         },
@@ -684,11 +684,11 @@
             {
               "id": 103268656722,
               "name": "update-contracts (Linux, fcp-linux-fast, bash)",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T12:52:38Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-11T13:36:21Z",
+              "completed_at": "2026-09-11T13:37:36Z"
             },
             {
               "id": 103268657187,
@@ -927,10 +927,10 @@
             {
               "id": 103248585286,
               "name": "Windows regressions (capability-product)",
-              "status": "queued",
+              "status": "in_progress",
               "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T11:38:20Z",
+              "runner_name": "Nettking",
+              "started_at": "2026-09-11T13:33:23Z",
               "completed_at": null
             },
             {
@@ -1202,11 +1202,11 @@
             {
               "id": 103267381052,
               "name": "Release checks (Windows)",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T12:48:15Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking",
+              "started_at": "2026-09-11T13:25:08Z",
+              "completed_at": "2026-09-11T13:28:37Z"
             },
             {
               "id": 103267381112,
@@ -1274,11 +1274,11 @@
             {
               "id": 103267381256,
               "name": "Full-suite order (fixed)",
-              "status": "in_progress",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "runner_name": "AQG7NCC-Linux",
               "started_at": "2026-09-11T13:07:33Z",
-              "completed_at": null
+              "completed_at": "2026-09-11T13:26:08Z"
             },
             {
               "id": 103267381282,
@@ -1297,6 +1297,15 @@
               "runner_name": "",
               "started_at": "2026-09-11T12:48:15Z",
               "completed_at": null
+            },
+            {
+              "id": 103278819198,
+              "name": "Clean-checkout suite order independence",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "AQG7NCC-Linux",
+              "started_at": "2026-09-11T13:26:14Z",
+              "completed_at": "2026-09-11T13:26:30Z"
             }
           ]
         },
@@ -1328,11 +1337,11 @@
             {
               "id": 103267380974,
               "name": "update-contracts (Linux, fcp-linux-fast, bash)",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T12:48:15Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-11T13:27:12Z",
+              "completed_at": "2026-09-11T13:28:28Z"
             }
           ]
         },
@@ -1368,15 +1377,15 @@
           "run_id": 34600817414,
           "event": "pull_request",
           "api_head_sha": "5b826c6806ab1bdb960412ba20ca78192971fb1d",
-          "status": "in_progress",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "attempt": 1,
           "required_count": 2,
           "signature": {
-            "status": "in_progress",
-            "conclusion": null,
+            "status": "completed",
+            "conclusion": "success",
             "run_attempt": 1,
-            "updated_at": "2026-09-11T13:20:57Z"
+            "updated_at": "2026-09-11T13:23:55Z"
           },
           "jobs": [
             {
@@ -1391,11 +1400,11 @@
             {
               "id": 103267380959,
               "name": "linux",
-              "status": "in_progress",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "runner_name": "Nettking-Linux",
               "started_at": "2026-09-11T13:20:57Z",
-              "completed_at": null
+              "completed_at": "2026-09-11T13:23:54Z"
             }
           ]
         },
@@ -1418,11 +1427,11 @@
             {
               "id": 103267381770,
               "name": "role-retirement (Linux, fcp-linux-fast, bash)",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T12:48:15Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-11T13:28:30Z",
+              "completed_at": "2026-09-11T13:29:33Z"
             },
             {
               "id": 103267382042,
@@ -1476,25 +1485,25 @@
           "run_id": 34602729385,
           "event": "workflow_dispatch",
           "api_head_sha": "5b826c6806ab1bdb960412ba20ca78192971fb1d",
-          "status": "queued",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "attempt": 1,
           "required_count": 1,
           "signature": {
-            "status": "queued",
-            "conclusion": null,
+            "status": "completed",
+            "conclusion": "success",
             "run_attempt": 1,
-            "updated_at": "2026-09-11T13:09:31Z"
+            "updated_at": "2026-09-11T13:36:20Z"
           },
           "jobs": [
             {
               "id": 103273710299,
               "name": "product-branding",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T13:09:32Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-11T13:36:08Z",
+              "completed_at": "2026-09-11T13:36:19Z"
             }
           ]
         },
@@ -1526,11 +1535,11 @@
             {
               "id": 103267381288,
               "name": "acceptance (Linux, fcp-linux-fast, bash)",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T12:48:15Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-11T13:23:56Z",
+              "completed_at": "2026-09-11T13:26:44Z"
             }
           ]
         },
@@ -1539,43 +1548,43 @@
           "run_id": 34600817567,
           "event": "pull_request",
           "api_head_sha": "5b826c6806ab1bdb960412ba20ca78192971fb1d",
-          "status": "queued",
+          "status": "in_progress",
           "conclusion": null,
           "attempt": 1,
           "required_count": 4,
           "signature": {
-            "status": "queued",
+            "status": "in_progress",
             "conclusion": null,
             "run_attempt": 1,
-            "updated_at": "2026-09-11T12:48:15Z"
+            "updated_at": "2026-09-11T13:37:38Z"
           },
           "jobs": [
             {
               "id": 103267381236,
               "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
-              "status": "in_progress",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "runner_name": "Nettking",
               "started_at": "2026-09-11T13:20:20Z",
-              "completed_at": null
+              "completed_at": "2026-09-11T13:25:06Z"
             },
             {
               "id": 103267381660,
               "name": "reviewer-compose",
-              "status": "queued",
+              "status": "in_progress",
               "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T12:48:15Z",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-11T13:37:38Z",
               "completed_at": null
             },
             {
               "id": 103267381672,
               "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T12:48:15Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-11T13:34:51Z",
+              "completed_at": "2026-09-11T13:36:06Z"
             }
           ]
         },
@@ -1607,11 +1616,11 @@
             {
               "id": 103267386012,
               "name": "operator-surface (Linux, fcp-linux-fast, bash)",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T12:48:16Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-11T13:32:38Z",
+              "completed_at": "2026-09-11T13:34:49Z"
             }
           ]
         },
@@ -1679,11 +1688,11 @@
             {
               "id": 103268629887,
               "name": "readiness (Linux, fcp-linux-fast, bash)",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T12:52:33Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-11T13:31:41Z",
+              "completed_at": "2026-09-11T13:32:36Z"
             }
           ]
         },
