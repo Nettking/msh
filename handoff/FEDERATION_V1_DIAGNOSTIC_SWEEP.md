@@ -34,6 +34,26 @@ pressure, publish unfinished state and the exact next action before continuing.
 | D02 | Ordinary tailnet discovery, before enrollment/P01 | Default 0.75 s probes time out; public advertisement requests fresh authority; later server 200 is too late | product | Three ordinary N timeouts; focused delayed-response and authority regressions | Ordinary discovery/zero-touch join; no longer-timeout workaround counts as fixed | YES: independently addressed metadata/provider checks and safe authority diagnostics | [#457](https://github.com/Nettking/msh/pull/457), local routing metadata and bounded total HTTP budget |
 | D03 | Nettking local AI provider before P10/B/CF7 | Audit 60 s timeout; actual unchanged 120 s adapter completes in 103.55 s, correctly recommends not-recommended | harness (audit deadline); environmental cold-load latency, no product defect established | Actual product-bound observation completed, 100% GPU; no retry needed | No independent deadline blocker; cold latency remains unsuitable by existing policy | YES: independent authority/status paths | [#458](https://github.com/Nettking/msh/issues/458); no product repair proposed |
 | D04 | Nitro host responder/runtime admission before joining | Legacy responder owns tailnet port5151; no N responder; legacy checkout5dfbcd1, deleted Python3.14 | environment | PID/socket ownership confirmed; actual-bind health timed out5.03s | N responder cannot bind default port; grant path is not N | YES: independent app/status checks; no legacy process mutation | [#459](https://github.com/Nettking/msh/issues/459); admission/ownership repair required |
+| D05 | Configured responder port / candidate admission | Host FCP_AUTO_JOIN_PORT=5152, rendered Flask omits it and advertises5151 | product (Compose propagation) | Unchanged N Compose render + N auto_join_port; no deployment | Supported non-default responder ports, including isolated admission around D04 | YES: read-only reconciliation; do not deploy local workaround | Issue follows immediate evidence push; narrow separate repair needed |
+
+## D05
+
+**Finding:** D05  
+**Status:** CONFIRMED  
+**Candidate SHA:** `0536f03d67eb277e11573c2188d8e820399627e3`  
+**Host(s):** Nettking native Docker Compose rendering; applies to Windows/POSIX supported launchers; motivated by Nitro D04 port ownership  
+**Physical stage:** Runtime configuration/admission before joining, no formal P-test and no alternative-port deployment  
+**Observed:** With FCP_AUTO_JOIN_PORT=5152 in the rendering subprocess, the unchanged N Compose Flask environment omits the setting. Both supported host launchers use5152, whereas unchanged N auto_join_port(rendered_flask_environment) returns5151 for the discovery advertisement. No .env or overrides in the clean exact-N harness checkout.  
+**Expected:** Configured host responder port and public advertised port agree, preserving default5151 when unset.  
+**Classification:** product — missing Compose environment propagation  
+**Acceptance impact:** A correctly configured separate candidate responder port cannot be advertised through the stock Compose service. This blocks the simple isolated-port admission option for D04 and any supported non-default responder port. It does not establish a deployed non-default runtime failure; the exact configuration mismatch is demonstrated without deployment.  
+**Safe continuation:** YES — read-only reconciliation and final sweep coverage review; no local runtime workaround or new qualification until sweep complete.  
+**Evidence:** [Exact N render and observed values](diagnostics/D05-configured-port.json), [audit procedure](diagnostics/probe_configured_responder_port.py). Command is Docker Compose `config --format json` with only the render child set to FCP_AUTO_JOIN_PORT=5152 and FCP_BUILD_COMMIT=N. Source chain: `start-tailscale.{sh,cmd}` -> missing `docker-compose.yml` Flask environment -> `federation_pairing_routes.py:_discovery_response` -> `tailnet_join_bridge.auto_join_port`.  
+**State changed:** None; config rendered only. No containers created, ports bound, sources deployed or runtime env changed.  
+**Protected Recorder data:** Untouched.  
+**GitHub artifact:** Publish issue immediately after this evidence push.  
+**Repair:** NONE yet; narrow separate Compose propagation and regression PR recommended, independent of D01/D02.  
+**Next diagnostic action:** Publish issue, then complete remaining safety/coverage reconciliation. Required regression: default5151 and non-default5152 render agree with host port, both supported launchers retain bounded validation, no authority or one-use grant behavior changes.
 
 ## D04
 
@@ -42,10 +62,10 @@ pressure, publish unfinished state and the exact next action before continuing.
 **Candidate SHA:** `0536f03d67eb277e11573c2188d8e820399627e3`  
 **Host(s):** Nitro  
 **Physical stage:** Host-side responder/runtime admission before Federation joining  
-**Observed:** No responder process has the candidate source cwd. A broader read-only /proc inspection found PID 1422341 from `/home/martin/fcp`, elapsed 630709 s, executable `/usr/bin/python3.14 (deleted)`, no FCP_BUILD_COMMIT environment. Current clean N core containers do not establish that this older host daemon is N. Loopback health refused; actual tailnet bind/listener still needs identification.  
+**Observed:** No responder process has the candidate source cwd. A broader read-only /proc inspection found PID 1422341 from `/home/martin/fcp`, elapsed 630709 s, executable `/usr/bin/python3.14 (deleted)`, no FCP_BUILD_COMMIT environment. It owns the tailnet TCP5151 listener; actual-bind health timed out5.03s. Current legacy disk HEAD is clean5dfbcd1, not N; imported bytes remain unproven. Current clean N core containers cannot establish this older host daemon as N.  
 **Expected:** Every process used for exact-N joining has provable N provenance and belongs to the owned campaign; no legacy service is silently used as N.  
 **Classification:** environment  
-**Acceptance impact:** Host responder/grant diagnostics cannot be presented as N until provenance/ownership is resolved. No grant request or membership mutation has been attempted. N `start-tailscale.sh` starts its responder only after `start.sh` succeeds; D01 prevents reaching that path. Legacy port conflict is a hypothesis, not yet proved.  
+**Acceptance impact:** Host responder/grant diagnostics cannot be presented as N until provenance/ownership is resolved. No authenticated grant request or membership mutation attempted. N `start-tailscale.sh` starts its responder only after `start.sh` succeeds; D01 prevents reaching that path. The existing default-port owner must also be resolved for subsequent N admission.  
 **Safe continuation:** YES — read-only process/listener/health inspection and independently bounded unauthenticated app refusal. Do not kill, restart, reconfigure, or borrow the legacy responder; do not issue/redeem a grant through it.  
 **Evidence:** [N-source-only process search](diagnostics/nitro-responder-metadata.json), [broader process metadata](diagnostics/nitro-responder-all-cwds-metadata.json), [streamed audit procedure](diagnostics/collect_nitro_responder_metadata.py). The `source_sha` field in the latter is the campaign checkout, NOT the legacy process source. Process elapsed age and cwd are the contrary evidence.  
 **State changed:** None; /proc metadata and one health GET only. Secret content was not read.  
@@ -163,6 +183,16 @@ pressure, publish unfinished state and the exact next action before continuing.
   printed and protected Recorder data remained untouched. Next: one direct
   no-redirect HTTP POST response per owned app, preserving status/content type
   and route-only Location. Do not infer a grant defect from JSON parse failure.
+
+H03 follow-up: direct no-redirect probes are now retained as
+`diagnostics/{nettking,nitro}-direct-grant-boundary.json`. Nitro returns the
+expected JSON403 `unauthenticated`, no grant, in1.992s. Nettking returns direct
+HTML503 in0.052s. N `auth/routes.py:first_user_bootstrap_gate` intentionally
+returns503 for JSON requests when no local human/remote binding exists; Nettking
+is still pre-admission. Thus different prerequisite state explains the result,
+not a proved grant-authority bypass or independent product defect. Earlier
+Nitro10s latency remains a transient/H01 contributor, not independently isolated.
+No secrets were supplied. Do not repeat these requests or relax the bootstrap gate.
 
 ## Next safe diagnostic action / recovery
 

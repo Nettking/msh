@@ -1,0 +1,33 @@
+{
+  "candidate_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
+  "host": "nettking",
+  "physical_stage": "D04 prospective isolated-port admission; supported Compose/rendering boundary, no deployment",
+  "mode": "DIAGNOSTIC ONLY - NOT PHYSICAL ACCEPTANCE EVIDENCE",
+  "observed_at": "2026-09-11T12:41:31.819665+00:00",
+  "command": [
+    "docker",
+    "compose",
+    "-f",
+    "C:\\wsl\\fcp-v1-0536f03d-nettking-20260911\\docker-compose.yml",
+    "--project-directory",
+    "C:\\wsl\\fcp-v1-0536f03d-nettking-20260911",
+    "config",
+    "--format",
+    "json"
+  ],
+  "compose_file_sha256": "f8294adb78b2fd4ff32d5df2a6d10ae323189b36c77cf4b994a445f6daa0af30",
+  "host_configured_port": 5152,
+  "flask_environment_contains_port": false,
+  "flask_advertised_port": 5151,
+  "expected": "Host responder and Flask advertised auto_join_port both equal configured 5152",
+  "source_boundary": [
+    "start-tailscale.sh: host responder --port FCP_AUTO_JOIN_PORT",
+    "start-tailscale.cmd: same Windows host port",
+    "docker-compose.yml: flask environment omits FCP_AUTO_JOIN_PORT",
+    "catalog/flask_app/federation_pairing_routes.py: advertisement uses auto_join_port()"
+  ],
+  "state_changed": false,
+  "containers_created": false,
+  "protected_recorder_data_untouched": true,
+  "physical_acceptance": false
+}
