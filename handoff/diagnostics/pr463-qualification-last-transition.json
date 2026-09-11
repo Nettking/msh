@@ -1,49 +1,43 @@
 {
-  "observed_at": "2026-09-11T21:07:19.120875+00:00",
+  "observed_at": "2026-09-11T21:18:17.493650+00:00",
   "changes": {
     "463": [
       {
         "workflow": "federation-v1-release.yml",
         "run_id": 34644764330,
         "event": "workflow_dispatch",
-        "status": "queued",
-        "conclusion": null,
+        "status": "completed",
+        "conclusion": "success",
         "jobs": [
-          {
-            "id": 103412772995,
-            "name": "Release checks (Windows)",
-            "status": "completed",
-            "conclusion": "success"
-          },
           {
             "id": 103412773029,
             "name": "Full-suite order (fixed)",
-            "status": "in_progress",
-            "conclusion": null
-          },
-          {
-            "id": 103412773047,
-            "name": "Release checks (Linux)",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
-            "id": 103412773054,
-            "name": "Linux regression shard (1)",
             "status": "completed",
             "conclusion": "success"
           },
           {
             "id": 103420221740,
             "name": "Release matrix (Windows)",
-            "status": "queued",
-            "conclusion": null
+            "status": "completed",
+            "conclusion": "success"
           },
           {
             "id": 103420221775,
             "name": "Release matrix (Linux)",
-            "status": "queued",
-            "conclusion": null
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103422855539,
+            "name": "Clean-checkout suite order independence",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103422998853,
+            "name": "Federation v1 automated release verdict",
+            "status": "completed",
+            "conclusion": "success"
           }
         ]
       }

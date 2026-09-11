@@ -1,5 +1,5 @@
 {
-  "observed_at": "2026-09-11T21:07:19.120875+00:00",
+  "observed_at": "2026-09-11T21:18:17.493650+00:00",
   "prs": {
     "463": {
       "number": 463,
@@ -53,15 +53,15 @@
           "run_id": 34644764330,
           "event": "workflow_dispatch",
           "api_head_sha": "7286f30d30e20c94c13cc9acebb2fd6d61bc1163",
-          "status": "queued",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "attempt": 1,
           "required_count": 16,
           "signature": {
-            "status": "queued",
-            "conclusion": null,
+            "status": "completed",
+            "conclusion": "success",
             "run_attempt": 1,
-            "updated_at": "2026-09-11T20:32:31Z"
+            "updated_at": "2026-09-11T21:09:09Z"
           },
           "jobs": [
             {
@@ -130,11 +130,11 @@
             {
               "id": 103412773029,
               "name": "Full-suite order (fixed)",
-              "status": "in_progress",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "runner_name": "Nettking-Linux",
               "started_at": "2026-09-11T20:59:07Z",
-              "completed_at": null
+              "completed_at": "2026-09-11T21:08:30Z"
             },
             {
               "id": 103412773030,
@@ -175,20 +175,38 @@
             {
               "id": 103420221740,
               "name": "Release matrix (Windows)",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T20:59:06Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-11T21:08:33Z",
+              "completed_at": "2026-09-11T21:08:42Z"
             },
             {
               "id": 103420221775,
               "name": "Release matrix (Linux)",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-11T20:59:06Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-11T21:08:44Z",
+              "completed_at": "2026-09-11T21:08:55Z"
+            },
+            {
+              "id": 103422855539,
+              "name": "Clean-checkout suite order independence",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-11T21:08:56Z",
+              "completed_at": "2026-09-11T21:09:01Z"
+            },
+            {
+              "id": 103422998853,
+              "name": "Federation v1 automated release verdict",
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-11T21:09:03Z",
+              "completed_at": "2026-09-11T21:09:08Z"
             }
           ]
         },

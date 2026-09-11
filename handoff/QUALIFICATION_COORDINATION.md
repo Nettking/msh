@@ -1529,3 +1529,11 @@ All four Linux regression shards have completed. Preserve these proofs and ICSE
 review. Next state check: `poll_pr463_state.py`, retain only new terminal logs,
 then review final release aggregates/artifacts once the parent completes.
 No merge or candidate selection yet; physical admission remains stopped by D06.
+
+##21:18UTC — all PR463 qualification workflows completed successfully
+
+Head7286f30d unchanged. Release34644764330 completed16/16; all required37 jobs
+and companion3 jobs now report success. Native provenance/artifact review remains
+the final qualification step. Next: retain five new release logs, verify aggregate
+dependencies, retain/review immutable release artifacts, inspect current review
+findings and exact head before normal merge. Physical admission remains stopped.
