@@ -846,3 +846,13 @@ exact9b286f93; the successful verdict is checkout-free. All40 required/additiona
 job records are now retained (38 source-running jobs, two dependency aggregates).
 No source mismatch or new failure. Next: final native artifact/gate review,
 using existing ICSE/registry proofs and without rerunning software.
+
+## September11 18:01UTC — complete final-main release artifacts verified
+
+All9 native release ZIPs match GitHub digests. Four disjoint shards cover4420
+tests; both full-suite orders contain4420 cases. All JUnit failures/errors are
+zero, with recorded expected platform skips. Windows groups contain872,371,298
+cases. Exact-source artifact review and receipts are persisted. Next: final
+aggregate dependency/test-identity/skip reconciliation and37/37 qualification
+receipt, reusing verified ICSE and registry evidence. No tests rerun, no host
+changes or physical acceptance claim.
