@@ -633,6 +633,52 @@
       "response": {
         "http_status": 204
       }
+    },
+    {
+      "pr": 463,
+      "sha": "83955f65b7e6bb36de8e90f34608b97070fed33b",
+      "ref": "codex/responder-replacement-exit-wait",
+      "workflow": "icse-tool-demo.yml",
+      "requested_at": "2026-09-11T22:30:00.348074+00:00",
+      "reason": "Completed successful PR jobs checked out synthetic SHA, not intended head",
+      "native_proof": [
+        {
+          "job_id": 103427821564,
+          "run_id": 34649416778,
+          "checkout_commits": [
+            "68f6e72c45bf1b0f709efb4ac90ff05fbde37ec7"
+          ],
+          "sha256": "3ddfe8132031755d0f7afda5d6e698fc385001e1f9ce36e421200ddf5a77b4dd"
+        },
+        {
+          "job_id": 103427821741,
+          "run_id": 34649416778,
+          "checkout_commits": [
+            "68f6e72c45bf1b0f709efb4ac90ff05fbde37ec7"
+          ],
+          "sha256": "7e1a0d4a538bd8da68f1fe333ab2b9e2313367aaae5bfe93924fadbf287db708"
+        },
+        {
+          "job_id": 103427821787,
+          "run_id": 34649416778,
+          "checkout_commits": [
+            "68f6e72c45bf1b0f709efb4ac90ff05fbde37ec7"
+          ],
+          "sha256": "a85075c172a4d3504a93e6be93910b618650d19c6f5ba35bbb192b08c04f916d"
+        },
+        {
+          "job_id": 103440919806,
+          "run_id": 34649416778,
+          "checkout_commits": [
+            "68f6e72c45bf1b0f709efb4ac90ff05fbde37ec7"
+          ],
+          "sha256": "19ce95db30619bfa452ce320f838ff5d7470f99706e84ce2635d513a753da628"
+        }
+      ],
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
     }
   ]
 }

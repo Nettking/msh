@@ -1686,3 +1686,9 @@ branding and phase2 are fully verified, registry also verifies exact head.
 All four completed ICSE jobs prove synthetic68f6e72c. Next: dispatch the ICSE
 exact-head gap once. Release remains active; its new no-checkout aggregate
 is retained for later dependency review. Review-comment count unchanged.
+
+22:29UTC: ICSE exact-head83955f65 replacement dispatched once (HTTP204), with
+all four source proofs in the ledger. Twelve dispatches now recorded for this
+head. Only automatic release still needs later source-gap resolution. Next:
+`poll_pr463_state.py` on next state check; retain only new terminal/review evidence.
+Preserve16/37+2/3 native PASS. No merge, candidate or physical state change.
