@@ -260,3 +260,9 @@ reconcile all required exact-head evidence plus unresolved release-relevant
 correctness findings. Do not infer merge readiness from API greens alone.
 Runtime remains0536f03d67eb277e11573c2188d8e820399627e3; no host/D04/physical
 change, protected Recorder data untouched, P07/P12 not started.
+
+PR457 six new native logs retained: five successful jobs prove143fe7a9,
+including both release matrices; the successful final aggregate has no checkout
+step and must be reconciled against its required dependency jobs. No new error.
+Next: audit native release artifacts and the completed gate graph, then review
+current release-relevant PR findings before any readiness/merge declaration.
