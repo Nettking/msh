@@ -500,3 +500,9 @@ now complete/success. No new failure. Next: retain four new native proofs, then
 dispatch only demonstrated completed CFI2/operator exact-head gaps after live
 checks. No merge or host action; runtime remains0536f03d67eb277e11573c2188d8e820399627e3,
 protected Recorder untouched, physical acceptance incomplete, no P07/P12 timers.
+
+Four new native proofs retained: exact5b826c68 for fixed full-suite order and
+Windows software-update; synthetic e03addedbc4 for Windows CFI2/operator.
+Together with their prior Linux proofs, both completed workflows are demonstrated
+exact-head gaps. Software-update is now proved on both platforms. Next: guarded
+CFI2/operator exact dispatches, preserving all qualified heads and active CI.
