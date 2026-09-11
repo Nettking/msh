@@ -1184,3 +1184,13 @@ commit_index=last_applied1553. No OOM or protected Recorder action. No PASS clai
 Next: bind a fresh M responder to the verified M app/5151 through the checked-in
 process-identity replacement; preserve the current shared secret and verify real
 peer health. Do not count old imported N responder bytes as M.
+
+### Nitro M responder replacement procedure staged
+
+`admit_nitro_m_responder.py` rechecks current N PID1174977/start185384331 and
+canonical process record/socket, exact M app/source/port and existing secret.
+Under the shared host mutex it invokes unchanged M responder main, including
+its own checked-in stable-process-handle replacement guard. No manual pre-stop
+or alternative bind/retry workaround. Preserve secret, native log and receipt;
+on failure stop dependent admission and classify before any retry. No grants,
+enrollment, protected Recorder action or physical evidence claim.
