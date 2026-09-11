@@ -915,3 +915,18 @@ explicitly permits normal checked-in helper creation of these absent Nitro-only
 files, while refusing any overwrite, symlink or legacy identity copy. This is
 controlled host configuration, not a product assertion/deadline change. Next:
 execute the persisted guarded procedure once, then retain exact results.
+
+##18:13UTC — D04 stale responder replaced, local ownership verified
+
+The guarded PID-file-descriptor SIGTERM stopped only legacy1422341. The unchanged
+checked-in N responder now runs as PID1174977/start185384331/native Python3.12.13,
+owns socket56386768 on5151, and returns local health200/ready/Tailscale in0.103s.
+No stale respawn observed during10s. All core container IDs/images/start times
+are unchanged. Normal helper startup created only the previously absent Nitro
+campaign secret0600 and PID record; no existing secret replaced or identity copied.
+No enrollment/grant request and no Recorder-host access. Source remains clean N.
+[Durable result](diagnostics/d04-controlled-replacement.json).
+
+Next: verify health from real Nettking peer, persist D04 resolution in#459 and
+freeze qualified9b286f93. New M runtime admission/verification remains required;
+this N host configuration observation is not M physical acceptance evidence.

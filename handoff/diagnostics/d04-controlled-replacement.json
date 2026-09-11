@@ -1,0 +1,53 @@
+{
+  "started_at": "2026-09-11T18:13:48.212128+00:00",
+  "status": "D04_CURRENT_RUNTIME_PORT_OWNERSHIP_VERIFIED",
+  "host": "nitro",
+  "qualified_main": "9b286f931497bf6291e215f6340443c5162826b0",
+  "runtime_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
+  "command": "SIGTERM exact stale instance; checked-in N federation_host_runner.py tailnet_join_responder on tailnet5151",
+  "previous": {
+    "pid": 1422341,
+    "ppid": 1,
+    "start_ticks": "120268097",
+    "uid": 1000,
+    "cwd": "/home/martin/fcp",
+    "exe": "/usr/bin/python3.14 (deleted)",
+    "argv_sha256": "c0b224917a90d9b662818ce970624ffc461f8b84d3ab4f144bb84bec8046bfb5",
+    "cgroup": "0::/user.slice/user-1000.slice/session-601.scope"
+  },
+  "state_changed": true,
+  "physical_acceptance": false,
+  "planned_state_writes": [
+    "new Nitro-only shared host secret through checked-in ensure_secret",
+    "new Nitro-only canonical responder PID record",
+    "maintenance log/receipt"
+  ],
+  "protected_recorder_data_untouched": true,
+  "enrollment_request_sent": false,
+  "pid": 1174977,
+  "current": {
+    "pid": 1174977,
+    "ppid": 1174868,
+    "start_ticks": "185384331",
+    "uid": 1000,
+    "cwd": "/home/martin/fcp-v1-73c779-nitro-20260910/source",
+    "exe": "/home/martin/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/bin/python3.12",
+    "argv_sha256": "3b5982f0a93483b75f1695235c5fc92d654a0750edddf24445c6983bcc334ca1",
+    "cgroup": "0::/user.slice/user-1000.slice/session-1403.scope"
+  },
+  "listener_inode": "56386768",
+  "health": {
+    "status": 200,
+    "responder": "ready",
+    "tailscale": true,
+    "elapsed_seconds": 0.10258870990946889
+  },
+  "no_stale_respawn_observed_seconds": 10,
+  "core_container_identity_and_start_times_unchanged": true,
+  "new_nitro_shared_secret_created_by_checked_in_helper": true,
+  "existing_secret_overwritten": false,
+  "legacy_identity_copied": false,
+  "source_clean": true,
+  "next_action": "Verify real Nettking peer health; freeze qualified M, clean revalidation, then align owned responder and all campaign runtime with M before physical evidence",
+  "finished_at": "2026-09-11T18:13:59.452549+00:00"
+}
