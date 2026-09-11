@@ -614,3 +614,12 @@ findings, and mergeable source trees. Main remains0536f03d. PR456 was marked
 ready on exact1a0c634f through GitHub at16:27:57UTC; receipt retained. Next:
 normal expected-head merge456 with GitHub's protection enforcement. No host or
 physical acceptance changes.
+
+## September11 16:29UTC — PR456 merged normally
+
+GitHub merged qualified1a0c634f as63976fb3aa24fffd25d9ee407572e61180ab5315
+with an expected-head guard and normal merge enforcement. Receipt: pr456-merge.json.
+This is intermediate main, not a new candidate or qualified merged main. No
+explicit intermediate-main qualification will be dispatched. Next: refresh457
+head/findings, mark ready and merge it separately; preserve its exact-head PASS.
+Runtime/Recorder state unchanged, physical acceptance not restarted.
