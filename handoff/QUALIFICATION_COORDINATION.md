@@ -189,3 +189,17 @@ both completed workflows lack intended5b826c68 checkout proof. Exact harness
 now has both platform proofs. Next: dispatch only these two demonstrated461
 CF7B/ICSE gaps after live absence/head checks; no synthetic artifact review or
 rerun of existing exact-head PASS.
+
+## September11 13:53UTC — two proven exact-head gaps dispatched
+
+PR461 CF7B and ICSE were dispatched on unchanged5b826c6806ab1bdb960412ba20ca78192971fb1d.
+Live PR/ref checks and absence checks passed; every prior matching run was
+completed with native synthetic-source proof. The ledger retains proof digests,
+workflow digests and204 receipts. No active job was cancelled or valid exact-head
+PASS repeated. Both runs will be picked up by the next compact scheduled poll.
+
+Next actionable trigger: completion/failure of required jobs or intended-head
+change. Persist the transition first, retain only new proofs, reconcile remaining
+461 exact-head gaps after prior workflows complete. No merge-ready verdict yet;
+final merged-main qualification/D04/physical campaign remain deferred. Runtime
+and protected Recorder state unchanged; no P07/P12 timer or physical PASS.
