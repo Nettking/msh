@@ -1362,3 +1362,10 @@ are the already-requested exact-head replacements, not additional dispatches.
 No failed jobs observed. Next: retain newly completed logs, verify checkout SHA,
 then fill the phase2 gap only if both jobs prove source mismatch. Physical state
 remains unchanged and admission stopped by D06.
+
+Five new native logs retained. Retirement Windows and CFI2 Windows are verified
+exact-head PASS, bringing the current native total to four (three required37
+jobs plus one companion job). Phase2 Windows and both release full-order jobs
+used syntheticbfec91c9. Both phase2 jobs now have complete mismatch proofs;
+next dispatch its exact-head gap once with the guarded helper. Release remains
+active; preserve all completed evidence without restarting it.

@@ -1,6 +1,6 @@
 {
   "source_commit": "7286f30d30e20c94c13cc9acebb2fd6d61bc1163",
-  "retained_at": "2026-09-11T19:31:21.522713+00:00",
+  "retained_at": "2026-09-11T19:43:52.691487+00:00",
   "records": [
     {
       "job_id": 103388045522,
@@ -166,6 +166,71 @@
       "conclusion": "success",
       "bytes": 45085,
       "sha256": "fdda00137a454e3dd0771d64f8478e428f3c9ed28ddf3a7439d119725ede95fa",
+      "checkout_commits": [
+        "7286f30d30e20c94c13cc9acebb2fd6d61bc1163"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103388044521,
+      "run_id": 34637251366,
+      "name": "windows",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 48292,
+      "sha256": "835a4f7232a65982acbe606422b89facd5bf462ad9976783e9db6bc9d301bc99",
+      "checkout_commits": [
+        "bfec91c9c0ab3581645bc4c575bf4a056b2b80c9"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103388045662,
+      "run_id": 34637251378,
+      "name": "Full-suite order (fixed)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 69551,
+      "sha256": "1096c5efc6293928f67200a3946dd9c9ecd76f51d51863ff946d6217806c0a87",
+      "checkout_commits": [
+        "bfec91c9c0ab3581645bc4c575bf4a056b2b80c9"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103388045689,
+      "run_id": 34637251378,
+      "name": "Full-suite order (rotating)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 67800,
+      "sha256": "245bcadea54bbdec09f1c47196315ab6a1eb273216b75fbb758ad31becb56691",
+      "checkout_commits": [
+        "bfec91c9c0ab3581645bc4c575bf4a056b2b80c9"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103389811519,
+      "run_id": 34637788283,
+      "name": "role-retirement (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 50663,
+      "sha256": "cd170a222be6519eee44e5b43cd5cf7f826200915677ffb772124286e049b5d7",
+      "checkout_commits": [
+        "7286f30d30e20c94c13cc9acebb2fd6d61bc1163"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103389828467,
+      "run_id": 34637793677,
+      "name": "onboarding (Windows, fcp-test-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 58330,
+      "sha256": "0abc0451299da06075a99497e4f9cfa21a7757a5d1185bea273ce96470756622",
       "checkout_commits": [
         "7286f30d30e20c94c13cc9acebb2fd6d61bc1163"
       ],
