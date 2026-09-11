@@ -413,6 +413,84 @@
       "response": {
         "http_status": 204
       }
+    },
+    {
+      "pr": 463,
+      "sha": "83955f65b7e6bb36de8e90f34608b97070fed33b",
+      "ref": "codex/responder-replacement-exit-wait",
+      "workflow": "cf7-acceptance-harness.yml",
+      "requested_at": "2026-09-11T21:29:07.828075+00:00",
+      "reason": "No run exists",
+      "native_proof": [],
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "pr": 463,
+      "sha": "83955f65b7e6bb36de8e90f34608b97070fed33b",
+      "ref": "codex/responder-replacement-exit-wait",
+      "workflow": "cf7c-physical-test-readiness.yml",
+      "requested_at": "2026-09-11T21:29:09.359322+00:00",
+      "reason": "No run exists",
+      "native_proof": [],
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "pr": 463,
+      "sha": "83955f65b7e6bb36de8e90f34608b97070fed33b",
+      "ref": "codex/responder-replacement-exit-wait",
+      "workflow": "cf8-role-retirement.yml",
+      "requested_at": "2026-09-11T21:29:11.519672+00:00",
+      "reason": "No run exists",
+      "native_proof": [],
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "pr": 463,
+      "sha": "83955f65b7e6bb36de8e90f34608b97070fed33b",
+      "ref": "codex/responder-replacement-exit-wait",
+      "workflow": "phase-f85-operator-federation-surface.yml",
+      "requested_at": "2026-09-11T21:29:13.066836+00:00",
+      "reason": "No run exists",
+      "native_proof": [],
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "pr": 463,
+      "sha": "83955f65b7e6bb36de8e90f34608b97070fed33b",
+      "ref": "codex/responder-replacement-exit-wait",
+      "workflow": "cfi2-onboarding-composition.yml",
+      "requested_at": "2026-09-11T21:29:14.866999+00:00",
+      "reason": "No run exists",
+      "native_proof": [],
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "pr": 463,
+      "sha": "83955f65b7e6bb36de8e90f34608b97070fed33b",
+      "ref": "codex/responder-replacement-exit-wait",
+      "workflow": "release-image-metadata.yml",
+      "requested_at": "2026-09-11T21:29:16.720903+00:00",
+      "reason": "No run exists",
+      "native_proof": [],
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
     }
   ]
 }

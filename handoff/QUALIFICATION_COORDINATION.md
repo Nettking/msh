@@ -1587,3 +1587,14 @@ The addressed backup review thread is resolved after red-to-green verification
 and correction comment5640841676. Future polling now detects review-comment count
 changes so new correctness feedback is investigated before qualification finishes.
 Next: dispatch only the six proven absent gates for83955f65, then persist responses.
+
+21:29UTC: six proven absent gates dispatched once for83955f65 (all HTTP204),
+with fresh head/ref/absence guards. Ledger retains each response separately by
+SHA. Seven automatic parents remain active; no old-head rerun or host action.
+Next exact command: audit Python runs `handoff/diagnostics/poll_pr463_state.py`.
+If no material change, stay quiet. On review-comment changes inspect review
+threads promptly; on new terminal jobs retain only their native logs. Resolve
+synthetic-source gaps only after completed-parent proof, preserving valid work.
+Do not reuse the old release aggregate review without verifying its source/run.
+No merge until this exact new head satisfies all required gates/artifacts and
+has no relevant unresolved correctness findings; actual new main qualifies once.
