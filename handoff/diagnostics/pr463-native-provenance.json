@@ -1,6 +1,6 @@
 {
   "source_commit": "7286f30d30e20c94c13cc9acebb2fd6d61bc1163",
-  "retained_at": "2026-09-11T19:43:52.691487+00:00",
+  "retained_at": "2026-09-11T19:55:25.264133+00:00",
   "records": [
     {
       "job_id": 103388045522,
@@ -231,6 +231,110 @@
       "conclusion": "success",
       "bytes": 58330,
       "sha256": "0abc0451299da06075a99497e4f9cfa21a7757a5d1185bea273ce96470756622",
+      "checkout_commits": [
+        "7286f30d30e20c94c13cc9acebb2fd6d61bc1163"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103388045723,
+      "run_id": 34637251378,
+      "name": "Linux regression shard (0)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 63416,
+      "sha256": "52d9dc7c74bf9385eec0a2f2c395a73223d73504fc003c7c5f286ebe9d02dd92",
+      "checkout_commits": [
+        "bfec91c9c0ab3581645bc4c575bf4a056b2b80c9"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103388044662,
+      "run_id": 34637251466,
+      "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 52833,
+      "sha256": "9861451fb181445ca251bc10d81f6b1a34e3c289ea30d022bb3fa73b6dd948b6",
+      "checkout_commits": [
+        "bfec91c9c0ab3581645bc4c575bf4a056b2b80c9"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103388044553,
+      "run_id": 34637251468,
+      "name": "product-branding",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 13567,
+      "sha256": "6acccd06b3b149905237c3e0f9111accead692b6f377f5ff4e126361df8edf6d",
+      "checkout_commits": [
+        "bfec91c9c0ab3581645bc4c575bf4a056b2b80c9"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103395017456,
+      "run_id": 34639368409,
+      "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 70725,
+      "sha256": "4934218b0f4ef78d1b007208a14909192a2c7d846d7811dcd8d78cce40a22e4f",
+      "checkout_commits": [
+        "7286f30d30e20c94c13cc9acebb2fd6d61bc1163"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103389795136,
+      "run_id": 34637782331,
+      "name": "harness (Linux, fcp-linux-fast, bash)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 57803,
+      "sha256": "acf1fdba3b36e944a934222902e07727bc5721d7e28f040ffb29160c5d13dd2e",
+      "checkout_commits": [
+        "7286f30d30e20c94c13cc9acebb2fd6d61bc1163"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103389811801,
+      "run_id": 34637788283,
+      "name": "role-retirement (Linux, fcp-linux-fast, bash)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 50027,
+      "sha256": "d9de015f1588a8d0bef9b193e8cac8fa3bf55a2885bfb8e308994bc63ad2183e",
+      "checkout_commits": [
+        "7286f30d30e20c94c13cc9acebb2fd6d61bc1163"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103389828283,
+      "run_id": 34637793677,
+      "name": "onboarding (Linux, fcp-test-linux, bash, 3.12.13)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 58279,
+      "sha256": "17204b7d281bfbf10b6420cc571ad6136eaa4528870fe7db7a72a90c5643ff49",
+      "checkout_commits": [
+        "7286f30d30e20c94c13cc9acebb2fd6d61bc1163"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103389839602,
+      "run_id": 34637796846,
+      "name": "Verify immutable release image metadata",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 13156,
+      "sha256": "00534ed84e9f272a0cddbdc2fce2d149777d9828e0c9979bdb4a33aa70866e85",
       "checkout_commits": [
         "7286f30d30e20c94c13cc9acebb2fd6d61bc1163"
       ],

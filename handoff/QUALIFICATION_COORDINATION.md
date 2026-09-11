@@ -1384,3 +1384,9 @@ completed successfully. Other selected parents remain active; no failed jobs.
 Phase2 replacement34640438781 is visible. Next: retain only newly completed
 native logs, verify exact source, preserve valid gates and fill branding only
 if its completed native proof establishes a mismatch. Physical admission stopped.
+
+Eight new native logs retained. Exact-head verified PASS now6/37 required jobs
+plus CFI2/registry3/3. Harness and retirement both platforms are complete and
+preserved. Branding's only job used syntheticbfec91c9; its completed parent has
+a demonstrated source gap. Next: dispatch branding exact-head once. Release/ICSE
+new successes also used syntheticbfec91c9; those parents are still active.
