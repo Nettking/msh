@@ -181,3 +181,11 @@ gates still pending, no merge-ready verdict. Next: retain only new native proofs
 then fill completed CF7B/ICSE exact-head gaps only if the proofs confirm mismatch
 and no exact run exists. No candidate, host or protected-data change; runtime
 remains0536f03d67eb277e11573c2188d8e820399627e3. P07/P12 not started.
+
+Six new native logs retained: three successful exact-head proofs (457 Windows
+capability/product,461 Linux phase2 and Windows harness); three461 CF7B/ICSE
+leaves prove e03addedbc4 and are excluded. Together with prior retained leaves,
+both completed workflows lack intended5b826c68 checkout proof. Exact harness
+now has both platform proofs. Next: dispatch only these two demonstrated461
+CF7B/ICSE gaps after live absence/head checks; no synthetic artifact review or
+rerun of existing exact-head PASS.
