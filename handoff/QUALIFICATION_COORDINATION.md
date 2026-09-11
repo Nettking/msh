@@ -815,3 +815,11 @@ Next scheduled action: poll_merged_main_state.py. Remaining release leaves/
 matrices/verdict must complete before final release artifact/qualification review.
 Preserve verified ICSE and all existing PASS. No candidate freeze, D04/host/
 protected Recorder action or physical acceptance claim; P07/P12 not started.
+
+## September11 17:48UTC — final-main Windows regressions complete
+
+Actual main remains9b286f931497bf6291e215f6340443c5162826b0. Windows transport/
+storage and journal/artifacts succeeded; final Windows release checks are now
+running. No new failure. Next: retain two new native proofs, then await release
+checks/matrices/verdict before final artifact review. No rerun, dispatch or
+host/protected Recorder change; physical acceptance remains incomplete.

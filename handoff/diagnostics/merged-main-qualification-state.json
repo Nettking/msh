@@ -2,7 +2,7 @@
   "source_commit": "9b286f931497bf6291e215f6340443c5162826b0",
   "actual_main": "9b286f931497bf6291e215f6340443c5162826b0",
   "main_matches": true,
-  "recorded_at": "2026-09-11T17:35:26.135672+00:00",
+  "recorded_at": "2026-09-11T17:47:55.453122+00:00",
   "workflows": [
     {
       "workflow": "cf7b-product-physical-acceptance.yml",
@@ -306,15 +306,15 @@
       "run_id": 34622528054,
       "event": "push",
       "api_head_sha": "9b286f931497bf6291e215f6340443c5162826b0",
-      "status": "queued",
+      "status": "in_progress",
       "conclusion": null,
       "attempt": 1,
       "required_count": 16,
       "signature": {
-        "status": "queued",
+        "status": "in_progress",
         "conclusion": null,
         "run_attempt": 1,
-        "updated_at": "2026-09-11T16:48:03Z"
+        "updated_at": "2026-09-11T17:45:49Z"
       },
       "jobs": [
         {
@@ -392,10 +392,10 @@
         {
           "id": 103344769528,
           "name": "Release checks (Windows)",
-          "status": "queued",
+          "status": "in_progress",
           "conclusion": null,
-          "runner_name": "",
-          "started_at": "2026-09-11T16:48:02Z",
+          "runner_name": "Nettking",
+          "started_at": "2026-09-11T17:45:49Z",
           "completed_at": null
         },
         {
@@ -410,20 +410,20 @@
         {
           "id": 103344769581,
           "name": "Windows regressions (transport-storage)",
-          "status": "in_progress",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "runner_name": "Nettking",
           "started_at": "2026-09-11T17:32:39Z",
-          "completed_at": null
+          "completed_at": "2026-09-11T17:37:08Z"
         },
         {
           "id": 103344769593,
           "name": "Windows regressions (journal-artifacts)",
-          "status": "queued",
-          "conclusion": null,
-          "runner_name": "",
-          "started_at": "2026-09-11T16:48:02Z",
-          "completed_at": null
+          "status": "completed",
+          "conclusion": "success",
+          "runner_name": "Nettking",
+          "started_at": "2026-09-11T17:37:10Z",
+          "completed_at": "2026-09-11T17:45:47Z"
         },
         {
           "id": 103354309713,

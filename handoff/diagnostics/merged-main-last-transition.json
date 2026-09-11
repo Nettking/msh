@@ -1,62 +1,28 @@
 {
-  "recorded_at": "2026-09-11T17:35:26.135672+00:00",
+  "recorded_at": "2026-09-11T17:47:55.453122+00:00",
   "source_commit": "9b286f931497bf6291e215f6340443c5162826b0",
   "changes": [
     {
-      "workflow": "icse-tool-demo.yml",
-      "run_id": 34622527886,
-      "status": "completed",
-      "conclusion": "success",
-      "jobs": [
-        {
-          "id": 103345791974,
-          "name": "publication-bundle",
-          "status": "completed",
-          "conclusion": "success"
-        }
-      ]
-    },
-    {
-      "workflow": "federation-software-update.yml",
-      "run_id": 34622527937,
-      "status": "completed",
-      "conclusion": "success",
-      "jobs": [
-        {
-          "id": 103339707831,
-          "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
-          "status": "completed",
-          "conclusion": "success"
-        }
-      ]
-    },
-    {
       "workflow": "federation-v1-release.yml",
       "run_id": 34622528054,
-      "status": "queued",
+      "status": "in_progress",
       "conclusion": null,
       "jobs": [
         {
-          "id": 103344769249,
-          "name": "Windows regressions (capability-product)",
-          "status": "completed",
-          "conclusion": "success"
-        },
-        {
-          "id": 103344769461,
-          "name": "Linux regression shard (2)",
-          "status": "completed",
-          "conclusion": "success"
-        },
-        {
-          "id": 103344769581,
-          "name": "Windows regressions (transport-storage)",
+          "id": 103344769528,
+          "name": "Release checks (Windows)",
           "status": "in_progress",
           "conclusion": null
         },
         {
-          "id": 103354309713,
-          "name": "Clean-checkout suite order independence",
+          "id": 103344769581,
+          "name": "Windows regressions (transport-storage)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 103344769593,
+          "name": "Windows regressions (journal-artifacts)",
           "status": "completed",
           "conclusion": "success"
         }
