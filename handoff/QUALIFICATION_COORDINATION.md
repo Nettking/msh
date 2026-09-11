@@ -330,3 +330,9 @@ Windows regressions are running. Next: retain three new native leaf proofs,
 then dispatch only demonstrated completed exact-head gaps after live absence/
 head checks. No merge, host or protected-data change; runtime remains
 0536f03d67eb277e11573c2188d8e820399627e3. P07/P12 not started.
+
+New461 native proofs: Windows phase2 proves exact5b826c68, completing both
+platforms. Software-update and retirement Windows leaves prove e03addedbc4;
+with retained Linux proofs, both completed workflows are demonstrated exact-head
+gaps. No test failure. Next: dispatch those two gaps only after live checks;
+retain current456/457 evidence and leave active release CI untouched.
