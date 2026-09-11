@@ -423,9 +423,7 @@ def test_the_responder_never_terminates_itself(tmp_path: Path) -> None:
     assert responder.stop_previous_instance(pid_file) is None
 
 
-def test_the_pid_file_records_the_live_responder(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_the_pid_file_records_the_live_responder(tmp_path: Path, monkeypatch) -> None:
     import os as _os
 
     pid_file = tmp_path / "nested" / "responder.pid"
@@ -488,6 +486,7 @@ def test_linux_matching_identity_signals_only_the_pinned_process(
     monkeypatch,
 ) -> None:
     signalled: list[tuple[int, int]] = []
+    waited: list[int] = []
     closed: list[int] = []
     monkeypatch.setattr(responder.os, "name", "posix")
     monkeypatch.setattr(responder.sys, "platform", "linux")
@@ -513,9 +512,15 @@ def test_linux_matching_identity_signals_only_the_pinned_process(
         "close",
         lambda descriptor: closed.append(descriptor),
     )
+    monkeypatch.setattr(
+        responder,
+        "_wait_linux_process_exit",
+        lambda descriptor: waited.append(descriptor) or True,
+    )
 
     assert responder.terminate_process_if_same_instance(4242, "boot-a:100")
     assert signalled == [(91, responder.signal.SIGTERM)]
+    assert waited == [91]
     assert closed == [91]
 
 
@@ -551,6 +556,7 @@ def test_a_matching_child_process_instance_can_be_terminated() -> None:
                 time.sleep(0.05)
         assert token is not None
         assert responder.terminate_process_if_same_instance(child.pid, token)
+        assert child.poll() is not None, "success must confirm exit, not just signal"
         child.wait(timeout=5.0)
     finally:
         if child.poll() is None:

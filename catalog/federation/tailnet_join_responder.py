@@ -62,6 +62,11 @@ DEFAULT_APP_URL = "http://127.0.0.1:5000"
 PROCESS_RECORD_SCHEMA = "fcp.federation.tailnet-auto-join-process.v2"
 MAX_PROCESS_RECORD_BYTES = 4096
 MAX_PROCESS_START_TOKEN_LENGTH = 512
+PROCESS_EXIT_TIMEOUT_SECONDS = 5.0
+
+
+class ResponderReplacementError(RuntimeError):
+    """A signalled instance did not reach confirmed process exit."""
 
 
 def application_url(environ: dict[str, str] | None = None) -> str:
@@ -301,30 +306,61 @@ def _terminate_windows_process_if_same_instance(
 
     process_terminate = 0x0001
     process_query_limited_information = 0x1000
+    synchronize = 0x00100000
     kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
     kernel32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
     kernel32.OpenProcess.restype = wintypes.HANDLE
     kernel32.TerminateProcess.argtypes = (wintypes.HANDLE, wintypes.UINT)
     kernel32.TerminateProcess.restype = wintypes.BOOL
+    kernel32.WaitForSingleObject.argtypes = (wintypes.HANDLE, wintypes.DWORD)
+    kernel32.WaitForSingleObject.restype = wintypes.DWORD
     kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
     kernel32.CloseHandle.restype = wintypes.BOOL
     handle = kernel32.OpenProcess(
-        process_query_limited_information | process_terminate, False, pid
+        process_query_limited_information | process_terminate | synchronize, False, pid
     )
     if not handle:
         return False
     try:
         if _windows_start_token_from_handle(handle) != expected_start_token:
             return False
-        return bool(kernel32.TerminateProcess(handle, 1))
+        if not kernel32.TerminateProcess(handle, 1):
+            return False
+        # TerminateProcess is asynchronous. Keep the same verified handle open
+        # until process exit, rather than racing its still-owned listener.
+        if (
+            kernel32.WaitForSingleObject(
+                handle, int(PROCESS_EXIT_TIMEOUT_SECONDS * 1000)
+            )
+            != 0
+        ):
+            raise ResponderReplacementError("previous responder exit was not confirmed")
+        return True
     finally:
         kernel32.CloseHandle(handle)
+
+
+def _wait_linux_process_exit(descriptor: int) -> bool:
+    import select
+
+    try:
+        poller = select.poll()
+        poller.register(descriptor, select.POLLIN)
+        events = poller.poll(int(PROCESS_EXIT_TIMEOUT_SECONDS * 1000))
+    except (AttributeError, OSError):
+        return False
+    return any(
+        fd == descriptor
+        and mask & (select.POLLIN | select.POLLHUP)
+        and not mask & (select.POLLERR | select.POLLNVAL)
+        for fd, mask in events
+    )
 
 
 def _terminate_linux_process_if_same_instance(
     pid: int, expected_start_token: str
 ) -> bool:
-    """Signal only the process object pinned by a Linux pidfd."""
+    """Signal and await exit of only the process object pinned by a Linux pidfd."""
 
     try:
         descriptor = os.pidfd_open(pid, 0)
@@ -341,6 +377,10 @@ def _terminate_linux_process_if_same_instance(
             signal.pidfd_send_signal(descriptor, signal.SIGTERM)
         except (AttributeError, OSError):
             return False
+        # Sending SIGTERM does not mean that the listener has been released.
+        # pidfd readiness confirms exit without reopening or trusting a PID.
+        if not _wait_linux_process_exit(descriptor):
+            raise ResponderReplacementError("previous responder exit was not confirmed")
         return True
     finally:
         os.close(descriptor)
@@ -554,7 +594,11 @@ def main(argv: list[str] | None = None) -> int:
 
     # A responder from an earlier start still owns the port. Replace it rather
     # than failing to bind behind a launcher that already claimed success.
-    replaced = stop_previous_instance(pid_file)
+    try:
+        replaced = stop_previous_instance(pid_file)
+    except ResponderReplacementError as error:
+        print(f"tailnet-join responder: replacement refused ({error})", file=sys.stderr)
+        return 1
     if replaced is not None:
         print(
             f"tailnet-join responder: replaced earlier instance (pid {replaced})",
