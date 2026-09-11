@@ -1664,3 +1664,11 @@ Head83955f65 unchanged. Software-update34651625551 and operator34649607489
 completed successfully; other incomplete parents remain active with no failed
 jobs observed. Next: retain new native logs and verify source. Release/ICSE
 automatic parents remain active; no additional dispatch or physical action.
+
+Five new logs retained. Software-update Windows and operator Windows verify
+exact83955f65, bringing required PASS to12/37 plus companion1/3. Both gates are
+complete on both platforms. Three new release logs prove synthetic68f6e72c;
+preserve them without counting against the PR head. Review-comment count unchanged.
+Next exact action: `poll_pr463_state.py` at the next state check, then retain only
+new terminal/review evidence. Release/ICSE source gaps wait for parent completion.
+No merge, candidate selection, physical restart or protected-data operation.

@@ -338,7 +338,72 @@
         "83955f65b7e6bb36de8e90f34608b97070fed33b"
       ],
       "checkout_matches": true
+    },
+    {
+      "job_id": 103434869851,
+      "run_id": 34651625551,
+      "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 67001,
+      "sha256": "5940aac4c8869b70e14a7a86d94280f84a0821b4a1cabf6bdab08a65755bca22",
+      "checkout_commits": [
+        "83955f65b7e6bb36de8e90f34608b97070fed33b"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103427821272,
+      "run_id": 34649416713,
+      "name": "Full-suite order (fixed)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 68305,
+      "sha256": "bec73738836ec93c339f6f0afac1e5f7c0ed01e538584a9e429766e9a370622f",
+      "checkout_commits": [
+        "68f6e72c45bf1b0f709efb4ac90ff05fbde37ec7"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103427821290,
+      "run_id": 34649416713,
+      "name": "Linux regression shard (1)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 57211,
+      "sha256": "3c8cf31d12019e05e1bb19b4d8db89288790b96b43943f139a8562bfd2bd537e",
+      "checkout_commits": [
+        "68f6e72c45bf1b0f709efb4ac90ff05fbde37ec7"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103427821296,
+      "run_id": 34649416713,
+      "name": "Linux regression shard (0)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 58677,
+      "sha256": "69f4013df8d01db4c7fcd4b15d33f6e64c529f182d295cf0939af9b0da22aa04",
+      "checkout_commits": [
+        "68f6e72c45bf1b0f709efb4ac90ff05fbde37ec7"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103428432785,
+      "run_id": 34649607489,
+      "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 107727,
+      "sha256": "5d5e6e90e736c837562b6bb7aa59a3cb23b1a66afe0bb2d1f4551ea1f6358492",
+      "checkout_commits": [
+        "83955f65b7e6bb36de8e90f34608b97070fed33b"
+      ],
+      "checkout_matches": true
     }
   ],
-  "retained_at": "2026-09-11T22:06:31.958356+00:00"
+  "retained_at": "2026-09-11T22:17:52.699885+00:00"
 }
