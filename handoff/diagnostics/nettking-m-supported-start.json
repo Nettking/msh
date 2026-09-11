@@ -104,7 +104,9 @@
   "safety_review_sha256": "9ba681326d97d85b61dfe5cd1654da4389dd2a18d6d6586db86f52e57863ff73",
   "protected_recorder_operation": false,
   "physical_pass": false,
-  "status": "RUNNING",
+  "status": "LAUNCHER_SUCCEEDED_REVIEW_REQUIRED",
   "source_and_launch_serialized": true,
-  "pid": 26896
+  "pid": 26896,
+  "exit_code": 0,
+  "finished_at": "2026-09-11T18:24:53.235660+00:00"
 }

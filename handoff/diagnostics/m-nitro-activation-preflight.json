@@ -1,0 +1,53 @@
+{
+  "observed_at": "2026-09-11T18:25:22.081334+00:00",
+  "target": "9b286f931497bf6291e215f6340443c5162826b0",
+  "host": "nitro",
+  "fingerprint": "ad885120af1f11cf",
+  "source_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
+  "source_clean": true,
+  "control": {
+    "role": "LEADER",
+    "ready": true,
+    "term": null,
+    "commit_index": 1551,
+    "last_applied": 1551,
+    "quorum": null,
+    "quorum_size": null,
+    "voter_count": null,
+    "connected_voters": null,
+    "leader_id": null
+  },
+  "control_field_names": [
+    "cluster_id",
+    "commit_index",
+    "consensus_leader_id",
+    "consensus_term",
+    "federation_id",
+    "fencing_epoch",
+    "last_applied",
+    "ready",
+    "role",
+    "schema",
+    "sessions",
+    "voter_id",
+    "voter_only"
+  ],
+  "pending_update_request": false,
+  "configured_capture_file_exists": false,
+  "processes": [
+    {
+      "pid": 1174977,
+      "cwd": "/home/martin/fcp-v1-73c779-nitro-20260910/source",
+      "is_responder": true,
+      "is_updater": false,
+      "exe": "/home/martin/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/bin/python3.12"
+    }
+  ],
+  "memory": {
+    "MemTotal": "3418608 kB",
+    "MemAvailable": "1925160 kB"
+  },
+  "state_changed": false,
+  "protected_recorder_data_untouched": true,
+  "physical_acceptance": false
+}

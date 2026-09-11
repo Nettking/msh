@@ -22,9 +22,9 @@ D04 host remediation and local/real Nettking peer verification are complete on N
 issue459 is closed. AUTHORITATIVE_SHA is now frozen as
 `9b286f931497bf6291e215f6340443c5162826b0` (M).
 Clean checked-in revalidation and scenario side-effect review are complete.
-Nettking controlled N-to-M activation is RUNNING, PID26896. Do not launch another.
+Nettking controlled N-to-M activation completed with launcher exit0 at18:24:53UTC.
 [Operation receipt](diagnostics/nettking-m-supported-start.json) and private native
-log/receipt identify the active work. Next: inspect completion and verify actual
+log/receipt identify the completed work. Next: verify actual
 M images/source, then continue [owned runtime admission](PHYSICAL_M_ADMISSION.md).
 Fresh runtime/source/owner/topology checks remain required before evidence.
 
@@ -1012,3 +1012,19 @@ configuration. [Operation receipt](diagnostics/nettking-m-supported-start.json).
 No second launch, timer or acceptance probe while activation is active. Next:
 read private `.acceptance/nettking-9b286f93-supported-start.json` on a completion
 transition and inspect the native log only if needed; then verify actual runtime.
+
+##18:25UTC — Nettking supported M startup completed; runtime verification next
+
+Supported launcher exit0 at18:24:53; [completed operation receipt](diagnostics/nettking-m-supported-start.json).
+This is startup completion, not physical PASS. Next verify all three actual M
+images/env/source bytes, preserved mounts/model and fresh runtime provenance.
+
+[Nitro preflight](diagnostics/m-nitro-activation-preflight.json) is clean N,
+LEADER/ready/index1551, no pending updater/capture request, native N responder
+still owned, about1.93millionKiB RAM available. No Nitro source/containers changed.
+Recorder fingerprint retry identified that the audit selected the old per-Martin
+Windows Store-backed venv, which cannot launch under current SSH context.
+[Exact audit failure](diagnostics/m-recorder-legacy-python-context-attempt.json).
+This does not yet establish a new independent defect: select the already documented
+N-native interpreter/context before diagnosis. Protected container invariant remains
+verified; no protected record files read, no service-account or host changes.

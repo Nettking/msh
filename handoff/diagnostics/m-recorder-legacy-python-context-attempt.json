@@ -1,0 +1,15 @@
+{
+  "observed_between_utc": ["2026-09-11T18:22:01Z", "2026-09-11T18:25:23Z"],
+  "candidate": "9b286f931497bf6291e215f6340443c5162826b0",
+  "host": "DESKTOP-N5KI14R",
+  "operative_user": "existing SSH account Utlån",
+  "procedure": "m_recorder_fingerprint.ps1: legacy campaign/runtime-venv/Scripts/python.exe -B -c platform/fingerprint",
+  "observed": "Unable to create process using C:\\Users\\martin\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\\python.exe",
+  "expected": "Native interpreter executes in operative account and returns fingerprint",
+  "classification": "audit selected legacy per-user interpreter; not yet a new independent host blocker",
+  "next_action": "Use the previously documented N candidate native interpreter/context; do not repair or change service accounts merely to satisfy this legacy path",
+  "state_changed": false,
+  "protected_record_files_read": false,
+  "protected_recorder_data_untouched": true,
+  "physical_acceptance": false
+}
