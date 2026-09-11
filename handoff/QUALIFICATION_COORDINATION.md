@@ -1054,3 +1054,16 @@ only the audit child process metadata and distinguish interpreter/Git/transport.
 No product/data mutation was requested; check whether a read-only child remains.
 Nitro source staging can safely continue independently. M source bundle was
 created from clean M with N prerequisite and HEAD exactlyM; it is not deployed.
+
+##18:31UTC — Recorder operative preflight resolved without host repair
+
+No leftover audit child process exists. Separate bounded native and Git probes
+all return exit0: existing Python3.12.10 in0.096s, expected physical fingerprint
+8589698c32d44b1f in0.510s, staged source exact clean N in0.050s each.
+[Native proof](diagnostics/m-recorder-native-bounded.json),
+[source proof](diagnostics/m-recorder-source-bounded.json).
+The earlier combined transport timeout is retained as an unreproduced audit
+observation; no independent product/environment defect is demonstrated. No host
+repair, identity copy or service-account change; protected data untouched.
+Next: stage the qualified M bundle for Nitro, then controlled source/build/start
+using the existing per-service image configuration and mutation lock.
