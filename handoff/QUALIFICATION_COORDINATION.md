@@ -705,3 +705,18 @@ Linux operator and branding. Log digests are preserved in
 merged-main-native-provenance.json; no new failure. Qualification is still
 pending. Next: update recurring follow-up to final-main-only state polling;
 then await required completions without duplicate runs or host changes.
+
+## September11 16:39UTC — recurring execution moved to final-main qualification
+
+Automation fortsett-federation-v1-p-nettking remains ACTIVE every10 minutes and
+now follows poll_merged_main_state.py / retain_merged_main_jobs.py. It preserves
+all PR qualification, selects only actual final9b286f93 runs, and stays quiet on
+ordinary pending progress. No duplicate qualification or PR merge will be started.
+
+Exact next command from this diagnostic checkout:
+C:\wsl\fcp-v1-fba508-nettking-20260910\.venv\Scripts\python.exe -B handoff/diagnostics/poll_merged_main_state.py
+On a material change persist before retaining/reviewing new evidence. Once all
+final-main gates and artifacts qualify, D04 is the next controlled host action,
+followed by candidate freeze, checked-in revalidation and fresh physical tests.
+Runtime remains0536f03d67eb277e11573c2188d8e820399627e3; protected Recorder data
+untouched. No physical PASS, no P07/P12 timers, no candidate freeze yet.
