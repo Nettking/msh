@@ -266,3 +266,15 @@ including both release matrices; the successful final aggregate has no checkout
 step and must be reconciled against its required dependency jobs. No new error.
 Next: audit native release artifacts and the completed gate graph, then review
 current release-relevant PR findings before any readiness/merge declaration.
+
+PR457 final native release artifact review is complete: all9 GitHub ZIP digests
+match; four shards cover4397 unique tests, and both full-suite orders contain
+4397 cases. All JUnit failures/errors are zero. Windows groups contain872,
+371 and298 cases. Exact native source proof is retained for every source-running
+job; the only two jobs without checkout are declared dependency aggregates.
+[Release artifact review](diagnostics/pr457-final-release-artifact-review.json)
+and [receipts](diagnostics/pr457-final-release-artifact-retention.json) are stored.
+The live PR review snapshot has no inline correctness findings or review objects;
+its review summary is complete at the intended head. Next: reconcile intentional
+platform skips and aggregate dependencies, then publish exact-head qualification
+verdict. No physical evidence or host state changed.
