@@ -57,3 +57,18 @@ The existing ten-minute follow-up was updated to low-token state-driven rules
 and the user's controlled D04 procedure. Next: retain only newly completed native
 logs, then handle proven exact-head gaps for completed461 workflows; no duplicate
 dispatch, active-job cancellation, merge or host change.
+
+## September11 13:09UTC — new native proofs retained
+
+Downloaded only13 newly completed job logs; existing logs were not reread.
+Seven new successful jobs prove intended exact heads:456 two,457 four,461 one.
+Six other461 successes prove synthetic checkout
+e03addedbc4d10e39e7c6a592977f45995ec6b8e, including its completed branding and
+registry workflows; they cannot qualify5b826c68. No new test failure.
+[Accumulating native provenance](diagnostics/qualification-native-provenance.json)
+retains prior and new records with log digests. [Delta retention helper](diagnostics/retain_changed_jobs.py)
+uses only newly completed jobs on subsequent polls.
+
+Next: dispatch branding and registry on the unchanged461 branch only if no exact
+run exists; both prior runs are complete and their source mismatch is proved.
+Other active/queued jobs remain untouched. No merge/D04/runtime action yet.
