@@ -1390,3 +1390,10 @@ plus CFI2/registry3/3. Harness and retirement both platforms are complete and
 preserved. Branding's only job used syntheticbfec91c9; its completed parent has
 a demonstrated source gap. Next: dispatch branding exact-head once. Release/ICSE
 new successes also used syntheticbfec91c9; those parents are still active.
+
+19:55UTC: branding exact-head replacement dispatched once (HTTP204); ten total
+dispatches for463 now recorded. Preserve6/37+companion3/3 verified native PASS.
+Next: `poll_pr463_state.py` on the next state check; retain only newly completed
+logs. Remaining synthetic-source parents are release, sharding and ICSE; wait for
+completion, then inspect native/aggregate provenance before a justified dispatch.
+No merge, new candidate, physical restart or protected-data operation.
