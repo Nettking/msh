@@ -720,3 +720,14 @@ final-main gates and artifacts qualify, D04 is the next controlled host action,
 followed by candidate freeze, checked-in revalidation and fresh physical tests.
 Runtime remains0536f03d67eb277e11573c2188d8e820399627e3; protected Recorder data
 untouched. No physical PASS, no P07/P12 timers, no candidate freeze yet.
+
+## September11 16:49UTC — final-main qualification advanced
+
+Actual main remains9b286f931497bf6291e215f6340443c5162826b0. New successes:
+CF7B/phase2/software-update/harness/readiness/sharding Linux, ICSE Windows,
+both CFI2 platforms and registry metadata. Release34622528054 now exposes its
+queued leaf jobs; other required work is pending/running. No new failure.
+Next: retain ten new native proofs, preserving all completed evidence. Registry
+emits no artifact by design; its native exact-source successful verification
+is the evidence. No duplicate dispatch, host or protected Recorder action;
+runtime remains0536f03d, candidate not frozen, physical acceptance incomplete.
