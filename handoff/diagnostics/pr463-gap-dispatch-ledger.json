@@ -107,6 +107,36 @@
       "response": {
         "http_status": 204
       }
+    },
+    {
+      "pr": 463,
+      "sha": "7286f30d30e20c94c13cc9acebb2fd6d61bc1163",
+      "ref": "codex/responder-replacement-exit-wait",
+      "workflow": "federation-software-update.yml",
+      "requested_at": "2026-09-11T19:32:33.420050+00:00",
+      "reason": "Completed successful PR jobs checked out synthetic SHA, not intended head",
+      "native_proof": [
+        {
+          "job_id": 103388045033,
+          "run_id": 34637251568,
+          "checkout_commits": [
+            "bfec91c9c0ab3581645bc4c575bf4a056b2b80c9"
+          ],
+          "sha256": "783189a19f061db8a47446727da96d145a668dcf8d07be2bed033de7618c262f"
+        },
+        {
+          "job_id": 103388045328,
+          "run_id": 34637251568,
+          "checkout_commits": [
+            "bfec91c9c0ab3581645bc4c575bf4a056b2b80c9"
+          ],
+          "sha256": "0771b29d3fa2646c85587a842c374718380857f9ce63ce0bdc195730cc864764"
+        }
+      ],
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
     }
   ]
 }

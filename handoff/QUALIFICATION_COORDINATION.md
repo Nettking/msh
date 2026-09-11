@@ -1344,3 +1344,12 @@ persist each response; other active parents remain untouched.
 19:32UTC: CF7B exact-head replacement dispatched once (HTTP204), with both native
 source mismatch proofs in the dispatch ledger. Next: software-update completed
 gap through `dispatch_pr463_completed_gap.py federation-software-update.yml`.
+
+19:32UTC: software-update exact-head replacement also dispatched once (HTTP204),
+with both native proofs persisted. Eight dispatches total are recorded for463;
+do not repeat them. Two exact-head native PASS jobs verified so far; qualification
+is incomplete. Next exact action: native audit Python runs
+`handoff/diagnostics/poll_pr463_state.py` on the next state check, then retains only
+new terminal logs with `retain_pr463_new_native_logs.py`. Other automatic parents
+remain active; use the guarded completed-gap helper only after successful parent
+completion and native source mismatch proof. Keep physical admission stopped.
