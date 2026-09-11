@@ -521,3 +521,14 @@ artifacts and final qualification using already retained ICSE/registry proofs.
 Preserve456/457 qualified verdicts. After461 qualification, separate merge batch
 with live checks, then actual final-main qualification once. Hosts/Recorder data
 remain untouched; no new candidate, D04 action or physical acceptance claim.
+
+## September11 16:01UTC — exact PR461 release advanced
+
+Heads unchanged;456/457 qualifications remain valid. PR461 exact release
+34616905954 gained successful Windows transport/storage, release checks,
+capability/product, Linux shard1 and rotating full-suite order. Shard0 and
+Windows journal/artifacts are running. Exact operator34618403669 has Linux
+success; CFI2 run34618400138 is queued. No new failure. Next: retain six new
+native proofs, then await remaining gates; no duplicate dispatch or partial
+artifact review needed. Runtime remains0536f03d67eb277e11573c2188d8e820399627e3,
+protected Recorder untouched, no merge/candidate/physical acceptance action.
