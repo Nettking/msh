@@ -1,19 +1,34 @@
 {
-  "observed_at": "2026-09-11T23:37:48.277114+00:00",
+  "observed_at": "2026-09-11T23:49:19.438856+00:00",
   "changes": {
     "465": [
+      {
+        "workflow": "phase-f85-operator-federation-surface.yml",
+        "run_id": 34656348284,
+        "event": "pull_request",
+        "status": "completed",
+        "conclusion": "success",
+        "jobs": [
+          {
+            "id": 103449514247,
+            "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
       {
         "workflow": "federation-software-update.yml",
         "run_id": 34656348383,
         "event": "pull_request",
-        "status": "in_progress",
-        "conclusion": null,
+        "status": "completed",
+        "conclusion": "success",
         "jobs": [
           {
             "id": 103449511893,
             "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
-            "status": "in_progress",
-            "conclusion": null
+            "status": "completed",
+            "conclusion": "success"
           }
         ]
       },
@@ -25,64 +40,49 @@
         "conclusion": null,
         "jobs": [
           {
-            "id": 103453725966,
-            "name": "Full-suite order (fixed)",
-            "status": "completed",
-            "conclusion": "success"
+            "id": 103453726123,
+            "name": "Linux regression shard (2)",
+            "status": "in_progress",
+            "conclusion": null
           },
           {
-            "id": 103453726126,
-            "name": "PostgreSQL storage release check",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
-            "id": 103453726148,
-            "name": "Release checks (Windows)",
+            "id": 103453726152,
+            "name": "Linux regression shard (0)",
             "status": "completed",
             "conclusion": "success"
           },
           {
             "id": 103453726153,
             "name": "Full-suite order (rotating)",
-            "status": "in_progress",
-            "conclusion": null
-          },
-          {
-            "id": 103453726159,
-            "name": "Release checks (Linux)",
             "status": "completed",
             "conclusion": "success"
+          },
+          {
+            "id": 103457898256,
+            "name": "Clean-checkout suite order independence",
+            "status": "queued",
+            "conclusion": null
           }
         ]
       },
       {
         "workflow": "phase2-federation.yml",
-        "run_id": 34656348532,
-        "event": "pull_request",
-        "status": "completed",
-        "conclusion": "success",
-        "jobs": [
-          {
-            "id": 103449514749,
-            "name": "windows",
-            "status": "completed",
-            "conclusion": "success"
-          }
-        ]
-      },
-      {
-        "workflow": "cf7-acceptance-harness.yml",
-        "run_id": 34656508419,
+        "run_id": 34658824145,
         "event": "workflow_dispatch",
-        "status": "completed",
-        "conclusion": "success",
+        "status": "queued",
+        "conclusion": null,
         "jobs": [
           {
-            "id": 103449995519,
-            "name": "harness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Byp...",
-            "status": "completed",
-            "conclusion": "success"
+            "id": 103456873389,
+            "name": "windows",
+            "status": "in_progress",
+            "conclusion": null
+          },
+          {
+            "id": 103456873518,
+            "name": "linux",
+            "status": "queued",
+            "conclusion": null
           }
         ]
       }
