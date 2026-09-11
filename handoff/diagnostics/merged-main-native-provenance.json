@@ -440,7 +440,33 @@
       "sha256": "905fd344c1ccc06db1486177c65f8fb2d12e2791c67eb64b030288808487e1a1",
       "checkout_commits": [],
       "checkout_matches": null
+    },
+    {
+      "job_id": 103344769581,
+      "run_id": 34622528054,
+      "name": "Windows regressions (transport-storage)",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 54007,
+      "sha256": "4243833f778ca3912dc13045e27f52ceda92c04e69f0084632a0b19261c93169",
+      "checkout_commits": [
+        "9b286f931497bf6291e215f6340443c5162826b0"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103344769593,
+      "run_id": 34622528054,
+      "name": "Windows regressions (journal-artifacts)",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 52191,
+      "sha256": "0e4054cef254fe56da647fad13abc415bbdd2019daa46d8e0945d0f4f11403e3",
+      "checkout_commits": [
+        "9b286f931497bf6291e215f6340443c5162826b0"
+      ],
+      "checkout_matches": true
     }
   ],
-  "retained_at": "2026-09-11T17:35:56.580573+00:00"
+  "retained_at": "2026-09-11T17:48:18.028270+00:00"
 }

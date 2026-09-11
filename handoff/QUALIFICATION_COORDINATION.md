@@ -823,3 +823,10 @@ storage and journal/artifacts succeeded; final Windows release checks are now
 running. No new failure. Next: retain two new native proofs, then await release
 checks/matrices/verdict before final artifact review. No rerun, dispatch or
 host/protected Recorder change; physical acceptance remains incomplete.
+
+Both new successful native logs prove exact final9b286f93;36 native records
+retained. No source mismatch/new failure. Next scheduled action:
+poll_merged_main_state.py. When final Windows release checks and dependent
+matrices/verdict complete, review complete release artifacts and final37/37
+qualification; reuse verified ICSE/registry evidence. Runtime0536f03d, protected
+Recorder data and P07/P12 state remain unchanged. No candidate freeze yet.
