@@ -150,3 +150,113 @@ def test_expected_commit_is_checked_before_build(tmp_path: Path, monkeypatch) ->
 def test_build_policy_matches_supported_update_figures() -> None:
     assert host_build.UPDATE_REQUIRED_FREE_BYTES == 10 * 1024**3
     assert host_build.BUILD_CACHE_KEEP_BYTES == 8 * 1024**3
+
+
+@pytest.fixture
+def built_images(monkeypatch):
+    """Model Docker's distinct configured-image and created-container views."""
+    candidate = "c" * 40
+    current_id = "sha256:" + "1" * 64
+    previous_id = "sha256:" + "2" * 64
+    references = {service: f"fcp-{service}:candidate" for service in host_build.CORE_BUILD_SERVICES}
+    state = SimpleNamespace(
+        candidate=candidate,
+        current_id=current_id,
+        previous_id=previous_id,
+        references=references,
+        containers={},
+        rendered={service: (0, reference) for service, reference in references.items()},
+        images={reference: (current_id, candidate) for reference in references.values()},
+        inspect_results={},
+        inspected=[],
+    )
+    state.images.update({current_id: (current_id, candidate), previous_id: (previous_id, "b" * 40)})
+
+    def docker(_root, arguments, *, env, timeout):
+        assert env == {"COMPOSE_PROJECT_NAME": "reviewed-project"}
+        assert timeout > 0
+        if arguments[:4] == ["docker", "compose", "config", "--images"]:
+            code, output = state.rendered[arguments[4]]
+        elif arguments[:4] == ["docker", "compose", "images", "-q"]:
+            code, output = 0, state.containers.get(arguments[4], "")
+        else:
+            assert arguments[:3] == ["docker", "image", "inspect"]
+            reference = arguments[-1]
+            state.inspected.append(reference)
+            if reference in state.inspect_results:
+                code, output = state.inspect_results[reference]
+            else:
+                image_id, label = state.images[reference]
+                image_format = arguments[arguments.index("--format") + 1]
+                code, output = 0, f"{image_id}|{label}" if "{{.Id}}" in image_format else label
+        return SimpleNamespace(returncode=code, stdout=output, stderr="")
+
+    monkeypatch.setattr(host_build, "_docker_run", docker)
+    return state
+
+
+@pytest.mark.parametrize("container_state", ["absent", "previous", "current"])
+def test_built_image_identity_is_independent_of_created_containers(
+    tmp_path: Path, built_images, container_state: str
+) -> None:
+    if container_state != "absent":
+        image_id = built_images.previous_id if container_state == "previous" else built_images.current_id
+        built_images.containers.update(dict.fromkeys(host_build.CORE_BUILD_SERVICES, image_id))
+
+    host_build._verify_core_image_commits(
+        tmp_path, {"COMPOSE_PROJECT_NAME": "reviewed-project"}, built_images.candidate,
+    )
+
+    assert set(built_images.inspected) == set(built_images.references.values())
+
+
+@pytest.mark.parametrize("service", host_build.CORE_BUILD_SERVICES)
+def test_wrong_built_image_is_rejected_even_when_running_container_is_current(
+    tmp_path: Path, built_images, service: str
+) -> None:
+    built_images.containers.update(dict.fromkeys(host_build.CORE_BUILD_SERVICES, built_images.current_id))
+    built_images.images[built_images.references[service]] = (built_images.previous_id, "b" * 40)
+
+    with pytest.raises(RuntimeError, match="built_image_identity_mismatch"):
+        host_build._verify_core_image_commits(
+            tmp_path, {"COMPOSE_PROJECT_NAME": "reviewed-project"}, built_images.candidate,
+        )
+
+
+@pytest.mark.parametrize("rendered", [(1, "fcp-relay:candidate"), (0, ""), (0, "one\ntwo")])
+def test_unavailable_or_ambiguous_configured_image_is_refused(
+    tmp_path: Path, built_images, rendered: tuple[int, str]
+) -> None:
+    built_images.rendered["relay"] = rendered
+
+    with pytest.raises(RuntimeError, match="built_image_identity_unavailable"):
+        host_build._verify_core_image_commits(
+            tmp_path, {"COMPOSE_PROJECT_NAME": "reviewed-project"}, built_images.candidate,
+        )
+
+    assert built_images.inspected == []
+
+
+@pytest.mark.parametrize(
+    "inspection",
+    [(1, ""), (0, ""), (0, "missing-separator"), (0, "|" + "c" * 40),
+     (0, "sha256:one|" + "c" * 40 + "\nsha256:two|" + "c" * 40)],
+)
+def test_failed_or_malformed_built_image_inspection_is_refused(
+    tmp_path: Path, built_images, inspection: tuple[int, str]
+) -> None:
+    built_images.inspect_results[built_images.references["relay"]] = inspection
+
+    with pytest.raises(RuntimeError, match="built_image_identity_unavailable"):
+        host_build._verify_core_image_commits(
+            tmp_path, {"COMPOSE_PROJECT_NAME": "reviewed-project"}, built_images.candidate,
+        )
+
+
+def test_built_image_without_commit_label_is_refused(tmp_path: Path, built_images) -> None:
+    built_images.images[built_images.references["relay"]] = (built_images.current_id, "")
+
+    with pytest.raises(RuntimeError, match="built_image_identity_mismatch"):
+        host_build._verify_core_image_commits(
+            tmp_path, {"COMPOSE_PROJECT_NAME": "reviewed-project"}, built_images.candidate,
+        )

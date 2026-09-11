@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import socket
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -18,35 +17,13 @@ from catalog.federation.recorder_control_plane_voter import (
     RecorderControlPlaneVoter,
     validate_recorder_voter_isolation,
 )
+from catalog.federation.tests.test_control_plane_physical_runtime import (
+    _free_port_triple as _free_triple,
+)
 from catalog.node.identity import IdentityStore
 
 NOW = datetime(2026, 9, 8, tzinfo=timezone.utc)
 SECRET = bytes(range(32))
-
-
-def _free_triple(used: set[int]) -> int:
-    for _ in range(100):
-        probe = socket.socket()
-        probe.bind(("127.0.0.1", 0))
-        port = int(probe.getsockname()[1])
-        probe.close()
-        candidates = {port, port + 1, port + 2}
-        if port >= 65533 or candidates & used:
-            continue
-        sockets: list[socket.socket] = []
-        try:
-            for candidate in (port, port + 1, port + 2):
-                sock = socket.socket()
-                sock.bind(("127.0.0.1", candidate))
-                sockets.append(sock)
-        except OSError:
-            continue
-        finally:
-            for sock in sockets:
-                sock.close()
-        used.update(candidates)
-        return port
-    raise RuntimeError("could not allocate test port triple")
 
 
 def _topology(root: Path):

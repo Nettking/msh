@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+import os
+import re
 import socket
+import subprocess
+import sys
 import time
 from datetime import datetime, timezone
+from functools import lru_cache
 from pathlib import Path
 
 from catalog.federation.control_plane_product import (
@@ -19,14 +24,47 @@ NOW = datetime(2026, 9, 8, tzinfo=timezone.utc)
 SECRET = bytes(range(32))
 
 
+@lru_cache(maxsize=1)
+def _tcp_dynamic_port_range() -> tuple[int, int]:
+    """Read the native IPv4 TCP client range once; never change host settings."""
+    if os.name == "nt":
+        result = subprocess.run(
+            ["netsh", "interface", "ipv4", "show", "dynamicportrange", "protocol=tcp"],
+            check=True, capture_output=True, text=True, errors="replace", timeout=10,
+        )
+        # Labels are localized, but netsh's two numeric fields are start/count.
+        values = re.findall(r":\s*(\d+)[ \t]*\r?$", result.stdout, re.MULTILINE)
+        if len(values) != 2:
+            raise RuntimeError("could not verify native TCP dynamic-port range")
+        start, count = map(int, values)
+        end = start + count - 1
+    elif sys.platform.startswith("linux"):
+        values = Path("/proc/sys/net/ipv4/ip_local_port_range").read_text().split()
+        if len(values) != 2:
+            raise RuntimeError("could not verify native TCP dynamic-port range")
+        start, end = map(int, values)
+    else:
+        raise RuntimeError("test port allocation requires a verified native TCP range")
+    if not 1027 <= start <= end <= 65535:
+        raise RuntimeError("native TCP range leaves no unprivileged listener triple")
+    return start, end
+
+
 def _free_port_triple(used: set[int]) -> int:
-    """Reserve-test consecutive control/credential/migration ports."""
+    """Probe listener triples outside the OS-selected outgoing client range."""
+    dynamic_start, dynamic_end = _tcp_dynamic_port_range()
     for _ in range(100):
         with socket.socket() as first:
             first.bind(("127.0.0.1", 0))
-            port = int(first.getsockname()[1])
+            ephemeral = int(first.getsockname()[1])
+        if not dynamic_start <= ephemeral <= dynamic_end:
+            raise RuntimeError("native bind selected a port outside the verified TCP range")
+        # Retain the native allocation seed but keep every sibling below the
+        # client range. Otherwise an ordinary connect() can immediately consume
+        # base+1/base+2 after these probes close, before voters acquire them.
+        port = 1024 + ephemeral % (dynamic_start - 1026)
         candidates = {port, port + 1, port + 2}
-        if port >= 65533 or candidates & used:
+        if candidates & used:
             continue
         sockets: list[socket.socket] = []
         try:
