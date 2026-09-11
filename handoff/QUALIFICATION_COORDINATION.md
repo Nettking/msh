@@ -26,8 +26,10 @@ Nettking supported activation and all three actual M core image/env/repaired-sou
 hashes are verified. [Runtime receipt](diagnostics/nettking-m-runtime-admission.json).
 **PHYSICAL ADMISSION STOPPED: new confirmed D06 product defect on M.** Checked-in
 Nitro responder replacement stopped old instance then failed bind with EADDRINUSE.
-Preserve [D06 / issue462](diagnostics/D06.md); issue is published, proceed with isolated
-repair/regression work. No dependent admission, retry workaround or physical PASS.
+Preserve [D06 / issue462](diagnostics/D06.md). Repair is pushed as draft PR463,
+head7286f30d30e20c94c13cc9acebb2fd6d61bc1163, with focused development tests PASS.
+Next: review repair/native exact-head CI state. No dependent admission, physical
+retry workaround or PASS; no repair deployed and no new candidate frozen.
 Nitro supported startup and actual M core image/env/repaired-source hashes are
 verified. Control identity preserved; LEADER/ready term9/index1553. Next replace
 the still-imported N host responder through the checked-in exact-process guard.
@@ -1227,3 +1229,21 @@ D04 creation18:13:48UTC. Exact native log digest matches. No listener retry.
 This supports the asynchronous signal/rebind mechanism. Next: isolated repair
 branch from M, real-process regression reproducing delayed exit, bounded exit
 wait on the same stable process handle, and draft PR linked to#462. No host deploy.
+
+##19:09UTC — D06 narrow repair pushed as draft463
+
+[Draft463](https://github.com/Nettking/msh/pull/463), exact
+7286f30d30e20c94c13cc9acebb2fd6d61bc1163, waits for confirmed process exit on the
+same verified OS handle, bounded5s. Unconfirmed exit refuses before bind/PID write.
+Real Linux child reproduced M EADDRINUSE before repair. Focused Windows37PASS,
+7Linux skips; isolated Linux host-only11PASS including delayed exit/timeout;
+ruff/diff PASS. [Development evidence](diagnostics/d06-repair-focused-evidence.json).
+No grant/discovery deadline, PID-reuse protection or authority requirement relaxed.
+
+No full qualification manually dispatched merely because repair exists; native
+PR workflows may run automatically. Next: inspect only463 current exact head,
+relevant correctness findings and required native runs on a state transition.
+Preserve all prior software evidence. Before any future physical restart, this
+new repair needs the required PR-head qualification, normal merge, actual new
+merged-main qualification and clean revalidation/candidate selection. Physical
+hosts stay on M cores; Nitro has no responder; Recorder protected data untouched.

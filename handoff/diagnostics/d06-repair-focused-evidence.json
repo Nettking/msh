@@ -1,0 +1,38 @@
+{
+  "recorded_at": "2026-09-11T19:10:18.475963+00:00",
+  "finding": "D06",
+  "issue": 462,
+  "draft_pr": 463,
+  "branch": "codex/responder-replacement-exit-wait",
+  "head": "7286f30d30e20c94c13cc9acebb2fd6d61bc1163",
+  "physical_candidate": "9b286f931497bf6291e215f6340443c5162826b0",
+  "status": "REPAIR_PUSHED_DRAFT_PR_FOCUSED_DEVELOPMENT_TESTS_PASS",
+  "tests": {
+    "windows": {
+      "junit_sha256": "e57e7a9f4eeaae613e75242335f9ab6f469ac79a56c32a5d2f3107417fb85d2f",
+      "cases": 44,
+      "passed": 37,
+      "skipped": 7,
+      "failures": 0
+    },
+    "linux_isolated": {
+      "junit_sha256": "c2f1a80eda5a3748d321500e53fbe8094d30262e12c27800bf6a087fab585dbb",
+      "cases": 11,
+      "passed": 11,
+      "skipped": 0,
+      "failures": 0
+    }
+  },
+  "test_scope": "Native Windows responder/identity/exit tests; isolated Linux stdlib host-loader real process and handle tests under WSL Python3.10.12. Not full exact-head or physical qualification.",
+  "post_test_changes": "Only restored unrelated original formatting and added new test file to native release workflow; semantic repair/test content unchanged.",
+  "ruff": "PASS",
+  "git_diff_check": "PASS",
+  "product_files": [
+    "catalog/federation/tailnet_join_responder.py"
+  ],
+  "contract": "Wait at most5s on same pinned pidfd/Windows process handle; refuse startup before bind/PID write when exit unconfirmed",
+  "runtime_repair_deployed": false,
+  "physical_acceptance": false,
+  "protected_recorder_data_untouched": true,
+  "next_action": "Review draft463 exact head and newly completed native CI evidence; no duplicate qualification jobs. Preserve M software PASS, keep physical admission stopped until new exact-head/merged-main candidate process completes."
+}
