@@ -699,3 +699,9 @@ selected final SHA's required workflows, caches terminal jobs and writes only
 material transitions. retain_merged_main_jobs.py preserves source-bound proof
 without rereading completed logs. No PR polling or duplicate qualification is
 needed. The automated follow-up will be updated to this stage after persistence.
+
+Three completed final-main jobs now have native exact9b286f93 proof: ICSE Compose,
+Linux operator and branding. Log digests are preserved in
+merged-main-native-provenance.json; no new failure. Qualification is still
+pending. Next: update recurring follow-up to final-main-only state polling;
+then await required completions without duplicate runs or host changes.
