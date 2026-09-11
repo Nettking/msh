@@ -1,0 +1,45 @@
+{
+  "recorded_at": "2026-09-11T18:18:51.132779+00:00",
+  "baseline": "0536f03d67eb277e11573c2188d8e820399627e3",
+  "candidate": "9b286f931497bf6291e215f6340443c5162826b0",
+  "command": [
+    "C:\\wsl\\fcp-v1-fba508-nettking-20260910\\.venv\\Scripts\\python.exe",
+    "-B",
+    "-m",
+    "catalog.federation.tests.cf7_acceptance.physical_revalidation",
+    "--baseline",
+    "0536f03d67eb277e11573c2188d8e820399627e3",
+    "--candidate",
+    "9b286f931497bf6291e215f6340443c5162826b0",
+    "--repo-root",
+    "."
+  ],
+  "cwd": "C:\\wsl\\fcp-v1-9b286f93-merged-main-20260911",
+  "python_version": "3.12.10",
+  "clean_exact_checkout": true,
+  "exit_code": 2,
+  "plan_sha256": "76ece7d9dedd39570d97e5c45f0cb4b571eef8d423ca7d469ef075be888048c4",
+  "outcome": "ALL_12_SCENARIOS_REQUIRE_FRESH_OBSERVATION",
+  "carry_forward_authorized": false,
+  "prior_physical_passes": 0,
+  "unknown_paths": [
+    "catalog/federation/tailscale_host_discovery.py"
+  ],
+  "policy_interpretation": "Exit2 denies carry-forward for unknown discovery path. Full fresh observations satisfy fail-closed policy. No impact-map weakening, product repair or software rerun is warranted.",
+  "unchanged_execution_contracts": {
+    "scripts/acceptance/v1_physical_automation.py": "5b2cbb5b7c81c5fe0120d1b5b064a09b6a22b1bed93f914f2b152276c2865156",
+    "scripts/acceptance/v1_physical_runner.py": "176bdd7deeb2b489fb26d34aa5b46eaaa0e7889d83f6a042faaf918bb834d16c",
+    "scripts/acceptance/v1_physical_probes.py": "8e4f2efb81ccc459a08c72fd019c0004c6e06c614232da7ba50c439bff95f974",
+    "scripts/acceptance/v1_physical_campaign.py": "46a0d8f5e67da627d156821e44d978c8a38673ce97cebe830f559188f237a899",
+    "scripts/acceptance/v1_prepare_windows.ps1": "16e2aa0ce6d533fe79d2a440c09e94510b5daabab5736c22b4b9e08d5a8cc490",
+    "scripts/acceptance/v1_prepare_linux.sh": "7984989401ec9c6dd33f79fa8128509e643076196ba7be6ed7d5aaf1ebd2f6d7",
+    "docs/implementation/v1_physical_campaign_automation.md": "f3a4209681cbaf0de80347254d75a79df264b9e496dbc276422117debdc3119d",
+    "docs/implementation/v1_physical_campaign.md": "d473cebffc22d9c01883132e54fb4674e92f9b1372c47fa6ae7abb46679b8785",
+    "docs/implementation/v1_b01_b09_physical_acceptance.md": "ee4348444ccf0aee076fb5b1f8cf0546756376273c7352819588629520105fb3"
+  },
+  "review_delta": "Only startup readiness and Compose responder-port propagation affect activation configuration; inspect resolved mounts/project/port and actual M source on each host before launch.",
+  "automate_safety": "No blanket automate. All ten full untimed scenarios contain stateful/disruptive work; use runtime-bound individual probes/actions after preconditions and isolation.",
+  "physical_acceptance": false,
+  "state_changed": "local audit receipt only",
+  "protected_recorder_data_untouched": true
+}

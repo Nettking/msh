@@ -21,7 +21,8 @@ Preserve `diagnostics/merged-main-final-qualification.json`; no software rerun.
 D04 host remediation and local/real Nettking peer verification are complete on N;
 issue459 is closed. AUTHORITATIVE_SHA is now frozen as
 `9b286f931497bf6291e215f6340443c5162826b0` (M).
-Next: clean checked-in revalidation, side-effect review and owned runtime admission.
+Clean checked-in revalidation and scenario side-effect review are complete.
+Next: [controlled owned runtime admission](PHYSICAL_M_ADMISSION.md).
 M is not yet deployed; fresh runtime/source/owner/topology checks remain required.
 
 Nettking/Nitro campaign core runtime remains0536f03d67eb277e11573c2188d8e820399627e3.
@@ -959,3 +960,18 @@ Next exact action: native Python3.12 from clean M runs
 Retain planner output, including any fail-closed unknown paths. Then reconcile
 the checked-in scenario/precondition contract and stage state-preserving runtime
 admission. All M physical observations fresh; P07/P12 real durations remain.
+
+##18:18UTC — clean revalidation and M scenario safety review complete
+
+The exact checked-in M planner executed once from clean M with native Python3.12.
+Exit2 denies carry-forward due to unknown discovery impact path and requires all12
+fresh CF7 observations. [Plan](diagnostics/main-9b286f93-revalidation-plan.json)
+and [review](diagnostics/main-9b286f93-revalidation-review.json) preserve that
+fail-closed result; no map weakening or software rerun. All prior physical PASS0.
+
+Nine execution/contract files are unchanged N-to-M. [M admission/safety plan](PHYSICAL_M_ADMISSION.md)
+records each untimed scenario's stateful/disruptive boundary and prohibits blanket
+automate. Startup readiness and Compose port changes were separately reviewed.
+Next: fresh host/runtime/updater/pending-request and protected-container metadata,
+then stage exact-M source/configuration under existing mutation locks. Do not
+touch protected corpus, change voters or start timers before actual admission.
