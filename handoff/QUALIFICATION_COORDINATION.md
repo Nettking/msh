@@ -26,7 +26,7 @@ Nettking supported activation and all three actual M core image/env/repaired-sou
 hashes are verified. [Runtime receipt](diagnostics/nettking-m-runtime-admission.json).
 **PHYSICAL ADMISSION STOPPED: new confirmed D06 product defect on M.** Checked-in
 Nitro responder replacement stopped old instance then failed bind with EADDRINUSE.
-Preserve [D06 / issue462](diagnostics/D06.md). Repair is pushed as draft PR463,
+Preserve [D06 / issue462](diagnostics/D06.md). Repair is ready for review in PR463,
 head7286f30d30e20c94c13cc9acebb2fd6d61bc1163, with focused development tests PASS.
 Next: review repair/native exact-head CI state. No dependent admission, physical
 retry workaround or PASS; no repair deployed and no new candidate frozen.
@@ -1268,3 +1268,11 @@ Next: mark463 ready for review; qualify this reviewed exact head under existing
 37-job/CFI2/registry contracts. First retain completed native checkout proofs,
 then dispatch only proven absent gates; let existing jobs finish before resolving
 any synthetic-checkout gaps. Do not qualify old candidates or deploy the repair.
+
+###19:13UTC — reviewed PR463 ready; required qualification now justified
+
+Normal GitHub ready-for-review transition succeeded for exact7286f30d, base M;
+PR is open/unmerged and mergeable. Local source review and focused regressions
+are complete, so the required exact-head qualification is now the next gate.
+No physical deployment or merge yet. Retain existing jobs before filling only
+proven absent workflow gaps. No repeated old qualification or blanket dispatch.
