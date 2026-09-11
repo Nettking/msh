@@ -1369,3 +1369,9 @@ jobs plus one companion job). Phase2 Windows and both release full-order jobs
 used syntheticbfec91c9. Both phase2 jobs now have complete mismatch proofs;
 next dispatch its exact-head gap once with the guarded helper. Release remains
 active; preserve all completed evidence without restarting it.
+
+19:44UTC: phase2 exact-head replacement dispatched once (HTTP204), with both
+native mismatch proofs recorded. Nine dispatches now recorded for463; no repeats.
+Next: `poll_pr463_state.py` on the next state check; only new completed jobs need
+`retain_pr463_new_native_logs.py`. Fill remaining gaps only after parent completion
+and native source verification. No merge, new candidate or physical restart yet.
