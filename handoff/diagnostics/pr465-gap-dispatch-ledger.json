@@ -99,6 +99,36 @@
       "response": {
         "http_status": 204
       }
+    },
+    {
+      "pr": 465,
+      "sha": "4749ab6689315a7ad953c11ce4b2ec942433d71a",
+      "ref": "codex/analysis-content-reader-sharing",
+      "workflow": "phase2-federation.yml",
+      "requested_at": "2026-09-11T23:38:30.320268+00:00",
+      "reason": "Completed successful PR jobs checked out synthetic SHA, not intended head",
+      "native_proof": [
+        {
+          "job_id": 103449514749,
+          "run_id": 34656348532,
+          "checkout_commits": [
+            "2be67d18c2c58bde4b4be09c2f7b97b6a42dd83c"
+          ],
+          "sha256": "edb703fec41a98c6114a9bb28f966c3807df31c6f2bd6acb52f101945c329fe7"
+        },
+        {
+          "job_id": 103449514985,
+          "run_id": 34656348532,
+          "checkout_commits": [
+            "2be67d18c2c58bde4b4be09c2f7b97b6a42dd83c"
+          ],
+          "sha256": "4c5dbd6bf14c2e813a8cf5e24a5fc386aa8efef08b0606ef2aa644d37401e59a"
+        }
+      ],
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
     }
   ]
 }

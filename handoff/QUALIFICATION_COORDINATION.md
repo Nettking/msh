@@ -1835,3 +1835,8 @@ phase2 source gap. All prior evidence preserved; no physical state change.
 companions retained. Four release jobs and the final phase2 job prove synthetic
 2be67d18. Both phase2 jobs now have retained source mismatch proof; next dispatch
 its exact-head gap once. Release remains active; no release dispatch justified.
+
+23:38UTC: phase2 exact-head4749ab66 dispatched once (HTTP204), both synthetic
+job proofs recorded in the ledger. Eight justified dispatches total; preserve
+required8/37 plus3/3 native PASS. Next: poll_pr465_state.py on next state check;
+retain only newly completed evidence. No new defect, merge or physical change.
