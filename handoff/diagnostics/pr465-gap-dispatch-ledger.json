@@ -77,6 +77,28 @@
       "response": {
         "http_status": 204
       }
+    },
+    {
+      "pr": 465,
+      "sha": "4749ab6689315a7ad953c11ce4b2ec942433d71a",
+      "ref": "codex/analysis-content-reader-sharing",
+      "workflow": "product-branding.yml",
+      "requested_at": "2026-09-11T23:16:16.450390+00:00",
+      "reason": "Completed successful PR jobs checked out synthetic SHA, not intended head",
+      "native_proof": [
+        {
+          "job_id": 103449511496,
+          "run_id": 34656348285,
+          "checkout_commits": [
+            "2be67d18c2c58bde4b4be09c2f7b97b6a42dd83c"
+          ],
+          "sha256": "b5b0814781ba723eaf20a6aa21ad2848d211420250a3b9655ecbee0c8b15e914"
+        }
+      ],
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
     }
   ]
 }

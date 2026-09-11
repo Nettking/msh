@@ -1806,3 +1806,11 @@ Completed branding34656348285 proves synthetic2be67d18, not intended head.
 Other synthetic-source workflows still have active jobs. Next: dispatch only
 the completed branding exact-head gap once using the guarded helper; preserve
 all verified proof and wait for remaining independent CI. Review count unchanged.
+
+23:16UTC: branding exact-head gap dispatched once (HTTP204), with synthetic
+checkout/digest proof in the ledger. PR465 now has seven justified dispatches
+(six absent plus branding source gap), required5/37 plus companion2/3 native
+PASS retained. No failures reported or review/head changes. Next actionable
+command on the next state check: python -B handoff/diagnostics/poll_pr465_state.py;
+then retain_pr465_new_native_logs.py only if new terminal jobs exist. PR463 and
+physical M unchanged; no physical acceptance PASS or active timers.
