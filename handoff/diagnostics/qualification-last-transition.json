@@ -1,17 +1,29 @@
 {
-  "observed_at": "2026-09-11T15:08:50.927994+00:00",
+  "observed_at": "2026-09-11T15:21:22.741485+00:00",
   "changes": {
     "456": [
       {
         "workflow": "federation-v1-release.yml",
         "run_id": 34595427316,
         "event": "workflow_dispatch",
-        "status": "queued",
+        "status": "in_progress",
         "conclusion": null,
         "jobs": [
           {
             "id": 103249965566,
             "name": "Windows regressions (transport-storage)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103249965630,
+            "name": "Windows regressions (journal-artifacts)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103249965655,
+            "name": "Windows regressions (capability-product)",
             "status": "in_progress",
             "conclusion": null
           }
@@ -20,36 +32,15 @@
     ],
     "461": [
       {
-        "workflow": "federation-v1-release.yml",
-        "run_id": 34600817254,
-        "event": "pull_request",
-        "status": "queued",
-        "conclusion": null,
-        "jobs": [
-          {
-            "id": 103267381209,
-            "name": "Windows regressions (capability-product)",
-            "status": "completed",
-            "conclusion": "success"
-          }
-        ]
-      },
-      {
-        "workflow": "icse-tool-demo.yml",
-        "run_id": 34606870244,
+        "workflow": "ci-test-sharding.yml",
+        "run_id": 34601196761,
         "event": "workflow_dispatch",
         "status": "completed",
         "conclusion": "success",
         "jobs": [
           {
-            "id": 103287341780,
-            "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
-            "id": 103311460581,
-            "name": "publication-bundle",
+            "id": 103268639822,
+            "name": "Shard contract (Windows, shared-pool)",
             "status": "completed",
             "conclusion": "success"
           }

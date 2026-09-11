@@ -401,3 +401,13 @@ Next scheduled action: poll_required_state.py, preserving qualified457 and all
 other valid evidence. Await456 release and461 pending gates; reconcile remaining
 synthetic release/CFI2/operator workflows after completion. No new candidate or
 merge yet; no D04/host/protected Recorder action; P07/P12 not started.
+
+## September11 15:22UTC — required Windows jobs advanced
+
+Heads unchanged;457 qualification remains valid, no new failure. PR456 exact
+release34595427316 has transport/storage and journal/artifacts success;
+capability/product is running. PR461 exact sharding34601196761 completed
+successfully on both platforms. Next: retain three new native proofs; wait for
+456 release completion before its complete artifact review. No duplicate jobs,
+merge or host action; runtime remains0536f03d67eb277e11573c2188d8e820399627e3,
+protected Recorder untouched, no physical PASS and no P07/P12 timers.
