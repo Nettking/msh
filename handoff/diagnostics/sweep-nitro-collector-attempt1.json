@@ -1,0 +1,22 @@
+{
+  "candidate_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
+  "host": "nitro",
+  "stage": "diagnostic metadata collection, not P test",
+  "command": "ssh_campaign_script.py nitro collect_owned_metadata.py --timeout 55",
+  "observed": "AssertionError: ('relay', 4)",
+  "expected": "Identify one running owned relay; collector used docker ps -aq and assumed one total container.",
+  "classification": "DIAGNOSTIC_HELPER_SELECTION_ERROR_RESOLVED",
+  "state_changed": false,
+  "protected_recorder_data_untouched": true,
+  "next_action": "Inspect only names/status of the four matching relay containers; do not stop or remove them.",
+  "physical_acceptance": false,
+  "immediate_mechanism": "docker ps -aq included three stopped successful one-off relay setup containers, all exited 22-23h earlier. Exactly one normal relay is running on N.",
+  "running_relay": "02403a8e33b5",
+  "historical_exited_oneoff_ids": [
+    "0ec5ed328c2d",
+    "4d5778ee7a7c",
+    "6f6e9046ac84"
+  ],
+  "repair": "Collector now selects running com.docker.compose.oneoff=False containers. No container was stopped, removed or changed.",
+  "independent_candidate_defect": false
+}
