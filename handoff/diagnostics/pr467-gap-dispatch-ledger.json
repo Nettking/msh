@@ -142,6 +142,154 @@
       "response": {
         "http_status": 204
       }
+    },
+    {
+      "pr": 467,
+      "sha": "84c66f8185c1411d9dc8c5c33244a2f564845ce7",
+      "ref": "codex/analysis-content-resolve-race",
+      "workflow": "federation-v1-release.yml",
+      "requested_at": "2026-09-12T07:41:38.727418+00:00",
+      "reason": "Completed successful PR jobs checked out synthetic SHA, not intended head",
+      "native_proof": [
+        {
+          "job_id": 103506523575,
+          "run_id": 34676251393,
+          "checkout_commits": [
+            "fcf8603b93e114d5367dcf0adf79d14410b612d8"
+          ],
+          "sha256": "7dd11e00c4784a280b2b3ce4a02bc63f690a02a0bb25216ae0a0658eca5aac8e"
+        },
+        {
+          "job_id": 103506523637,
+          "run_id": 34676251393,
+          "checkout_commits": [
+            "fcf8603b93e114d5367dcf0adf79d14410b612d8"
+          ],
+          "sha256": "7761a5664c4958b06fab7c9d54aee8f68d0f7317e91942bf3552c134de2b3e0d"
+        },
+        {
+          "job_id": 103506523658,
+          "run_id": 34676251393,
+          "checkout_commits": [
+            "fcf8603b93e114d5367dcf0adf79d14410b612d8"
+          ],
+          "sha256": "e0da85c6c53fa75d796b6d4505c38d046889daebd0da520f461c8f58027e23e9"
+        },
+        {
+          "job_id": 103506523662,
+          "run_id": 34676251393,
+          "checkout_commits": [
+            "fcf8603b93e114d5367dcf0adf79d14410b612d8"
+          ],
+          "sha256": "004c7425839c29427dc403bb6d498ff35006e1ca4059dd099f7a381e83b133ed"
+        },
+        {
+          "job_id": 103506523664,
+          "run_id": 34676251393,
+          "checkout_commits": [
+            "fcf8603b93e114d5367dcf0adf79d14410b612d8"
+          ],
+          "sha256": "869d30b85837588cd359661290bc440e50d00bfb35d5320b704e09565d4289b5"
+        },
+        {
+          "job_id": 103506523674,
+          "run_id": 34676251393,
+          "checkout_commits": [
+            "fcf8603b93e114d5367dcf0adf79d14410b612d8"
+          ],
+          "sha256": "193c02b6896f4a9aa67a75ba5ec48b3d0602d18a8ca57d153262444ab1b51171"
+        },
+        {
+          "job_id": 103506523677,
+          "run_id": 34676251393,
+          "checkout_commits": [
+            "fcf8603b93e114d5367dcf0adf79d14410b612d8"
+          ],
+          "sha256": "c860f7f8e9ff73008ddab11d9268d7ffe6f2edfdb88f2c53738d065be94667c6"
+        },
+        {
+          "job_id": 103506523680,
+          "run_id": 34676251393,
+          "checkout_commits": [
+            "fcf8603b93e114d5367dcf0adf79d14410b612d8"
+          ],
+          "sha256": "067cd47c0662a7acb79bcfe5d1c7f0fe6d947c5b65c0c0a98c33041be962fd0e"
+        },
+        {
+          "job_id": 103506523696,
+          "run_id": 34676251393,
+          "checkout_commits": [
+            "fcf8603b93e114d5367dcf0adf79d14410b612d8"
+          ],
+          "sha256": "ad65c66645f5b9e73d8badca29e9e05906cc7f4b229482124dbde3856e32ddd3"
+        },
+        {
+          "job_id": 103506523700,
+          "run_id": 34676251393,
+          "checkout_commits": [
+            "fcf8603b93e114d5367dcf0adf79d14410b612d8"
+          ],
+          "sha256": "988c707bae9a16aaf28b4934c3aac1e84f9d2e8a3f39e4fcf882600a4f0d8d88"
+        },
+        {
+          "job_id": 103506523702,
+          "run_id": 34676251393,
+          "checkout_commits": [
+            "fcf8603b93e114d5367dcf0adf79d14410b612d8"
+          ],
+          "sha256": "67a0284f3eecc3aee0f08cf2d00cba842ca0e92ac0568591b7d83cd872deffa5"
+        },
+        {
+          "job_id": 103506523734,
+          "run_id": 34676251393,
+          "checkout_commits": [
+            "fcf8603b93e114d5367dcf0adf79d14410b612d8"
+          ],
+          "sha256": "e5df54c6092bafe802a072a362fd026899bd7977a7d58d7c0183e24de12a025d"
+        },
+        {
+          "job_id": 103509492199,
+          "run_id": 34676251393,
+          "sha256": "446478ae090a9da04f53821cb843bf3db607b8549cb62b762ccef251acfc43b5",
+          "aggregate_review": "pr467-release-aggregate-review.json",
+          "dependency_job_ids": [
+            103506523696,
+            103506523637
+          ]
+        },
+        {
+          "job_id": 103513329092,
+          "run_id": 34676251393,
+          "checkout_commits": [
+            "fcf8603b93e114d5367dcf0adf79d14410b612d8"
+          ],
+          "sha256": "a88c89edea0a1f6e1fd48f11d8bab3797ec4e5e7fd37fb28e4aed7a9c21466f5"
+        },
+        {
+          "job_id": 103513329103,
+          "run_id": 34676251393,
+          "checkout_commits": [
+            "fcf8603b93e114d5367dcf0adf79d14410b612d8"
+          ],
+          "sha256": "8b6f3001b527d06201d271462b92ab4315f69181bb7a272f18b2128a61d8603c"
+        },
+        {
+          "job_id": 103513389066,
+          "run_id": 34676251393,
+          "sha256": "19bfd78eaec7735b08bdf92e8ac84fc84f32adde8b7d6bde8118e1e54153815f",
+          "aggregate_review": "pr467-release-aggregate-review.json",
+          "dependency_job_ids": [
+            103513329103,
+            103513329092,
+            103506523700,
+            103509492199
+          ]
+        }
+      ],
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
     }
   ]
 }
