@@ -2494,11 +2494,13 @@ Required replacement proof:1/2 reviewed green; actual JS-only event proved in
 PR469/run34690234286, native pair still queued at the last bounded snapshot.
 Next scheduled check11:55Z: run diagnostics/inspect_f7_replacement_runs.py with
 the audit Python -B. If the canary completed, retain its native logs/artifacts
-using label ci-f7-pr469-run34690234286, then run review_f7_native_proof.py469
-(the CLI requires a space before469). Preserve source/head/synthetic distinctions.
+using label ci-f7-pr469-run34690234286, then run `review_f7_native_proof.py 469`. Preserve source/head/synthetic distinctions.
 Do not merge the disposable canary. Preserve automatic PR468/469 companion runs;
 inspect any failures before edits or reruns. Long-run first snapshot was11:05Z;
 do not repeat long-job checks before11:55Z absent an actionable external event.
 After the second native green proof, complete final reference/status-contract and
 retirement-group review before any deletion. All eight legacy files remain.
 Protected Recorder data untouched; no candidate freeze or physical PASS/P07/P12.
+
+PR468 proof comment: https://github.com/Nettking/msh/pull/468#issuecomment-5645545367 . Heartbeat updated to this
+checkpoint; next scheduled inspection11:55Z, quiet unless actionable.
