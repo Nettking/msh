@@ -2823,3 +2823,7 @@ Beast jobs103572679136/103572679035 passed their native tests and failed final G
 ## 2026-09-12T16:04:05.016436+00:00 — D12 host ownership cause confirmed
 
 Update-smoke job103572678961 exposes actual Git dubious-ownership stderr: CI path owned by Beast/nksra, runner is NETWORK SERVICE S-1-5-20. PR473 Windows release job103573774515 fails three launcher tests at unreadable-commit guard; exact synthetic0355023f tree equals440123f6. Source-specific evidence/complete logs pushed in diagnostics/D12-confirmed-ownership-root-cause.json. D12 is host/environment configuration, no product repair. Plan only a controlled narrow CI-workspace trust/ownership correction under the unchanged runner identity; no action applied, no wildcard bypass or account change. Next classify the remaining AQG Phase2 failure before repair decisions.
+
+## 2026-09-12T16:05:40.512462+00:00 — AQG Windows Phase2 failure retained under D11
+
+Job103572679008 on exact b7194820 fails the same reinstatement test, now at tail-catchup assertion line361: generic retryable instead of catch-up-required. Suite1failed/380passed/1skip. Underlying exception reason is not printed, so common TimeoutError/root cause is not asserted. Evidence/complete log in diagnostics/D11-aqg-windows-phase2-recurrence.json. Original issue471 remains open; no second blind retry. All newly completed failures are now classified by observed mechanism (D11 unresolved, D12 host ownership); no new independent product defect established.

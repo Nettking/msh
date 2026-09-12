@@ -1,0 +1,37 @@
+{
+  "recorded_at": "2026-09-12T16:05:40.512462+00:00",
+  "finding": "D11",
+  "status": "CONFIRMED_RECURRING_TEST_FAILURE_ROOT_CAUSE_UNRESOLVED",
+  "candidate_sha": "b7194820d8f1940ae60b8c9639e09b7f61e65c55",
+  "host": "AQG7NCC-Windows native runner30; same physical AQG machine as original Linux failure",
+  "physical_stage": "None; Phase2 Identity/state/protocol/relay/Phase F CI selection",
+  "run_id": 34701018877,
+  "job_id": 103572679008,
+  "test": "catalog/node/tests/test_live_storage_reinstatement.py::test_live_reinstatement_restores_replica_and_acknowledgement_policy",
+  "stage_in_test": "Tail catch-up precondition assertion at line361; earlier than original line410 final-success failure",
+  "observed": "outcome.result.code is live-reinstatement-retryable rather than reinstatement-tail-catchup-required. Suite1failed/380passed/1skipped in303.23s. Underlying exception reason is not exposed by this assertion output.",
+  "expected": "Missing tail fence yields the specific catch-up-required code, preserving authority and acknowledgement policy.",
+  "classification": "UNRESOLVED product/harness/environment interaction. Same test/retryable result family as D11 on the same physical AQG host; do not assert the original TimeoutError or identical root cause without evidence.",
+  "acceptance_impact": "Postmerge Phase2 Windows fails; retain all passing same-source evidence but do not treat a different-host pass as repair.",
+  "safe_continuation": "YES: independent CI/read-only source and existing-artifact comparison. No guard/deadline weakening or further blind retry.",
+  "command_or_procedure": "Run the checked-in Phase2 workflow test selection; full command and traceback retained in native log.",
+  "state_changed": "CI-owned test temporary SQLite/loopback fixtures only. No product source, host configuration or physical deployment.",
+  "protected_recorder_data": "UNTOUCHED",
+  "github_artifact": "https://github.com/Nettking/msh/issues/471",
+  "repair": "NONE",
+  "next_diagnostic_action": "Compare already-retained b719 full-suite/Windows transport JUnit outcomes and source path for line361. Record missing exception detail separately; a focused reproduction must expose the retryable reason and preserve original timing/authority guards, without repeating successful qualification jobs.",
+  "evidence": {
+    "job_id": 103572679008,
+    "run_id": 34701018877,
+    "name": "windows",
+    "runner_name": "AQG7NCC-Windows",
+    "conclusion": "failure",
+    "bytes": 107993,
+    "sha256": "f12fbc3c5c26e29d29f8d06e4cc483a29b64de0ab064f745b0aeb2ed956e0e14",
+    "checkout_commits": [
+      "b7194820d8f1940ae60b8c9639e09b7f61e65c55"
+    ],
+    "checkout_matches": true
+  },
+  "durable_log": "D11-aqg-windows-phase2-log.zip"
+}
