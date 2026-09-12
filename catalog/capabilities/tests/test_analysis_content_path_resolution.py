@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
-import os
 from pathlib import Path
-import threading
 
 import pytest
 
@@ -22,11 +23,11 @@ def test_resolution_survives_native_leaf_replacement(
     tmp_path, monkeypatch, extended_root, key
 ):
     import ctypes
-    from ctypes import wintypes
     import msvcrt
     import ntpath
+    from ctypes import wintypes
 
-    root = tmp_path / "artifacts"
+    root = Path(str(tmp_path / "artifacts").removeprefix("\\\\?\\"))
     if extended_root:
         root = Path("\\\\?\\" + str(root))
     store = LocalArtifactContentStore(root)
@@ -36,8 +37,15 @@ def test_resolution_survives_native_leaf_replacement(
     replacement = tmp_path / "replacement"
     replacement.write_bytes(payload)
     original_final_name = ntpath._getfinalpathname
-    final_name = ctypes.WinDLL("kernel32", use_last_error=True).GetFinalPathNameByHandleW
-    final_name.argtypes = (wintypes.HANDLE, wintypes.LPWSTR, wintypes.DWORD, wintypes.DWORD)
+    final_name = ctypes.WinDLL(
+        "kernel32", use_last_error=True
+    ).GetFinalPathNameByHandleW
+    final_name.argtypes = (
+        wintypes.HANDLE,
+        wintypes.LPWSTR,
+        wintypes.DWORD,
+        wintypes.DWORD,
+    )
     final_name.restype = wintypes.DWORD
     interleaved = False
 
@@ -101,7 +109,9 @@ def test_resolution_preserves_real_link_containment(tmp_path, inside, parent_lin
     target.write_bytes(b"unchanged target")
     link = store.root / "alias"
     try:
-        link.symlink_to(target_parent if parent_link else target, target_is_directory=parent_link)
+        link.symlink_to(
+            target_parent if parent_link else target, target_is_directory=parent_link
+        )
     except OSError as error:
         if os.name == "nt" and error.winerror == 1314:
             pytest.skip("Windows symlink privilege unavailable")
@@ -114,6 +124,36 @@ def test_resolution_preserves_real_link_containment(tmp_path, inside, parent_lin
             store.resolve(key)
         assert error.value.code == "artifact-object-key-escape"
     assert target.read_bytes() == b"unchanged target"
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows junction containment")
+@pytest.mark.parametrize("inside", [False, True])
+@pytest.mark.parametrize("parent_link", [False, True])
+def test_resolution_preserves_real_junction_containment(tmp_path, inside, parent_link):
+    store = LocalArtifactContentStore(tmp_path / "artifacts")
+    target = store.root / "target" if inside else tmp_path / "outside"
+    target.mkdir()
+    (target / "body").write_bytes(b"unchanged target")
+    link = store.root / "alias"
+    # Directory junctions exercise real reparse targets without granting symlink
+    # privileges or changing the runner account. Remove only the owned junction.
+    subprocess.run(
+        ["cmd", "/d", "/c", "mklink", "/J", str(link), str(target)],
+        check=True,
+        capture_output=True,
+    )
+    try:
+        key = "alias/body" if parent_link else "alias"
+        expected = target / "body" if parent_link else target
+        if inside:
+            assert store.resolve(key) == expected
+        else:
+            with pytest.raises(FederationValidationError) as error:
+                store.resolve(key)
+            assert error.value.code == "artifact-object-key-escape"
+        assert (target / "body").read_bytes() == b"unchanged target"
+    finally:
+        os.rmdir(link)
 
 
 @pytest.mark.parametrize("key", ["new", "missing/parent/new", ".", "./new"])
