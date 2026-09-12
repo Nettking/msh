@@ -568,7 +568,59 @@
         "2be67d18c2c58bde4b4be09c2f7b97b6a42dd83c"
       ],
       "checkout_matches": false
+    },
+    {
+      "job_id": 103458955227,
+      "run_id": 34659532030,
+      "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 107533,
+      "sha256": "fdb4e342b3a3bce9f17ccdb44032b86119ea8a49826c37b7c570c8cf53a0b770",
+      "checkout_commits": [
+        "4749ab6689315a7ad953c11ce4b2ec942433d71a"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103464860129,
+      "run_id": 34661528639,
+      "name": "Full-suite order (rotating)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 65895,
+      "sha256": "6979fb03aaad95b869e1330a6660e12aa89b9259b342ca04045fe5ba60900569",
+      "checkout_commits": [
+        "4749ab6689315a7ad953c11ce4b2ec942433d71a"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103464860238,
+      "run_id": 34661528639,
+      "name": "Release checks (Windows)",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 57196,
+      "sha256": "aebbde5c90cc1dd57868785424d084974c755e6021879882eb401386ccd752a1",
+      "checkout_commits": [
+        "4749ab6689315a7ad953c11ce4b2ec942433d71a"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103450006534,
+      "run_id": 34656512238,
+      "name": "role-retirement (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 50663,
+      "sha256": "782c8e97bb07279df5d642579c8d6ebbc2e2d92ef7de0f78863b962c8af4b04d",
+      "checkout_commits": [
+        "4749ab6689315a7ad953c11ce4b2ec942433d71a"
+      ],
+      "checkout_matches": true
     }
   ],
-  "retained_at": "2026-09-12T00:23:19.464573+00:00"
+  "retained_at": "2026-09-12T00:35:44.623247+00:00"
 }

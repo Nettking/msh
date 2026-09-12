@@ -1909,3 +1909,10 @@ Native source proof and dispatch ledger committed; no duplicate or physical chan
 completed; final release34661528639 has two successful jobs. CF7B34661541571 and
 ICSE34661535011 are queued. All13 required/companion workflows now have one
 justified exact-head dispatch. Next: retain only new terminal native evidence.
+
+00:36UTC: four new native logs verify exact4749ab66: F85-Windows, CF8-Windows,
+release Windows checks and rotating full-suite order. Required native evidence
+now16/37 plus3/3 companions; none inferred from synthetic runs. Next: poll
+pr465_state.py via the existing poll_pr465_state.py helper on next state check,
+then retain newly completed logs/artifacts only. Remaining CI active; no new
+dispatch, defect, merge, candidate or physical state change.
