@@ -25,12 +25,13 @@
   },
   "ruff": "check and format PASS",
   "diff_hygiene": "PASS",
-  "native_replacement_executions_verified": 0,
-  "js_only_automatic_event_verified": false,
+  "native_replacement_executions_verified": 1,
+  "js_only_automatic_event_verified": true,
   "legacy_retired": [],
   "product_runtime_changed": false,
   "physical_acceptance": false,
   "note": "Focused contract tests, not replacement qualification. One existing matrix, eight added product paths plus CI test self-path, three product test modules plus CI contract module, and JUnit retention; zero new jobs/workflows.",
   "pr": 468,
-  "pr_url": "https://github.com/Nettking/msh/pull/468"
+  "pr_url": "https://github.com/Nettking/msh/pull/468",
+  "native_receipt": "ci-f7-pr468-native-proof.json"
 }

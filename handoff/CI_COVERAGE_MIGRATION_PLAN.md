@@ -1,6 +1,6 @@
 # Coverage-preserving self-hosted CI migration
 
-Status: **STAGE1 IMPLEMENTED in draft [PR468](https://github.com/Nettking/msh/pull/468); native equivalence proof pending.**
+Status: **STAGE1 IMPLEMENTED in draft [PR468](https://github.com/Nettking/msh/pull/468); native equivalence proof 1/2 reviewed green; JS-only automatic event verified.**
 Plan/matrix were pushed at41d89c63 before source edits. Exact source: f3abe5452db2f21593a688bc62bc5f4b22d5c40e.
 Qualified baseline: `17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05`.
 [Final main qualification](diagnostics/merged-main-final-qualification.json) is
@@ -105,8 +105,9 @@ Nitro's online status is not admission to any requested or release runner pool.
 ## Current action
 
 The first gate is finished and this minimal proposal is now durable. Next:
-review PR468 native run34689990990 and create the planned JS-only canary;
-then obtain two complete source-bound green replacement executions. Focused29
+preserve the reviewed PR468 native proof and inspect queued JS-only PR469
+run34690234286 near completion. One of two required native executions is reviewed
+green; actual JS-only automatic triggering is proved. Focused29
 contract checks passed; see diagnostics/ci-f7-extension-checkpoint.json. Keep the acceptance campaign paused
 while the source decision is pending. The23 hosted admission failures remain
 infrastructure observations; no successful job is restarted to erase old red checks.

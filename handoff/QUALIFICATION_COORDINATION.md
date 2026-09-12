@@ -16,11 +16,12 @@ Next highest-value action: review native F7 replacement evidence for draft
 f3abe5452db2f21593a688bc62bc5f4b22d5c40e. Stage1 extension is pushed;
 29 focused coverage-contract checks and lint/format/diff checks passed.
 Automatic F7 run34689990990 completed green on Nettking native Windows
-and Nettking-Linux at11:07Z; native log/JUnit reconciliation is next. Preserve
+and Nettking-Linux at11:07Z; native logs/JUnit are now reconciled (1 of 2 required green runs). Preserve
 all automatic PR468 runs. Disposable JS-only PR469 is open against this migration branch. Its automatic
 F7 run34690234286 proves the path event, with unchanged workflow blob and just
 one inert JS comment. Native matrix queued at11:08Z. Never merge PR469. Next:
-review both F7 runs (34689990990 and34690234286) and their native logs/JUnit.
+review queued canary F7 run34690234286 at the next scheduled check; retain the
+completed PR468 proof unchanged (diagnostics/ci-f7-pr468-native-proof.json).
 Two complete green native executions are still required before retirement.
 No duplicate37-job dispatch is needed for replacement proof. F7 jobs have30min
 limits; check near expected completion, long release jobs no sooner than45-60min.
@@ -2475,3 +2476,29 @@ b0fbb8a1a4e216b8696b8015a35594c1007319de; Git trees and workflow blob match.
 Receipt: diagnostics/ci-f7-replacement-runs-latest.json. Next retain/reconcile
 native logs and both JUnit artifacts before counting this as reviewed proof.
 Canary F7 run34690234286 is queued; no retry/duplicate dispatch.
+
+## 2026-09-12T11:14:37.796288+00:00 — first native replacement proof reviewed and retained
+
+F7 run34689990990: Linux713 PASS/9 platform skips, Windows717 PASS/5
+symlink-privilege skips;722 distinct test identities pass across the native pair.
+Both actual checkouts are b0fbb8a1a4e216b8696b8015a35594c1007319de and
+have the identical tree of PR468 source f3abe545. Seven exact command invocations,
+Python3.12.13/3.12.10, native shells, Linux storage/Windows long-path preconditions,
+strictUP035/relay lint, Compose and diff hygiene are verified in logs. All12 mapped
+AI-JavaScript Windows modules, three transfer modules and29 CI-contract checks
+passed without skips on both OS. Every other skip passes on the opposite OS.
+Receipt: diagnostics/ci-f7-pr468-native-proof.json; both original digest-verified
+JUnit ZIPs are retained in diagnostics/ci-f7-native-evidence/. No CI was rerun.
+
+Required replacement proof:1/2 reviewed green; actual JS-only event proved in
+PR469/run34690234286, native pair still queued at the last bounded snapshot.
+Next scheduled check11:55Z: run diagnostics/inspect_f7_replacement_runs.py with
+the audit Python -B. If the canary completed, retain its native logs/artifacts
+using label ci-f7-pr469-run34690234286, then run review_f7_native_proof.py469
+(the CLI requires a space before469). Preserve source/head/synthetic distinctions.
+Do not merge the disposable canary. Preserve automatic PR468/469 companion runs;
+inspect any failures before edits or reruns. Long-run first snapshot was11:05Z;
+do not repeat long-job checks before11:55Z absent an actionable external event.
+After the second native green proof, complete final reference/status-contract and
+retirement-group review before any deletion. All eight legacy files remain.
+Protected Recorder data untouched; no candidate freeze or physical PASS/P07/P12.
