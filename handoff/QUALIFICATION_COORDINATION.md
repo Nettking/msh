@@ -1,13 +1,21 @@
 # Federation v1 qualification coordination
 
-**Current actionable checkpoint (2026-09-12T06:02:13.067030+00:00):** PR467/D08 is ready for review at
+**Current actionable checkpoint (2026-09-12T06:33Z policy update; last CI snapshot06:24UTC):** PR467/D08 is ready for review at
 exact head84c66f8185c1411d9dc8c5c33244a2f564845ce7, clean repair checkout.
 Prequalification correctness/scope review completed with no findings;37+3 exact-head
-qualification active. Eight exact-head dispatches recorded once (seven absent gates
-plus completed branding source gap). Five original auto workflows remain active;
+qualification active. Nine exact-head dispatches recorded once (seven absent gates
+plus completed branding and CF7B source gaps). Four original auto workflows remain active;
 Current native proof:4/37 required plus1/3 companions (06:24UTC); sixteen
 synthetic-source logs are separately retained and excluded. No required failure observed.
-Next command: audit Python -B handoff/diagnostics/poll_pr467_state.py; persist only
+**Polling policy:** long-running jobs normally take1–2+ hours. After confirmed start/progress,
+wait at least45–60 minutes between checks unless expected completion is sooner; prefer
+checking near expected completion. The existing heartbeat is now hourly and quiet for
+unchanged/non-actionable progress. Last CI snapshot:2026-09-12T06:24:00Z.
+**Next eligible routine CI check:2026-09-12T07:24:00Z or later.** Do not poll before
+then unless an actionable completion/failure/timeout/head change is independently delivered.
+Do not create a new work cycle merely to report unchanged progress. On subsequent
+meaningful transitions, record last/next check times and preserve this policy across sessions.
+Next command, only when due: audit Python -B handoff/diagnostics/poll_pr467_state.py; persist only
 material transitions, retain new terminal logs via retain_pr467_new_native_logs.py,
 and use dispatch_pr467_completed_gap.py only for completed proven source gaps.
 Release requires additional aggregate dependency proof. No duplicate jobs/reviews.
@@ -2310,3 +2318,13 @@ All current work is pushed; product/physical checkouts remain clean and unchange
 06:24UTC native retention: three new logs verify exact84c66f81 (sharding2+CFI2-Linux), now4/37 required plus1/3companions; five auto logs prove syntheticfcf8603b. Completed CF7B run34676251391 has both native checkouts synthetic, establishing one exact-head source gap. Next: guarded CF7B-only dispatch via dispatch_pr467_completed_gap.py, persist response, then await state changes. No failure, duplicate job or physical action.
 
 06:25:36UTC: PR467 CF7B exact84c66f81 source gap dispatched once after completed synthetic native proof; ninth exact-head dispatch, ledger persisted. Remaining auto workflows release/update/F85/ICSE are not eligible until terminal source proof. Next exact command: audit Python -B handoff/diagnostics/poll_pr467_state.py; no physical action.
+
+06:33UTC policy transition: user requires45–60 minute minimum spacing after confirmed
+qualification start/progress, preferably near expected completion for1–2+ hour jobs.
+Updated existing heartbeat fortsett-federation-v1-p-nettking to hourly with quiet routine
+progress. No CI polling or job dispatch performed for this policy update. Last snapshot
+remains06:24UTC; next eligible routine snapshot07:24UTC or later. At that snapshot,
+discover the already accepted CF7B dispatch run, retain only new terminal evidence and
+continue on actionable transitions. Repair head84c66f81 and physical runtimeM unchanged;
+protected Recorder data untouched; no physical PASS and no P07/P12. Persist this policy
+before waiting; do not keep a live short-interval polling loop.
