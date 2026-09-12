@@ -724,7 +724,59 @@
         "2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee"
       ],
       "checkout_matches": true
+    },
+    {
+      "job_id": 103489264464,
+      "run_id": 34669934632,
+      "name": "Windows regressions (capability-product)",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 59897,
+      "sha256": "05ca486a96b01603f1b7a5d379dbc1462da420b20d1ca632a07c703b801166bb",
+      "checkout_commits": [
+        "2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103489264470,
+      "run_id": 34669934632,
+      "name": "Full-suite order (fixed)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 70074,
+      "sha256": "159312e3e960994f426631b09ef62cc6d21d84056d4205cf97b43aa50556a487",
+      "checkout_commits": [
+        "2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103489264566,
+      "run_id": 34669934632,
+      "name": "Linux regression shard (1)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 56654,
+      "sha256": "dff34ce556bfe3820906ebb18eef02460dd3230f77a4d83297db7a18eaf0edb6",
+      "checkout_commits": [
+        "2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103484877504,
+      "run_id": 34668388027,
+      "name": "windows",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 49155,
+      "sha256": "755f15acd596f9ad04412e9616d1b6311cff4aa3f00c82a2ec439f205c12e4df",
+      "checkout_commits": [
+        "2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee"
+      ],
+      "checkout_matches": true
     }
   ],
-  "retained_at": "2026-09-12T03:42:22.838922+00:00"
+  "retained_at": "2026-09-12T03:53:51.842788+00:00"
 }
