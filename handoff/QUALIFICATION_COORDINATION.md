@@ -2347,3 +2347,5 @@ Next: dispatch exactly these four missing exact-head gates individually with imm
 ledger/checkpoint commit and push after each; then confirm the new jobs were accepted
 and await the next eligible hourly snapshot. No passing exact-head evidence rerun.
 07:41:40UTC: PR467 exact84c66f81 federation-v1-release.yml dispatched once after completed native synthetic-source proof (and release aggregate review where applicable). Request/response persisted in pr467-gap-dispatch-ledger.json. No valid exact-head rerun or physical action. Next: finish only the other proven source-gap dispatches, confirm new run acceptance, then hourly waiting.
+
+07:41:48UTC: PR467 exact84c66f81 federation-software-update.yml dispatched once after completed native synthetic-source proof (and release aggregate review where applicable). Request/response persisted in pr467-gap-dispatch-ledger.json. No valid exact-head rerun or physical action. Next: finish only the other proven source-gap dispatches, confirm new run acceptance, then hourly waiting.
