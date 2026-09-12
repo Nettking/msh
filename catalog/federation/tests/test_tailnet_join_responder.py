@@ -6,7 +6,9 @@ same-tailnet, same-owner peer must end without a grant.
 
 from __future__ import annotations
 
+import http.client
 import json
+import socket
 import subprocess
 import sys
 import threading
@@ -14,6 +16,7 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -135,6 +138,87 @@ def test_unknown_paths_are_refused() -> None:
         server.shutdown()
 
     assert status == 404
+
+
+def test_unknown_path_response_precedes_segmented_body_and_graceful_close() -> None:
+    def forbidden(**_kwargs):
+        raise AssertionError("refusal must not access identity or pairing authority")
+
+    server, port = _serve(forbidden, forbidden)
+    closed = threading.Event()
+    original_shutdown = server.shutdown_request
+
+    def observe_shutdown(request):
+        try:
+            original_shutdown(request)
+        finally:
+            closed.set()
+
+    server.shutdown_request = observe_shutdown
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=5) as connection:
+            connection.sendall(
+                b"POST /anything-else HTTP/1.1\r\nHost: localhost\r\n"
+                b"Content-Length: 2\r\nConnection: close\r\n\r\n"
+            )
+            response = http.client.HTTPResponse(connection)
+            response.begin()
+            assert response.status == 404  # Refusal must not wait for the body.
+            assert not closed.wait(0.1), "closed before the declared body arrived"
+            connection.sendall(b"{}")
+            assert json.loads(response.read()) == {
+                "accepted": False, "error": "unknown-path",
+            }
+            assert closed.wait(5), "completed request did not close"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+@pytest.mark.parametrize("length", [None, "", "0", "-1", "invalid", "2,2", "4097", "9" * 40])
+def test_refusal_never_reads_invalid_or_oversized_body(length) -> None:
+    handler = responder._Handler.__new__(responder._Handler)
+    handler.headers = {} if length is None else {"Content-Length": length}
+    # No socket or input stream exists: these lengths must not reach a read.
+    handler._discard_refused_post_body()
+
+
+def test_refusal_trickle_cannot_restart_absolute_cleanup_deadline(monkeypatch) -> None:
+    handler = responder._Handler.__new__(responder._Handler)
+    handler.headers = {"Content-Length": "4"}
+    budget = responder.GRANT_TIMEOUT_SECONDS
+    clock = iter([100.0, 100.0, 100.0 + budget / 2, 100.0 + budget])
+    monkeypatch.setattr(responder, "time", SimpleNamespace(monotonic=lambda: next(clock)))
+    timeouts = []
+    reads = []
+    handler.connection = SimpleNamespace(settimeout=timeouts.append)
+
+    def read1(size):
+        reads.append(size)
+        return b"x"
+
+    handler.rfile = SimpleNamespace(read1=read1)
+    handler._discard_refused_post_body()
+    assert timeouts == [budget, budget / 2]
+    assert reads == [4, 3]  # Two bytes remain when the original deadline expires.
+
+
+@pytest.mark.parametrize("result", [b"", TimeoutError(), ConnectionResetError(), ValueError()])
+def test_refusal_incomplete_body_or_socket_error_ends_cleanup(result) -> None:
+    handler = responder._Handler.__new__(responder._Handler)
+    handler.headers = {"Content-Length": "2"}
+    timeouts = []
+    handler.connection = SimpleNamespace(settimeout=timeouts.append)
+
+    def read1(_size):
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    handler.rfile = SimpleNamespace(read1=read1)
+    handler._discard_refused_post_body()
+    assert len(timeouts) == 1
+    assert 0 < timeouts[0] <= responder.GRANT_TIMEOUT_SECONDS
 
 
 def test_health_endpoint_reports_readiness_without_granting(monkeypatch) -> None:
