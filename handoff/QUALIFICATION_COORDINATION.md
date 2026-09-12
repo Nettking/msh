@@ -12,6 +12,8 @@ NEXT HIGHEST VALUE ACTION: prepare bounded original-Beast D16 diagnostic on clea
 
 D12 Beast exact Git trust host correction verified; different-host launcher passes are not original-host CI proof. D10 stays separate. Main b719 release16/16 archived with companion failures; last fully qualified17ab3a05(37+3) unchanged. Physical runtime9b286f93 and protected Recorder data untouched. No physical PASS/P07/P12, Docker reset/prune, runner/account/pool changes. Coordination maintenance workflow never enters a candidate.
 
+**18:44 UTC user-requested check:** No PR475 CI transition; release remains red from D14-D16. Beast and both Nettking runners are online/idle; both AQG runners are offline, with AQG Linux still outside fcp-linux-fast. No runner changes. The bounded original-Beast D16 CI plan is now persisted in [D16_BOUNDED_BEAST_DIAGNOSTIC_PLAN.md](D16_BOUNDED_BEAST_DIAGNOSTIC_PLAN.md). Next: implement that diagnostic-only control workflow against unchanged5e6source, then preserve its native result.
+
 Current user direction, September 11 2026: execute on state changes, using this
 checkpoint and the completed diagnostic sweep report; do not repeat the sweep.
 

@@ -1,0 +1,111 @@
+{
+  "recorded_at": "2026-09-12T18:44:05.053201+00:00",
+  "runners": [
+    {
+      "id": 31,
+      "name": "AQG7NCC-Linux",
+      "status": "offline",
+      "busy": false,
+      "labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "fcp-test-linux",
+        "fcp-docker-linux",
+        "aqg7ncc-linux-admission"
+      ]
+    },
+    {
+      "id": 30,
+      "name": "AQG7NCC-Windows",
+      "status": "offline",
+      "busy": false,
+      "labels": [
+        "self-hosted",
+        "X64",
+        "Windows",
+        "fcp-windows",
+        "aqg7ncc-admission"
+      ]
+    },
+    {
+      "id": 22,
+      "name": "Nettking",
+      "status": "online",
+      "busy": false,
+      "labels": [
+        "self-hosted",
+        "X64",
+        "Windows",
+        "nettking",
+        "fcp-windows",
+        "fcp-windows-fast",
+        "fcp-test-windows"
+      ]
+    },
+    {
+      "id": 27,
+      "name": "Nettking-Linux",
+      "status": "online",
+      "busy": false,
+      "labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "fcp-linux-fast",
+        "nettking-linux",
+        "fcp-test-linux",
+        "fcp-docker-linux"
+      ]
+    },
+    {
+      "id": 28,
+      "name": "Beast",
+      "status": "online",
+      "busy": false,
+      "labels": [
+        "self-hosted",
+        "X64",
+        "Windows",
+        "fcp-windows",
+        "beast-windows",
+        "fcp-windows-fast",
+        "fcp-test-windows"
+      ]
+    },
+    {
+      "id": 29,
+      "name": "Beast-Linux-WSL",
+      "status": "online",
+      "busy": false,
+      "labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "beast-linux",
+        "fcp-linux-fast"
+      ]
+    },
+    {
+      "id": 21,
+      "name": "Nitro",
+      "status": "online",
+      "busy": false,
+      "labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "nitro",
+        "fcp-linux"
+      ]
+    }
+  ],
+  "pr475_reviews": [],
+  "pr475_comments": [
+    {
+      "id": 5647756883,
+      "body": "Automatic PR475 CI completed at unchanged head5e6f1843 / actual tree-identical a5e743fe. Both release checks pass: Windows discovery164PASS/7skips; Linux168PASS/3skips. Branding, update, CF7-B, Phase2 and ICSE workflows pass. D13's previously failing Windows boundary is green with native provenance retained.\n\nThe release aggregate remains red from two underlying jobs containing three newly preserved observations: D14/#476 benchmark-start setup missed2s and D15/#477 owner inspection403 in AQG rotating seed1702; D16/#478 initial fixture quorum refusal on Beast journal-artifacts. Four other red jobs are dependent aggregates. All three have individual pushed checkpoints and issues; root-cause classifications remain unresolved. No blanket retry or head change.\n\n19new successful native logs and16digest-verified artifacts are durable in the coordination branch. Existing same-source passes and a bounded NETTKING Linux2-test diagnostic do not invalidate the failures. Current AQG runner lacks fcp-linux-fast and retains admission/test labels; no label/pool change made. Next original-host D16 diagnosis and runner-policy reconciliation. [Current complete checkpoint](https://github.com/Nettking/msh/blob/codex/federation-v1-diagnostic-sweep-20260911/handoff/QUALIFICATION_COORDINATION.md). Both475 and473 stay draft/fixed; no candidate freeze, physical PASS or protected Recorder-data access.",
+      "updated_at": "2026-09-12T18:13:27Z"
+    }
+  ]
+}
