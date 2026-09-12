@@ -2811,3 +2811,7 @@ AI modules, three transfer modules and29CI contracts pass without skips. JUnit Z
 are retained under diagnostics/ci-f7-native-evidence. Original2/2 proof and real
 JS-only event remain separate. Next assess due automatic CI and unresolved host
 findings; PR473 remains draft until the complete gate is reviewed.
+
+## 2026-09-12T15:59:19.234106+00:00 — due automatic checks expose additional failures
+
+Main b719 release34701018870 completed16/16green; preserve exact native/artifact evidence. PR473 release34701429430 has a failed Windows release check and shard2 still running. Post-merge F7/F8/update Windows on Beast and Phase2 Windows on AQG also failed. Native classification is pending; do not infer they share D12. Snapshot and selected failing steps are durable in diagnostics/pr473-current-20260912T155828.json and diagnostics/pr473-due-failure-triage-plan.json. Next retain/read only newly failing logs, classify each mechanism and publish independent findings immediately. No retries/source changes. PR473 stays draft.

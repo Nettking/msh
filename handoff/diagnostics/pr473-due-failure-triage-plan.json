@@ -1,0 +1,97 @@
+{
+  "recorded_at": "2026-09-12T15:59:19.234106+00:00",
+  "snapshot": "pr473-current-20260912T155828.json",
+  "new_failed_jobs_pending_native_classification": [
+    {
+      "source": "440123f6bc6dc358eef3d233236bc14f91af60e0",
+      "checkout": "0355023f27c4c6886ab6beb48bb9a998b3ab2904",
+      "run": 34701429430,
+      "job": 103573774515,
+      "runner": "Beast",
+      "failed_steps": [
+        {
+          "name": "Discovery authority and bounded startup regressions",
+          "status": "completed",
+          "conclusion": "failure",
+          "number": 13,
+          "started_at": "2026-09-12T15:27:27Z",
+          "completed_at": "2026-09-12T15:28:00Z"
+        }
+      ]
+    },
+    {
+      "source": "b7194820d8f1940ae60b8c9639e09b7f61e65c55",
+      "checkout": "b7194820d8f1940ae60b8c9639e09b7f61e65c55",
+      "run": 34701018859,
+      "job": 103572679035,
+      "runner": "Beast",
+      "failed_steps": [
+        {
+          "name": "Diff hygiene",
+          "status": "completed",
+          "conclusion": "failure",
+          "number": 10,
+          "started_at": "2026-09-12T15:14:02Z",
+          "completed_at": "2026-09-12T15:14:03Z"
+        }
+      ]
+    },
+    {
+      "source": "b7194820d8f1940ae60b8c9639e09b7f61e65c55",
+      "checkout": "b7194820d8f1940ae60b8c9639e09b7f61e65c55",
+      "run": 34701018877,
+      "job": 103572679008,
+      "runner": "AQG7NCC-Windows",
+      "failed_steps": [
+        {
+          "name": "Identity, state, protocol, relay, and Phase F tests",
+          "status": "completed",
+          "conclusion": "failure",
+          "number": 7,
+          "started_at": "2026-09-12T15:13:11Z",
+          "completed_at": "2026-09-12T15:18:18Z"
+        }
+      ]
+    },
+    {
+      "source": "b7194820d8f1940ae60b8c9639e09b7f61e65c55",
+      "checkout": "b7194820d8f1940ae60b8c9639e09b7f61e65c55",
+      "run": 34701018850,
+      "job": 103572679136,
+      "runner": "Beast",
+      "failed_steps": [
+        {
+          "name": "Diff hygiene",
+          "status": "completed",
+          "conclusion": "failure",
+          "number": 12,
+          "started_at": "2026-09-12T15:19:56Z",
+          "completed_at": "2026-09-12T15:19:56Z"
+        }
+      ]
+    },
+    {
+      "source": "b7194820d8f1940ae60b8c9639e09b7f61e65c55",
+      "checkout": "b7194820d8f1940ae60b8c9639e09b7f61e65c55",
+      "run": 34701018863,
+      "job": 103572678961,
+      "runner": "Beast",
+      "failed_steps": [
+        {
+          "name": "Smoke Windows recorder supervisor restart policy",
+          "status": "completed",
+          "conclusion": "failure",
+          "number": 12,
+          "started_at": "2026-09-12T15:24:59Z",
+          "completed_at": "2026-09-12T15:25:00Z"
+        }
+      ]
+    }
+  ],
+  "known_D12_job_not_reread": 103572678982,
+  "main_b719_release": "16/16 PASS native retention next; not full candidate qualification",
+  "pr473_release": "One failed check, shard2 still executing at15:58Z; no repoll before16:43Z",
+  "no_jobs_rerun": true,
+  "physical_acceptance": false,
+  "protected_recorder_data": "UNTOUCHED"
+}
