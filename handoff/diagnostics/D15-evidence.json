@@ -24,8 +24,8 @@
     "pr475-completed-failures-native-retention.json",
     "pr475-completed-failures-logs.zip (103589446004.log lines545-639)"
   ],
-  "github_artifact": "PENDING immediate issue publication",
+  "github_artifact": "https://github.com/Nettking/msh/issues/477",
   "repair": "NONE",
   "next_diagnostic_action": "Inspect exact /onboarding/inspect403 branches and owner client/session token lifecycle; retain same-source passing CF7-B artifact. If needed capture the actual forbidden response in a bounded isolated reproduction on unchanged source, preserving CSRF and authority guards.",
-  "recorded_at": "2026-09-12T18:01:46.810511+00:00"
+  "recorded_at": "2026-09-12T18:02:42.606962+00:00"
 }

@@ -19,6 +19,9 @@ Physical runtime9b286f93 and protected Recorder data untouched. No physical PASS
 
 **2026-09-12T18:01:46.810511+00:00 — D15 confirmed:** POST /onboarding/inspect from owner test client returned403 instead of303 at helper line329, after all three authorized contexts joined the same session. Response body/reason not exposed in failing assertion. Classification: UNRESOLVED: determine actual forbidden reason before attributing CSRF, authority, product regression or suite-order effects. Candidate5e6f1843 / actuala5e743fe, run34707260030/job103589446004. PENDING immediate issue publication. Receipt diagnostics/D15.md. No retry or source change. NEXT: Inspect exact /onboarding/inspect403 branches and owner client/session token lifecycle; retain same-source passing CF7-B artifact. If needed capture the actual forbidden response in a bounded isolated reproduction on unchanged source, preserving CSRF and authority guards.
 
+
+**2026-09-12T18:02:42.606962+00:00 — D15 confirmed:** POST /onboarding/inspect from owner test client returned403 instead of303 at helper line329, after all three authorized contexts joined the same session. Response body/reason not exposed in failing assertion. Classification: UNRESOLVED: determine actual forbidden reason before attributing CSRF, authority, product regression or suite-order effects. Candidate5e6f1843 / actuala5e743fe, run34707260030/job103589446004. https://github.com/Nettking/msh/issues/477. Receipt diagnostics/D15.md. No retry or source change. NEXT: Inspect exact /onboarding/inspect403 branches and owner client/session token lifecycle; retain same-source passing CF7-B artifact. If needed capture the actual forbidden response in a bounded isolated reproduction on unchanged source, preserving CSRF and authority guards.
+
 Current user direction, September 11 2026: execute on state changes, using this
 checkpoint and the completed diagnostic sweep report; do not repeat the sweep.
 
