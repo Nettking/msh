@@ -1,0 +1,40 @@
+{
+  "finding": "D12",
+  "status": "CONFIRMED_FAILURE_ROOT_CAUSE_UNRESOLVED",
+  "recorded_at": "2026-09-12T14:00:15.199564+00:00",
+  "candidate_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+  "actual_checkout_sha": "f18e91adae2cb198fb5cebad61ee202a38d2bd8e",
+  "checkout_tree_identical_to_candidate": true,
+  "host": "Beast Windows, runner28",
+  "physical_stage": "Phase2 Go direct peer sidecar build; no physical stage",
+  "command": "cd cmd/fcp-peer-sidecar; go mod tidy; go test ./...; New-Item -ItemType Directory -Force -Path ../../build; go build -trimpath -o ../../build/fcp-peer-sidecar.exe .",
+  "observed": "Go1.25.7 tests pass (0.191s), then go build fails: error obtaining VCS status: exit status128. Python Phase2 regression step is skipped after the build failure.",
+  "expected": "Go build obtains valid Git provenance and produces the sidecar binary, allowing the remaining Phase2 checks to execute.",
+  "classification": "UNRESOLVED; host/toolchain Git provenance failure is suspected. Underlying Git stderr is not in the retained build error, and no product test failure was observed.",
+  "acceptance_impact": "Phase2 Windows check blocked. Not the same proven mechanism as D10, although the same runner/workspace may share an environment cause; do not merge those findings without evidence.",
+  "safe_continuation": "YES: independent read-only/focused diagnosis on unchanged source; no merge or retirement while required failures remain unclassified/unresolved.",
+  "evidence": {
+    "run_id": 34695331247,
+    "job_id": 103557723740,
+    "native_log_receipt": {
+      "job_id": 103557723740,
+      "run_id": 34695331247,
+      "name": "windows",
+      "runner_name": "Beast",
+      "conclusion": "failure",
+      "bytes": 51398,
+      "sha256": "41ef5d5a1f99cbfad693c55193805186685674a1d86800e2cbf3c9320b955ee3",
+      "checkout_commits": [
+        "f18e91adae2cb198fb5cebad61ee202a38d2bd8e"
+      ],
+      "checkout_matches": true
+    },
+    "durable_excerpt": "D12-native-excerpt.log"
+  },
+  "state_changed": "CI-owned checkout/test fixtures/dependency caches and failed build/test work only; investigation read retained logs. No manual host mutation.",
+  "protected_recorder_data": "UNTOUCHED",
+  "physical_runtime_sha": "9b286f931497bf6291e215f6340443c5162826b0",
+  "github_artifact": "PENDING",
+  "repair": "NONE",
+  "next_diagnostic_action": "Inspect the unchanged workflow/toolchain and same-runner Git cwd/HOME/safe-directory/ownership diagnostics through a read-only channel. Obtain the actual Git error before repair or targeted retry. Do not disable VCS stamping, add broad safe.directory exceptions or change service accounts."
+}

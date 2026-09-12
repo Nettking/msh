@@ -2683,3 +2683,12 @@ diagnostics/D11.md. Publish its durable GitHub artifact before further
 investigation. Retain the failed shard manifest/JUnit and inspect the exact result/timeout boundary in test_live_storage_reinstatement.py and live_storage_reinstatement.py. Check prior native same-test outcomes and AQG31 admission evidence before a focused unchanged-source reproduction. Do not extend deadlines or weaken authority/acknowledgement guards.
 
 D11 durable artifact: https://github.com/Nettking/msh/issues/471.
+
+## 2026-09-12T14:00:15.199564+00:00 — D12 confirmed before deeper diagnosis
+
+Go1.25.7 tests pass (0.191s), then go build fails: error obtaining VCS status: exit status128. Python Phase2 regression step is skipped after the build failure.
+
+UNRESOLVED; host/toolchain Git provenance failure is suspected. Underlying Git stderr is not in the retained build error, and no product test failure was observed.
+Exact SHA/logs/procedure and protected-data invariant are persisted in
+diagnostics/D12.md. Publish its durable GitHub artifact before further
+investigation. Inspect the unchanged workflow/toolchain and same-runner Git cwd/HOME/safe-directory/ownership diagnostics through a read-only channel. Obtain the actual Git error before repair or targeted retry. Do not disable VCS stamping, add broad safe.directory exceptions or change service accounts.
