@@ -1,0 +1,153 @@
+{
+  "candidate_sha": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "run": 34707260030,
+  "job": 103589446004,
+  "artifact": 10302576589,
+  "seed": 1702,
+  "contexts": {
+    "D14": {
+      "index": 491,
+      "xml": "order-rotating.xml",
+      "neighbors": [
+        {
+          "index": 483,
+          "class": "catalog.federation.tests.test_service_incarnation",
+          "test": "test_intentional_stop_reason_remains_clean_inside_exception_handler[trial]",
+          "seconds": "0.019"
+        },
+        {
+          "index": 484,
+          "class": "catalog.mtconnect_recorder.tests.test_resource_pressure_process_wide",
+          "test": "test_new_capture_admission_is_atomic_across_resources",
+          "seconds": "0.003"
+        },
+        {
+          "index": 485,
+          "class": "catalog.mtconnect_recorder.tests.test_resource_pressure_process_wide",
+          "test": "test_default_recorder_guard_shares_process_wide_controller",
+          "seconds": "0.002"
+        },
+        {
+          "index": 486,
+          "class": "catalog.mtconnect_recorder.tests.test_resource_pressure_process_wide",
+          "test": "test_new_capture_coalesces_same_resource_in_one_transaction",
+          "seconds": "0.002"
+        },
+        {
+          "index": 487,
+          "class": "catalog.mtconnect_recorder.tests.test_resource_pressure_process_wide",
+          "test": "test_completion_may_start_at_pressure_but_preserves_critical_floor",
+          "seconds": "0.002"
+        },
+        {
+          "index": 488,
+          "class": "catalog.flask_app.tests.test_capability_benchmark_route",
+          "test": "test_skip_after_completed_result_does_not_mark_completed_check_skipped",
+          "seconds": "0.444"
+        },
+        {
+          "index": 489,
+          "class": "catalog.flask_app.tests.test_capability_benchmark_route",
+          "test": "test_app_factory_registers_cfi4_before_cfi3_and_legacy",
+          "seconds": "0.089"
+        },
+        {
+          "index": 490,
+          "class": "catalog.flask_app.tests.test_capability_benchmark_route",
+          "test": "test_corrupt_benchmark_state_fails_closed_without_leaking_bytes",
+          "seconds": "0.428"
+        },
+        {
+          "index": 491,
+          "class": "catalog.flask_app.tests.test_capability_benchmark_route",
+          "test": "test_skip_serializes_with_concurrent_benchmark_completion",
+          "seconds": "3.086"
+        },
+        {
+          "index": 492,
+          "class": "catalog.flask_app.tests.test_capability_benchmark_route",
+          "test": "test_default_ollama_benchmark_runs_inference_only_after_explicit_post",
+          "seconds": "0.653"
+        },
+        {
+          "index": 493,
+          "class": "catalog.flask_app.tests.test_capability_benchmark_route",
+          "test": "test_benchmark_routes_preserve_prerequisite_409_boundary",
+          "seconds": "0.243"
+        }
+      ]
+    },
+    "D15": {
+      "index": 673,
+      "xml": "order-rotating.xml",
+      "neighbors": [
+        {
+          "index": 665,
+          "class": "catalog.federation.tests.test_phase1",
+          "test": "test_f1_007_multiple_capabilities_of_one_type_and_deterministic_filters",
+          "seconds": "0.003"
+        },
+        {
+          "index": 666,
+          "class": "catalog.federation.tests.test_phase1",
+          "test": "test_f1_001_filesystem_adapter_exact_recorder_output_and_outbox_recovery",
+          "seconds": "0.179"
+        },
+        {
+          "index": 667,
+          "class": "catalog.federation.tests.test_phase1",
+          "test": "test_outbox_activate_transition_matrix_and_conflict_preserves_state",
+          "seconds": "0.052"
+        },
+        {
+          "index": 668,
+          "class": "catalog.federation.tests.test_phase1",
+          "test": "test_crash_after_delivery_prepare_before_recorder_write",
+          "seconds": "0.058"
+        },
+        {
+          "index": 669,
+          "class": "catalog.federation.tests.test_phase1",
+          "test": "test_outbox_prepare_transition_matrix",
+          "seconds": "0.264"
+        },
+        {
+          "index": 670,
+          "class": "catalog.federation.tests.test_phase1",
+          "test": "test_f1_003_pending_survives_restart_and_identical_enqueue",
+          "seconds": "0.054"
+        },
+        {
+          "index": 671,
+          "class": "catalog.federation.tests.test_phase1",
+          "test": "test_delivery_identity_conflict_is_rejected_before_recorder_mutation",
+          "seconds": "0.058"
+        },
+        {
+          "index": 672,
+          "class": "catalog.federation.tests.cf7_acceptance.test_product_acceptance",
+          "test": "test_fresh_product_flow_finishes_restarts_and_reruns_expired_evidence",
+          "seconds": "21.179"
+        },
+        {
+          "index": 673,
+          "class": "catalog.federation.tests.cf7_acceptance.test_product_acceptance",
+          "test": "test_three_device_federation_keeps_ai_compute_and_storage_authority_separate",
+          "seconds": "1.551"
+        },
+        {
+          "index": 674,
+          "class": "catalog.federation.tests.test_outbox_compaction",
+          "test": "test_schema_v1_migrates_without_compacting_pending_or_deleting_rows",
+          "seconds": "0.154"
+        },
+        {
+          "index": 675,
+          "class": "catalog.federation.tests.test_outbox_compaction",
+          "test": "test_tampered_completed_receipt_is_rejected_not_silently_rewritten",
+          "seconds": "0.092"
+        }
+      ]
+    }
+  }
+}

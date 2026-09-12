@@ -1,0 +1,42 @@
+{
+  "recorded_at": "2026-09-12T18:13:18.839812+00:00",
+  "candidate_sha": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "focused_result": "2PASS,1warning on NETTKING Ubuntu WSL; one D14 and one D15 test. Pytest deduplicated repeated node arguments; no claim of five D15 executions.",
+  "context_limitation": "Different host and isolated selection, without complete rotating-order predecessor history. Neither original failure reproduced or invalidated.",
+  "diagnostic_preflight": "Linux Git could not resolve Windows-owned worktree .git path; source provenance was checked using native Windows Git. No source or Git trust configuration change.",
+  "native_order": "Rotating seed1702: D14 index491 (after corrupt benchmark-state test); D15 index673 (after fresh product flow restart/expiry test). Exact8predecessor contexts retained in D14-D15-native-order-context.json.",
+  "runner_observation": {
+    "AQG7NCC-Linux": {
+      "id": 31,
+      "status": "online",
+      "busy": false,
+      "labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "fcp-test-linux",
+        "fcp-docker-linux",
+        "aqg7ncc-linux-admission"
+      ],
+      "note": "Current labels do not include fcp-linux-fast. Do not readmit or alter labels just because online; no claim about who changed them."
+    },
+    "Beast": {
+      "id": 28,
+      "status": "online",
+      "busy": false,
+      "labels": [
+        "self-hosted",
+        "X64",
+        "Windows",
+        "fcp-windows",
+        "beast-windows",
+        "fcp-windows-fast",
+        "fcp-test-windows"
+      ]
+    }
+  },
+  "next_highest_value_action": "Prepare a bounded diagnostic-only original-host D16 run on existing Beast/fcp-windows runner using clean checked-in5e6source and test-owned temporary fixtures; capture ready/leader/quorum evidence at the failing populate boundary without weakening guards. Persist plan before control-workflow changes. Before any AQG diagnostic scheduling, reconcile its current admission-only labels against checked-in runner policy; never restore release-pool labels automatically.",
+  "remaining": "D11,D14,D15,D16 root causes unresolved. D13 repaired in draft475; both drafts475/473 remain fixed. No further broad suite retry or candidate qualification.",
+  "protected_recorder_data": "UNTOUCHED",
+  "physical_runtime": "UNCHANGED; no physical PASS/P07/P12"
+}

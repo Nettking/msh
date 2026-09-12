@@ -1,0 +1,21 @@
+{
+  "recorded_at": "2026-09-12T18:07:44.715882+00:00",
+  "candidate_sha": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "context": "NETTKING Ubuntu WSL, isolated development venv; distinct from original AQG runner",
+  "exitstatus": 0,
+  "observations": [
+    {
+      "test": "catalog/flask_app/tests/test_capability_benchmark_route.py::test_skip_serializes_with_concurrent_benchmark_completion",
+      "outcome": "passed",
+      "duration": 0.8225492700003088
+    },
+    {
+      "test": "catalog/federation/tests/cf7_acceptance/test_product_acceptance.py::test_three_device_federation_keeps_ai_compute_and_storage_authority_separate",
+      "outcome": "passed",
+      "duration": 1.3178229740005918
+    }
+  ],
+  "product_source_changed": false,
+  "protected_recorder_data": "UNTOUCHED",
+  "qualification": false
+}
