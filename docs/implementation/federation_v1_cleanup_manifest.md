@@ -290,6 +290,12 @@ The repository currently has many phase-specific workflows. They may overlap, bu
 
 Workflow consolidation must not silently reduce coverage merely to reduce file count.
 
+The [F7 consolidation extension](f7_ci_consolidation.md) preserves the unique
+capability lint, relay lint, transfer tests and Windows AI trigger coverage in the
+existing native F7 matrix. It is under validation: keep all legacy workflow files
+until two green equivalent executions, actual trigger evidence and final reference
+checks are recorded. This entry does not authorize deletion based on overlap alone.
+
 ---
 
 ## H. Proposed cleanup batches
