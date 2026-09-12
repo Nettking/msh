@@ -1,5 +1,5 @@
 {
-  "observed_at": "2026-09-12T01:33:21.319149+00:00",
+  "observed_at": "2026-09-12T01:44:51.743822+00:00",
   "prs": {
     "463": {
       "number": 463,
@@ -68,11 +68,11 @@
             {
               "id": 103473479287,
               "name": "Full-suite order (fixed)",
-              "status": "in_progress",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "runner_name": "Nettking-Linux",
               "started_at": "2026-09-12T01:24:24Z",
-              "completed_at": null
+              "completed_at": "2026-09-12T01:34:27Z"
             },
             {
               "id": 103473479376,
@@ -86,11 +86,11 @@
             {
               "id": 103473479380,
               "name": "PostgreSQL storage release check",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-12T01:19:14Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-12T01:36:09Z",
+              "completed_at": "2026-09-12T01:36:58Z"
             },
             {
               "id": 103473479388,
@@ -113,10 +113,10 @@
             {
               "id": 103473479415,
               "name": "Windows regressions (journal-artifacts)",
-              "status": "queued",
+              "status": "in_progress",
               "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-12T01:19:14Z",
+              "runner_name": "Nettking",
+              "started_at": "2026-09-12T01:43:43Z",
               "completed_at": null
             },
             {
@@ -258,37 +258,37 @@
         },
         {
           "workflow": "ci-test-sharding.yml",
-          "run_id": 34664467275,
-          "event": "pull_request",
+          "run_id": 34665214234,
+          "event": "workflow_dispatch",
           "api_head_sha": "2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee",
-          "status": "completed",
-          "conclusion": "success",
+          "status": "queued",
+          "conclusion": null,
           "attempt": 1,
           "required_count": 2,
           "signature": {
-            "status": "completed",
-            "conclusion": "success",
+            "status": "queued",
+            "conclusion": null,
             "run_attempt": 1,
-            "updated_at": "2026-09-12T01:31:54Z"
+            "updated_at": "2026-09-12T01:34:15Z"
           },
           "jobs": [
             {
-              "id": 103473479504,
+              "id": 103475612834,
+              "name": "Shard contract (Linux, shared-pool)",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "started_at": "2026-09-12T01:34:16Z",
+              "completed_at": null
+            },
+            {
+              "id": 103475612973,
               "name": "Shard contract (Windows, shared-pool)",
               "status": "completed",
               "conclusion": "success",
               "runner_name": "Nettking",
-              "started_at": "2026-09-12T01:31:12Z",
-              "completed_at": "2026-09-12T01:31:54Z"
-            },
-            {
-              "id": 103473479647,
-              "name": "Shard contract (Linux, shared-pool)",
-              "status": "completed",
-              "conclusion": "success",
-              "runner_name": "Nettking-Linux",
-              "started_at": "2026-09-12T01:20:28Z",
-              "completed_at": "2026-09-12T01:20:51Z"
+              "started_at": "2026-09-12T01:43:00Z",
+              "completed_at": "2026-09-12T01:43:42Z"
             }
           ]
         },
@@ -297,25 +297,25 @@
           "run_id": 34664467276,
           "event": "pull_request",
           "api_head_sha": "2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee",
-          "status": "queued",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "attempt": 1,
           "required_count": 1,
           "signature": {
-            "status": "queued",
-            "conclusion": null,
+            "status": "completed",
+            "conclusion": "success",
             "run_attempt": 1,
-            "updated_at": "2026-09-12T01:19:14Z"
+            "updated_at": "2026-09-12T01:36:08Z"
           },
           "jobs": [
             {
               "id": 103473479204,
               "name": "product-branding",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-12T01:19:14Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-12T01:35:59Z",
+              "completed_at": "2026-09-12T01:36:08Z"
             }
           ]
         },
@@ -374,11 +374,11 @@
             {
               "id": 103473838845,
               "name": "harness (Linux, fcp-linux-fast, bash)",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-12T01:21:46Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-12T01:37:00Z",
+              "completed_at": "2026-09-12T01:39:13Z"
             },
             {
               "id": 103473838973,
