@@ -1,6 +1,6 @@
 # Federation v1 qualification coordination
 
-**Current actionable checkpoint (2026-09-12T11:06Z):** actual merged main
+**Current actionable checkpoint (2026-09-12T13:15Z):** actual merged main
 17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05 is QUALIFIED_ACTUAL_MERGED_MAIN.
 Receipt: diagnostics/merged-main-final-qualification.json. All37 required plus3
 companions passed;40 native logs reconciled (38 exact checkouts,2 dependency-only
@@ -2646,3 +2646,29 @@ same runner had D10 earlier. Preserve D10 as an intermittent environment failure
 with unknown underlying cause; no manual host cleanup was performed. Receipt:
 diagnostics/D10-later-checkout-observation.json. Avoid speculative cleanup during
 active jobs. All eight legacy workflows and physical/Recorder state are unchanged.
+
+## 2026-09-12T13:18:52.228526+00:00 — next scheduled gate and admission scope
+
+PR468 remains draft at ba44100ec1e4cde19daba0d3723b991c11742316. D09 is
+resolved on the final head, including native branding; replacement proof is2/2
+and the real JS-only event is retained. No merge or legacy retirement yet.
+Native proof comments: PR468 issuecomment5646080623; D10 later-state comment:
+https://github.com/Nettking/msh/issues/470#issuecomment-5646117308 .
+
+Use diagnostics/inspect_pr468_final_ci.py for the next bounded check13:55Z or later;
+last active-job snapshot13:10Z. Do not run the old source-pinned auto inspector
+or poll completed17ab/467/469 and the two reviewed native F7 runs. Preserve all
+automatic new-head runs, inspect failures first, and do not dispatch duplicate
+expensive proof solely for the documentation change.
+
+AQG31 admission verification is a hypothesis/evidence lookup, not a confirmed new
+defect. A bounded query found no CI test sharding run created after10:01Z; this
+does NOT establish that earlier qualifying evidence does not exist. Before using
+AQG31 release results, locate the earlier durable admission/sharding receipt and
+check native prerequisites per docs/ci_parallel_testing.md. Online status and
+labels alone are insufficient. Existing original replacement proof used only
+Nettking22/27 and does not depend on this unresolved admission review.
+
+No code, runtime, service account, runner label/pool or protected Recorder changes
+were made beyond the reviewed documentation fast-forward. GitHub contains the
+complete transition history and exact next action. No physical PASS/P07/P12.

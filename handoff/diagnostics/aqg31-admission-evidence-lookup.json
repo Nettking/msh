@@ -1,0 +1,7 @@
+{
+  "recorded_at": "2026-09-12T13:15:30.134478+00:00",
+  "scope": "Recent CI test sharding runs since AQG registration was observed offline; bounded admission-evidence lookup, not completed main qualification polling",
+  "runner_id_of_interest": 31,
+  "runs": [],
+  "qualification_conclusion": "PENDING_NATIVE_REVIEW; no release-pool admission inferred from online state"
+}
