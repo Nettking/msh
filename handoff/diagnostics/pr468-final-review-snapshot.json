@@ -1,0 +1,35 @@
+{
+  "pr": 468,
+  "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+  "threads": {
+    "status": "fulfilled",
+    "value": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "review_threads": []
+      },
+      "isError": false
+    }
+  },
+  "reviews": {
+    "status": "fulfilled",
+    "value": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "reviews": []
+      },
+      "isError": false
+    }
+  },
+  "note": "Read-only review snapshot during final-head validation; neither tool returned an unresolved review or submitted review."
+}

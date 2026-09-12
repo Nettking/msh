@@ -2620,3 +2620,29 @@ check. The source push may naturally trigger normal PR workflows; none was
 manually dispatched or rerun. Next inspect their initial state once, then observe
 long jobs no more often than45–60minutes. Keep all evidence and the environment
 issue separate from any physical acceptance decision.
+
+## 2026-09-12T13:15:24.175380+00:00 — native final-head branding green; new capacity observed
+
+Run34695331243/job103557723619 passed branding on Beast-Linux-WSL29.
+Actual checkout f18e91adae2cb198fb5cebad61ee202a38d2bd8e is tree-identical
+to ba44100e. Native proof: diagnostics/D09-final-native-branding.json. This
+resolves D09 on the integrated PR head; no checker exception was introduced.
+
+Initial final-head automatic CI snapshot at13:10Z: release34695331201 has active
+shards/full-order work, no failure then; F6/F8/update/Phase2/F7 still progressing.
+No manual native/full qualification dispatch occurred. Docs-portal34695331180
+again failed hosted billing admission before any step; exact annotations retained.
+Next long-job observation13:55Z or later, preferably near expected completion.
+
+AQG Windows30 and Linux31 are now online, distinct registrations. Windows F6
+passed existing Python/Go/dependency setup; Linux release shard passed Python/Go/
+storage prerequisites. This is observed execution, not an assumption of admission.
+Before counting release evidence from AQG31, verify the required prior CI test
+sharding/prerequisite evidence under docs/ci_parallel_testing.md. No labels,
+accounts or admission decisions were changed by this task.
+
+Beast28's new capability shard successfully checked out and entered tests; the
+same runner had D10 earlier. Preserve D10 as an intermittent environment failure
+with unknown underlying cause; no manual host cleanup was performed. Receipt:
+diagnostics/D10-later-checkout-observation.json. Avoid speculative cleanup during
+active jobs. All eight legacy workflows and physical/Recorder state are unchanged.

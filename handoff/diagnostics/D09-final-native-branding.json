@@ -1,0 +1,106 @@
+{
+  "recorded_at": "2026-09-12T13:15:24.175380+00:00",
+  "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+  "actual_checkout": "f18e91adae2cb198fb5cebad61ee202a38d2bd8e",
+  "checkout_tree_identical_to_head": true,
+  "status": "NATIVE_FINAL_HEAD_BRANDING_PASS",
+  "run_id": 34695331243,
+  "native_receipt": {
+    "source_commit": "f18e91adae2cb198fb5cebad61ee202a38d2bd8e",
+    "retained_at": "2026-09-12T13:11:51.024539+00:00",
+    "records": [
+      {
+        "job_id": 103557723619,
+        "run_id": 34695331243,
+        "name": "product-branding",
+        "runner_name": "Beast-Linux-WSL",
+        "conclusion": "success",
+        "bytes": 13167,
+        "sha256": "4073a73aaaee2bdbdded80a4d60bcf59dc7024f196dfcad26850c870d11a18e1",
+        "checkout_commits": [
+          "f18e91adae2cb198fb5cebad61ee202a38d2bd8e"
+        ],
+        "checkout_matches": true
+      }
+    ]
+  },
+  "job": {
+    "id": 103557723619,
+    "run_id": 34695331243,
+    "workflow_name": "Product branding boundary",
+    "head_branch": "codex/ci-f7-coverage-consolidation",
+    "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34695331243",
+    "run_attempt": 1,
+    "node_id": "CR_kwDOPZM3cc8AAAAYHIV14w",
+    "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+    "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103557723619",
+    "html_url": "https://github.com/Nettking/msh/actions/runs/34695331243/job/103557723619",
+    "status": "completed",
+    "conclusion": "success",
+    "created_at": "2026-09-12T13:02:54Z",
+    "started_at": "2026-09-12T13:05:33Z",
+    "completed_at": "2026-09-12T13:05:43Z",
+    "name": "product-branding",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1,
+        "started_at": "2026-09-12T13:05:34Z",
+        "completed_at": "2026-09-12T13:05:35Z"
+      },
+      {
+        "name": "Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2,
+        "started_at": "2026-09-12T13:05:35Z",
+        "completed_at": "2026-09-12T13:05:37Z"
+      },
+      {
+        "name": "Run ./.github/actions/self-hosted-python",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3,
+        "started_at": "2026-09-12T13:05:37Z",
+        "completed_at": "2026-09-12T13:05:38Z"
+      },
+      {
+        "name": "Enforce Federated Capability Platform identity",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4,
+        "started_at": "2026-09-12T13:05:38Z",
+        "completed_at": "2026-09-12T13:05:39Z"
+      },
+      {
+        "name": "Post Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 8,
+        "started_at": "2026-09-12T13:05:39Z",
+        "completed_at": "2026-09-12T13:05:40Z"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 9,
+        "started_at": "2026-09-12T13:05:40Z",
+        "completed_at": "2026-09-12T13:05:40Z"
+      }
+    ],
+    "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103557723619",
+    "labels": [
+      "self-hosted",
+      "fcp-linux-fast"
+    ],
+    "runner_id": 29,
+    "runner_name": "Beast-Linux-WSL",
+    "runner_group_id": 1,
+    "runner_group_name": "Default"
+  },
+  "original_two_native_proofs": "ci-f7-two-native-greens.json",
+  "not_physical_acceptance": true
+}

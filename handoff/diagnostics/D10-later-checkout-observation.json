@@ -1,0 +1,287 @@
+{
+  "recorded_at": "2026-09-12T13:13:07.152890+00:00",
+  "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+  "status": "LATER_CHECKOUT_SUCCEEDED_WITHOUT_AGENT_HOST_MUTATION",
+  "old_D10_runner_ids": [
+    28
+  ],
+  "current_job": {
+    "id": 103557723358,
+    "run_id": 34695331201,
+    "workflow_name": "Federation v1 release gate",
+    "head_branch": "codex/ci-f7-coverage-consolidation",
+    "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34695331201",
+    "run_attempt": 1,
+    "node_id": "CR_kwDOPZM3cc8AAAAYHIV03g",
+    "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+    "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103557723358",
+    "html_url": "https://github.com/Nettking/msh/actions/runs/34695331201/job/103557723358",
+    "status": "in_progress",
+    "conclusion": null,
+    "created_at": "2026-09-12T13:02:54Z",
+    "started_at": "2026-09-12T13:02:55Z",
+    "completed_at": null,
+    "name": "Windows regressions (capability-product)",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1,
+        "started_at": "2026-09-12T13:02:56Z",
+        "completed_at": "2026-09-12T13:02:59Z"
+      },
+      {
+        "name": "Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2,
+        "started_at": "2026-09-12T13:02:59Z",
+        "completed_at": "2026-09-12T13:03:04Z"
+      },
+      {
+        "name": "Run ./.github/actions/self-hosted-python",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3,
+        "started_at": "2026-09-12T13:03:04Z",
+        "completed_at": "2026-09-12T13:03:10Z"
+      },
+      {
+        "name": "Run actions/setup-go@v5",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4,
+        "started_at": "2026-09-12T13:03:10Z",
+        "completed_at": "2026-09-12T13:03:11Z"
+      },
+      {
+        "name": "Install release dependencies",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5,
+        "started_at": "2026-09-12T13:03:11Z",
+        "completed_at": "2026-09-12T13:07:13Z"
+      },
+      {
+        "name": "Windows capability and product release regressions",
+        "status": "in_progress",
+        "conclusion": null,
+        "number": 6,
+        "started_at": "2026-09-12T13:07:13Z",
+        "completed_at": null
+      },
+      {
+        "name": "Windows transport, storage, and failover regressions",
+        "status": "pending",
+        "conclusion": null,
+        "number": 7,
+        "started_at": null,
+        "completed_at": null
+      },
+      {
+        "name": "Windows replicated journal and reviewer artifact regressions",
+        "status": "pending",
+        "conclusion": null,
+        "number": 8,
+        "started_at": null,
+        "completed_at": null
+      },
+      {
+        "name": "Preserve Windows regression timings",
+        "status": "pending",
+        "conclusion": null,
+        "number": 9,
+        "started_at": null,
+        "completed_at": null
+      },
+      {
+        "name": "Post Run actions/setup-go@v5",
+        "status": "pending",
+        "conclusion": null,
+        "number": 17,
+        "started_at": null,
+        "completed_at": null
+      },
+      {
+        "name": "Post Run actions/checkout@v4",
+        "status": "pending",
+        "conclusion": null,
+        "number": 18,
+        "started_at": null,
+        "completed_at": null
+      }
+    ],
+    "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103557723358",
+    "labels": [
+      "self-hosted",
+      "Windows",
+      "X64",
+      "fcp-test-windows"
+    ],
+    "runner_id": 28,
+    "runner_name": "Beast",
+    "runner_group_id": 1,
+    "runner_group_name": "Default"
+  },
+  "runner_metadata": [
+    {
+      "id": 31,
+      "name": "AQG7NCC-Linux",
+      "os": "unknown",
+      "status": "online",
+      "busy": true,
+      "version": "2.337.0",
+      "labels": [
+        {
+          "id": 0,
+          "name": "self-hosted",
+          "type": "custom"
+        },
+        {
+          "id": 0,
+          "name": "Linux",
+          "type": "custom"
+        },
+        {
+          "id": 0,
+          "name": "X64",
+          "type": "custom"
+        },
+        {
+          "id": 0,
+          "name": "fcp-test-linux",
+          "type": "custom"
+        },
+        {
+          "id": 0,
+          "name": "fcp-docker-linux",
+          "type": "custom"
+        },
+        {
+          "id": 0,
+          "name": "aqg7ncc-linux-admission",
+          "type": "custom"
+        }
+      ]
+    },
+    {
+      "id": 30,
+      "name": "AQG7NCC-Windows",
+      "os": "unknown",
+      "status": "online",
+      "busy": true,
+      "version": "2.337.0",
+      "labels": [
+        {
+          "id": 0,
+          "name": "self-hosted",
+          "type": "custom"
+        },
+        {
+          "id": 0,
+          "name": "X64",
+          "type": "custom"
+        },
+        {
+          "id": 0,
+          "name": "Windows",
+          "type": "custom"
+        },
+        {
+          "id": 0,
+          "name": "fcp-windows",
+          "type": "custom"
+        },
+        {
+          "id": 0,
+          "name": "aqg7ncc-admission",
+          "type": "custom"
+        }
+      ]
+    },
+    {
+      "id": 28,
+      "name": "Beast",
+      "os": "Windows",
+      "status": "online",
+      "busy": true,
+      "version": "2.337.0",
+      "labels": [
+        {
+          "id": 0,
+          "name": "self-hosted",
+          "type": "read-only"
+        },
+        {
+          "id": 0,
+          "name": "X64",
+          "type": "read-only"
+        },
+        {
+          "id": 0,
+          "name": "Windows",
+          "type": "read-only"
+        },
+        {
+          "id": 0,
+          "name": "fcp-windows",
+          "type": "custom"
+        },
+        {
+          "id": 0,
+          "name": "beast-windows",
+          "type": "custom"
+        },
+        {
+          "id": 0,
+          "name": "fcp-windows-fast",
+          "type": "custom"
+        },
+        {
+          "id": 0,
+          "name": "fcp-test-windows",
+          "type": "custom"
+        }
+      ]
+    },
+    {
+      "id": 29,
+      "name": "Beast-Linux-WSL",
+      "os": "Linux",
+      "status": "online",
+      "busy": false,
+      "version": "2.337.0",
+      "labels": [
+        {
+          "id": 0,
+          "name": "self-hosted",
+          "type": "read-only"
+        },
+        {
+          "id": 0,
+          "name": "Linux",
+          "type": "read-only"
+        },
+        {
+          "id": 0,
+          "name": "X64",
+          "type": "read-only"
+        },
+        {
+          "id": 0,
+          "name": "beast-linux",
+          "type": "custom"
+        },
+        {
+          "id": 0,
+          "name": "fcp-linux-fast",
+          "type": "custom"
+        }
+      ]
+    }
+  ],
+  "interpretation": "Same named Beast CI path later completed checkout/setup; original access failure remains valid. No manual recovery was applied, and the underlying ACL/open-handle cause is unconfirmed. Avoid speculative cleanup while current jobs run.",
+  "AQG_note": "Windows runner30 and Linux31 are distinct and now executing jobs. Setup progress is observed; label/online state alone is not release-pool qualification. Agent made no admission/configuration changes.",
+  "protected_recorder_data": "UNTOUCHED"
+}
