@@ -12,6 +12,19 @@
       "response": {
         "http_status": 204
       }
+    },
+    {
+      "pr": 467,
+      "sha": "84c66f8185c1411d9dc8c5c33244a2f564845ce7",
+      "ref": "codex/analysis-content-resolve-race",
+      "workflow": "cf7c-physical-test-readiness.yml",
+      "requested_at": "2026-09-12T05:59:13.617771+00:00",
+      "reason": "Required reviewed exact-head gate has no existing run",
+      "workflow_sha256": "1d015b626c9acbfd91aa9e5df06fdb245cd3eb2650da1cdb06ba3965c0461c84",
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
     }
   ]
 }
