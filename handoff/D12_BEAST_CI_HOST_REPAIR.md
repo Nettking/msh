@@ -1,6 +1,6 @@
 # D12: controlled Beast CI checkout trust repair
 
-Status: PLANNED, not applied. This is CI host maintenance, not candidate source
+Status: APPLIED AND VERIFIED on actual Beast NETWORK SERVICE identity; affected CI check pending. This is CI host maintenance, not candidate source
 deployment or physical acceptance. Evidence: diagnostics/D12-confirmed-ownership-root-cause.json.
 
 Actual Git stderr identifies the cause: checkout
@@ -51,3 +51,5 @@ qualification or the native replacement proof. Older source failures remain dura
 If preconditions, access, or correction fail, preserve the result under D12 and
 stop this repair path. Do not relax Git ownership protection or use another host
 as evidence that Beast is fixed.
+
+Actual reviewed run34704678898/job103582477854: see diagnostics/D12-host-repair-reviewed.json. The workflow control SHA and unchanged existing CI checkout SHA are separately recorded.

@@ -1,0 +1,71 @@
+{
+  "recorded_at": "2026-09-12T16:15:41.8439695Z",
+  "control_workflow_sha": "22abd041ada72b9e7c43c7c90307bc9494147068",
+  "control_ref": "refs/heads/codex/federation-v1-diagnostic-sweep-20260911",
+  "run_id": "34704678898",
+  "purpose": "CI_HOST_CONFIGURATION_ONLY_NO_CHECKOUT_OR_DEPLOYMENT",
+  "status": "EXACT_CI_WORKSPACE_GIT_TRUST_VERIFIED",
+  "state_changed": true,
+  "protected_recorder_data": "UNTOUCHED",
+  "identity": "NT-MYNDIGHET\\NETTVERKSTJENESTE",
+  "sid": "S-1-5-20",
+  "computer": "BEAST",
+  "runner": "Beast",
+  "workspace": "C:\\actions-runner\\_work\\msh\\msh",
+  "owner_sid": "S-1-5-21-2697059779-2177400912-248823070-1001",
+  "profile": "C:\\WINDOWS\\ServiceProfiles\\NetworkService",
+  "home_context": null,
+  "git_executable": "C:\\Program Files\\Git\\cmd\\git.exe",
+  "existing_checkout_sha": "0355023f27c4c6886ab6beb48bb9a998b3ab2904",
+  "plain_git_before": {
+    "exit_code": 128,
+    "output": "fatal: detected dubious ownership in repository at 'C:/actions-runner/_work/msh/msh'\n'C:/actions-runner/_work/msh/msh' is owned by:\n\tBeast/nksra (S-1-5-21-2697059779-2177400912-248823070-1001)\nbut the current user is:\n\tNT-MYNDIGHET/NETTVERKSTJENESTE (S-1-5-20)\nTo add an exception for this directory, call:\nSystem.Management.Automation.RemoteException\n\tgit config --global --add safe.directory C:/actions-runner/_work/msh/msh"
+  },
+  "global_trust_before": [],
+  "repair_result": {
+    "exit_code": 0,
+    "output": ""
+  },
+  "plain_git_after": [
+    {
+      "directory": "C:\\actions-runner\\_work\\msh\\msh",
+      "result": {
+        "exit_code": 0,
+        "output": "0355023f27c4c6886ab6beb48bb9a998b3ab2904"
+      },
+      "executable": "C:\\Program Files\\Git\\cmd\\git.exe"
+    },
+    {
+      "directory": "C:\\actions-runner\\_work\\msh\\msh\\cmd\\fcp-peer-sidecar",
+      "result": {
+        "exit_code": 0,
+        "output": "0355023f27c4c6886ab6beb48bb9a998b3ab2904"
+      },
+      "executable": "C:\\Program Files\\Git\\cmd\\git.exe"
+    },
+    {
+      "directory": "C:\\actions-runner\\_work\\msh\\msh",
+      "result": {
+        "exit_code": 0,
+        "output": "0355023f27c4c6886ab6beb48bb9a998b3ab2904"
+      },
+      "executable": "C:\\Program Files\\Git\\bin\\git.exe"
+    },
+    {
+      "directory": "C:\\actions-runner\\_work\\msh\\msh\\cmd\\fcp-peer-sidecar",
+      "result": {
+        "exit_code": 0,
+        "output": "0355023f27c4c6886ab6beb48bb9a998b3ab2904"
+      },
+      "executable": "C:\\Program Files\\Git\\bin\\git.exe"
+    }
+  ],
+  "diff_hygiene": {
+    "exit_code": 0,
+    "output": ""
+  },
+  "global_trust_after": [
+    "C:/actions-runner/_work/msh/msh"
+  ],
+  "completed_at": "2026-09-12T16:15:43.6721931Z"
+}

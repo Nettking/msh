@@ -2865,3 +2865,7 @@ Beast. Initial outcome: diagnostics/D12-maintenance-20260912T161720.json. No oth
 workflow was triggered by that control commit. Before claiming repair verified,
 retain/review the before/after artifact and unchanged existing checkout identity.
 No product checkout/deployment was part of this job; PR473 source stays fixed.
+
+## 2026-09-12T16:19:33.292914+00:00 — D12 host correction verified
+
+Actual Beast NETWORK SERVICE job34704678898/103582477854 added one exact CI safe.directory entry, preserving prior values. Four plain Git root/sidecar cmd/bin reads and diff hygiene now pass at unchanged existing checkout 0355023f27c4c6886ab6beb48bb9a998b3ab2904. No checkout/deployment/runner-account/ACL change or protected-data access. Evidence: diagnostics/D12-host-repair-reviewed.json. SSH confirmation is no longer needed for this repair. Next confirm the current PR473 release run is complete before retrying only its affected failed Windows check103573774515; no active job interruption and no successful-job rerun.

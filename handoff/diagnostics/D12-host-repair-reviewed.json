@@ -1,0 +1,55 @@
+{
+  "recorded_at": "2026-09-12T16:19:33.292914+00:00",
+  "finding": "D12",
+  "status": "HOST_CONFIGURATION_REPAIRED_AND_VERIFIED_AFFECTED_CI_CHECK_PENDING",
+  "control_workflow_sha": "22abd041ada72b9e7c43c7c90307bc9494147068",
+  "existing_ci_checkout_sha": "0355023f27c4c6886ab6beb48bb9a998b3ab2904",
+  "run_id": 34704678898,
+  "job_id": 103582477854,
+  "host": "BEAST native runner28",
+  "identity_sid": "S-1-5-20",
+  "before_error": "Actual dubious-ownership rejection under NETWORK SERVICE",
+  "exact_change": "Added only C:/actions-runner/_work/msh/msh to the existing NETWORK SERVICE global safe.directory list. All prior entries preserved.",
+  "after": "Four plain Git provenance reads succeed (cmd/bin Git, repository/sidecar directories), same existing checkout SHA; plain diff hygiene passes. No per-command trust override used for these validation reads.",
+  "no_changes": [
+    "Service account",
+    "Ownership/ACLs",
+    "Runner labels/pools",
+    "Worktree checkout/source",
+    "PR473 head",
+    "Product/runtime state",
+    "Protected Recorder data",
+    "VCS stamping/CI assertions/deadlines"
+  ],
+  "native_retention": {
+    "source_commit": "22abd041ada72b9e7c43c7c90307bc9494147068",
+    "retained_at": "2026-09-12T16:17:46.078259+00:00",
+    "records": [
+      {
+        "job_id": 103582477854,
+        "run_id": 34704678898,
+        "name": "scoped-host-repair",
+        "runner_name": "Beast",
+        "conclusion": "success",
+        "bytes": 16194,
+        "sha256": "64bc2536b81ed51207b8d91c9ec9f78c33fdd17896d4a73b763a8729876c3a97",
+        "checkout_commits": [],
+        "checkout_matches": null
+      }
+    ]
+  },
+  "artifact": {
+    "run_id": 34704678898,
+    "id": 10301657288,
+    "name": "d12-beast-git-context",
+    "digest": "sha256:9963e021001c79928cff101588531532a07352adb90105d8216975e5fb00dc38",
+    "bytes": 1191,
+    "created_at": "2026-09-12T16:15:45Z",
+    "api_workflow_head": "22abd041ada72b9e7c43c7c90307bc9494147068"
+  },
+  "audit": "D12-verified-host-repair-audit.json",
+  "safe_continuation": "YES: after current run completes, rerun only failed PR473 Windows release check103573774515 on unchanged head440123f6. No successful jobs or original2/2 replacement proof repeated. Keep earlier-source failures archived.",
+  "repair_scope": "Coordination-only maintenance workflow, excluded from release/candidate branches. SSH trust/credentials were not required and no SSH session opened.",
+  "physical_acceptance": false,
+  "protected_recorder_data": "UNTOUCHED"
+}
