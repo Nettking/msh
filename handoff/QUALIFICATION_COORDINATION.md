@@ -1898,3 +1898,6 @@ resume state-change polling. No physical acceptance or candidate freeze.
 
 00:24:33UTC: PR465 exact-head4749ab66 gap dispatched: federation-v1-release.yml (HTTP204).
 Native source proof and dispatch ledger committed; no duplicate or physical change.
+
+00:24:40UTC: PR465 exact-head4749ab66 gap dispatched: icse-tool-demo.yml (HTTP204).
+Native source proof and dispatch ledger committed; no duplicate or physical change.
