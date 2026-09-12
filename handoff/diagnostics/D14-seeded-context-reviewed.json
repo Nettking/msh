@@ -1,0 +1,174 @@
+{
+  "recorded_at": "2026-09-12T19:17:37.628838+00:00",
+  "finding": "D14",
+  "receipt": {
+    "recorded_at": "2026-09-12T19:16:31.415719+00:00",
+    "group": "D14",
+    "candidate_sha": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+    "host": "Nettking",
+    "python": "3.12.13 (main, Sep  9 2026, 20:28:49) [GCC 11.4.0]",
+    "executable": "/tmp/fcp-d13-development-20260912/bin/python",
+    "command": [
+      "/tmp/fcp-d13-development-20260912/bin/python",
+      "-B",
+      "-m",
+      "pytest",
+      "-o",
+      "addopts=",
+      "-p",
+      "no:cacheprovider",
+      "-p",
+      "pr475_context_observer",
+      "-p",
+      "randomly",
+      "--randomly-seed=1702",
+      "--randomly-dont-reorganize",
+      "-q",
+      "-x",
+      "--durations=10",
+      "--basetemp=/tmp/fcp-d14-seeded-p1fmtydh/pytest",
+      "--junitxml=/mnt/c/wsl/fcp-v1-fba508-nettking-20260910/.acceptance/D14-seeded-context/result.xml",
+      "catalog/federation/tests/test_service_incarnation.py::test_intentional_stop_reason_remains_clean_inside_exception_handler[trial]",
+      "catalog/mtconnect_recorder/tests/test_resource_pressure_process_wide.py::test_new_capture_admission_is_atomic_across_resources",
+      "catalog/mtconnect_recorder/tests/test_resource_pressure_process_wide.py::test_default_recorder_guard_shares_process_wide_controller",
+      "catalog/mtconnect_recorder/tests/test_resource_pressure_process_wide.py::test_new_capture_coalesces_same_resource_in_one_transaction",
+      "catalog/mtconnect_recorder/tests/test_resource_pressure_process_wide.py::test_completion_may_start_at_pressure_but_preserves_critical_floor",
+      "catalog/flask_app/tests/test_capability_benchmark_route.py::test_skip_after_completed_result_does_not_mark_completed_check_skipped",
+      "catalog/flask_app/tests/test_capability_benchmark_route.py::test_app_factory_registers_cfi4_before_cfi3_and_legacy",
+      "catalog/flask_app/tests/test_capability_benchmark_route.py::test_corrupt_benchmark_state_fails_closed_without_leaking_bytes",
+      "catalog/flask_app/tests/test_capability_benchmark_route.py::test_skip_serializes_with_concurrent_benchmark_completion"
+    ],
+    "cwd": "/mnt/c/wsl/fcp-fix-d13-windows-refusal-response-20260912",
+    "qualification": false,
+    "context_limitation": "NETTKING WSL development; different from original AQG runner; bounded predecessor selection only",
+    "protected_recorder_data": "UNTOUCHED",
+    "timeout_seconds": 180,
+    "exit_code": 0,
+    "elapsed_seconds": 23.4408047440229,
+    "final_sha": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+    "final_tracked_status": ""
+  },
+  "junit": [
+    {
+      "test": "test_intentional_stop_reason_remains_clean_inside_exception_handler[trial]",
+      "seconds": "0.069"
+    },
+    {
+      "test": "test_new_capture_admission_is_atomic_across_resources",
+      "seconds": "0.023"
+    },
+    {
+      "test": "test_default_recorder_guard_shares_process_wide_controller",
+      "seconds": "0.002"
+    },
+    {
+      "test": "test_new_capture_coalesces_same_resource_in_one_transaction",
+      "seconds": "0.002"
+    },
+    {
+      "test": "test_completion_may_start_at_pressure_but_preserves_critical_floor",
+      "seconds": "0.002"
+    },
+    {
+      "test": "test_skip_after_completed_result_does_not_mark_completed_check_skipped",
+      "seconds": "1.044"
+    },
+    {
+      "test": "test_app_factory_registers_cfi4_before_cfi3_and_legacy",
+      "seconds": "0.317"
+    },
+    {
+      "test": "test_corrupt_benchmark_state_fails_closed_without_leaking_bytes",
+      "seconds": "0.717"
+    },
+    {
+      "test": "test_skip_serializes_with_concurrent_benchmark_completion",
+      "seconds": "1.270"
+    }
+  ],
+  "result": "9PASS in retained original predecessor order with pytest-randomly4.1.0 seed1702 per-test reseeding; D14 not reproduced on NETTKING WSL. Different host/subset; original AQG failure remains unresolved.",
+  "thread_snapshots": [
+    {
+      "test": "catalog/federation/tests/test_service_incarnation.py::test_intentional_stop_reason_remains_clean_inside_exception_handler[trial]",
+      "threads": [
+        {
+          "name": "MainThread",
+          "daemon": false
+        }
+      ]
+    },
+    {
+      "test": "catalog/mtconnect_recorder/tests/test_resource_pressure_process_wide.py::test_new_capture_admission_is_atomic_across_resources",
+      "threads": [
+        {
+          "name": "MainThread",
+          "daemon": false
+        }
+      ]
+    },
+    {
+      "test": "catalog/mtconnect_recorder/tests/test_resource_pressure_process_wide.py::test_default_recorder_guard_shares_process_wide_controller",
+      "threads": [
+        {
+          "name": "MainThread",
+          "daemon": false
+        }
+      ]
+    },
+    {
+      "test": "catalog/mtconnect_recorder/tests/test_resource_pressure_process_wide.py::test_new_capture_coalesces_same_resource_in_one_transaction",
+      "threads": [
+        {
+          "name": "MainThread",
+          "daemon": false
+        }
+      ]
+    },
+    {
+      "test": "catalog/mtconnect_recorder/tests/test_resource_pressure_process_wide.py::test_completion_may_start_at_pressure_but_preserves_critical_floor",
+      "threads": [
+        {
+          "name": "MainThread",
+          "daemon": false
+        }
+      ]
+    },
+    {
+      "test": "catalog/flask_app/tests/test_capability_benchmark_route.py::test_skip_after_completed_result_does_not_mark_completed_check_skipped",
+      "threads": [
+        {
+          "name": "MainThread",
+          "daemon": false
+        }
+      ]
+    },
+    {
+      "test": "catalog/flask_app/tests/test_capability_benchmark_route.py::test_app_factory_registers_cfi4_before_cfi3_and_legacy",
+      "threads": [
+        {
+          "name": "MainThread",
+          "daemon": false
+        }
+      ]
+    },
+    {
+      "test": "catalog/flask_app/tests/test_capability_benchmark_route.py::test_corrupt_benchmark_state_fails_closed_without_leaking_bytes",
+      "threads": [
+        {
+          "name": "MainThread",
+          "daemon": false
+        }
+      ]
+    },
+    {
+      "test": "catalog/flask_app/tests/test_capability_benchmark_route.py::test_skip_serializes_with_concurrent_benchmark_completion",
+      "threads": [
+        {
+          "name": "MainThread",
+          "daemon": false
+        }
+      ]
+    }
+  ],
+  "next": "Continue independently with the planned2-test D15 predecessor context; do not repeat D14 contexts or claim repair."
+}

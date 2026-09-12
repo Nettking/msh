@@ -32,7 +32,8 @@
   ],
   "github_artifact": "https://github.com/Nettking/msh/issues/476",
   "repair": "NONE",
-  "next_diagnostic_action": "Retain order-rotating artifact with exact seed and test durations; inspect benchmark.run entry and captured run_errors lifecycle without changing the two-second assertion; compare existing same-source fixed/shard evidence.",
+  "next_diagnostic_action": "Continue independently with the planned2-test D15 predecessor context; do not repeat D14 contexts or claim repair.",
   "recorded_at": "2026-09-12T18:00:49.086503+00:00",
-  "focused_followup": "2PASS,1warning on NETTKING Ubuntu WSL; one D14 and one D15 test. Pytest deduplicated repeated node arguments; no claim of five D15 executions. Different host and isolated selection, without complete rotating-order predecessor history. Neither original failure reproduced or invalidated."
+  "focused_followup": "2PASS,1warning on NETTKING Ubuntu WSL; one D14 and one D15 test. Pytest deduplicated repeated node arguments; no claim of five D15 executions. Different host and isolated selection, without complete rotating-order predecessor history. Neither original failure reproduced or invalidated.",
+  "seeded_context": "D14-seeded-context-reviewed.json"
 }
