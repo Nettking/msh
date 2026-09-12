@@ -2328,3 +2328,12 @@ discover the already accepted CF7B dispatch run, retain only new terminal eviden
 continue on actionable transitions. Repair head84c66f81 and physical runtimeM unchanged;
 protected Recorder data untouched; no physical PASS and no P07/P12. Persist this policy
 before waiting; do not keep a live short-interval polling loop.
+
+07:39UTC: first hourly snapshot (last06:24) confirms all13 selected PR467 workflows
+completed successfully at unchanged84c66f8185c1411d9dc8c5c33244a2f564845ce7;
+no missing/failed workflow. Ninth CF7B dispatch discovered as34678091409, completed2/2.
+Release34676251393/update34676251420/F8534676251432/ICSE34676251433 are now
+terminal automatic runs. Next: retain only new terminal native logs; count exact-head
+proof only, then review completed synthetic source gaps including release aggregates
+before any guarded dispatch. Last CI snapshot07:38:59UTC; next routine snapshot
+08:39UTC or later unless an actionable event arrives. No physical action or PASS.
