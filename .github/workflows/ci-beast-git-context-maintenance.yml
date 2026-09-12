@@ -1,0 +1,153 @@
+name: D12 bounded Beast CI Git context maintenance
+
+# Coordination-branch host maintenance only. Never merge into a candidate.
+on:
+  push:
+    branches: [codex/federation-v1-diagnostic-sweep-20260911]
+    paths:
+      - ".github/workflows/ci-beast-git-context-maintenance.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: d12-beast-ci-git-context-maintenance
+  cancel-in-progress: false
+
+jobs:
+  scoped-host-repair:
+    runs-on: [self-hosted, Windows, X64, beast-windows, fcp-windows]
+    timeout-minutes: 5
+    steps:
+      # Deliberately no checkout: preserve the existing CI workspace/source.
+      - name: Verify identity and repair only the authorized CI path trust
+        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Set-StrictMode -Version Latest
+          $auditPath = Join-Path $env:RUNNER_TEMP ('d12-git-context-' + $env:GITHUB_RUN_ID + '.json')
+          $audit = [ordered]@{
+            recorded_at = [DateTime]::UtcNow.ToString('o')
+            control_workflow_sha = $env:GITHUB_SHA
+            control_ref = $env:GITHUB_REF
+            run_id = $env:GITHUB_RUN_ID
+            purpose = 'CI_HOST_CONFIGURATION_ONLY_NO_CHECKOUT_OR_DEPLOYMENT'
+            status = 'PREFLIGHT'
+            state_changed = $false
+            protected_recorder_data = 'UNTOUCHED'
+          }
+          function Save-Audit {
+            [IO.File]::WriteAllText($auditPath, ($audit | ConvertTo-Json -Depth 15), [Text.UTF8Encoding]::new($false))
+          }
+          function Require([bool]$Condition, [string]$Message) {
+            if (-not $Condition) { throw $Message }
+          }
+          function Read-Git([string]$Executable, [string[]]$Arguments) {
+            $previousPreference = $ErrorActionPreference
+            try {
+              $ErrorActionPreference = 'Continue'
+              $lines = @(& $Executable @Arguments 2>&1)
+              $code = $LASTEXITCODE
+              return [pscustomobject]@{ exit_code = $code; output = (($lines | ForEach-Object { $_.ToString() }) -join "`n") }
+            }
+            finally { $ErrorActionPreference = $previousPreference }
+          }
+          try {
+            $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+            $audit.identity = $identity.Name
+            $audit.sid = $identity.User.Value
+            $audit.computer = $env:COMPUTERNAME
+            $audit.runner = $env:RUNNER_NAME
+            Require ($env:GITHUB_REPOSITORY -ceq 'Nettking/msh') 'unexpected_repository'
+            Require ($env:GITHUB_REF -ceq 'refs/heads/codex/federation-v1-diagnostic-sweep-20260911') 'unexpected_control_branch'
+            Require ($env:RUNNER_NAME -ceq 'Beast' -and $env:COMPUTERNAME -ieq 'BEAST') 'unexpected_physical_runner'
+            Require ($identity.User.Value -eq 'S-1-5-20') 'runner_service_identity_changed'
+            $repo = [IO.Path]::GetFullPath($env:GITHUB_WORKSPACE).TrimEnd('\')
+            Require ($repo -ieq 'C:\actions-runner\_work\msh\msh') 'unexpected_workspace'
+            foreach ($path in @('C:\actions-runner', 'C:\actions-runner\_work', 'C:\actions-runner\_work\msh', $repo, (Join-Path $repo '.git'))) {
+              $item = Get-Item -LiteralPath $path -Force
+              Require ($item.PSIsContainer -and -not ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) ('unsafe_directory:' + $path)
+            }
+            $registration = Get-Content -LiteralPath 'C:\actions-runner\.runner' -Raw | ConvertFrom-Json
+            Require ($registration.agentName -ceq 'Beast' -and $registration.workFolder -eq '_work') 'unexpected_runner_registration'
+            $ownerSid = (Get-Acl -LiteralPath $repo).GetOwner([Security.Principal.SecurityIdentifier]).Value
+            Require ($ownerSid -eq 'S-1-5-21-2697059779-2177400912-248823070-1001') 'checkout_owner_changed_reassess_first'
+            $audit.workspace = $repo
+            $audit.owner_sid = $ownerSid
+            $audit.profile = $env:USERPROFILE
+            $audit.home_context = $env:HOME
+            $expectedProfile = 'C:\Windows\ServiceProfiles\NetworkService'
+            Require ([IO.Path]::GetFullPath($env:USERPROFILE).TrimEnd('\') -ieq $expectedProfile) 'unexpected_service_profile'
+            if (-not [string]::IsNullOrWhiteSpace($env:HOME)) {
+              Require ([IO.Path]::GetFullPath($env:HOME).TrimEnd('\') -ieq $expectedProfile) 'unexpected_git_home_no_write'
+            }
+            Require ([string]::IsNullOrWhiteSpace($env:GIT_CONFIG_GLOBAL)) 'unexpected_global_config_override_no_write'
+            $git = (Get-Command git.exe -CommandType Application).Source
+            $gitPaths = @('C:\Program Files\Git\cmd\git.exe', 'C:\Program Files\Git\bin\git.exe')
+            Require ($gitPaths -icontains $git) 'unexpected_git_executable'
+            foreach ($path in $gitPaths) { Require (Test-Path -LiteralPath $path -PathType Leaf) 'git_entrypoint_missing' }
+            $audit.git_executable = $git
+            $safeRepo = 'C:/actions-runner/_work/msh/msh'
+            $origin = Read-Git $git @('-c', ('safe.directory=' + $safeRepo), '-C', $repo, 'config', '--local', '--get', 'remote.origin.url')
+            Require ($origin.exit_code -eq 0 -and @('https://github.com/Nettking/msh', 'https://github.com/Nettking/msh.git') -ccontains $origin.output.Trim()) 'unexpected_checkout_origin'
+            $source = Read-Git $git @('-c', ('safe.directory=' + $safeRepo), '-C', $repo, 'rev-parse', '--verify', 'HEAD^{commit}')
+            $allowedSources = @('b7194820d8f1940ae60b8c9639e09b7f61e65c55', '0355023f27c4c6886ab6beb48bb9a998b3ab2904', '440123f6bc6dc358eef3d233236bc14f91af60e0')
+            Require ($source.exit_code -eq 0 -and $allowedSources -ccontains $source.output.Trim()) 'unexpected_existing_checkout_source'
+            $audit.existing_checkout_sha = $source.output.Trim()
+            $before = Read-Git $git @('-C', $repo, 'rev-parse', '--verify', 'HEAD^{commit}')
+            $trustBefore = Read-Git $git @('config', '--global', '--get-all', 'safe.directory')
+            Require ($trustBefore.exit_code -in @(0, 1)) 'cannot_read_existing_global_trust'
+            $beforeEntries = @($trustBefore.output -split '\r?\n' | Where-Object { $_ })
+            Require (-not ($beforeEntries -contains '*')) 'unexpected_existing_wildcard_reassess_first'
+            $audit.plain_git_before = $before
+            $audit.global_trust_before = $beforeEntries
+            Save-Audit
+            if ($before.exit_code -ne 0) {
+              Require ($before.output -match 'detected dubious ownership') 'unexpected_git_failure_no_repair'
+              Require (-not ($beforeEntries -contains $safeRepo)) 'exact_trust_already_present_reassess_context'
+              $repair = Read-Git $git @('config', '--global', '--add', 'safe.directory', $safeRepo)
+              $audit.repair_result = $repair
+              $audit.state_changed = $repair.exit_code -eq 0
+              Save-Audit
+              Require ($repair.exit_code -eq 0) 'scoped_trust_write_failed'
+            }
+            $validation = @()
+            foreach ($executable in $gitPaths) {
+              foreach ($directory in @($repo, (Join-Path $repo 'cmd\fcp-peer-sidecar'))) {
+                $result = Read-Git $executable @('-C', $directory, 'rev-parse', '--verify', 'HEAD^{commit}')
+                $validation += @{ executable = $executable; directory = $directory; result = $result }
+                Require ($result.exit_code -eq 0 -and $result.output.Trim() -ceq $audit.existing_checkout_sha) 'plain_git_provenance_still_invalid'
+              }
+            }
+            $hygiene = Read-Git $git @('-C', $repo, 'diff', '--check', 'origin/main...HEAD')
+            Require ($hygiene.exit_code -eq 0) 'plain_diff_check_failed'
+            $trustAfter = Read-Git $git @('config', '--global', '--get-all', 'safe.directory')
+            Require ($trustAfter.exit_code -eq 0) 'cannot_verify_global_trust'
+            $afterEntries = @($trustAfter.output -split '\r?\n' | Where-Object { $_ })
+            if ($audit.state_changed) {
+              Require (($afterEntries.Count -eq ($beforeEntries.Count + 1)) -and ($afterEntries -contains $safeRepo)) 'unexpected_global_trust_delta'
+              foreach ($entry in $beforeEntries) { Require ($afterEntries -contains $entry) 'existing_trust_entry_changed' }
+            }
+            $audit.plain_git_after = $validation
+            $audit.diff_hygiene = $hygiene
+            $audit.global_trust_after = $afterEntries
+            $audit.status = 'EXACT_CI_WORKSPACE_GIT_TRUST_VERIFIED'
+            $audit.completed_at = [DateTime]::UtcNow.ToString('o')
+            Save-Audit
+            Write-Output ('D12_GIT_CONTEXT=PASS; HOST=' + $audit.computer + '; SID=' + $audit.sid + '; CHECKOUT=' + $audit.existing_checkout_sha + '; EXACT_TRUST_ENTRY_ADDED=' + $audit.state_changed)
+            $global:LASTEXITCODE = 0
+          }
+          catch {
+            $audit.status = 'FAILED_CLOSED'
+            $audit.error = $_.Exception.Message
+            Save-Audit
+            throw
+          }
+      - name: Preserve exact before and after host evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: d12-beast-git-context
+          path: ${{ runner.temp }}/d12-git-context-${{ github.run_id }}.json
+          if-no-files-found: error
+          retention-days: 30

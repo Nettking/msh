@@ -2839,3 +2839,17 @@ then plain Git validation under that identity. No wildcard, ownership/ACL change
 runner pool changes or protected Recorder paths. The maintenance workflow stays
 on the coordination branch and is excluded from the release candidate. Persisted
 before implementation/execution; actual host correction is still NOT applied.
+
+## 2026-09-12 — bounded D12 maintenance implementation ready
+
+The coordination-only workflow ci-beast-git-context-maintenance.yml targets the
+existing beast-windows registration without checkout. PowerShell parsing passed.
+It checks exact host/SID, NetworkService profile/HOME with no global-config override,
+non-reparse CI path, registration, known owner/origin and observed source SHAs.
+It records before-state and adds at most one exact safe.directory entry, then
+requires plain Git root/sidecar provenance from both Git entry points and diff
+hygiene. No wildcard, account/ACL/ownership/source change is permitted. The next
+push of this workflow starts exactly one short host-maintenance job; other
+coordination updates do not match its trigger. Expected evidence is an uploaded
+before/after JSON. Keep PR473 head fixed; do not retry failed CI until correction
+is actually demonstrated. This workflow is excluded from all release branches.
