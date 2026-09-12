@@ -2082,3 +2082,7 @@ merge or physical change. All completed exact-head evidence preserved.
 02:18UTC: PR463 head2c1a8d93 unchanged. Automatic CF7B and exact-head registry
 completed success; no failed jobs. Next: retain their new native logs, verify
 source, and fill CF7B only if its completed source gap is demonstrated.
+
+02:19UTC: registry verifies exact2c1a8d93; preserve required5/37 plus companion2/3.
+Both completed CF7B jobs prove synthetic2cc004b3. Next: guarded one-time CF7B
+exact-head dispatch; all active/passing runs remain untouched.

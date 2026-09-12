@@ -208,7 +208,33 @@
         "2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee"
       ],
       "checkout_matches": true
+    },
+    {
+      "job_id": 103473479267,
+      "run_id": 34664467227,
+      "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 71731,
+      "sha256": "05ce200864be837a50d221d32910d0a7d3ce19710d60dc14951863dfdd22b49c",
+      "checkout_commits": [
+        "2cc004b3529ab3b0d99e10e1cdffbe1391f27231"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103473858031,
+      "run_id": 34664592951,
+      "name": "Verify immutable release image metadata",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 12915,
+      "sha256": "0de6911418fd2f1a3b3d7a81f6e5c0173cbdee94fe4824f9f3c479b2079846b6",
+      "checkout_commits": [
+        "2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee"
+      ],
+      "checkout_matches": true
     }
   ],
-  "retained_at": "2026-09-12T02:07:54.013198+00:00"
+  "retained_at": "2026-09-12T02:19:18.617577+00:00"
 }
