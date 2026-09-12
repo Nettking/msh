@@ -64,6 +64,19 @@
       "response": {
         "http_status": 204
       }
+    },
+    {
+      "pr": 467,
+      "sha": "84c66f8185c1411d9dc8c5c33244a2f564845ce7",
+      "ref": "codex/analysis-content-resolve-race",
+      "workflow": "phase2-federation.yml",
+      "requested_at": "2026-09-12T05:59:40.825543+00:00",
+      "reason": "Required reviewed exact-head gate has no existing run",
+      "workflow_sha256": "20b1ffdb6116552326f5b99cc31a14fb1621227cb7bd58992c81e344c2ede238",
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
     }
   ]
 }
