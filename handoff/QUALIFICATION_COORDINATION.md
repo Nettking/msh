@@ -2111,3 +2111,8 @@ any dispatch. Preserve required7/37 plus companion2/3.
 companion2/3 native PASS. Both completed phase2 jobs prove synthetic2cc004b3;
 rotating release order also synthetic. Next: guarded phase2 exact-head dispatch
 once; active release remains untouched.
+
+02:42:12UTC: phase2 exact-head2c1a8d93 dispatched once (HTTP204), both native
+source proofs recorded. Ten new-head dispatches total. Next: poll_pr463_state.py
+at next state check; retain newly completed native evidence only. Physical M,
+protected data and candidate status unchanged; no physical PASS or timed runs.

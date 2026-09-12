@@ -839,6 +839,36 @@
       "response": {
         "http_status": 204
       }
+    },
+    {
+      "pr": 463,
+      "sha": "2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee",
+      "ref": "codex/responder-replacement-exit-wait",
+      "workflow": "phase2-federation.yml",
+      "requested_at": "2026-09-12T02:42:10.499529+00:00",
+      "reason": "Completed successful PR jobs checked out synthetic SHA, not intended head",
+      "native_proof": [
+        {
+          "job_id": 103473479330,
+          "run_id": 34664467273,
+          "checkout_commits": [
+            "2cc004b3529ab3b0d99e10e1cdffbe1391f27231"
+          ],
+          "sha256": "cb4450876b9d2c9ff5f263ff956970e3a731bc70c8a0da00ea517f443a0cae16"
+        },
+        {
+          "job_id": 103473479476,
+          "run_id": 34664467273,
+          "checkout_commits": [
+            "2cc004b3529ab3b0d99e10e1cdffbe1391f27231"
+          ],
+          "sha256": "812e99e3922651f753aa3c56cf2cbc82f7a862a2a0368f34092e3c453183db6a"
+        }
+      ],
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
     }
   ]
 }
