@@ -1945,3 +1945,11 @@ jobs successful. Final release34661528639 and ICSE34661535011 completed. This is
 not yet a final qualification verdict: next retain remaining native logs, audit
 release/ICSE artifacts and current reviews, then record the exact-head verdict
 before normal merge. No rerun, candidate freeze or physical change.
+
+01:10UTC: all final native logs retained;38 source-bearing checks verify4749ab66,
+with two no-checkout aggregates awaiting final dependency reconciliation. Nine
+release ZIPs plus six ICSE ZIPs retained with matching GitHub digests. Release
+artifact review confirms4426 collected identities across four disjoint shards
+and both full orders, zero failures/errors and complete nine-artifact set.
+Current GitHub reviews/threads are empty. Next: validate native ICSE publication
+and audit skipped-case coverage/current-head review before qualification verdict.
