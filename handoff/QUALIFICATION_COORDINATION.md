@@ -1904,3 +1904,8 @@ Native source proof and dispatch ledger committed; no duplicate or physical chan
 
 00:24:47UTC: PR465 exact-head4749ab66 gap dispatched: cf7b-product-physical-acceptance.yml (HTTP204).
 Native source proof and dispatch ledger committed; no duplicate or physical change.
+
+00:35UTC: PR465 head4749ab66 unchanged, no reported failures. Exact-head F85/CF8
+completed; final release34661528639 has two successful jobs. CF7B34661541571 and
+ICSE34661535011 are queued. All13 required/companion workflows now have one
+justified exact-head dispatch. Next: retain only new terminal native evidence.
