@@ -14,6 +14,11 @@ import xml.etree.ElementTree as ET
 SHA = "5e6f184311019b9982e8544a18f3dc02c1b16e98"
 TREE = "1c671f446fa215c99a6a58a155806de394aa569a"
 NODE = "catalog/federation/tests/test_control_plane_session_authority.py::test_reachable_isolated_leader_cannot_report_current_session_authority"
+PREDECESSORS = [
+    "catalog/federation/tests/test_control_plane_release_bootstrap_recovery.py::test_actual_release_voters_resume_interrupted_fresh_bootstrap[after-genesis]",
+    "catalog/federation/tests/test_control_plane_release_bootstrap_recovery.py::test_actual_release_voters_resume_interrupted_fresh_bootstrap[after-journal-before-seal]",
+    "catalog/federation/tests/test_control_plane_witnessed_chunk_recovery.py::test_different_voter_completes_exact_witnessed_prefix_after_first_real_chunk",
+]
 
 
 def git(*args):
@@ -33,6 +38,7 @@ def main():
     assert root.parent.resolve() == pathlib.Path("C:/fcp-qtmp").resolve()
     root.mkdir()  # Exclusive new owned directory. Pytest bases below do not exist.
     observer = pathlib.Path(__file__).with_name("d16_beast_observer.py")
+    context_mode = os.environ.get("D16_MODE", "isolated") == "context"
     receipt = {"recorded_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                "candidate_sha": SHA, "tree": TREE,
                "control_sha": os.environ["GITHUB_SHA"], "run_id": os.environ["GITHUB_RUN_ID"],
@@ -41,7 +47,7 @@ def main():
                "owned_tmp": str(root), "diagnostic_only": True,
                "protected_recorder_data": "UNTOUCHED", "physical_runtime": "UNCHANGED",
                "observer_sha256": hashlib.sha256(observer.read_bytes()).hexdigest(),
-               "executions": []}
+               "context_mode": context_mode, "executions": []}
 
     def save():
         (output / "receipt.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
@@ -49,26 +55,29 @@ def main():
     save()
     failed = False
     try:
-        for mode in ("original", "observed"):
+        for mode in (("context",) if context_mode else ("original", "observed")):
             env = os.environ.copy()
             env["PYTHONDONTWRITEBYTECODE"] = "1"
             env["TEMP"] = env["TMP"] = "C:/fcp-qtmp"
             command = [sys.executable, "-B", "-m", "pytest", "-o", "addopts=", "-p", "no:cacheprovider",
                        "-q", "--durations=5", "--basetemp=" + str(root / mode),
                        "--junitxml=" + str(output / (mode + ".xml"))]
-            if mode == "observed":
+            if mode in ("observed", "context"):
                 env["PYTHONPATH"] = os.pathsep.join([str(observer.parent), os.getcwd()])
                 env["D16_OBSERVER_OUTPUT"] = str(output / "observer.json")
                 command += ["-p", "d16_beast_observer"]
-            command.append(NODE)
+            command += (PREDECESSORS if context_mode else []) + [NODE]
+            if context_mode:
+                command.append("-x")  # Stop at first failure; no misleading later context.
             started = time.monotonic()
-            entry = {"mode": mode, "command": command, "timeout_seconds": 180}
+            entry = {"mode": mode, "command": command,
+                     "timeout_seconds": 300 if context_mode else 180}
             receipt["executions"].append(entry)
             save()
             try:
                 with (output / (mode + ".log")).open("w", encoding="utf-8") as log:
                     completed = subprocess.run(command, env=env, stdout=log, stderr=subprocess.STDOUT,
-                                               text=True, timeout=180)
+                                               text=True, timeout=entry["timeout_seconds"])
                 entry["returncode"] = completed.returncode
                 failed = failed or completed.returncode != 0
             except subprocess.TimeoutExpired:

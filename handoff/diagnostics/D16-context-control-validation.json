@@ -1,0 +1,7 @@
+{
+  "recorded_at": "2026-09-12T19:02:01.815584+00:00",
+  "AST": "PASS two scripts",
+  "YAML": "PASS exact source/Beast/context mode",
+  "PowerShell": "PASS four native parser blocks",
+  "purpose": "4-test original predecessor context once; no release qualification; original deadlines unchanged"
+}

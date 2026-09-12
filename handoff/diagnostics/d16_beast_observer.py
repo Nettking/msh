@@ -54,6 +54,16 @@ def observe_d16(request, monkeypatch):
 
     original_populate = request.module._populate
     original_require = FederationV1ReleaseRuntime.require_quorum_leader
+    original_round = FederationV1ReleaseRuntime._lifecycle_round
+
+    @functools.wraps(original_round)
+    def lifecycle_round(runtime):
+        try:
+            return original_round(runtime)
+        except Exception as error:
+            record("lifecycle_round_exception", exception=type(error).__name__,
+                   text=str(error), runtime=snapshot(runtime))
+            raise
 
     @functools.wraps(original_populate)
     async def populate(cluster, root):
@@ -83,6 +93,7 @@ def observe_d16(request, monkeypatch):
 
     monkeypatch.setattr(request.module, "_populate", populate)
     monkeypatch.setattr(FederationV1ReleaseRuntime, "require_quorum_leader", require)
+    monkeypatch.setattr(FederationV1ReleaseRuntime, "_lifecycle_round", lifecycle_round)
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -90,7 +101,8 @@ def pytest_runtest_makereport(item, call):
     outcome = yield
     report = outcome.get_result()
     record("pytest_" + report.when, nodeid=report.nodeid, outcome=report.outcome,
-           duration=report.duration)
+           duration=report.duration,
+           threads=[{"name": t.name, "daemon": t.daemon} for t in threading.enumerate()])
 
 
 def pytest_sessionfinish(session, exitstatus):

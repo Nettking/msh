@@ -1,4 +1,4 @@
-name: D16 bounded original-Beast diagnostic
+name: D16 bounded original-Beast context diagnostic
 
 # Coordination branch only. Never merge into a candidate or acceptance contract.
 on:
@@ -63,7 +63,9 @@ jobs:
           python -B -c "import os,pathlib,subprocess; root=pathlib.Path(os.environ['D16_EVIDENCE']); sha=os.environ['GITHUB_SHA']; names=('d16_beast_observer.py','run_d16_beast_diagnostic.py'); [(root/name).write_bytes(subprocess.check_output(['git','show',sha+':handoff/diagnostics/'+name],timeout=30)) for name in names]"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Run bounded original and observed D16 test
+      - name: Run bounded original predecessor sequence and D16 test
+        env:
+          D16_MODE: context
         run: |
           python -B (Join-Path $env:D16_EVIDENCE 'run_d16_beast_diagnostic.py')
           exit $LASTEXITCODE
