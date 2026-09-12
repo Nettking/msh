@@ -2853,3 +2853,7 @@ push of this workflow starts exactly one short host-maintenance job; other
 coordination updates do not match its trigger. Expected evidence is an uploaded
 before/after JSON. Keep PR473 head fixed; do not retry failed CI until correction
 is actually demonstrated. This workflow is excluded from all release branches.
+
+## 2026-09-12T16:16:40.752375+00:00 — successful b719 release evidence retained
+
+All16 native release logs and9digest-verified artifacts are durably bundled; all four source-bound clean shard manifests pass the checked-in verifier. Every retained JUnit has zero errors/failures. Four existing b719 executions of D11 test pass (shard2, fixed, rotating, Windows transport), retained distinctly from the failed AQG Phase2 stage. Receipt: diagnostics/main-b719-release-reviewed.json. This is the automatic release run only, not a complete candidate qualification or physical acceptance. No job rerun.

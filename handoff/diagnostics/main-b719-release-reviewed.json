@@ -1,0 +1,407 @@
+{
+  "recorded_at": "2026-09-12T16:16:40.752375+00:00",
+  "source_sha": "b7194820d8f1940ae60b8c9639e09b7f61e65c55",
+  "run_id": 34701018870,
+  "status": "AUTOMATIC_RELEASE_16_OF_16_NATIVE_AND_ARTIFACTS_REVIEWED_NOT_FULL_CANDIDATE_QUALIFICATION",
+  "native": {
+    "source_commit": "b7194820d8f1940ae60b8c9639e09b7f61e65c55",
+    "retained_at": "2026-09-12T15:59:38.510581+00:00",
+    "records": [
+      {
+        "job_id": 103572679086,
+        "run_id": 34701018870,
+        "name": "Linux regression shard (1)",
+        "runner_name": "AQG7NCC-Linux",
+        "conclusion": "success",
+        "bytes": 60074,
+        "sha256": "3f5f007d56bfa9f00549bee58c2955d146df9ef1de61bc3e91682c7346b9a29d",
+        "checkout_commits": [
+          "b7194820d8f1940ae60b8c9639e09b7f61e65c55"
+        ],
+        "checkout_matches": true
+      },
+      {
+        "job_id": 103572679194,
+        "run_id": 34701018870,
+        "name": "Release checks (Windows)",
+        "runner_name": "Nettking",
+        "conclusion": "success",
+        "bytes": 55613,
+        "sha256": "2cc1eb80b811e6d2f1954fe3482ac8faf8ad5701e221e6f81d721f86e8dd20e1",
+        "checkout_commits": [
+          "b7194820d8f1940ae60b8c9639e09b7f61e65c55"
+        ],
+        "checkout_matches": true
+      },
+      {
+        "job_id": 103572679197,
+        "run_id": 34701018870,
+        "name": "PostgreSQL storage release check",
+        "runner_name": "Nettking-Linux",
+        "conclusion": "success",
+        "bytes": 43403,
+        "sha256": "7dc3a5a13665953704e18493bff8a42fb8223de65ac8f35c51c50e10fbbbb855",
+        "checkout_commits": [
+          "b7194820d8f1940ae60b8c9639e09b7f61e65c55"
+        ],
+        "checkout_matches": true
+      },
+      {
+        "job_id": 103572679213,
+        "run_id": 34701018870,
+        "name": "Full-suite order (rotating)",
+        "runner_name": "Nettking-Linux",
+        "conclusion": "success",
+        "bytes": 68256,
+        "sha256": "e6f0c7baf61e6d4deebd568d240680217e0785ae69b28bfd770b49398238dcd7",
+        "checkout_commits": [
+          "b7194820d8f1940ae60b8c9639e09b7f61e65c55"
+        ],
+        "checkout_matches": true
+      },
+      {
+        "job_id": 103572679214,
+        "run_id": 34701018870,
+        "name": "Windows regressions (transport-storage)",
+        "runner_name": "Nettking",
+        "conclusion": "success",
+        "bytes": 56190,
+        "sha256": "1ed50ea4cea10f9edd67118d4bc796f01df96ce6be67a0f34f043341b550c195",
+        "checkout_commits": [
+          "b7194820d8f1940ae60b8c9639e09b7f61e65c55"
+        ],
+        "checkout_matches": true
+      },
+      {
+        "job_id": 103572679229,
+        "run_id": 34701018870,
+        "name": "Windows regressions (capability-product)",
+        "runner_name": "Nettking",
+        "conclusion": "success",
+        "bytes": 59612,
+        "sha256": "d46444f26b163807373b845d3352e770c8758d6ca3c2a1fc18d63d489e27a2ab",
+        "checkout_commits": [
+          "b7194820d8f1940ae60b8c9639e09b7f61e65c55"
+        ],
+        "checkout_matches": true
+      },
+      {
+        "job_id": 103572679233,
+        "run_id": 34701018870,
+        "name": "Linux regression shard (0)",
+        "runner_name": "Nettking-Linux",
+        "conclusion": "success",
+        "bytes": 58974,
+        "sha256": "1d6dea14c3acca7c89aff60644f952020872ad1d5e63205a746231eecec09af6",
+        "checkout_commits": [
+          "b7194820d8f1940ae60b8c9639e09b7f61e65c55"
+        ],
+        "checkout_matches": true
+      },
+      {
+        "job_id": 103572679234,
+        "run_id": 34701018870,
+        "name": "Full-suite order (fixed)",
+        "runner_name": "Nettking-Linux",
+        "conclusion": "success",
+        "bytes": 70003,
+        "sha256": "2639c8e4e69469db87920f3ce40dca746154752cad83d9fefbcb4c563918f171",
+        "checkout_commits": [
+          "b7194820d8f1940ae60b8c9639e09b7f61e65c55"
+        ],
+        "checkout_matches": true
+      },
+      {
+        "job_id": 103572679281,
+        "run_id": 34701018870,
+        "name": "Windows regressions (journal-artifacts)",
+        "runner_name": "Nettking",
+        "conclusion": "success",
+        "bytes": 53646,
+        "sha256": "2640a4fcc275e9227e5f6e3e80aa70f06227622b6c2cfe090bbbf75fb1667149",
+        "checkout_commits": [
+          "b7194820d8f1940ae60b8c9639e09b7f61e65c55"
+        ],
+        "checkout_matches": true
+      },
+      {
+        "job_id": 103572679292,
+        "run_id": 34701018870,
+        "name": "Linux regression shard (3)",
+        "runner_name": "AQG7NCC-Linux",
+        "conclusion": "success",
+        "bytes": 61389,
+        "sha256": "8b2ea382ccaef9f242fafd43da839f9c7dba31a33bbbeecccfc0da298f10ac31",
+        "checkout_commits": [
+          "b7194820d8f1940ae60b8c9639e09b7f61e65c55"
+        ],
+        "checkout_matches": true
+      },
+      {
+        "job_id": 103572679306,
+        "run_id": 34701018870,
+        "name": "Release checks (Linux)",
+        "runner_name": "Nettking-Linux",
+        "conclusion": "success",
+        "bytes": 56593,
+        "sha256": "d0fbc75f6fc65a4e4056d910bb0584212ddd40cea5467d9daf4db112d469d889",
+        "checkout_commits": [
+          "b7194820d8f1940ae60b8c9639e09b7f61e65c55"
+        ],
+        "checkout_matches": true
+      },
+      {
+        "job_id": 103572679319,
+        "run_id": 34701018870,
+        "name": "Linux regression shard (2)",
+        "runner_name": "Nettking-Linux",
+        "conclusion": "success",
+        "bytes": 60164,
+        "sha256": "eeb4ae987999ee6e0ad9b4f0f18161b3614b3584dd676da281476ba2c409fdf0",
+        "checkout_commits": [
+          "b7194820d8f1940ae60b8c9639e09b7f61e65c55"
+        ],
+        "checkout_matches": true
+      },
+      {
+        "job_id": 103576216705,
+        "run_id": 34701018870,
+        "name": "Clean-checkout suite order independence",
+        "runner_name": "Nettking-Linux",
+        "conclusion": "success",
+        "bytes": 1101,
+        "sha256": "48549fa699ac214adf5101340c02ce88671e0c80819cfacec09e5896ec5d335a",
+        "checkout_commits": [],
+        "checkout_matches": null
+      },
+      {
+        "job_id": 103579241117,
+        "run_id": 34701018870,
+        "name": "Release matrix (Linux)",
+        "runner_name": "Nettking-Linux",
+        "conclusion": "success",
+        "bytes": 19106,
+        "sha256": "68ed43d806b64ac002a77f0cf5051fdd0760b5e509f8719dff4d44cb058e2b07",
+        "checkout_commits": [
+          "b7194820d8f1940ae60b8c9639e09b7f61e65c55"
+        ],
+        "checkout_matches": true
+      },
+      {
+        "job_id": 103579241142,
+        "run_id": 34701018870,
+        "name": "Release matrix (Windows)",
+        "runner_name": "Nettking-Linux",
+        "conclusion": "success",
+        "bytes": 15375,
+        "sha256": "6745b74b32e5b8264efe1c2a05a70e2cab9fcc3b14628a6588d4056327087102",
+        "checkout_commits": [
+          "b7194820d8f1940ae60b8c9639e09b7f61e65c55"
+        ],
+        "checkout_matches": true
+      },
+      {
+        "job_id": 103579534839,
+        "run_id": 34701018870,
+        "name": "Federation v1 automated release verdict",
+        "runner_name": "Nettking-Linux",
+        "conclusion": "success",
+        "bytes": 1189,
+        "sha256": "2f8bd5b9e05eec1abd101442942db0cf1287ebac8b6d60d0472ff469df1a6254",
+        "checkout_commits": [],
+        "checkout_matches": null
+      }
+    ]
+  },
+  "artifacts": {
+    "recorded_at": "2026-09-12T16:00:12.272240+00:00",
+    "records": [
+      {
+        "run_id": 34701018870,
+        "id": 10301535923,
+        "name": "linux-regression-shard-2",
+        "digest": "sha256:4eccd5431baac622300b26143acffe3cff428f50894c479a535a83a57294fd4d",
+        "bytes": 159878,
+        "created_at": "2026-09-12T15:50:14Z",
+        "api_workflow_head": "b7194820d8f1940ae60b8c9639e09b7f61e65c55"
+      },
+      {
+        "run_id": 34701018870,
+        "id": 10301451125,
+        "name": "linux-regression-shard-3",
+        "digest": "sha256:e1fb0839336f59c1db03ed8123f8eb59a0740de6836683b6f80c3ef6408eb350",
+        "bytes": 162130,
+        "created_at": "2026-09-12T15:51:16Z",
+        "api_workflow_head": "b7194820d8f1940ae60b8c9639e09b7f61e65c55"
+      },
+      {
+        "run_id": 34701018870,
+        "id": 10301256132,
+        "name": "linux-regression-shard-0",
+        "digest": "sha256:3a641a9da840ecd3327b6de31727044a985f5cde15ead0879d2ad3f26f37b39d",
+        "bytes": 158655,
+        "created_at": "2026-09-12T15:45:57Z",
+        "api_workflow_head": "b7194820d8f1940ae60b8c9639e09b7f61e65c55"
+      },
+      {
+        "run_id": 34701018870,
+        "id": 10301180109,
+        "name": "full-suite-order-fixed",
+        "digest": "sha256:8b8535828bc6bede9f41dd5734ded5ecaaa951b56f203f964a25b3f4a9d97e25",
+        "bytes": 107459,
+        "created_at": "2026-09-12T15:28:32Z",
+        "api_workflow_head": "b7194820d8f1940ae60b8c9639e09b7f61e65c55"
+      },
+      {
+        "run_id": 34701018870,
+        "id": 10301100039,
+        "name": "windows-regression-journal-artifacts",
+        "digest": "sha256:d9694eff0da7e6c3e33b1423082fd77792ee2894aabd96ae85301e692a3756d8",
+        "bytes": 6978,
+        "created_at": "2026-09-12T15:25:34Z",
+        "api_workflow_head": "b7194820d8f1940ae60b8c9639e09b7f61e65c55"
+      },
+      {
+        "run_id": 34701018870,
+        "id": 10300710085,
+        "name": "full-suite-order-rotating",
+        "digest": "sha256:b0e464366eeb0723884024613dd3a9cdacd7cf04894675a8a4e41acbd86531d1",
+        "bytes": 107565,
+        "created_at": "2026-09-12T15:18:39Z",
+        "api_workflow_head": "b7194820d8f1940ae60b8c9639e09b7f61e65c55"
+      },
+      {
+        "run_id": 34701018870,
+        "id": 10300373223,
+        "name": "linux-regression-shard-1",
+        "digest": "sha256:f6b7efe54207f7ed61e4d713df967b98e845d1068c3a536f874bbd9af690c6fc",
+        "bytes": 162254,
+        "created_at": "2026-09-12T15:13:11Z",
+        "api_workflow_head": "b7194820d8f1940ae60b8c9639e09b7f61e65c55"
+      },
+      {
+        "run_id": 34701018870,
+        "id": 10299894070,
+        "name": "windows-regression-transport-storage",
+        "digest": "sha256:d122b18db3296c76e08965c13066e8d521fda7f9244f97c5376cc495ad2d4c71",
+        "bytes": 8772,
+        "created_at": "2026-09-12T15:10:24Z",
+        "api_workflow_head": "b7194820d8f1940ae60b8c9639e09b7f61e65c55"
+      },
+      {
+        "run_id": 34701018870,
+        "id": 10299714482,
+        "name": "windows-regression-capability-product",
+        "digest": "sha256:e57daa2c6c6eb2ea77ea464819077b2e93a7cc2325ecc9fe565278bfe83732f2",
+        "bytes": 21407,
+        "created_at": "2026-09-12T15:16:43Z",
+        "api_workflow_head": "b7194820d8f1940ae60b8c9639e09b7f61e65c55"
+      }
+    ]
+  },
+  "test_artifact_summaries": [
+    {
+      "artifact": "linux-regression-shard-2",
+      "member": "junit-2.xml",
+      "testcases": 1121,
+      "skips": 19
+    },
+    {
+      "artifact": "linux-regression-shard-3",
+      "member": "junit-3.xml",
+      "testcases": 1121,
+      "skips": 3
+    },
+    {
+      "artifact": "linux-regression-shard-0",
+      "member": "junit-0.xml",
+      "testcases": 1122,
+      "skips": 2
+    },
+    {
+      "artifact": "full-suite-order-fixed",
+      "member": "order-fixed.xml",
+      "testcases": 4486,
+      "skips": 40
+    },
+    {
+      "artifact": "windows-regression-journal-artifacts",
+      "member": "windows-journal-artifacts.xml",
+      "testcases": 298,
+      "skips": 1
+    },
+    {
+      "artifact": "full-suite-order-rotating",
+      "member": "order-rotating.xml",
+      "testcases": 4486,
+      "skips": 40
+    },
+    {
+      "artifact": "linux-regression-shard-1",
+      "member": "junit-1.xml",
+      "testcases": 1122,
+      "skips": 16
+    },
+    {
+      "artifact": "windows-regression-transport-storage",
+      "member": "windows-transport-storage.xml",
+      "testcases": 371,
+      "skips": 1
+    },
+    {
+      "artifact": "windows-regression-capability-product",
+      "member": "windows-capability-product.xml",
+      "testcases": 895,
+      "skips": 5
+    }
+  ],
+  "shard_verification": {
+    "command": [
+      "C:\\wsl\\fcp-v1-fba508-nettking-20260910\\.venv\\Scripts\\python.exe",
+      "-B",
+      "-m",
+      "scripts.ci_pytest_shards",
+      "verify",
+      "--directory",
+      "C:\\wsl\\fcp-v1-fba508-nettking-20260910\\.acceptance\\main-b719-reviewed-shards",
+      "--count",
+      "4",
+      "--source-sha",
+      "b7194820d8f1940ae60b8c9639e09b7f61e65c55"
+    ],
+    "exit_code": 0,
+    "stdout": "Verified 4486 tests across 4 disjoint successful shards\n",
+    "stderr": "",
+    "verifier_source_note": "Checked-in verifier byte-identical between b719 and retirement440; data/source-sha remain explicitly b719."
+  },
+  "D11_existing_same_source_passes": [
+    {
+      "artifact": "linux-regression-shard-2",
+      "member": "junit-2.xml",
+      "seconds": 2.473,
+      "status": "PASS"
+    },
+    {
+      "artifact": "full-suite-order-fixed",
+      "member": "order-fixed.xml",
+      "seconds": 1.936,
+      "status": "PASS"
+    },
+    {
+      "artifact": "full-suite-order-rotating",
+      "member": "order-rotating.xml",
+      "seconds": 2.488,
+      "status": "PASS"
+    },
+    {
+      "artifact": "windows-regression-transport-storage",
+      "member": "windows-transport-storage.xml",
+      "seconds": 6.664,
+      "status": "PASS"
+    }
+  ],
+  "durable_bundle": "main-b719-release-native-and-artifact-evidence.zip",
+  "remaining_limits": "D11/D12 companion failures remain open; no physical candidate freeze, no full37 qualification claim, no reruns.",
+  "protected_recorder_data": "UNTOUCHED",
+  "physical_acceptance": false
+}
