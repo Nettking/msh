@@ -7,7 +7,7 @@ PR465/D07 previously qualified and merged asb6a96b21. All required fixes are mer
 Clean detached qualification checkout is verified. All13 workflows are running or
 completed (six existing push runs plus seven single guarded dispatches). Next:
 poll_merged_main_state.py, retain only new native logs, then final artifact review.
-Current verified proof:21/37 required plus3/3 companions (04:49UTC).
+Current verified proof:28/37 required plus3/3 companions (05:00UTC).
 Main2a9c9b8e is not yet qualified or frozen as a physical candidate.
 Do not requalify PR heads or intermediate main. Physical runtime remains
 M`9b286f931497bf6291e215f6340443c5162826b0`; admission stopped, no physical PASS
@@ -2227,3 +2227,5 @@ Only required absent gates may be dispatched; no physical deployment or candidat
 04:49UTC native retention: all six new terminal logs verify exact2a9c9b8eb53edff74c2de23570ec56e054d29b22; required proof now21/37 plus3/3 companions. ICSE4/4 native source proofs complete; publication artifact review still required. No new defect or duplicate job. Next exact command: audit Python -B handoff/diagnostics/poll_merged_main_state.py; retain only new terminal jobs with retain_merged_main_jobs.py and complete current-main artifact/skip/ICSE review once required runs finish. Physical admission remains stopped; no timers.
 
 05:00UTC: actual main remains2a9c9b8eb53edff74c2de23570ec56e054d29b22; seven new successful terminal jobs (release3,branding,phase2,CF7C,CF8). Both full-suite orders now completed successfully; no failed or missing required workflow. Next: retain new native logs and verify exact checkout before updating count. No dispatch or physical action.
+
+05:00UTC native retention: all seven new terminal logs prove exact2a9c9b8eb53edff74c2de23570ec56e054d29b22; required proof now28/37 plus3/3 companions. Both full-order native receipts retained. No source mismatch or new defect. Next exact command: audit Python -B handoff/diagnostics/poll_merged_main_state.py; retain only newly terminal jobs with retain_merged_main_jobs.py, then complete exact-main artifact/skip/ICSE review when required jobs finish. No rerun, physical action, freeze or timers.
