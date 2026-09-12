@@ -1,0 +1,234 @@
+{
+  "recorded_at": "2026-09-12T15:00:49.158561+00:00",
+  "status": "TARGETED_RETRY_NATIVE_REVIEW_PASS_ORIGINAL_CAUSES_OPEN",
+  "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+  "actual_checkout": "f18e91adae2cb198fb5cebad61ee202a38d2bd8e",
+  "native_retention": {
+    "source_commit": "f18e91adae2cb198fb5cebad61ee202a38d2bd8e",
+    "retained_at": "2026-09-12T14:58:40.488356+00:00",
+    "records": [
+      {
+        "job_id": 103566982282,
+        "run_id": 34695331201,
+        "name": "Linux regression shard (2)",
+        "runner_name": "Nettking-Linux",
+        "conclusion": "success",
+        "bytes": 59402,
+        "sha256": "f4348a9a498fb3d76bc05db4c4035747329153e9477c2afc95f68a47bfe3b8c9",
+        "checkout_commits": [
+          "f18e91adae2cb198fb5cebad61ee202a38d2bd8e"
+        ],
+        "checkout_matches": true
+      },
+      {
+        "job_id": 103567411589,
+        "run_id": 34695331201,
+        "name": "Release matrix (Windows)",
+        "runner_name": "AQG7NCC-Linux",
+        "conclusion": "success",
+        "bytes": 15499,
+        "sha256": "3dc4da4721549470723f4eb79fef417ab03043b434a0d56fd294909f894520df",
+        "checkout_commits": [
+          "f18e91adae2cb198fb5cebad61ee202a38d2bd8e"
+        ],
+        "checkout_matches": true
+      },
+      {
+        "job_id": 103567411606,
+        "run_id": 34695331201,
+        "name": "Release matrix (Linux)",
+        "runner_name": "Nettking-Linux",
+        "conclusion": "success",
+        "bytes": 18830,
+        "sha256": "3b64d6e1b36c1772f24c929fa88c7c0a1c21e135091b8eac1538b3a2b2f67023",
+        "checkout_commits": [
+          "f18e91adae2cb198fb5cebad61ee202a38d2bd8e"
+        ],
+        "checkout_matches": true
+      },
+      {
+        "job_id": 103567449153,
+        "run_id": 34695331201,
+        "name": "Federation v1 automated release verdict",
+        "runner_name": "Nettking-Linux",
+        "conclusion": "success",
+        "bytes": 1189,
+        "sha256": "6bdd97c45e18450a877812d0c926529dd636339b335c080628bc9ec9293ae561",
+        "checkout_commits": [],
+        "checkout_matches": null
+      },
+      {
+        "job_id": 103566982639,
+        "run_id": 34695331247,
+        "name": "windows",
+        "runner_name": "Nettking",
+        "conclusion": "success",
+        "bytes": 48234,
+        "sha256": "f3994ce921e383ac28508b9d640bf4d661f9032eb2e80a5338773d560ff18490",
+        "checkout_commits": [
+          "f18e91adae2cb198fb5cebad61ee202a38d2bd8e"
+        ],
+        "checkout_matches": true
+      }
+    ]
+  },
+  "artifacts": {
+    "recorded_at": "2026-09-12T14:58:46.796336+00:00",
+    "records": [
+      {
+        "run_id": 34695331201,
+        "id": 10299617193,
+        "name": "linux-regression-shard-2",
+        "digest": "sha256:8bedd4f5b8929c6f86e5c7912325c37b3a1227828d916ee5a0cf059ff5e7457b",
+        "bytes": 160037,
+        "created_at": "2026-09-12T14:21:08Z",
+        "api_workflow_head": "ba44100ec1e4cde19daba0d3723b991c11742316"
+      },
+      {
+        "run_id": 34695331201,
+        "id": 10299280471,
+        "name": "windows-regression-journal-artifacts",
+        "digest": "sha256:d0e9277c07ccc24ff3b579e8c8d9822605f773f78947ce421a0a5cb7a3a6aa01",
+        "bytes": 6882,
+        "created_at": "2026-09-12T13:21:15Z",
+        "api_workflow_head": "ba44100ec1e4cde19daba0d3723b991c11742316"
+      },
+      {
+        "run_id": 34695331201,
+        "id": 10298887104,
+        "name": "linux-regression-shard-0",
+        "digest": "sha256:2a8df4bcefa6cfd598ca115e60961839b9717e05b870b7d835fc67d376b50196",
+        "bytes": 158698,
+        "created_at": "2026-09-12T13:32:42Z",
+        "api_workflow_head": "ba44100ec1e4cde19daba0d3723b991c11742316"
+      },
+      {
+        "run_id": 34695331201,
+        "id": 10298632332,
+        "name": "full-suite-order-rotating",
+        "digest": "sha256:6cb8f0bcaf08f689454abf95abd2516553dc2a2df27a963d5f1461149ba60dd6",
+        "bytes": 107632,
+        "created_at": "2026-09-12T13:28:58Z",
+        "api_workflow_head": "ba44100ec1e4cde19daba0d3723b991c11742316"
+      },
+      {
+        "run_id": 34695331201,
+        "id": 10298587816,
+        "name": "linux-regression-shard-3",
+        "digest": "sha256:827198b1624752f8f9aed6ef6d56956cd9e1a5bdcf40f74d9bb1236cab2f24d0",
+        "bytes": 162209,
+        "created_at": "2026-09-12T13:29:36Z",
+        "api_workflow_head": "ba44100ec1e4cde19daba0d3723b991c11742316"
+      },
+      {
+        "run_id": 34695331201,
+        "id": 10298577170,
+        "name": "linux-regression-shard-1",
+        "digest": "sha256:85ff8a35b3bece3c8c576fc2f2fd29f52372048694b8387779a3de5d1fef0b0d",
+        "bytes": 162168,
+        "created_at": "2026-09-12T13:11:41Z",
+        "api_workflow_head": "ba44100ec1e4cde19daba0d3723b991c11742316"
+      },
+      {
+        "run_id": 34695331201,
+        "id": 10298549789,
+        "name": "full-suite-order-fixed",
+        "digest": "sha256:37b1d7cd5dd79301676ce6d12315ddeb1cc4a5c6f0dd9f96a040a8741c5fff6c",
+        "bytes": 107416,
+        "created_at": "2026-09-12T13:17:54Z",
+        "api_workflow_head": "ba44100ec1e4cde19daba0d3723b991c11742316"
+      },
+      {
+        "run_id": 34695331201,
+        "id": 10298003614,
+        "name": "windows-regression-transport-storage",
+        "digest": "sha256:406463c63d16a111302020af6f774cb5375fe467ca36ef006637e29a1ab2294b",
+        "bytes": 8811,
+        "created_at": "2026-09-12T13:07:28Z",
+        "api_workflow_head": "ba44100ec1e4cde19daba0d3723b991c11742316"
+      },
+      {
+        "run_id": 34695331201,
+        "id": 10297614070,
+        "name": "windows-regression-capability-product",
+        "digest": "sha256:4b29017d36c7cb6717015ada4eca8204882f7421ba92a68e4fc362f67ac6bc35",
+        "bytes": 21333,
+        "created_at": "2026-09-12T13:12:48Z",
+        "api_workflow_head": "ba44100ec1e4cde19daba0d3723b991c11742316"
+      }
+    ]
+  },
+  "D11": {
+    "runner": "Nettking-Linux",
+    "job": 103566982282,
+    "target_seconds": 2.198,
+    "test_result": "PASS",
+    "shard_result": "1102 passed,19 skipped,3365 deselected",
+    "manifest": {
+      "source_sha": "f18e91adae2cb198fb5cebad61ee202a38d2bd8e",
+      "source_identity_before": {
+        "sha": "f18e91adae2cb198fb5cebad61ee202a38d2bd8e",
+        "tree": "403cf4d2bcf1560d940842fba365196441096951"
+      },
+      "source_identity_after": {
+        "sha": "f18e91adae2cb198fb5cebad61ee202a38d2bd8e",
+        "tree": "403cf4d2bcf1560d940842fba365196441096951"
+      },
+      "source_error": null,
+      "exit_code": 0,
+      "collection_complete": true
+    },
+    "durable_zip": "D11-successful-retry-shard-2.zip",
+    "original_failure": "D11-original-shard-2.zip",
+    "classification": "UNRESOLVED intermittent timing/host/test/runtime cause; no repair established"
+  },
+  "D12": {
+    "runner": "Nettking",
+    "job": 103566982639,
+    "go_build": "PASS with unchanged default VCS stamping",
+    "python_result": "381 passed,1 skipped",
+    "classification": "Git/VCS introspection execution failure on original Beast host; underlying host/toolchain cause unresolved, no product test failure observed"
+  },
+  "pr_metadata": {
+    "number": 468,
+    "state": "open",
+    "draft": true,
+    "mergeable": true,
+    "mergeable_state": "unstable",
+    "merge_commit_sha": "f18e91adae2cb198fb5cebad61ee202a38d2bd8e",
+    "updated_at": "2026-09-12T13:08:10Z"
+  },
+  "pr_head": "ba44100ec1e4cde19daba0d3723b991c11742316",
+  "pr_base": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
+  "current_main": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
+  "changed_files": [
+    {
+      "filename": ".github/workflows/phase-f7-closeout.yml",
+      "status": "modified",
+      "additions": 42,
+      "deletions": 0
+    },
+    {
+      "filename": "catalog/common/tests/test_f7_ci_coverage.py",
+      "status": "added",
+      "additions": 163,
+      "deletions": 0
+    },
+    {
+      "filename": "docs/implementation/f7_ci_consolidation.md",
+      "status": "added",
+      "additions": 40,
+      "deletions": 0
+    },
+    {
+      "filename": "docs/implementation/federation_v1_cleanup_manifest.md",
+      "status": "modified",
+      "additions": 6,
+      "deletions": 0
+    }
+  ],
+  "reviews": [],
+  "disposition": "Required final-head checks now pass under the unchanged checked-in retry contract. Original failure issues stay open: these successes do not establish host root causes or repair product behavior. CI coverage-only extension can be assessed independently; no new physical candidate or physical PASS is selected from this evidence.",
+  "protected_recorder_data": "UNTOUCHED",
+  "physical_runtime_changed": false
+}

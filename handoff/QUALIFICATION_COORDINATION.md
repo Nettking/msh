@@ -2727,3 +2727,7 @@ additional retry or full qualification is scheduled. Current source unchanged.
 ## 2026-09-12T14:58:18.418025+00:00 — both bounded retries completed green
 
 API snapshot and selected actual reexecutions are persisted in diagnostics/D11-D12-targeted-retry-outcome.json. Successful-job metadata copies have original earlier timestamps and are not claimed as additional executions. Native outcome review is next; original issues stay open.
+
+## 2026-09-12T15:00:49.158561+00:00 — retry native evidence reviewed
+
+D11 test PASS2.20s, shard1102PASS/19skips; clean manifest has unchanged f18e91ad source before/after. D12 default-stamped Go build PASS then381PythonPASS/1skip. Actual checkout verified for both and both release matrix verifiers; verdict is dependency-only. Original issues471/472 remain open, not repaired. Required final-head checks are green under the existing failed-job retry contract. Next finish the independent CI-extension merge/reference review; keep host causes distinct from migration and physical evidence. Receipt: diagnostics/D11-D12-reviewed-retry-pass.json.
