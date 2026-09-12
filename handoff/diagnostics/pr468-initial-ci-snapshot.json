@@ -1,0 +1,492 @@
+{
+  "recorded_at": "2026-09-12T11:05:42.822046+00:00",
+  "pr": 468,
+  "url": "https://github.com/Nettking/msh/pull/468",
+  "head": "f3abe5452db2f21593a688bc62bc5f4b22d5c40e",
+  "base": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
+  "merge_commit_sha": "b0fbb8a1a4e216b8696b8015a35594c1007319de",
+  "draft": true,
+  "state": "open",
+  "runs": [
+    {
+      "id": 34689990982,
+      "name": "Phase F8 trusted provider closeout",
+      "path": ".github/workflows/phase-f8-closeout.yml",
+      "status": "queued",
+      "conclusion": null,
+      "head_sha": "f3abe5452db2f21593a688bc62bc5f4b22d5c40e",
+      "event": "pull_request",
+      "run_attempt": 1,
+      "created_at": "2026-09-12T11:02:17Z",
+      "updated_at": "2026-09-12T11:02:17Z",
+      "html_url": "https://github.com/Nettking/msh/actions/runs/34689990982"
+    },
+    {
+      "id": 34689990969,
+      "name": "Federation software update",
+      "path": ".github/workflows/federation-software-update.yml",
+      "status": "queued",
+      "conclusion": null,
+      "head_sha": "f3abe5452db2f21593a688bc62bc5f4b22d5c40e",
+      "event": "pull_request",
+      "run_attempt": 1,
+      "created_at": "2026-09-12T11:02:17Z",
+      "updated_at": "2026-09-12T11:02:17Z",
+      "html_url": "https://github.com/Nettking/msh/actions/runs/34689990969"
+    },
+    {
+      "id": 34689990979,
+      "name": "Phase 2 federation",
+      "path": ".github/workflows/phase2-federation.yml",
+      "status": "queued",
+      "conclusion": null,
+      "head_sha": "f3abe5452db2f21593a688bc62bc5f4b22d5c40e",
+      "event": "pull_request",
+      "run_attempt": 1,
+      "created_at": "2026-09-12T11:02:17Z",
+      "updated_at": "2026-09-12T11:02:17Z",
+      "html_url": "https://github.com/Nettking/msh/actions/runs/34689990979"
+    },
+    {
+      "id": 34689990970,
+      "name": "Product branding boundary",
+      "path": ".github/workflows/product-branding.yml",
+      "status": "queued",
+      "conclusion": null,
+      "head_sha": "f3abe5452db2f21593a688bc62bc5f4b22d5c40e",
+      "event": "pull_request",
+      "run_attempt": 1,
+      "created_at": "2026-09-12T11:02:17Z",
+      "updated_at": "2026-09-12T11:02:17Z",
+      "html_url": "https://github.com/Nettking/msh/actions/runs/34689990970"
+    },
+    {
+      "id": 34689990991,
+      "name": "Phase F6 transport closeout",
+      "path": ".github/workflows/phase-f6-closeout.yml",
+      "status": "queued",
+      "conclusion": null,
+      "head_sha": "f3abe5452db2f21593a688bc62bc5f4b22d5c40e",
+      "event": "pull_request",
+      "run_attempt": 1,
+      "created_at": "2026-09-12T11:02:17Z",
+      "updated_at": "2026-09-12T11:02:17Z",
+      "html_url": "https://github.com/Nettking/msh/actions/runs/34689990991"
+    },
+    {
+      "id": 34689991000,
+      "name": "Federation v1 release gate",
+      "path": ".github/workflows/federation-v1-release.yml",
+      "status": "queued",
+      "conclusion": null,
+      "head_sha": "f3abe5452db2f21593a688bc62bc5f4b22d5c40e",
+      "event": "pull_request",
+      "run_attempt": 1,
+      "created_at": "2026-09-12T11:02:17Z",
+      "updated_at": "2026-09-12T11:02:17Z",
+      "html_url": "https://github.com/Nettking/msh/actions/runs/34689991000"
+    },
+    {
+      "id": 34689991015,
+      "name": "Documentation portal",
+      "path": ".github/workflows/docs-portal.yml",
+      "status": "completed",
+      "conclusion": "failure",
+      "head_sha": "f3abe5452db2f21593a688bc62bc5f4b22d5c40e",
+      "event": "pull_request",
+      "run_attempt": 1,
+      "created_at": "2026-09-12T11:02:17Z",
+      "updated_at": "2026-09-12T11:02:21Z",
+      "html_url": "https://github.com/Nettking/msh/actions/runs/34689991015",
+      "jobs": [
+        {
+          "id": 103543444495,
+          "run_id": 34689991015,
+          "workflow_name": "Documentation portal",
+          "head_branch": "codex/ci-f7-coverage-consolidation",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34689991015",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYG6uUDw",
+          "head_sha": "f3abe5452db2f21593a688bc62bc5f4b22d5c40e",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103543444495",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34689991015/job/103543444495",
+          "status": "completed",
+          "conclusion": "failure",
+          "created_at": "2026-09-12T11:02:17Z",
+          "started_at": "2026-09-12T11:02:17Z",
+          "completed_at": "2026-09-12T11:02:19Z",
+          "name": "docs-portal (windows-latest)",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103543444495",
+          "labels": [
+            "windows-latest"
+          ],
+          "runner_id": 0,
+          "runner_name": "",
+          "runner_group_id": 0,
+          "runner_group_name": "",
+          "annotations": [
+            {
+              "path": ".github",
+              "blob_href": "https://github.com/Nettking/msh/blob/f3abe5452db2f21593a688bc62bc5f4b22d5c40e/.github",
+              "start_line": 1,
+              "start_column": null,
+              "end_line": 1,
+              "end_column": null,
+              "annotation_level": "failure",
+              "title": "",
+              "message": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings",
+              "raw_details": ""
+            }
+          ]
+        },
+        {
+          "id": 103543444692,
+          "run_id": 34689991015,
+          "workflow_name": "Documentation portal",
+          "head_branch": "codex/ci-f7-coverage-consolidation",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34689991015",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYG6uU1A",
+          "head_sha": "f3abe5452db2f21593a688bc62bc5f4b22d5c40e",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103543444692",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34689991015/job/103543444692",
+          "status": "completed",
+          "conclusion": "failure",
+          "created_at": "2026-09-12T11:02:17Z",
+          "started_at": "2026-09-12T11:02:17Z",
+          "completed_at": "2026-09-12T11:02:21Z",
+          "name": "docs-portal (ubuntu-latest)",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103543444692",
+          "labels": [
+            "ubuntu-latest"
+          ],
+          "runner_id": 0,
+          "runner_name": "",
+          "runner_group_id": 0,
+          "runner_group_name": "",
+          "annotations": [
+            {
+              "path": ".github",
+              "blob_href": "https://github.com/Nettking/msh/blob/f3abe5452db2f21593a688bc62bc5f4b22d5c40e/.github",
+              "start_line": 1,
+              "start_column": null,
+              "end_line": 1,
+              "end_column": null,
+              "annotation_level": "failure",
+              "title": "",
+              "message": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings",
+              "raw_details": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 34689990990,
+      "name": "Phase F7 capability scheduling closeout",
+      "path": ".github/workflows/phase-f7-closeout.yml",
+      "status": "in_progress",
+      "conclusion": null,
+      "head_sha": "f3abe5452db2f21593a688bc62bc5f4b22d5c40e",
+      "event": "pull_request",
+      "run_attempt": 1,
+      "created_at": "2026-09-12T11:02:17Z",
+      "updated_at": "2026-09-12T11:02:26Z",
+      "html_url": "https://github.com/Nettking/msh/actions/runs/34689990990",
+      "jobs": [
+        {
+          "id": 103543444377,
+          "run_id": 34689990990,
+          "workflow_name": "Phase F7 capability scheduling closeout",
+          "head_branch": "codex/ci-f7-coverage-consolidation",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34689990990",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYG6uTmQ",
+          "head_sha": "f3abe5452db2f21593a688bc62bc5f4b22d5c40e",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103543444377",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34689990990/job/103543444377",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-12T11:02:17Z",
+          "started_at": "2026-09-12T11:02:19Z",
+          "completed_at": "2026-09-12T11:04:18Z",
+          "name": "capability-closeout (Linux, fcp-linux-fast, bash)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-12T11:02:20Z",
+              "completed_at": "2026-09-12T11:02:23Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-12T11:02:23Z",
+              "completed_at": "2026-09-12T11:02:25Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-12T11:02:25Z",
+              "completed_at": "2026-09-12T11:02:29Z"
+            },
+            {
+              "name": "Install dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-12T11:02:29Z",
+              "completed_at": "2026-09-12T11:03:05Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-12T11:03:05Z",
+              "completed_at": "2026-09-12T11:03:05Z"
+            },
+            {
+              "name": "Compile complete F7 boundary",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-12T11:03:05Z",
+              "completed_at": "2026-09-12T11:03:05Z"
+            },
+            {
+              "name": "Complete F7 and Phase 6 acceptance matrix",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-12T11:03:05Z",
+              "completed_at": "2026-09-12T11:04:12Z"
+            },
+            {
+              "name": "Ruff complete F7 boundary",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-12T11:04:12Z",
+              "completed_at": "2026-09-12T11:04:12Z"
+            },
+            {
+              "name": "Preserve capability UP035 coverage",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-12T11:04:12Z",
+              "completed_at": "2026-09-12T11:04:12Z"
+            },
+            {
+              "name": "Preserve relay lifecycle lint coverage",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-09-12T11:04:12Z",
+              "completed_at": "2026-09-12T11:04:12Z"
+            },
+            {
+              "name": "Compose validation",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-09-12T11:04:12Z",
+              "completed_at": "2026-09-12T11:04:12Z"
+            },
+            {
+              "name": "Diff hygiene",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-09-12T11:04:12Z",
+              "completed_at": "2026-09-12T11:04:12Z"
+            },
+            {
+              "name": "Preserve native F7 test evidence",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-09-12T11:04:12Z",
+              "completed_at": "2026-09-12T11:04:14Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 26,
+              "started_at": "2026-09-12T11:04:14Z",
+              "completed_at": "2026-09-12T11:04:14Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 27,
+              "started_at": "2026-09-12T11:04:14Z",
+              "completed_at": "2026-09-12T11:04:14Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103543444377",
+          "labels": [
+            "self-hosted",
+            "fcp-linux-fast"
+          ],
+          "runner_id": 27,
+          "runner_name": "Nettking-Linux",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103543444464,
+          "run_id": 34689990990,
+          "workflow_name": "Phase F7 capability scheduling closeout",
+          "head_branch": "codex/ci-f7-coverage-consolidation",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34689990990",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYG6uT8A",
+          "head_sha": "f3abe5452db2f21593a688bc62bc5f4b22d5c40e",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103543444464",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34689990990/job/103543444464",
+          "status": "in_progress",
+          "conclusion": null,
+          "created_at": "2026-09-12T11:02:17Z",
+          "started_at": "2026-09-12T11:02:19Z",
+          "completed_at": null,
+          "name": "capability-closeout (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-12T11:02:20Z",
+              "completed_at": "2026-09-12T11:02:23Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-12T11:02:23Z",
+              "completed_at": "2026-09-12T11:02:30Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-12T11:02:30Z",
+              "completed_at": "2026-09-12T11:02:40Z"
+            },
+            {
+              "name": "Install dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-12T11:02:40Z",
+              "completed_at": "2026-09-12T11:05:02Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 5,
+              "started_at": "2026-09-12T11:05:02Z",
+              "completed_at": "2026-09-12T11:05:02Z"
+            },
+            {
+              "name": "Compile complete F7 boundary",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-12T11:05:02Z",
+              "completed_at": "2026-09-12T11:05:03Z"
+            },
+            {
+              "name": "Complete F7 and Phase 6 acceptance matrix",
+              "status": "in_progress",
+              "conclusion": null,
+              "number": 7,
+              "started_at": "2026-09-12T11:05:03Z",
+              "completed_at": null
+            },
+            {
+              "name": "Ruff complete F7 boundary",
+              "status": "pending",
+              "conclusion": null,
+              "number": 8,
+              "started_at": null,
+              "completed_at": null
+            },
+            {
+              "name": "Preserve capability UP035 coverage",
+              "status": "pending",
+              "conclusion": null,
+              "number": 9,
+              "started_at": null,
+              "completed_at": null
+            },
+            {
+              "name": "Preserve relay lifecycle lint coverage",
+              "status": "pending",
+              "conclusion": null,
+              "number": 10,
+              "started_at": null,
+              "completed_at": null
+            },
+            {
+              "name": "Compose validation",
+              "status": "pending",
+              "conclusion": null,
+              "number": 11,
+              "started_at": null,
+              "completed_at": null
+            },
+            {
+              "name": "Diff hygiene",
+              "status": "pending",
+              "conclusion": null,
+              "number": 12,
+              "started_at": null,
+              "completed_at": null
+            },
+            {
+              "name": "Preserve native F7 test evidence",
+              "status": "pending",
+              "conclusion": null,
+              "number": 13,
+              "started_at": null,
+              "completed_at": null
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "pending",
+              "conclusion": null,
+              "number": 26,
+              "started_at": null,
+              "completed_at": null
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103543444464",
+          "labels": [
+            "self-hosted",
+            "fcp-windows"
+          ],
+          "runner_id": 22,
+          "runner_name": "Nettking",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        }
+      ]
+    }
+  ]
+}

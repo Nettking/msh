@@ -30,5 +30,7 @@
   "legacy_retired": [],
   "product_runtime_changed": false,
   "physical_acceptance": false,
-  "note": "Focused contract tests, not replacement qualification. One existing matrix, eight added product paths plus CI test self-path, three product test modules plus CI contract module, and JUnit retention; zero new jobs/workflows."
+  "note": "Focused contract tests, not replacement qualification. One existing matrix, eight added product paths plus CI test self-path, three product test modules plus CI contract module, and JUnit retention; zero new jobs/workflows.",
+  "pr": 468,
+  "pr_url": "https://github.com/Nettking/msh/pull/468"
 }

@@ -1,6 +1,6 @@
 # Federation v1 qualification coordination
 
-**Current actionable checkpoint (2026-09-12T10:00Z):** actual merged main
+**Current actionable checkpoint (2026-09-12T11:06Z):** actual merged main
 17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05 is QUALIFIED_ACTUAL_MERGED_MAIN.
 Receipt: diagnostics/merged-main-final-qualification.json. All37 required plus3
 companions passed;40 native logs reconciled (38 exact checkouts,2 dependency-only
@@ -11,11 +11,21 @@ all17 D08 cases across native platforms, original scheduler failure and explicit
 platform exclusions reconciled. No job was rerun for historical hosted billing reds.
 All prior PR/failed-main evidence retained under its own source. No further17ab CI
 polling or qualification is needed unless a concrete new contract reason appears.
-Next highest-value action: implement/review the already-persisted one-workflow migration proposal in an isolated CI-only branch. Plan: CI_COVERAGE_MIGRATION_PLAN.md; exact matrix: diagnostics/ci-migration-equivalence-matrix.json. Retain legacy files until replacement evidence exists. Read handoff/CI_WORKFLOW_RETIREMENT_REVIEW.md and its audit receipts.
-Verify reported AQG7NCC native fcp-windows capacity without changing labels/accounts
-or admitting a runner to fcp-test release pools. Prefer retained workflow extensions,
-preserveUP035, relay lint and12Windows AI-trigger modules; require equivalent green
-replacement evidence twice before partial/coherent retirement. No eight duplicates.
+Next highest-value action: review native F7 replacement evidence for draft
+[PR468](https://github.com/Nettking/msh/pull/468), exact head
+f3abe5452db2f21593a688bc62bc5f4b22d5c40e. Stage1 extension is pushed;
+29 focused coverage-contract checks and lint/format/diff checks passed.
+Initial automatic F7 run34689990990 started correctly on Nettking native Windows
+and Nettking-Linux; Linux passed, Windows tests in progress at11:05Z. Preserve
+all automatic PR468 runs. Next independent action: create the planned disposable
+JS-only canary PR against this migration branch, retain its actual event/run/source
+proof, then review two complete green native F7 executions before any retirement.
+No duplicate37-job dispatch is needed for replacement proof. F7 jobs have30min
+limits; check near expected completion, long release jobs no sooner than45-60min.
+Plan: CI_COVERAGE_MIGRATION_PLAN.md; mapping: diagnostics/ci-migration-equivalence-matrix.json.
+All eight legacy workflows remain. Release/F6/F8 and runner accounts/pools unchanged.
+AQG Windows has fcp-windows but was offline at10:01Z, separate from AQG Linux;
+Nettking supplies both current native jobs. No runner admission changes.
 Clean qualified checkout:C:/wsl/fcp-v1-17ab3a05-merged-main-20260912.
 Physical runtime remains9b286f931497bf6291e215f6340443c5162826b0; freeze/revalidation
 and physical restart deferred while CI source decision is pending. No physical PASS,
@@ -2425,3 +2435,17 @@ permanent cancellation of the newly authorized migration objective.
 
 2026-09-12T10:08:09.7495438Z: heartbeat now targets persisted stage1 migration proposal and stops polling fully qualified17ab/467. Proposal is reviewable in GitHub; zero workflow/product edits made so far. Next: isolated CI branch, F7-only extension plus focused contract validation, draft PR and source-bound replacement evidence, with retirement withheld. All source/evidence branches pushed; physical runtime unchanged.
 2026-09-12T11:02:15.0899456Z: stage1 CI extension pushed clean atf3abe5452db2f21593a688bc62bc5f4b22d5c40e on codex/ci-f7-coverage-consolidation; draft PR creation completed (resolve current PR number from GitHub if needed). Four changed files only: F7 workflow, CI contract tests, consolidation doc, manifest note. Focused29PASS plus lint/format/diff PASS; receipts retained. Added CI test self-trigger/module and native JUnit retention implement the planned contract/provenance proof without new jobs. Native replacement2greens and realJS-only automatic proof remain pending; no legacy deletion/product change. Next: inspect new PR/native F7 state once, preserve auto CI, then controlled exact-head evidence and canary proof.
+
+## 2026-09-12T11:06Z — PR468 published and replacement started
+
+Draft PR468 binds f3abe5452db2f21593a688bc62bc5f4b22d5c40e; initial CI/source
+receipt: diagnostics/pr468-initial-ci-snapshot.json. F7 automatic pull_request
+run34689990990 uses the retained native matrix. Linux completed all test/lint/
+Compose/hygiene/evidence steps; Windows passed setup/dependencies/compile and
+was testing. Complete native evidence review remains pending (zero verified runs).
+The separate docs-portal run34689991015 failed admission on two hosted jobs: zero
+steps, runner_id0, explicit payment/spending-limit annotations. This is the same
+known CI infrastructure condition, not product failure; do not restart passing
+jobs or broaden this eight-workflow migration into an unreviewed docs rewrite.
+Next: JS-only canary, then source/log/JUnit reconciliation and second green proof.
+No physical state changed; protected Recorder data remained untouched.

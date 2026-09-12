@@ -1,6 +1,7 @@
 # Coverage-preserving self-hosted CI migration
 
-Status: **PROPOSED; plan and matrix persisted before workflow changes.**
+Status: **STAGE1 IMPLEMENTED in draft [PR468](https://github.com/Nettking/msh/pull/468); native equivalence proof pending.**
+Plan/matrix were pushed at41d89c63 before source edits. Exact source: f3abe5452db2f21593a688bc62bc5f4b22d5c40e.
 Qualified baseline: `17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05`.
 [Final main qualification](diagnostics/merged-main-final-qualification.json) is
 complete37/37 plus3companions with native/artifact review. Preserve it unchanged.
@@ -104,7 +105,8 @@ Nitro's online status is not admission to any requested or release runner pool.
 ## Current action
 
 The first gate is finished and this minimal proposal is now durable. Next:
-implement/review stage1 in an isolated CI-only branch, validate its coverage mapping,
-then obtain source-bound replacement evidence. Keep the acceptance campaign paused
+review PR468 native run34689990990 and create the planned JS-only canary;
+then obtain two complete source-bound green replacement executions. Focused29
+contract checks passed; see diagnostics/ci-f7-extension-checkpoint.json. Keep the acceptance campaign paused
 while the source decision is pending. The23 hosted admission failures remain
 infrastructure observations; no successful job is restarted to erase old red checks.

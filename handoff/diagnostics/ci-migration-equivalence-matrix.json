@@ -1,7 +1,7 @@
 {
   "recorded_at": "2026-09-12T10:05:19.258426+00:00",
   "qualified_baseline": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
-  "status": "PROPOSED_NOT_IMPLEMENTED",
+  "status": "STAGE1_IMPLEMENTED_NATIVE_PROOF_PENDING",
   "changed_retained_workflow": "phase-f7-closeout.yml",
   "new_workflows": 0,
   "new_job_definitions": 0,
@@ -1023,5 +1023,15 @@
     "Record every exact SHA and never relabel17ab or467 proof as migration-source qualification."
   ],
   "physical_acceptance": false,
-  "state_changed": false
+  "state_changed": false,
+  "implementation": {
+    "pr": 468,
+    "head": "f3abe5452db2f21593a688bc62bc5f4b22d5c40e",
+    "receipt": "ci-f7-extension-checkpoint.json",
+    "initial_run": 34689990990,
+    "focused_contract_tests": 29,
+    "native_runs_verified": 0,
+    "js_only_event_verified": false,
+    "legacy_retired": []
+  }
 }
