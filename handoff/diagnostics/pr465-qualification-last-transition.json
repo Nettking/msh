@@ -1,77 +1,56 @@
 {
-  "observed_at": "2026-09-12T00:00:51.671532+00:00",
+  "observed_at": "2026-09-12T00:11:49.959529+00:00",
   "changes": {
     "465": [
-      {
-        "workflow": "phase-f85-operator-federation-surface.yml",
-        "run_id": 34659532030,
-        "event": "workflow_dispatch",
-        "status": "queued",
-        "conclusion": null,
-        "jobs": [
-          {
-            "id": 103458955227,
-            "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
-            "status": "queued",
-            "conclusion": null
-          },
-          {
-            "id": 103458955385,
-            "name": "operator-surface (Linux, fcp-linux-fast, bash)",
-            "status": "completed",
-            "conclusion": "success"
-          }
-        ]
-      },
-      {
-        "workflow": "federation-software-update.yml",
-        "run_id": 34659536814,
-        "event": "workflow_dispatch",
-        "status": "queued",
-        "conclusion": null,
-        "jobs": [
-          {
-            "id": 103458969699,
-            "name": "update-contracts (Linux, fcp-linux-fast, bash)",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
-            "id": 103458969834,
-            "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
-            "status": "queued",
-            "conclusion": null
-          }
-        ]
-      },
       {
         "workflow": "federation-v1-release.yml",
         "run_id": 34656348410,
         "event": "pull_request",
-        "status": "queued",
+        "status": "in_progress",
         "conclusion": null,
         "jobs": [
           {
-            "id": 103453726123,
-            "name": "Linux regression shard (2)",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
-            "id": 103453726136,
-            "name": "Linux regression shard (1)",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
-            "id": 103453726189,
-            "name": "Linux regression shard (3)",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
             "id": 103453726200,
             "name": "Windows regressions (journal-artifacts)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103453726216,
+            "name": "Windows regressions (capability-product)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103453726290,
+            "name": "Windows regressions (transport-storage)",
+            "status": "in_progress",
+            "conclusion": null
+          },
+          {
+            "id": 103457898256,
+            "name": "Clean-checkout suite order independence",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
+      {
+        "workflow": "icse-tool-demo.yml",
+        "run_id": 34656348432,
+        "event": "pull_request",
+        "status": "in_progress",
+        "conclusion": null,
+        "jobs": [
+          {
+            "id": 103449516273,
+            "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103462678187,
+            "name": "publication-bundle",
             "status": "in_progress",
             "conclusion": null
           }
@@ -81,20 +60,14 @@
         "workflow": "phase2-federation.yml",
         "run_id": 34658824145,
         "event": "workflow_dispatch",
-        "status": "queued",
-        "conclusion": null,
+        "status": "completed",
+        "conclusion": "success",
         "jobs": [
-          {
-            "id": 103456873389,
-            "name": "windows",
-            "status": "completed",
-            "conclusion": "success"
-          },
           {
             "id": 103456873518,
             "name": "linux",
-            "status": "in_progress",
-            "conclusion": null
+            "status": "completed",
+            "conclusion": "success"
           }
         ]
       }
