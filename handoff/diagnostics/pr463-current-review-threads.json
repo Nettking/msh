@@ -1,0 +1,40 @@
+{
+  "review_threads": [
+    {
+      "id": "PRRT_kwDOPZM3cc6hmxQd",
+      "is_resolved": true,
+      "is_outdated": true,
+      "path": "catalog/federation/tailnet_join_responder.py",
+      "line": null,
+      "diff_side": "RIGHT",
+      "start_line": null,
+      "start_diff_side": "RIGHT",
+      "original_line": 383,
+      "original_start_line": 382,
+      "resolved_by": {
+        "login": "Nettking",
+        "name": "Nettking",
+        "email": null,
+        "avatar_url": "https://avatars.githubusercontent.com/u/3659520?v=4",
+        "id": null
+      },
+      "comments": [
+        {
+          "id": "PRRC_kwDOPZM3cc7t-h9j",
+          "database_id": 3992592227,
+          "body": "**<sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub>  Preserve the backup shutdown timeout and error contract**\n\nWhen a responder takes between 5 and 10 seconds to exit after SIGTERM, this newly raised exception bypasses `backup_recovery._quiesce_responder`, which imports this helper and intentionally allows `RESPONDER_STOP_TIMEOUT_SECONDS = 10.0`. The backup CLI catches only `BackupError` and `ValueError`, so it now aborts after five seconds with an uncaught traceback instead of waiting its documented bound and reporting `responder_stop_unverified`; either keep this helper's boolean contract or translate/configure the timeout in the backup caller.\n\nUseful? React with 👍 / 👎.",
+          "created_at": "2026-09-11T19:14:36Z",
+          "updated_at": "2026-09-11T19:14:36Z",
+          "author": {
+            "login": "chatgpt-codex-connector",
+            "name": "chatgpt-codex-connector",
+            "email": null,
+            "avatar_url": "https://avatars.githubusercontent.com/in/1144995?v=4",
+            "id": null
+          },
+          "viewer_did_author": false
+        }
+      ]
+    }
+  ]
+}

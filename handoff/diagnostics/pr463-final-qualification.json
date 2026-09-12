@@ -1,0 +1,235 @@
+{
+  "recorded_at": "2026-09-12T04:10:16.609788+00:00",
+  "source_commit": "2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee",
+  "required_jobs": 37,
+  "additional_cfi2_registry_jobs": 3,
+  "workflows": [
+    {
+      "workflow": "cf7-acceptance-harness.yml",
+      "run_id": 34664586934,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "phase2-federation.yml",
+      "run_id": 34668388027,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "cf7b-product-physical-acceptance.yml",
+      "run_id": 34667348711,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "product-branding.yml",
+      "run_id": 34665765899,
+      "jobs": 1,
+      "result": "PASS"
+    },
+    {
+      "workflow": "federation-software-update.yml",
+      "run_id": 34669945014,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "cf7c-physical-test-readiness.yml",
+      "run_id": 34664588193,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "icse-tool-demo.yml",
+      "run_id": 34669939857,
+      "jobs": 4,
+      "result": "PASS"
+    },
+    {
+      "workflow": "cf8-role-retirement.yml",
+      "run_id": 34664589243,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "phase-f85-operator-federation-surface.yml",
+      "run_id": 34664590472,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "federation-v1-release.yml",
+      "run_id": 34669934632,
+      "jobs": 16,
+      "result": "PASS"
+    },
+    {
+      "workflow": "ci-test-sharding.yml",
+      "run_id": 34665214234,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "cfi2-onboarding-composition.yml",
+      "run_id": 34664591540,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "release-image-metadata.yml",
+      "run_id": 34664592951,
+      "jobs": 1,
+      "result": "PASS"
+    }
+  ],
+  "release_native_checkouts": 14,
+  "source_bound_aggregates": 2,
+  "collected_test_identities": 4440,
+  "full_orders_exact_test_identities": true,
+  "skips_with_pass_elsewhere": 14,
+  "skips_covered_by_native_nonartifact_log": 10,
+  "unchanged_intentional_posix_exclusions": [
+    {
+      "test": "catalog.flask_app.tests.test_model_resource_admission_paths.test_windows_model_pull_script_has_valid_powershell_syntax",
+      "reason": "Windows PowerShell parser check"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_relay_volume_selector.test_selector_survives_missing_current_images_and_reuses_existing_relay_volume",
+      "reason": "Windows PowerShell regression"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_relay_volume_selector.test_selector_pulls_python_probe_and_identifies_pc3_identity",
+      "reason": "Windows PowerShell regression"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_runtime_state_resolver.test_encoded_python_survives_windows_powershell_native_argument_forwarding",
+      "reason": "Windows PowerShell native argument check"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_first_federation_start.test_windows_fresh_start_executes_real_batch_with_reset_stdin",
+      "reason": "requires real Windows cmd.exe"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_first_federation_start.test_windows_scaffolding_repair_restores_real_dirty_checkout",
+      "reason": "requires real Windows cmd.exe and git"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_migration_script.test_windows_migration_script_has_valid_powershell_syntax",
+      "reason": "Windows PowerShell parser check"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_migration_script.test_windows_migration_fast_forwards_fake_legacy_checkout_and_resumes",
+      "reason": "Windows migration smoke"
+    },
+    {
+      "test": "catalog.federation.tests.test_host_mutation_activation.test_windows_activation_lease_has_valid_powershell_syntax",
+      "reason": "Windows PowerShell parser check"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_fresh_url_output.test_fresh_onboarding_query_is_printed_without_executing_reset_fragment",
+      "reason": "Windows cmd metacharacter regression"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_fresh_shutdown.test_shutdown_timeout_recovers_without_hanging",
+      "reason": "Windows process-tree recovery contract"
+    }
+  ],
+  "native_skip_map_sha256": "a76fc60a5ea690e020d348add110f3f9584408256550b7534270760f0f0fb20e",
+  "windows_focused_skip_accounting": {
+    "total": 157,
+    "passed": 150,
+    "linux_only_skipped": 7,
+    "linux_only_cases": {
+      "test_main_waits_for_previous_process_to_release_its_listener": 2,
+      "test_linux_wait_requires_exit_readiness_within_the_bound": 5
+    },
+    "recorder_windows_cases_passed": [
+      "test_windows_probe_rejects_runtime_that_cannot_import_exact_entrypoint",
+      "test_windows_wrapper_scrubs_legacy_secret_and_forwards_recorder_options",
+      "test_root_cmd_preserves_spaced_argument_and_nonzero_exit"
+    ]
+  },
+  "release_artifact_sha256": "cc79d53fbeb6319850cfc72d8e25f9b5a07a89c8f6dc9a22f3c2e30ed7bfac7c",
+  "icse_review_sha256": "87dc213e221f3e800f6c0fbc128290f09692699825f98c10f7274d5589de68ad",
+  "manual_reviewed_files": [
+    ".github/workflows/federation-v1-release.yml",
+    "catalog/federation/tailnet_join_responder.py",
+    "catalog/federation/tests/test_backup_recovery.py",
+    "catalog/federation/tests/test_tailnet_join_responder.py",
+    "catalog/federation/tests/test_tailnet_join_responder_exit.py"
+  ],
+  "review_findings": [],
+  "resolved_review_threads": [
+    "PRRT_kwDOPZM3cc6hmxQd"
+  ],
+  "reviewed_boundaries": [
+    "same pinned pidfd or Windows handle from identity verification through bounded exit wait",
+    "timeout and wait error fail closed before bind or process-record overwrite",
+    "default signal-only boolean API preserved for backup; backup source and10s deadline unchanged",
+    "real Linux delayed-listener release, native Windows owned-child exit and Windows wait status coverage",
+    "D07 six-case regression coverage preserved in current-head artifacts"
+  ],
+  "regression_artifacts": [
+    {
+      "artifact_id": 10291275054,
+      "module": "test_tailnet_join_responder_exit",
+      "tests": 11,
+      "passed": 11
+    },
+    {
+      "artifact_id": 10291275054,
+      "module": "test_tailnet_join_responder",
+      "tests": 32,
+      "passed": 32
+    },
+    {
+      "artifact_id": 10291275054,
+      "module": "test_backup_recovery",
+      "tests": 17,
+      "passed": 17
+    },
+    {
+      "artifact_id": 10291275054,
+      "tests": 6,
+      "passed": 5
+    },
+    {
+      "artifact_id": 10290658180,
+      "module": "test_tailnet_join_responder_exit",
+      "tests": 11,
+      "passed": 11
+    },
+    {
+      "artifact_id": 10290658180,
+      "module": "test_tailnet_join_responder",
+      "tests": 32,
+      "passed": 32
+    },
+    {
+      "artifact_id": 10290658180,
+      "module": "test_backup_recovery",
+      "tests": 17,
+      "passed": 17
+    },
+    {
+      "artifact_id": 10290658180,
+      "tests": 6,
+      "passed": 5
+    },
+    {
+      "artifact_id": 10290569734,
+      "tests": 6,
+      "passed": 6
+    },
+    {
+      "artifact_id": 10289959488,
+      "tests": 6,
+      "passed": 5
+    }
+  ],
+  "status": "QUALIFIED_REQUIRED_PR_HEAD_SCOPE",
+  "merge_boundary": "Recheck ready-state review/head and merge requirements immediately before normal merge.",
+  "physical_acceptance": false,
+  "candidate_frozen": false
+}
