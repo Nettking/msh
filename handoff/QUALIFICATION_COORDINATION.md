@@ -2692,3 +2692,5 @@ UNRESOLVED; host/toolchain Git provenance failure is suspected. Underlying Git s
 Exact SHA/logs/procedure and protected-data invariant are persisted in
 diagnostics/D12.md. Publish its durable GitHub artifact before further
 investigation. Inspect the unchanged workflow/toolchain and same-runner Git cwd/HOME/safe-directory/ownership diagnostics through a read-only channel. Obtain the actual Git error before repair or targeted retry. Do not disable VCS stamping, add broad safe.directory exceptions or change service accounts.
+
+D12 durable artifact: https://github.com/Nettking/msh/issues/472.
