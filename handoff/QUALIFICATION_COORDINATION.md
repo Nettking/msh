@@ -2142,3 +2142,10 @@ retain newly completed evidence only. No rerun, merge or physical state change.
 34664467237 completed16/16, ICSE34664467253 and update34664467309 also success.
 Exact CF7B completed. Next: retain new terminal native logs and verify source/
 aggregate dependencies before filling the remaining demonstrated exact-head gaps.
+
+03:16UTC: nine new native logs retained; CF7B-Windows verifies2c1a8d93, bringing
+required exact-head proof to11/37 plus3/3 companions. Completed release review
+confirms14 synthetic2cc004b3 source jobs and two successful dependency-only
+aggregates with identical checked-in workflow. ICSE/update source jobs also
+prove synthetic. Old aggregate review archived by SHA. Next: dispatch only
+these three completed source gaps once (release,ICSE,update). No new defect.

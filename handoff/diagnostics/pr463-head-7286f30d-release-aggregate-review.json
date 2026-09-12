@@ -1,33 +1,33 @@
 {
-  "reviewed_at": "2026-09-12T03:16:08.613584+00:00",
-  "source_commit": "2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee",
-  "run_id": 34664467237,
-  "synthetic_commit": "2cc004b3529ab3b0d99e10e1cdffbe1391f27231",
+  "reviewed_at": "2026-09-11T20:31:54.877822+00:00",
+  "source_commit": "7286f30d30e20c94c13cc9acebb2fd6d61bc1163",
+  "run_id": 34637251378,
+  "synthetic_commit": "bfec91c9c0ab3581645bc4c575bf4a056b2b80c9",
   "workflow_path": ".github/workflows/federation-v1-release.yml",
   "workflow_sha256": "9b3bb7daa6dae152fcf9569a5db689f77028fb7ab9f20eb0e0a9fef60f689d21",
   "workflow_identical_on_head_and_synthetic": true,
   "source_jobs": 14,
   "aggregates": [
     {
-      "job_id": 103484305279,
+      "job_id": 103398147796,
       "name": "Clean-checkout suite order independence",
-      "sha256": "7196f2a22515b54bc88c59fa16acaba56b3ba6ec31481d09953dcc71560ad666",
+      "sha256": "f21880b958d150918fa2b337be90ec39b9fa7b851fba2a7d954815ada809990c",
       "dependency_job_ids": [
-        103473479287,
-        103473479388
+        103388045662,
+        103388045689
       ],
       "classification": "dependency aggregate; no checkout by contract",
       "source_disposition": "Dependencies ultimately used synthetic SHA; not exact-head qualification"
     },
     {
-      "job_id": 103487772581,
+      "job_id": 103408808278,
       "name": "Federation v1 automated release verdict",
-      "sha256": "abf33822b68efc76603c10cdc9a11f8af869e7e0c9549bbcaf96a2beb44815fc",
+      "sha256": "8cf233f63813e86bb20444982c7fdfb1e931783a36a97f90715782436ef2f203",
       "dependency_job_ids": [
-        103487684003,
-        103487683972,
-        103473479380,
-        103484305279
+        103408682694,
+        103408682700,
+        103388045522,
+        103398147796
       ],
       "classification": "dependency aggregate; no checkout by contract",
       "source_disposition": "Dependencies ultimately used synthetic SHA; not exact-head qualification"
