@@ -1,62 +1,74 @@
 {
-  "observed_at": "2026-09-12T03:53:24.147529+00:00",
+  "observed_at": "2026-09-12T04:04:25.703847+00:00",
   "changes": {
     "463": [
       {
         "workflow": "federation-v1-release.yml",
         "run_id": 34669934632,
         "event": "workflow_dispatch",
-        "status": "queued",
-        "conclusion": null,
+        "status": "completed",
+        "conclusion": "success",
         "jobs": [
-          {
-            "id": 103489264464,
-            "name": "Windows regressions (capability-product)",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
-            "id": 103489264470,
-            "name": "Full-suite order (fixed)",
-            "status": "completed",
-            "conclusion": "success"
-          },
           {
             "id": 103489264491,
             "name": "Windows regressions (transport-storage)",
-            "status": "in_progress",
-            "conclusion": null
+            "status": "completed",
+            "conclusion": "success"
           },
           {
-            "id": 103489264566,
-            "name": "Linux regression shard (1)",
+            "id": 103489264540,
+            "name": "Release checks (Windows)",
             "status": "completed",
             "conclusion": "success"
           },
           {
             "id": 103489264609,
             "name": "Linux regression shard (0)",
-            "status": "in_progress",
-            "conclusion": null
+            "status": "completed",
+            "conclusion": "success"
           },
           {
             "id": 103493414866,
             "name": "Clean-checkout suite order independence",
-            "status": "queued",
-            "conclusion": null
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103494428628,
+            "name": "Release matrix (Linux)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103494428638,
+            "name": "Release matrix (Windows)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103494470620,
+            "name": "Federation v1 automated release verdict",
+            "status": "completed",
+            "conclusion": "success"
           }
         ]
       },
       {
-        "workflow": "phase2-federation.yml",
-        "run_id": 34668388027,
+        "workflow": "icse-tool-demo.yml",
+        "run_id": 34669939857,
         "event": "workflow_dispatch",
         "status": "completed",
         "conclusion": "success",
         "jobs": [
           {
-            "id": 103484877504,
-            "name": "windows",
+            "id": 103489279046,
+            "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103494832193,
+            "name": "publication-bundle",
             "status": "completed",
             "conclusion": "success"
           }
