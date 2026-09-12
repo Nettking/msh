@@ -25,6 +25,19 @@
       "response": {
         "http_status": 204
       }
+    },
+    {
+      "pr": 467,
+      "sha": "84c66f8185c1411d9dc8c5c33244a2f564845ce7",
+      "ref": "codex/analysis-content-resolve-race",
+      "workflow": "cf8-role-retirement.yml",
+      "requested_at": "2026-09-12T05:59:21.423547+00:00",
+      "reason": "Required reviewed exact-head gate has no existing run",
+      "workflow_sha256": "c7a825604fe63bacf9e84408658121a97e3480d5b8d059a5d396f188f823bc5a",
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
     }
   ]
 }
