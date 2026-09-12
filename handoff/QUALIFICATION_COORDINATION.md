@@ -2153,3 +2153,7 @@ these three completed source gaps once (release,ICSE,update). No new defect.
 03:16:47UTC: integrated PR463 exact-head2c1a8d93 gap dispatched once:
 federation-v1-release.yml (HTTP204). Native proof and ledger preserved; no duplicate job or
 physical action. Next: state-change poll463 and retain new terminal evidence.
+
+03:16:54UTC: integrated PR463 exact-head2c1a8d93 gap dispatched once:
+icse-tool-demo.yml (HTTP204). Native proof and ledger preserved; no duplicate job or
+physical action. Next: state-change poll463 and retain new terminal evidence.
