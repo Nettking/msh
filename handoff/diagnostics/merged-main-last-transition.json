@@ -1,5 +1,5 @@
 {
-  "recorded_at": "2026-09-12T04:13:20.480277+00:00",
+  "recorded_at": "2026-09-12T04:15:19.022642+00:00",
   "source_commit": "2a9c9b8eb53edff74c2de23570ec56e054d29b22",
   "changes": [
     {
@@ -11,73 +11,13 @@
         {
           "id": 103496010625,
           "name": "Release checks (Linux)",
-          "status": "queued",
-          "conclusion": null
-        },
-        {
-          "id": 103496010716,
-          "name": "Windows regressions (capability-product)",
-          "status": "in_progress",
-          "conclusion": null
+          "status": "completed",
+          "conclusion": "success"
         },
         {
           "id": 103496010723,
           "name": "PostgreSQL storage release check",
-          "status": "queued",
-          "conclusion": null
-        },
-        {
-          "id": 103496010736,
-          "name": "Windows regressions (journal-artifacts)",
-          "status": "queued",
-          "conclusion": null
-        },
-        {
-          "id": 103496010739,
-          "name": "Release checks (Windows)",
-          "status": "queued",
-          "conclusion": null
-        },
-        {
-          "id": 103496010750,
-          "name": "Linux regression shard (2)",
-          "status": "queued",
-          "conclusion": null
-        },
-        {
-          "id": 103496010754,
-          "name": "Full-suite order (rotating)",
-          "status": "queued",
-          "conclusion": null
-        },
-        {
-          "id": 103496010769,
-          "name": "Linux regression shard (3)",
-          "status": "queued",
-          "conclusion": null
-        },
-        {
-          "id": 103496010787,
-          "name": "Windows regressions (transport-storage)",
-          "status": "queued",
-          "conclusion": null
-        },
-        {
-          "id": 103496010801,
-          "name": "Full-suite order (fixed)",
-          "status": "queued",
-          "conclusion": null
-        },
-        {
-          "id": 103496010847,
-          "name": "Linux regression shard (0)",
-          "status": "queued",
-          "conclusion": null
-        },
-        {
-          "id": 103496010857,
-          "name": "Linux regression shard (1)",
-          "status": "queued",
+          "status": "in_progress",
           "conclusion": null
         }
       ]
@@ -91,92 +31,140 @@
         {
           "id": 103496010694,
           "name": "reviewer-compose",
-          "status": "in_progress",
-          "conclusion": null
-        },
-        {
-          "id": 103496010753,
-          "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
-          "status": "queued",
-          "conclusion": null
-        },
-        {
-          "id": 103496010783,
-          "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
-          "status": "queued",
-          "conclusion": null
-        }
-      ]
-    },
-    {
-      "workflow": "cf7b-product-physical-acceptance.yml",
-      "run_id": 34672364171,
-      "status": "queued",
-      "conclusion": null,
-      "jobs": [
-        {
-          "id": 103496010761,
-          "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
-          "status": "queued",
-          "conclusion": null
-        },
-        {
-          "id": 103496010827,
-          "name": "acceptance (Linux, fcp-linux-fast, bash)",
-          "status": "queued",
-          "conclusion": null
-        }
-      ]
-    },
-    {
-      "workflow": "federation-software-update.yml",
-      "run_id": 34672364185,
-      "status": "queued",
-      "conclusion": null,
-      "jobs": [
-        {
-          "id": 103496010690,
-          "name": "update-contracts (Linux, fcp-linux-fast, bash)",
           "status": "completed",
           "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "workflow": "cf7-acceptance-harness.yml",
+      "run_id": 34672479567,
+      "status": "queued",
+      "conclusion": null,
+      "jobs": [
+        {
+          "id": 103496345443,
+          "name": "harness (Linux, fcp-linux-fast, bash)",
+          "status": "queued",
+          "conclusion": null
         },
         {
-          "id": 103496010805,
-          "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+          "id": 103496345578,
+          "name": "harness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Byp...",
           "status": "queued",
           "conclusion": null
         }
       ]
     },
     {
-      "workflow": "product-branding.yml",
-      "run_id": 34672364194,
+      "workflow": "cf7c-physical-test-readiness.yml",
+      "run_id": 34672483585,
       "status": "queued",
       "conclusion": null,
       "jobs": [
         {
-          "id": 103496010741,
-          "name": "product-branding",
+          "id": 103496356715,
+          "name": "readiness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy B...",
+          "status": "queued",
+          "conclusion": null
+        },
+        {
+          "id": 103496356764,
+          "name": "readiness (Linux, fcp-linux-fast, bash)",
           "status": "queued",
           "conclusion": null
         }
       ]
     },
     {
-      "workflow": "phase2-federation.yml",
-      "run_id": 34672364216,
+      "workflow": "cf8-role-retirement.yml",
+      "run_id": 34672487812,
       "status": "queued",
       "conclusion": null,
       "jobs": [
         {
-          "id": 103496011104,
-          "name": "linux",
+          "id": 103496368578,
+          "name": "role-retirement (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
           "status": "queued",
           "conclusion": null
         },
         {
-          "id": 103496011201,
-          "name": "windows",
+          "id": 103496368651,
+          "name": "role-retirement (Linux, fcp-linux-fast, bash)",
+          "status": "queued",
+          "conclusion": null
+        }
+      ]
+    },
+    {
+      "workflow": "cfi2-onboarding-composition.yml",
+      "run_id": 34672491622,
+      "status": "queued",
+      "conclusion": null,
+      "jobs": [
+        {
+          "id": 103496379750,
+          "name": "onboarding (Linux, fcp-test-linux, bash, 3.12.13)",
+          "status": "queued",
+          "conclusion": null
+        },
+        {
+          "id": 103496379954,
+          "name": "onboarding (Windows, fcp-test-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+          "status": "queued",
+          "conclusion": null
+        }
+      ]
+    },
+    {
+      "workflow": "ci-test-sharding.yml",
+      "run_id": 34672495196,
+      "status": "queued",
+      "conclusion": null,
+      "jobs": [
+        {
+          "id": 103496391321,
+          "name": "Shard contract (Windows, shared-pool)",
+          "status": "queued",
+          "conclusion": null
+        },
+        {
+          "id": 103496391402,
+          "name": "Shard contract (Linux, shared-pool)",
+          "status": "queued",
+          "conclusion": null
+        }
+      ]
+    },
+    {
+      "workflow": "phase-f85-operator-federation-surface.yml",
+      "run_id": 34672498480,
+      "status": "queued",
+      "conclusion": null,
+      "jobs": [
+        {
+          "id": 103496400575,
+          "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+          "status": "queued",
+          "conclusion": null
+        },
+        {
+          "id": 103496400650,
+          "name": "operator-surface (Linux, fcp-linux-fast, bash)",
+          "status": "queued",
+          "conclusion": null
+        }
+      ]
+    },
+    {
+      "workflow": "release-image-metadata.yml",
+      "run_id": 34672501803,
+      "status": "queued",
+      "conclusion": null,
+      "jobs": [
+        {
+          "id": 103496409923,
+          "name": "Verify immutable release image metadata",
           "status": "queued",
           "conclusion": null
         }
