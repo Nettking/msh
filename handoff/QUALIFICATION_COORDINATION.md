@@ -9,7 +9,7 @@ on Nettking with a DIFFERENT failure: D13 unknown-path refusal logged404 but
 the client received WinError10053.149passed/7skipped/1failed; three red aggregates
 are dependent consequences. Exact checkout0355023f/tree==440 verified in native
 logs. See diagnostics/D13.md and full logs/receipt linked there. No further retry.
-Next publish D13 issue immediately, then inspect unchanged socket lifecycle and
+D13 issue474 is published. Next inspect unchanged socket lifecycle and
 perform only a bounded isolated loopback reproduction with current deadlines.
 
 D12 Beast scoped Git trust repair remains verified on the actual original runner;

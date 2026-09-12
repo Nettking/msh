@@ -21,7 +21,7 @@
   "protected_recorder_data": "UNTOUCHED",
   "physical_runtime": "UNCHANGED;9b286f931497bf6291e215f6340443c5162826b0",
   "repair": "NONE",
-  "github_artifact": "PENDING immediate issue publication",
+  "github_artifact": "https://github.com/Nettking/msh/issues/474",
   "hypotheses": [
     "Unknown-path handler returns before reading POST body; unread bytes and close behavior may abort the Windows socket. Not yet established as root cause."
   ],
