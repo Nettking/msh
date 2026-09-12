@@ -1,5 +1,5 @@
 {
-  "observed_at": "2026-09-12T06:00:06.505985+00:00",
+  "observed_at": "2026-09-12T06:12:56.824724+00:00",
   "prs": {
     "467": {
       "number": 467,
@@ -131,20 +131,20 @@
             {
               "id": 103506523680,
               "name": "Windows regressions (journal-artifacts)",
-              "status": "in_progress",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "runner_name": "Nettking",
               "started_at": "2026-09-12T05:58:15Z",
-              "completed_at": null
+              "completed_at": "2026-09-12T06:07:30Z"
             },
             {
               "id": 103506523696,
               "name": "Full-suite order (fixed)",
-              "status": "in_progress",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "runner_name": "Nettking-Linux",
               "started_at": "2026-09-12T05:58:15Z",
-              "completed_at": null
+              "completed_at": "2026-09-12T06:08:35Z"
             },
             {
               "id": 103506523700,
@@ -171,6 +171,15 @@
               "conclusion": null,
               "runner_name": "",
               "started_at": "2026-09-12T05:42:02Z",
+              "completed_at": null
+            },
+            {
+              "id": 103509492199,
+              "name": "Clean-checkout suite order independence",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "started_at": "2026-09-12T06:08:35Z",
               "completed_at": null
             }
           ]
@@ -313,7 +322,7 @@
               "name": "product-branding",
               "status": "queued",
               "conclusion": null,
-              "runner_name": null,
+              "runner_name": "",
               "started_at": "2026-09-12T05:59:56Z",
               "completed_at": null
             }
@@ -347,11 +356,11 @@
             {
               "id": 103508392401,
               "name": "harness (Linux, fcp-linux-fast, bash)",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-12T05:59:09Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-12T06:10:39Z",
+              "completed_at": "2026-09-12T06:12:59Z"
             }
           ]
         },
@@ -376,7 +385,7 @@
               "name": "readiness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy B...",
               "status": "queued",
               "conclusion": null,
-              "runner_name": null,
+              "runner_name": "",
               "started_at": "2026-09-12T05:59:16Z",
               "completed_at": null
             },
@@ -385,7 +394,7 @@
               "name": "readiness (Linux, fcp-linux-fast, bash)",
               "status": "queued",
               "conclusion": null,
-              "runner_name": null,
+              "runner_name": "",
               "started_at": "2026-09-12T05:59:16Z",
               "completed_at": null
             }
@@ -412,7 +421,7 @@
               "name": "role-retirement (Linux, fcp-linux-fast, bash)",
               "status": "queued",
               "conclusion": null,
-              "runner_name": null,
+              "runner_name": "",
               "started_at": "2026-09-12T05:59:23Z",
               "completed_at": null
             },
@@ -421,7 +430,7 @@
               "name": "role-retirement (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
               "status": "queued",
               "conclusion": null,
-              "runner_name": null,
+              "runner_name": "",
               "started_at": "2026-09-12T05:59:23Z",
               "completed_at": null
             }
@@ -448,7 +457,7 @@
               "name": "onboarding (Windows, fcp-test-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
               "status": "queued",
               "conclusion": null,
-              "runner_name": null,
+              "runner_name": "",
               "started_at": "2026-09-12T05:59:30Z",
               "completed_at": null
             },
@@ -457,7 +466,7 @@
               "name": "onboarding (Linux, fcp-test-linux, bash, 3.12.13)",
               "status": "queued",
               "conclusion": null,
-              "runner_name": null,
+              "runner_name": "",
               "started_at": "2026-09-12T05:59:30Z",
               "completed_at": null
             }
@@ -484,17 +493,17 @@
               "name": "Shard contract (Linux, shared-pool)",
               "status": "queued",
               "conclusion": null,
-              "runner_name": null,
+              "runner_name": "",
               "started_at": "2026-09-12T05:59:37Z",
               "completed_at": null
             },
             {
               "id": 103508440403,
               "name": "Shard contract (Windows, shared-pool)",
-              "status": "queued",
+              "status": "in_progress",
               "conclusion": null,
-              "runner_name": null,
-              "started_at": "2026-09-12T05:59:37Z",
+              "runner_name": "Nettking",
+              "started_at": "2026-09-12T06:12:29Z",
               "completed_at": null
             }
           ]
@@ -518,18 +527,18 @@
             {
               "id": 103508450249,
               "name": "linux",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": null,
-              "started_at": "2026-09-12T05:59:43Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-12T06:08:37Z",
+              "completed_at": "2026-09-12T06:10:38Z"
             },
             {
               "id": 103508450313,
               "name": "windows",
               "status": "queued",
               "conclusion": null,
-              "runner_name": null,
+              "runner_name": "",
               "started_at": "2026-09-12T05:59:43Z",
               "completed_at": null
             }
@@ -556,7 +565,7 @@
               "name": "Verify immutable release image metadata",
               "status": "queued",
               "conclusion": null,
-              "runner_name": null,
+              "runner_name": "",
               "started_at": "2026-09-12T05:59:49Z",
               "completed_at": null
             }
