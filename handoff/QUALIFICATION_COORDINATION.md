@@ -2015,3 +2015,9 @@ empty. Next: poll_pr463_state.py and fill only absent new-head workflows.
 workflows queued, no completed proof. Missing:CF7,CF7C,CF8,F85 plus CFI2/registry
 companions. Next: dispatch only these six absent workflows through the guarded
 helper; existing seven automatic workflows remain untouched.
+
+01:21:52UTC: six absent463 gates for exact2c1a8d93 dispatched once (HTTP204).
+New-head ledger entries preserve the prior heads separately. Next: monitor only
+PR463 state changes using poll_pr463_state.py; retain new native evidence and
+fill demonstrated completed source gaps only. Do not repeat465 qualification.
+Physical M unchanged; final merged-main qualification waits for463 merge.
