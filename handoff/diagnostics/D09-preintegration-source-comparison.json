@@ -1,0 +1,39 @@
+{
+  "recorded_at": "2026-09-12T12:18:07.538385+00:00",
+  "status": "PRE_INTEGRATION_READ_ONLY_PROOF_NOT_FINAL_HEAD_VALIDATION",
+  "original_pr468_source": "f3abe5452db2f21593a688bc62bc5f4b22d5c40e",
+  "actual_canary_head": "660bf23269893305c7e8ffcc4c910a7efaed567d",
+  "proposed_documentation_repair": "ba44100ec1e4cde19daba0d3723b991c11742316",
+  "repair_parent_is_original_head": true,
+  "delta_original_pr_to_repair": [
+    "docs/implementation/f7_ci_consolidation.md"
+  ],
+  "all_other_tracked_entries_identical": 1417,
+  "identical_entry_metadata": "Git mode, object type, blob/object id, and path; includes workflows, triggers, test/product sources, runner configuration and dependencies",
+  "workflow_blob": "143db0b43c870bc5791c3629e34fd61a72293c47",
+  "canary_delta_from_original": [
+    "catalog/flask_app/static/js/ai-explainer.js"
+  ],
+  "canary_change": "one known inert comment; excluded from integration, never merged",
+  "delta_actual_canary_to_repair": [
+    "catalog/flask_app/static/js/ai-explainer.js",
+    "docs/implementation/f7_ci_consolidation.md"
+  ],
+  "source_attribution_note": "The documentation-only statement compares the proven original PR468 source f3abe545 to ba44100e. Actual canary660bf232 additionally contains its disposable comment; direct canary-to-repair diff removes that comment. Do not falsely describe those two complete trees as differing only in documentation.",
+  "policy_review": {
+    "source": "f3abe5452db2f21593a688bc62bc5f4b22d5c40e",
+    "paths_and_blobs": {
+      "docs/implementation/federation_v1_cleanup_manifest.md": "72eebba08881d3144ebde4b55b42a516d278c7d4",
+      "docs/implementation/phase_f7_closeout.md": "a9ad6380b32355ea634b7b13cb4186359642c8c8",
+      "docs/implementation/f7_ci_consolidation.md": "0295b6df032897a0119c270184f96015bded2670",
+      ".github/workflows/phase-f7-closeout.yml": "143db0b43c870bc5791c3629e34fd61a72293c47"
+    },
+    "cleanup_manifest_requirement": "Run the equivalent replacement at least twice green, then remove superseded workflows in a separate change.",
+    "finding": "No requirement in the reviewed cleanup/F7 contracts to repeat both complete native runs solely for a documentation-only delta with byte-identical executable/workflow source. Retain exact original provenance and separately validate final PR head.",
+    "physical_revalidation": "Physical impact-map tooling does not authorize CI qualification or physical PASS here; no physical evidence is carried forward."
+  },
+  "required_next_gate": "Wait for canary Windows; retain/review 2/2 proof or diagnose failure on unchanged head. Only then integrate docs repair, verify actual PR head and full tree delta, rerun branding and required lightweight final checks.",
+  "current_pr_head_not_changed": true,
+  "legacy_retired": [],
+  "protected_recorder_data": "UNTOUCHED"
+}

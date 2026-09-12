@@ -11,18 +11,30 @@ all17 D08 cases across native platforms, original scheduler failure and explicit
 platform exclusions reconciled. No job was rerun for historical hosted billing reds.
 All prior PR/failed-main evidence retained under its own source. No further17ab CI
 polling or qualification is needed unless a concrete new contract reason appears.
-Next highest-value action: resolve the CI-only documentation blocker D09 in draft
-PR468 (current head f3abe5452db2f21593a688bc62bc5f4b22d5c40e). The unchanged
-branding check rejects two repository URLs in the new migration document.
-Evidence: diagnostics/D09.md. Docs-only repair ba44100ec1e4cde19daba0d3723b991c11742316 is pushed on
-codex/ci-f7-branding-doc-fix; focused unchanged branding and diff checks passed.
-Do not update current PR468/469 heads while their automatic runs are active.
-Keep the checker and all workflow/product semantics unchanged.
-First F7 native proof remains reviewed green. JS-only canary PR469/run34690234286
-has Linux green and Windows queued at11:57Z; no second complete proof yet.
-PR468 F6/F8 and Phase2 pairs are green; both PRs have active/queued release work
-with no release failure at the snapshot. Preserve all running/completed evidence.
-Hourly snapshot: diagnostics/ci-migration-auto-runs-20260912T1157.json.
+Next highest-value action: WAIT for the existing PR469 canary Windows job in
+F7 run34690234286 to resolve. Do not move PR468 HEAD f3abe5452db2f21593a688bc62bc5f4b22d5c40e
+while that proof is queued/running. D09 repair ba44100ec1e4cde19daba0d3723b991c11742316
+remains separate on codex/ci-f7-branding-doc-fix; user accepted this handling.
+If Windows passes, retain/review the complete second native pair before proceeding.
+If it fails, diagnose against unchanged source before integrating D09.
+After canary evidence is safely pushed, integrate docs-only repair with clean,
+fast-forward history where possible; preserve unrelated active qualification.
+Then verify the actual final PR head/delta and run unchanged branding plus required
+lightweight final-head/reference/status-contract checks. Preserve the two expensive
+native proofs when executable/workflow content is byte-identical, unless an explicit
+checked-in contract demands whole-final-commit rebinding. Do not manually repeat
+those complete runs merely for this documentation change.
+Pre-integration comparison: diagnostics/D09-preintegration-source-comparison.json.
+Base f3abe545 -> repair ba44100e changes one document; all1417 other tracked entries
+(mode/type/object/path) match. Actual canary660bf232 has its separately documented
+inert JS comment; direct canary -> repair also removes that comment. Never merge
+that canary or claim those complete trees differ only in documentation.
+First F7 native proof remains reviewed green; real JS-only event is proved.
+Last canary observation11:57Z: Linux green, Windows queued. Next check12:55Z;
+no early CI poll was made for this user clarification. PR468 F6/F8/Phase2 pairs
+are green; preserve automatic jobs and their exact source-specific evidence.
+No PR468 merge or legacy retirement before every replacement-proof requirement,
+including final-source validation and the actual JS-only event, is satisfied.
 No duplicate37-job dispatch is needed for replacement proof. F7 jobs have30min
 limits; check near expected completion, long release jobs no sooner than45-60min.
 Plan: CI_COVERAGE_MIGRATION_PLAN.md; mapping: diagnostics/ci-migration-equivalence-matrix.json.
@@ -2531,3 +2543,20 @@ The accepted retirement audit and completed main17ab qualification remain intact
 D09 pushed-repair PR artifact: https://github.com/Nettking/msh/pull/468#issuecomment-5645763798 .
 Hourly snapshot helper now writes timestamped files; reviewed F7 proof is reused
 without polling completed runs. Next scheduled observation remains12:55Z.
+
+## 2026-09-12T12:19:35.305891+00:00 — accepted D09 integration sequence persisted
+
+User explicitly accepts D09 handling and requires the current canary to resolve
+before moving PR468. Read-only comparison verified the planned docs-only delta
+and all1417 unchanged entries; this is not final-head validation. Reviewed cleanup
+manifest/F7 contracts require two equivalent green replacement runs with retained
+provenance; no explicit whole-final-commit repetition rule was found there for a
+docs-only correction. Retain original native receipts and separately validate the
+new actual PR head after integration. Physical revalidation policy does not grant
+CI qualification or physical PASS and was not used to carry physical evidence.
+
+Remote refs remain f3abe545 (PR468),660bf232 (canary),ba44100e (separate docs fix).
+Next12:55Z: inspect current canary, persist completion/failure and native proof,
+then follow the accepted conditional integration path. Do not merge or delete
+legacy gates until proof and final source/reference/status contracts are satisfied.
+Physical runtime, Recorder data and unrelated active qualification stay untouched.
