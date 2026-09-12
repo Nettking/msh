@@ -1,14 +1,15 @@
 # Federation v1 qualification coordination
 
-**Current actionable checkpoint (2026-09-11 23:01UTC):** physical admission remains
-stopped on M9b286f93. D06 repair PR463 head83955f65 has21/37 required plus3/3
-companion native exact-head PASS at last retained check; preserve them. D07/#464 is
-a separate pre-existing Windows product defect found in its automatic synthetic
-release run. Draft repair PR465 head4749ab6689315a7ad953c11ce4b2ec942433d71a is
-pushed with focused native Windows evidence. PR465 qualification is active; six absent gates were dispatched once. Next: poll
-PR465 for state changes and retain only new native evidence. Never
-infer a retry from the red automatic aggregate. Neither fix deployed/merged;
-no physical PASS or timers. See the end of this document for chronological deltas.
+**Current actionable checkpoint (2026-09-12 01:18UTC):** PR465/D07 qualified37/37
+plus3/3 at4749ab6689315a7ad953c11ce4b2ec942433d71a and normally merged as
+`b6a96b218a513fe241ef4d6f051cf166444643ac`. Required D06 repair PR463 remains.
+Next: verify clean PR463 head83955f65, integrate the actual465 merged main, then
+qualify that new exact PR463 head. Preserve prior21/37 plus3/3 evidence as history;
+the head update is necessary to include the now-qualified D07 product correction,
+not a retry of the known failing source. Do not qualify intermediate main as the
+new release candidate. Qualify actual final main once after all required fixes merge.
+Physical admission remains stopped on M9b286f93; no repair deployment, physical
+PASS or timers. See the end of this document for chronological deltas.
 
 Current user direction, September 11 2026: execute on state changes, using this
 checkpoint and the completed diagnostic sweep report; do not repeat the sweep.
@@ -1990,3 +1991,9 @@ still show no findings/requested reviewers and the exact qualified465 head.
 Main branch metadata/policy-read result retained; use only the normal merge API,
 without settings changes or bypass. Next: normal merge465 guarded by exact head;
 then persist its actual merge SHA before considering463 integration.
+
+01:18:40UTC: PR465 normal exact-head-guarded merge succeeded:
+b6a96b218a513fe241ef4d6f051cf166444643ac. No bypass or repository-policy change.
+Next: verify463 live head/clean worktree, integrate this merged main so463 also
+contains D07, then qualify the resulting new PR head. Preserve historical proofs;
+no deliberate intermediate-main qualification and no physical deployment.
