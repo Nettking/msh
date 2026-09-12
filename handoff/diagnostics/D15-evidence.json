@@ -1,0 +1,31 @@
+{
+  "finding": "D15",
+  "status": "CONFIRMED",
+  "title": "Three-device acceptance setup refuses owner inspection after peer joins",
+  "candidate_sha": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "actual_checkout": "a5e743fee24e27bfd8d6d4f57c8efd589c6c3a42",
+  "identical_tree": "1c671f446fa215c99a6a58a155806de394aa569a",
+  "hosts": "AQG7NCC-Linux runner, native Linux",
+  "stage": "CI rotating full suite / CF7-B owner inspection after three test-device joins",
+  "run_id": 34707260030,
+  "job_id": 103589446004,
+  "test": "catalog/federation/tests/cf7_acceptance/test_product_acceptance.py::test_three_device_federation_keeps_ai_compute_and_storage_authority_separate",
+  "command": "python -m pytest -o addopts= -q -p randomly --randomly-seed=1702 --durations=20 --junitxml=$RUNNER_TEMP/order-rotating.xml",
+  "observed": "POST /onboarding/inspect from owner test client returned403 instead of303 at helper line329, after all three authorized contexts joined the same session. Response body/reason not exposed in failing assertion.",
+  "expected": "Existing owner client/token can initiate inspection after compute/storage test peers join; expected303 redirect.",
+  "classification": "UNRESOLVED: determine actual forbidden reason before attributing CSRF, authority, product regression or suite-order effects",
+  "acceptance_impact": "Rotating full-suite CF7-B scenario did not reach later capability/authority assertions; PR475 not release-qualified.",
+  "safe_continuation": "YES: native artifact/source review and isolated test-owned reproduction; no CSRF/authority bypass or full-suite retry",
+  "state_changed": "Original CI used temporary owner/compute/storage fixtures under runner temp. Diagnosis reads logs only; no production topology or host change.",
+  "protected_recorder_data": "UNTOUCHED",
+  "physical_runtime": "UNCHANGED;9b286f931497bf6291e215f6340443c5162826b0",
+  "evidence": [
+    "pr475-ci-20260912T175749.json",
+    "pr475-completed-failures-native-retention.json",
+    "pr475-completed-failures-logs.zip (103589446004.log lines545-639)"
+  ],
+  "github_artifact": "PENDING immediate issue publication",
+  "repair": "NONE",
+  "next_diagnostic_action": "Inspect exact /onboarding/inspect403 branches and owner client/session token lifecycle; retain same-source passing CF7-B artifact. If needed capture the actual forbidden response in a bounded isolated reproduction on unchanged source, preserving CSRF and authority guards.",
+  "recorded_at": "2026-09-12T18:01:46.810511+00:00"
+}

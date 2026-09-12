@@ -16,6 +16,9 @@ Physical runtime9b286f93 and protected Recorder data untouched. No physical PASS
 
 **2026-09-12T18:00:49.086503+00:00 — D14 confirmed:** adapter.started.wait(timeout=2) returnedFalse at line497 after background benchmark thread start; intended skip/completion interleaving was not reached. Classification: UNRESOLVED: product, test/order interaction or host timing; no automatic product-regression attribution. Candidate5e6f1843 / actuala5e743fe, run34707260030/job103589446004. https://github.com/Nettking/msh/issues/476. Receipt diagnostics/D14.md. No retry or source change. NEXT: Retain order-rotating artifact with exact seed and test durations; inspect benchmark.run entry and captured run_errors lifecycle without changing the two-second assertion; compare existing same-source fixed/shard evidence.
 
+
+**2026-09-12T18:01:46.810511+00:00 — D15 confirmed:** POST /onboarding/inspect from owner test client returned403 instead of303 at helper line329, after all three authorized contexts joined the same session. Response body/reason not exposed in failing assertion. Classification: UNRESOLVED: determine actual forbidden reason before attributing CSRF, authority, product regression or suite-order effects. Candidate5e6f1843 / actuala5e743fe, run34707260030/job103589446004. PENDING immediate issue publication. Receipt diagnostics/D15.md. No retry or source change. NEXT: Inspect exact /onboarding/inspect403 branches and owner client/session token lifecycle; retain same-source passing CF7-B artifact. If needed capture the actual forbidden response in a bounded isolated reproduction on unchanged source, preserving CSRF and authority guards.
+
 Current user direction, September 11 2026: execute on state changes, using this
 checkpoint and the completed diagnostic sweep report; do not repeat the sweep.
 
