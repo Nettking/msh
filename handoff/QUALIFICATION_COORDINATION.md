@@ -2096,3 +2096,8 @@ No new defect, merge, candidate or physical state change.
 completed success; CF8 and automatic ICSE gained one successful job. Next: retain
 only new terminal native logs and verify checkout; no source-gap dispatch is
 justified while remaining automatic parents are active.
+
+02:31UTC: branding and CF8-Linux native logs verify2c1a8d93, bringing required
+proof to7/37 plus companion2/3. ICSE-Linux uses synthetic2cc004b3 and parent
+remains active. Next: poll_pr463_state.py at next state check; retain only new
+terminal evidence. No extra dispatch, merge, defect or physical state change.
