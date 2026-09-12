@@ -1,44 +1,77 @@
 {
-  "observed_at": "2026-09-12T03:03:53.820588+00:00",
+  "observed_at": "2026-09-12T03:15:05.845022+00:00",
   "changes": {
     "463": [
       {
-        "workflow": "federation-v1-release.yml",
-        "run_id": 34664467237,
-        "event": "pull_request",
-        "status": "queued",
-        "conclusion": null,
+        "workflow": "cf7b-product-physical-acceptance.yml",
+        "run_id": 34667348711,
+        "event": "workflow_dispatch",
+        "status": "completed",
+        "conclusion": "success",
         "jobs": [
           {
-            "id": 103473479394,
-            "name": "Linux regression shard (1)",
+            "id": 103481851157,
+            "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
             "status": "completed",
             "conclusion": "success"
-          },
-          {
-            "id": 103473479429,
-            "name": "Release checks (Linux)",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
-            "id": 103473479473,
-            "name": "Linux regression shard (0)",
-            "status": "in_progress",
-            "conclusion": null
           }
         ]
       },
       {
-        "workflow": "phase2-federation.yml",
-        "run_id": 34668388027,
-        "event": "workflow_dispatch",
-        "status": "queued",
-        "conclusion": null,
+        "workflow": "federation-v1-release.yml",
+        "run_id": 34664467237,
+        "event": "pull_request",
+        "status": "completed",
+        "conclusion": "success",
         "jobs": [
           {
-            "id": 103484877403,
-            "name": "linux",
+            "id": 103473479473,
+            "name": "Linux regression shard (0)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103484305279,
+            "name": "Clean-checkout suite order independence",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103487683972,
+            "name": "Release matrix (Windows)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103487684003,
+            "name": "Release matrix (Linux)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103487772581,
+            "name": "Federation v1 automated release verdict",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
+      {
+        "workflow": "icse-tool-demo.yml",
+        "run_id": 34664467253,
+        "event": "pull_request",
+        "status": "completed",
+        "conclusion": "success",
+        "jobs": [
+          {
+            "id": 103473479670,
+            "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103488255324,
+            "name": "publication-bundle",
             "status": "completed",
             "conclusion": "success"
           }
@@ -48,29 +81,29 @@
         "workflow": "federation-software-update.yml",
         "run_id": 34664467309,
         "event": "pull_request",
-        "status": "in_progress",
-        "conclusion": null,
-        "jobs": [
-          {
-            "id": 103473479500,
-            "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
-            "status": "in_progress",
-            "conclusion": null
-          }
-        ]
-      },
-      {
-        "workflow": "cfi2-onboarding-composition.yml",
-        "run_id": 34664591540,
-        "event": "workflow_dispatch",
         "status": "completed",
         "conclusion": "success",
         "jobs": [
           {
-            "id": 103473852827,
-            "name": "onboarding (Windows, fcp-test-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+            "id": 103473479500,
+            "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
             "status": "completed",
             "conclusion": "success"
+          }
+        ]
+      },
+      {
+        "workflow": "cf8-role-retirement.yml",
+        "run_id": 34664589243,
+        "event": "workflow_dispatch",
+        "status": "in_progress",
+        "conclusion": null,
+        "jobs": [
+          {
+            "id": 103473846384,
+            "name": "role-retirement (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+            "status": "in_progress",
+            "conclusion": null
           }
         ]
       }
