@@ -4,9 +4,11 @@
 `2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee` qualified37/37 plus3/3 and
 normally merged as **`2a9c9b8eb53edff74c2de23570ec56e054d29b22`**.
 PR465/D07 previously qualified and merged asb6a96b21. All required fixes are merged.
-Next: verify actual main and create a clean detached qualification checkout;
-retain existing push workflows, dispatch only absent required workflows once,
-and qualify actual final main2a9c9b8e. This SHA is not yet a frozen physical candidate.
+Clean detached qualification checkout is verified. All13 workflows are running or
+completed (six existing push runs plus seven single guarded dispatches). Next:
+poll_merged_main_state.py, retain only new native logs, then final artifact review.
+Current verified proof:10/37 required plus1/3 companions (04:26UTC).
+Main2a9c9b8e is not yet qualified or frozen as a physical candidate.
 Do not requalify PR heads or intermediate main. Physical runtime remains
 M`9b286f931497bf6291e215f6340443c5162826b0`; admission stopped, no physical PASS
 or P07/P12 timers. Protected Recorder data unchanged. Chronological deltas follow.
@@ -2213,3 +2215,5 @@ Only required absent gates may be dispatched; no physical deployment or candidat
 04:15UTC native retention: final-main2a9c9b8e has3/37 verified required successes (update-Linux, release-Linux, ICSE-compose); each native checkout equals the actual merged SHA, log hashes persisted. Remaining required/companion jobs are queued/running; no failure. Next exact command: C:/wsl/fcp-v1-fba508-nettking-20260910/.venv/Scripts/python.exe -B handoff/diagnostics/poll_merged_main_state.py from this diagnostic worktree; only on changes persist state, retain new logs with retain_merged_main_jobs.py, and progress to complete exact-main artifact review when terminal. Physical runtime/protected Recorder invariant unchanged; no candidate freeze or timers.
 
 04:26UTC: actual final main remains2a9c9b8eb53edff74c2de23570ec56e054d29b22; eight new successful terminal jobs across release,CF7B,update,phase2,CF7C,CFI2. Update workflow completed; no failing required job or missing workflow. Next: retain new native logs and verify source before counting. Existing qualification runs preserved; no physical action.
+
+04:26UTC native retention: all eight new terminal logs prove exact2a9c9b8eb53edff74c2de23570ec56e054d29b22; required proof now10/37 plus1/3 companions. Hash receipts committed; no source mismatch or new defect. Next exact command: audit Python -B handoff/diagnostics/poll_merged_main_state.py; retain only changed terminal jobs with retain_merged_main_jobs.py and await full required completion before final artifact/skip/ICSE review. No dispatch, candidate freeze, physical operation or timers.
