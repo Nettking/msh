@@ -273,7 +273,59 @@
         "2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee"
       ],
       "checkout_matches": true
+    },
+    {
+      "job_id": 103481851242,
+      "run_id": 34667348711,
+      "name": "acceptance (Linux, fcp-linux-fast, bash)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 72122,
+      "sha256": "a4e38f005688e56f78820fb54fd1bcff93adcd01f35140fc0482616f9a38e385",
+      "checkout_commits": [
+        "2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103473479388,
+      "run_id": 34664467237,
+      "name": "Full-suite order (rotating)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 66189,
+      "sha256": "6c6815448cde75bcceab420fcb65f60cc446009161f55ba9a96d8e99e8656875",
+      "checkout_commits": [
+        "2cc004b3529ab3b0d99e10e1cdffbe1391f27231"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103473479330,
+      "run_id": 34664467273,
+      "name": "windows",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 48939,
+      "sha256": "cb4450876b9d2c9ff5f263ff956970e3a731bc70c8a0da00ea517f443a0cae16",
+      "checkout_commits": [
+        "2cc004b3529ab3b0d99e10e1cdffbe1391f27231"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103473838973,
+      "run_id": 34664586934,
+      "name": "harness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Byp...",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 66047,
+      "sha256": "e9767cea00da4e2844029da43f64417c734dd966a6942f2f837aabac071f57cf",
+      "checkout_commits": [
+        "2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee"
+      ],
+      "checkout_matches": true
     }
   ],
-  "retained_at": "2026-09-12T02:30:46.468029+00:00"
+  "retained_at": "2026-09-12T02:41:47.883731+00:00"
 }

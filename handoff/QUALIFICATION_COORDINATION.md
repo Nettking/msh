@@ -2106,3 +2106,8 @@ terminal evidence. No extra dispatch, merge, defect or physical state change.
 and exact-head CF7 completed; CF7B and release each gained one success. Next:
 retain new terminal native evidence and verify completed phase2 source gap before
 any dispatch. Preserve required7/37 plus companion2/3.
+
+02:42UTC: CF7B-Linux and CF7-Windows verify exact2c1a8d93: required9/37 plus
+companion2/3 native PASS. Both completed phase2 jobs prove synthetic2cc004b3;
+rotating release order also synthetic. Next: guarded phase2 exact-head dispatch
+once; active release remains untouched.
