@@ -1,13 +1,23 @@
 name: Phase F7 capability scheduling closeout
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - ".github/actions/**"
       - "catalog/capabilities/**"
       - "catalog/ai/**"
+      - "catalog/common/tests/test_f7_ci_coverage.py"
+      - "catalog/federation/object_transfer.py"
+      - "catalog/federation/resumable_chunk_transfer.py"
+      - "catalog/federation/tests/test_phase_f641_chunk_contract.py"
+      - "catalog/node/tests/test_phase_f642_verified_chunk_transfer.py"
+      - "catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py"
       - "catalog/flask_app/ai_routes.py"
+      - "catalog/flask_app/services/server_setup_service.py"
+      - "catalog/flask_app/static/js/ai-explainer.js"
       - "catalog/flask_app/templates/ai_explainer.html"
+      - "catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py"
       - "catalog/flask_app/tests/test_ai_explainer_chat.py"
       - "catalog/flask_app/tests/test_ai_runtime_integration.py"
       - "catalog/flask_app/tests/test_connected_ai_provider.py"
@@ -26,8 +36,17 @@ on:
       - ".github/actions/**"
       - "catalog/capabilities/**"
       - "catalog/ai/**"
+      - "catalog/common/tests/test_f7_ci_coverage.py"
+      - "catalog/federation/object_transfer.py"
+      - "catalog/federation/resumable_chunk_transfer.py"
+      - "catalog/federation/tests/test_phase_f641_chunk_contract.py"
+      - "catalog/node/tests/test_phase_f642_verified_chunk_transfer.py"
+      - "catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py"
       - "catalog/flask_app/ai_routes.py"
+      - "catalog/flask_app/services/server_setup_service.py"
+      - "catalog/flask_app/static/js/ai-explainer.js"
       - "catalog/flask_app/templates/ai_explainer.html"
+      - "catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py"
       - "catalog/flask_app/tests/test_ai_explainer_chat.py"
       - "catalog/flask_app/tests/test_ai_runtime_integration.py"
       - "catalog/flask_app/tests/test_connected_ai_provider.py"
@@ -86,6 +105,7 @@ jobs:
           python -m compileall
           catalog/capabilities
           catalog/ai
+          catalog/common/tests/test_f7_ci_coverage.py
           catalog/flask_app/ai_routes.py
           catalog/flask_app/tests/test_ai_explainer_chat.py
           catalog/flask_app/tests/test_ai_runtime_integration.py
@@ -99,6 +119,8 @@ jobs:
           TMP: ${{ runner.os == 'Windows' && '\\?\C:\fcp-qtmp' || runner.temp }}
         run: >-
           python -m pytest -o addopts= -q
+          --junitxml="${{ runner.temp }}/f7-closeout-${{ matrix.os }}.xml"
+          catalog/common/tests/test_f7_ci_coverage.py
           catalog/capabilities/tests
           catalog/ai/tests
           catalog/flask_app/tests/test_ai_explainer_chat.py
@@ -109,15 +131,35 @@ jobs:
           catalog/relay/tests/test_phase_f75_retry_cancellation.py
           catalog/federation/tests/test_phase0.py
           catalog/federation/tests/test_phase1.py
+          catalog/federation/tests/test_phase_f641_chunk_contract.py
+          catalog/node/tests/test_phase_f642_verified_chunk_transfer.py
+          catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py
       - name: Ruff complete F7 boundary
         run: >-
           python -m ruff check
           catalog/capabilities
           catalog/ai
+          catalog/common/tests/test_f7_ci_coverage.py
           catalog/flask_app/ai_routes.py
           catalog/flask_app/tests/test_ai_runtime_integration.py
           --ignore I001,RUF022,B008,C408,PLC0206,UP035
+      - name: Preserve capability UP035 coverage
+        run: python -m ruff check catalog/capabilities --select UP035
+      - name: Preserve relay lifecycle lint coverage
+        run: >-
+          python -m ruff check
+          catalog/relay/tests/test_phase_f74_capability_dispatch.py
+          catalog/relay/tests/test_phase_f75_retry_cancellation.py
+          --ignore I001,RUF022,B008,C408,PLC0206
       - name: Compose validation
         run: docker compose config --quiet
       - name: Diff hygiene
         run: git diff --check origin/${{ github.base_ref || 'main' }}...HEAD
+      - name: Preserve native F7 test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: f7-closeout-${{ matrix.os }}
+          path: ${{ runner.temp }}/f7-closeout-${{ matrix.os }}.xml
+          if-no-files-found: error
+          retention-days: 14
