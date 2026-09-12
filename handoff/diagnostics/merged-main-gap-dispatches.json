@@ -22,6 +22,17 @@
       "response": {
         "http_status": 204
       }
+    },
+    {
+      "workflow": "cf8-role-retirement.yml",
+      "source_commit": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
+      "ref": "main",
+      "requested_at": "2026-09-12T08:51:28.654549+00:00",
+      "workflow_sha256": "c7a825604fe63bacf9e84408658121a97e3480d5b8d059a5d396f188f823bc5a",
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
     }
   ]
 }
