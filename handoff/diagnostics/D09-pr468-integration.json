@@ -9,7 +9,8 @@
   "history": "normal fast-forward to existing direct child; no rebase, cherry-pick or force push",
   "canary_closed_without_merge": true,
   "two_green_evidence_pushed_before_integration": "afc16d07",
-  "final_head_validation": "PENDING",
+  "final_head_validation": "pr468-ba44100e-final-validation.json",
   "product_runtime_changed": false,
-  "physical_acceptance": false
+  "physical_acceptance": false,
+  "status": "INTEGRATED_FINAL_HEAD_LIGHTWEIGHT_VALIDATED"
 }

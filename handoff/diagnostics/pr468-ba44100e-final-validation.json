@@ -1,0 +1,239 @@
+{
+  "recorded_at": "2026-09-12T13:06:28.358425+00:00",
+  "status": "FINAL_HEAD_LIGHTWEIGHT_SOURCE_VALIDATION_PASS_WITH_STATUS_API_LIMITATION",
+  "pr": 468,
+  "actual_head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+  "base_sha": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
+  "clean": true,
+  "compared_native_proven_source": "f3abe5452db2f21593a688bc62bc5f4b22d5c40e",
+  "changed_paths": [
+    "docs/implementation/f7_ci_consolidation.md"
+  ],
+  "all_other_tracked_entries_identical": 1417,
+  "unchanged_source_entries_sha256": "538c9ccf2e41faf042a193ec90015fa52151e51e44851b24f018d8023713bba3",
+  "executable_workflow_source_byte_identical": true,
+  "two_native_greens_receipt": "ci-f7-two-native-greens.json",
+  "provenance_rule": "Retain original run/head/checkout attribution; reuse unchanged executable/command/OS coverage, do not relabel earlier runs as executions of final commit.",
+  "real_js_only_event_receipt": "ci-f7-js-only-trigger-proof.json",
+  "canary_comment_excluded": true,
+  "checks": [
+    {
+      "name": "branding",
+      "command": [
+        "C:\\wsl\\fcp-v1-fba508-nettking-20260910\\.venv\\Scripts\\python.exe",
+        "-B",
+        "scripts/check_product_branding.py"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "29 focused CI contracts",
+      "command": [
+        "C:\\wsl\\fcp-v1-fba508-nettking-20260910\\.venv\\Scripts\\python.exe",
+        "-B",
+        "-m",
+        "pytest",
+        "-o",
+        "addopts=",
+        "-p",
+        "no:cacheprovider",
+        "-q",
+        "catalog/common/tests/test_f7_ci_coverage.py",
+        "--junitxml=C:\\wsl\\fcp-v1-fba508-nettking-20260910\\.acceptance\\pr468-ba44100e-final-lightweight.xml"
+      ],
+      "exit_code": 0,
+      "stdout": ".............................                                            [100%]\n29 passed in 0.20s\n",
+      "stderr": ""
+    },
+    {
+      "name": "diff hygiene",
+      "command": [
+        "git",
+        "diff",
+        "--check",
+        "f3abe5452db2f21593a688bc62bc5f4b22d5c40e",
+        "ba44100ec1e4cde19daba0d3723b991c11742316"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "focused_tests": 29,
+  "legacy_workflows_still_present": [
+    "phase-f71-job-contracts.yml",
+    "phase-f72-provider-selection.yml",
+    "phase-f73-durable-job-ownership.yml",
+    "phase-f74-worker-dispatch.yml",
+    "phase-f75-retry-cancellation.yml",
+    "phase-f76-artifact-authorization.yml",
+    "phase-f77-ai-runtime-integration.yml",
+    "phase-f84-compute-worker-activation.yml"
+  ],
+  "reference_matches": [
+    "./.github/workflows/phase-f71-job-contracts.yml:1:name: Phase F7.1 job contracts",
+    "./.github/workflows/phase-f71-job-contracts.yml:7:      - \".github/workflows/phase-f71-job-contracts.yml\"",
+    "./.github/workflows/phase-f71-job-contracts.yml:12:      - \".github/workflows/phase-f71-job-contracts.yml\"",
+    "./.github/workflows/phase-f75-retry-cancellation.yml:1:name: Phase F7.5 retry and cancellation",
+    "./.github/workflows/phase-f75-retry-cancellation.yml:8:      - \".github/workflows/phase-f75-retry-cancellation.yml\"",
+    "./.github/workflows/phase-f75-retry-cancellation.yml:14:      - \".github/workflows/phase-f75-retry-cancellation.yml\"",
+    "./.github/workflows/phase-f73-durable-job-ownership.yml:1:name: Phase F7.3 durable job ownership",
+    "./.github/workflows/phase-f73-durable-job-ownership.yml:7:      - \".github/workflows/phase-f73-durable-job-ownership.yml\"",
+    "./.github/workflows/phase-f73-durable-job-ownership.yml:12:      - \".github/workflows/phase-f73-durable-job-ownership.yml\"",
+    "./.github/workflows/phase-f72-provider-selection.yml:1:name: Phase F7.2 provider selection",
+    "./.github/workflows/phase-f72-provider-selection.yml:7:      - \".github/workflows/phase-f72-provider-selection.yml\"",
+    "./.github/workflows/phase-f72-provider-selection.yml:12:      - \".github/workflows/phase-f72-provider-selection.yml\"",
+    "./.github/workflows/phase-f77-ai-runtime-integration.yml:1:name: Phase F7.7 AI runtime integration",
+    "./.github/workflows/phase-f77-ai-runtime-integration.yml:17:      - \".github/workflows/phase-f77-ai-runtime-integration.yml\"",
+    "./.github/workflows/phase-f77-ai-runtime-integration.yml:32:      - \".github/workflows/phase-f77-ai-runtime-integration.yml\"",
+    "./.github/workflows/phase-f74-worker-dispatch.yml:1:name: Phase F7.4 worker dispatch",
+    "./.github/workflows/phase-f74-worker-dispatch.yml:8:      - \".github/workflows/phase-f74-worker-dispatch.yml\"",
+    "./.github/workflows/phase-f74-worker-dispatch.yml:14:      - \".github/workflows/phase-f74-worker-dispatch.yml\"",
+    "./.github/workflows/phase-f76-artifact-authorization.yml:1:name: Phase F7.6 artifact authorization",
+    "./.github/workflows/phase-f76-artifact-authorization.yml:12:      - \".github/workflows/phase-f76-artifact-authorization.yml\"",
+    "./.github/workflows/phase-f76-artifact-authorization.yml:22:      - \".github/workflows/phase-f76-artifact-authorization.yml\"",
+    "./.github/workflows/phase-f84-compute-worker-activation.yml:1:name: Phase F8.4 trusted compute worker activation",
+    "./.github/workflows/phase-f84-compute-worker-activation.yml:10:      - \".github/workflows/phase-f84-compute-worker-activation.yml\"",
+    "./.github/workflows/phase-f84-compute-worker-activation.yml:17:      - \".github/workflows/phase-f84-compute-worker-activation.yml\"",
+    "./docs/implementation/osl_integration/08_validation_testing_and_ci.md:63:  `.github/workflows/phase-f77-ai-runtime-integration.yml:39-99` and",
+    "./docs/implementation/osl_integration/02_current_fcp_architecture.md:505:  `.github/workflows/phase-f77-ai-runtime-integration.yml` lines 39--99 and",
+    "./docs/implementation/federation_v1_cleanup_manifest.md:271:- `.github/workflows/phase-f71-job-contracts.yml`;",
+    "./docs/implementation/federation_v1_cleanup_manifest.md:272:- `.github/workflows/phase-f72-provider-selection.yml`;",
+    "./docs/implementation/federation_v1_cleanup_manifest.md:273:- `.github/workflows/phase-f73-durable-job-ownership.yml`;",
+    "./docs/implementation/federation_v1_cleanup_manifest.md:274:- `.github/workflows/phase-f74-worker-dispatch.yml`;",
+    "./docs/implementation/federation_v1_cleanup_manifest.md:275:- `.github/workflows/phase-f75-retry-cancellation.yml`;",
+    "./docs/implementation/federation_v1_cleanup_manifest.md:276:- `.github/workflows/phase-f76-artifact-authorization.yml`;",
+    "./docs/implementation/federation_v1_cleanup_manifest.md:277:- `.github/workflows/phase-f77-ai-runtime-integration.yml`;",
+    "./docs/implementation/federation_v1_cleanup_manifest.md:282:- `.github/workflows/phase-f84-compute-worker-activation.yml`;"
+  ],
+  "external_executable_workflow_name_or_file_consumers": [],
+  "reference_disposition": "Current references intact. Retirement still requires updating the manifest and two OSL F7.7 documentation references; no deletion performed.",
+  "status_contract_api": {
+    "/branches/main": {
+      "http_status": 200,
+      "data": {
+        "name": "main",
+        "commit": {
+          "sha": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
+          "node_id": "C_kwDOPZM3cdoAKDE3YWIzYTA1YzljNTA2ZTBmOTJhZGZhYTRmYTBiYWMyMzFhYzJjMDU",
+          "commit": {
+            "author": {
+              "name": "Nettking",
+              "email": "martin.arthur.andersen@gmail.com",
+              "date": "2026-09-12T08:48:28Z"
+            },
+            "committer": {
+              "name": "GitHub",
+              "email": "noreply@github.com",
+              "date": "2026-09-12T08:48:28Z"
+            },
+            "message": "Merge pull request #467 from Nettking/codex/analysis-content-resolve-race\n\nfix: keep Windows artifact paths stable during concurrent publication",
+            "tree": {
+              "sha": "8483a71f3bea56741c75262cab2e9929fa594f93",
+              "url": "https://api.github.com/repos/Nettking/msh/git/trees/8483a71f3bea56741c75262cab2e9929fa594f93"
+            },
+            "url": "https://api.github.com/repos/Nettking/msh/git/commits/17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
+            "comment_count": 0,
+            "verification": {
+              "verified": true,
+              "reason": "valid",
+              "signature": "-----BEGIN PGP SIGNATURE-----\n\nwsFcBAABCAAQBQJqpRHcCRC1aQ7uu5UhlAAA0NIQAKAX0V+iUe20c5o8XaUmUS/Q\nnO80YR0otjjwecvDVh0c1V2JUOVgjtTTap4KpK2Nawm48X/FqK7/UhLh3MrSyg+R\nrWjKnjWzMMvqADcpujQoCF48aC2iM0Rg5GJgFThPm1g7/I9ONoSO64CGzFHRq2Z7\nXEv24cczAcFQMUIX9Nu43Lj7XgSuNo3uR5SCzo8g0VEc1Jpy9d2gGON5gtB0e3It\nsj43vtxYPw3OoEvtSEGu9Im/fbqgTd13maLQ01RAVbZl+RXhP9c9OXHDVGi+uNAg\nPpR7TAB+4+lSUZGuAr7Ps7Pfo6ABhupdx00Shv0+r19cUiPSZANBcdSI0ZX9/1Ww\ntR2xbJT1IlpxNyBBU2w2+peNY6ALtvCeDhYKokiakRDnGLjNIviDinxlctl+Y+PH\nfvujOVyYm/MWQd9h6qYNX17eC41JzSFK3xUwPyq2kU1qUQ9K0nr6FNFSTgspzdPv\nWD82JFTUGTHpP6Z3CTGsKT3PQ+wnVmScO5im4qHVfS3a/r6z//SjiHEpsaxFmZ0K\niNoF+fpoSoanQ3KfT3IMLsOY149TOmxaemy3btxJXh2uM9MiUTTil9D9pfz/R8ok\nk6+y3gXGVfQVREogTyP0o5+wLAgINYgh6VXCZtgyfklcfL0YG6wZ4kdzld1DJETK\nOArEKmmMlA8WMbOOMVxH\n=OC6Z\n-----END PGP SIGNATURE-----\n",
+              "payload": "tree 8483a71f3bea56741c75262cab2e9929fa594f93\nparent 2a9c9b8eb53edff74c2de23570ec56e054d29b22\nparent 84c66f8185c1411d9dc8c5c33244a2f564845ce7\nauthor Nettking <martin.arthur.andersen@gmail.com> 1789202908 +0200\ncommitter GitHub <noreply@github.com> 1789202908 +0200\n\nMerge pull request #467 from Nettking/codex/analysis-content-resolve-race\n\nfix: keep Windows artifact paths stable during concurrent publication",
+              "verified_at": "2026-09-12T08:48:28Z"
+            }
+          },
+          "url": "https://api.github.com/repos/Nettking/msh/commits/17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
+          "html_url": "https://github.com/Nettking/msh/commit/17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
+          "comments_url": "https://api.github.com/repos/Nettking/msh/commits/17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05/comments",
+          "author": {
+            "login": "Nettking",
+            "id": 3659520,
+            "node_id": "MDQ6VXNlcjM2NTk1MjA=",
+            "avatar_url": "https://avatars.githubusercontent.com/u/3659520?v=4",
+            "gravatar_id": "",
+            "url": "https://api.github.com/users/Nettking",
+            "html_url": "https://github.com/Nettking",
+            "followers_url": "https://api.github.com/users/Nettking/followers",
+            "following_url": "https://api.github.com/users/Nettking/following{/other_user}",
+            "gists_url": "https://api.github.com/users/Nettking/gists{/gist_id}",
+            "starred_url": "https://api.github.com/users/Nettking/starred{/owner}{/repo}",
+            "subscriptions_url": "https://api.github.com/users/Nettking/subscriptions",
+            "organizations_url": "https://api.github.com/users/Nettking/orgs",
+            "repos_url": "https://api.github.com/users/Nettking/repos",
+            "events_url": "https://api.github.com/users/Nettking/events{/privacy}",
+            "received_events_url": "https://api.github.com/users/Nettking/received_events",
+            "type": "User",
+            "user_view_type": "public",
+            "site_admin": false
+          },
+          "committer": {
+            "login": "web-flow",
+            "id": 19864447,
+            "node_id": "MDQ6VXNlcjE5ODY0NDQ3",
+            "avatar_url": "https://avatars.githubusercontent.com/u/19864447?v=4",
+            "gravatar_id": "",
+            "url": "https://api.github.com/users/web-flow",
+            "html_url": "https://github.com/web-flow",
+            "followers_url": "https://api.github.com/users/web-flow/followers",
+            "following_url": "https://api.github.com/users/web-flow/following{/other_user}",
+            "gists_url": "https://api.github.com/users/web-flow/gists{/gist_id}",
+            "starred_url": "https://api.github.com/users/web-flow/starred{/owner}{/repo}",
+            "subscriptions_url": "https://api.github.com/users/web-flow/subscriptions",
+            "organizations_url": "https://api.github.com/users/web-flow/orgs",
+            "repos_url": "https://api.github.com/users/web-flow/repos",
+            "events_url": "https://api.github.com/users/web-flow/events{/privacy}",
+            "received_events_url": "https://api.github.com/users/web-flow/received_events",
+            "type": "User",
+            "user_view_type": "public",
+            "site_admin": false
+          },
+          "parents": [
+            {
+              "sha": "2a9c9b8eb53edff74c2de23570ec56e054d29b22",
+              "url": "https://api.github.com/repos/Nettking/msh/commits/2a9c9b8eb53edff74c2de23570ec56e054d29b22",
+              "html_url": "https://github.com/Nettking/msh/commit/2a9c9b8eb53edff74c2de23570ec56e054d29b22"
+            },
+            {
+              "sha": "84c66f8185c1411d9dc8c5c33244a2f564845ce7",
+              "url": "https://api.github.com/repos/Nettking/msh/commits/84c66f8185c1411d9dc8c5c33244a2f564845ce7",
+              "html_url": "https://github.com/Nettking/msh/commit/84c66f8185c1411d9dc8c5c33244a2f564845ce7"
+            }
+          ]
+        },
+        "_links": {
+          "self": "https://api.github.com/repos/Nettking/msh/branches/main",
+          "html": "https://github.com/Nettking/msh/tree/main"
+        },
+        "protected": false,
+        "protection": {
+          "enabled": false,
+          "required_status_checks": {
+            "enforcement_level": "off",
+            "contexts": [],
+            "checks": []
+          }
+        },
+        "protection_url": "https://api.github.com/repos/Nettking/msh/branches/main/protection"
+      }
+    },
+    "/branches/main/protection": {
+      "http_status": 403,
+      "message": "Upgrade to GitHub Pro or make this repository public to enable this feature."
+    },
+    "/branches/main/protection/required_status_checks": {
+      "http_status": 403,
+      "message": "Upgrade to GitHub Pro or make this repository public to enable this feature."
+    },
+    "/rulesets": {
+      "http_status": 403,
+      "message": "Upgrade to GitHub Pro or make this repository public to enable this feature."
+    }
+  },
+  "status_contract_limitation": "Main branch metadata and accessible contexts are recorded; detailed protection/ruleset endpoints may be unavailable. Do not infer inaccessible policy contents.",
+  "no_contract_found_requiring_two_native_reruns_for_docs_only": "Reviewed cleanup manifest and F7 contracts in D09-preintegration-source-comparison.json. Final-source checks are distinct from the retained prior-source native evidence.",
+  "merge_or_retirement_approved": false,
+  "physical_acceptance": false,
+  "protected_recorder_data": "UNTOUCHED"
+}

@@ -11,20 +11,23 @@ all17 D08 cases across native platforms, original scheduler failure and explicit
 platform exclusions reconciled. No job was rerun for historical hosted billing reds.
 All prior PR/failed-main evidence retained under its own source. No further17ab CI
 polling or qualification is needed unless a concrete new contract reason appears.
-Next highest-value action: integrate the separate D09 docs-only repair into PR468
-through clean history, then validate the actual head and source equivalence.
-The existing canary Windows job PASSED at12:08Z. Both native replacement runs
-are fully reviewed (2/2), with exact source/command/runtime/JUnit evidence:
-diagnostics/ci-f7-two-native-greens.json. The actual JS-only event is verified.
-Canary660bf232 is closed without merge. PR468 was cleanly fast-forwarded to
-ba44100ec1e4cde19daba0d3723b991c11742316 after the complete proof was pushed.
-The13:00-bound snapshot found all PR468/469 automatic jobs completed; preserve
-all successes. Separate release failures occurred at checkout on Beast in three
-Windows regression jobs; their aggregates are consequences. Inspect the exact
-checkout error and persist its classification before any merge or rerun.
-After integrating ba44100e, rerun branding and required lightweight final-head/
-reference/status checks, preserve unchanged native coverage with original provenance,
-and require all replacement proof before merge or legacy retirement.
+Next highest-value action: inspect the necessary exact-head automatic CI/status
+checks for PR468 at ba44100ec1e4cde19daba0d3723b991c11742316, then resolve
+remaining merge/retirement gates without repeating proven native coverage.
+D09 is integrated through clean fast-forward. Final-head branding,29 focused
+CI contracts and diff hygiene PASS; only docs/implementation/f7_ci_consolidation.md
+changed from f3abe545, with all1417 other entries byte-identical.
+Receipt: diagnostics/pr468-ba44100e-final-validation.json. Two complete native
+replacement runs and real JS-only event are reviewed and pushed; canary469 is
+closed without merge. Preserve original source attribution; no manual native rerun.
+Literal reference scan found no external executable consumers of the eight legacy
+workflow names/files; existing manifest and two OSL references remain for retirement
+updates. All eight legacy workflows are still present. Detailed GitHub protection/
+ruleset endpoints return403, so invisible policy content is not asserted.
+Separate D10/#470: three old-source Beast Windows shards failed checkout on the
+runner-owned .pytest_cache (EPERM), before tests. Aggregates are downstream;
+no product repair proposed. Preserve those errors and all passing qualification.
+No PR468 merge or legacy retirement has occurred; do not disturb unrelated work.
 Pre-integration comparison: diagnostics/D09-preintegration-source-comparison.json.
 Base f3abe545 -> repair ba44100e changes one document; all1417 other tracked entries
 (mode/type/object/path) match. Actual canary660bf232 has its separately documented
@@ -2601,3 +2604,19 @@ PR469 is closed and unmerged; original native proof remains preserved at afc16d0
 Receipt: diagnostics/D09-pr468-integration.json. Next verify the final exact tree
 delta, run branding and required lightweight CI/reference/status checks. No manual
 full native rerun, legacy deletion, merge or physical change has occurred.
+
+## 2026-09-12T13:08:06.165088+00:00 — final-head lightweight proof persisted
+
+Actual head ba44100e is clean. Branding and29 CI-contract checks pass; complete
+tracked-tree comparison proves the sole documentation delta and unchanged workflow/
+executable source. No external executable literal references were found; final
+retirement must still update manifest/OSL references and resolve status-contract
+visibility/requirements. Reviewed cleanup/F7 contracts do not require repeating
+the two native executions solely for this docs delta. Native proof remains under
+its exact prior sources, separate from final-head validation.
+
+No unresolved PR468 review threads or submitted reviews were returned at this
+check. The source push may naturally trigger normal PR workflows; none was
+manually dispatched or rerun. Next inspect their initial state once, then observe
+long jobs no more often than45–60minutes. Keep all evidence and the environment
+issue separate from any physical acceptance decision.

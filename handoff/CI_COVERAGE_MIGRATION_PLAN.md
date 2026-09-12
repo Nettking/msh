@@ -1,7 +1,7 @@
 # Coverage-preserving self-hosted CI migration
 
-Status: **STAGE1 IMPLEMENTED in draft [PR468](https://github.com/Nettking/msh/pull/468); native equivalence proof 1/2 reviewed green; JS-only automatic event verified.**
-Plan/matrix were pushed at41d89c63 before source edits. Exact source: f3abe5452db2f21593a688bc62bc5f4b22d5c40e.
+Status: **STAGE1 IMPLEMENTED in draft [PR468](https://github.com/Nettking/msh/pull/468); native equivalence proof 2/2 reviewed green; JS-only automatic event and final-head lightweight validation verified.**
+Plan/matrix were pushed at41d89c63 before source edits. Current exact PR head: ba44100ec1e4cde19daba0d3723b991c11742316. Native proof sources retain f3abe545 and canary660bf232 attribution; the documentation-only integration preserves every executable/workflow byte.
 Qualified baseline: `17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05`.
 [Final main qualification](diagnostics/merged-main-final-qualification.json) is
 complete37/37 plus3companions with native/artifact review. Preserve it unchanged.
@@ -111,3 +111,8 @@ green; actual JS-only automatic triggering is proved. Focused29
 contract checks passed; see diagnostics/ci-f7-extension-checkpoint.json. Keep the acceptance campaign paused
 while the source decision is pending. The23 hosted admission failures remain
 infrastructure observations; no successful job is restarted to erase old red checks.
+
+Current receipts: diagnostics/ci-f7-two-native-greens.json and
+diagnostics/pr468-ba44100e-final-validation.json. Canary469 is closed unmerged.
+All eight legacy files remain. D10/#470 records the separate Beast CI checkout
+blocker; do not weaken product or runner contracts to address it.
