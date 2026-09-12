@@ -2897,3 +2897,7 @@ Same WinError10053 on iteration2 of unchanged test in clean440123f6 source under
 ## 2026-09-12T17:00:08.874701+00:00 — D13 isolated regression proves baseline failure
 
 Repair worktree is C:/wsl/fcp-fix-d13-windows-refusal-response-20260912 on codex/fix-d13-windows-refusal-response, based on unchanged actual main b7194820. New development test receives404 before sending body and observes the premature server close:1expectedFAIL on unchanged product. Receipt diagnostics/D13-baseline-regression.json and XML/patch retained. Next implement the persisted bounded refusal-body cleanup plan, with no PR473 or physical changes.
+
+## 2026-09-12T17:04:12.963872+00:00 — D13 focused repair proof and local PATH precondition
+
+Isolated two-file development repair passes46native Windows responder tests and Ruff/syntax. Expanded discovery has163PASS/7skips plus one unrelated launcher fallback failure: local invocation did not put the testing venv on PATH as CI does. Preserve diagnostics/D13-development-progress.json, both XMLs and development diff. Next retry only that failed test with child-only correct PATH; native Linux focused proof then commit/push/draftPR. No PR473/product-runtime/host-config change.

@@ -1,0 +1,20 @@
+{
+  "command": [
+    "C:\\wsl\\fcp-v1-fba508-nettking-20260910\\.venv\\Scripts\\python.exe",
+    "-B",
+    "-m",
+    "pytest",
+    "-o",
+    "addopts=",
+    "-p",
+    "no:cacheprovider",
+    "-q",
+    "catalog/mtconnect_recorder/tests/test_tailscale_recorder_launcher.py::test_windows_probe_rejects_runtime_that_cannot_import_exact_entrypoint",
+    "--basetemp=C:\\fcp-qtmp\\d13-fallback-correct-context",
+    "--junitxml=C:\\wsl\\fcp-v1-fba508-nettking-20260910\\.acceptance\\D13-fallback-correct-context.xml"
+  ],
+  "returncode": 0,
+  "output": ".                                                                        [100%]\n1 passed in 5.42s\n",
+  "environment_delta": "Only child PATH prepended testing venv Scripts and PYTHONDONTWRITEBYTECODE=1; original source unchanged.",
+  "protected_recorder_data": "UNTOUCHED"
+}
