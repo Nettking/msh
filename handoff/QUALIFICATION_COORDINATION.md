@@ -1,12 +1,14 @@
 # Federation v1 qualification coordination
 
-**Current actionable checkpoint (2026-09-12 01:18UTC):** PR465/D07 qualified37/37
+**Current actionable checkpoint (2026-09-12 01:22UTC):** PR465/D07 qualified37/37
 plus3/3 at4749ab6689315a7ad953c11ce4b2ec942433d71a and normally merged as
 `b6a96b218a513fe241ef4d6f051cf166444643ac`. Required D06 repair PR463 remains.
-Next: verify clean PR463 head83955f65, integrate the actual465 merged main, then
-qualify that new exact PR463 head. Preserve prior21/37 plus3/3 evidence as history;
-the head update is necessary to include the now-qualified D07 product correction,
-not a retry of the known failing source. Do not qualify intermediate main as the
+PR463 integrated head is `2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee`, pushed clean;
+D06/D07 source blobs match their respective prior heads. Six absent gates were
+dispatched once; seven automatic workflows were queued. Next command:
+`python -B handoff/diagnostics/poll_pr463_state.py` with the documented audit Python.
+Qualify the new exact head; prior21/37 plus3/3 proof is archived as history.
+The head update includes the qualified D07 correction. Do not qualify intermediate main as the
 new release candidate. Qualify actual final main once after all required fixes merge.
 Physical admission remains stopped on M9b286f93; no repair deployment, physical
 PASS or timers. See the end of this document for chronological deltas.
@@ -2021,3 +2023,9 @@ New-head ledger entries preserve the prior heads separately. Next: monitor only
 PR463 state changes using poll_pr463_state.py; retain new native evidence and
 fill demonstrated completed source gaps only. Do not repeat465 qualification.
 Physical M unchanged; final merged-main qualification waits for463 merge.
+
+01:22:50UTC: handoff top, D06/D07 table and automation now target integrated463
+head2c1a8d93. All six absent-gate dispatches confirmed/pushed; no active local
+execution remains. Next: state-change poll463, retain new native evidence, then
+normal merge when qualified/reviewed and final actual-main qualification once.
+Do not poll or requalify merged465. Physical M/protected Recorder data unchanged.
