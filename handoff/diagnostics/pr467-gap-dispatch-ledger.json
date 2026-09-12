@@ -1,0 +1,17 @@
+{
+  "dispatches": [
+    {
+      "pr": 467,
+      "sha": "84c66f8185c1411d9dc8c5c33244a2f564845ce7",
+      "ref": "codex/analysis-content-resolve-race",
+      "workflow": "cf7-acceptance-harness.yml",
+      "requested_at": "2026-09-12T05:59:07.199426+00:00",
+      "reason": "Required reviewed exact-head gate has no existing run",
+      "workflow_sha256": "dc7a4143e27b6cb54a597897ccbfb7801f02149df675886d3f18f9aab1014bd6",
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
+    }
+  ]
+}
