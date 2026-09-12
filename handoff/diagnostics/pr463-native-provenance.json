@@ -325,7 +325,72 @@
         "2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee"
       ],
       "checkout_matches": true
+    },
+    {
+      "job_id": 103473479376,
+      "run_id": 34664467237,
+      "name": "Linux regression shard (2)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 59918,
+      "sha256": "a27421c84fba07c52ee5d75947e0aabd51779b43cdd508d702091e0a06ca2c29",
+      "checkout_commits": [
+        "2cc004b3529ab3b0d99e10e1cdffbe1391f27231"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103473479432,
+      "run_id": 34664467237,
+      "name": "Linux regression shard (3)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 66995,
+      "sha256": "806746cb43f54dedc6b81e1f718b40ce03625eeda2e067ef451ad01391d42c79",
+      "checkout_commits": [
+        "2cc004b3529ab3b0d99e10e1cdffbe1391f27231"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103473479487,
+      "run_id": 34664467237,
+      "name": "Windows regressions (capability-product)",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 58700,
+      "sha256": "5d98ff9aa93c40d10d15cffdae9bfd116d39d340f59d5e8de587704daae516f5",
+      "checkout_commits": [
+        "2cc004b3529ab3b0d99e10e1cdffbe1391f27231"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103473479499,
+      "run_id": 34664467237,
+      "name": "Windows regressions (transport-storage)",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 53706,
+      "sha256": "4bc633bbdb6d6e1457fc4accc8eea3b88fba6d8cad8475794846cc1bc676eb2f",
+      "checkout_commits": [
+        "2cc004b3529ab3b0d99e10e1cdffbe1391f27231"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103473479671,
+      "run_id": 34664467253,
+      "name": "reviewer-compose",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 28055,
+      "sha256": "db34eadf6df8f6327b4eb9619748aa7778c964c0004445ae8bf4cde6440ace84",
+      "checkout_commits": [
+        "2cc004b3529ab3b0d99e10e1cdffbe1391f27231"
+      ],
+      "checkout_matches": false
     }
   ],
-  "retained_at": "2026-09-12T02:41:47.883731+00:00"
+  "retained_at": "2026-09-12T02:53:19.531920+00:00"
 }

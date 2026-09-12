@@ -2121,3 +2121,9 @@ protected data and candidate status unchanged; no physical PASS or timed runs.
 has nine successes and ICSE two, with both parent runs still active. Next:
 retain newly terminal native logs; preserve9/37 plus2/3 exact-head proof and
 leave active workflows untouched. No new dispatch justified.
+
+02:53UTC: five new native logs all prove synthetic2cc004b3 (release shards2/3,
+Windows capability/transport and ICSE compose); exact-head count stays9/37 plus
+2/3 companions. No failed tests or completed new source-gap parent. Next:
+poll_pr463_state.py at next state check; retain only new terminal evidence.
+No extra jobs, merge, deployment or protected Recorder-data operation.
