@@ -1953,3 +1953,9 @@ artifact review confirms4426 collected identities across four disjoint shards
 and both full orders, zero failures/errors and complete nine-artifact set.
 Current GitHub reviews/threads are empty. Next: validate native ICSE publication
 and audit skipped-case coverage/current-head review before qualification verdict.
+
+01:11UTC: ICSE source export verifies all1412 files against exact4749ab66, all19
+checksum entries, Linux/Windows/compose4/4 scenarios, both native10-check network
+sets and teardown. Receipt: diagnostics/pr465-icse-artifact-review.json. Next:
+audit current-head skipped-case/native coverage and final source-bound aggregates;
+no qualification or physical PASS inferred merely from green parent runs.
