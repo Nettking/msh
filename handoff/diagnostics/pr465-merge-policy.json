@@ -1,0 +1,9 @@
+{
+  "recorded_at": "2026-09-12T01:17:46.683863+00:00",
+  "main": "9b286f931497bf6291e215f6340443c5162826b0",
+  "protected": false,
+  "rules_read_error": {
+    "http_status": 403,
+    "message": "Upgrade to GitHub Pro or make this repository public to enable this feature."
+  }
+}

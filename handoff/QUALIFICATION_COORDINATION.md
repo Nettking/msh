@@ -1982,3 +1982,11 @@ due to28 failed legacy hosted checks outside the retained required set; commit
 status has zero entries. Do not infer product regressions or ignore these blindly.
 Next: inspect their annotations/execution status and compare the documented
 legacy-hosted disposition before normal merge. Required37+3 proof remains valid.
+
+01:17:47UTC: all28 non-required hosted-check annotations confirm the known
+GitHub billing/spending refusal before job execution, matching the completed
+sweep report. No independent defect or product test failure. Fresh review inputs
+still show no findings/requested reviewers and the exact qualified465 head.
+Main branch metadata/policy-read result retained; use only the normal merge API,
+without settings changes or bypass. Next: normal merge465 guarded by exact head;
+then persist its actual merge SHA before considering463 integration.
