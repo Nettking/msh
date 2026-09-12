@@ -1960,7 +1960,7 @@ sets and teardown. Receipt: diagnostics/pr465-icse-artifact-review.json. Next:
 audit current-head skipped-case/native coverage and final source-bound aggregates;
 no qualification or physical PASS inferred merely from green parent runs.
 
-01:16UTC: PR465 head4749ab6689315a7ad953c11ce4b2ec942433d71a is QUALIFIED_REQUIRED_PR_HEAD_SCOPE:
+01:14UTC: PR465 head4749ab6689315a7ad953c11ce4b2ec942433d71a is QUALIFIED_REQUIRED_PR_HEAD_SCOPE:
 37 required plus3 companion jobs, exact native source/aggregate proof, nine
 release artifacts and ICSE publication reviewed. All six D07 cases execute on
 Windows; five platform-neutral cases also execute in both full Linux orders.
@@ -1970,3 +1970,8 @@ the three changed files has no correctness findings; current reviews are empty.
 Receipt: diagnostics/pr465-final-qualification.json. Next: publish this verdict,
 mark PR465 ready, and inspect live review/merge requirements before normal merge.
 No candidate freeze or physical qualification; D06/PR463 remains required.
+
+
+01:14:39UTC: PR465 marked ready for review at the qualified exact head4749ab66.
+Published final qualification in its PR description. Next: inspect current
+review/check state and normal merge eligibility; no override of branch policy.
