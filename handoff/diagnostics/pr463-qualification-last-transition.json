@@ -1,5 +1,5 @@
 {
-  "observed_at": "2026-09-12T01:44:51.743822+00:00",
+  "observed_at": "2026-09-12T01:56:24.949470+00:00",
   "changes": {
     "463": [
       {
@@ -10,41 +10,29 @@
         "conclusion": null,
         "jobs": [
           {
-            "id": 103473479287,
-            "name": "Full-suite order (fixed)",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
-            "id": 103473479380,
-            "name": "PostgreSQL storage release check",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
             "id": 103473479415,
             "name": "Windows regressions (journal-artifacts)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103473479417,
+            "name": "Release checks (Windows)",
             "status": "in_progress",
             "conclusion": null
           }
         ]
       },
       {
-        "workflow": "ci-test-sharding.yml",
-        "run_id": 34665214234,
-        "event": "workflow_dispatch",
+        "workflow": "phase2-federation.yml",
+        "run_id": 34664467273,
+        "event": "pull_request",
         "status": "queued",
         "conclusion": null,
         "jobs": [
           {
-            "id": 103475612834,
-            "name": "Shard contract (Linux, shared-pool)",
-            "status": "queued",
-            "conclusion": null
-          },
-          {
-            "id": 103475612973,
-            "name": "Shard contract (Windows, shared-pool)",
+            "id": 103473479476,
+            "name": "linux",
             "status": "completed",
             "conclusion": "success"
           }
@@ -52,31 +40,16 @@
       },
       {
         "workflow": "product-branding.yml",
-        "run_id": 34664467276,
-        "event": "pull_request",
-        "status": "completed",
-        "conclusion": "success",
-        "jobs": [
-          {
-            "id": 103473479204,
-            "name": "product-branding",
-            "status": "completed",
-            "conclusion": "success"
-          }
-        ]
-      },
-      {
-        "workflow": "cf7-acceptance-harness.yml",
-        "run_id": 34664586934,
+        "run_id": 34665765899,
         "event": "workflow_dispatch",
         "status": "queued",
         "conclusion": null,
         "jobs": [
           {
-            "id": 103473838845,
-            "name": "harness (Linux, fcp-linux-fast, bash)",
-            "status": "completed",
-            "conclusion": "success"
+            "id": 103477205459,
+            "name": "product-branding",
+            "status": "queued",
+            "conclusion": null
           }
         ]
       }

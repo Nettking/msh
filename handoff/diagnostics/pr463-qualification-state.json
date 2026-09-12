@@ -1,5 +1,5 @@
 {
-  "observed_at": "2026-09-12T01:44:51.743822+00:00",
+  "observed_at": "2026-09-12T01:56:24.949470+00:00",
   "prs": {
     "463": {
       "number": 463,
@@ -113,19 +113,19 @@
             {
               "id": 103473479415,
               "name": "Windows regressions (journal-artifacts)",
-              "status": "in_progress",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "runner_name": "Nettking",
               "started_at": "2026-09-12T01:43:43Z",
-              "completed_at": null
+              "completed_at": "2026-09-12T01:52:44Z"
             },
             {
               "id": 103473479417,
               "name": "Release checks (Windows)",
-              "status": "queued",
+              "status": "in_progress",
               "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-12T01:19:14Z",
+              "runner_name": "Nettking",
+              "started_at": "2026-09-12T01:52:46Z",
               "completed_at": null
             },
             {
@@ -248,11 +248,11 @@
             {
               "id": 103473479476,
               "name": "linux",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-12T01:19:14Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-12T01:51:20Z",
+              "completed_at": "2026-09-12T01:53:22Z"
             }
           ]
         },
@@ -294,28 +294,28 @@
         },
         {
           "workflow": "product-branding.yml",
-          "run_id": 34664467276,
-          "event": "pull_request",
+          "run_id": 34665765899,
+          "event": "workflow_dispatch",
           "api_head_sha": "2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee",
-          "status": "completed",
-          "conclusion": "success",
+          "status": "queued",
+          "conclusion": null,
           "attempt": 1,
           "required_count": 1,
           "signature": {
-            "status": "completed",
-            "conclusion": "success",
+            "status": "queued",
+            "conclusion": null,
             "run_attempt": 1,
-            "updated_at": "2026-09-12T01:36:08Z"
+            "updated_at": "2026-09-12T01:45:45Z"
           },
           "jobs": [
             {
-              "id": 103473479204,
+              "id": 103477205459,
               "name": "product-branding",
-              "status": "completed",
-              "conclusion": "success",
-              "runner_name": "Nettking-Linux",
-              "started_at": "2026-09-12T01:35:59Z",
-              "completed_at": "2026-09-12T01:36:08Z"
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": "",
+              "started_at": "2026-09-12T01:45:47Z",
+              "completed_at": null
             }
           ]
         },
