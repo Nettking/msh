@@ -2585,3 +2585,10 @@ issue, then continue D09 integration; it is independent of the verified 2/2 nati
 replacement proof. No failing test is being relabeled or suppressed.
 
 D10 durable GitHub artifact: https://github.com/Nettking/msh/issues/470. No product repair proposed.
+
+## 2026-09-12T13:02:43.992353+00:00 — disposable canary closed without merge
+
+PR469 is closed after its complete 2/2 replacement proof was pushed at afc16d07.
+The inert JS comment was not merged. All original automatic runs had completed;
+new Beast checkout failures are tracked in issue470. Next: fast-forward PR468
+from f3abe545 to its docs-only child ba44100e, then verify the actual final head.
