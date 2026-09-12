@@ -1,32 +1,42 @@
 # Federation v1 qualification coordination
 
-**Current actionable checkpoint (2026-09-12T15:11Z):** draft PR473 contains
-the separate proven retirement at440123f6bc6dc358eef3d233236bc14f91af60e0,
-based on merged PR468 b7194820d8f1940ae60b8c9639e09b7f61e65c55.
-It removes exactly eight hosted workflows and edits four documentation files;
-all1406 other tracked entries, including all retained workflows/tests/product/
-runner configuration, remain identical. Branding,29F7 contracts and diff hygiene
-PASS on the clean exact head. No legacy filename consumers remain.
+**Current actionable checkpoint (2026-09-12T16:23Z):** draft PR473 remains at
+440123f6bc6dc358eef3d233236bc14f91af60e0. Its exact native F7 run34701516368
+is fully reviewed green: AQG Windows717PASS/5skips, Beast Linux713PASS/9skips;
+all722 identities pass across the pair, with every unique mapped module passing.
+Original2/2 replacement proof and real JS-only event remain preserved. Retirement
+changes only8deleted workflows/4docs; all1406 other entries remain identical.
 
-Prior F7 two-green proof and real JS-only event remain durable. F8.4 two-green
-proof was reviewed from existing F8 runs plus each source's native release lint
-checks, without reruns. Pre-delete inventory/proof: diagnostics/phase-workflow-
-retirement-preflight.json. Final source: diagnostics/phase-retirement-final-head-
-validation.json. PR473 is draft; deletion is not merged yet.
+D12 ownership/trust cause is corrected and verified on actual Beast NETWORK SERVICE
+runner28: maintenance34704678898/job103582477854 added only the exact CI path to
+safe.directory. Plain root/sidecar provenance using both native Git entry points
+and diff hygiene pass at unchanged existing checkout0355023f. No account/ACL/
+ownership/source/runner-pool or physical changes. Receipt: diagnostics/D12-host-
+repair-reviewed.json. SSH credentials/trust are no longer needed for this repair.
+The coordination-only maintenance workflow must never enter a release candidate.
 
-Next run one scoped native F7 matrix on the exact retirement head using existing
-workflow_dispatch, since its automatic filters do not select deleted sibling
-files. Plan: diagnostics/pr473-native-validation-plan.json. Preserve automatic
-PR473 and post-merge b719 CI; no intermediate full37 campaign. Keep head fixed
-while evidence runs. Next routine review15:55Z near completion; do not short-poll.
+Every underlying PR473 release job except the affected Windows check passed.
+After the run completed and host correction was verified, exactly that failed
+check was retried. New job103583206021 in release34701429430 attempt2 is running
+on Nettking; checkout/setup passed, dependency installation active at16:23Z.
+Receipt: diagnostics/pr473-D12-retry-20260912T162305.json. Existing successful
+jobs are copied metadata with earlier timestamps, not reruns. Keep head fixed.
+Next review the20-minute check/aggregates near completion at16:55Z; no duplicate
+retry or repeated native matrices. Retain actual0355023f checkout provenance.
 
-PR468 final-head release16/16/Phase2 2/2 passes are retained. Issues470/471/472
-stay open for original-host causes; a pass on Nettking did not diagnose AQG/Beast.
-Last fully qualified candidate remains17ab3a05 (37+3). Physical runtime9b286f93
-unchanged; no frozen new candidate, physical PASS, P07/P12, runner pool/account
-changes or protected Recorder-data access. Full eventual candidate qualification
-must use actual final merged source, preserving all earlier source-specific proof.
+D11 remains unresolved: the same reinstatement test failed on AQG Windows b719
+at an earlier tail-catchup assertion, without exposing the exception reason.
+Four existing same-source b719 executions passed and are retained, not rerun.
+Issue471 stays open; do not infer host or product repair. Original D10 also stays
+separate. Main b719 automatic release16/16 is native/artifact reviewed and archived,
+but its companion failures are preserved; no full-candidate qualification claim.
 
+PR468 merged b7194820; last fully qualified candidate remains17ab3a05 (37+3).
+PR473 remains unmerged until its complete final-source/native/status gate is
+reviewed. After coherent cleanup merge, assess D11 and required qualification
+for actual final main once; never relabel old evidence or freeze prematurely.
+Physical runtime9b286f93 unchanged; no physical PASS/P07/P12, deployment, protected
+Recorder-data access, Docker reset/prune, or runner account/pool changes.
 Current user direction, September 11 2026: execute on state changes, using this
 checkpoint and the completed diagnostic sweep report; do not repeat the sweep.
 
