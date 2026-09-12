@@ -2,7 +2,7 @@
   "source_commit": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
   "actual_main": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
   "main_matches": true,
-  "recorded_at": "2026-09-12T08:50:36.958746+00:00",
+  "recorded_at": "2026-09-12T08:52:42.572847+00:00",
   "workflows": [
     {
       "workflow": "cf7b-product-physical-acceptance.yml",
@@ -309,15 +309,250 @@
           "completed_at": null
         }
       ]
+    },
+    {
+      "workflow": "cf7-acceptance-harness.yml",
+      "run_id": 34684336496,
+      "event": "workflow_dispatch",
+      "api_head_sha": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
+      "status": "queued",
+      "conclusion": null,
+      "attempt": 1,
+      "required_count": 2,
+      "signature": {
+        "status": "queued",
+        "conclusion": null,
+        "run_attempt": 1,
+        "updated_at": "2026-09-12T08:51:15Z"
+      },
+      "jobs": [
+        {
+          "id": 103528559180,
+          "name": "harness (Linux, fcp-linux-fast, bash)",
+          "status": "queued",
+          "conclusion": null,
+          "runner_name": "",
+          "started_at": "2026-09-12T08:51:17Z",
+          "completed_at": null
+        },
+        {
+          "id": 103528559282,
+          "name": "harness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Byp...",
+          "status": "queued",
+          "conclusion": null,
+          "runner_name": "",
+          "started_at": "2026-09-12T08:51:17Z",
+          "completed_at": null
+        }
+      ]
+    },
+    {
+      "workflow": "cf7c-physical-test-readiness.yml",
+      "run_id": 34684340863,
+      "event": "workflow_dispatch",
+      "api_head_sha": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
+      "status": "queued",
+      "conclusion": null,
+      "attempt": 1,
+      "required_count": 2,
+      "signature": {
+        "status": "queued",
+        "conclusion": null,
+        "run_attempt": 1,
+        "updated_at": "2026-09-12T08:51:23Z"
+      },
+      "jobs": [
+        {
+          "id": 103528572320,
+          "name": "readiness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy B...",
+          "status": "queued",
+          "conclusion": null,
+          "runner_name": "",
+          "started_at": "2026-09-12T08:51:24Z",
+          "completed_at": null
+        },
+        {
+          "id": 103528572364,
+          "name": "readiness (Linux, fcp-linux-fast, bash)",
+          "status": "queued",
+          "conclusion": null,
+          "runner_name": "",
+          "started_at": "2026-09-12T08:51:24Z",
+          "completed_at": null
+        }
+      ]
+    },
+    {
+      "workflow": "cf8-role-retirement.yml",
+      "run_id": 34684344381,
+      "event": "workflow_dispatch",
+      "api_head_sha": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
+      "status": "queued",
+      "conclusion": null,
+      "attempt": 1,
+      "required_count": 2,
+      "signature": {
+        "status": "queued",
+        "conclusion": null,
+        "run_attempt": 1,
+        "updated_at": "2026-09-12T08:51:29Z"
+      },
+      "jobs": [
+        {
+          "id": 103528583404,
+          "name": "role-retirement (Linux, fcp-linux-fast, bash)",
+          "status": "queued",
+          "conclusion": null,
+          "runner_name": "",
+          "started_at": "2026-09-12T08:51:31Z",
+          "completed_at": null
+        },
+        {
+          "id": 103528583425,
+          "name": "role-retirement (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+          "status": "queued",
+          "conclusion": null,
+          "runner_name": "",
+          "started_at": "2026-09-12T08:51:31Z",
+          "completed_at": null
+        }
+      ]
+    },
+    {
+      "workflow": "cfi2-onboarding-composition.yml",
+      "run_id": 34684348208,
+      "event": "workflow_dispatch",
+      "api_head_sha": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
+      "status": "queued",
+      "conclusion": null,
+      "attempt": 1,
+      "required_count": null,
+      "signature": {
+        "status": "queued",
+        "conclusion": null,
+        "run_attempt": 1,
+        "updated_at": "2026-09-12T08:51:36Z"
+      },
+      "jobs": [
+        {
+          "id": 103528594617,
+          "name": "onboarding (Windows, fcp-test-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+          "status": "queued",
+          "conclusion": null,
+          "runner_name": "",
+          "started_at": "2026-09-12T08:51:37Z",
+          "completed_at": null
+        },
+        {
+          "id": 103528594759,
+          "name": "onboarding (Linux, fcp-test-linux, bash, 3.12.13)",
+          "status": "queued",
+          "conclusion": null,
+          "runner_name": "",
+          "started_at": "2026-09-12T08:51:37Z",
+          "completed_at": null
+        }
+      ]
+    },
+    {
+      "workflow": "ci-test-sharding.yml",
+      "run_id": 34684352823,
+      "event": "workflow_dispatch",
+      "api_head_sha": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
+      "status": "queued",
+      "conclusion": null,
+      "attempt": 1,
+      "required_count": 2,
+      "signature": {
+        "status": "queued",
+        "conclusion": null,
+        "run_attempt": 1,
+        "updated_at": "2026-09-12T08:51:42Z"
+      },
+      "jobs": [
+        {
+          "id": 103528608822,
+          "name": "Shard contract (Windows, shared-pool)",
+          "status": "queued",
+          "conclusion": null,
+          "runner_name": null,
+          "started_at": "2026-09-12T08:51:43Z",
+          "completed_at": null
+        },
+        {
+          "id": 103528608892,
+          "name": "Shard contract (Linux, shared-pool)",
+          "status": "queued",
+          "conclusion": null,
+          "runner_name": null,
+          "started_at": "2026-09-12T08:51:44Z",
+          "completed_at": null
+        }
+      ]
+    },
+    {
+      "workflow": "phase2-federation.yml",
+      "run_id": 34684358475,
+      "event": "workflow_dispatch",
+      "api_head_sha": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
+      "status": "queued",
+      "conclusion": null,
+      "attempt": 1,
+      "required_count": 2,
+      "signature": {
+        "status": "queued",
+        "conclusion": null,
+        "run_attempt": 1,
+        "updated_at": "2026-09-12T08:51:48Z"
+      },
+      "jobs": [
+        {
+          "id": 103528622704,
+          "name": "windows",
+          "status": "queued",
+          "conclusion": null,
+          "runner_name": null,
+          "started_at": "2026-09-12T08:51:50Z",
+          "completed_at": null
+        },
+        {
+          "id": 103528622985,
+          "name": "linux",
+          "status": "queued",
+          "conclusion": null,
+          "runner_name": null,
+          "started_at": "2026-09-12T08:51:50Z",
+          "completed_at": null
+        }
+      ]
+    },
+    {
+      "workflow": "release-image-metadata.yml",
+      "run_id": 34684364551,
+      "event": "workflow_dispatch",
+      "api_head_sha": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
+      "status": "queued",
+      "conclusion": null,
+      "attempt": 1,
+      "required_count": null,
+      "signature": {
+        "status": "queued",
+        "conclusion": null,
+        "run_attempt": 1,
+        "updated_at": "2026-09-12T08:51:55Z"
+      },
+      "jobs": [
+        {
+          "id": 103528637964,
+          "name": "Verify immutable release image metadata",
+          "status": "queued",
+          "conclusion": null,
+          "runner_name": null,
+          "started_at": "2026-09-12T08:51:57Z",
+          "completed_at": null
+        }
+      ]
     }
   ],
-  "missing_workflows": [
-    "cf7-acceptance-harness.yml",
-    "cf7c-physical-test-readiness.yml",
-    "cf8-role-retirement.yml",
-    "cfi2-onboarding-composition.yml",
-    "ci-test-sharding.yml",
-    "phase2-federation.yml",
-    "release-image-metadata.yml"
-  ]
+  "missing_workflows": []
 }
