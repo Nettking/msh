@@ -1,0 +1,52 @@
+{
+  "source_commit": "0355023f27c4c6886ab6beb48bb9a998b3ab2904",
+  "retained_at": "2026-09-12T16:40:08.426475+00:00",
+  "records": [
+    {
+      "job_id": 103583206021,
+      "run_id": 34701429430,
+      "name": "Release checks (Windows)",
+      "runner_name": "Nettking",
+      "conclusion": "failure",
+      "bytes": 59875,
+      "sha256": "1eef5ba9b4df02d79928cd9d5975b729739fa0b26e20dbd60ecf98681819c959",
+      "checkout_commits": [
+        "0355023f27c4c6886ab6beb48bb9a998b3ab2904"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103583682899,
+      "run_id": 34701429430,
+      "name": "Release matrix (Windows)",
+      "runner_name": "AQG7NCC-Linux",
+      "conclusion": "failure",
+      "bytes": 1707,
+      "sha256": "436f2c048c1127f8c59ef8886aa6422de0622dd3db69086d8b02a4137ddc2c45",
+      "checkout_commits": [],
+      "checkout_matches": null
+    },
+    {
+      "job_id": 103583682979,
+      "run_id": 34701429430,
+      "name": "Release matrix (Linux)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "failure",
+      "bytes": 1699,
+      "sha256": "f573587c321b81a03043198e7130bb804b6abae595ac26a4643a0725c2ba7080",
+      "checkout_commits": [],
+      "checkout_matches": null
+    },
+    {
+      "job_id": 103583717502,
+      "run_id": 34701429430,
+      "name": "Federation v1 automated release verdict",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "failure",
+      "bytes": 1263,
+      "sha256": "d23566ee7276d224e7f8d9a25c6b8f32f9ad590d955aed2189a268745a13d926",
+      "checkout_commits": [],
+      "checkout_matches": null
+    }
+  ]
+}

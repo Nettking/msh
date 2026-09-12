@@ -1,0 +1,72 @@
+2026-09-12T16:24:11.5129233Z ================================== FAILURES ===================================
+2026-09-12T16:24:11.5129989Z _______________________ test_unknown_paths_are_refused ________________________
+2026-09-12T16:24:11.5130421Z
+2026-09-12T16:24:11.5130795Z     def test_unknown_paths_are_refused() -> None:
+2026-09-12T16:24:11.5131538Z         def grant(*, app_url, secret, peer_node_name):
+2026-09-12T16:24:11.5132331Z             raise AssertionError("must not be asked")
+2026-09-12T16:24:11.5132790Z
+2026-09-12T16:24:11.5133552Z         server, port = _serve(lambda _address: PeerVerification(PEER, "verified"), grant)
+2026-09-12T16:24:11.5134198Z         try:
+2026-09-12T16:24:11.5134629Z >           status, _payload = _post(port, "/anything-else")
+2026-09-12T16:24:11.5135473Z                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-12T16:24:11.5135746Z
+2026-09-12T16:24:11.5136103Z catalog\federation\tests\test_tailnet_join_responder.py:133:
+2026-09-12T16:24:11.5137480Z _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+2026-09-12T16:24:11.5138184Z catalog\federation\tests\test_tailnet_join_responder.py:58: in _post
+2026-09-12T16:24:11.5138894Z     with urllib.request.urlopen(request, timeout=5) as response:
+2026-09-12T16:24:11.5139465Z          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-12T16:24:11.5140014Z ..\..\..\toolchains\python-3.12.10\Lib\urllib\request.py:215: in urlopen
+2026-09-12T16:24:11.5140594Z     return opener.open(url, data, timeout)
+2026-09-12T16:24:11.5144133Z            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-12T16:24:11.5145056Z ..\..\..\toolchains\python-3.12.10\Lib\urllib\request.py:515: in open
+2026-09-12T16:24:11.5145663Z     response = self._open(req, data)
+2026-09-12T16:24:11.5146150Z                ^^^^^^^^^^^^^^^^^^^^^
+2026-09-12T16:24:11.5146691Z ..\..\..\toolchains\python-3.12.10\Lib\urllib\request.py:532: in _open
+2026-09-12T16:24:11.5147759Z     result = self._call_chain(self.handle_open, protocol, protocol +
+2026-09-12T16:24:11.5148484Z ..\..\..\toolchains\python-3.12.10\Lib\urllib\request.py:492: in _call_chain
+2026-09-12T16:24:11.5149063Z     result = func(*args)
+2026-09-12T16:24:11.5149428Z              ^^^^^^^^^^^
+2026-09-12T16:24:11.5149918Z ..\..\..\toolchains\python-3.12.10\Lib\urllib\request.py:1373: in http_open
+2026-09-12T16:24:11.5150567Z     return self.do_open(http.client.HTTPConnection, req)
+2026-09-12T16:24:11.5151166Z            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-12T16:24:11.5151751Z ..\..\..\toolchains\python-3.12.10\Lib\urllib\request.py:1348: in do_open
+2026-09-12T16:24:11.5152307Z     r = h.getresponse()
+2026-09-12T16:24:11.5152672Z         ^^^^^^^^^^^^^^^
+2026-09-12T16:24:11.5153258Z ..\..\..\toolchains\python-3.12.10\Lib\http\client.py:1430: in getresponse
+2026-09-12T16:24:11.5153877Z     response.begin()
+2026-09-12T16:24:11.5154399Z ..\..\..\toolchains\python-3.12.10\Lib\http\client.py:331: in begin
+2026-09-12T16:24:11.5155071Z     version, status, reason = self._read_status()
+2026-09-12T16:24:11.5155741Z                               ^^^^^^^^^^^^^^^^^^^
+2026-09-12T16:24:11.5156326Z ..\..\..\toolchains\python-3.12.10\Lib\http\client.py:292: in _read_status
+2026-09-12T16:24:11.5157034Z     line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+2026-09-12T16:24:11.5157685Z                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-12T16:24:11.5158231Z _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+2026-09-12T16:24:11.5158573Z
+2026-09-12T16:24:11.5158847Z self = <socket.SocketIO object at 0x0000019F61CE09A0>
+2026-09-12T16:24:11.5159330Z b = <memory at 0x0000019F61C5D9C0>
+2026-09-12T16:24:11.5159556Z
+2026-09-12T16:24:11.5159760Z     def readinto(self, b):
+2026-09-12T16:24:11.5160410Z         """Read up to len(b) bytes into the writable buffer *b* and return
+2026-09-12T16:24:11.5161241Z         the number of bytes read.  If the socket is non-blocking and no bytes
+2026-09-12T16:24:11.5161961Z         are available, None is returned.
+2026-09-12T16:24:11.5162428Z
+2026-09-12T16:24:11.5163078Z         If *b* is non-empty, a 0 return value indicates that the connection
+2026-09-12T16:24:11.5163746Z         was shutdown at the other end.
+2026-09-12T16:24:11.5164156Z         """
+2026-09-12T16:24:11.5164557Z         self._checkClosed()
+2026-09-12T16:24:11.5165157Z         self._checkReadable()
+2026-09-12T16:24:11.5165648Z         if self._timeout_occurred:
+2026-09-12T16:24:11.5166368Z             raise OSError("cannot read from timed out object")
+2026-09-12T16:24:11.5166892Z         while True:
+2026-09-12T16:24:11.5167250Z             try:
+2026-09-12T16:24:11.5167642Z >               return self._sock.recv_into(b)
+2026-09-12T16:24:11.5168283Z                        ^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-12T16:24:11.5173341Z E               ConnectionAbortedError: [WinError 10053] En etablert tilkobling ble avbrutt av programvaren p� vertsmaskinen
+2026-09-12T16:24:11.5173984Z
+2026-09-12T16:24:11.5174440Z ..\..\..\toolchains\python-3.12.10\Lib\socket.py:720: ConnectionAbortedError
+2026-09-12T16:24:11.5175129Z ---------------------------- Captured stderr call -----------------------------
+2026-09-12T16:24:11.5175743Z tailnet-join responder: "POST /anything-else HTTP/1.1" 404 -
+2026-09-12T16:24:11.5176300Z =========================== short test summary info ===========================
+2026-09-12T16:24:11.5179330Z FAILED catalog/federation/tests/test_tailnet_join_responder.py::test_unknown_paths_are_refused - ConnectionAbortedError: [WinError 10053] En etablert tilkobling ble avbrutt av programvaren p� vertsmaskinen
+2026-09-12T16:24:11.5180623Z 1 failed, 149 passed, 7 skipped in 34.83s
+2026-09-12T16:24:11.9217895Z ##[error]Process completed with exit code 1.

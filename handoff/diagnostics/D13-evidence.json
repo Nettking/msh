@@ -1,0 +1,36 @@
+{
+  "finding": "D13",
+  "status": "CONFIRMED",
+  "recorded_at": "2026-09-12T16:41:38.856769+00:00",
+  "candidate_sha": "440123f6bc6dc358eef3d233236bc14f91af60e0",
+  "actual_checkout": "0355023f27c4c6886ab6beb48bb9a998b3ab2904",
+  "identical_source_tree": "ad163ea2ac60b4bf26177f84fd47660453e5c041",
+  "host": "NETTKING native Windows",
+  "run_id": 34701429430,
+  "attempt": 2,
+  "job_id": 103583206021,
+  "stage": "Release checks (Windows) / Discovery authority and bounded startup regressions; CI only",
+  "test": "catalog/federation/tests/test_tailnet_join_responder.py::test_unknown_paths_are_refused",
+  "procedure": "Checked-in release discovery pytest selection; POST {} to a test-owned 127.0.0.1 ephemeral responder at /anything-else with existing 5 second client timeout",
+  "observed": "ConnectionAbortedError WinError 10053 while reading HTTP status; server logged 404. Selection: 1 failed,149 passed,7 skipped in34.83s.",
+  "expected": "Client receives HTTP404; no pairing-authority invocation.",
+  "classification": "UNRESOLVED: product HTTP lifecycle, test lifecycle, or host/transient transport cause requires diagnosis.",
+  "acceptance_impact": "PR473 Windows release check and its three dependency aggregates remain red; no physical acceptance claim.",
+  "safe_continuation": "YES: source inspection and bounded isolated CI-owned loopback reproduction; no blanket retry or merge.",
+  "state_changed": "Only CI checkout, installed temporary dependencies and ephemeral test fixture resources; no new host repair during this retry.",
+  "protected_recorder_data": "UNTOUCHED",
+  "physical_runtime": "UNCHANGED;9b286f931497bf6291e215f6340443c5162826b0",
+  "repair": "NONE",
+  "github_artifact": "PENDING immediate issue publication",
+  "hypotheses": [
+    "Unknown-path handler returns before reading POST body; unread bytes and close behavior may abort the Windows socket. Not yet established as root cause."
+  ],
+  "next_diagnostic_action": "Inspect unchanged responder/test socket lifecycle, then run only the failing test in a bounded isolated NETTKING loopback reproduction with existing deadlines and no production services.",
+  "evidence": [
+    "pr473-corrected-host-retry-failed-native-retention.json",
+    "pr473-corrected-host-retry-failed-logs.zip",
+    "D13-native-excerpt.log",
+    "pr473-D12-retry-20260912T163928.json"
+  ],
+  "D12_note": "Beast trust repair remains verified on Beast. Three prior launcher failures did not recur in this Nettking execution; different-host pass does not establish their original-host CI resolution."
+}

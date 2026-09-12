@@ -1,42 +1,27 @@
 # Federation v1 qualification coordination
 
-**Current actionable checkpoint (2026-09-12T16:23Z):** draft PR473 remains at
-440123f6bc6dc358eef3d233236bc14f91af60e0. Its exact native F7 run34701516368
-is fully reviewed green: AQG Windows717PASS/5skips, Beast Linux713PASS/9skips;
-all722 identities pass across the pair, with every unique mapped module passing.
-Original2/2 replacement proof and real JS-only event remain preserved. Retirement
-changes only8deleted workflows/4docs; all1406 other entries remain identical.
+**Current actionable checkpoint (2026-09-12T16:41:38.856769+00:00):** PR473 stays fixed at
+440123f6bc6dc358eef3d233236bc14f91af60e0. Its native F7 final-source proof,
+original2/2 replacement proof and real JS-only event remain valid and retained.
 
-D12 ownership/trust cause is corrected and verified on actual Beast NETWORK SERVICE
-runner28: maintenance34704678898/job103582477854 added only the exact CI path to
-safe.directory. Plain root/sidecar provenance using both native Git entry points
-and diff hygiene pass at unchanged existing checkout0355023f. No account/ACL/
-ownership/source/runner-pool or physical changes. Receipt: diagnostics/D12-host-
-repair-reviewed.json. SSH credentials/trust are no longer needed for this repair.
-The coordination-only maintenance workflow must never enter a release candidate.
+The single affected-check retry34701429430/attempt2/job103583206021 completed
+on Nettking with a DIFFERENT failure: D13 unknown-path refusal logged404 but
+the client received WinError10053.149passed/7skipped/1failed; three red aggregates
+are dependent consequences. Exact checkout0355023f/tree==440 verified in native
+logs. See diagnostics/D13.md and full logs/receipt linked there. No further retry.
+Next publish D13 issue immediately, then inspect unchanged socket lifecycle and
+perform only a bounded isolated loopback reproduction with current deadlines.
 
-Every underlying PR473 release job except the affected Windows check passed.
-After the run completed and host correction was verified, exactly that failed
-check was retried. New job103583206021 in release34701429430 attempt2 is running
-on Nettking; checkout/setup passed, dependency installation active at16:23Z.
-Receipt: diagnostics/pr473-D12-retry-20260912T162305.json. Existing successful
-jobs are copied metadata with earlier timestamps, not reruns. Keep head fixed.
-Next review the20-minute check/aggregates near completion at16:55Z; no duplicate
-retry or repeated native matrices. Retain actual0355023f checkout provenance.
+D12 Beast scoped Git trust repair remains verified on the actual original runner;
+the three former launcher failures did not recur on Nettking, but this does not
+prove their original-host CI resolution. D11 remains unresolved on AQG; neither
+finding is reclassified by D13. Main b719 release16/16 evidence is archived, its
+companion failures preserved. Last fully qualified candidate17ab3a05(37+3) remains.
+No merge/new candidate or blanket rerun. No physical PASS/P07/P12, deployment,
+protected Recorder-data access, Docker reset/prune or new runner/account changes.
+Physical runtime9b286f93 remains untouched. The coordination maintenance workflow
+must never enter a candidate. No live jobs remain in the targeted release run.
 
-D11 remains unresolved: the same reinstatement test failed on AQG Windows b719
-at an earlier tail-catchup assertion, without exposing the exception reason.
-Four existing same-source b719 executions passed and are retained, not rerun.
-Issue471 stays open; do not infer host or product repair. Original D10 also stays
-separate. Main b719 automatic release16/16 is native/artifact reviewed and archived,
-but its companion failures are preserved; no full-candidate qualification claim.
-
-PR468 merged b7194820; last fully qualified candidate remains17ab3a05 (37+3).
-PR473 remains unmerged until its complete final-source/native/status gate is
-reviewed. After coherent cleanup merge, assess D11 and required qualification
-for actual final main once; never relabel old evidence or freeze prematurely.
-Physical runtime9b286f93 unchanged; no physical PASS/P07/P12, deployment, protected
-Recorder-data access, Docker reset/prune, or runner account/pool changes.
 Current user direction, September 11 2026: execute on state changes, using this
 checkpoint and the completed diagnostic sweep report; do not repeat the sweep.
 
