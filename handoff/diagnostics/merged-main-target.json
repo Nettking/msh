@@ -1,17 +1,16 @@
 {
-  "recorded_at": "2026-09-11T16:33:45.345021+00:00",
-  "source_commit": "9b286f931497bf6291e215f6340443c5162826b0",
-  "worktree": "C:/wsl/fcp-v1-9b286f93-merged-main-20260911",
+  "recorded_at": "2026-09-12T04:13:17.555049+00:00",
+  "source_commit": "2a9c9b8eb53edff74c2de23570ec56e054d29b22",
+  "worktree": "C:\\wsl\\fcp-v1-2a9c9b8e-merged-main-20260912",
   "clean": true,
   "qualified_heads_are_ancestors": [
-    "1a0c634f47f8a247b6d1d2d1a219f5c12590587d",
-    "143fe7a9082193114af3d34dc437b85f845849a2",
-    "5b826c6806ab1bdb960412ba20ca78192971fb1d"
+    "4749ab6689315a7ad953c11ce4b2ec942433d71a",
+    "2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee"
   ],
-  "final_merged_main_qualified": true,
-  "candidate_frozen": true,
-  "runtime_sha": "0536f03d67eb277e11573c2188d8e820399627e3",
-  "next_action": "Run checked-in physical_revalidation N-to-M from clean M; retain fail-closed result and require all fresh observations; review side effects then stage exact-M owned runtime admission",
-  "qualification_receipt": "merged-main-final-qualification.json",
-  "candidate_receipt": "authoritative-candidate-9b286f93.json"
+  "tree_identical_to_qualified_pr463": true,
+  "final_merged_main_qualified": false,
+  "candidate_frozen": false,
+  "runtime_sha": "9b286f931497bf6291e215f6340443c5162826b0",
+  "previous_main_receipts": "archive-main-9b286f93",
+  "next_action": "Poll current main workflows; dispatch only absent required gates once; retain and qualify this exact main independently"
 }

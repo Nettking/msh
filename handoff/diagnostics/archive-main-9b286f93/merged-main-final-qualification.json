@@ -1,0 +1,181 @@
+{
+  "recorded_at": "2026-09-11T18:01:49.548375+00:00",
+  "source_commit": "9b286f931497bf6291e215f6340443c5162826b0",
+  "required_jobs": 37,
+  "additional_cfi2_registry_jobs": 3,
+  "workflows": [
+    {
+      "workflow": "cf7-acceptance-harness.yml",
+      "run_id": 34622777814,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "phase2-federation.yml",
+      "run_id": 34622527818,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "cf7b-product-physical-acceptance.yml",
+      "run_id": 34622527813,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "product-branding.yml",
+      "run_id": 34622528031,
+      "jobs": 1,
+      "result": "PASS"
+    },
+    {
+      "workflow": "federation-software-update.yml",
+      "run_id": 34622527937,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "cf7c-physical-test-readiness.yml",
+      "run_id": 34622782096,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "icse-tool-demo.yml",
+      "run_id": 34622527886,
+      "jobs": 4,
+      "result": "PASS"
+    },
+    {
+      "workflow": "cf8-role-retirement.yml",
+      "run_id": 34622527924,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "phase-f85-operator-federation-surface.yml",
+      "run_id": 34622527917,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "federation-v1-release.yml",
+      "run_id": 34622528054,
+      "jobs": 16,
+      "result": "PASS"
+    },
+    {
+      "workflow": "ci-test-sharding.yml",
+      "run_id": 34622786434,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "cfi2-onboarding-composition.yml",
+      "run_id": 34622527835,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "release-image-metadata.yml",
+      "run_id": 34622528246,
+      "jobs": 1,
+      "result": "PASS"
+    }
+  ],
+  "release_native_checkouts": 14,
+  "source_bound_aggregates": 2,
+  "collected_test_identities": 4420,
+  "full_orders_exact_test_identities": true,
+  "skips_with_pass_elsewhere": 13,
+  "skips_covered_by_native_nonartifact_log": 10,
+  "native_skip_map_sha256": "86d7f8ab8c8dfa545a9fd64617f94914ca97403a47b88c7b8de6d41bef62046d",
+  "unchanged_intentional_posix_exclusions": [
+    {
+      "test": "catalog.flask_app.tests.test_first_federation_start.test_windows_fresh_start_executes_real_batch_with_reset_stdin",
+      "reason": "requires real Windows cmd.exe"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_first_federation_start.test_windows_scaffolding_repair_restores_real_dirty_checkout",
+      "reason": "requires real Windows cmd.exe and git"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_fresh_url_output.test_fresh_onboarding_query_is_printed_without_executing_reset_fragment",
+      "reason": "Windows cmd metacharacter regression"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_model_resource_admission_paths.test_windows_model_pull_script_has_valid_powershell_syntax",
+      "reason": "Windows PowerShell parser check"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_relay_volume_selector.test_selector_survives_missing_current_images_and_reuses_existing_relay_volume",
+      "reason": "Windows PowerShell regression"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_relay_volume_selector.test_selector_pulls_python_probe_and_identifies_pc3_identity",
+      "reason": "Windows PowerShell regression"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_migration_script.test_windows_migration_script_has_valid_powershell_syntax",
+      "reason": "Windows PowerShell parser check"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_migration_script.test_windows_migration_fast_forwards_fake_legacy_checkout_and_resumes",
+      "reason": "Windows migration smoke"
+    },
+    {
+      "test": "catalog.federation.tests.test_host_mutation_activation.test_windows_activation_lease_has_valid_powershell_syntax",
+      "reason": "Windows PowerShell parser check"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_fresh_shutdown.test_shutdown_timeout_recovers_without_hanging",
+      "reason": "Windows process-tree recovery contract"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_runtime_state_resolver.test_encoded_python_survives_windows_powershell_native_argument_forwarding",
+      "reason": "Windows PowerShell native argument check"
+    }
+  ],
+  "release_artifact_sha256": "0a91a60917dfaf68e2273de951d8d1589e6b15199367d262e8ff5002421097a0",
+  "icse_review_sha256": "67ae2d084cf8214de004286347d183134fcf68498cca2f5e313343f6a513dcdb",
+  "no_reported_correctness_findings": true,
+  "status": "QUALIFIED_ACTUAL_MERGED_MAIN",
+  "next_stage": "Controlled D04 environment remediation, then freeze exact candidate and run clean checked-in revalidation.",
+  "candidate_frozen": false,
+  "all_required_qualified_heads_are_ancestors": true,
+  "focused_boundary_native_evidence": [
+    {
+      "job": "Release checks (Windows)",
+      "id": 103344769528,
+      "sha256": "dc4ab071b9f8bb22466ed70c4242aceded5cafa388b50d31dd6d8c8af9e11143",
+      "summaries": [
+        "2026-09-11T17:48:42.3179645Z 18 passed in 22.44s"
+      ]
+    },
+    {
+      "job": "Release checks (Windows)",
+      "id": 103344769528,
+      "sha256": "dc4ab071b9f8bb22466ed70c4242aceded5cafa388b50d31dd6d8c8af9e11143",
+      "summaries": [
+        "2026-09-11T17:49:13.4544439Z 145 passed in 27.52s"
+      ]
+    },
+    {
+      "job": "Release checks (Linux)",
+      "id": 103344769516,
+      "sha256": "0d9b806a78cc10836f8a4b1fdf3240041ef10495cdabb881f02b5a4432dba33b",
+      "summaries": [
+        "2026-09-11T17:23:07.2981177Z 18 passed in 13.02s"
+      ]
+    },
+    {
+      "job": "Release checks (Linux)",
+      "id": 103344769516,
+      "sha256": "0d9b806a78cc10836f8a4b1fdf3240041ef10495cdabb881f02b5a4432dba33b",
+      "summaries": [
+        "2026-09-11T17:23:26.5801858Z 142 passed, 3 skipped in 17.31s"
+      ]
+    }
+  ],
+  "physical_acceptance": false
+}

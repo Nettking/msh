@@ -1,0 +1,60 @@
+{
+  "matched": [
+    {
+      "job": "PostgreSQL storage release check",
+      "id": 103344769486,
+      "sha256": "8c52546712151d68e0e07f7bd0dc44b78d6fa93f298fc00643a5b88d9c63fd89",
+      "summaries": [
+        "2026-09-11T16:50:00.2567260Z 11 passed in 0.91s"
+      ],
+      "modules": [
+        "catalog/federation/tests/test_phase_d2_postgres.py"
+      ]
+    },
+    {
+      "job": "Release checks (Windows)",
+      "id": 103344769528,
+      "sha256": "dc4ab071b9f8bb22466ed70c4242aceded5cafa388b50d31dd6d8c8af9e11143",
+      "summaries": [
+        "2026-09-11T17:49:13.4544439Z 145 passed in 27.52s"
+      ],
+      "modules": [
+        "catalog/mtconnect_recorder/tests/test_tailscale_recorder_launcher.py"
+      ]
+    }
+  ],
+  "focused_boundaries": [
+    {
+      "job": "Release checks (Windows)",
+      "id": 103344769528,
+      "sha256": "dc4ab071b9f8bb22466ed70c4242aceded5cafa388b50d31dd6d8c8af9e11143",
+      "summaries": [
+        "2026-09-11T17:48:42.3179645Z 18 passed in 22.44s"
+      ]
+    },
+    {
+      "job": "Release checks (Windows)",
+      "id": 103344769528,
+      "sha256": "dc4ab071b9f8bb22466ed70c4242aceded5cafa388b50d31dd6d8c8af9e11143",
+      "summaries": [
+        "2026-09-11T17:49:13.4544439Z 145 passed in 27.52s"
+      ]
+    },
+    {
+      "job": "Release checks (Linux)",
+      "id": 103344769516,
+      "sha256": "0d9b806a78cc10836f8a4b1fdf3240041ef10495cdabb881f02b5a4432dba33b",
+      "summaries": [
+        "2026-09-11T17:23:07.2981177Z 18 passed in 13.02s"
+      ]
+    },
+    {
+      "job": "Release checks (Linux)",
+      "id": 103344769516,
+      "sha256": "0d9b806a78cc10836f8a4b1fdf3240041ef10495cdabb881f02b5a4432dba33b",
+      "summaries": [
+        "2026-09-11T17:23:26.5801858Z 142 passed, 3 skipped in 17.31s"
+      ]
+    }
+  ]
+}

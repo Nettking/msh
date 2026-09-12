@@ -1,38 +1,4 @@
 {
-  "source_commit": "9b286f931497bf6291e215f6340443c5162826b0",
-  "dispatches": [
-    {
-      "workflow": "cf7-acceptance-harness.yml",
-      "source_commit": "9b286f931497bf6291e215f6340443c5162826b0",
-      "ref": "main",
-      "requested_at": "2026-09-11T16:34:28.937369+00:00",
-      "workflow_sha256": "dc7a4143e27b6cb54a597897ccbfb7801f02149df675886d3f18f9aab1014bd6",
-      "status": "DISPATCHED",
-      "response": {
-        "http_status": 204
-      }
-    },
-    {
-      "workflow": "cf7c-physical-test-readiness.yml",
-      "source_commit": "9b286f931497bf6291e215f6340443c5162826b0",
-      "ref": "main",
-      "requested_at": "2026-09-11T16:34:31.671951+00:00",
-      "workflow_sha256": "1d015b626c9acbfd91aa9e5df06fdb245cd3eb2650da1cdb06ba3965c0461c84",
-      "status": "DISPATCHED",
-      "response": {
-        "http_status": 204
-      }
-    },
-    {
-      "workflow": "ci-test-sharding.yml",
-      "source_commit": "9b286f931497bf6291e215f6340443c5162826b0",
-      "ref": "main",
-      "requested_at": "2026-09-11T16:34:34.485429+00:00",
-      "workflow_sha256": "ec92d1a338be6ed83597546d19cd9e6d8f477cf284971c167808c948f9c6a267",
-      "status": "DISPATCHED",
-      "response": {
-        "http_status": 204
-      }
-    }
-  ]
+  "source_commit": "2a9c9b8eb53edff74c2de23570ec56e054d29b22",
+  "dispatches": []
 }
