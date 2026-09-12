@@ -1,28 +1,31 @@
 # Federation v1 qualification coordination
 
-**Current actionable checkpoint (2026-09-12T15:02Z):** PR468 is MERGED as
-b7194820d8f1940ae60b8c9639e09b7f61e65c55 from reviewed ba44100e. Normal merge
-used an expected-head guard; no status bypass. Receipt: diagnostics/pr468-merge.json.
+**Current actionable checkpoint (2026-09-12T15:11Z):** draft PR473 contains
+the separate proven retirement at440123f6bc6dc358eef3d233236bc14f91af60e0,
+based on merged PR468 b7194820d8f1940ae60b8c9639e09b7f61e65c55.
+It removes exactly eight hosted workflows and edits four documentation files;
+all1406 other tracked entries, including all retained workflows/tests/product/
+runner configuration, remain identical. Branding,29F7 contracts and diff hygiene
+PASS on the clean exact head. No legacy filename consumers remain.
 
-The original2/2 native F7 replacement executions, real JS-only automatic event,
-D09 documentation-only source comparison, branding and29focused contracts are
-durable. Final PR release16/16 and Phase2 2/2 are green after one bounded retry
-of each failed job; exact native outcomes reviewed. Issues470/471/472 remain
-open for original-host root causes, without source repair or physical evidence.
-AQG31 admission is verified from already-valid08:57Z evidence. No extra admission.
+Prior F7 two-green proof and real JS-only event remain durable. F8.4 two-green
+proof was reviewed from existing F8 runs plus each source's native release lint
+checks, without reruns. Pre-delete inventory/proof: diagnostics/phase-workflow-
+retirement-preflight.json. Final source: diagnostics/phase-retirement-final-head-
+validation.json. PR473 is draft; deletion is not merged yet.
 
-All eight legacy workflows remain. Next prepare a separate retirement change
-using the explicit equivalence matrix, final references and manifest rules.
-Review existing two-green F8 native evidence before including F8.4; otherwise
-retire the proven F7 group independently. Update two OSL references and cleanup
-manifest. Validate the exact retirement head and preserve automatic post-merge
-CI. Do not manually launch an intermediate37-job campaign; final merged-main
-qualification belongs to the final coherent cleanup state.
+Next run one scoped native F7 matrix on the exact retirement head using existing
+workflow_dispatch, since its automatic filters do not select deleted sibling
+files. Plan: diagnostics/pr473-native-validation-plan.json. Preserve automatic
+PR473 and post-merge b719 CI; no intermediate full37 campaign. Keep head fixed
+while evidence runs. Next routine review15:55Z near completion; do not short-poll.
 
-Actual main17ab3a05 remains the last fully qualified candidate (37+3); preserve
-its evidence. b7194820 is a merged CI extension, not a newly frozen physical
-candidate. Physical runtime9b286f93 unchanged; no physical PASS, P07/P12,
-deployment, runner-account/pool changes or protected Recorder-data access.
+PR468 final-head release16/16/Phase2 2/2 passes are retained. Issues470/471/472
+stay open for original-host causes; a pass on Nettking did not diagnose AQG/Beast.
+Last fully qualified candidate remains17ab3a05 (37+3). Physical runtime9b286f93
+unchanged; no frozen new candidate, physical PASS, P07/P12, runner pool/account
+changes or protected Recorder-data access. Full eventual candidate qualification
+must use actual final merged source, preserving all earlier source-specific proof.
 
 Current user direction, September 11 2026: execute on state changes, using this
 checkpoint and the completed diagnostic sweep report; do not repeat the sweep.
@@ -2760,3 +2763,7 @@ Receipt: diagnostics/phase-workflow-retirement-preflight.json. F7 two-green/JS-e
 ## 2026-09-12T15:10:04.189367+00:00 — separate retirement source pushed and clean checks pass
 
 Branch codex/ci-phase-workflow-retirement-20260912 at 440123f6bc6dc358eef3d233236bc14f91af60e0 removes exactly eight proven hosted workflow files and edits four documentation files. All1406 remaining entries are byte-identical to merged b7194820; zero remaining literal legacy filename references. Branding,29F7 contracts and diff hygiene PASS on the clean final head. Receipt: diagnostics/phase-retirement-final-head-validation.json. Next open a draft retirement PR, preserve automatic CI and run one exact-head F7 native validation through the existing dispatch path. No physical/runtime/protected-data change.
+
+## 2026-09-12T15:12:09.354326+00:00 — PR473 opened; single native validation planned
+
+Draft PR473 has exact head440123f6. Existing automatic runs are listed in diagnostics/pr473-native-validation-plan.json; no F7 run exists yet. One checked-in F7 workflow dispatch is planned solely for required exact deletion-source validation. No full campaign or original two-proof repetitions.

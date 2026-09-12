@@ -1,0 +1,38 @@
+{
+  "recorded_at": "2026-09-12T15:12:09.354326+00:00",
+  "pr": 473,
+  "head_sha": "440123f6bc6dc358eef3d233236bc14f91af60e0",
+  "base_sha": "b7194820d8f1940ae60b8c9639e09b7f61e65c55",
+  "branch": "codex/ci-phase-workflow-retirement-20260912",
+  "draft": true,
+  "status": "PLANNED_NOT_DISPATCHED",
+  "workflow": "phase-f7-closeout.yml",
+  "reason": "Exact retirement source validation required by manifest/accepted plan; deleted sibling paths do not trigger retained F7 automatically. Existing2/2 replacement proofs and real JS-only event remain preserved. One new scoped native matrix, no repeated two-proof campaign.",
+  "source_changes": "Eight deletions/four docs only; all1406 remaining entries identical",
+  "existing_runs": [
+    {
+      "id": 34701429430,
+      "path": ".github/workflows/federation-v1-release.yml",
+      "status": "queued"
+    },
+    {
+      "id": 34701429438,
+      "path": ".github/workflows/federation-software-update.yml",
+      "status": "queued"
+    },
+    {
+      "id": 34701429424,
+      "path": ".github/workflows/product-branding.yml",
+      "status": "completed"
+    },
+    {
+      "id": 34701429475,
+      "path": ".github/workflows/docs-portal.yml",
+      "status": "completed"
+    }
+  ],
+  "manual_dispatches_planned": 1,
+  "full37_dispatches_planned": 0,
+  "physical_acceptance": false,
+  "protected_recorder_data": "UNTOUCHED"
+}
