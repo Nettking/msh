@@ -2,7 +2,7 @@
   "source_commit": "2a9c9b8eb53edff74c2de23570ec56e054d29b22",
   "actual_main": "2a9c9b8eb53edff74c2de23570ec56e054d29b22",
   "main_matches": true,
-  "recorded_at": "2026-09-12T04:15:19.022642+00:00",
+  "recorded_at": "2026-09-12T04:26:27.986601+00:00",
   "workflows": [
     {
       "workflow": "federation-v1-release.yml",
@@ -32,28 +32,28 @@
         {
           "id": 103496010716,
           "name": "Windows regressions (capability-product)",
-          "status": "in_progress",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "runner_name": "Nettking",
           "started_at": "2026-09-12T04:11:47Z",
-          "completed_at": null
+          "completed_at": "2026-09-12T04:18:49Z"
         },
         {
           "id": 103496010723,
           "name": "PostgreSQL storage release check",
-          "status": "in_progress",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "runner_name": "Nettking-Linux",
           "started_at": "2026-09-12T04:15:11Z",
-          "completed_at": null
+          "completed_at": "2026-09-12T04:16:06Z"
         },
         {
           "id": 103496010736,
           "name": "Windows regressions (journal-artifacts)",
-          "status": "queued",
+          "status": "in_progress",
           "conclusion": null,
-          "runner_name": "",
-          "started_at": "2026-09-12T04:11:46Z",
+          "runner_name": "Nettking",
+          "started_at": "2026-09-12T04:25:42Z",
           "completed_at": null
         },
         {
@@ -68,11 +68,11 @@
         {
           "id": 103496010750,
           "name": "Linux regression shard (2)",
-          "status": "queued",
-          "conclusion": null,
-          "runner_name": "",
-          "started_at": "2026-09-12T04:11:46Z",
-          "completed_at": null
+          "status": "completed",
+          "conclusion": "success",
+          "runner_name": "Nettking-Linux",
+          "started_at": "2026-09-12T04:22:13Z",
+          "completed_at": "2026-09-12T04:26:18Z"
         },
         {
           "id": 103496010754,
@@ -158,10 +158,10 @@
         {
           "id": 103496010753,
           "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
-          "status": "queued",
+          "status": "in_progress",
           "conclusion": null,
-          "runner_name": "",
-          "started_at": "2026-09-12T04:11:46Z",
+          "runner_name": "Nettking-Linux",
+          "started_at": "2026-09-12T04:26:19Z",
           "completed_at": null
         },
         {
@@ -203,11 +203,11 @@
         {
           "id": 103496010827,
           "name": "acceptance (Linux, fcp-linux-fast, bash)",
-          "status": "queued",
-          "conclusion": null,
-          "runner_name": "",
-          "started_at": "2026-09-12T04:11:46Z",
-          "completed_at": null
+          "status": "completed",
+          "conclusion": "success",
+          "runner_name": "Nettking-Linux",
+          "started_at": "2026-09-12T04:17:23Z",
+          "completed_at": "2026-09-12T04:19:19Z"
         }
       ]
     },
@@ -216,15 +216,15 @@
       "run_id": 34672364185,
       "event": "push",
       "api_head_sha": "2a9c9b8eb53edff74c2de23570ec56e054d29b22",
-      "status": "queued",
-      "conclusion": null,
+      "status": "completed",
+      "conclusion": "success",
       "attempt": 1,
       "required_count": 2,
       "signature": {
-        "status": "queued",
-        "conclusion": null,
+        "status": "completed",
+        "conclusion": "success",
         "run_attempt": 1,
-        "updated_at": "2026-09-12T04:11:45Z"
+        "updated_at": "2026-09-12T04:25:41Z"
       },
       "jobs": [
         {
@@ -239,11 +239,11 @@
         {
           "id": 103496010805,
           "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
-          "status": "queued",
-          "conclusion": null,
-          "runner_name": "",
-          "started_at": "2026-09-12T04:11:46Z",
-          "completed_at": null
+          "status": "completed",
+          "conclusion": "success",
+          "runner_name": "Nettking",
+          "started_at": "2026-09-12T04:18:51Z",
+          "completed_at": "2026-09-12T04:25:40Z"
         }
       ]
     },
@@ -293,11 +293,11 @@
         {
           "id": 103496011104,
           "name": "linux",
-          "status": "queued",
-          "conclusion": null,
-          "runner_name": "",
-          "started_at": "2026-09-12T04:11:46Z",
-          "completed_at": null
+          "status": "completed",
+          "conclusion": "success",
+          "runner_name": "Nettking-Linux",
+          "started_at": "2026-09-12T04:20:11Z",
+          "completed_at": "2026-09-12T04:22:12Z"
         },
         {
           "id": 103496011201,
@@ -331,7 +331,7 @@
           "name": "harness (Linux, fcp-linux-fast, bash)",
           "status": "queued",
           "conclusion": null,
-          "runner_name": null,
+          "runner_name": "",
           "started_at": "2026-09-12T04:14:29Z",
           "completed_at": null
         },
@@ -340,7 +340,7 @@
           "name": "harness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Byp...",
           "status": "queued",
           "conclusion": null,
-          "runner_name": null,
+          "runner_name": "",
           "started_at": "2026-09-12T04:14:29Z",
           "completed_at": null
         }
@@ -367,18 +367,18 @@
           "name": "readiness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy B...",
           "status": "queued",
           "conclusion": null,
-          "runner_name": null,
+          "runner_name": "",
           "started_at": "2026-09-12T04:14:35Z",
           "completed_at": null
         },
         {
           "id": 103496356764,
           "name": "readiness (Linux, fcp-linux-fast, bash)",
-          "status": "queued",
-          "conclusion": null,
-          "runner_name": null,
-          "started_at": "2026-09-12T04:14:35Z",
-          "completed_at": null
+          "status": "completed",
+          "conclusion": "success",
+          "runner_name": "Nettking-Linux",
+          "started_at": "2026-09-12T04:19:21Z",
+          "completed_at": "2026-09-12T04:20:10Z"
         }
       ]
     },
@@ -403,7 +403,7 @@
           "name": "role-retirement (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
           "status": "queued",
           "conclusion": null,
-          "runner_name": null,
+          "runner_name": "",
           "started_at": "2026-09-12T04:14:41Z",
           "completed_at": null
         },
@@ -412,7 +412,7 @@
           "name": "role-retirement (Linux, fcp-linux-fast, bash)",
           "status": "queued",
           "conclusion": null,
-          "runner_name": null,
+          "runner_name": "",
           "started_at": "2026-09-12T04:14:41Z",
           "completed_at": null
         }
@@ -437,18 +437,18 @@
         {
           "id": 103496379750,
           "name": "onboarding (Linux, fcp-test-linux, bash, 3.12.13)",
-          "status": "queued",
-          "conclusion": null,
-          "runner_name": null,
-          "started_at": "2026-09-12T04:14:46Z",
-          "completed_at": null
+          "status": "completed",
+          "conclusion": "success",
+          "runner_name": "Nettking-Linux",
+          "started_at": "2026-09-12T04:16:08Z",
+          "completed_at": "2026-09-12T04:17:22Z"
         },
         {
           "id": 103496379954,
           "name": "onboarding (Windows, fcp-test-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
           "status": "queued",
           "conclusion": null,
-          "runner_name": null,
+          "runner_name": "",
           "started_at": "2026-09-12T04:14:46Z",
           "completed_at": null
         }
@@ -475,7 +475,7 @@
           "name": "Shard contract (Windows, shared-pool)",
           "status": "queued",
           "conclusion": null,
-          "runner_name": null,
+          "runner_name": "",
           "started_at": "2026-09-12T04:14:52Z",
           "completed_at": null
         },
@@ -484,7 +484,7 @@
           "name": "Shard contract (Linux, shared-pool)",
           "status": "queued",
           "conclusion": null,
-          "runner_name": null,
+          "runner_name": "",
           "started_at": "2026-09-12T04:14:52Z",
           "completed_at": null
         }
@@ -511,7 +511,7 @@
           "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
           "status": "queued",
           "conclusion": null,
-          "runner_name": null,
+          "runner_name": "",
           "started_at": "2026-09-12T04:14:56Z",
           "completed_at": null
         },
@@ -520,7 +520,7 @@
           "name": "operator-surface (Linux, fcp-linux-fast, bash)",
           "status": "queued",
           "conclusion": null,
-          "runner_name": null,
+          "runner_name": "",
           "started_at": "2026-09-12T04:14:56Z",
           "completed_at": null
         }
@@ -547,7 +547,7 @@
           "name": "Verify immutable release image metadata",
           "status": "queued",
           "conclusion": null,
-          "runner_name": null,
+          "runner_name": "",
           "started_at": "2026-09-12T04:15:01Z",
           "completed_at": null
         }
