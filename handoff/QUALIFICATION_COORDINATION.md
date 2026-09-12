@@ -2708,3 +2708,19 @@ of entering a blind retry loop. No deadline, authority or VCS checks are weakene
 ## 2026-09-12T14:18:58.767183+00:00 — targeted retries dispatched
 
 Both single-job API requests returned success. See diagnostics/D11-D12-targeted-retry-dispatch.json for the initial attempt/runner/progress snapshot. No source, workflow, runner, physical runtime or protected Recorder state was changed.
+
+## 2026-09-12T14:23Z — recovery schedule and issue links
+
+The initial retained snapshot confirms shard2 reached regression execution;
+Phase2 Windows completed checkout/setup and was installing dependencies.
+Actual retried jobs are 103566982282 on Nettking-Linux and 103566982639 on
+Nettking Windows, both started14:17:53Z. A pass on a different scheduled host
+will not establish the original AQG/Beast root cause. Attempt2 also exposes
+copied successful-job records with new IDs and original earlier timestamps;
+these are not additional suite executions.
+
+Issue updates: [D11](https://github.com/Nettking/msh/issues/471#issuecomment-5646443559)
+and [D12](https://github.com/Nettking/msh/issues/472#issuecomment-5646443637).
+Hourly heartbeat fortsett-federation-v1-p-nettking now follows this checkpoint,
+with the next check14:55Z. It remains quiet without actionable change. No
+additional retry or full qualification is scheduled. Current source unchanged.
