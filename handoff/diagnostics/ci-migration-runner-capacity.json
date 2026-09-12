@@ -1,0 +1,178 @@
+{
+  "recorded_at": "2026-09-12T12:01:10.198011+02:00",
+  "source_commit": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
+  "runners": [
+    {
+      "id": 31,
+      "name": "AQG7NCC-Linux",
+      "os": "unknown",
+      "status": "offline",
+      "busy": false,
+      "labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "fcp-test-linux",
+        "fcp-docker-linux",
+        "aqg7ncc-linux-admission"
+      ]
+    },
+    {
+      "id": 30,
+      "name": "AQG7NCC-Windows",
+      "os": "unknown",
+      "status": "offline",
+      "busy": false,
+      "labels": [
+        "self-hosted",
+        "X64",
+        "Windows",
+        "fcp-windows",
+        "aqg7ncc-admission"
+      ]
+    },
+    {
+      "id": 25,
+      "name": "Beast-Windows",
+      "os": "Windows",
+      "status": "online",
+      "busy": false,
+      "labels": [
+        "self-hosted",
+        "X64",
+        "Windows",
+        "beast-windows",
+        "fcp-windows-fast"
+      ]
+    },
+    {
+      "id": 26,
+      "name": "Beast-Linux",
+      "os": "Linux",
+      "status": "offline",
+      "busy": false,
+      "labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "beast-linux"
+      ]
+    },
+    {
+      "id": 28,
+      "name": "Beast",
+      "os": "Windows",
+      "status": "offline",
+      "busy": false,
+      "labels": [
+        "self-hosted",
+        "X64",
+        "Windows",
+        "fcp-windows",
+        "beast-windows",
+        "fcp-windows-fast",
+        "fcp-test-windows"
+      ]
+    },
+    {
+      "id": 29,
+      "name": "Beast-Linux-WSL",
+      "os": "Linux",
+      "status": "offline",
+      "busy": false,
+      "labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "beast-linux",
+        "fcp-linux-fast"
+      ]
+    },
+    {
+      "id": 21,
+      "name": "Nitro",
+      "os": "Linux",
+      "status": "online",
+      "busy": false,
+      "labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "nitro",
+        "fcp-linux"
+      ]
+    },
+    {
+      "id": 22,
+      "name": "Nettking",
+      "os": "Windows",
+      "status": "online",
+      "busy": false,
+      "labels": [
+        "self-hosted",
+        "X64",
+        "Windows",
+        "nettking",
+        "fcp-windows",
+        "fcp-windows-fast",
+        "fcp-test-windows"
+      ]
+    },
+    {
+      "id": 27,
+      "name": "Nettking-Linux",
+      "os": "Linux",
+      "status": "online",
+      "busy": false,
+      "labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "fcp-linux-fast",
+        "nettking-linux",
+        "fcp-test-linux",
+        "fcp-docker-linux"
+      ]
+    }
+  ],
+  "aqg7ncc_native_windows": [
+    {
+      "id": 30,
+      "name": "AQG7NCC-Windows",
+      "os": "unknown",
+      "status": "offline",
+      "busy": false,
+      "labels": [
+        "self-hosted",
+        "X64",
+        "Windows",
+        "fcp-windows",
+        "aqg7ncc-admission"
+      ]
+    }
+  ],
+  "aqg7ncc_linux": [
+    {
+      "id": 31,
+      "name": "AQG7NCC-Linux",
+      "os": "unknown",
+      "status": "offline",
+      "busy": false,
+      "labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "fcp-test-linux",
+        "fcp-docker-linux",
+        "aqg7ncc-linux-admission"
+      ]
+    }
+  ],
+  "native_windows_label_verified": true,
+  "runtime_provenance": "Metadata only: execution prerequisites must be verified by a checked-in replacement job before counting AQG Windows green evidence.",
+  "pool_admission": "No fcp-test pool admission or label/account changes performed.",
+  "state_changed": false,
+  "protected_recorder_data_untouched": true,
+  "native_windows_available": false,
+  "interpretation": "Registration name/Windows label identifies the intended native runner; API OS is unknown and status offline, so native runtime availability is not verified. Do not conflate label presence with readiness or Linux/WSL."
+}
