@@ -1,24 +1,30 @@
 # Federation v1 qualification coordination
 
-**Current actionable checkpoint (2026-09-12T08:47Z):** PR467 exact head
-84c66f8185c1411d9dc8c5c33244a2f564845ce7 is QUALIFIED_REQUIRED_PR_HEAD_SCOPE:
-37/37 required jobs plus3/3 companions, all40 native receipts reconciled;38 exact
-checkouts and2 reviewed dependency-only aggregates. Nine release artifacts cover
-4457 identities in4 disjoint shards and both complete orders. ICSE1414-file export,
-19checksums, components4/4 on3executions and network10/10 onboth native platforms.
-D08: all17new cases have native pass across platforms; Windows13PASS/4explicit
-symlink-privilege skips, Linux9PASS/8Windows-only skips. Original failing scheduler
-case passes Windows and both Linux orders; F85-Windows742PASS/5skips.
-D06/D07 regressions retained; existing11intentional POSIX exclusions unchanged.
-Current correctness/review findings: none. Clean source; no product changes made.
-Receipt: diagnostics/pr467-final-qualification.json. Next: current merge-readiness
-check and normal expected-head-guarded merge467, then qualify actual resulting main
-once. Do not reuse PR-head proof as merged-main qualification. Do not rerun prior
-passing jobs or failed old main2a9c9b8e. Keep all prior native/artifact evidence.
-Long CI policy remains hourly (45–60 minutes minimum after confirmed progress,
-prefer near expected completion). No further PR467 routine polling is needed.
-Physical runtime stays9b286f931497bf6291e215f6340443c5162826b0. No candidate freeze,
-repair deployment, physical PASS, P07/P12 or protected Recorder-data change.
+**Current actionable checkpoint (2026-09-12T08:54Z):** actual merged main
+17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05 is undergoing its single qualification.
+PR467 exact84c66f8185c1411d9dc8c5c33244a2f564845ce7 qualified37/37 plus3companions,
+with full native/artifact/skip/D06-D08 review, then merged normally with head guard.
+Receipts: diagnostics/pr467-final-qualification.json and pr467-merge-receipt.json.
+Clean audit worktree:C:/wsl/fcp-v1-17ab3a05-merged-main-20260912. All six qualified
+repair heads are ancestors; identical tree to467 is recorded but not qualification.
+All13 main workflows present: six original push runs plus seven absent gates dispatched
+once, each persisted. Current exact-main native proof:2/37 required plus0/3companions.
+Last initial progress snapshot2026-09-12T08:52:42Z:2successful,3executing,no failures.
+Main release34684218734; ICSE34684218746; F8534684218733. Complete run inventory:
+diagnostics/merged-main-qualification-state.json; no missing/duplicate jobs.
+**Next routine CI check:2026-09-12T09:53:00Z or later**, preferably near expected
+completion. Hourly cadence;45–60minute minimum after confirmed progress, absent
+independently delivered actionable events. No unchanged-progress notifications.
+Exact next command when due: C:/wsl/fcp-v1-fba508-nettking-20260910/.venv/Scripts/python.exe
+-B handoff/diagnostics/poll_merged_main_state.py. Persist meaningful delta, then
+retain only new terminal logs via retain_merged_main_jobs.py. No more dispatch is
+justified. Prior2a9 failed-main receipts archived in diagnostics/archive-main-2a9c9b8e.
+After all37+3 complete, adapt PR467 artifact/finalization reviewers to actual main
+SHA/ref/events/run IDs and verify4457identities, full orders, ICSE exact export and
+D06-D08 native regressions/skips. Do not run older2a9-bound main review scripts blindly.
+Only fully qualified actual main may then be frozen/revalidated for fresh physical work.
+Physical runtime remains9b286f931497bf6291e215f6340443c5162826b0. No candidate freeze,
+physical PASS, P07/P12 or protected Recorder-data changes. Do not repeat old PR CI.
 Current user direction, September 11 2026: execute on state changes, using this
 checkpoint and the completed diagnostic sweep report; do not repeat the sweep.
 
@@ -2388,3 +2394,5 @@ no source/physical state changes, protected Recorder data untouched, no physical
 2026-09-12T08:51:56.1669331Z: actual-main17ab3a05 release-image-metadata.yml dispatched once after verified absence and current-main guard; immutable workflow digest and HTTP response recorded in merged-main-gap-dispatches.json. Preserve six push runs. Next: remaining absent gates, one acceptance/progress snapshot, then wait45-60+minutes before routine checks. No physical action.
 
 2026-09-12T08:53:07.3758942Z: all13 actual-main17ab workflows are present; seven absent gates dispatched once plus six preserved push runs. At08:52:42UTC, two jobs completed successfully and three were executing, no failure. D08 table records qualified467/merged17ab with actual-main qualification pending. Next: retain only these two completed native logs, then no routine CI check before09:53UTC (prefer near expected completion). No source or physical state change.
+
+2026-09-12T08:54:37.2057931Z: two completed main jobs103528236062(release) and103528235851(ICSE) have retained exact17ab native checkout/hash proof. Current2/37 plus0/3; no further poll. Existing hourly heartbeat updated to actual-main stage and next eligible09:53UTC. All branches/checkpoints pushed; next action is due main-state snapshot, new-log retention, final actual-main artifact review when complete. No runtime or protected Recorder changes.
