@@ -1,33 +1,14 @@
 # Federation v1 qualification coordination
 
-**Current actionable checkpoint (2026-09-12T16:47:17.958904+00:00):** PR473 stays fixed at
-440123f6bc6dc358eef3d233236bc14f91af60e0. Its native F7 final-source proof,
-original2/2 replacement proof and real JS-only event remain valid and retained.
+**Current actionable checkpoint (2026-09-12T17:11:58.143638+00:00):** D13 repair is published as draft PR475, exact5e6f184311019b9982e8544a18f3dc02c1b16e98, based on main b7194820. Only responder/test changed. Native Windows3.12.10 and Linux3.12.13 each46/46 responderPASS. New synchronized regression fails on unchanged baseline. Size/deadline/EOF/error coverage and lint/syntax/diff pass. Broader Windows discovery164uniquePASS/7skips across original run plus one corrected child-PATH test; original local environment failure retained. No assertion or source workaround.
 
-The single affected-check retry34701429430/attempt2/job103583206021 completed
-on Nettking with a DIFFERENT failure, D13/#474: unknown-path refusal logged404
-but client received WinError10053.149passed/7skipped/1failed. Three red aggregates
-are dependent consequences. Actual0355023f checkout/tree==440 verified in native
-logs. No live jobs remain in this run; no further CI retry. PR473 remains draft.
+Automatic PR475 checks started normally; release fixed/rotating suites executing at17:09Z. Branding and Linux update completed and native checkout a5e743fee24e27bfd8d6d4f57c8efd589c6c3a42 verified; tree1c671f446fa215c99a6a58a155806de394aa569a equals5e6head. Receipts diagnostics/D13-focused-proof.json and pr475-initial-ci.json. NEXT routine check no earlier than17:55Z, limited to PR475 active required jobs/reviews; preserve head and results. No manual full candidate qualification or duplicate dispatch. D11/#471 remains unresolved and must not be inferred repaired from green runs.
 
-D13/#474 is now a CONFIRMED PRODUCT DEFECT: same valid HTTP request passes
-coalesced5/5, passes split without delay5/5, fails split with10ms body delay5/5.
-All failed cases log404 but client raises WinError10053. Handler returns before
-reading declared body; the default server closes the connection. Authority stays
-fail-closed. Packet-level reset details are not captured, but client-visible
-segmentation failure is demonstrated on unchanged440 native Windows.
-Original test also failed on iteration2 outside Actions. Full receipts:
-diagnostics/D13.md and D13-controlled-split-request.json; issue474 linked.
-D13 isolated repair is PUSHED as draft PR475, exact5e6f184311019b9982e8544a18f3dc02c1b16e98, based on actual main b719. Only responder/test changed.46Windows responder tests and lint/syntax pass. New synchronized regression proves baseline premature close. Broader Windows discovery has163PASS/7skips; one local PATH-precondition failure passes alone with child-only CI-equivalent venv PATH; original evidence preserved. Linux disposable Python3.12.13 dependencies ready. NEXT: native Linux responder module on clean repair head; retain evidence and inspect automatic PR475 CI startup once. No full candidate qualification or PR473 change. Receipt diagnostics/D13-draft-repair.json. Required CI/correctness review pending.
+PR473 remains draft/fixed440123f6, with exact F7 final-source native proof, original2/2 replacement proof and real JS-only event retained. Its Windows release retry failed D13, not D12;149PASS/7skips/1fail plus3dependent red aggregates. No further retry. D13 issue474 links original evidence and draft475; no physical observations used for acceptance.
 
-D12 Beast scoped Git trust repair remains verified on original runner. Its former
-launcher failures did not recur on Nettking; this is not original-host CI proof.
-D11/#471 remains unresolved on AQG; D10 remains separate. Main b719 release16/16
-native/artifact proof is archived, companion failures preserved. Last fully
-qualified candidate17ab3a05(37+3) remains. No new candidate or physical acceptance.
-Physical runtime9b286f93 and protected Recorder data untouched. No P07/P12,
-deployment, Docker reset/prune or new runner/account/pool changes. Coordination-
-only Beast maintenance workflow must never enter a release candidate.
+D12 Beast exact safe.directory host correction remains verified under original NETWORK SERVICE; prior launcher failures did not recur on Nettking, which is not original-host CI proof. Keep D10 separate. Main b719 release16/16 proof archived with companion failures. Last fully qualified candidate17ab3a05(37+3) remains; no new candidate freeze or merge yet.
+
+Physical runtime9b286f93 and protected Recorder data untouched. No physical PASS, P07/P12, deployment, Docker reset/prune or runner/account/pool change. Coordination-only Beast maintenance workflow must never enter a release candidate.
 
 Current user direction, September 11 2026: execute on state changes, using this
 checkpoint and the completed diagnostic sweep report; do not repeat the sweep.

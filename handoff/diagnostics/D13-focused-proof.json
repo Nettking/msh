@@ -1,0 +1,59 @@
+{
+  "recorded_at": "2026-09-12T17:11:58.143638+00:00",
+  "repair_sha": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "synthetic_checkout": "a5e743fee24e27bfd8d6d4f57c8efd589c6c3a42",
+  "identical_tree": "1c671f446fa215c99a6a58a155806de394aa569a",
+  "base": "b7194820d8f1940ae60b8c9639e09b7f61e65c55",
+  "pr": 475,
+  "changed_files": [
+    "catalog/federation/tailnet_join_responder.py",
+    "catalog/federation/tests/test_tailnet_join_responder.py"
+  ],
+  "source_clean": true,
+  "junit": {
+    "D13-repair-windows.xml": {
+      "tests": 46,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0,
+      "sha256": "02d986ce04ca4e50915064a3c8a52f7e1b08e1dd5e6b5fcdaaba53eae7161da7"
+    },
+    "D13-repair-linux.xml": {
+      "tests": 46,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0,
+      "sha256": "109efeac99ba51999775b2bd0c6a2ddb67f03f268385f43a2c9f03b6377cbea3"
+    },
+    "D13-repair-discovery-windows.xml": {
+      "tests": 171,
+      "failures": 1,
+      "errors": 0,
+      "skips": 7,
+      "sha256": "cafc6cafbafe6708123186aa9ef51300e0e0deb2210ded2497c9621638c9fa7b"
+    },
+    "D13-fallback-correct-context.xml": {
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0,
+      "sha256": "95aa3b2e15df208cb997713875c982fa3f6ee30b3cc4fa7de0d2b14f4308c8ae"
+    },
+    "D13-baseline-regression.xml": {
+      "tests": 1,
+      "failures": 1,
+      "errors": 0,
+      "skips": 0,
+      "sha256": "a41361f5fd2a0443e77dbb7efbe4b91b0daaf01ebc3460b5751399df395f8b57"
+    }
+  },
+  "native_windows": "NETTKING/Martin Python3.12.10,46/46 responderPASS; development source before commit byte-identical to published source",
+  "native_linux": "NETTKING Ubuntu WSL Python3.12.13,46/46 responderPASS on clean exact head; disposable constrained venv",
+  "windows_discovery": "164unique tests pass across original163pass and one corrected-context fallback test;7platform skips. Original local PATH failure retained, no claim of a single all-green invocation.",
+  "lint_syntax_diff": "PASS on unchanged two-file repair",
+  "automatic_ci": "Startup confirmed17:09Z; release fixed/rotating suites actively executing. Branding and Linux update completed, native logs retained at synthetic checkout. No manual qualification dispatch.",
+  "next_check": "No routine job poll before17:55Z; process completion/failure state changes only. Keep both draft475 and473 heads fixed. D11 remains unresolved.",
+  "protected_recorder_data": "UNTOUCHED",
+  "physical_runtime": "UNCHANGED; no physical PASS/P07/P12",
+  "qualification": "Focused development and automatic PR evidence only; not full release qualification or physical acceptance."
+}
