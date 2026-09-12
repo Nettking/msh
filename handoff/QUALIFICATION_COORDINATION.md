@@ -1,6 +1,6 @@
 # Federation v1 qualification coordination
 
-**Current actionable checkpoint (2026-09-12T14:18Z):** PR468 stays draft,
+**Current actionable checkpoint (2026-09-12T14:57Z):** PR468 stays draft,
 unmerged at ba44100ec1e4cde19daba0d3723b991c11742316. D09 documentation repair
 is integrated and branding/final-source checks pass. The original two native
 replacement executions and real AI-JavaScript-only automatic event are retained;
@@ -17,14 +17,13 @@ remain unresolved. Three existing same-source native executions passed D11's
 test; existing F6 on AQG Windows built the same Go source with VCS stamping.
 AQG31 admission is VERIFIED from already-valid08:57Z evidence; no new admission.
 
-Exactly one retry per failed job was accepted at14:18Z: D11 job103557723475 in
-run34695331201; D12 job103557723740 in run34695331247. No successful job or full
-native replacement matrix was manually repeated. GitHub may rerun dependent
-release aggregates. Original failed D11 ZIP/logs and both issues were durably
-retained first. Receipt: diagnostics/D11-D12-targeted-retry-dispatch.json.
-Inspect retries near completion, no later than14:55Z; retain new job/attempt/
-runner/source evidence. If either recurs, diagnose the actual stage/host instead
-of another blind retry. A retry pass does not erase the original failure.
+Both bounded retries have now completed SUCCESS on the unchanged PR head:
+release34695331201 attempt2 is16/16 green; Phase2 run34695331247 attempt2 is2/2
+green. New executions ran on Nettking Linux/Windows. Original AQG/Beast failures
+remain durable and their root causes unresolved; no retry pass erases them.
+Receipt: diagnostics/D11-D12-targeted-retry-outcome.json. Next retain/review actual
+native checkout/test/build evidence and new shard artifacts, then assess remaining
+final-source/reference/retirement gates. No further retry or full qualification.
 
 All eight legacy workflows remain. No merge or retirement until replacement-proof
 and required final-source/status gates are satisfied. No product/workflow change,
@@ -2724,3 +2723,7 @@ and [D12](https://github.com/Nettking/msh/issues/472#issuecomment-5646443637).
 Hourly heartbeat fortsett-federation-v1-p-nettking now follows this checkpoint,
 with the next check14:55Z. It remains quiet without actionable change. No
 additional retry or full qualification is scheduled. Current source unchanged.
+
+## 2026-09-12T14:58:18.418025+00:00 — both bounded retries completed green
+
+API snapshot and selected actual reexecutions are persisted in diagnostics/D11-D12-targeted-retry-outcome.json. Successful-job metadata copies have original earlier timestamps and are not claimed as additional executions. Native outcome review is next; original issues stay open.

@@ -1,0 +1,3536 @@
+{
+  "recorded_at": "2026-09-12T14:57:14.473382+00:00",
+  "pr": 468,
+  "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+  "draft": true,
+  "state": "open",
+  "merge_commit_sha": "f18e91adae2cb198fb5cebad61ee202a38d2bd8e",
+  "runs": [
+    {
+      "id": 34695331201,
+      "path": ".github/workflows/federation-v1-release.yml",
+      "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+      "status": "completed",
+      "conclusion": "success",
+      "event": "pull_request",
+      "run_attempt": 2,
+      "created_at": "2026-09-12T13:02:53Z",
+      "updated_at": "2026-09-12T14:21:37Z",
+      "html_url": "https://github.com/Nettking/msh/actions/runs/34695331201",
+      "jobs": [
+        {
+          "id": 103566982282,
+          "run_id": 34695331201,
+          "workflow_name": "Federation v1 release gate",
+          "head_branch": "codex/ci-f7-coverage-consolidation",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34695331201",
+          "run_attempt": 2,
+          "node_id": "CR_kwDOPZM3cc8AAAAYHRK8ig",
+          "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103566982282",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34695331201/job/103566982282",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-12T14:17:51Z",
+          "started_at": "2026-09-12T14:17:53Z",
+          "completed_at": "2026-09-12T14:21:12Z",
+          "name": "Linux regression shard (2)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-12T14:17:54Z",
+              "completed_at": "2026-09-12T14:17:57Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-12T14:17:57Z",
+              "completed_at": "2026-09-12T14:17:59Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-12T14:17:59Z",
+              "completed_at": "2026-09-12T14:18:02Z"
+            },
+            {
+              "name": "Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-12T14:18:02Z",
+              "completed_at": "2026-09-12T14:18:02Z"
+            },
+            {
+              "name": "Install release dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-12T14:18:02Z",
+              "completed_at": "2026-09-12T14:18:35Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-12T14:18:35Z",
+              "completed_at": "2026-09-12T14:18:35Z"
+            },
+            {
+              "name": "Run one file-preserving regression shard",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-12T14:18:35Z",
+              "completed_at": "2026-09-12T14:21:06Z"
+            },
+            {
+              "name": "Preserve shard coverage and timings",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-12T14:21:06Z",
+              "completed_at": "2026-09-12T14:21:08Z"
+            },
+            {
+              "name": "Repository stays clean after the suite",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-12T14:21:08Z",
+              "completed_at": "2026-09-12T14:21:08Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-09-12T14:21:08Z",
+              "completed_at": "2026-09-12T14:21:08Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 18,
+              "started_at": "2026-09-12T14:21:08Z",
+              "completed_at": "2026-09-12T14:21:08Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 19,
+              "started_at": "2026-09-12T14:21:08Z",
+              "completed_at": "2026-09-12T14:21:08Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103566982282",
+          "labels": [
+            "self-hosted",
+            "Linux",
+            "X64",
+            "fcp-test-linux"
+          ],
+          "runner_id": 27,
+          "runner_name": "Nettking-Linux",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103566982629,
+          "run_id": 34695331201,
+          "workflow_name": "Federation v1 release gate",
+          "head_branch": "codex/ci-f7-coverage-consolidation",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34695331201",
+          "run_attempt": 2,
+          "node_id": "CR_kwDOPZM3cc8AAAAYHRK95Q",
+          "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103566982629",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34695331201/job/103566982629",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-12T14:17:51Z",
+          "started_at": "2026-09-12T13:18:02Z",
+          "completed_at": "2026-09-12T13:19:26Z",
+          "name": "Release checks (Linux)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-12T13:18:03Z",
+              "completed_at": "2026-09-12T13:18:05Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-12T13:18:05Z",
+              "completed_at": "2026-09-12T13:18:08Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-12T13:18:08Z",
+              "completed_at": "2026-09-12T13:18:11Z"
+            },
+            {
+              "name": "Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-12T13:18:11Z",
+              "completed_at": "2026-09-12T13:18:12Z"
+            },
+            {
+              "name": "Install release dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-12T13:18:12Z",
+              "completed_at": "2026-09-12T13:18:45Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-12T13:18:45Z",
+              "completed_at": "2026-09-12T13:18:45Z"
+            },
+            {
+              "name": "Compile maintained product packages",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-12T13:18:45Z",
+              "completed_at": "2026-09-12T13:18:48Z"
+            },
+            {
+              "name": "POSIX readiness redirect regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-12T13:18:48Z",
+              "completed_at": "2026-09-12T13:19:01Z"
+            },
+            {
+              "name": "Validate acceptance manifest shape",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-12T13:19:01Z",
+              "completed_at": "2026-09-12T13:19:01Z"
+            },
+            {
+              "name": "Go direct peer sidecar tests",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-09-12T13:19:01Z",
+              "completed_at": "2026-09-12T13:19:01Z"
+            },
+            {
+              "name": "Ruff maintained release boundaries",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-09-12T13:19:01Z",
+              "completed_at": "2026-09-12T13:19:01Z"
+            },
+            {
+              "name": "Validate Compose configuration",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-09-12T13:19:01Z",
+              "completed_at": "2026-09-12T13:19:01Z"
+            },
+            {
+              "name": "Discovery authority and bounded startup regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-09-12T13:19:01Z",
+              "completed_at": "2026-09-12T13:19:21Z"
+            },
+            {
+              "name": "Lint discovery boundary",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14,
+              "started_at": "2026-09-12T13:19:21Z",
+              "completed_at": "2026-09-12T13:19:21Z"
+            },
+            {
+              "name": "Diff hygiene",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-09-12T13:19:21Z",
+              "completed_at": "2026-09-12T13:19:21Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 29,
+              "started_at": "2026-09-12T13:19:21Z",
+              "completed_at": "2026-09-12T13:19:21Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 30,
+              "started_at": "2026-09-12T13:19:21Z",
+              "completed_at": "2026-09-12T13:19:21Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 31,
+              "started_at": "2026-09-12T13:19:21Z",
+              "completed_at": "2026-09-12T13:19:21Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103566982629",
+          "labels": [
+            "self-hosted",
+            "Linux",
+            "X64",
+            "fcp-test-linux"
+          ],
+          "runner_id": 27,
+          "runner_name": "Nettking-Linux",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103566982695,
+          "run_id": 34695331201,
+          "workflow_name": "Federation v1 release gate",
+          "head_branch": "codex/ci-f7-coverage-consolidation",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34695331201",
+          "run_attempt": 2,
+          "node_id": "CR_kwDOPZM3cc8AAAAYHRK-Jw",
+          "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103566982695",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34695331201/job/103566982695",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-12T14:17:51Z",
+          "started_at": "2026-09-12T13:07:54Z",
+          "completed_at": "2026-09-12T13:18:00Z",
+          "name": "Full-suite order (fixed)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-12T13:07:55Z",
+              "completed_at": "2026-09-12T13:07:58Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-12T13:07:58Z",
+              "completed_at": "2026-09-12T13:07:59Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-12T13:07:59Z",
+              "completed_at": "2026-09-12T13:08:02Z"
+            },
+            {
+              "name": "Install release dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-12T13:08:02Z",
+              "completed_at": "2026-09-12T13:08:32Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-12T13:08:32Z",
+              "completed_at": "2026-09-12T13:08:32Z"
+            },
+            {
+              "name": "Entire suite in the selected shuffled order",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-12T13:08:32Z",
+              "completed_at": "2026-09-12T13:17:52Z"
+            },
+            {
+              "name": "Repository stays clean after the suite",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-12T13:17:52Z",
+              "completed_at": "2026-09-12T13:17:52Z"
+            },
+            {
+              "name": "Preserve full-suite order timings",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-12T13:17:52Z",
+              "completed_at": "2026-09-12T13:17:54Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 16,
+              "started_at": "2026-09-12T13:17:54Z",
+              "completed_at": "2026-09-12T13:17:54Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-09-12T13:17:54Z",
+              "completed_at": "2026-09-12T13:17:54Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103566982695",
+          "labels": [
+            "self-hosted",
+            "Linux",
+            "X64",
+            "fcp-test-linux"
+          ],
+          "runner_id": 27,
+          "runner_name": "Nettking-Linux",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103566982829,
+          "run_id": 34695331201,
+          "workflow_name": "Federation v1 release gate",
+          "head_branch": "codex/ci-f7-coverage-consolidation",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34695331201",
+          "run_attempt": 2,
+          "node_id": "CR_kwDOPZM3cc8AAAAYHRK-rQ",
+          "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103566982829",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34695331201/job/103566982829",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-12T14:17:51Z",
+          "started_at": "2026-09-12T13:29:05Z",
+          "completed_at": "2026-09-12T13:32:46Z",
+          "name": "Linux regression shard (0)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-12T13:29:06Z",
+              "completed_at": "2026-09-12T13:29:10Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-12T13:29:10Z",
+              "completed_at": "2026-09-12T13:29:12Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-12T13:29:12Z",
+              "completed_at": "2026-09-12T13:29:14Z"
+            },
+            {
+              "name": "Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-12T13:29:14Z",
+              "completed_at": "2026-09-12T13:29:14Z"
+            },
+            {
+              "name": "Install release dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-12T13:29:14Z",
+              "completed_at": "2026-09-12T13:29:44Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-12T13:29:44Z",
+              "completed_at": "2026-09-12T13:29:44Z"
+            },
+            {
+              "name": "Run one file-preserving regression shard",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-12T13:29:44Z",
+              "completed_at": "2026-09-12T13:32:40Z"
+            },
+            {
+              "name": "Preserve shard coverage and timings",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-12T13:32:40Z",
+              "completed_at": "2026-09-12T13:32:42Z"
+            },
+            {
+              "name": "Repository stays clean after the suite",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-12T13:32:42Z",
+              "completed_at": "2026-09-12T13:32:42Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-09-12T13:32:42Z",
+              "completed_at": "2026-09-12T13:32:42Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 18,
+              "started_at": "2026-09-12T13:32:42Z",
+              "completed_at": "2026-09-12T13:32:42Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 19,
+              "started_at": "2026-09-12T13:32:42Z",
+              "completed_at": "2026-09-12T13:32:42Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103566982829",
+          "labels": [
+            "self-hosted",
+            "Linux",
+            "X64",
+            "fcp-test-linux"
+          ],
+          "runner_id": 27,
+          "runner_name": "Nettking-Linux",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103566982889,
+          "run_id": 34695331201,
+          "workflow_name": "Federation v1 release gate",
+          "head_branch": "codex/ci-f7-coverage-consolidation",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34695331201",
+          "run_attempt": 2,
+          "node_id": "CR_kwDOPZM3cc8AAAAYHRK-6Q",
+          "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103566982889",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34695331201/job/103566982889",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-12T14:17:51Z",
+          "started_at": "2026-09-12T13:22:42Z",
+          "completed_at": "2026-09-12T13:29:41Z",
+          "name": "Linux regression shard (3)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-12T13:22:44Z",
+              "completed_at": "2026-09-12T13:22:49Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-12T13:22:49Z",
+              "completed_at": "2026-09-12T13:22:50Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-12T13:22:50Z",
+              "completed_at": "2026-09-12T13:22:53Z"
+            },
+            {
+              "name": "Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-12T13:22:53Z",
+              "completed_at": "2026-09-12T13:22:53Z"
+            },
+            {
+              "name": "Install release dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-12T13:22:53Z",
+              "completed_at": "2026-09-12T13:23:39Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-12T13:23:39Z",
+              "completed_at": "2026-09-12T13:23:39Z"
+            },
+            {
+              "name": "Run one file-preserving regression shard",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-12T13:23:39Z",
+              "completed_at": "2026-09-12T13:29:34Z"
+            },
+            {
+              "name": "Preserve shard coverage and timings",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-12T13:29:34Z",
+              "completed_at": "2026-09-12T13:29:37Z"
+            },
+            {
+              "name": "Repository stays clean after the suite",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-12T13:29:37Z",
+              "completed_at": "2026-09-12T13:29:37Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-09-12T13:29:37Z",
+              "completed_at": "2026-09-12T13:29:37Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 18,
+              "started_at": "2026-09-12T13:29:37Z",
+              "completed_at": "2026-09-12T13:29:37Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 19,
+              "started_at": "2026-09-12T13:29:37Z",
+              "completed_at": "2026-09-12T13:29:37Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103566982889",
+          "labels": [
+            "self-hosted",
+            "Linux",
+            "X64",
+            "fcp-test-linux"
+          ],
+          "runner_id": 31,
+          "runner_name": "AQG7NCC-Linux",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103566983180,
+          "run_id": 34695331201,
+          "workflow_name": "Federation v1 release gate",
+          "head_branch": "codex/ci-f7-coverage-consolidation",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34695331201",
+          "run_attempt": 2,
+          "node_id": "CR_kwDOPZM3cc8AAAAYHRLADA",
+          "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103566983180",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34695331201/job/103566983180",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-12T14:17:51Z",
+          "started_at": "2026-09-12T13:30:49Z",
+          "completed_at": "2026-09-12T13:31:24Z",
+          "name": "Clean-checkout suite order independence",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-12T13:30:51Z",
+              "completed_at": "2026-09-12T13:30:51Z"
+            },
+            {
+              "name": "Require both complete-suite order checks",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-12T13:30:51Z",
+              "completed_at": "2026-09-12T13:30:51Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-12T13:30:51Z",
+              "completed_at": "2026-09-12T13:30:52Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103566983180",
+          "labels": [
+            "self-hosted",
+            "Linux",
+            "X64",
+            "fcp-test-linux"
+          ],
+          "runner_id": 31,
+          "runner_name": "AQG7NCC-Linux",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103566994853,
+          "run_id": 34695331201,
+          "workflow_name": "Federation v1 release gate",
+          "head_branch": "codex/ci-f7-coverage-consolidation",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34695331201",
+          "run_attempt": 2,
+          "node_id": "CR_kwDOPZM3cc8AAAAYHRLtpQ",
+          "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103566994853",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34695331201/job/103566994853",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-12T14:17:57Z",
+          "started_at": "2026-09-12T13:29:44Z",
+          "completed_at": "2026-09-12T13:30:47Z",
+          "name": "PostgreSQL storage release check",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-12T13:29:46Z",
+              "completed_at": "2026-09-12T13:29:47Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-12T13:29:47Z",
+              "completed_at": "2026-09-12T13:29:48Z"
+            },
+            {
+              "name": "Start disposable PostgreSQL 16",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-12T13:29:49Z",
+              "completed_at": "2026-09-12T13:29:55Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-12T13:29:55Z",
+              "completed_at": "2026-09-12T13:29:57Z"
+            },
+            {
+              "name": "Install dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-12T13:29:57Z",
+              "completed_at": "2026-09-12T13:30:41Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-12T13:30:41Z",
+              "completed_at": "2026-09-12T13:30:41Z"
+            },
+            {
+              "name": "PostgreSQL storage authority regression",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-12T13:30:41Z",
+              "completed_at": "2026-09-12T13:30:43Z"
+            },
+            {
+              "name": "Remove disposable PostgreSQL 16",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-12T13:30:43Z",
+              "completed_at": "2026-09-12T13:30:43Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 16,
+              "started_at": "2026-09-12T13:30:43Z",
+              "completed_at": "2026-09-12T13:30:43Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-09-12T13:30:43Z",
+              "completed_at": "2026-09-12T13:30:43Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103566994853",
+          "labels": [
+            "self-hosted",
+            "Linux",
+            "X64",
+            "fcp-docker-linux"
+          ],
+          "runner_id": 31,
+          "runner_name": "AQG7NCC-Linux",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103566996934,
+          "run_id": 34695331201,
+          "workflow_name": "Federation v1 release gate",
+          "head_branch": "codex/ci-f7-coverage-consolidation",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34695331201",
+          "run_attempt": 2,
+          "node_id": "CR_kwDOPZM3cc8AAAAYHRL1xg",
+          "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103566996934",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34695331201/job/103566996934",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-12T14:17:58Z",
+          "started_at": "2026-09-12T13:19:27Z",
+          "completed_at": "2026-09-12T13:29:03Z",
+          "name": "Full-suite order (rotating)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-12T13:19:28Z",
+              "completed_at": "2026-09-12T13:19:31Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-12T13:19:31Z",
+              "completed_at": "2026-09-12T13:19:32Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-12T13:19:32Z",
+              "completed_at": "2026-09-12T13:19:34Z"
+            },
+            {
+              "name": "Install release dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-12T13:19:34Z",
+              "completed_at": "2026-09-12T13:20:07Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-12T13:20:07Z",
+              "completed_at": "2026-09-12T13:20:07Z"
+            },
+            {
+              "name": "Entire suite in the selected shuffled order",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-12T13:20:07Z",
+              "completed_at": "2026-09-12T13:28:56Z"
+            },
+            {
+              "name": "Repository stays clean after the suite",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-12T13:28:56Z",
+              "completed_at": "2026-09-12T13:28:56Z"
+            },
+            {
+              "name": "Preserve full-suite order timings",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-12T13:28:56Z",
+              "completed_at": "2026-09-12T13:28:58Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 16,
+              "started_at": "2026-09-12T13:28:58Z",
+              "completed_at": "2026-09-12T13:28:59Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-09-12T13:28:59Z",
+              "completed_at": "2026-09-12T13:28:59Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103566996934",
+          "labels": [
+            "self-hosted",
+            "Linux",
+            "X64",
+            "fcp-test-linux"
+          ],
+          "runner_id": 27,
+          "runner_name": "Nettking-Linux",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103566998250,
+          "run_id": 34695331201,
+          "workflow_name": "Federation v1 release gate",
+          "head_branch": "codex/ci-f7-coverage-consolidation",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34695331201",
+          "run_attempt": 2,
+          "node_id": "CR_kwDOPZM3cc8AAAAYHRL66g",
+          "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103566998250",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34695331201/job/103566998250",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-12T14:17:58Z",
+          "started_at": "2026-09-12T13:12:56Z",
+          "completed_at": "2026-09-12T13:21:21Z",
+          "name": "Windows regressions (journal-artifacts)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-12T13:12:57Z",
+              "completed_at": "2026-09-12T13:13:00Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-12T13:13:00Z",
+              "completed_at": "2026-09-12T13:13:10Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-12T13:13:10Z",
+              "completed_at": "2026-09-12T13:13:17Z"
+            },
+            {
+              "name": "Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-12T13:13:17Z",
+              "completed_at": "2026-09-12T13:13:17Z"
+            },
+            {
+              "name": "Install release dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-12T13:13:17Z",
+              "completed_at": "2026-09-12T13:14:49Z"
+            },
+            {
+              "name": "Windows capability and product release regressions",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 6,
+              "started_at": "2026-09-12T13:14:49Z",
+              "completed_at": "2026-09-12T13:14:49Z"
+            },
+            {
+              "name": "Windows transport, storage, and failover regressions",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 7,
+              "started_at": "2026-09-12T13:14:49Z",
+              "completed_at": "2026-09-12T13:14:49Z"
+            },
+            {
+              "name": "Windows replicated journal and reviewer artifact regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-12T13:14:49Z",
+              "completed_at": "2026-09-12T13:21:14Z"
+            },
+            {
+              "name": "Preserve Windows regression timings",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-12T13:21:14Z",
+              "completed_at": "2026-09-12T13:21:16Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-09-12T13:21:16Z",
+              "completed_at": "2026-09-12T13:21:16Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 18,
+              "started_at": "2026-09-12T13:21:16Z",
+              "completed_at": "2026-09-12T13:21:18Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 19,
+              "started_at": "2026-09-12T13:21:18Z",
+              "completed_at": "2026-09-12T13:21:18Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103566998250",
+          "labels": [
+            "self-hosted",
+            "Windows",
+            "X64",
+            "fcp-test-windows"
+          ],
+          "runner_id": 28,
+          "runner_name": "Beast",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103566998594,
+          "run_id": 34695331201,
+          "workflow_name": "Federation v1 release gate",
+          "head_branch": "codex/ci-f7-coverage-consolidation",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34695331201",
+          "run_attempt": 2,
+          "node_id": "CR_kwDOPZM3cc8AAAAYHRL8Qg",
+          "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103566998594",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34695331201/job/103566998594",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-12T14:17:58Z",
+          "started_at": "2026-09-12T13:12:36Z",
+          "completed_at": "2026-09-12T13:16:03Z",
+          "name": "Release checks (Windows)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-12T13:12:37Z",
+              "completed_at": "2026-09-12T13:12:40Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-12T13:12:40Z",
+              "completed_at": "2026-09-12T13:12:45Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-12T13:12:45Z",
+              "completed_at": "2026-09-12T13:12:55Z"
+            },
+            {
+              "name": "Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-12T13:12:55Z",
+              "completed_at": "2026-09-12T13:12:56Z"
+            },
+            {
+              "name": "Install release dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-12T13:12:56Z",
+              "completed_at": "2026-09-12T13:15:00Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 6,
+              "started_at": "2026-09-12T13:15:00Z",
+              "completed_at": "2026-09-12T13:15:00Z"
+            },
+            {
+              "name": "Compile maintained product packages",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-12T13:15:00Z",
+              "completed_at": "2026-09-12T13:15:05Z"
+            },
+            {
+              "name": "POSIX readiness redirect regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-12T13:15:05Z",
+              "completed_at": "2026-09-12T13:15:24Z"
+            },
+            {
+              "name": "Validate acceptance manifest shape",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-12T13:15:24Z",
+              "completed_at": "2026-09-12T13:15:24Z"
+            },
+            {
+              "name": "Go direct peer sidecar tests",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-09-12T13:15:24Z",
+              "completed_at": "2026-09-12T13:15:25Z"
+            },
+            {
+              "name": "Ruff maintained release boundaries",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-09-12T13:15:25Z",
+              "completed_at": "2026-09-12T13:15:26Z"
+            },
+            {
+              "name": "Validate Compose configuration",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-09-12T13:15:26Z",
+              "completed_at": "2026-09-12T13:15:26Z"
+            },
+            {
+              "name": "Discovery authority and bounded startup regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-09-12T13:15:26Z",
+              "completed_at": "2026-09-12T13:15:55Z"
+            },
+            {
+              "name": "Lint discovery boundary",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14,
+              "started_at": "2026-09-12T13:15:55Z",
+              "completed_at": "2026-09-12T13:15:55Z"
+            },
+            {
+              "name": "Diff hygiene",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-09-12T13:15:55Z",
+              "completed_at": "2026-09-12T13:15:56Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 29,
+              "started_at": "2026-09-12T13:15:56Z",
+              "completed_at": "2026-09-12T13:15:56Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 30,
+              "started_at": "2026-09-12T13:15:56Z",
+              "completed_at": "2026-09-12T13:15:58Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 31,
+              "started_at": "2026-09-12T13:15:58Z",
+              "completed_at": "2026-09-12T13:15:58Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103566998594",
+          "labels": [
+            "self-hosted",
+            "Windows",
+            "X64",
+            "fcp-test-windows"
+          ],
+          "runner_id": 22,
+          "runner_name": "Nettking",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103566999330,
+          "run_id": 34695331201,
+          "workflow_name": "Federation v1 release gate",
+          "head_branch": "codex/ci-f7-coverage-consolidation",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34695331201",
+          "run_attempt": 2,
+          "node_id": "CR_kwDOPZM3cc8AAAAYHRL_Ig",
+          "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103566999330",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34695331201/job/103566999330",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-12T14:17:59Z",
+          "started_at": "2026-09-12T13:02:55Z",
+          "completed_at": "2026-09-12T13:07:36Z",
+          "name": "Windows regressions (transport-storage)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-12T13:02:57Z",
+              "completed_at": "2026-09-12T13:03:01Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-12T13:03:01Z",
+              "completed_at": "2026-09-12T13:03:07Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-12T13:03:07Z",
+              "completed_at": "2026-09-12T13:03:18Z"
+            },
+            {
+              "name": "Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-12T13:03:18Z",
+              "completed_at": "2026-09-12T13:03:19Z"
+            },
+            {
+              "name": "Install release dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-12T13:03:19Z",
+              "completed_at": "2026-09-12T13:05:47Z"
+            },
+            {
+              "name": "Windows capability and product release regressions",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 6,
+              "started_at": "2026-09-12T13:05:47Z",
+              "completed_at": "2026-09-12T13:05:47Z"
+            },
+            {
+              "name": "Windows transport, storage, and failover regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-12T13:05:47Z",
+              "completed_at": "2026-09-12T13:07:26Z"
+            },
+            {
+              "name": "Windows replicated journal and reviewer artifact regressions",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 8,
+              "started_at": "2026-09-12T13:07:26Z",
+              "completed_at": "2026-09-12T13:07:26Z"
+            },
+            {
+              "name": "Preserve Windows regression timings",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-12T13:07:26Z",
+              "completed_at": "2026-09-12T13:07:29Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-09-12T13:07:29Z",
+              "completed_at": "2026-09-12T13:07:29Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 18,
+              "started_at": "2026-09-12T13:07:29Z",
+              "completed_at": "2026-09-12T13:07:32Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 19,
+              "started_at": "2026-09-12T13:07:32Z",
+              "completed_at": "2026-09-12T13:07:32Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103566999330",
+          "labels": [
+            "self-hosted",
+            "Windows",
+            "X64",
+            "fcp-test-windows"
+          ],
+          "runner_id": 22,
+          "runner_name": "Nettking",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103567000855,
+          "run_id": 34695331201,
+          "workflow_name": "Federation v1 release gate",
+          "head_branch": "codex/ci-f7-coverage-consolidation",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34695331201",
+          "run_attempt": 2,
+          "node_id": "CR_kwDOPZM3cc8AAAAYHRMFFw",
+          "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103567000855",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34695331201/job/103567000855",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-12T14:17:59Z",
+          "started_at": "2026-09-12T13:02:55Z",
+          "completed_at": "2026-09-12T13:12:55Z",
+          "name": "Windows regressions (capability-product)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-12T13:02:56Z",
+              "completed_at": "2026-09-12T13:02:59Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-12T13:02:59Z",
+              "completed_at": "2026-09-12T13:03:04Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-12T13:03:04Z",
+              "completed_at": "2026-09-12T13:03:10Z"
+            },
+            {
+              "name": "Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-12T13:03:10Z",
+              "completed_at": "2026-09-12T13:03:11Z"
+            },
+            {
+              "name": "Install release dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-12T13:03:11Z",
+              "completed_at": "2026-09-12T13:07:13Z"
+            },
+            {
+              "name": "Windows capability and product release regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-12T13:07:13Z",
+              "completed_at": "2026-09-12T13:12:46Z"
+            },
+            {
+              "name": "Windows transport, storage, and failover regressions",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 7,
+              "started_at": "2026-09-12T13:12:46Z",
+              "completed_at": "2026-09-12T13:12:46Z"
+            },
+            {
+              "name": "Windows replicated journal and reviewer artifact regressions",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 8,
+              "started_at": "2026-09-12T13:12:46Z",
+              "completed_at": "2026-09-12T13:12:46Z"
+            },
+            {
+              "name": "Preserve Windows regression timings",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-12T13:12:46Z",
+              "completed_at": "2026-09-12T13:12:48Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-09-12T13:12:48Z",
+              "completed_at": "2026-09-12T13:12:49Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 18,
+              "started_at": "2026-09-12T13:12:49Z",
+              "completed_at": "2026-09-12T13:12:51Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 19,
+              "started_at": "2026-09-12T13:12:51Z",
+              "completed_at": "2026-09-12T13:12:51Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103567000855",
+          "labels": [
+            "self-hosted",
+            "Windows",
+            "X64",
+            "fcp-test-windows"
+          ],
+          "runner_id": 28,
+          "runner_name": "Beast",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103567002335,
+          "run_id": 34695331201,
+          "workflow_name": "Federation v1 release gate",
+          "head_branch": "codex/ci-f7-coverage-consolidation",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34695331201",
+          "run_attempt": 2,
+          "node_id": "CR_kwDOPZM3cc8AAAAYHRMK3w",
+          "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103567002335",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34695331201/job/103567002335",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-12T14:18:00Z",
+          "started_at": "2026-09-12T13:03:28Z",
+          "completed_at": "2026-09-12T13:13:11Z",
+          "name": "Linux regression shard (1)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-12T13:03:30Z",
+              "completed_at": "2026-09-12T13:03:37Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-12T13:03:37Z",
+              "completed_at": "2026-09-12T13:03:39Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-12T13:03:39Z",
+              "completed_at": "2026-09-12T13:03:41Z"
+            },
+            {
+              "name": "Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-12T13:03:41Z",
+              "completed_at": "2026-09-12T13:03:42Z"
+            },
+            {
+              "name": "Install release dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-12T13:03:42Z",
+              "completed_at": "2026-09-12T13:04:28Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-12T13:04:28Z",
+              "completed_at": "2026-09-12T13:04:28Z"
+            },
+            {
+              "name": "Run one file-preserving regression shard",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-12T13:04:28Z",
+              "completed_at": "2026-09-12T13:10:57Z"
+            },
+            {
+              "name": "Preserve shard coverage and timings",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-12T13:10:57Z",
+              "completed_at": "2026-09-12T13:12:30Z"
+            },
+            {
+              "name": "Repository stays clean after the suite",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-12T13:12:30Z",
+              "completed_at": "2026-09-12T13:12:30Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-09-12T13:12:30Z",
+              "completed_at": "2026-09-12T13:12:30Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 18,
+              "started_at": "2026-09-12T13:12:30Z",
+              "completed_at": "2026-09-12T13:12:31Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 19,
+              "started_at": "2026-09-12T13:12:31Z",
+              "completed_at": "2026-09-12T13:12:31Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103567002335",
+          "labels": [
+            "self-hosted",
+            "Linux",
+            "X64",
+            "fcp-test-linux"
+          ],
+          "runner_id": 31,
+          "runner_name": "AQG7NCC-Linux",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103567411589,
+          "run_id": 34695331201,
+          "workflow_name": "Federation v1 release gate",
+          "head_branch": "codex/ci-f7-coverage-consolidation",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34695331201",
+          "run_attempt": 2,
+          "node_id": "CR_kwDOPZM3cc8AAAAYHRlJhQ",
+          "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103567411589",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34695331201/job/103567411589",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-12T14:21:12Z",
+          "started_at": "2026-09-12T14:21:15Z",
+          "completed_at": "2026-09-12T14:21:29Z",
+          "name": "Release matrix (Windows)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-12T14:21:17Z",
+              "completed_at": "2026-09-12T14:21:21Z"
+            },
+            {
+              "name": "Require release checks and every regression shard",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-12T14:21:21Z",
+              "completed_at": "2026-09-12T14:21:21Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-12T14:21:21Z",
+              "completed_at": "2026-09-12T14:21:22Z"
+            },
+            {
+              "name": "Run actions/download-artifact@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-12T14:21:22Z",
+              "completed_at": "2026-09-12T14:21:25Z"
+            },
+            {
+              "name": "Require exact complete Linux test coverage",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-12T14:21:25Z",
+              "completed_at": "2026-09-12T14:21:25Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-09-12T14:21:25Z",
+              "completed_at": "2026-09-12T14:21:25Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-09-12T14:21:25Z",
+              "completed_at": "2026-09-12T14:21:25Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103567411589",
+          "labels": [
+            "self-hosted",
+            "Linux",
+            "X64",
+            "fcp-test-linux"
+          ],
+          "runner_id": 31,
+          "runner_name": "AQG7NCC-Linux",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103567411606,
+          "run_id": 34695331201,
+          "workflow_name": "Federation v1 release gate",
+          "head_branch": "codex/ci-f7-coverage-consolidation",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34695331201",
+          "run_attempt": 2,
+          "node_id": "CR_kwDOPZM3cc8AAAAYHRlJlg",
+          "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103567411606",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34695331201/job/103567411606",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-12T14:21:12Z",
+          "started_at": "2026-09-12T14:21:14Z",
+          "completed_at": "2026-09-12T14:21:24Z",
+          "name": "Release matrix (Linux)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-12T14:21:15Z",
+              "completed_at": "2026-09-12T14:21:17Z"
+            },
+            {
+              "name": "Require release checks and every regression shard",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-12T14:21:17Z",
+              "completed_at": "2026-09-12T14:21:17Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-12T14:21:17Z",
+              "completed_at": "2026-09-12T14:21:18Z"
+            },
+            {
+              "name": "Run actions/download-artifact@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-12T14:21:18Z",
+              "completed_at": "2026-09-12T14:21:20Z"
+            },
+            {
+              "name": "Require exact complete Linux test coverage",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-12T14:21:20Z",
+              "completed_at": "2026-09-12T14:21:20Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-09-12T14:21:20Z",
+              "completed_at": "2026-09-12T14:21:20Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-09-12T14:21:20Z",
+              "completed_at": "2026-09-12T14:21:20Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103567411606",
+          "labels": [
+            "self-hosted",
+            "Linux",
+            "X64",
+            "fcp-test-linux"
+          ],
+          "runner_id": 27,
+          "runner_name": "Nettking-Linux",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103567449153,
+          "run_id": 34695331201,
+          "workflow_name": "Federation v1 release gate",
+          "head_branch": "codex/ci-f7-coverage-consolidation",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34695331201",
+          "run_attempt": 2,
+          "node_id": "CR_kwDOPZM3cc8AAAAYHRncQQ",
+          "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103567449153",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34695331201/job/103567449153",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-12T14:21:29Z",
+          "started_at": "2026-09-12T14:21:31Z",
+          "completed_at": "2026-09-12T14:21:36Z",
+          "name": "Federation v1 automated release verdict",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-12T14:21:32Z",
+              "completed_at": "2026-09-12T14:21:32Z"
+            },
+            {
+              "name": "Require every automated release job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-12T14:21:32Z",
+              "completed_at": "2026-09-12T14:21:32Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-12T14:21:32Z",
+              "completed_at": "2026-09-12T14:21:33Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103567449153",
+          "labels": [
+            "self-hosted",
+            "Linux",
+            "X64",
+            "fcp-test-linux"
+          ],
+          "runner_id": 27,
+          "runner_name": "Nettking-Linux",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        }
+      ]
+    },
+    {
+      "id": 34695331247,
+      "path": ".github/workflows/phase2-federation.yml",
+      "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+      "status": "completed",
+      "conclusion": "success",
+      "event": "pull_request",
+      "run_attempt": 2,
+      "created_at": "2026-09-12T13:02:53Z",
+      "updated_at": "2026-09-12T14:22:07Z",
+      "html_url": "https://github.com/Nettking/msh/actions/runs/34695331247",
+      "jobs": [
+        {
+          "id": 103566982639,
+          "run_id": 34695331247,
+          "workflow_name": "Phase 2 federation",
+          "head_branch": "codex/ci-f7-coverage-consolidation",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34695331247",
+          "run_attempt": 2,
+          "node_id": "CR_kwDOPZM3cc8AAAAYHRK97w",
+          "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103566982639",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34695331247/job/103566982639",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-12T14:17:51Z",
+          "started_at": "2026-09-12T14:17:53Z",
+          "completed_at": "2026-09-12T14:22:07Z",
+          "name": "windows",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-12T14:17:54Z",
+              "completed_at": "2026-09-12T14:17:56Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-12T14:17:56Z",
+              "completed_at": "2026-09-12T14:18:03Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-12T14:18:03Z",
+              "completed_at": "2026-09-12T14:18:15Z"
+            },
+            {
+              "name": "Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-12T14:18:15Z",
+              "completed_at": "2026-09-12T14:18:17Z"
+            },
+            {
+              "name": "Install dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-12T14:18:17Z",
+              "completed_at": "2026-09-12T14:20:29Z"
+            },
+            {
+              "name": "Go direct peer sidecar",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-12T14:20:29Z",
+              "completed_at": "2026-09-12T14:20:34Z"
+            },
+            {
+              "name": "Identity, state, protocol, relay, and Phase F tests",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-12T14:20:34Z",
+              "completed_at": "2026-09-12T14:22:00Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-09-12T14:22:00Z",
+              "completed_at": "2026-09-12T14:22:01Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14,
+              "started_at": "2026-09-12T14:22:01Z",
+              "completed_at": "2026-09-12T14:22:03Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-09-12T14:22:03Z",
+              "completed_at": "2026-09-12T14:22:03Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103566982639",
+          "labels": [
+            "self-hosted",
+            "fcp-windows"
+          ],
+          "runner_id": 22,
+          "runner_name": "Nettking",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103566983550,
+          "run_id": 34695331247,
+          "workflow_name": "Phase 2 federation",
+          "head_branch": "codex/ci-f7-coverage-consolidation",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34695331247",
+          "run_attempt": 2,
+          "node_id": "CR_kwDOPZM3cc8AAAAYHRLBfg",
+          "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103566983550",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34695331247/job/103566983550",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-12T14:17:52Z",
+          "started_at": "2026-09-12T13:03:49Z",
+          "completed_at": "2026-09-12T13:05:46Z",
+          "name": "linux",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-12T13:03:50Z",
+              "completed_at": "2026-09-12T13:03:54Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-12T13:03:54Z",
+              "completed_at": "2026-09-12T13:03:55Z"
+            },
+            {
+              "name": "Start disposable PostgreSQL 16",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-12T13:03:55Z",
+              "completed_at": "2026-09-12T13:04:00Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-12T13:04:00Z",
+              "completed_at": "2026-09-12T13:04:03Z"
+            },
+            {
+              "name": "Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-12T13:04:03Z",
+              "completed_at": "2026-09-12T13:04:03Z"
+            },
+            {
+              "name": "Install dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-12T13:04:03Z",
+              "completed_at": "2026-09-12T13:04:35Z"
+            },
+            {
+              "name": "Go direct peer sidecar",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-12T13:04:35Z",
+              "completed_at": "2026-09-12T13:04:37Z"
+            },
+            {
+              "name": "Capture Go module lock",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-12T13:04:37Z",
+              "completed_at": "2026-09-12T13:04:39Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-12T13:04:39Z",
+              "completed_at": "2026-09-12T13:04:39Z"
+            },
+            {
+              "name": "Compile",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-09-12T13:04:39Z",
+              "completed_at": "2026-09-12T13:04:41Z"
+            },
+            {
+              "name": "Phase 0 and 1 regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-09-12T13:04:41Z",
+              "completed_at": "2026-09-12T13:04:42Z"
+            },
+            {
+              "name": "Phase D and E storage tests",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-09-12T13:04:42Z",
+              "completed_at": "2026-09-12T13:05:03Z"
+            },
+            {
+              "name": "Phase 2 unit and integration tests",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-09-12T13:05:03Z",
+              "completed_at": "2026-09-12T13:05:39Z"
+            },
+            {
+              "name": "Ruff federation code",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14,
+              "started_at": "2026-09-12T13:05:39Z",
+              "completed_at": "2026-09-12T13:05:39Z"
+            },
+            {
+              "name": "Compose validation",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-09-12T13:05:39Z",
+              "completed_at": "2026-09-12T13:05:39Z"
+            },
+            {
+              "name": "Diff hygiene",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 16,
+              "started_at": "2026-09-12T13:05:39Z",
+              "completed_at": "2026-09-12T13:05:39Z"
+            },
+            {
+              "name": "Remove disposable PostgreSQL 16",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-09-12T13:05:39Z",
+              "completed_at": "2026-09-12T13:05:40Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 33,
+              "started_at": "2026-09-12T13:05:40Z",
+              "completed_at": "2026-09-12T13:05:40Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 34,
+              "started_at": "2026-09-12T13:05:40Z",
+              "completed_at": "2026-09-12T13:05:40Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 35,
+              "started_at": "2026-09-12T13:05:40Z",
+              "completed_at": "2026-09-12T13:05:40Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103566983550",
+          "labels": [
+            "self-hosted",
+            "fcp-linux-fast"
+          ],
+          "runner_id": 27,
+          "runner_name": "Nettking-Linux",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        }
+      ]
+    },
+    {
+      "id": 34695331243,
+      "path": ".github/workflows/product-branding.yml",
+      "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+      "status": "completed",
+      "conclusion": "success",
+      "event": "pull_request",
+      "run_attempt": 1,
+      "created_at": "2026-09-12T13:02:53Z",
+      "updated_at": "2026-09-12T13:05:43Z",
+      "html_url": "https://github.com/Nettking/msh/actions/runs/34695331243",
+      "jobs": [
+        {
+          "id": 103557723619,
+          "run_id": 34695331243,
+          "workflow_name": "Product branding boundary",
+          "head_branch": "codex/ci-f7-coverage-consolidation",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34695331243",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYHIV14w",
+          "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103557723619",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34695331243/job/103557723619",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-12T13:02:54Z",
+          "started_at": "2026-09-12T13:05:33Z",
+          "completed_at": "2026-09-12T13:05:43Z",
+          "name": "product-branding",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-12T13:05:34Z",
+              "completed_at": "2026-09-12T13:05:35Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-12T13:05:35Z",
+              "completed_at": "2026-09-12T13:05:37Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-12T13:05:37Z",
+              "completed_at": "2026-09-12T13:05:38Z"
+            },
+            {
+              "name": "Enforce Federated Capability Platform identity",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-12T13:05:38Z",
+              "completed_at": "2026-09-12T13:05:39Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-12T13:05:39Z",
+              "completed_at": "2026-09-12T13:05:40Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-12T13:05:40Z",
+              "completed_at": "2026-09-12T13:05:40Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103557723619",
+          "labels": [
+            "self-hosted",
+            "fcp-linux-fast"
+          ],
+          "runner_id": 29,
+          "runner_name": "Beast-Linux-WSL",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        }
+      ]
+    },
+    {
+      "id": 34695331207,
+      "path": ".github/workflows/phase-f8-closeout.yml",
+      "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+      "status": "completed",
+      "conclusion": "success",
+      "event": "pull_request",
+      "run_attempt": 1,
+      "created_at": "2026-09-12T13:02:53Z",
+      "updated_at": "2026-09-12T13:12:35Z",
+      "html_url": "https://github.com/Nettking/msh/actions/runs/34695331207",
+      "jobs": [
+        {
+          "id": 103557723464,
+          "run_id": 34695331207,
+          "workflow_name": "Phase F8 trusted provider closeout",
+          "head_branch": "codex/ci-f7-coverage-consolidation",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34695331207",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYHIV1SA",
+          "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103557723464",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34695331207/job/103557723464",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-12T13:02:54Z",
+          "started_at": "2026-09-12T13:07:37Z",
+          "completed_at": "2026-09-12T13:12:34Z",
+          "name": "trusted-provider-closeout (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -E...",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-12T13:07:38Z",
+              "completed_at": "2026-09-12T13:07:40Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-12T13:07:40Z",
+              "completed_at": "2026-09-12T13:07:44Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-12T13:07:44Z",
+              "completed_at": "2026-09-12T13:07:52Z"
+            },
+            {
+              "name": "Install dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-12T13:07:52Z",
+              "completed_at": "2026-09-12T13:10:05Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 5,
+              "started_at": "2026-09-12T13:10:05Z",
+              "completed_at": "2026-09-12T13:10:05Z"
+            },
+            {
+              "name": "Compile complete F8 boundary",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-12T13:10:05Z",
+              "completed_at": "2026-09-12T13:10:05Z"
+            },
+            {
+              "name": "Complete F8 and affected F7 acceptance matrix",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-12T13:10:05Z",
+              "completed_at": "2026-09-12T13:12:26Z"
+            },
+            {
+              "name": "Ruff complete F8 boundary",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-12T13:12:26Z",
+              "completed_at": "2026-09-12T13:12:27Z"
+            },
+            {
+              "name": "Compose validation",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-12T13:12:27Z",
+              "completed_at": "2026-09-12T13:12:28Z"
+            },
+            {
+              "name": "Diff hygiene",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-09-12T13:12:28Z",
+              "completed_at": "2026-09-12T13:12:28Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 20,
+              "started_at": "2026-09-12T13:12:28Z",
+              "completed_at": "2026-09-12T13:12:30Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 21,
+              "started_at": "2026-09-12T13:12:30Z",
+              "completed_at": "2026-09-12T13:12:30Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103557723464",
+          "labels": [
+            "self-hosted",
+            "fcp-windows"
+          ],
+          "runner_id": 22,
+          "runner_name": "Nettking",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103557723574,
+          "run_id": 34695331207,
+          "workflow_name": "Phase F8 trusted provider closeout",
+          "head_branch": "codex/ci-f7-coverage-consolidation",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34695331207",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYHIV1tg",
+          "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103557723574",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34695331207/job/103557723574",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-12T13:02:54Z",
+          "started_at": "2026-09-12T13:05:44Z",
+          "completed_at": "2026-09-12T13:11:28Z",
+          "name": "trusted-provider-closeout (Linux, fcp-linux-fast, bash)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-12T13:05:45Z",
+              "completed_at": "2026-09-12T13:05:46Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-12T13:05:46Z",
+              "completed_at": "2026-09-12T13:05:48Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-12T13:05:48Z",
+              "completed_at": "2026-09-12T13:05:50Z"
+            },
+            {
+              "name": "Install dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-12T13:05:50Z",
+              "completed_at": "2026-09-12T13:06:52Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-12T13:06:52Z",
+              "completed_at": "2026-09-12T13:06:52Z"
+            },
+            {
+              "name": "Compile complete F8 boundary",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-12T13:06:52Z",
+              "completed_at": "2026-09-12T13:06:53Z"
+            },
+            {
+              "name": "Complete F8 and affected F7 acceptance matrix",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-12T13:06:53Z",
+              "completed_at": "2026-09-12T13:11:22Z"
+            },
+            {
+              "name": "Ruff complete F8 boundary",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-12T13:11:22Z",
+              "completed_at": "2026-09-12T13:11:22Z"
+            },
+            {
+              "name": "Compose validation",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-12T13:11:22Z",
+              "completed_at": "2026-09-12T13:11:23Z"
+            },
+            {
+              "name": "Diff hygiene",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-09-12T13:11:23Z",
+              "completed_at": "2026-09-12T13:11:23Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 20,
+              "started_at": "2026-09-12T13:11:23Z",
+              "completed_at": "2026-09-12T13:11:23Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 21,
+              "started_at": "2026-09-12T13:11:23Z",
+              "completed_at": "2026-09-12T13:11:23Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103557723574",
+          "labels": [
+            "self-hosted",
+            "fcp-linux-fast"
+          ],
+          "runner_id": 29,
+          "runner_name": "Beast-Linux-WSL",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        }
+      ]
+    },
+    {
+      "id": 34695331194,
+      "path": ".github/workflows/phase-f6-closeout.yml",
+      "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+      "status": "completed",
+      "conclusion": "success",
+      "event": "pull_request",
+      "run_attempt": 1,
+      "created_at": "2026-09-12T13:02:53Z",
+      "updated_at": "2026-09-12T13:15:31Z",
+      "html_url": "https://github.com/Nettking/msh/actions/runs/34695331194",
+      "jobs": [
+        {
+          "id": 103557723364,
+          "run_id": 34695331194,
+          "workflow_name": "Phase F6 transport closeout",
+          "head_branch": "codex/ci-f7-coverage-consolidation",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34695331194",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYHIV05A",
+          "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103557723364",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34695331194/job/103557723364",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-12T13:02:54Z",
+          "started_at": "2026-09-12T13:02:55Z",
+          "completed_at": "2026-09-12T13:03:47Z",
+          "name": "transport-closeout (Linux, fcp-linux-fast, bash)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-12T13:02:56Z",
+              "completed_at": "2026-09-12T13:02:59Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-12T13:02:59Z",
+              "completed_at": "2026-09-12T13:03:00Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-12T13:03:00Z",
+              "completed_at": "2026-09-12T13:03:03Z"
+            },
+            {
+              "name": "Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-12T13:03:03Z",
+              "completed_at": "2026-09-12T13:03:03Z"
+            },
+            {
+              "name": "Install dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-12T13:03:03Z",
+              "completed_at": "2026-09-12T13:03:36Z"
+            },
+            {
+              "name": "Verify Go node-agent boundary",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-12T13:03:36Z",
+              "completed_at": "2026-09-12T13:03:38Z"
+            },
+            {
+              "name": "Compile complete F6 boundary",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-12T13:03:38Z",
+              "completed_at": "2026-09-12T13:03:38Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-12T13:03:38Z",
+              "completed_at": "2026-09-12T13:03:38Z"
+            },
+            {
+              "name": "Phase 5 transport acceptance matrix",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-12T13:03:38Z",
+              "completed_at": "2026-09-12T13:03:42Z"
+            },
+            {
+              "name": "Ruff complete F6 boundary",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-09-12T13:03:42Z",
+              "completed_at": "2026-09-12T13:03:42Z"
+            },
+            {
+              "name": "Diff hygiene",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-09-12T13:03:42Z",
+              "completed_at": "2026-09-12T13:03:42Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 21,
+              "started_at": "2026-09-12T13:03:42Z",
+              "completed_at": "2026-09-12T13:03:43Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 22,
+              "started_at": "2026-09-12T13:03:43Z",
+              "completed_at": "2026-09-12T13:03:43Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 23,
+              "started_at": "2026-09-12T13:03:43Z",
+              "completed_at": "2026-09-12T13:03:43Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103557723364",
+          "labels": [
+            "self-hosted",
+            "fcp-linux-fast"
+          ],
+          "runner_id": 27,
+          "runner_name": "Nettking-Linux",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103557723553,
+          "run_id": 34695331194,
+          "workflow_name": "Phase F6 transport closeout",
+          "head_branch": "codex/ci-f7-coverage-consolidation",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34695331194",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYHIV1oQ",
+          "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103557723553",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34695331194/job/103557723553",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-12T13:02:54Z",
+          "started_at": "2026-09-12T13:03:43Z",
+          "completed_at": "2026-09-12T13:15:30Z",
+          "name": "transport-closeout (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executio...",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-12T13:03:45Z",
+              "completed_at": "2026-09-12T13:03:49Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-12T13:03:50Z",
+              "completed_at": "2026-09-12T13:03:57Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-12T13:03:57Z",
+              "completed_at": "2026-09-12T13:04:05Z"
+            },
+            {
+              "name": "Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-12T13:04:05Z",
+              "completed_at": "2026-09-12T13:04:06Z"
+            },
+            {
+              "name": "Install dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-12T13:04:06Z",
+              "completed_at": "2026-09-12T13:09:00Z"
+            },
+            {
+              "name": "Verify Go node-agent boundary",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-12T13:09:00Z",
+              "completed_at": "2026-09-12T13:14:48Z"
+            },
+            {
+              "name": "Compile complete F6 boundary",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-12T13:14:48Z",
+              "completed_at": "2026-09-12T13:14:49Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 8,
+              "started_at": "2026-09-12T13:14:49Z",
+              "completed_at": "2026-09-12T13:14:49Z"
+            },
+            {
+              "name": "Phase 5 transport acceptance matrix",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-12T13:14:49Z",
+              "completed_at": "2026-09-12T13:15:08Z"
+            },
+            {
+              "name": "Ruff complete F6 boundary",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-09-12T13:15:08Z",
+              "completed_at": "2026-09-12T13:15:10Z"
+            },
+            {
+              "name": "Diff hygiene",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-09-12T13:15:10Z",
+              "completed_at": "2026-09-12T13:15:10Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 21,
+              "started_at": "2026-09-12T13:15:10Z",
+              "completed_at": "2026-09-12T13:15:13Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 22,
+              "started_at": "2026-09-12T13:15:13Z",
+              "completed_at": "2026-09-12T13:15:16Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 23,
+              "started_at": "2026-09-12T13:15:16Z",
+              "completed_at": "2026-09-12T13:15:16Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103557723553",
+          "labels": [
+            "self-hosted",
+            "fcp-windows"
+          ],
+          "runner_id": 30,
+          "runner_name": "AQG7NCC-Windows",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        }
+      ]
+    },
+    {
+      "id": 34695331180,
+      "path": ".github/workflows/docs-portal.yml",
+      "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+      "status": "completed",
+      "conclusion": "failure",
+      "event": "pull_request",
+      "run_attempt": 1,
+      "created_at": "2026-09-12T13:02:53Z",
+      "updated_at": "2026-09-12T13:02:59Z",
+      "html_url": "https://github.com/Nettking/msh/actions/runs/34695331180",
+      "jobs": [
+        {
+          "id": 103557723278,
+          "run_id": 34695331180,
+          "workflow_name": "Documentation portal",
+          "head_branch": "codex/ci-f7-coverage-consolidation",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34695331180",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYHIV0jg",
+          "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103557723278",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34695331180/job/103557723278",
+          "status": "completed",
+          "conclusion": "failure",
+          "created_at": "2026-09-12T13:02:54Z",
+          "started_at": "2026-09-12T13:02:54Z",
+          "completed_at": "2026-09-12T13:02:58Z",
+          "name": "docs-portal (ubuntu-latest)",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103557723278",
+          "labels": [
+            "ubuntu-latest"
+          ],
+          "runner_id": 0,
+          "runner_name": "",
+          "runner_group_id": 0,
+          "runner_group_name": ""
+        },
+        {
+          "id": 103557723427,
+          "run_id": 34695331180,
+          "workflow_name": "Documentation portal",
+          "head_branch": "codex/ci-f7-coverage-consolidation",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34695331180",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYHIV1Iw",
+          "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103557723427",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34695331180/job/103557723427",
+          "status": "completed",
+          "conclusion": "failure",
+          "created_at": "2026-09-12T13:02:54Z",
+          "started_at": "2026-09-12T13:02:54Z",
+          "completed_at": "2026-09-12T13:02:55Z",
+          "name": "docs-portal (windows-latest)",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103557723427",
+          "labels": [
+            "windows-latest"
+          ],
+          "runner_id": 0,
+          "runner_name": "",
+          "runner_group_id": 0,
+          "runner_group_name": ""
+        }
+      ]
+    },
+    {
+      "id": 34695331236,
+      "path": ".github/workflows/federation-software-update.yml",
+      "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+      "status": "completed",
+      "conclusion": "success",
+      "event": "pull_request",
+      "run_attempt": 1,
+      "created_at": "2026-09-12T13:02:53Z",
+      "updated_at": "2026-09-12T13:22:44Z",
+      "html_url": "https://github.com/Nettking/msh/actions/runs/34695331236",
+      "jobs": [
+        {
+          "id": 103557723480,
+          "run_id": 34695331236,
+          "workflow_name": "Federation software update",
+          "head_branch": "codex/ci-f7-coverage-consolidation",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34695331236",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYHIV1WA",
+          "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103557723480",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34695331236/job/103557723480",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-12T13:02:54Z",
+          "started_at": "2026-09-12T13:02:55Z",
+          "completed_at": "2026-09-12T13:05:32Z",
+          "name": "update-contracts (Linux, fcp-linux-fast, bash)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-12T13:02:57Z",
+              "completed_at": "2026-09-12T13:02:58Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-12T13:02:58Z",
+              "completed_at": "2026-09-12T13:03:01Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-12T13:03:01Z",
+              "completed_at": "2026-09-12T13:03:03Z"
+            },
+            {
+              "name": "Install test dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-12T13:03:03Z",
+              "completed_at": "2026-09-12T13:04:12Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-12T13:04:12Z",
+              "completed_at": "2026-09-12T13:04:12Z"
+            },
+            {
+              "name": "Compile update Python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-12T13:04:12Z",
+              "completed_at": "2026-09-12T13:04:12Z"
+            },
+            {
+              "name": "Run update contract tests",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-12T13:04:12Z",
+              "completed_at": "2026-09-12T13:05:25Z"
+            },
+            {
+              "name": "Ruff update Python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-12T13:05:25Z",
+              "completed_at": "2026-09-12T13:05:25Z"
+            },
+            {
+              "name": "Parse and smoke Windows host agent",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 9,
+              "started_at": "2026-09-12T13:05:25Z",
+              "completed_at": "2026-09-12T13:05:25Z"
+            },
+            {
+              "name": "Smoke native recorder update agent",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-09-12T13:05:25Z",
+              "completed_at": "2026-09-12T13:05:27Z"
+            },
+            {
+              "name": "Smoke Windows activation exit handling",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 11,
+              "started_at": "2026-09-12T13:05:27Z",
+              "completed_at": "2026-09-12T13:05:27Z"
+            },
+            {
+              "name": "Smoke Windows recorder supervisor restart policy",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 12,
+              "started_at": "2026-09-12T13:05:27Z",
+              "completed_at": "2026-09-12T13:05:27Z"
+            },
+            {
+              "name": "Parse and smoke POSIX host agent",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-09-12T13:05:27Z",
+              "completed_at": "2026-09-12T13:05:27Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 26,
+              "started_at": "2026-09-12T13:05:27Z",
+              "completed_at": "2026-09-12T13:05:28Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 27,
+              "started_at": "2026-09-12T13:05:28Z",
+              "completed_at": "2026-09-12T13:05:28Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103557723480",
+          "labels": [
+            "self-hosted",
+            "fcp-linux-fast"
+          ],
+          "runner_id": 29,
+          "runner_name": "Beast-Linux-WSL",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103557723640,
+          "run_id": 34695331236,
+          "workflow_name": "Federation software update",
+          "head_branch": "codex/ci-f7-coverage-consolidation",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34695331236",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYHIV1-A",
+          "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103557723640",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34695331236/job/103557723640",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-12T13:02:54Z",
+          "started_at": "2026-09-12T13:16:04Z",
+          "completed_at": "2026-09-12T13:22:43Z",
+          "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-12T13:16:05Z",
+              "completed_at": "2026-09-12T13:16:07Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-12T13:16:07Z",
+              "completed_at": "2026-09-12T13:16:12Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-12T13:16:12Z",
+              "completed_at": "2026-09-12T13:16:21Z"
+            },
+            {
+              "name": "Install test dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-12T13:16:21Z",
+              "completed_at": "2026-09-12T13:18:26Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 5,
+              "started_at": "2026-09-12T13:18:26Z",
+              "completed_at": "2026-09-12T13:18:26Z"
+            },
+            {
+              "name": "Compile update Python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-12T13:18:26Z",
+              "completed_at": "2026-09-12T13:18:26Z"
+            },
+            {
+              "name": "Run update contract tests",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-12T13:18:26Z",
+              "completed_at": "2026-09-12T13:22:02Z"
+            },
+            {
+              "name": "Ruff update Python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-12T13:22:02Z",
+              "completed_at": "2026-09-12T13:22:03Z"
+            },
+            {
+              "name": "Parse and smoke Windows host agent",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-12T13:22:03Z",
+              "completed_at": "2026-09-12T13:22:04Z"
+            },
+            {
+              "name": "Smoke native recorder update agent",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-09-12T13:22:04Z",
+              "completed_at": "2026-09-12T13:22:09Z"
+            },
+            {
+              "name": "Smoke Windows activation exit handling",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-09-12T13:22:09Z",
+              "completed_at": "2026-09-12T13:22:10Z"
+            },
+            {
+              "name": "Smoke Windows recorder supervisor restart policy",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-09-12T13:22:10Z",
+              "completed_at": "2026-09-12T13:22:37Z"
+            },
+            {
+              "name": "Parse and smoke POSIX host agent",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 13,
+              "started_at": "2026-09-12T13:22:37Z",
+              "completed_at": "2026-09-12T13:22:37Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 26,
+              "started_at": "2026-09-12T13:22:37Z",
+              "completed_at": "2026-09-12T13:22:38Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 27,
+              "started_at": "2026-09-12T13:22:38Z",
+              "completed_at": "2026-09-12T13:22:38Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103557723640",
+          "labels": [
+            "self-hosted",
+            "fcp-windows"
+          ],
+          "runner_id": 22,
+          "runner_name": "Nettking",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        }
+      ]
+    },
+    {
+      "id": 34695331248,
+      "path": ".github/workflows/phase-f7-closeout.yml",
+      "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+      "status": "completed",
+      "conclusion": "success",
+      "event": "pull_request",
+      "run_attempt": 1,
+      "created_at": "2026-09-12T13:02:53Z",
+      "updated_at": "2026-09-12T13:27:51Z",
+      "html_url": "https://github.com/Nettking/msh/actions/runs/34695331248",
+      "jobs": [
+        {
+          "id": 103557723675,
+          "run_id": 34695331248,
+          "workflow_name": "Phase F7 capability scheduling closeout",
+          "head_branch": "codex/ci-f7-coverage-consolidation",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34695331248",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYHIV2Gw",
+          "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103557723675",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34695331248/job/103557723675",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-12T13:02:54Z",
+          "started_at": "2026-09-12T13:15:33Z",
+          "completed_at": "2026-09-12T13:27:50Z",
+          "name": "capability-closeout (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-12T13:15:35Z",
+              "completed_at": "2026-09-12T13:15:46Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-12T13:15:46Z",
+              "completed_at": "2026-09-12T13:15:56Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-12T13:15:56Z",
+              "completed_at": "2026-09-12T13:16:11Z"
+            },
+            {
+              "name": "Install dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-12T13:16:11Z",
+              "completed_at": "2026-09-12T13:21:17Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 5,
+              "started_at": "2026-09-12T13:21:17Z",
+              "completed_at": "2026-09-12T13:21:17Z"
+            },
+            {
+              "name": "Compile complete F7 boundary",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-12T13:21:17Z",
+              "completed_at": "2026-09-12T13:21:23Z"
+            },
+            {
+              "name": "Complete F7 and Phase 6 acceptance matrix",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-12T13:21:23Z",
+              "completed_at": "2026-09-12T13:27:31Z"
+            },
+            {
+              "name": "Ruff complete F7 boundary",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-12T13:27:31Z",
+              "completed_at": "2026-09-12T13:27:33Z"
+            },
+            {
+              "name": "Preserve capability UP035 coverage",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-12T13:27:33Z",
+              "completed_at": "2026-09-12T13:27:33Z"
+            },
+            {
+              "name": "Preserve relay lifecycle lint coverage",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-09-12T13:27:33Z",
+              "completed_at": "2026-09-12T13:27:34Z"
+            },
+            {
+              "name": "Compose validation",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-09-12T13:27:34Z",
+              "completed_at": "2026-09-12T13:27:34Z"
+            },
+            {
+              "name": "Diff hygiene",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-09-12T13:27:34Z",
+              "completed_at": "2026-09-12T13:27:35Z"
+            },
+            {
+              "name": "Preserve native F7 test evidence",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-09-12T13:27:35Z",
+              "completed_at": "2026-09-12T13:27:38Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 26,
+              "started_at": "2026-09-12T13:27:38Z",
+              "completed_at": "2026-09-12T13:27:43Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 27,
+              "started_at": "2026-09-12T13:27:43Z",
+              "completed_at": "2026-09-12T13:27:43Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103557723675",
+          "labels": [
+            "self-hosted",
+            "fcp-windows"
+          ],
+          "runner_id": 30,
+          "runner_name": "AQG7NCC-Windows",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103557723772,
+          "run_id": 34695331248,
+          "workflow_name": "Phase F7 capability scheduling closeout",
+          "head_branch": "codex/ci-f7-coverage-consolidation",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34695331248",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYHIV2fA",
+          "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103557723772",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34695331248/job/103557723772",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-12T13:02:54Z",
+          "started_at": "2026-09-12T13:05:47Z",
+          "completed_at": "2026-09-12T13:07:52Z",
+          "name": "capability-closeout (Linux, fcp-linux-fast, bash)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-12T13:05:48Z",
+              "completed_at": "2026-09-12T13:05:50Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-12T13:05:50Z",
+              "completed_at": "2026-09-12T13:05:51Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-12T13:05:51Z",
+              "completed_at": "2026-09-12T13:05:54Z"
+            },
+            {
+              "name": "Install dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-12T13:05:54Z",
+              "completed_at": "2026-09-12T13:06:28Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-12T13:06:28Z",
+              "completed_at": "2026-09-12T13:06:28Z"
+            },
+            {
+              "name": "Compile complete F7 boundary",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-12T13:06:28Z",
+              "completed_at": "2026-09-12T13:06:28Z"
+            },
+            {
+              "name": "Complete F7 and Phase 6 acceptance matrix",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-12T13:06:28Z",
+              "completed_at": "2026-09-12T13:07:44Z"
+            },
+            {
+              "name": "Ruff complete F7 boundary",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-12T13:07:44Z",
+              "completed_at": "2026-09-12T13:07:44Z"
+            },
+            {
+              "name": "Preserve capability UP035 coverage",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-12T13:07:44Z",
+              "completed_at": "2026-09-12T13:07:44Z"
+            },
+            {
+              "name": "Preserve relay lifecycle lint coverage",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-09-12T13:07:44Z",
+              "completed_at": "2026-09-12T13:07:44Z"
+            },
+            {
+              "name": "Compose validation",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-09-12T13:07:44Z",
+              "completed_at": "2026-09-12T13:07:44Z"
+            },
+            {
+              "name": "Diff hygiene",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-09-12T13:07:44Z",
+              "completed_at": "2026-09-12T13:07:44Z"
+            },
+            {
+              "name": "Preserve native F7 test evidence",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-09-12T13:07:44Z",
+              "completed_at": "2026-09-12T13:07:46Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 26,
+              "started_at": "2026-09-12T13:07:46Z",
+              "completed_at": "2026-09-12T13:07:47Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 27,
+              "started_at": "2026-09-12T13:07:47Z",
+              "completed_at": "2026-09-12T13:07:47Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103557723772",
+          "labels": [
+            "self-hosted",
+            "fcp-linux-fast"
+          ],
+          "runner_id": 27,
+          "runner_name": "Nettking-Linux",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        }
+      ]
+    }
+  ],
+  "purpose": "AUTOMATIC_FINAL_HEAD_CI; existing 2/2 native equivalence proof retained, no manual native rerun"
+}
