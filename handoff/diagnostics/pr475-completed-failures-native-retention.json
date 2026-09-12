@@ -1,0 +1,76 @@
+{
+  "source_commit": "a5e743fee24e27bfd8d6d4f57c8efd589c6c3a42",
+  "retained_at": "2026-09-12T17:58:26.610483+00:00",
+  "records": [
+    {
+      "job_id": 103589446004,
+      "run_id": 34707260030,
+      "name": "Full-suite order (rotating)",
+      "runner_name": "AQG7NCC-Linux",
+      "conclusion": "failure",
+      "bytes": 84622,
+      "sha256": "47da0d5573550a51f5357cb74acc7ccc845c43050a41d0116f420f47ecd4427d",
+      "checkout_commits": [
+        "a5e743fee24e27bfd8d6d4f57c8efd589c6c3a42"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103589446088,
+      "run_id": 34707260030,
+      "name": "Windows regressions (journal-artifacts)",
+      "runner_name": "Beast",
+      "conclusion": "failure",
+      "bytes": 61930,
+      "sha256": "15ec83e4f2f432fd14f5ef6d76605561c3fddb106ef984a23f7fff22dc4f0793",
+      "checkout_commits": [
+        "a5e743fee24e27bfd8d6d4f57c8efd589c6c3a42"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103592332907,
+      "run_id": 34707260030,
+      "name": "Clean-checkout suite order independence",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "failure",
+      "bytes": 1175,
+      "sha256": "9e456612c60d5a3298b2643e0153703c189b58d6cd378bbf880ec697d1a41694",
+      "checkout_commits": [],
+      "checkout_matches": null
+    },
+    {
+      "job_id": 103593337711,
+      "run_id": 34707260030,
+      "name": "Release matrix (Windows)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "failure",
+      "bytes": 1701,
+      "sha256": "6e5d124c8ac887c3d4c41a17307484b28e19bfcf54a552935ff98793e3fd6fcc",
+      "checkout_commits": [],
+      "checkout_matches": null
+    },
+    {
+      "job_id": 103593337825,
+      "run_id": 34707260030,
+      "name": "Release matrix (Linux)",
+      "runner_name": "AQG7NCC-Linux",
+      "conclusion": "failure",
+      "bytes": 1705,
+      "sha256": "a9923d429c3b47bf9934e6a2e006c9350b6e5507eae4937252239ac031f6d7ce",
+      "checkout_commits": [],
+      "checkout_matches": null
+    },
+    {
+      "job_id": 103593363809,
+      "run_id": 34707260030,
+      "name": "Federation v1 automated release verdict",
+      "runner_name": "AQG7NCC-Linux",
+      "conclusion": "failure",
+      "bytes": 1269,
+      "sha256": "878c3ea89472ee51634aa53950edf61ab84e93a8d26458ab401ec5bb480e6d18",
+      "checkout_commits": [],
+      "checkout_matches": null
+    }
+  ]
+}

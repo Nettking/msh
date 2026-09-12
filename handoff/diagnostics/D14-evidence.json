@@ -1,0 +1,32 @@
+{
+  "finding": "D14",
+  "status": "CONFIRMED",
+  "title": "Benchmark concurrency test never observes adapter start within two seconds",
+  "candidate_sha": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "actual_checkout": "a5e743fee24e27bfd8d6d4f57c8efd589c6c3a42",
+  "identical_tree": "1c671f446fa215c99a6a58a155806de394aa569a",
+  "hosts": "AQG7NCC-Linux runner, native Linux",
+  "stage": "CI rotating full suite / benchmark concurrency setup",
+  "run_id": 34707260030,
+  "job_id": 103589446004,
+  "test": "catalog/flask_app/tests/test_capability_benchmark_route.py::test_skip_serializes_with_concurrent_benchmark_completion",
+  "command": "python -m pytest -o addopts= -q -p randomly --randomly-seed=1702 --durations=20 --junitxml=$RUNNER_TEMP/order-rotating.xml",
+  "observed": "adapter.started.wait(timeout=2) returnedFalse at line497 after background benchmark thread start; intended skip/completion interleaving was not reached.",
+  "expected": "Adapter starts within the existing two-second setup bound, allowing the test to exercise skip/completion serialization.",
+  "classification": "UNRESOLVED: product, test/order interaction or host timing; no automatic product-regression attribution",
+  "acceptance_impact": "Rotating full-suite and order-independence gate red; source not release-qualified. Separate from D13 response fix.",
+  "safe_continuation": "YES: read-only logs/source/order evidence and isolated focused diagnosis; no changed deadlines or blanket retry",
+  "state_changed": "Original CI used its checkout and temporary test fixtures. This diagnostic only reads logs; no runtime/host configuration change.",
+  "protected_recorder_data": "UNTOUCHED",
+  "physical_runtime": "UNCHANGED;9b286f931497bf6291e215f6340443c5162826b0",
+  "evidence": [
+    "pr475-ci-20260912T175749.json",
+    "pr475-completed-failures-native-retention.json",
+    "pr475-completed-failures-logs.zip (103589446004.log lines461-544)",
+    "pr475-reviews-20260912T175749.json"
+  ],
+  "github_artifact": "PENDING immediate issue publication",
+  "repair": "NONE",
+  "next_diagnostic_action": "Retain order-rotating artifact with exact seed and test durations; inspect benchmark.run entry and captured run_errors lifecycle without changing the two-second assertion; compare existing same-source fixed/shard evidence.",
+  "recorded_at": "2026-09-12T18:00:32.240691+00:00"
+}

@@ -10,6 +10,9 @@ D12 Beast exact safe.directory host correction remains verified under original N
 
 Physical runtime9b286f93 and protected Recorder data untouched. No physical PASS, P07/P12, deployment, Docker reset/prune or runner/account/pool change. Coordination-only Beast maintenance workflow must never enter a release candidate.
 
+
+**2026-09-12T18:00:32.240691+00:00 — D14 confirmed:** adapter.started.wait(timeout=2) returnedFalse at line497 after background benchmark thread start; intended skip/completion interleaving was not reached. Classification: UNRESOLVED: product, test/order interaction or host timing; no automatic product-regression attribution. Candidate5e6f1843 / actuala5e743fe, run34707260030/job103589446004. PENDING immediate issue publication. Receipt diagnostics/D14.md. No retry or source change. NEXT: Retain order-rotating artifact with exact seed and test durations; inspect benchmark.run entry and captured run_errors lifecycle without changing the two-second assertion; compare existing same-source fixed/shard evidence.
+
 Current user direction, September 11 2026: execute on state changes, using this
 checkpoint and the completed diagnostic sweep report; do not repeat the sweep.
 
