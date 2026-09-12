@@ -10,18 +10,19 @@ but client received WinError10053.149passed/7skipped/1failed. Three red aggregat
 are dependent consequences. Actual0355023f checkout/tree==440 verified in native
 logs. No live jobs remain in this run; no further CI retry. PR473 remains draft.
 
-D13 reproduced on iteration2 of the unchanged test in clean440 under NETTKING/
-Martin, separate from Actions. Bounded framing contrast: empty-body20/20PASS,
-ordinary two-byte POST19PASS/1same failure, single-send headers+body20/20PASS.
-Unknown path returns before reading request body; standard client sends headers
-and body separately. Unread-body/close race is a supported hypothesis, not a
-proven safe repair. Cause remains unresolved; do not classify as capacity/Git.
-Receipts: diagnostics/D13.md, D13-unchanged-local-reproduction.json,
-D13-request-framing-contrast.json; full original logs archived and issue474 linked.
-NEXT: one bounded controlled split-request transport diagnosis against unchanged
-440 handler. Preserve5s deadline and authority guards; ephemeral loopback only.
-Any repair belongs in a separate PR/worktree, not in CI cleanup473. Do not merge
-or dispatch another full qualification merely because runners are idle.
+D13/#474 is now a CONFIRMED PRODUCT DEFECT: same valid HTTP request passes
+coalesced5/5, passes split without delay5/5, fails split with10ms body delay5/5.
+All failed cases log404 but client raises WinError10053. Handler returns before
+reading declared body; the default server closes the connection. Authority stays
+fail-closed. Packet-level reset details are not captured, but client-visible
+segmentation failure is demonstrated on unchanged440 native Windows.
+Original test also failed on iteration2 outside Actions. Full receipts:
+diagnostics/D13.md and D13-controlled-split-request.json; issue474 linked.
+NEXT: isolated separate D13 product repair branch, reviewing bounded rejection
+teardown before edits. Preserve immediate refusal, size/deadline bounds and
+authority guards; regress segmented, incomplete and oversized requests. No PR473
+head/product changes, deployment or full candidate qualification merely because
+runners are idle. PR473 merge remains paused; all prior valid proof retained.
 
 D12 Beast scoped Git trust repair remains verified on original runner. Its former
 launcher failures did not recur on Nettking; this is not original-host CI proof.

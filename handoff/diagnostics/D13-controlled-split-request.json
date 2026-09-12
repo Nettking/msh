@@ -1,0 +1,172 @@
+{
+  "recorded_at": "2026-09-12T16:48:08.998132+00:00",
+  "candidate_sha": "440123f6bc6dc358eef3d233236bc14f91af60e0",
+  "host": "Nettking",
+  "python": "3.12.10",
+  "user_context": "nettking\\martin",
+  "deadline_seconds": 5,
+  "procedure": "Valid identical HTTP/1.1 POST with Content-Length2 to unknown path, coalesced or separate header/body sends;10ms controlled client inter-send delay in third case;5 attempts per case.",
+  "qualification": false,
+  "product_source_modified": false,
+  "protected_recorder_data": "UNTOUCHED",
+  "physical_runtime": "UNCHANGED",
+  "cases": [
+    {
+      "case": "coalesced",
+      "passed": 5,
+      "failed": 0,
+      "attempts": [
+        {
+          "outcome": "pass",
+          "status": 404,
+          "payload": {
+            "accepted": false,
+            "error": "unknown-path"
+          },
+          "iteration": 1,
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "outcome": "pass",
+          "status": 404,
+          "payload": {
+            "accepted": false,
+            "error": "unknown-path"
+          },
+          "iteration": 2,
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "outcome": "pass",
+          "status": 404,
+          "payload": {
+            "accepted": false,
+            "error": "unknown-path"
+          },
+          "iteration": 3,
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "outcome": "pass",
+          "status": 404,
+          "payload": {
+            "accepted": false,
+            "error": "unknown-path"
+          },
+          "iteration": 4,
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "outcome": "pass",
+          "status": 404,
+          "payload": {
+            "accepted": false,
+            "error": "unknown-path"
+          },
+          "iteration": 5,
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        }
+      ]
+    },
+    {
+      "case": "split_no_delay",
+      "passed": 5,
+      "failed": 0,
+      "attempts": [
+        {
+          "outcome": "pass",
+          "status": 404,
+          "payload": {
+            "accepted": false,
+            "error": "unknown-path"
+          },
+          "iteration": 1,
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "outcome": "pass",
+          "status": 404,
+          "payload": {
+            "accepted": false,
+            "error": "unknown-path"
+          },
+          "iteration": 2,
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "outcome": "pass",
+          "status": 404,
+          "payload": {
+            "accepted": false,
+            "error": "unknown-path"
+          },
+          "iteration": 3,
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "outcome": "pass",
+          "status": 404,
+          "payload": {
+            "accepted": false,
+            "error": "unknown-path"
+          },
+          "iteration": 4,
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "outcome": "pass",
+          "status": 404,
+          "payload": {
+            "accepted": false,
+            "error": "unknown-path"
+          },
+          "iteration": 5,
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        }
+      ]
+    },
+    {
+      "case": "split_10ms",
+      "passed": 0,
+      "failed": 5,
+      "attempts": [
+        {
+          "outcome": "failure",
+          "exception": "ConnectionAbortedError",
+          "message": "[WinError 10053] En etablert tilkobling ble avbrutt av programvaren p\u00e5 vertsmaskinen",
+          "iteration": 1,
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "outcome": "failure",
+          "exception": "ConnectionAbortedError",
+          "message": "[WinError 10053] En etablert tilkobling ble avbrutt av programvaren p\u00e5 vertsmaskinen",
+          "iteration": 2,
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "outcome": "failure",
+          "exception": "ConnectionAbortedError",
+          "message": "[WinError 10053] En etablert tilkobling ble avbrutt av programvaren p\u00e5 vertsmaskinen",
+          "iteration": 3,
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "outcome": "failure",
+          "exception": "ConnectionAbortedError",
+          "message": "[WinError 10053] En etablert tilkobling ble avbrutt av programvaren p\u00e5 vertsmaskinen",
+          "iteration": 4,
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "outcome": "failure",
+          "exception": "ConnectionAbortedError",
+          "message": "[WinError 10053] En etablert tilkobling ble avbrutt av programvaren p\u00e5 vertsmaskinen",
+          "iteration": 5,
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        }
+      ]
+    }
+  ],
+  "source_clean_after": true
+}

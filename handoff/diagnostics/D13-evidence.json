@@ -14,27 +14,30 @@
   "procedure": "Checked-in release discovery pytest selection; POST {} to a test-owned 127.0.0.1 ephemeral responder at /anything-else with existing 5 second client timeout",
   "observed": "ConnectionAbortedError WinError 10053 while reading HTTP status; server logged 404. Selection: 1 failed,149 passed,7 skipped in34.83s.",
   "expected": "Client receives HTTP404; no pairing-authority invocation.",
-  "classification": "UNRESOLVED cause; confirmed reproducible Windows refusal-response failure. Request framing narrows product/socket lifecycle hypothesis; no evidence of Git ownership or capacity/queue cause.",
+  "classification": "PRODUCT DEFECT: valid segmented POST refusal response is unreliable on native Windows; unchanged handler closes without consuming the declared request body.",
   "acceptance_impact": "PR473 Windows release check and its three dependency aggregates remain red; no physical acceptance claim.",
   "safe_continuation": "YES: source inspection and bounded isolated CI-owned loopback reproduction; no blanket retry or merge.",
   "state_changed": "Only CI checkout, installed temporary dependencies and ephemeral test fixture resources; no new host repair during this retry.",
   "protected_recorder_data": "UNTOUCHED",
   "physical_runtime": "UNCHANGED;9b286f931497bf6291e215f6340443c5162826b0",
-  "repair": "NONE",
+  "repair": "NONE; separate product repair required, outside PR473",
   "github_artifact": "https://github.com/Nettking/msh/issues/474",
   "hypotheses": [
-    "Unknown-path do_POST returns404 before consuming Content-Length bytes. Python http.client sends headers and body separately; socketserver shuts down write then closes. Native framing contrast supports an unread-body/close race, but exact socket-level causation is not yet demonstrated. Do not infer a safe fix from merely draining an unbounded body."
+    "Unread data arriving during close is the likely OS-level reset mechanism; packet-level close/reset sequence has not been captured. This remaining low-level detail does not invalidate the controlled product behavior defect."
   ],
-  "next_diagnostic_action": "Run one bounded controlled split-request transport diagnosis against unchanged440123f6 handler to establish whether unread request data at close causes the response abort. Preserve5s client deadline, refusal/authority guards and ephemeral isolation. Develop any demonstrated repair in a separate PR/worktree; never amend473 product source or retry full CI to mask D13.",
+  "next_diagnostic_action": "Prepare an isolated D13 repair branch from the intended base after reviewing bounded rejection-response teardown. Preserve immediate refusal, request-size bounds, deadlines and no-authority behavior. Add regression with deterministic segmented POST plus incomplete/oversized-body safety coverage; do not alter PR473 head, deploy repair or launch full candidate qualification.",
   "evidence": [
     "pr473-corrected-host-retry-failed-native-retention.json",
     "pr473-corrected-host-retry-failed-logs.zip",
     "D13-native-excerpt.log",
     "pr473-D12-retry-20260912T163928.json",
     "D13-unchanged-local-reproduction.json",
-    "D13-request-framing-contrast.json"
+    "D13-request-framing-contrast.json",
+    "D13-controlled-split-request.json"
   ],
   "D12_note": "Beast trust repair remains verified on Beast. Three prior launcher failures did not recur in this Nettking execution; different-host pass does not establish their original-host CI resolution.",
   "reproduction": "Same WinError10053 on iteration2 of unchanged test in clean440123f6 source under NETTKING/Martin; stopped immediately. Separate Python3.12.10 installation from Actions; no production access.",
-  "framing_contrast": "Unchanged handler, fresh loopback sockets,5s client deadline, explicit teardown: empty-body urllib20/20PASS; two-byte-body urllib19PASS/1WinError10053; single-send headers+two-byte body20/20PASS. Same refused path; no grant invocation."
+  "framing_contrast": "Unchanged handler, fresh loopback sockets,5s client deadline, explicit teardown: empty-body urllib20/20PASS; two-byte-body urllib19PASS/1WinError10053; single-send headers+two-byte body20/20PASS. Same refused path; no grant invocation.",
+  "controlled_reproduction": "Identical HTTP/1.1 POST with Content-Length2 and body{}: coalesced5/5PASS; split without imposed delay5/5PASS; split with10ms body delay0PASS/5WinError10053. Server404 logged on every failed attempt. No authority invocation or source change.",
+  "mechanism": "Unknown-path do_POST writes404 and returns before reading declared request body; default socketserver teardown closes the connection. A short, valid header/body split reliably causes Windows response read abort. The defect is client-visible response delivery, not authority bypass."
 }
