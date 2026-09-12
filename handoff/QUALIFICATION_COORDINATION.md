@@ -2752,3 +2752,7 @@ reconciled. Physical runtime and protected Recorder data remain untouched.
 ## 2026-09-12T15:03:27.538445+00:00 — PR468 merged
 
 Ordinary expected-head merge returned b7194820d8f1940ae60b8c9639e09b7f61e65c55. API confirms merged state and unchanged intended head. All eight legacy files remain; no physical/runtime or protected-data change. Next separate retirement preparation under the existing conditional user authorization.
+
+## 2026-09-12T15:07:34.205926+00:00 — all eight retirement preconditions verified
+
+Receipt: diagnostics/phase-workflow-retirement-preflight.json. F7 two-green/JS-event proof remains valid. Existing F8 native pairs34689990982 and34695331207 plus each source release lint checks supply two-green F8.4 equivalence. Eight native logs are archived in diagnostics/f84-existing-native-proof-logs.zip; no jobs rerun. All four retained workflow blobs match original/final/merged sources. Exact deletion inventory and all literal consumers are recorded; only manifest/two OSL docs require edits. AI index excludes .github; documentation fingerprints invalidate automatically. Next delete only the eight proven files on the isolated retirement branch, update the four documentation files and validate the final source. No physical or runner state change.

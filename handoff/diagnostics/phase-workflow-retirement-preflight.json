@@ -1,0 +1,419 @@
+{
+  "recorded_at": "2026-09-12T15:07:34.205926+00:00",
+  "base_sha": "b7194820d8f1940ae60b8c9639e09b7f61e65c55",
+  "status": "PRE_DELETE_ALL_EIGHT_EQUIVALENCE_AND_REFERENCE_REVIEW_PASS",
+  "tracked_deletion_inventory": [
+    ".github/workflows/phase-f71-job-contracts.yml",
+    ".github/workflows/phase-f72-provider-selection.yml",
+    ".github/workflows/phase-f73-durable-job-ownership.yml",
+    ".github/workflows/phase-f74-worker-dispatch.yml",
+    ".github/workflows/phase-f75-retry-cancellation.yml",
+    ".github/workflows/phase-f76-artifact-authorization.yml",
+    ".github/workflows/phase-f77-ai-runtime-integration.yml",
+    ".github/workflows/phase-f84-compute-worker-activation.yml"
+  ],
+  "legacy_blobs": {
+    ".github/workflows/phase-f71-job-contracts.yml": "a1ab46f016ea604afff68853633b3acb72adcfe0",
+    ".github/workflows/phase-f72-provider-selection.yml": "77b932152f36d0d01ce841c3ff6c9ce796fb7d27",
+    ".github/workflows/phase-f73-durable-job-ownership.yml": "6d6b599c5718885b682ff0611ec216bc322978f8",
+    ".github/workflows/phase-f74-worker-dispatch.yml": "8a1dd238ada3dd8bb4b27de68cf7248b2883367d",
+    ".github/workflows/phase-f75-retry-cancellation.yml": "2b66e40f755273fae949fa7e3d653d364770c42c",
+    ".github/workflows/phase-f76-artifact-authorization.yml": "2a64bd43aaeec8961e578d1c08fc20fd79a66275",
+    ".github/workflows/phase-f77-ai-runtime-integration.yml": "a51b63ffd9abfce4b0ccd4d809d06df7c094cc7c",
+    ".github/workflows/phase-f84-compute-worker-activation.yml": "f878c94ea989b7aff67928772e05ef2ad1fd48fb"
+  },
+  "retained_workflow_blobs": {
+    ".github/workflows/phase-f7-closeout.yml": {
+      "f3abe5452db2f21593a688bc62bc5f4b22d5c40e": "143db0b43c870bc5791c3629e34fd61a72293c47",
+      "ba44100ec1e4cde19daba0d3723b991c11742316": "143db0b43c870bc5791c3629e34fd61a72293c47",
+      "b7194820d8f1940ae60b8c9639e09b7f61e65c55": "143db0b43c870bc5791c3629e34fd61a72293c47"
+    },
+    ".github/workflows/phase-f8-closeout.yml": {
+      "f3abe5452db2f21593a688bc62bc5f4b22d5c40e": "8993dbb5389d6b7728c18394980eb80ab26f76ca",
+      "ba44100ec1e4cde19daba0d3723b991c11742316": "8993dbb5389d6b7728c18394980eb80ab26f76ca",
+      "b7194820d8f1940ae60b8c9639e09b7f61e65c55": "8993dbb5389d6b7728c18394980eb80ab26f76ca"
+    },
+    ".github/workflows/phase-f6-closeout.yml": {
+      "f3abe5452db2f21593a688bc62bc5f4b22d5c40e": "e9d93f4880ea5013c6c657334debfbab128a4a49",
+      "ba44100ec1e4cde19daba0d3723b991c11742316": "e9d93f4880ea5013c6c657334debfbab128a4a49",
+      "b7194820d8f1940ae60b8c9639e09b7f61e65c55": "e9d93f4880ea5013c6c657334debfbab128a4a49"
+    },
+    ".github/workflows/federation-v1-release.yml": {
+      "f3abe5452db2f21593a688bc62bc5f4b22d5c40e": "77e0499850e6044ec1bcebcaa24c7ea68962c667",
+      "ba44100ec1e4cde19daba0d3723b991c11742316": "77e0499850e6044ec1bcebcaa24c7ea68962c667",
+      "b7194820d8f1940ae60b8c9639e09b7f61e65c55": "77e0499850e6044ec1bcebcaa24c7ea68962c667"
+    }
+  },
+  "F7_proof": "ci-f7-two-native-greens.json",
+  "F7_real_js_only_event": "ci-f7-js-only-trigger-proof.json",
+  "F8_proof": {
+    "native_runs": [
+      34689990982,
+      34695331207
+    ],
+    "supplemental_lint_runs": [
+      34689991000,
+      34695331201
+    ],
+    "native_retention": [
+      {
+        "source_commit": "b0fbb8a1a4e216b8696b8015a35594c1007319de",
+        "retained_at": "2026-09-12T15:05:47.276117+00:00",
+        "records": [
+          {
+            "job_id": 103543444255,
+            "run_id": 34689990982,
+            "name": "trusted-provider-closeout (Linux, fcp-linux-fast, bash)",
+            "runner_name": "Nettking-Linux",
+            "conclusion": "success",
+            "bytes": 65489,
+            "sha256": "e523dc427bf1f99975d92772ca15fca10fd04bbccfa70c71a6eaf4b2d69d56ed",
+            "checkout_commits": [
+              "b0fbb8a1a4e216b8696b8015a35594c1007319de"
+            ],
+            "checkout_matches": true
+          },
+          {
+            "job_id": 103543444344,
+            "run_id": 34689990982,
+            "name": "trusted-provider-closeout (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -E...",
+            "runner_name": "Nettking",
+            "conclusion": "success",
+            "bytes": 65761,
+            "sha256": "bc5eafb7f7b817b65ad531e93e1d5839524f66aa63992bf9c55c5b5f99994d1b",
+            "checkout_commits": [
+              "b0fbb8a1a4e216b8696b8015a35594c1007319de"
+            ],
+            "checkout_matches": true
+          },
+          {
+            "job_id": 103543444304,
+            "run_id": 34689991000,
+            "name": "Release checks (Windows)",
+            "runner_name": "Nettking",
+            "conclusion": "success",
+            "bytes": 56259,
+            "sha256": "5d979b4ec6a993a64325e3332c22b25ec87035de0a795fa87f7e260492abd31b",
+            "checkout_commits": [
+              "b0fbb8a1a4e216b8696b8015a35594c1007319de"
+            ],
+            "checkout_matches": true
+          },
+          {
+            "job_id": 103543444399,
+            "run_id": 34689991000,
+            "name": "Release checks (Linux)",
+            "runner_name": "Nettking-Linux",
+            "conclusion": "success",
+            "bytes": 54460,
+            "sha256": "73d5c23ab7c3825bf980ff4d7e5b5967f6867cddee57d937bff7a668bb2eb45b",
+            "checkout_commits": [
+              "b0fbb8a1a4e216b8696b8015a35594c1007319de"
+            ],
+            "checkout_matches": true
+          }
+        ]
+      },
+      {
+        "source_commit": "f18e91adae2cb198fb5cebad61ee202a38d2bd8e",
+        "retained_at": "2026-09-12T15:04:55.803533+00:00",
+        "records": [
+          {
+            "job_id": 103557723464,
+            "run_id": 34695331207,
+            "name": "trusted-provider-closeout (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -E...",
+            "runner_name": "Nettking",
+            "conclusion": "success",
+            "bytes": 64959,
+            "sha256": "9eeb596bb3815aebbb79a9a1001d4c51e246e4ac52f767aa8bb434fe7a424987",
+            "checkout_commits": [
+              "f18e91adae2cb198fb5cebad61ee202a38d2bd8e"
+            ],
+            "checkout_matches": true
+          },
+          {
+            "job_id": 103557723574,
+            "run_id": 34695331207,
+            "name": "trusted-provider-closeout (Linux, fcp-linux-fast, bash)",
+            "runner_name": "Beast-Linux-WSL",
+            "conclusion": "success",
+            "bytes": 63276,
+            "sha256": "e86486a32b06d19a28a734bbf30bd31942ebbcfd25ed17e3382b871296817b27",
+            "checkout_commits": [
+              "f18e91adae2cb198fb5cebad61ee202a38d2bd8e"
+            ],
+            "checkout_matches": true
+          },
+          {
+            "job_id": 103557723460,
+            "run_id": 34695331201,
+            "name": "Release checks (Windows)",
+            "runner_name": "Nettking",
+            "conclusion": "success",
+            "bytes": 56311,
+            "sha256": "76b4702827b52e33b80f1f52fce2de733c0497b44c842c14c05b8ac069d9fe2c",
+            "checkout_commits": [
+              "f18e91adae2cb198fb5cebad61ee202a38d2bd8e"
+            ],
+            "checkout_matches": true
+          },
+          {
+            "job_id": 103557723477,
+            "run_id": 34695331201,
+            "name": "Release checks (Linux)",
+            "runner_name": "Nettking-Linux",
+            "conclusion": "success",
+            "bytes": 56407,
+            "sha256": "bd2727a92590e8b8c1b64039fa3e059ee1b1d8b2c6530e9f202465713d3e87aa",
+            "checkout_commits": [
+              "f18e91adae2cb198fb5cebad61ee202a38d2bd8e"
+            ],
+            "checkout_matches": true
+          }
+        ]
+      }
+    ],
+    "summaries": [
+      {
+        "job_id": 103543444255,
+        "runner": "Nettking-Linux",
+        "summary": "685 passed, 9 skipped, 8 warnings in 75.56s (0:01:15)"
+      },
+      {
+        "job_id": 103543444344,
+        "runner": "Nettking",
+        "summary": "689 passed, 5 skipped, 8 warnings in 137.06s (0:02:17)"
+      },
+      {
+        "job_id": 103557723464,
+        "runner": "Nettking",
+        "summary": "689 passed, 5 skipped, 8 warnings in 138.91s (0:02:18)"
+      },
+      {
+        "job_id": 103557723574,
+        "runner": "Beast-Linux-WSL",
+        "summary": "685 passed, 9 skipped, 8 warnings in 268.94s (0:04:28)"
+      }
+    ],
+    "trigger_checks": [
+      {
+        "event": "pull_request",
+        "old_path": "catalog/capabilities/**",
+        "f8_exact_path": true,
+        "release_path": true
+      },
+      {
+        "event": "pull_request",
+        "old_path": "catalog/relay/tests/test_phase_f84_compute_worker_activation.py",
+        "f8_exact_path": true,
+        "release_path": true
+      },
+      {
+        "event": "pull_request",
+        "old_path": "docs/implementation/phase_f8_plan.md",
+        "f8_exact_path": true,
+        "release_path": true
+      },
+      {
+        "event": "push",
+        "old_path": "catalog/capabilities/**",
+        "f8_exact_path": true,
+        "release_path": true
+      },
+      {
+        "event": "push",
+        "old_path": "catalog/relay/tests/test_phase_f84_compute_worker_activation.py",
+        "f8_exact_path": true,
+        "release_path": true
+      },
+      {
+        "event": "push",
+        "old_path": "docs/implementation/phase_f8_plan.md",
+        "f8_exact_path": true,
+        "release_path": true
+      }
+    ],
+    "archive": "f84-existing-native-proof-logs.zip",
+    "interpretation": "Two complete native F8 matrices green; same-source Linux/Windows release check steps supply the exact F8.4 relay lint scope missing from F8 broad lint. Aggregate failures in unrelated old release shards are not claimed green. All retained F8/release command bytes are identical across proof sources and current main. Existing platform skips remain unchanged; F8 target has no added exclusion."
+  },
+  "references": [
+    {
+      "path": ".github/workflows/phase-f71-job-contracts.yml",
+      "line": 1,
+      "text": "name: Phase F7.1 job contracts"
+    },
+    {
+      "path": ".github/workflows/phase-f71-job-contracts.yml",
+      "line": 7,
+      "text": "      - \".github/workflows/phase-f71-job-contracts.yml\""
+    },
+    {
+      "path": ".github/workflows/phase-f71-job-contracts.yml",
+      "line": 12,
+      "text": "      - \".github/workflows/phase-f71-job-contracts.yml\""
+    },
+    {
+      "path": ".github/workflows/phase-f72-provider-selection.yml",
+      "line": 1,
+      "text": "name: Phase F7.2 provider selection"
+    },
+    {
+      "path": ".github/workflows/phase-f72-provider-selection.yml",
+      "line": 7,
+      "text": "      - \".github/workflows/phase-f72-provider-selection.yml\""
+    },
+    {
+      "path": ".github/workflows/phase-f72-provider-selection.yml",
+      "line": 12,
+      "text": "      - \".github/workflows/phase-f72-provider-selection.yml\""
+    },
+    {
+      "path": ".github/workflows/phase-f73-durable-job-ownership.yml",
+      "line": 1,
+      "text": "name: Phase F7.3 durable job ownership"
+    },
+    {
+      "path": ".github/workflows/phase-f73-durable-job-ownership.yml",
+      "line": 7,
+      "text": "      - \".github/workflows/phase-f73-durable-job-ownership.yml\""
+    },
+    {
+      "path": ".github/workflows/phase-f73-durable-job-ownership.yml",
+      "line": 12,
+      "text": "      - \".github/workflows/phase-f73-durable-job-ownership.yml\""
+    },
+    {
+      "path": ".github/workflows/phase-f74-worker-dispatch.yml",
+      "line": 1,
+      "text": "name: Phase F7.4 worker dispatch"
+    },
+    {
+      "path": ".github/workflows/phase-f74-worker-dispatch.yml",
+      "line": 8,
+      "text": "      - \".github/workflows/phase-f74-worker-dispatch.yml\""
+    },
+    {
+      "path": ".github/workflows/phase-f74-worker-dispatch.yml",
+      "line": 14,
+      "text": "      - \".github/workflows/phase-f74-worker-dispatch.yml\""
+    },
+    {
+      "path": ".github/workflows/phase-f75-retry-cancellation.yml",
+      "line": 1,
+      "text": "name: Phase F7.5 retry and cancellation"
+    },
+    {
+      "path": ".github/workflows/phase-f75-retry-cancellation.yml",
+      "line": 8,
+      "text": "      - \".github/workflows/phase-f75-retry-cancellation.yml\""
+    },
+    {
+      "path": ".github/workflows/phase-f75-retry-cancellation.yml",
+      "line": 14,
+      "text": "      - \".github/workflows/phase-f75-retry-cancellation.yml\""
+    },
+    {
+      "path": ".github/workflows/phase-f76-artifact-authorization.yml",
+      "line": 1,
+      "text": "name: Phase F7.6 artifact authorization"
+    },
+    {
+      "path": ".github/workflows/phase-f76-artifact-authorization.yml",
+      "line": 12,
+      "text": "      - \".github/workflows/phase-f76-artifact-authorization.yml\""
+    },
+    {
+      "path": ".github/workflows/phase-f76-artifact-authorization.yml",
+      "line": 22,
+      "text": "      - \".github/workflows/phase-f76-artifact-authorization.yml\""
+    },
+    {
+      "path": ".github/workflows/phase-f77-ai-runtime-integration.yml",
+      "line": 1,
+      "text": "name: Phase F7.7 AI runtime integration"
+    },
+    {
+      "path": ".github/workflows/phase-f77-ai-runtime-integration.yml",
+      "line": 17,
+      "text": "      - \".github/workflows/phase-f77-ai-runtime-integration.yml\""
+    },
+    {
+      "path": ".github/workflows/phase-f77-ai-runtime-integration.yml",
+      "line": 32,
+      "text": "      - \".github/workflows/phase-f77-ai-runtime-integration.yml\""
+    },
+    {
+      "path": ".github/workflows/phase-f84-compute-worker-activation.yml",
+      "line": 1,
+      "text": "name: Phase F8.4 trusted compute worker activation"
+    },
+    {
+      "path": ".github/workflows/phase-f84-compute-worker-activation.yml",
+      "line": 10,
+      "text": "      - \".github/workflows/phase-f84-compute-worker-activation.yml\""
+    },
+    {
+      "path": ".github/workflows/phase-f84-compute-worker-activation.yml",
+      "line": 17,
+      "text": "      - \".github/workflows/phase-f84-compute-worker-activation.yml\""
+    },
+    {
+      "path": "docs/implementation/federation_v1_cleanup_manifest.md",
+      "line": 271,
+      "text": "- `.github/workflows/phase-f71-job-contracts.yml`;"
+    },
+    {
+      "path": "docs/implementation/federation_v1_cleanup_manifest.md",
+      "line": 272,
+      "text": "- `.github/workflows/phase-f72-provider-selection.yml`;"
+    },
+    {
+      "path": "docs/implementation/federation_v1_cleanup_manifest.md",
+      "line": 273,
+      "text": "- `.github/workflows/phase-f73-durable-job-ownership.yml`;"
+    },
+    {
+      "path": "docs/implementation/federation_v1_cleanup_manifest.md",
+      "line": 274,
+      "text": "- `.github/workflows/phase-f74-worker-dispatch.yml`;"
+    },
+    {
+      "path": "docs/implementation/federation_v1_cleanup_manifest.md",
+      "line": 275,
+      "text": "- `.github/workflows/phase-f75-retry-cancellation.yml`;"
+    },
+    {
+      "path": "docs/implementation/federation_v1_cleanup_manifest.md",
+      "line": 276,
+      "text": "- `.github/workflows/phase-f76-artifact-authorization.yml`;"
+    },
+    {
+      "path": "docs/implementation/federation_v1_cleanup_manifest.md",
+      "line": 277,
+      "text": "- `.github/workflows/phase-f77-ai-runtime-integration.yml`;"
+    },
+    {
+      "path": "docs/implementation/federation_v1_cleanup_manifest.md",
+      "line": 282,
+      "text": "- `.github/workflows/phase-f84-compute-worker-activation.yml`;"
+    },
+    {
+      "path": "docs/implementation/osl_integration/02_current_fcp_architecture.md",
+      "line": 505,
+      "text": "  `.github/workflows/phase-f77-ai-runtime-integration.yml` lines 39--99 and"
+    },
+    {
+      "path": "docs/implementation/osl_integration/08_validation_testing_and_ci.md",
+      "line": 63,
+      "text": "  `.github/workflows/phase-f77-ai-runtime-integration.yml:39-99` and"
+    }
+  ],
+  "external_executable_consumers": [],
+  "status_contract": "None of these eight is in the current37 required set; main metadata unprotected/empty contexts, detailed policy API403 visibility limitation preserved. Ordinary PR gates remain enforced, no bypass.",
+  "index_cache_consequences": "repo_index.should_index excludes .github paths. Edited docs are indexed; load_cached_chunks compares full fingerprint including SHA256 and invalidates stale cache automatically. No runtime cache or protected data is touched. Exact export inventory will change and must be revalidated on the eventual new candidate.",
+  "authorized_scope": "User explicitly permits retirement of proven gates/coherent groups after replacement and references proven. This is the separate change required by cleanup manifestG, after PR468 extension merged.",
+  "planned_changes": "Delete these eight tracked YAML files; update cleanup manifest, F7 consolidation status and two OSL references. Retained workflows, tests, product, commands, dependencies, runner accounts/config and trigger bytes stay unchanged.",
+  "validation_plan": "Clean final commit: branding,29F7 CI contracts, diff hygiene, exact deletion inventory/reference/blob checks. Native F7 exact-head dispatch (existing path filters do not trigger on deleted sibling files), applicable automatic release checks; retain existing2/2 and actual JS-only event instead of repeating both. No full37 intermediate qualification.",
+  "physical_acceptance": false,
+  "protected_recorder_data": "UNTOUCHED"
+}
