@@ -1,0 +1,30 @@
+{
+  "finding": "D09",
+  "status": "RESOLVED-IN-BRANCH",
+  "recorded_at": "2026-09-12T12:03:50.173367+00:00",
+  "base_sha": "f3abe5452db2f21593a688bc62bc5f4b22d5c40e",
+  "repair_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+  "branch": "codex/ci-f7-branding-doc-fix",
+  "worktree": "C:\\wsl\\fcp-ci-f7-doc-fix-20260912",
+  "clean": true,
+  "changed_files": [
+    "docs/implementation/f7_ci_consolidation.md"
+  ],
+  "documentation_blob": "b4034fc7387b6ed948c8b55e9c0a5874e1ff2b72",
+  "branding_checker_blob_unchanged": "a45790795b3e0d645cb39146b1d20dd165d0578b",
+  "f7_workflow_blob_unchanged": "143db0b43c870bc5791c3629e34fd61a72293c47",
+  "validation": {
+    "command": "C:/wsl/fcp-v1-fba508-nettking-20260910/.venv/Scripts/python.exe -B scripts/check_product_branding.py",
+    "exit_code": 0,
+    "stdout": "",
+    "context": "Native Windows audit Python; worktree contents committed unchanged as repair SHA. Focused development evidence, not a GitHub replacement run.",
+    "diff_check_exit": 0
+  },
+  "github_artifact": "https://github.com/Nettking/msh/pull/468#issuecomment-5645751717",
+  "not_promoted_to_pr468": true,
+  "reason": "PR468 and canary469 still have valid active/queued automatic jobs; avoid cancellation or premature base changes.",
+  "full_qualification_started": false,
+  "protected_recorder_data": "UNTOUCHED",
+  "physical_runtime_sha": "9b286f931497bf6291e215f6340443c5162826b0",
+  "next_action": "At the next scheduled state check, preserve current runs; after they finish, promote the docs-only correction to PR468 in the appropriate final CI change and validate resulting exact head under the cleanup/revalidation contracts."
+}

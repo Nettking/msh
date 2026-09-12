@@ -1,6 +1,6 @@
 {
   "finding": "D09",
-  "status": "CONFIRMED",
+  "status": "RESOLVED-IN-BRANCH",
   "recorded_at": "2026-09-12T12:01:03.558120+00:00",
   "candidate_sha": "f3abe5452db2f21593a688bc62bc5f4b22d5c40e",
   "hosts": [
@@ -72,6 +72,11 @@
   "protected_recorder_data": "UNTOUCHED",
   "physical_runtime_sha": "9b286f931497bf6291e215f6340443c5162826b0",
   "github_artifact": "https://github.com/Nettking/msh/pull/468",
-  "repair": "planned documentation-only branch; not yet developed",
+  "repair": {
+    "branch": "codex/ci-f7-branding-doc-fix",
+    "sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+    "focused_evidence": "D09-repair-focused.json",
+    "not_promoted_to_pr468": true
+  },
   "next_action": "Replace the two raw repository URLs with explicit coordination branch/path references; run unchanged branding checker and diff hygiene; push isolated repair branch and link from draft PR468. Promote to PR468 only after existing runs finish."
 }

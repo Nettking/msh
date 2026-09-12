@@ -14,8 +14,9 @@ polling or qualification is needed unless a concrete new contract reason appears
 Next highest-value action: resolve the CI-only documentation blocker D09 in draft
 PR468 (current head f3abe5452db2f21593a688bc62bc5f4b22d5c40e). The unchanged
 branding check rejects two repository URLs in the new migration document.
-Evidence: diagnostics/D09.md. Prepare/push a docs-only repair on a separate branch;
-do not update current PR468/469 heads while their automatic runs are active.
+Evidence: diagnostics/D09.md. Docs-only repair ba44100ec1e4cde19daba0d3723b991c11742316 is pushed on
+codex/ci-f7-branding-doc-fix; focused unchanged branding and diff checks passed.
+Do not update current PR468/469 heads while their automatic runs are active.
 Keep the checker and all workflow/product semantics unchanged.
 First F7 native proof remains reviewed green. JS-only canary PR469/run34690234286
 has Linux green and Windows queued at11:57Z; no second complete proof yet.
@@ -2512,3 +2513,17 @@ not group it with zero-step hosted billing reds. The two new document URLs are
 the immediate cause. Next: isolated docs-only correction and unchanged focused
 branding check; keep active PR heads stable until automatic CI finishes.
 Canary Linux F7 has completed green; Windows remains queued. No physical changes.
+
+## 2026-09-12T12:03:50.173367+00:00 — D09 correction durable; active heads preserved
+
+Repair ba44100ec1e4cde19daba0d3723b991c11742316 is pushed on
+codex/ci-f7-branding-doc-fix. Only the migration document changed; unchanged
+branding checker exit0 and diff hygiene PASS. Receipt: diagnostics/D09-repair-focused.json.
+Existing draft PR468 is the repair coordination artifact; active head remains
+f3abe545 and disposable canary remains660bf232. No automatic job was cancelled,
+restarted or dispatched. Do not claim the corrected SHA qualified from old runs.
+Next scheduled state check12:55Z: inspect canary F7 completion and active automatic
+PR468/469 jobs, preserve/review new completed evidence, then integrate the docs
+correction only when it will not disrupt those runs. Two reviewed native greens
+and final reference/required-status proof still precede any legacy retirement.
+The accepted retirement audit and completed main17ab qualification remain intact.
