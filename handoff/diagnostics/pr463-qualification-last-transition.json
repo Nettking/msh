@@ -1,5 +1,5 @@
 {
-  "observed_at": "2026-09-12T03:41:53.736277+00:00",
+  "observed_at": "2026-09-12T03:53:24.147529+00:00",
   "changes": {
     "463": [
       {
@@ -10,34 +10,40 @@
         "conclusion": null,
         "jobs": [
           {
-            "id": 103489264468,
-            "name": "Full-suite order (rotating)",
+            "id": 103489264464,
+            "name": "Windows regressions (capability-product)",
             "status": "completed",
             "conclusion": "success"
           },
           {
             "id": 103489264470,
             "name": "Full-suite order (fixed)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103489264491,
+            "name": "Windows regressions (transport-storage)",
             "status": "in_progress",
             "conclusion": null
           },
           {
-            "id": 103489264471,
-            "name": "Windows regressions (journal-artifacts)",
+            "id": 103489264566,
+            "name": "Linux regression shard (1)",
             "status": "completed",
             "conclusion": "success"
           },
           {
-            "id": 103489264479,
-            "name": "Linux regression shard (2)",
-            "status": "completed",
-            "conclusion": "success"
+            "id": 103489264609,
+            "name": "Linux regression shard (0)",
+            "status": "in_progress",
+            "conclusion": null
           },
           {
-            "id": 103489264485,
-            "name": "Linux regression shard (3)",
-            "status": "completed",
-            "conclusion": "success"
+            "id": 103493414866,
+            "name": "Clean-checkout suite order independence",
+            "status": "queued",
+            "conclusion": null
           }
         ]
       },
@@ -45,42 +51,12 @@
         "workflow": "phase2-federation.yml",
         "run_id": 34668388027,
         "event": "workflow_dispatch",
-        "status": "in_progress",
-        "conclusion": null,
+        "status": "completed",
+        "conclusion": "success",
         "jobs": [
           {
             "id": 103484877504,
             "name": "windows",
-            "status": "in_progress",
-            "conclusion": null
-          }
-        ]
-      },
-      {
-        "workflow": "federation-software-update.yml",
-        "run_id": 34669945014,
-        "event": "workflow_dispatch",
-        "status": "completed",
-        "conclusion": "success",
-        "jobs": [
-          {
-            "id": 103489294287,
-            "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
-            "status": "completed",
-            "conclusion": "success"
-          }
-        ]
-      },
-      {
-        "workflow": "phase-f85-operator-federation-surface.yml",
-        "run_id": 34664590472,
-        "event": "workflow_dispatch",
-        "status": "completed",
-        "conclusion": "success",
-        "jobs": [
-          {
-            "id": 103473850351,
-            "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
             "status": "completed",
             "conclusion": "success"
           }
