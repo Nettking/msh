@@ -1,0 +1,1027 @@
+{
+  "recorded_at": "2026-09-12T10:05:19.258426+00:00",
+  "qualified_baseline": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
+  "status": "PROPOSED_NOT_IMPLEMENTED",
+  "changed_retained_workflow": "phase-f7-closeout.yml",
+  "new_workflows": 0,
+  "new_job_definitions": 0,
+  "existing_matrix_executions_per_run": 2,
+  "add_paths_to_pull_request_and_main_push": [
+    "catalog/federation/object_transfer.py",
+    "catalog/federation/resumable_chunk_transfer.py",
+    "catalog/federation/tests/test_phase_f641_chunk_contract.py",
+    "catalog/flask_app/services/server_setup_service.py",
+    "catalog/flask_app/static/js/ai-explainer.js",
+    "catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py",
+    "catalog/node/tests/test_phase_f642_verified_chunk_transfer.py",
+    "catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py"
+  ],
+  "add_test_modules": [
+    "catalog/federation/tests/test_phase_f641_chunk_contract.py",
+    "catalog/node/tests/test_phase_f642_verified_chunk_transfer.py",
+    "catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py"
+  ],
+  "add_lint_commands": [
+    "python -m ruff check catalog/capabilities --select UP035",
+    "python -m ruff check catalog/relay/tests/test_phase_f74_capability_dispatch.py catalog/relay/tests/test_phase_f75_retry_cancellation.py --ignore I001,RUF022,B008,C408,PLC0206"
+  ],
+  "add_workflow_dispatch": "For controlled exact-source replacement qualification; never treat dispatch as automatic-path trigger proof.",
+  "unchanged": [
+    "federation-v1-release.yml",
+    "phase-f6-closeout.yml",
+    "phase-f8-closeout.yml",
+    ".github/actions/self-hosted-python/action.yml",
+    "product/runtime source",
+    "runner labels/accounts/pool admission"
+  ],
+  "rows": [
+    {
+      "legacy": "phase-f71-job-contracts.yml",
+      "old_workflow_blob": "a1ab46f016ea604afff68853633b3acb72adcfe0",
+      "old_triggers": {
+        "pull_request": {
+          "paths": [
+            "catalog/capabilities/**",
+            ".github/workflows/phase-f71-job-contracts.yml"
+          ],
+          "raw": "    paths:\n      - \"catalog/capabilities/**\"\n      - \".github/workflows/phase-f71-job-contracts.yml\"\n"
+        },
+        "push": {
+          "paths": [
+            "catalog/capabilities/**",
+            ".github/workflows/phase-f71-job-contracts.yml"
+          ],
+          "raw": "    branches: [main]\n    paths:\n      - \"catalog/capabilities/**\"\n      - \".github/workflows/phase-f71-job-contracts.yml\"\n\n"
+        }
+      },
+      "old_jobs": [
+        {
+          "id": "job-contracts",
+          "runs_on": [
+            "${{ matrix.os }}"
+          ],
+          "matrix_os": [
+            "[ubuntu-latest, windows-latest]"
+          ],
+          "commands": [
+            {
+              "type": "other",
+              "command": "python -m pip install --upgrade pip python -m pip install -r requirements.txt -c constraints-phase2.txt python -m pip install pytest ruff",
+              "scopes": [],
+              "line": 36
+            },
+            {
+              "type": "compile",
+              "command": "python -m compileall catalog/capabilities",
+              "scopes": [
+                "catalog/capabilities"
+              ],
+              "line": 41
+            },
+            {
+              "type": "pytest",
+              "command": "python -m pytest -o addopts= -q catalog/capabilities/tests catalog/federation/tests/test_phase0.py catalog/federation/tests/test_phase1.py",
+              "scopes": [
+                "catalog/capabilities/tests",
+                "catalog/federation/tests/test_phase0.py",
+                "catalog/federation/tests/test_phase1.py"
+              ],
+              "line": 48
+            },
+            {
+              "type": "ruff",
+              "command": "python -m ruff check catalog/capabilities --ignore I001,RUF022,B008,C408,PLC0206",
+              "scopes": [
+                "catalog/capabilities"
+              ],
+              "line": 54
+            }
+          ],
+          "raw": "    strategy:\n      fail-fast: false\n      matrix:\n        os: [ubuntu-latest, windows-latest]\n    runs-on: ${{ matrix.os }}\n    timeout-minutes: 20\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-python@v5\n        with:\n          python-version: \"3.12\"\n          cache: pip\n      - name: Install dependencies\n        run: |\n          python -m pip install --upgrade pip\n          python -m pip install -r requirements.txt -c constraints-phase2.txt\n          python -m pip install pytest ruff\n      - name: Compile F7.1\n        run: >-\n          python -m compileall\n          catalog/capabilities\n      - name: Ubuntu storage precondition\n        if: runner.os == 'Linux'\n        uses: ./.github/actions/ubuntu-storage-precondition\n      - name: F7.1 and affected federation tests\n        run: >-\n          python -m pytest -o addopts= -q\n          catalog/capabilities/tests\n          catalog/federation/tests/test_phase0.py\n          catalog/federation/tests/test_phase1.py\n      - name: Ruff F7.1\n        run: >-\n          python -m ruff check\n          catalog/capabilities\n          --ignore I001,RUF022,B008,C408,PLC0206\n\n"
+        },
+        {
+          "id": "repository-hygiene",
+          "runs_on": [
+            "ubuntu-latest"
+          ],
+          "matrix_os": [],
+          "commands": [
+            {
+              "type": "compose",
+              "command": "docker compose config --quiet",
+              "scopes": [],
+              "line": 67
+            },
+            {
+              "type": "diff",
+              "command": "git diff --check HEAD^ HEAD",
+              "scopes": [],
+              "line": 69
+            }
+          ],
+          "raw": "    runs-on: ubuntu-latest\n    timeout-minutes: 10\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 2\n      - name: Validate Compose configuration\n        run: docker compose config --quiet\n      - name: Validate diff hygiene\n        run: git diff --check HEAD^ HEAD"
+        }
+      ],
+      "os": [
+        "Linux",
+        "Windows"
+      ],
+      "replacement": "extended F7 closeout + unchanged release/F6/F8",
+      "trigger_mapping": "F7 preserves existing paths and adds union of legacy product paths for both pull_request and main push.",
+      "lint_mapping": "Existing F7/release lint retained; separate capabilities UP035 guard preserves stricter F7.1-F7.6 rules; strict two-file relay lint preserves F7.4/F7.5.",
+      "test_mapping": "F7 existing modules plus three transfer modules; release covers AI candidate-visibility module. No module removed.",
+      "runtime_assumptions": {
+        "python": "existing pinned Python action: Linux3.12.13/Windows3.12.10",
+        "dependencies": "existing requirements.txt + constraints-phase2.txt; no product dependency changes",
+        "storage": "existing Linux storage precondition and native Windows long-path temp policy",
+        "services": "existing owned test fixtures and Compose config validation; no Recorder/runtime data",
+        "runners": [
+          "self-hosted/fcp-linux-fast",
+          "self-hosted/fcp-windows"
+        ]
+      },
+      "legacy_self_path": "After retirement the deleted file is not an input; retirement diff itself requires release and targeted replacement validation. No dangling legacy trigger reference retained.",
+      "retirement_status": "NOT YET AUTHORIZED BY EVIDENCE: needs exact replacement green runs and final reference checks"
+    },
+    {
+      "legacy": "phase-f72-provider-selection.yml",
+      "old_workflow_blob": "77b932152f36d0d01ce841c3ff6c9ce796fb7d27",
+      "old_triggers": {
+        "pull_request": {
+          "paths": [
+            "catalog/capabilities/**",
+            ".github/workflows/phase-f72-provider-selection.yml"
+          ],
+          "raw": "    paths:\n      - \"catalog/capabilities/**\"\n      - \".github/workflows/phase-f72-provider-selection.yml\"\n"
+        },
+        "push": {
+          "paths": [
+            "catalog/capabilities/**",
+            ".github/workflows/phase-f72-provider-selection.yml"
+          ],
+          "raw": "    branches: [main]\n    paths:\n      - \"catalog/capabilities/**\"\n      - \".github/workflows/phase-f72-provider-selection.yml\"\n\n"
+        }
+      },
+      "old_jobs": [
+        {
+          "id": "provider-selection",
+          "runs_on": [
+            "${{ matrix.os }}"
+          ],
+          "matrix_os": [
+            "[ubuntu-latest, windows-latest]"
+          ],
+          "commands": [
+            {
+              "type": "other",
+              "command": "python -m pip install --upgrade pip python -m pip install -r requirements.txt -c constraints-phase2.txt python -m pip install pytest ruff",
+              "scopes": [],
+              "line": 36
+            },
+            {
+              "type": "compile",
+              "command": "python -m compileall catalog/capabilities",
+              "scopes": [
+                "catalog/capabilities"
+              ],
+              "line": 41
+            },
+            {
+              "type": "pytest",
+              "command": "python -m pytest -o addopts= -q catalog/capabilities/tests catalog/federation/tests/test_phase0.py catalog/federation/tests/test_phase1.py",
+              "scopes": [
+                "catalog/capabilities/tests",
+                "catalog/federation/tests/test_phase0.py",
+                "catalog/federation/tests/test_phase1.py"
+              ],
+              "line": 48
+            },
+            {
+              "type": "ruff",
+              "command": "python -m ruff check catalog/capabilities --ignore I001,RUF022,B008,C408,PLC0206",
+              "scopes": [
+                "catalog/capabilities"
+              ],
+              "line": 54
+            }
+          ],
+          "raw": "    strategy:\n      fail-fast: false\n      matrix:\n        os: [ubuntu-latest, windows-latest]\n    runs-on: ${{ matrix.os }}\n    timeout-minutes: 20\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-python@v5\n        with:\n          python-version: \"3.12\"\n          cache: pip\n      - name: Install dependencies\n        run: |\n          python -m pip install --upgrade pip\n          python -m pip install -r requirements.txt -c constraints-phase2.txt\n          python -m pip install pytest ruff\n      - name: Compile F7.1 and F7.2\n        run: >-\n          python -m compileall\n          catalog/capabilities\n      - name: Ubuntu storage precondition\n        if: runner.os == 'Linux'\n        uses: ./.github/actions/ubuntu-storage-precondition\n      - name: Capability and affected federation tests\n        run: >-\n          python -m pytest -o addopts= -q\n          catalog/capabilities/tests\n          catalog/federation/tests/test_phase0.py\n          catalog/federation/tests/test_phase1.py\n      - name: Ruff capability domain\n        run: >-\n          python -m ruff check\n          catalog/capabilities\n          --ignore I001,RUF022,B008,C408,PLC0206\n\n"
+        },
+        {
+          "id": "repository-hygiene",
+          "runs_on": [
+            "ubuntu-latest"
+          ],
+          "matrix_os": [],
+          "commands": [
+            {
+              "type": "compose",
+              "command": "docker compose config --quiet",
+              "scopes": [],
+              "line": 67
+            },
+            {
+              "type": "diff",
+              "command": "git diff --check HEAD^ HEAD",
+              "scopes": [],
+              "line": 69
+            }
+          ],
+          "raw": "    runs-on: ubuntu-latest\n    timeout-minutes: 10\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 2\n      - name: Validate Compose configuration\n        run: docker compose config --quiet\n      - name: Validate diff hygiene\n        run: git diff --check HEAD^ HEAD"
+        }
+      ],
+      "os": [
+        "Linux",
+        "Windows"
+      ],
+      "replacement": "extended F7 closeout + unchanged release/F6/F8",
+      "trigger_mapping": "F7 preserves existing paths and adds union of legacy product paths for both pull_request and main push.",
+      "lint_mapping": "Existing F7/release lint retained; separate capabilities UP035 guard preserves stricter F7.1-F7.6 rules; strict two-file relay lint preserves F7.4/F7.5.",
+      "test_mapping": "F7 existing modules plus three transfer modules; release covers AI candidate-visibility module. No module removed.",
+      "runtime_assumptions": {
+        "python": "existing pinned Python action: Linux3.12.13/Windows3.12.10",
+        "dependencies": "existing requirements.txt + constraints-phase2.txt; no product dependency changes",
+        "storage": "existing Linux storage precondition and native Windows long-path temp policy",
+        "services": "existing owned test fixtures and Compose config validation; no Recorder/runtime data",
+        "runners": [
+          "self-hosted/fcp-linux-fast",
+          "self-hosted/fcp-windows"
+        ]
+      },
+      "legacy_self_path": "After retirement the deleted file is not an input; retirement diff itself requires release and targeted replacement validation. No dangling legacy trigger reference retained.",
+      "retirement_status": "NOT YET AUTHORIZED BY EVIDENCE: needs exact replacement green runs and final reference checks"
+    },
+    {
+      "legacy": "phase-f73-durable-job-ownership.yml",
+      "old_workflow_blob": "6d6b599c5718885b682ff0611ec216bc322978f8",
+      "old_triggers": {
+        "pull_request": {
+          "paths": [
+            "catalog/capabilities/**",
+            ".github/workflows/phase-f73-durable-job-ownership.yml"
+          ],
+          "raw": "    paths:\n      - \"catalog/capabilities/**\"\n      - \".github/workflows/phase-f73-durable-job-ownership.yml\"\n"
+        },
+        "push": {
+          "paths": [
+            "catalog/capabilities/**",
+            ".github/workflows/phase-f73-durable-job-ownership.yml"
+          ],
+          "raw": "    branches: [main]\n    paths:\n      - \"catalog/capabilities/**\"\n      - \".github/workflows/phase-f73-durable-job-ownership.yml\"\n\n"
+        }
+      },
+      "old_jobs": [
+        {
+          "id": "durable-job-ownership",
+          "runs_on": [
+            "${{ matrix.os }}"
+          ],
+          "matrix_os": [
+            "[ubuntu-latest, windows-latest]"
+          ],
+          "commands": [
+            {
+              "type": "other",
+              "command": "python -m pip install --upgrade pip python -m pip install -r requirements.txt -c constraints-phase2.txt python -m pip install pytest ruff",
+              "scopes": [],
+              "line": 36
+            },
+            {
+              "type": "compile",
+              "command": "python -m compileall catalog/capabilities",
+              "scopes": [
+                "catalog/capabilities"
+              ],
+              "line": 41
+            },
+            {
+              "type": "pytest",
+              "command": "python -m pytest -o addopts= -q catalog/capabilities/tests catalog/federation/tests/test_phase0.py catalog/federation/tests/test_phase1.py",
+              "scopes": [
+                "catalog/capabilities/tests",
+                "catalog/federation/tests/test_phase0.py",
+                "catalog/federation/tests/test_phase1.py"
+              ],
+              "line": 48
+            },
+            {
+              "type": "ruff",
+              "command": "python -m ruff check catalog/capabilities --ignore I001,RUF022,B008,C408,PLC0206",
+              "scopes": [
+                "catalog/capabilities"
+              ],
+              "line": 54
+            }
+          ],
+          "raw": "    strategy:\n      fail-fast: false\n      matrix:\n        os: [ubuntu-latest, windows-latest]\n    runs-on: ${{ matrix.os }}\n    timeout-minutes: 20\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-python@v5\n        with:\n          python-version: \"3.12\"\n          cache: pip\n      - name: Install dependencies\n        run: |\n          python -m pip install --upgrade pip\n          python -m pip install -r requirements.txt -c constraints-phase2.txt\n          python -m pip install pytest ruff\n      - name: Compile capability domain\n        run: >-\n          python -m compileall\n          catalog/capabilities\n      - name: Ubuntu storage precondition\n        if: runner.os == 'Linux'\n        uses: ./.github/actions/ubuntu-storage-precondition\n      - name: F7 capability and affected federation tests\n        run: >-\n          python -m pytest -o addopts= -q\n          catalog/capabilities/tests\n          catalog/federation/tests/test_phase0.py\n          catalog/federation/tests/test_phase1.py\n      - name: Ruff capability domain\n        run: >-\n          python -m ruff check\n          catalog/capabilities\n          --ignore I001,RUF022,B008,C408,PLC0206\n\n"
+        },
+        {
+          "id": "repository-hygiene",
+          "runs_on": [
+            "ubuntu-latest"
+          ],
+          "matrix_os": [],
+          "commands": [
+            {
+              "type": "compose",
+              "command": "docker compose config --quiet",
+              "scopes": [],
+              "line": 67
+            },
+            {
+              "type": "diff",
+              "command": "git diff --check HEAD^ HEAD",
+              "scopes": [],
+              "line": 69
+            }
+          ],
+          "raw": "    runs-on: ubuntu-latest\n    timeout-minutes: 10\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 2\n      - name: Validate Compose configuration\n        run: docker compose config --quiet\n      - name: Validate diff hygiene\n        run: git diff --check HEAD^ HEAD"
+        }
+      ],
+      "os": [
+        "Linux",
+        "Windows"
+      ],
+      "replacement": "extended F7 closeout + unchanged release/F6/F8",
+      "trigger_mapping": "F7 preserves existing paths and adds union of legacy product paths for both pull_request and main push.",
+      "lint_mapping": "Existing F7/release lint retained; separate capabilities UP035 guard preserves stricter F7.1-F7.6 rules; strict two-file relay lint preserves F7.4/F7.5.",
+      "test_mapping": "F7 existing modules plus three transfer modules; release covers AI candidate-visibility module. No module removed.",
+      "runtime_assumptions": {
+        "python": "existing pinned Python action: Linux3.12.13/Windows3.12.10",
+        "dependencies": "existing requirements.txt + constraints-phase2.txt; no product dependency changes",
+        "storage": "existing Linux storage precondition and native Windows long-path temp policy",
+        "services": "existing owned test fixtures and Compose config validation; no Recorder/runtime data",
+        "runners": [
+          "self-hosted/fcp-linux-fast",
+          "self-hosted/fcp-windows"
+        ]
+      },
+      "legacy_self_path": "After retirement the deleted file is not an input; retirement diff itself requires release and targeted replacement validation. No dangling legacy trigger reference retained.",
+      "retirement_status": "NOT YET AUTHORIZED BY EVIDENCE: needs exact replacement green runs and final reference checks"
+    },
+    {
+      "legacy": "phase-f74-worker-dispatch.yml",
+      "old_workflow_blob": "8a1dd238ada3dd8bb4b27de68cf7248b2883367d",
+      "old_triggers": {
+        "pull_request": {
+          "paths": [
+            "catalog/capabilities/**",
+            "catalog/relay/tests/test_phase_f74_capability_dispatch.py",
+            ".github/workflows/phase-f74-worker-dispatch.yml"
+          ],
+          "raw": "    paths:\n      - \"catalog/capabilities/**\"\n      - \"catalog/relay/tests/test_phase_f74_capability_dispatch.py\"\n      - \".github/workflows/phase-f74-worker-dispatch.yml\"\n"
+        },
+        "push": {
+          "paths": [
+            "catalog/capabilities/**",
+            "catalog/relay/tests/test_phase_f74_capability_dispatch.py",
+            ".github/workflows/phase-f74-worker-dispatch.yml"
+          ],
+          "raw": "    branches: [main]\n    paths:\n      - \"catalog/capabilities/**\"\n      - \"catalog/relay/tests/test_phase_f74_capability_dispatch.py\"\n      - \".github/workflows/phase-f74-worker-dispatch.yml\"\n\n"
+        }
+      },
+      "old_jobs": [
+        {
+          "id": "worker-dispatch",
+          "runs_on": [
+            "${{ matrix.os }}"
+          ],
+          "matrix_os": [
+            "[ubuntu-latest, windows-latest]"
+          ],
+          "commands": [
+            {
+              "type": "other",
+              "command": "python -m pip install --upgrade pip python -m pip install -r requirements.txt -c constraints-phase2.txt python -m pip install pytest ruff",
+              "scopes": [],
+              "line": 38
+            },
+            {
+              "type": "compile",
+              "command": "python -m compileall catalog/capabilities catalog/relay/tests/test_phase_f74_capability_dispatch.py",
+              "scopes": [
+                "catalog/capabilities",
+                "catalog/relay/tests/test_phase_f74_capability_dispatch.py"
+              ],
+              "line": 43
+            },
+            {
+              "type": "pytest",
+              "command": "python -m pytest -o addopts= -q catalog/capabilities/tests catalog/relay/tests/test_phase_f74_capability_dispatch.py catalog/federation/tests/test_phase0.py catalog/federation/tests/test_phase1.py",
+              "scopes": [
+                "catalog/capabilities/tests",
+                "catalog/federation/tests/test_phase0.py",
+                "catalog/federation/tests/test_phase1.py",
+                "catalog/relay/tests/test_phase_f74_capability_dispatch.py"
+              ],
+              "line": 51
+            },
+            {
+              "type": "ruff",
+              "command": "python -m ruff check catalog/capabilities catalog/relay/tests/test_phase_f74_capability_dispatch.py --ignore I001,RUF022,B008,C408,PLC0206",
+              "scopes": [
+                "catalog/capabilities",
+                "catalog/relay/tests/test_phase_f74_capability_dispatch.py"
+              ],
+              "line": 58
+            }
+          ],
+          "raw": "    strategy:\n      fail-fast: false\n      matrix:\n        os: [ubuntu-latest, windows-latest]\n    runs-on: ${{ matrix.os }}\n    timeout-minutes: 25\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-python@v5\n        with:\n          python-version: \"3.12\"\n          cache: pip\n      - name: Install dependencies\n        run: |\n          python -m pip install --upgrade pip\n          python -m pip install -r requirements.txt -c constraints-phase2.txt\n          python -m pip install pytest ruff\n      - name: Compile F7 capability and relay boundary\n        run: >-\n          python -m compileall\n          catalog/capabilities\n          catalog/relay/tests/test_phase_f74_capability_dispatch.py\n      - name: Ubuntu storage precondition\n        if: runner.os == 'Linux'\n        uses: ./.github/actions/ubuntu-storage-precondition\n      - name: F7 capability, relay acceptance and affected federation tests\n        run: >-\n          python -m pytest -o addopts= -q\n          catalog/capabilities/tests\n          catalog/relay/tests/test_phase_f74_capability_dispatch.py\n          catalog/federation/tests/test_phase0.py\n          catalog/federation/tests/test_phase1.py\n      - name: Ruff F7.4 scope\n        run: >-\n          python -m ruff check\n          catalog/capabilities\n          catalog/relay/tests/test_phase_f74_capability_dispatch.py\n          --ignore I001,RUF022,B008,C408,PLC0206\n\n"
+        },
+        {
+          "id": "repository-hygiene",
+          "runs_on": [
+            "ubuntu-latest"
+          ],
+          "matrix_os": [],
+          "commands": [
+            {
+              "type": "compose",
+              "command": "docker compose config --quiet",
+              "scopes": [],
+              "line": 72
+            },
+            {
+              "type": "diff",
+              "command": "git diff --check HEAD^ HEAD",
+              "scopes": [],
+              "line": 74
+            }
+          ],
+          "raw": "    runs-on: ubuntu-latest\n    timeout-minutes: 10\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 2\n      - name: Validate Compose configuration\n        run: docker compose config --quiet\n      - name: Validate diff hygiene\n        run: git diff --check HEAD^ HEAD"
+        }
+      ],
+      "os": [
+        "Linux",
+        "Windows"
+      ],
+      "replacement": "extended F7 closeout + unchanged release/F6/F8",
+      "trigger_mapping": "F7 preserves existing paths and adds union of legacy product paths for both pull_request and main push.",
+      "lint_mapping": "Existing F7/release lint retained; separate capabilities UP035 guard preserves stricter F7.1-F7.6 rules; strict two-file relay lint preserves F7.4/F7.5.",
+      "test_mapping": "F7 existing modules plus three transfer modules; release covers AI candidate-visibility module. No module removed.",
+      "runtime_assumptions": {
+        "python": "existing pinned Python action: Linux3.12.13/Windows3.12.10",
+        "dependencies": "existing requirements.txt + constraints-phase2.txt; no product dependency changes",
+        "storage": "existing Linux storage precondition and native Windows long-path temp policy",
+        "services": "existing owned test fixtures and Compose config validation; no Recorder/runtime data",
+        "runners": [
+          "self-hosted/fcp-linux-fast",
+          "self-hosted/fcp-windows"
+        ]
+      },
+      "legacy_self_path": "After retirement the deleted file is not an input; retirement diff itself requires release and targeted replacement validation. No dangling legacy trigger reference retained.",
+      "retirement_status": "NOT YET AUTHORIZED BY EVIDENCE: needs exact replacement green runs and final reference checks"
+    },
+    {
+      "legacy": "phase-f75-retry-cancellation.yml",
+      "old_workflow_blob": "2b66e40f755273fae949fa7e3d653d364770c42c",
+      "old_triggers": {
+        "pull_request": {
+          "paths": [
+            "catalog/capabilities/**",
+            "catalog/relay/tests/test_phase_f75_retry_cancellation.py",
+            ".github/workflows/phase-f75-retry-cancellation.yml"
+          ],
+          "raw": "    paths:\n      - \"catalog/capabilities/**\"\n      - \"catalog/relay/tests/test_phase_f75_retry_cancellation.py\"\n      - \".github/workflows/phase-f75-retry-cancellation.yml\"\n"
+        },
+        "push": {
+          "paths": [
+            "catalog/capabilities/**",
+            "catalog/relay/tests/test_phase_f75_retry_cancellation.py",
+            ".github/workflows/phase-f75-retry-cancellation.yml"
+          ],
+          "raw": "    branches: [main]\n    paths:\n      - \"catalog/capabilities/**\"\n      - \"catalog/relay/tests/test_phase_f75_retry_cancellation.py\"\n      - \".github/workflows/phase-f75-retry-cancellation.yml\"\n\n"
+        }
+      },
+      "old_jobs": [
+        {
+          "id": "retry-cancellation",
+          "runs_on": [
+            "${{ matrix.os }}"
+          ],
+          "matrix_os": [
+            "[ubuntu-latest, windows-latest]"
+          ],
+          "commands": [
+            {
+              "type": "other",
+              "command": "python -m pip install --upgrade pip python -m pip install -r requirements.txt -c constraints-phase2.txt python -m pip install pytest ruff",
+              "scopes": [],
+              "line": 38
+            },
+            {
+              "type": "compile",
+              "command": "python -m compileall catalog/capabilities catalog/relay/tests/test_phase_f75_retry_cancellation.py",
+              "scopes": [
+                "catalog/capabilities",
+                "catalog/relay/tests/test_phase_f75_retry_cancellation.py"
+              ],
+              "line": 43
+            },
+            {
+              "type": "pytest",
+              "command": "python -m pytest -o addopts= -q catalog/capabilities/tests catalog/relay/tests/test_phase_f74_capability_dispatch.py catalog/relay/tests/test_phase_f75_retry_cancellation.py catalog/federation/tests/test_phase0.py catalog/federation/tests/test_phase1.py",
+              "scopes": [
+                "catalog/capabilities/tests",
+                "catalog/federation/tests/test_phase0.py",
+                "catalog/federation/tests/test_phase1.py",
+                "catalog/relay/tests/test_phase_f74_capability_dispatch.py",
+                "catalog/relay/tests/test_phase_f75_retry_cancellation.py"
+              ],
+              "line": 51
+            },
+            {
+              "type": "ruff",
+              "command": "python -m ruff check catalog/capabilities catalog/relay/tests/test_phase_f74_capability_dispatch.py catalog/relay/tests/test_phase_f75_retry_cancellation.py --ignore I001,RUF022,B008,C408,PLC0206",
+              "scopes": [
+                "catalog/capabilities",
+                "catalog/relay/tests/test_phase_f74_capability_dispatch.py",
+                "catalog/relay/tests/test_phase_f75_retry_cancellation.py"
+              ],
+              "line": 59
+            }
+          ],
+          "raw": "    strategy:\n      fail-fast: false\n      matrix:\n        os: [ubuntu-latest, windows-latest]\n    runs-on: ${{ matrix.os }}\n    timeout-minutes: 25\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-python@v5\n        with:\n          python-version: \"3.12\"\n          cache: pip\n      - name: Install dependencies\n        run: |\n          python -m pip install --upgrade pip\n          python -m pip install -r requirements.txt -c constraints-phase2.txt\n          python -m pip install pytest ruff\n      - name: Compile F7.5 lifecycle boundary\n        run: >-\n          python -m compileall\n          catalog/capabilities\n          catalog/relay/tests/test_phase_f75_retry_cancellation.py\n      - name: Ubuntu storage precondition\n        if: runner.os == 'Linux'\n        uses: ./.github/actions/ubuntu-storage-precondition\n      - name: F7 lifecycle, relay acceptance and affected federation tests\n        run: >-\n          python -m pytest -o addopts= -q\n          catalog/capabilities/tests\n          catalog/relay/tests/test_phase_f74_capability_dispatch.py\n          catalog/relay/tests/test_phase_f75_retry_cancellation.py\n          catalog/federation/tests/test_phase0.py\n          catalog/federation/tests/test_phase1.py\n      - name: Ruff F7.5 scope\n        run: >-\n          python -m ruff check\n          catalog/capabilities\n          catalog/relay/tests/test_phase_f74_capability_dispatch.py\n          catalog/relay/tests/test_phase_f75_retry_cancellation.py\n          --ignore I001,RUF022,B008,C408,PLC0206\n\n"
+        },
+        {
+          "id": "repository-hygiene",
+          "runs_on": [
+            "ubuntu-latest"
+          ],
+          "matrix_os": [],
+          "commands": [
+            {
+              "type": "compose",
+              "command": "docker compose config --quiet",
+              "scopes": [],
+              "line": 74
+            },
+            {
+              "type": "diff",
+              "command": "git diff --check HEAD^ HEAD",
+              "scopes": [],
+              "line": 76
+            }
+          ],
+          "raw": "    runs-on: ubuntu-latest\n    timeout-minutes: 10\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 2\n      - name: Validate Compose configuration\n        run: docker compose config --quiet\n      - name: Validate diff hygiene\n        run: git diff --check HEAD^ HEAD"
+        }
+      ],
+      "os": [
+        "Linux",
+        "Windows"
+      ],
+      "replacement": "extended F7 closeout + unchanged release/F6/F8",
+      "trigger_mapping": "F7 preserves existing paths and adds union of legacy product paths for both pull_request and main push.",
+      "lint_mapping": "Existing F7/release lint retained; separate capabilities UP035 guard preserves stricter F7.1-F7.6 rules; strict two-file relay lint preserves F7.4/F7.5.",
+      "test_mapping": "F7 existing modules plus three transfer modules; release covers AI candidate-visibility module. No module removed.",
+      "runtime_assumptions": {
+        "python": "existing pinned Python action: Linux3.12.13/Windows3.12.10",
+        "dependencies": "existing requirements.txt + constraints-phase2.txt; no product dependency changes",
+        "storage": "existing Linux storage precondition and native Windows long-path temp policy",
+        "services": "existing owned test fixtures and Compose config validation; no Recorder/runtime data",
+        "runners": [
+          "self-hosted/fcp-linux-fast",
+          "self-hosted/fcp-windows"
+        ]
+      },
+      "legacy_self_path": "After retirement the deleted file is not an input; retirement diff itself requires release and targeted replacement validation. No dangling legacy trigger reference retained.",
+      "retirement_status": "NOT YET AUTHORIZED BY EVIDENCE: needs exact replacement green runs and final reference checks"
+    },
+    {
+      "legacy": "phase-f76-artifact-authorization.yml",
+      "old_workflow_blob": "2a64bd43aaeec8961e578d1c08fc20fd79a66275",
+      "old_triggers": {
+        "pull_request": {
+          "paths": [
+            "catalog/capabilities/**",
+            "catalog/federation/object_transfer.py",
+            "catalog/federation/resumable_chunk_transfer.py",
+            "catalog/federation/tests/test_phase_f641_chunk_contract.py",
+            "catalog/node/tests/test_phase_f642_verified_chunk_transfer.py",
+            "catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py",
+            ".github/workflows/phase-f76-artifact-authorization.yml"
+          ],
+          "raw": "    paths:\n      - \"catalog/capabilities/**\"\n      - \"catalog/federation/object_transfer.py\"\n      - \"catalog/federation/resumable_chunk_transfer.py\"\n      - \"catalog/federation/tests/test_phase_f641_chunk_contract.py\"\n      - \"catalog/node/tests/test_phase_f642_verified_chunk_transfer.py\"\n      - \"catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py\"\n      - \".github/workflows/phase-f76-artifact-authorization.yml\"\n"
+        },
+        "push": {
+          "paths": [
+            "catalog/capabilities/**",
+            "catalog/federation/object_transfer.py",
+            "catalog/federation/resumable_chunk_transfer.py",
+            "catalog/federation/tests/test_phase_f641_chunk_contract.py",
+            "catalog/node/tests/test_phase_f642_verified_chunk_transfer.py",
+            "catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py",
+            ".github/workflows/phase-f76-artifact-authorization.yml"
+          ],
+          "raw": "    branches: [main]\n    paths:\n      - \"catalog/capabilities/**\"\n      - \"catalog/federation/object_transfer.py\"\n      - \"catalog/federation/resumable_chunk_transfer.py\"\n      - \"catalog/federation/tests/test_phase_f641_chunk_contract.py\"\n      - \"catalog/node/tests/test_phase_f642_verified_chunk_transfer.py\"\n      - \"catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py\"\n      - \".github/workflows/phase-f76-artifact-authorization.yml\"\n\n"
+        }
+      },
+      "old_jobs": [
+        {
+          "id": "artifact-authorization",
+          "runs_on": [
+            "${{ matrix.os }}"
+          ],
+          "matrix_os": [
+            "[ubuntu-latest, windows-latest]"
+          ],
+          "commands": [
+            {
+              "type": "other",
+              "command": "python -m pip install --upgrade pip python -m pip install -r requirements.txt -c constraints-phase2.txt python -m pip install pytest ruff",
+              "scopes": [],
+              "line": 46
+            },
+            {
+              "type": "compile",
+              "command": "python -m compileall catalog/capabilities catalog/federation/object_transfer.py catalog/federation/resumable_chunk_transfer.py catalog/federation/tests/test_phase_f641_chunk_contract.py catalog/node/tests/test_phase_f642_verified_chunk_transfer.py catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py",
+              "scopes": [
+                "catalog/capabilities",
+                "catalog/federation/object_transfer.py",
+                "catalog/federation/resumable_chunk_transfer.py",
+                "catalog/federation/tests/test_phase_f641_chunk_contract.py",
+                "catalog/node/tests/test_phase_f642_verified_chunk_transfer.py",
+                "catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py"
+              ],
+              "line": 51
+            },
+            {
+              "type": "pytest",
+              "command": "python -m pytest -o addopts= -q catalog/capabilities/tests catalog/federation/tests/test_phase_f641_chunk_contract.py catalog/node/tests/test_phase_f642_verified_chunk_transfer.py catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py catalog/relay/tests/test_phase_f74_capability_dispatch.py catalog/relay/tests/test_phase_f75_retry_cancellation.py catalog/federation/tests/test_phase0.py catalog/federation/tests/test_phase1.py",
+              "scopes": [
+                "catalog/capabilities/tests",
+                "catalog/federation/tests/test_phase0.py",
+                "catalog/federation/tests/test_phase1.py",
+                "catalog/federation/tests/test_phase_f641_chunk_contract.py",
+                "catalog/node/tests/test_phase_f642_verified_chunk_transfer.py",
+                "catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py",
+                "catalog/relay/tests/test_phase_f74_capability_dispatch.py",
+                "catalog/relay/tests/test_phase_f75_retry_cancellation.py"
+              ],
+              "line": 63
+            },
+            {
+              "type": "ruff",
+              "command": "python -m ruff check catalog/capabilities --ignore I001,RUF022,B008,C408,PLC0206",
+              "scopes": [
+                "catalog/capabilities"
+              ],
+              "line": 74
+            }
+          ],
+          "raw": "    strategy:\n      fail-fast: false\n      matrix:\n        os: [ubuntu-latest, windows-latest]\n    runs-on: ${{ matrix.os }}\n    timeout-minutes: 30\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-python@v5\n        with:\n          python-version: \"3.12\"\n          cache: pip\n      - name: Install dependencies\n        run: |\n          python -m pip install --upgrade pip\n          python -m pip install -r requirements.txt -c constraints-phase2.txt\n          python -m pip install pytest ruff\n      - name: Compile F7.6 and F6 transfer boundary\n        run: >-\n          python -m compileall\n          catalog/capabilities\n          catalog/federation/object_transfer.py\n          catalog/federation/resumable_chunk_transfer.py\n          catalog/federation/tests/test_phase_f641_chunk_contract.py\n          catalog/node/tests/test_phase_f642_verified_chunk_transfer.py\n          catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py\n      - name: Ubuntu storage precondition\n        if: runner.os == 'Linux'\n        uses: ./.github/actions/ubuntu-storage-precondition\n      - name: F7 capability, F6 transfer and affected federation tests\n        run: >-\n          python -m pytest -o addopts= -q\n          catalog/capabilities/tests\n          catalog/federation/tests/test_phase_f641_chunk_contract.py\n          catalog/node/tests/test_phase_f642_verified_chunk_transfer.py\n          catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py\n          catalog/relay/tests/test_phase_f74_capability_dispatch.py\n          catalog/relay/tests/test_phase_f75_retry_cancellation.py\n          catalog/federation/tests/test_phase0.py\n          catalog/federation/tests/test_phase1.py\n      - name: Ruff F7.6 scope\n        run: >-\n          python -m ruff check\n          catalog/capabilities\n          --ignore I001,RUF022,B008,C408,PLC0206\n\n"
+        },
+        {
+          "id": "repository-hygiene",
+          "runs_on": [
+            "ubuntu-latest"
+          ],
+          "matrix_os": [],
+          "commands": [
+            {
+              "type": "compose",
+              "command": "docker compose config --quiet",
+              "scopes": [],
+              "line": 87
+            },
+            {
+              "type": "diff",
+              "command": "git diff --check HEAD^ HEAD",
+              "scopes": [],
+              "line": 89
+            }
+          ],
+          "raw": "    runs-on: ubuntu-latest\n    timeout-minutes: 10\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 2\n      - name: Validate Compose configuration\n        run: docker compose config --quiet\n      - name: Validate diff hygiene\n        run: git diff --check HEAD^ HEAD"
+        }
+      ],
+      "os": [
+        "Linux",
+        "Windows"
+      ],
+      "replacement": "extended F7 closeout + unchanged release/F6/F8",
+      "trigger_mapping": "F7 preserves existing paths and adds union of legacy product paths for both pull_request and main push.",
+      "lint_mapping": "Existing F7/release lint retained; separate capabilities UP035 guard preserves stricter F7.1-F7.6 rules; strict two-file relay lint preserves F7.4/F7.5.",
+      "test_mapping": "F7 existing modules plus three transfer modules; release covers AI candidate-visibility module. No module removed.",
+      "runtime_assumptions": {
+        "python": "existing pinned Python action: Linux3.12.13/Windows3.12.10",
+        "dependencies": "existing requirements.txt + constraints-phase2.txt; no product dependency changes",
+        "storage": "existing Linux storage precondition and native Windows long-path temp policy",
+        "services": "existing owned test fixtures and Compose config validation; no Recorder/runtime data",
+        "runners": [
+          "self-hosted/fcp-linux-fast",
+          "self-hosted/fcp-windows"
+        ]
+      },
+      "legacy_self_path": "After retirement the deleted file is not an input; retirement diff itself requires release and targeted replacement validation. No dangling legacy trigger reference retained.",
+      "retirement_status": "NOT YET AUTHORIZED BY EVIDENCE: needs exact replacement green runs and final reference checks"
+    },
+    {
+      "legacy": "phase-f77-ai-runtime-integration.yml",
+      "old_workflow_blob": "a51b63ffd9abfce4b0ccd4d809d06df7c094cc7c",
+      "old_triggers": {
+        "pull_request": {
+          "paths": [
+            "catalog/ai/**",
+            "catalog/flask_app/ai_routes.py",
+            "catalog/flask_app/templates/ai_explainer.html",
+            "catalog/flask_app/static/js/ai-explainer.js",
+            "catalog/flask_app/services/server_setup_service.py",
+            "catalog/flask_app/tests/test_ai_explainer_chat.py",
+            "catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py",
+            "catalog/flask_app/tests/test_ai_runtime_integration.py",
+            "catalog/flask_app/tests/test_connected_ai_provider.py",
+            "catalog/flask_app/tests/test_model_provider_compose.py",
+            "catalog/capabilities/**",
+            ".github/workflows/phase-f77-ai-runtime-integration.yml"
+          ],
+          "raw": "    paths:\n      - \"catalog/ai/**\"\n      - \"catalog/flask_app/ai_routes.py\"\n      - \"catalog/flask_app/templates/ai_explainer.html\"\n      - \"catalog/flask_app/static/js/ai-explainer.js\"\n      - \"catalog/flask_app/services/server_setup_service.py\"\n      - \"catalog/flask_app/tests/test_ai_explainer_chat.py\"\n      - \"catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py\"\n      - \"catalog/flask_app/tests/test_ai_runtime_integration.py\"\n      - \"catalog/flask_app/tests/test_connected_ai_provider.py\"\n      - \"catalog/flask_app/tests/test_model_provider_compose.py\"\n      - \"catalog/capabilities/**\"\n      - \".github/workflows/phase-f77-ai-runtime-integration.yml\"\n"
+        },
+        "push": {
+          "paths": [
+            "catalog/ai/**",
+            "catalog/flask_app/ai_routes.py",
+            "catalog/flask_app/templates/ai_explainer.html",
+            "catalog/flask_app/static/js/ai-explainer.js",
+            "catalog/flask_app/services/server_setup_service.py",
+            "catalog/flask_app/tests/test_ai_explainer_chat.py",
+            "catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py",
+            "catalog/flask_app/tests/test_ai_runtime_integration.py",
+            "catalog/flask_app/tests/test_connected_ai_provider.py",
+            "catalog/flask_app/tests/test_model_provider_compose.py",
+            "catalog/capabilities/**",
+            ".github/workflows/phase-f77-ai-runtime-integration.yml"
+          ],
+          "raw": "    branches: [main]\n    paths:\n      - \"catalog/ai/**\"\n      - \"catalog/flask_app/ai_routes.py\"\n      - \"catalog/flask_app/templates/ai_explainer.html\"\n      - \"catalog/flask_app/static/js/ai-explainer.js\"\n      - \"catalog/flask_app/services/server_setup_service.py\"\n      - \"catalog/flask_app/tests/test_ai_explainer_chat.py\"\n      - \"catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py\"\n      - \"catalog/flask_app/tests/test_ai_runtime_integration.py\"\n      - \"catalog/flask_app/tests/test_connected_ai_provider.py\"\n      - \"catalog/flask_app/tests/test_model_provider_compose.py\"\n      - \"catalog/capabilities/**\"\n      - \".github/workflows/phase-f77-ai-runtime-integration.yml\"\n\n"
+        }
+      },
+      "old_jobs": [
+        {
+          "id": "ai-runtime",
+          "runs_on": [
+            "${{ matrix.os }}"
+          ],
+          "matrix_os": [
+            "[ubuntu-latest, windows-latest]"
+          ],
+          "commands": [
+            {
+              "type": "other",
+              "command": "python -m pip install --upgrade pip python -m pip install -r requirements.txt -c constraints-phase2.txt python -m pip install pytest ruff",
+              "scopes": [],
+              "line": 56
+            },
+            {
+              "type": "compile",
+              "command": "python -m compileall catalog/ai catalog/capabilities catalog/flask_app/ai_routes.py catalog/flask_app/tests/test_ai_explainer_chat.py catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py catalog/flask_app/tests/test_ai_runtime_integration.py catalog/flask_app/tests/test_connected_ai_provider.py catalog/flask_app/tests/test_model_provider_compose.py",
+              "scopes": [
+                "catalog/ai",
+                "catalog/capabilities",
+                "catalog/flask_app/ai_routes.py",
+                "catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py",
+                "catalog/flask_app/tests/test_ai_explainer_chat.py",
+                "catalog/flask_app/tests/test_ai_runtime_integration.py",
+                "catalog/flask_app/tests/test_connected_ai_provider.py",
+                "catalog/flask_app/tests/test_model_provider_compose.py"
+              ],
+              "line": 61
+            },
+            {
+              "type": "pytest",
+              "command": "python -m pytest -o addopts= -q catalog/ai/tests catalog/flask_app/tests/test_ai_explainer_chat.py catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py catalog/flask_app/tests/test_ai_runtime_integration.py catalog/flask_app/tests/test_connected_ai_provider.py catalog/flask_app/tests/test_model_provider_compose.py catalog/capabilities/tests catalog/relay/tests/test_phase_f74_capability_dispatch.py catalog/relay/tests/test_phase_f75_retry_cancellation.py catalog/federation/tests/test_phase0.py catalog/federation/tests/test_phase1.py",
+              "scopes": [
+                "catalog/ai/tests",
+                "catalog/capabilities/tests",
+                "catalog/federation/tests/test_phase0.py",
+                "catalog/federation/tests/test_phase1.py",
+                "catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py",
+                "catalog/flask_app/tests/test_ai_explainer_chat.py",
+                "catalog/flask_app/tests/test_ai_runtime_integration.py",
+                "catalog/flask_app/tests/test_connected_ai_provider.py",
+                "catalog/flask_app/tests/test_model_provider_compose.py",
+                "catalog/relay/tests/test_phase_f74_capability_dispatch.py",
+                "catalog/relay/tests/test_phase_f75_retry_cancellation.py"
+              ],
+              "line": 75
+            },
+            {
+              "type": "ruff",
+              "command": "python -m ruff check catalog/ai catalog/flask_app/ai_routes.py catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py catalog/flask_app/tests/test_ai_runtime_integration.py --ignore I001,RUF022,B008,C408,PLC0206,UP035",
+              "scopes": [
+                "catalog/ai",
+                "catalog/flask_app/ai_routes.py",
+                "catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py",
+                "catalog/flask_app/tests/test_ai_runtime_integration.py"
+              ],
+              "line": 89
+            }
+          ],
+          "raw": "    strategy:\n      fail-fast: false\n      matrix:\n        os: [ubuntu-latest, windows-latest]\n    runs-on: ${{ matrix.os }}\n    timeout-minutes: 30\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-python@v5\n        with:\n          python-version: \"3.12\"\n          cache: pip\n      - name: Install dependencies\n        run: |\n          python -m pip install --upgrade pip\n          python -m pip install -r requirements.txt -c constraints-phase2.txt\n          python -m pip install pytest ruff\n      - name: Compile F7.7 AI and capability boundaries\n        run: >-\n          python -m compileall\n          catalog/ai\n          catalog/capabilities\n          catalog/flask_app/ai_routes.py\n          catalog/flask_app/tests/test_ai_explainer_chat.py\n          catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py\n          catalog/flask_app/tests/test_ai_runtime_integration.py\n          catalog/flask_app/tests/test_connected_ai_provider.py\n          catalog/flask_app/tests/test_model_provider_compose.py\n      - name: Ubuntu storage precondition\n        if: runner.os == 'Linux'\n        uses: ./.github/actions/ubuntu-storage-precondition\n      - name: F7.7 AI, F7 capability and affected federation tests\n        run: >-\n          python -m pytest -o addopts= -q\n          catalog/ai/tests\n          catalog/flask_app/tests/test_ai_explainer_chat.py\n          catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py\n          catalog/flask_app/tests/test_ai_runtime_integration.py\n          catalog/flask_app/tests/test_connected_ai_provider.py\n          catalog/flask_app/tests/test_model_provider_compose.py\n          catalog/capabilities/tests\n          catalog/relay/tests/test_phase_f74_capability_dispatch.py\n          catalog/relay/tests/test_phase_f75_retry_cancellation.py\n          catalog/federation/tests/test_phase0.py\n          catalog/federation/tests/test_phase1.py\n      - name: Ruff F7.7 scope\n        run: >-\n          python -m ruff check\n          catalog/ai\n          catalog/flask_app/ai_routes.py\n          catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py\n          catalog/flask_app/tests/test_ai_runtime_integration.py\n          --ignore I001,RUF022,B008,C408,PLC0206,UP035\n\n"
+        },
+        {
+          "id": "repository-hygiene",
+          "runs_on": [
+            "ubuntu-latest"
+          ],
+          "matrix_os": [],
+          "commands": [
+            {
+              "type": "compose",
+              "command": "docker compose config --quiet",
+              "scopes": [],
+              "line": 105
+            },
+            {
+              "type": "diff",
+              "command": "git diff --check HEAD^ HEAD",
+              "scopes": [],
+              "line": 107
+            }
+          ],
+          "raw": "    runs-on: ubuntu-latest\n    timeout-minutes: 10\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 2\n      - name: Validate Compose configuration\n        run: docker compose config --quiet\n      - name: Validate diff hygiene\n        run: git diff --check HEAD^ HEAD"
+        }
+      ],
+      "os": [
+        "Linux",
+        "Windows"
+      ],
+      "replacement": "extended F7 closeout + unchanged release/F6/F8",
+      "trigger_mapping": "F7 preserves existing paths and adds union of legacy product paths for both pull_request and main push.",
+      "lint_mapping": "Existing F7/release lint retained; separate capabilities UP035 guard preserves stricter F7.1-F7.6 rules; strict two-file relay lint preserves F7.4/F7.5.",
+      "test_mapping": "F7 existing modules plus three transfer modules; release covers AI candidate-visibility module. No module removed.",
+      "runtime_assumptions": {
+        "python": "existing pinned Python action: Linux3.12.13/Windows3.12.10",
+        "dependencies": "existing requirements.txt + constraints-phase2.txt; no product dependency changes",
+        "storage": "existing Linux storage precondition and native Windows long-path temp policy",
+        "services": "existing owned test fixtures and Compose config validation; no Recorder/runtime data",
+        "runners": [
+          "self-hosted/fcp-linux-fast",
+          "self-hosted/fcp-windows"
+        ]
+      },
+      "legacy_self_path": "After retirement the deleted file is not an input; retirement diff itself requires release and targeted replacement validation. No dangling legacy trigger reference retained.",
+      "retirement_status": "NOT YET AUTHORIZED BY EVIDENCE: needs exact replacement green runs and final reference checks"
+    },
+    {
+      "legacy": "phase-f84-compute-worker-activation.yml",
+      "old_workflow_blob": "f878c94ea989b7aff67928772e05ef2ad1fd48fb",
+      "old_triggers": {
+        "pull_request": {
+          "paths": [
+            "catalog/capabilities/**",
+            "catalog/relay/tests/test_phase_f84_compute_worker_activation.py",
+            "docs/implementation/phase_f8_plan.md",
+            ".github/workflows/phase-f84-compute-worker-activation.yml"
+          ],
+          "raw": "    paths:\n      - \"catalog/capabilities/**\"\n      - \"catalog/relay/tests/test_phase_f84_compute_worker_activation.py\"\n      - \"docs/implementation/phase_f8_plan.md\"\n      - \".github/workflows/phase-f84-compute-worker-activation.yml\"\n"
+        },
+        "push": {
+          "paths": [
+            "catalog/capabilities/**",
+            "catalog/relay/tests/test_phase_f84_compute_worker_activation.py",
+            "docs/implementation/phase_f8_plan.md",
+            ".github/workflows/phase-f84-compute-worker-activation.yml"
+          ],
+          "raw": "    branches: [main]\n    paths:\n      - \"catalog/capabilities/**\"\n      - \"catalog/relay/tests/test_phase_f84_compute_worker_activation.py\"\n      - \"docs/implementation/phase_f8_plan.md\"\n      - \".github/workflows/phase-f84-compute-worker-activation.yml\"\n\n"
+        }
+      },
+      "old_jobs": [
+        {
+          "id": "compute-worker",
+          "runs_on": [
+            "${{ matrix.os }}"
+          ],
+          "matrix_os": [
+            "[ubuntu-latest, windows-latest]"
+          ],
+          "commands": [
+            {
+              "type": "other",
+              "command": "python -m pip install --upgrade pip python -m pip install -r requirements.txt -c constraints-phase2.txt python -m pip install pytest ruff",
+              "scopes": [],
+              "line": 43
+            },
+            {
+              "type": "compile",
+              "command": "python -m compileall catalog/capabilities catalog/relay/tests/test_phase_f84_compute_worker_activation.py",
+              "scopes": [
+                "catalog/capabilities",
+                "catalog/relay/tests/test_phase_f84_compute_worker_activation.py"
+              ],
+              "line": 48
+            },
+            {
+              "type": "pytest",
+              "command": "python -m pytest -o addopts= -q catalog/capabilities/tests catalog/relay/tests/test_phase_f74_capability_dispatch.py catalog/relay/tests/test_phase_f75_retry_cancellation.py catalog/relay/tests/test_phase_f84_compute_worker_activation.py catalog/federation/tests/test_phase0.py catalog/federation/tests/test_phase1.py catalog/federation/tests/test_phase2_unit.py",
+              "scopes": [
+                "catalog/capabilities/tests",
+                "catalog/federation/tests/test_phase0.py",
+                "catalog/federation/tests/test_phase1.py",
+                "catalog/federation/tests/test_phase2_unit.py",
+                "catalog/relay/tests/test_phase_f74_capability_dispatch.py",
+                "catalog/relay/tests/test_phase_f75_retry_cancellation.py",
+                "catalog/relay/tests/test_phase_f84_compute_worker_activation.py"
+              ],
+              "line": 56
+            },
+            {
+              "type": "ruff",
+              "command": "python -m ruff check catalog/capabilities catalog/relay/tests/test_phase_f84_compute_worker_activation.py --ignore I001,RUF022,B008,C408,PLC0206,UP035",
+              "scopes": [
+                "catalog/capabilities",
+                "catalog/relay/tests/test_phase_f84_compute_worker_activation.py"
+              ],
+              "line": 66
+            },
+            {
+              "type": "compose",
+              "command": "docker compose config --quiet",
+              "scopes": [],
+              "line": 72
+            },
+            {
+              "type": "diff",
+              "command": "git diff --check origin/${{ github.base_ref || 'main' }}...HEAD",
+              "scopes": [],
+              "line": 74
+            }
+          ],
+          "raw": "    strategy:\n      fail-fast: false\n      matrix:\n        os: [ubuntu-latest, windows-latest]\n    runs-on: ${{ matrix.os }}\n    timeout-minutes: 45\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 0\n      - uses: actions/setup-python@v5\n        with:\n          python-version: \"3.12\"\n          cache: pip\n      - name: Install dependencies\n        run: |\n          python -m pip install --upgrade pip\n          python -m pip install -r requirements.txt -c constraints-phase2.txt\n          python -m pip install pytest ruff\n      - name: Compile F8.4 boundaries\n        run: >-\n          python -m compileall\n          catalog/capabilities\n          catalog/relay/tests/test_phase_f84_compute_worker_activation.py\n      - name: Ubuntu storage precondition\n        if: runner.os == 'Linux'\n        uses: ./.github/actions/ubuntu-storage-precondition\n      - name: F8.4 and affected regressions\n        run: >-\n          python -m pytest -o addopts= -q\n          catalog/capabilities/tests\n          catalog/relay/tests/test_phase_f74_capability_dispatch.py\n          catalog/relay/tests/test_phase_f75_retry_cancellation.py\n          catalog/relay/tests/test_phase_f84_compute_worker_activation.py\n          catalog/federation/tests/test_phase0.py\n          catalog/federation/tests/test_phase1.py\n          catalog/federation/tests/test_phase2_unit.py\n      - name: Ruff F8.4 boundaries\n        run: >-\n          python -m ruff check\n          catalog/capabilities\n          catalog/relay/tests/test_phase_f84_compute_worker_activation.py\n          --ignore I001,RUF022,B008,C408,PLC0206,UP035\n      - name: Compose validation\n        run: docker compose config --quiet\n      - name: Diff hygiene\n        run: git diff --check origin/${{ github.base_ref || 'main' }}...HEAD"
+        }
+      ],
+      "os": [
+        "Linux",
+        "Windows"
+      ],
+      "replacement": "unchanged F8 closeout + release",
+      "trigger_mapping": "All remaining product/docs paths already trigger F8/release; independently prove before partial retirement.",
+      "lint_mapping": "Original F8.4 ignore set/scopes covered by unchanged release.",
+      "test_mapping": "F8 covers old full explicit set on both OS; release remains full Linux and selected Windows.",
+      "runtime_assumptions": {
+        "python": "existing pinned Python action: Linux3.12.13/Windows3.12.10",
+        "dependencies": "existing requirements.txt + constraints-phase2.txt; no product dependency changes",
+        "storage": "existing Linux storage precondition and native Windows long-path temp policy",
+        "services": "existing owned test fixtures and Compose config validation; no Recorder/runtime data",
+        "runners": [
+          "self-hosted/fcp-linux-fast",
+          "self-hosted/fcp-windows"
+        ]
+      },
+      "legacy_self_path": "After retirement the deleted file is not an input; retirement diff itself requires release and targeted replacement validation. No dangling legacy trigger reference retained.",
+      "retirement_status": "NOT YET AUTHORIZED BY EVIDENCE: needs exact replacement green runs and final reference checks"
+    }
+  ],
+  "proposed_trigger_probes": [
+    {
+      "path": "catalog/capabilities/analysis/content_store.py",
+      "f7_would_match": true
+    },
+    {
+      "path": "catalog/relay/tests/test_phase_f74_capability_dispatch.py",
+      "f7_would_match": true
+    },
+    {
+      "path": "catalog/relay/tests/test_phase_f75_retry_cancellation.py",
+      "f7_would_match": true
+    },
+    {
+      "path": "catalog/federation/object_transfer.py",
+      "f7_would_match": true
+    },
+    {
+      "path": "catalog/federation/resumable_chunk_transfer.py",
+      "f7_would_match": true
+    },
+    {
+      "path": "catalog/federation/tests/test_phase_f641_chunk_contract.py",
+      "f7_would_match": true
+    },
+    {
+      "path": "catalog/node/tests/test_phase_f642_verified_chunk_transfer.py",
+      "f7_would_match": true
+    },
+    {
+      "path": "catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py",
+      "f7_would_match": true
+    },
+    {
+      "path": "catalog/flask_app/static/js/ai-explainer.js",
+      "f7_would_match": true
+    },
+    {
+      "path": "catalog/flask_app/services/server_setup_service.py",
+      "f7_would_match": true
+    },
+    {
+      "path": "catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py",
+      "f7_would_match": true
+    }
+  ],
+  "proof_boundaries": [
+    "Static proposed mapping only; validate actual edited YAML later.",
+    "Real JS-only pull-request event required on a disposable non-release canary branch; no canary product change is merged.",
+    "Two full green native replacement matrix executions with source/workflow/command provenance before retirement.",
+    "Record every exact SHA and never relabel17ab or467 proof as migration-source qualification."
+  ],
+  "physical_acceptance": false,
+  "state_changed": false
+}
