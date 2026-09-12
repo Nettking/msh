@@ -2116,3 +2116,8 @@ once; active release remains untouched.
 source proofs recorded. Ten new-head dispatches total. Next: poll_pr463_state.py
 at next state check; retain newly completed native evidence only. Physical M,
 protected data and candidate status unchanged; no physical PASS or timed runs.
+
+02:52UTC: PR463 head2c1a8d93 unchanged, no reported failure. Automatic release
+has nine successes and ICSE two, with both parent runs still active. Next:
+retain newly terminal native logs; preserve9/37 plus2/3 exact-head proof and
+leave active workflows untouched. No new dispatch justified.
