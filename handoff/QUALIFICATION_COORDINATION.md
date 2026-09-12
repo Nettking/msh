@@ -2048,3 +2048,8 @@ No new defect, merge or physical change;465 remains qualified/merged.
 completed success; two release jobs, one exact-head sharding job and one CF7 job
 now successful. Next: retain new native logs and verify checkout before counting
 or filling the completed branding source gap. No duplicate or physical action.
+
+01:45UTC: native logs verify exact2c1a8d93 for sharding-Windows and CF7-Linux:
+required2/37 plus companion1/3. Completed branding proves synthetic2cc004b3;
+release jobs also synthetic and parent remains active. Next: dispatch only the
+completed branding exact-head gap; preserve all verified work.

@@ -39,7 +39,72 @@
         "2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee"
       ],
       "checkout_matches": true
+    },
+    {
+      "job_id": 103473479287,
+      "run_id": 34664467237,
+      "name": "Full-suite order (fixed)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 68315,
+      "sha256": "8a4a5defaa1e1ceb8c02380f15d501cfd67e2666a6d7d1de6b31200299682324",
+      "checkout_commits": [
+        "2cc004b3529ab3b0d99e10e1cdffbe1391f27231"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103473479380,
+      "run_id": 34664467237,
+      "name": "PostgreSQL storage release check",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 40713,
+      "sha256": "9126035b11651e72dd500ec1309f3df01f1b961f79f2c6f7707196e1eedb58f8",
+      "checkout_commits": [
+        "2cc004b3529ab3b0d99e10e1cdffbe1391f27231"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103475612973,
+      "run_id": 34665214234,
+      "name": "Shard contract (Windows, shared-pool)",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 26268,
+      "sha256": "57dc4b5d9e5e5529af6d72247187804958f7d33ce3cf0e3d31e4962cc32ccce7",
+      "checkout_commits": [
+        "2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103473479204,
+      "run_id": 34664467276,
+      "name": "product-branding",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 11330,
+      "sha256": "e00f06cc3b8af084e27b0a2979a2276169e4172c8ffeaa55ff5c8f0e14c0e33d",
+      "checkout_commits": [
+        "2cc004b3529ab3b0d99e10e1cdffbe1391f27231"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103473838845,
+      "run_id": 34664586934,
+      "name": "harness (Linux, fcp-linux-fast, bash)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 58416,
+      "sha256": "4fc7c50074201467b3e3715564f6d89a99dbbb07a955c0e99967ea4331277592",
+      "checkout_commits": [
+        "2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee"
+      ],
+      "checkout_matches": true
     }
   ],
-  "retained_at": "2026-09-12T01:33:45.399503+00:00"
+  "retained_at": "2026-09-12T01:45:18.909460+00:00"
 }
