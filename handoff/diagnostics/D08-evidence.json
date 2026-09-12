@@ -67,5 +67,6 @@
   "protected_recorder_data": "UNTOUCHED; no access or mutation by this diagnosis",
   "classification": "unresolved",
   "repair": "NONE",
-  "next_action": "Publish GitHub issue, then inspect exact-main content_store._path and concurrent scheduling fixture; focused isolated reproduction only"
+  "next_action": "Inspect exact-main content_store._path and concurrent scheduling fixture; focused isolated reproduction only",
+  "github_artifact": "https://github.com/Nettking/msh/issues/466"
 }
