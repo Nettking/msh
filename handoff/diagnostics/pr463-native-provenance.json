@@ -646,7 +646,85 @@
         "2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee"
       ],
       "checkout_matches": true
+    },
+    {
+      "job_id": 103489264468,
+      "run_id": 34669934632,
+      "name": "Full-suite order (rotating)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 68484,
+      "sha256": "069edfb775f558fa5bbefbe9544f1538cf409173dd0cc7bd58795cfb816d5925",
+      "checkout_commits": [
+        "2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103489264471,
+      "run_id": 34669934632,
+      "name": "Windows regressions (journal-artifacts)",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 53657,
+      "sha256": "c50f87f54f0593df46694f985e45aad7df960104632c4df78851fd7f565d1c92",
+      "checkout_commits": [
+        "2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103489264479,
+      "run_id": 34669934632,
+      "name": "Linux regression shard (2)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 61272,
+      "sha256": "a952e87c841316f5711c611af46f3c87f242088e216ecaa7c40448e9a7cfc36e",
+      "checkout_commits": [
+        "2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103489264485,
+      "run_id": 34669934632,
+      "name": "Linux regression shard (3)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 67314,
+      "sha256": "9756bf81a0a2c3493e188b1d289a840bf7e7bed1d3e5bf82e26b494a479a376b",
+      "checkout_commits": [
+        "2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103489294287,
+      "run_id": 34669945014,
+      "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 64714,
+      "sha256": "7bc14f090b91c1b89e543a9e48bf051ee89ac0e69ca5e12fe69853a9cac2dbde",
+      "checkout_commits": [
+        "2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103473850351,
+      "run_id": 34664590472,
+      "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 107932,
+      "sha256": "69b292d7f36f5ed9a199630d00d019703c5b0ee18f8091c6ed38d0b6bed0aa63",
+      "checkout_commits": [
+        "2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee"
+      ],
+      "checkout_matches": true
     }
   ],
-  "retained_at": "2026-09-12T03:30:56.367938+00:00"
+  "retained_at": "2026-09-12T03:42:22.838922+00:00"
 }
