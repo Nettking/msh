@@ -1921,3 +1921,9 @@ dispatch, defect, merge, candidate or physical state change.
 workflow completed; CF7B gained one success and release gained two. Next: retain
 only new terminal native logs and update source-verified counts. No dispatch,
 merge or physical change; remaining qualification runs are active.
+
+00:47UTC: four new native logs verify4749ab66: CF7B-Windows, update-Windows,
+release Linux checks and fixed suite order. Required native proof now20/37 plus
+3/3 companions. Preserve every completed job; no further dispatch is needed.
+Next: python -B handoff/diagnostics/poll_pr465_state.py at next state check;
+retain only newly completed evidence. Physical M and protected data unchanged.

@@ -620,7 +620,59 @@
         "4749ab6689315a7ad953c11ce4b2ec942433d71a"
       ],
       "checkout_matches": true
+    },
+    {
+      "job_id": 103464901160,
+      "run_id": 34661541571,
+      "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 72234,
+      "sha256": "f1292a025edbe5defbc18bd7f8ac3f71fff2c73d18e9712e1ebc7caceb5b3201",
+      "checkout_commits": [
+        "4749ab6689315a7ad953c11ce4b2ec942433d71a"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103458969834,
+      "run_id": 34659536814,
+      "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 67133,
+      "sha256": "d10371972f2782c66328ca5c05a2bdbec49ce11817c5cdb079fa8a88cd9cbaa5",
+      "checkout_commits": [
+        "4749ab6689315a7ad953c11ce4b2ec942433d71a"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103464860195,
+      "run_id": 34661528639,
+      "name": "Release checks (Linux)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 57191,
+      "sha256": "9971a38979500e3827732a350445d77b05b4a16c3cbf3332c642f0f37c8471f6",
+      "checkout_commits": [
+        "4749ab6689315a7ad953c11ce4b2ec942433d71a"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103464860262,
+      "run_id": 34661528639,
+      "name": "Full-suite order (fixed)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 70486,
+      "sha256": "c3881f633bc6a65c9e102906fb59523974125453c63877071d6cfe7112619848",
+      "checkout_commits": [
+        "4749ab6689315a7ad953c11ce4b2ec942433d71a"
+      ],
+      "checkout_matches": true
     }
   ],
-  "retained_at": "2026-09-12T00:35:44.623247+00:00"
+  "retained_at": "2026-09-12T00:46:47.016360+00:00"
 }
