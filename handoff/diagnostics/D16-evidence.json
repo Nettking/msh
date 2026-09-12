@@ -1,0 +1,31 @@
+{
+  "finding": "D16",
+  "status": "CONFIRMED",
+  "title": "Quorum authority refusal aborts session-authority fixture population before isolation",
+  "candidate_sha": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "actual_checkout": "a5e743fee24e27bfd8d6d4f57c8efd589c6c3a42",
+  "identical_tree": "1c671f446fa215c99a6a58a155806de394aa569a",
+  "hosts": "Beast native Windows runner",
+  "stage": "CI Windows journal-artifacts / session-authority fixture population",
+  "run_id": 34707260030,
+  "job_id": 103589446088,
+  "test": "catalog/federation/tests/test_control_plane_session_authority.py::test_reachable_isolated_leader_cannot_report_current_session_authority",
+  "command": "Checked-in federation-v1-release.yml Windows replicated journal and reviewer artifact regressions pytest selection; exact full command preserved in native job103589446088 log.",
+  "observed": "_populate calls owner.announce_capability and raises RelayRemoteError: actor_node_id: authorization rejected (federation-quorum-leader-required). Failure occurs before planned voter isolation. Job1failed296passed1skipped in355.47s.",
+  "expected": "Initial test-owned cluster establishes current quorum authority and populates capabilities; only subsequent deliberate voter isolation should make authority reads fail closed.",
+  "classification": "UNRESOLVED: authority guard refused; determine actual leader/quorum lifecycle or fixture readiness before any product/harness/host attribution",
+  "acceptance_impact": "Windows journal-artifacts check and dependent release gates blocked; intended isolated-leader assertion not reached.",
+  "safe_continuation": "YES: read-only fixture/runtime evidence and isolated test-owned reproduction; never bypass or relax quorum/authority guards",
+  "state_changed": "Original CI created temporary voter/relay/session fixtures under C:/fcp-qtmp; failed during setup, before intentional isolation. This diagnostic reads logs only; production topology untouched.",
+  "protected_recorder_data": "UNTOUCHED",
+  "physical_runtime": "UNCHANGED;9b286f931497bf6291e215f6340443c5162826b0",
+  "evidence": [
+    "pr475-ci-20260912T175749.json",
+    "pr475-completed-failures-native-retention.json",
+    "pr475-completed-failures-logs.zip (103589446088.log lines435-554)"
+  ],
+  "github_artifact": "PENDING immediate issue publication",
+  "repair": "NONE",
+  "next_diagnostic_action": "Retain journal-artifact JUnit and inspect _cluster readiness, _populate capability announcement and quorum guard evidence; compare existing same-source Linux/fixed passes. Reproduce only on ephemeral test fixtures if needed; do not retry full CI or weaken fail-closed behavior.",
+  "recorded_at": "2026-09-12T18:02:45.721843+00:00"
+}
