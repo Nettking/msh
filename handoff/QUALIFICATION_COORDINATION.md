@@ -1901,3 +1901,6 @@ Native source proof and dispatch ledger committed; no duplicate or physical chan
 
 00:24:40UTC: PR465 exact-head4749ab66 gap dispatched: icse-tool-demo.yml (HTTP204).
 Native source proof and dispatch ledger committed; no duplicate or physical change.
+
+00:24:47UTC: PR465 exact-head4749ab66 gap dispatched: cf7b-product-physical-acceptance.yml (HTTP204).
+Native source proof and dispatch ledger committed; no duplicate or physical change.
