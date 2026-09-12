@@ -1861,3 +1861,10 @@ check; no duplicate jobs, merge, deployment or physical acceptance claim.
 successes in exact-head F85/update/phase2 and three more automatic release jobs.
 No newly completed synthetic-source workflow. Next: retain new terminal native
 logs and update exact-head counts; do not duplicate active jobs.
+
+00:01UTC: six new native logs retained. Exact4749ab66 verified for F85-Linux,
+update-Linux and phase2-Windows (correcting the preceding phase2 platform label).
+Required proof is11/37 plus3/3 companions. Three release shards use synthetic
+2be67d18; release parent still active. No further dispatch justified. Next:
+poll_pr465_state.py at next state check, retaining only new terminal evidence.
+Physical M, PR463, protected data and timers remain unchanged.
