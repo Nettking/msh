@@ -14,6 +14,7 @@ from collections.abc import Iterator as TypingIterator
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from typing import BinaryIO
 
 from catalog.common.managed_temporary import (
     ManagedTemporaryFile,
@@ -23,6 +24,10 @@ from catalog.common.managed_temporary import (
 from catalog.federation.errors import FederationValidationError
 from catalog.federation.host_resources import ProcessResourceAdmission
 from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
+from catalog.federation.stable_filesystem import (
+    replace_preserving_readers,
+    stable_directory,
+)
 
 from ..artifact_contracts import _logical_key
 from .contracts import DEFAULT_MAX_SLICE_BYTES
@@ -84,7 +89,9 @@ class LocalArtifactContentStore:
     def exists(self, object_key: str) -> bool:
         return self.resolve(object_key).is_file()
 
-    def _atomic_write(self, destination: Path, chunks: Iterable[bytes]) -> ContentIdentity:
+    def _atomic_write(
+        self, destination: Path, chunks: Iterable[bytes]
+    ) -> ContentIdentity:
         destination.parent.mkdir(parents=True, exist_ok=True)
         digest = hashlib.sha256()
         size = 0
@@ -135,7 +142,7 @@ class LocalArtifactContentStore:
                     "object_key",
                     "artifact publication parent disappeared",
                 )
-            temporary.path.replace(destination)
+            replace_preserving_readers(temporary.path, destination)
         finally:
             if temporary is not None:
                 temporary.close()
@@ -190,6 +197,16 @@ class LocalArtifactContentStore:
         with self._write_reservation(destination, bytes_required=self.max_bytes):
             return self._atomic_write(destination, chunks)
 
+    @contextmanager
+    def _open_read(self, path: Path) -> Iterator[BinaryIO]:
+        # Readers retain the opened version while atomic publication replaces
+        # its name. The stable API includes FILE_SHARE_DELETE on Windows.
+        with (
+            stable_directory(self.root, path.parent.relative_to(self.root)) as parent,
+            parent.open_read(path.name) as handle,
+        ):
+            yield handle
+
     def identity(self, object_key: str) -> ContentIdentity:
         path = self.resolve(object_key)
         if not path.is_file():
@@ -198,7 +215,7 @@ class LocalArtifactContentStore:
             )
         digest = hashlib.sha256()
         size = 0
-        with path.open("rb") as handle:
+        with self._open_read(path) as handle:
             while chunk := handle.read(self.chunk_size):
                 size += len(chunk)
                 digest.update(chunk)
@@ -218,21 +235,21 @@ class LocalArtifactContentStore:
             raise FederationValidationError(
                 "analysis-artifact-missing", "object_key", "artifact body is not stored"
             )
-        actual_size = path.stat().st_size
-        if actual_size != size_bytes:
-            raise FederationValidationError(
-                "analysis-artifact-integrity-mismatch",
-                "size_bytes",
-                "stored artifact size differs from its registered identity",
-            )
-        if actual_size > self.max_bytes:
-            raise FederationValidationError(
-                "analysis-artifact-too-large",
-                "size_bytes",
-                f"must not exceed {self.max_bytes} bytes",
-            )
         digest = hashlib.sha256()
-        with path.open("rb") as handle:
+        with self._open_read(path) as handle:
+            actual_size = os.fstat(handle.fileno()).st_size
+            if actual_size != size_bytes:
+                raise FederationValidationError(
+                    "analysis-artifact-integrity-mismatch",
+                    "size_bytes",
+                    "stored artifact size differs from its registered identity",
+                )
+            if actual_size > self.max_bytes:
+                raise FederationValidationError(
+                    "analysis-artifact-too-large",
+                    "size_bytes",
+                    f"must not exceed {self.max_bytes} bytes",
+                )
             while chunk := handle.read(self.chunk_size):
                 digest.update(chunk)
                 yield chunk
@@ -264,12 +281,6 @@ class LocalArtifactContentStore:
             raise FederationValidationError(
                 "analysis-artifact-missing", "object_key", "artifact body is not stored"
             )
-        if path.stat().st_size != size_bytes:
-            raise FederationValidationError(
-                "analysis-artifact-integrity-mismatch",
-                "size_bytes",
-                "stored artifact size differs from its registered identity",
-            )
         if offset < 0 or length < 0 or offset + length > size_bytes:
             raise FederationValidationError(
                 "analysis-artifact-range-invalid",
@@ -282,7 +293,13 @@ class LocalArtifactContentStore:
                 "length",
                 "chunk length exceeds the configured transfer chunk size",
             )
-        with path.open("rb") as handle:
+        with self._open_read(path) as handle:
+            if os.fstat(handle.fileno()).st_size != size_bytes:
+                raise FederationValidationError(
+                    "analysis-artifact-integrity-mismatch",
+                    "size_bytes",
+                    "stored artifact size differs from its registered identity",
+                )
             handle.seek(offset)
             data = handle.read(length)
         if len(data) != length:
