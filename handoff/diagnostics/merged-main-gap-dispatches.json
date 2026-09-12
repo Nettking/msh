@@ -1,4 +1,16 @@
 {
   "source_commit": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
-  "dispatches": []
+  "dispatches": [
+    {
+      "workflow": "cf7-acceptance-harness.yml",
+      "source_commit": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
+      "ref": "main",
+      "requested_at": "2026-09-12T08:51:14.660848+00:00",
+      "workflow_sha256": "dc7a4143e27b6cb54a597897ccbfb7801f02149df675886d3f18f9aab1014bd6",
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
+    }
+  ]
 }
