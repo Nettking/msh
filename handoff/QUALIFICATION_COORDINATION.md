@@ -1,17 +1,15 @@
 # Federation v1 qualification coordination
 
-**Current actionable checkpoint (2026-09-12 01:22UTC):** PR465/D07 qualified37/37
-plus3/3 at4749ab6689315a7ad953c11ce4b2ec942433d71a and normally merged as
-`b6a96b218a513fe241ef4d6f051cf166444643ac`. Required D06 repair PR463 remains.
-PR463 integrated head is `2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee`, pushed clean;
-D06/D07 source blobs match their respective prior heads. Six absent gates were
-dispatched once; seven automatic workflows were queued. Next command:
-`python -B handoff/diagnostics/poll_pr463_state.py` with the documented audit Python.
-Qualify the new exact head; prior21/37 plus3/3 proof is archived as history.
-The head update includes the qualified D07 correction. Do not qualify intermediate main as the
-new release candidate. Qualify actual final main once after all required fixes merge.
-Physical admission remains stopped on M9b286f93; no repair deployment, physical
-PASS or timers. See the end of this document for chronological deltas.
+**Current actionable checkpoint (2026-09-12T04:12:06.620483+00:00):** PR463/D06 exact head
+`2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee` qualified37/37 plus3/3 and
+normally merged as **`2a9c9b8eb53edff74c2de23570ec56e054d29b22`**.
+PR465/D07 previously qualified and merged asb6a96b21. All required fixes are merged.
+Next: verify actual main and create a clean detached qualification checkout;
+retain existing push workflows, dispatch only absent required workflows once,
+and qualify actual final main2a9c9b8e. This SHA is not yet a frozen physical candidate.
+Do not requalify PR heads or intermediate main. Physical runtime remains
+M`9b286f931497bf6291e215f6340443c5162826b0`; admission stopped, no physical PASS
+or P07/P12 timers. Protected Recorder data unchanged. Chronological deltas follow.
 
 Current user direction, September 11 2026: execute on state changes, using this
 checkpoint and the completed diagnostic sweep report; do not repeat the sweep.
@@ -2185,3 +2183,9 @@ physical action. Next: state-change poll463 and retain new terminal evidence.
 04:10:38UTC: PR463 exact2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee QUALIFIED_REQUIRED_PR_HEAD_SCOPE,37/37+3/3. Final receipt reconciles38 native source checkouts, two dependency-only aggregates,4440 test identities,9 release artifacts and ICSE source1413 files. Audit-only inherited zero-skip assumption was corrected by exact AST/collection/native-summary accounting:157 focused Windows cases=150 pass+7 explicit Linux-only skips, proving three Recorder-launcher cases executed. No changed acceptance assertion/test/deadline or product defect;11 unchanged intentional POSIX exclusions match qualified M. Sole historical correctness thread resolved/outdated, backup source10s deadline unchanged. Next: fresh head/review/merge-policy check and normal PR463 merge; then qualify actual final main once. Physical admission still stopped onM, no timers.
 
 04:11UTC premerge: PR463 remains exact2c1a8d93, ready/non-draft, mergeable=true/clean, no nonpassing checks or requested reviewers. Sole historical comment/review matches the resolved D06-R1 finding; no unresolved current correctness findings. Actual main remainsb6a96b21. Main metadata reports unprotected; rules endpoint403 is the documented plan restriction. Normal merge only, no policy override. Next: publish exact-head qualification receipt on463 and merge with expected_head_sha guard.
+
+2026-09-12T04:12:06.620483+00:00: PR463 normal guarded merge succeeded as2a9c9b8eb53edff74c2de23570ec56e054d29b22;
+qualification comment5643376319 and merge result retained. Next exact action:
+fetch origin main, verify it equals the merge result, create a clean detached audit
+worktree, archive old M qualification aliases, and poll actual merged-main workflows.
+Only required absent gates may be dispatched; no physical deployment or candidate freeze yet.
