@@ -1,3 +1,4 @@
+// Disposable CI path-trigger canary; never merge this comment.
 (() => {
   const chat = document.querySelector("[data-ai-chat]");
   if (!chat) return;
