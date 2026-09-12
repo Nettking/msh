@@ -2149,3 +2149,7 @@ confirms14 synthetic2cc004b3 source jobs and two successful dependency-only
 aggregates with identical checked-in workflow. ICSE/update source jobs also
 prove synthetic. Old aggregate review archived by SHA. Next: dispatch only
 these three completed source gaps once (release,ICSE,update). No new defect.
+
+03:16:47UTC: integrated PR463 exact-head2c1a8d93 gap dispatched once:
+federation-v1-release.yml (HTTP204). Native proof and ledger preserved; no duplicate job or
+physical action. Next: state-change poll463 and retain new terminal evidence.
