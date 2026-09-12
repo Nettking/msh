@@ -1,0 +1,63 @@
+{
+  "recorded_at": "2026-09-12T19:20:42.851026+00:00",
+  "candidate_sha": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "native_log_clock_review": {
+    "file": "103589446004.log",
+    "timestamped_lines": 856,
+    "backward_log_timestamps": [
+      {
+        "line": 169,
+        "previous_line": 168,
+        "delta_seconds": -0.712003
+      }
+    ],
+    "count": 1,
+    "limitation": "Runner-emitted wall-clock timestamps only; absence of reversal does not rule out scheduling latency or application-level timing effects.",
+    "context": "Reversal occurs between dependency-step header line168 at17:07:22.7956907Z and first pip output line169 at17:07:22.0836879Z, before tests. Log emission/order or actual clock behavior is unproven; not an independent blocker or causal diagnosis."
+  },
+  "runners": [
+    {
+      "id": 31,
+      "name": "AQG7NCC-Linux",
+      "status": "offline",
+      "busy": false,
+      "labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "fcp-test-linux",
+        "fcp-docker-linux",
+        "aqg7ncc-linux-admission"
+      ]
+    },
+    {
+      "id": 30,
+      "name": "AQG7NCC-Windows",
+      "status": "offline",
+      "busy": false,
+      "labels": [
+        "self-hosted",
+        "X64",
+        "Windows",
+        "fcp-windows",
+        "aqg7ncc-admission"
+      ]
+    },
+    {
+      "id": 27,
+      "name": "Nettking-Linux",
+      "status": "offline",
+      "busy": false,
+      "labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "fcp-linux-fast",
+        "nettking-linux",
+        "fcp-test-linux",
+        "fcp-docker-linux"
+      ]
+    }
+  ],
+  "existing_admission": "aqg31-existing-admission-proof.json: original native shared-pool admission preserved; do not restore labels or rerun admission."
+}
