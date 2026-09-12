@@ -2053,3 +2053,8 @@ or filling the completed branding source gap. No duplicate or physical action.
 required2/37 plus companion1/3. Completed branding proves synthetic2cc004b3;
 release jobs also synthetic and parent remains active. Next: dispatch only the
 completed branding exact-head gap; preserve all verified work.
+
+01:45:46UTC: branding exact-head2c1a8d93 dispatched once (HTTP204). Eight
+new-head dispatches now recorded with source evidence. Next: poll_pr463_state.py
+on next state check and retain only new completed jobs. No new defect or physical
+change; required2/37 plus companion1/3 native PASS preserved.
