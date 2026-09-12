@@ -5,7 +5,7 @@ exact head84c66f8185c1411d9dc8c5c33244a2f564845ce7, clean repair checkout.
 Prequalification correctness/scope review completed with no findings;37+3 exact-head
 qualification active. Eight exact-head dispatches recorded once (seven absent gates
 plus completed branding source gap). Five original auto workflows remain active;
-Current native proof:2/37 required exact-head successes (06:12UTC); eleven
+Current native proof:4/37 required plus1/3 companions (06:24UTC); sixteen
 synthetic-source logs are separately retained and excluded. No required failure observed.
 Next command: audit Python -B handoff/diagnostics/poll_pr467_state.py; persist only
 material transitions, retain new terminal logs via retain_pr467_new_native_logs.py,
@@ -2306,3 +2306,5 @@ All current work is pushed; product/physical checkouts remain clean and unchange
 06:12UTC native retention: CF7-Linux and phase2-Linux verify exact84c66f8185c1411d9dc8c5c33244a2f564845ce7, now2/37 required jobs. Two new automatic release logs prove syntheticfcf8603b, bringing retained synthetic logs to11; no cross-SHA proof carried. Next exact command: audit Python -B handoff/diagnostics/poll_pr467_state.py; retain new terminal logs and dispatch remaining source gaps only after completed native evidence, with release aggregate review. No duplicate job or physical action.
 
 06:24UTC: PR467 remains exact84c66f8185c1411d9dc8c5c33244a2f564845ce7. Automatic CF7B and exact-head sharding workflows completed successfully; eight newly terminal jobs await native retention across release,F85,ICSE,CF7B,CFI2,sharding. No failing or missing workflow. Next: retain source proof, count only exact-head jobs and dispatch CF7B only if both completed native jobs prove synthetic source.
+
+06:24UTC native retention: three new logs verify exact84c66f81 (sharding2+CFI2-Linux), now4/37 required plus1/3companions; five auto logs prove syntheticfcf8603b. Completed CF7B run34676251391 has both native checkouts synthetic, establishing one exact-head source gap. Next: guarded CF7B-only dispatch via dispatch_pr467_completed_gap.py, persist response, then await state changes. No failure, duplicate job or physical action.
