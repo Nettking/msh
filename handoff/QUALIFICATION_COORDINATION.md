@@ -2199,3 +2199,5 @@ Only required absent gates may be dispatched; no physical deployment or candidat
 04:14:34UTC: absent final-main2a9c9b8e gate cf7c-physical-test-readiness.yml dispatched once; guarded request and response persisted in merged-main-gap-dispatches.json. Existing push evidence preserved; no physical action. Next: remaining absent gates, then state-change poll and native retention.
 
 04:14:39UTC: absent final-main2a9c9b8e gate cf8-role-retirement.yml dispatched once; guarded request and response persisted in merged-main-gap-dispatches.json. Existing push evidence preserved; no physical action. Next: remaining absent gates, then state-change poll and native retention.
+
+04:14:45UTC: absent final-main2a9c9b8e gate cfi2-onboarding-composition.yml dispatched once; guarded request and response persisted in merged-main-gap-dispatches.json. Existing push evidence preserved; no physical action. Next: remaining absent gates, then state-change poll and native retention.
