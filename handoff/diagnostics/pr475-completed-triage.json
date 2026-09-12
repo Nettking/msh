@@ -1,0 +1,40 @@
+{
+  "recorded_at": "2026-09-12T18:08:49.020524+00:00",
+  "candidate_sha": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "actual_checkout": "a5e743fee24e27bfd8d6d4f57c8efd589c6c3a42",
+  "all_automatic_runs_completed": true,
+  "passing_workflows": [
+    "branding34707260158",
+    "update34707260019",
+    "CF7-B34707260000",
+    "Phase234707260045",
+    "ICSE34707260068"
+  ],
+  "failed_workflow": "release34707260030",
+  "underlying_failed_jobs": [
+    103589446004,
+    103589446088
+  ],
+  "dependent_failed_aggregates": [
+    103592332907,
+    103593337711,
+    103593337825,
+    103593363809
+  ],
+  "findings": {
+    "D14": "#476 adapter start misses2s in rotating seed1702",
+    "D15": "#477 owner inspection403 after joins in same rotating run",
+    "D16": "#478 quorum guard refuses capability announcement during fixture setup before deliberate isolation"
+  },
+  "classification": "All three mechanisms recorded; product/harness/environment root causes unresolved. Do not merge or infer a D13 regression.",
+  "native_successes_retained": 19,
+  "raw_artifacts_retained_and_digest_verified": 16,
+  "artifact_review": "pr475-artifacts-reviewed.json",
+  "raw_evidence": "pr475-complete-native-artifacts.zip",
+  "review_state": "No submitted reviews or review threads at17:57Z; not itself a completed correctness review.",
+  "same_source_observations": "D14/D15 pass in fixed and shard2 and Windows capability; D16 passes rotating/fixed/shard0 Linux. D11 passes across4current executions, not a repair.",
+  "next": "Finish bounded unchanged-source D14/D15 isolated observer run. Capture actual forbidden code or benchmark run_errors if reproduced; preserve result/context and diagnose original-host/order dependencies. D16 fixture readiness/quorum observation remains next independent path. No complete-suite retry or new source edits.",
+  "physical_runtime": "UNCHANGED;9b286f93",
+  "protected_recorder_data": "UNTOUCHED",
+  "physical_acceptance": false
+}

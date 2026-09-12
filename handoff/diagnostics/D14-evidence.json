@@ -23,7 +23,9 @@
     "pr475-ci-20260912T175749.json",
     "pr475-completed-failures-native-retention.json",
     "pr475-completed-failures-logs.zip (103589446004.log lines461-544)",
-    "pr475-reviews-20260912T175749.json"
+    "pr475-reviews-20260912T175749.json",
+    "pr475-artifacts-reviewed.json",
+    "pr475-complete-native-artifacts.zip"
   ],
   "github_artifact": "https://github.com/Nettking/msh/issues/476",
   "repair": "NONE",
