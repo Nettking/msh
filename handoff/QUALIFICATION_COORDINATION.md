@@ -15,8 +15,8 @@ Next highest-value action: review native F7 replacement evidence for draft
 [PR468](https://github.com/Nettking/msh/pull/468), exact head
 f3abe5452db2f21593a688bc62bc5f4b22d5c40e. Stage1 extension is pushed;
 29 focused coverage-contract checks and lint/format/diff checks passed.
-Initial automatic F7 run34689990990 started correctly on Nettking native Windows
-and Nettking-Linux; Linux passed, Windows tests in progress at11:05Z. Preserve
+Automatic F7 run34689990990 completed green on Nettking native Windows
+and Nettking-Linux at11:07Z; native log/JUnit reconciliation is next. Preserve
 all automatic PR468 runs. Disposable JS-only PR469 is open against this migration branch. Its automatic
 F7 run34690234286 proves the path event, with unchanged workflow blob and just
 one inert JS comment. Native matrix queued at11:08Z. Never merge PR469. Next:
@@ -2466,3 +2466,12 @@ zero-step/runner0 annotations retained. Automatic replacement/release runs remai
 untouched. Next: inspect the two bounded F7 completions near their expected finish,
 retain/review native source/command/JUnit proofs, and keep long release checks hourly.
 No protected Recorder or physical state changed.
+
+## 2026-09-12T11:12Z — first replacement matrix completed green
+
+F7 run34689990990 completed success: Nettking-Linux job103543444377 and
+Nettking Windows job103543444464. PR source f3abe545, expected checkout
+b0fbb8a1a4e216b8696b8015a35594c1007319de; Git trees and workflow blob match.
+Receipt: diagnostics/ci-f7-replacement-runs-latest.json. Next retain/reconcile
+native logs and both JUnit artifacts before counting this as reviewed proof.
+Canary F7 run34690234286 is queued; no retry/duplicate dispatch.
