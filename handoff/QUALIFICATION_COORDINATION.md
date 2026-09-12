@@ -2101,3 +2101,8 @@ justified while remaining automatic parents are active.
 proof to7/37 plus companion2/3. ICSE-Linux uses synthetic2cc004b3 and parent
 remains active. Next: poll_pr463_state.py at next state check; retain only new
 terminal evidence. No extra dispatch, merge, defect or physical state change.
+
+02:41UTC: PR463 head2c1a8d93 unchanged, no reported failures. Automatic phase2
+and exact-head CF7 completed; CF7B and release each gained one success. Next:
+retain new terminal native evidence and verify completed phase2 source gap before
+any dispatch. Preserve required7/37 plus companion2/3.

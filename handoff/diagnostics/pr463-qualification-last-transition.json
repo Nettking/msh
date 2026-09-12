@@ -1,5 +1,5 @@
 {
-  "observed_at": "2026-09-12T02:30:21.649296+00:00",
+  "observed_at": "2026-09-12T02:41:22.923204+00:00",
   "changes": {
     "463": [
       {
@@ -10,16 +10,10 @@
         "conclusion": null,
         "jobs": [
           {
-            "id": 103481851157,
-            "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
-            "status": "queued",
-            "conclusion": null
-          },
-          {
             "id": 103481851242,
             "name": "acceptance (Linux, fcp-linux-fast, bash)",
-            "status": "queued",
-            "conclusion": null
+            "status": "completed",
+            "conclusion": "success"
           }
         ]
       },
@@ -33,36 +27,33 @@
           {
             "id": 103473479388,
             "name": "Full-suite order (rotating)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103473479487,
+            "name": "Windows regressions (capability-product)",
             "status": "in_progress",
+            "conclusion": null
+          },
+          {
+            "id": 103484305279,
+            "name": "Clean-checkout suite order independence",
+            "status": "queued",
             "conclusion": null
           }
         ]
       },
       {
-        "workflow": "icse-tool-demo.yml",
-        "run_id": 34664467253,
+        "workflow": "phase2-federation.yml",
+        "run_id": 34664467273,
         "event": "pull_request",
-        "status": "queued",
-        "conclusion": null,
-        "jobs": [
-          {
-            "id": 103473479609,
-            "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
-            "status": "completed",
-            "conclusion": "success"
-          }
-        ]
-      },
-      {
-        "workflow": "product-branding.yml",
-        "run_id": 34665765899,
-        "event": "workflow_dispatch",
         "status": "completed",
         "conclusion": "success",
         "jobs": [
           {
-            "id": 103477205459,
-            "name": "product-branding",
+            "id": 103473479330,
+            "name": "windows",
             "status": "completed",
             "conclusion": "success"
           }
@@ -72,27 +63,12 @@
         "workflow": "cf7-acceptance-harness.yml",
         "run_id": 34664586934,
         "event": "workflow_dispatch",
-        "status": "in_progress",
-        "conclusion": null,
+        "status": "completed",
+        "conclusion": "success",
         "jobs": [
           {
             "id": 103473838973,
             "name": "harness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Byp...",
-            "status": "in_progress",
-            "conclusion": null
-          }
-        ]
-      },
-      {
-        "workflow": "cf8-role-retirement.yml",
-        "run_id": 34664589243,
-        "event": "workflow_dispatch",
-        "status": "queued",
-        "conclusion": null,
-        "jobs": [
-          {
-            "id": 103473846451,
-            "name": "role-retirement (Linux, fcp-linux-fast, bash)",
             "status": "completed",
             "conclusion": "success"
           }
