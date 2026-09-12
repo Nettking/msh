@@ -1873,3 +1873,11 @@ Physical M, PR463, protected data and timers remain unchanged.
 run completed; automatic ICSE has three successful jobs and release twelve.
 Next: retain new terminal native logs, verify source before counting. No new
 dispatch while ICSE/release remain active; preserve all earlier evidence.
+
+00:12UTC: five new logs retained. Phase2-Linux proves exact4749ab66, bringing
+required native PASS to12/37 plus3/3 companions. Windows capability-product
+(including D07 regressions), journal-artifacts and ICSE-Windows succeeded on
+synthetic2be67d18; these are not exact-head qualification. Order-independence
+aggregate has no checkout and awaits dependency review with completed release.
+Next: poll_pr465_state.py on next state check; retain only new completions.
+No active-source gap dispatch, merge or physical change is justified now.

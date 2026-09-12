@@ -429,7 +429,70 @@
         "4749ab6689315a7ad953c11ce4b2ec942433d71a"
       ],
       "checkout_matches": true
+    },
+    {
+      "job_id": 103453726200,
+      "run_id": 34656348410,
+      "name": "Windows regressions (journal-artifacts)",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 52088,
+      "sha256": "fc8c152511bf8c6398465dd400c44b5482005c836ae8730107fdc66327763fb3",
+      "checkout_commits": [
+        "2be67d18c2c58bde4b4be09c2f7b97b6a42dd83c"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103453726216,
+      "run_id": 34656348410,
+      "name": "Windows regressions (capability-product)",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 59933,
+      "sha256": "97eb6539bf5d242275bb518817a4d9af9a83db8f7418f393ad47b8ffee7f58e8",
+      "checkout_commits": [
+        "2be67d18c2c58bde4b4be09c2f7b97b6a42dd83c"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103457898256,
+      "run_id": 34656348410,
+      "name": "Clean-checkout suite order independence",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 1101,
+      "sha256": "b1d78324d4e67a9d7cedf4534eb09010e07eaf3bacd52cf26461b41de1b0bff9",
+      "checkout_commits": [],
+      "checkout_matches": null
+    },
+    {
+      "job_id": 103449516273,
+      "run_id": 34656348432,
+      "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 53952,
+      "sha256": "c58571a10cf27c94a6de9b1c410af671e63e916505dfd0ba6b6d8ebf118c1804",
+      "checkout_commits": [
+        "2be67d18c2c58bde4b4be09c2f7b97b6a42dd83c"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103456873518,
+      "run_id": 34658824145,
+      "name": "linux",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 195516,
+      "sha256": "d55dc56bd22af074f24d0a2e2a6cce5b8f656ae9b0a222df1761cb741697161f",
+      "checkout_commits": [
+        "4749ab6689315a7ad953c11ce4b2ec942433d71a"
+      ],
+      "checkout_matches": true
     }
   ],
-  "retained_at": "2026-09-12T00:01:19.217850+00:00"
+  "retained_at": "2026-09-12T00:12:17.189057+00:00"
 }
