@@ -2038,3 +2038,8 @@ or deciding whether completed sharding needs an exact-head dispatch.
 01:34UTC: three native logs retained. CFI2-Linux verifies exact2c1a8d93 (required
 0/37, companion1/3). Both completed sharding jobs prove synthetic2cc004b3. Next:
 dispatch that sole demonstrated exact-head gap once; leave active runs untouched.
+
+01:34:15UTC: sharding exact-head2c1a8d93 dispatched once (HTTP204), with both
+synthetic source proofs in the ledger. Seven new-head dispatches total. Next:
+poll_pr463_state.py on next state check; retain only new terminal evidence.
+No new defect, merge or physical change;465 remains qualified/merged.
