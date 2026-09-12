@@ -2072,3 +2072,9 @@ evidence only. Active workflows remain untouched; physical M unchanged.
 completed; CF7C/F85 and automatic CF7B/update/release gained successes. Next:
 retain new terminal logs and verify source. No completed automatic source gap
 or new dispatch is indicated by this snapshot.
+
+02:08UTC: six new logs retained. Exact2c1a8d93 verified for sharding-Linux,
+CF7C-Linux and F85-Linux: required5/37 plus companion1/3 native PASS. CF7B/update
+Linux and release Windows checks use synthetic2cc004b3; their parents remain
+active. Next: poll_pr463_state.py at next state check; no additional dispatch,
+merge or physical change. All completed exact-head evidence preserved.
