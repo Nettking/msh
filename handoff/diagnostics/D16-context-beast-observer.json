@@ -1,0 +1,362 @@
+{
+  "diagnostic_only": true,
+  "exitstatus": 0,
+  "events": [
+    {
+      "stage": "pytest_setup",
+      "monotonic": 616850.468,
+      "nodeid": "catalog/federation/tests/test_control_plane_release_bootstrap_recovery.py::test_actual_release_voters_resume_interrupted_fresh_bootstrap[after-genesis]",
+      "outcome": "passed",
+      "duration": 0.0033587999641895294,
+      "threads": [
+        {
+          "name": "MainThread",
+          "daemon": false
+        }
+      ]
+    },
+    {
+      "stage": "pytest_call",
+      "monotonic": 616867.218,
+      "nodeid": "catalog/federation/tests/test_control_plane_release_bootstrap_recovery.py::test_actual_release_voters_resume_interrupted_fresh_bootstrap[after-genesis]",
+      "outcome": "passed",
+      "duration": 16.7435484000016,
+      "threads": [
+        {
+          "name": "MainThread",
+          "daemon": false
+        }
+      ]
+    },
+    {
+      "stage": "pytest_teardown",
+      "monotonic": 616867.234,
+      "nodeid": "catalog/federation/tests/test_control_plane_release_bootstrap_recovery.py::test_actual_release_voters_resume_interrupted_fresh_bootstrap[after-genesis]",
+      "outcome": "passed",
+      "duration": 0.000448299921117723,
+      "threads": [
+        {
+          "name": "MainThread",
+          "daemon": false
+        }
+      ]
+    },
+    {
+      "stage": "pytest_setup",
+      "monotonic": 616867.234,
+      "nodeid": "catalog/federation/tests/test_control_plane_release_bootstrap_recovery.py::test_actual_release_voters_resume_interrupted_fresh_bootstrap[after-journal-before-seal]",
+      "outcome": "passed",
+      "duration": 0.0023541999980807304,
+      "threads": [
+        {
+          "name": "MainThread",
+          "daemon": false
+        }
+      ]
+    },
+    {
+      "stage": "pytest_call",
+      "monotonic": 616883.046,
+      "nodeid": "catalog/federation/tests/test_control_plane_release_bootstrap_recovery.py::test_actual_release_voters_resume_interrupted_fresh_bootstrap[after-journal-before-seal]",
+      "outcome": "passed",
+      "duration": 15.809933600015938,
+      "threads": [
+        {
+          "name": "MainThread",
+          "daemon": false
+        }
+      ]
+    },
+    {
+      "stage": "pytest_teardown",
+      "monotonic": 616883.046,
+      "nodeid": "catalog/federation/tests/test_control_plane_release_bootstrap_recovery.py::test_actual_release_voters_resume_interrupted_fresh_bootstrap[after-journal-before-seal]",
+      "outcome": "passed",
+      "duration": 0.0015613998984917998,
+      "threads": [
+        {
+          "name": "MainThread",
+          "daemon": false
+        }
+      ]
+    },
+    {
+      "stage": "pytest_setup",
+      "monotonic": 616883.046,
+      "nodeid": "catalog/federation/tests/test_control_plane_witnessed_chunk_recovery.py::test_different_voter_completes_exact_witnessed_prefix_after_first_real_chunk",
+      "outcome": "passed",
+      "duration": 0.006652600015513599,
+      "threads": [
+        {
+          "name": "MainThread",
+          "daemon": false
+        }
+      ]
+    },
+    {
+      "stage": "pytest_call",
+      "monotonic": 616925.937,
+      "nodeid": "catalog/federation/tests/test_control_plane_witnessed_chunk_recovery.py::test_different_voter_completes_exact_witnessed_prefix_after_first_real_chunk",
+      "outcome": "passed",
+      "duration": 42.888643700047396,
+      "threads": [
+        {
+          "name": "MainThread",
+          "daemon": false
+        }
+      ]
+    },
+    {
+      "stage": "pytest_teardown",
+      "monotonic": 616925.937,
+      "nodeid": "catalog/federation/tests/test_control_plane_witnessed_chunk_recovery.py::test_different_voter_completes_exact_witnessed_prefix_after_first_real_chunk",
+      "outcome": "passed",
+      "duration": 0.00032410002313554287,
+      "threads": [
+        {
+          "name": "MainThread",
+          "daemon": false
+        }
+      ]
+    },
+    {
+      "stage": "pytest_setup",
+      "monotonic": 616925.953,
+      "nodeid": "catalog/federation/tests/test_control_plane_session_authority.py::test_reachable_isolated_leader_cannot_report_current_session_authority",
+      "outcome": "passed",
+      "duration": 0.0017194999381899834,
+      "threads": [
+        {
+          "name": "MainThread",
+          "daemon": false
+        }
+      ]
+    },
+    {
+      "stage": "populate_entry",
+      "monotonic": 616928.093,
+      "voters": [
+        {
+          "voter_id": "node-KLpMhFai8Hx_EVlwkX6LjCPMZ1WOF2yLolP_WP91Ygo",
+          "role": "LEADER",
+          "leader_id": "node-KLpMhFai8Hx_EVlwkX6LjCPMZ1WOF2yLolP_WP91Ygo",
+          "quorum": 2,
+          "ready": true,
+          "term": 1,
+          "commit_index": 3,
+          "last_applied": 3,
+          "lifecycle_error": null,
+          "quorum_failures": 0,
+          "last_leader_contact_age": 2.062999999965541,
+          "election_due_in": 2.9679999999934807,
+          "heartbeat_seconds": 1.0,
+          "election_timeout_seconds": 5.0,
+          "lifecycle_alive": true
+        },
+        {
+          "voter_id": "node-S1BjqQEhlbHL92gGZuj8cZi7sbXIAWGmRNMLnH4Z1Is",
+          "role": "FOLLOWER",
+          "leader_id": "node-KLpMhFai8Hx_EVlwkX6LjCPMZ1WOF2yLolP_WP91Ygo",
+          "quorum": 2,
+          "ready": true,
+          "term": 1,
+          "commit_index": 3,
+          "last_applied": 3,
+          "lifecycle_error": null,
+          "quorum_failures": 0,
+          "last_leader_contact_age": 0.062000000034458935,
+          "election_due_in": 7.172000000020489,
+          "heartbeat_seconds": 1.0,
+          "election_timeout_seconds": 5.0,
+          "lifecycle_alive": true
+        },
+        {
+          "voter_id": "node-Pb3_HQoEfK2RMm63uZjpudhWtmn9TckIviTVPRvsO4o",
+          "role": "FOLLOWER",
+          "leader_id": "node-KLpMhFai8Hx_EVlwkX6LjCPMZ1WOF2yLolP_WP91Ygo",
+          "quorum": 2,
+          "ready": true,
+          "term": 1,
+          "commit_index": 3,
+          "last_applied": 3,
+          "lifecycle_error": null,
+          "quorum_failures": 0,
+          "last_leader_contact_age": 0.0779999999795109,
+          "election_due_in": 5.391000000061467,
+          "heartbeat_seconds": 1.0,
+          "election_timeout_seconds": 5.0,
+          "lifecycle_alive": true
+        }
+      ]
+    },
+    {
+      "stage": "populate_complete",
+      "monotonic": 616933.0,
+      "voters": [
+        {
+          "voter_id": "node-KLpMhFai8Hx_EVlwkX6LjCPMZ1WOF2yLolP_WP91Ygo",
+          "role": "LEADER",
+          "leader_id": "node-KLpMhFai8Hx_EVlwkX6LjCPMZ1WOF2yLolP_WP91Ygo",
+          "quorum": 2,
+          "ready": true,
+          "term": 1,
+          "commit_index": 9,
+          "last_applied": 9,
+          "lifecycle_error": null,
+          "quorum_failures": 0,
+          "last_leader_contact_age": 6.969000000040978,
+          "election_due_in": -1.9380000000819564,
+          "heartbeat_seconds": 1.0,
+          "election_timeout_seconds": 5.0,
+          "lifecycle_alive": true
+        },
+        {
+          "voter_id": "node-S1BjqQEhlbHL92gGZuj8cZi7sbXIAWGmRNMLnH4Z1Is",
+          "role": "FOLLOWER",
+          "leader_id": "node-KLpMhFai8Hx_EVlwkX6LjCPMZ1WOF2yLolP_WP91Ygo",
+          "quorum": 2,
+          "ready": true,
+          "term": 1,
+          "commit_index": 9,
+          "last_applied": 9,
+          "lifecycle_error": null,
+          "quorum_failures": 0,
+          "last_leader_contact_age": 0.07900000002700835,
+          "election_due_in": 8.875,
+          "heartbeat_seconds": 1.0,
+          "election_timeout_seconds": 5.0,
+          "lifecycle_alive": true
+        },
+        {
+          "voter_id": "node-Pb3_HQoEfK2RMm63uZjpudhWtmn9TckIviTVPRvsO4o",
+          "role": "FOLLOWER",
+          "leader_id": "node-KLpMhFai8Hx_EVlwkX6LjCPMZ1WOF2yLolP_WP91Ygo",
+          "quorum": 2,
+          "ready": true,
+          "term": 1,
+          "commit_index": 9,
+          "last_applied": 9,
+          "lifecycle_error": null,
+          "quorum_failures": 0,
+          "last_leader_contact_age": 0.0940000000409782,
+          "election_due_in": 6.875,
+          "heartbeat_seconds": 1.0,
+          "election_timeout_seconds": 5.0,
+          "lifecycle_alive": true
+        }
+      ]
+    },
+    {
+      "stage": "quorum_guard_exception",
+      "monotonic": 616933.14,
+      "elapsed": 0.0,
+      "exception": "AuthorizationError",
+      "code": "federation-quorum-leader-required",
+      "text": "actor_node_id: operation requires the current replicated Federation leader (federation-quorum-leader-required)",
+      "runtime": {
+        "voter_id": "node-S1BjqQEhlbHL92gGZuj8cZi7sbXIAWGmRNMLnH4Z1Is",
+        "role": "FOLLOWER",
+        "leader_id": "node-KLpMhFai8Hx_EVlwkX6LjCPMZ1WOF2yLolP_WP91Ygo",
+        "quorum": 2,
+        "ready": true,
+        "term": 1,
+        "commit_index": 9,
+        "last_applied": 9,
+        "lifecycle_error": null,
+        "quorum_failures": 0,
+        "last_leader_contact_age": 0.030999999959021807,
+        "election_due_in": 8.73499999998603,
+        "heartbeat_seconds": 1.0,
+        "election_timeout_seconds": 5.0,
+        "lifecycle_alive": true
+      },
+      "running_voters": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "stage": "quorum_guard_exception",
+      "monotonic": 616936.109,
+      "elapsed": 1.047000000020489,
+      "exception": "QuorumUnavailable",
+      "code": null,
+      "text": "current leader cannot prove an authenticated voter quorum",
+      "runtime": {
+        "voter_id": "node-KLpMhFai8Hx_EVlwkX6LjCPMZ1WOF2yLolP_WP91Ygo",
+        "role": "LEADER",
+        "leader_id": "node-KLpMhFai8Hx_EVlwkX6LjCPMZ1WOF2yLolP_WP91Ygo",
+        "quorum": 2,
+        "ready": true,
+        "term": 1,
+        "commit_index": 9,
+        "last_applied": 9,
+        "lifecycle_error": null,
+        "quorum_failures": 0,
+        "last_leader_contact_age": 10.094000000040978,
+        "election_due_in": -5.063000000081956,
+        "heartbeat_seconds": 1.0,
+        "election_timeout_seconds": 5.0,
+        "lifecycle_alive": true
+      },
+      "running_voters": [
+        0
+      ]
+    },
+    {
+      "stage": "quorum_guard_exception",
+      "monotonic": 616938.218,
+      "elapsed": 1.0309999999590218,
+      "exception": "QuorumUnavailable",
+      "code": null,
+      "text": "current leader cannot prove an authenticated voter quorum",
+      "runtime": {
+        "voter_id": "node-KLpMhFai8Hx_EVlwkX6LjCPMZ1WOF2yLolP_WP91Ygo",
+        "role": "LEADER",
+        "leader_id": "node-KLpMhFai8Hx_EVlwkX6LjCPMZ1WOF2yLolP_WP91Ygo",
+        "quorum": 2,
+        "ready": true,
+        "term": 1,
+        "commit_index": 9,
+        "last_applied": 9,
+        "lifecycle_error": null,
+        "quorum_failures": 1,
+        "last_leader_contact_age": 12.202999999979511,
+        "election_due_in": -7.172000000020489,
+        "heartbeat_seconds": 1.0,
+        "election_timeout_seconds": 5.0,
+        "lifecycle_alive": true
+      },
+      "running_voters": [
+        0
+      ]
+    },
+    {
+      "stage": "pytest_call",
+      "monotonic": 616940.437,
+      "nodeid": "catalog/federation/tests/test_control_plane_session_authority.py::test_reachable_isolated_leader_cannot_report_current_session_authority",
+      "outcome": "passed",
+      "duration": 14.487952499999665,
+      "threads": [
+        {
+          "name": "MainThread",
+          "daemon": false
+        }
+      ]
+    },
+    {
+      "stage": "pytest_teardown",
+      "monotonic": 616940.437,
+      "nodeid": "catalog/federation/tests/test_control_plane_session_authority.py::test_reachable_isolated_leader_cannot_report_current_session_authority",
+      "outcome": "passed",
+      "duration": 0.0002516999375075102,
+      "threads": [
+        {
+          "name": "MainThread",
+          "daemon": false
+        }
+      ]
+    }
+  ]
+}

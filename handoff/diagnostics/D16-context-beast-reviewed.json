@@ -1,0 +1,25 @@
+{
+  "recorded_at": "2026-09-12T19:11:37.978739+00:00",
+  "finding": "D16",
+  "candidate_sha": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "control_sha": "b24cb974121d78cc8d6618c0dd31d085848e9016",
+  "run": 34712968492,
+  "job": 103604969296,
+  "host": "Beast / native Windows / Python3.12.10 / NetworkService S-1-5-20",
+  "result": "4PASS in original predecessor order, process92.172s; D16 JUnit14.490s. Candidate source clean before/after.",
+  "observations": "All4test teardown snapshots show only MainThread; no D16 lifecycle-round exception; population retains voter0 leader,3ready voters,term1,commit/applied3to9.",
+  "classification": "NON-REPRODUCTION; D16 original failure and unresolved root cause retained. No observed predecessor thread residue in this execution.",
+  "limitations": "Four-case context, not the full174earlier tests or original host load. Forwarding observer may perturb timing. No release/physical qualification inference.",
+  "next": "Stop repeated D16 isolated/short-context runs. Shift to D14/D15 order/error evidence on unchanged source and test-owned fixtures.",
+  "evidence": [
+    "D16-context-beast-native-artifact.zip",
+    "D16-context-beast-native-logs.zip",
+    "D16-context-beast-native-retention.json",
+    "D16-context-beast-raw-artifact-retention.json",
+    "D16-context-beast-observer.json",
+    "D16-context-beast-receipt.json",
+    "D16-context-beast-host.json"
+  ],
+  "protected_recorder_data": "UNTOUCHED",
+  "physical_runtime": "UNCHANGED; no physical PASS/P07/P12"
+}

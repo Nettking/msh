@@ -1,0 +1,19 @@
+{
+  "source_commit": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "retained_at": "2026-09-12T19:10:36.472453+00:00",
+  "records": [
+    {
+      "job_id": 103604969296,
+      "run_id": 34712968492,
+      "name": "original-beast",
+      "runner_name": "Beast",
+      "conclusion": "success",
+      "bytes": 42761,
+      "sha256": "9a54e96e16eb22adc40736e92fbf5a87e50421481f96bc56221243fd5cb32a29",
+      "checkout_commits": [
+        "5e6f184311019b9982e8544a18f3dc02c1b16e98"
+      ],
+      "checkout_matches": true
+    }
+  ]
+}

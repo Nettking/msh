@@ -1,0 +1,14 @@
+{
+  "recorded_at": "2026-09-12T19:10:37.140643+00:00",
+  "records": [
+    {
+      "run_id": 34712968492,
+      "id": 10304360316,
+      "name": "d16-original-beast-34712968492-1",
+      "digest": "sha256:6f585d23eb4239898fb94d0085bffe827a355ede8b7ccff0aa37b61ae936102b",
+      "bytes": 7962,
+      "created_at": "2026-09-12T19:05:44Z",
+      "api_workflow_head": "b24cb974121d78cc8d6618c0dd31d085848e9016"
+    }
+  ]
+}

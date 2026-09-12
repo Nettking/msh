@@ -1,0 +1,50 @@
+{
+  "recorded_at": "2026-09-12T19:04:10.647318+00:00",
+  "candidate_sha": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "tree": "1c671f446fa215c99a6a58a155806de394aa569a",
+  "control_sha": "b24cb974121d78cc8d6618c0dd31d085848e9016",
+  "run_id": "34712968492",
+  "host": "Beast",
+  "runner": "Beast",
+  "python": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+  "executable": "C:\\actions-runner\\_work\\_temp\\fcp-python-d51ab149f86a44b3a21888ae4b66a1ba\\Scripts\\python.exe",
+  "source": "C:\\actions-runner\\_work\\msh\\msh",
+  "owned_tmp": "C:\\fcp-qtmp\\d16-f063b97de4874fd5",
+  "diagnostic_only": true,
+  "protected_recorder_data": "UNTOUCHED",
+  "physical_runtime": "UNCHANGED",
+  "observer_sha256": "bebd2cc1da001f4d12db82c5dcce19730bc6fa23b572dffce6830dfc13125159",
+  "context_mode": true,
+  "executions": [
+    {
+      "mode": "context",
+      "command": [
+        "C:\\actions-runner\\_work\\_temp\\fcp-python-d51ab149f86a44b3a21888ae4b66a1ba\\Scripts\\python.exe",
+        "-B",
+        "-m",
+        "pytest",
+        "-o",
+        "addopts=",
+        "-p",
+        "no:cacheprovider",
+        "-q",
+        "--durations=5",
+        "--basetemp=C:\\fcp-qtmp\\d16-f063b97de4874fd5\\context",
+        "--junitxml=C:\\actions-runner\\_work\\_temp\\d16-evidence-34712968492-1\\context.xml",
+        "-p",
+        "d16_beast_observer",
+        "catalog/federation/tests/test_control_plane_release_bootstrap_recovery.py::test_actual_release_voters_resume_interrupted_fresh_bootstrap[after-genesis]",
+        "catalog/federation/tests/test_control_plane_release_bootstrap_recovery.py::test_actual_release_voters_resume_interrupted_fresh_bootstrap[after-journal-before-seal]",
+        "catalog/federation/tests/test_control_plane_witnessed_chunk_recovery.py::test_different_voter_completes_exact_witnessed_prefix_after_first_real_chunk",
+        "catalog/federation/tests/test_control_plane_session_authority.py::test_reachable_isolated_leader_cannot_report_current_session_authority",
+        "-x"
+      ],
+      "timeout_seconds": 300,
+      "returncode": 0,
+      "elapsed_seconds": 92.17200000002049
+    }
+  ],
+  "final_sha": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "final_tracked_status": "",
+  "completed_at": "2026-09-12T19:05:42.911813+00:00"
+}
