@@ -2132,3 +2132,8 @@ No extra jobs, merge, deployment or protected Recorder-data operation.
 phase2 gained one success and automatic release two. No failed jobs. Next:
 retain new terminal native logs and verify checkout. Other parents remain active;
 no additional dispatch is justified yet.
+
+03:04UTC: phase2-Linux and CFI2-Windows native logs verify2c1a8d93, bringing
+required proof to10/37 and companions to3/3. Two release jobs prove synthetic
+2cc004b3; parent remains active. Next: poll_pr463_state.py at next state check;
+retain newly completed evidence only. No rerun, merge or physical state change.
