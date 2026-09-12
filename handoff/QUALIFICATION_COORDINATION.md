@@ -2293,3 +2293,5 @@ All current work is pushed; product/physical checkouts remain clean and unchange
 05:59:42UTC: absent PR467 exact84c66f81 gate phase2-federation.yml dispatched once after scope/correctness review; request/response persisted in pr467-gap-dispatch-ledger.json. Existing native proof preserved; no physical action. Next: remaining absent gates, completed branding source gap, then state-change poll467 and new-log retention.
 
 05:59:48UTC: absent PR467 exact84c66f81 gate release-image-metadata.yml dispatched once after scope/correctness review; request/response persisted in pr467-gap-dispatch-ledger.json. Existing native proof preserved; no physical action. Next: remaining absent gates, completed branding source gap, then state-change poll467 and new-log retention.
+
+05:59:54UTC: PR467 branding completed synthetic-source gap dispatched once on exact84c66f81 after native proof. No existing valid job rerun. Next: state-change poll467, retain new terminal logs and fill remaining auto-source gaps only after completion/proof; review current findings before merge.
