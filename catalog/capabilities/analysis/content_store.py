@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import stat
 from collections.abc import Iterable, Iterator
 from collections.abc import Iterator as TypingIterator
 from contextlib import ExitStack, contextmanager
@@ -77,7 +78,27 @@ class LocalArtifactContentStore:
         """Return the on-disk path for one logical key, never escaping the root."""
 
         key = _logical_key(object_key, "object_key")
-        candidate = (self.root / key).resolve()
+        candidate = self.root / key
+        if os.name == "nt" and candidate != self.root:
+            try:
+                reparse = bool(
+                    candidate.lstat().st_file_attributes
+                    & stat.FILE_ATTRIBUTE_REPARSE_POINT
+                )
+            except FileNotFoundError:
+                reparse = False
+            # A regular leaf can be atomically replaced while Windows resolves
+            # its opened object name, yielding an NTFS deleted-file name. Resolve
+            # the parent instead; actual reparse entries still need full target
+            # resolution and the same containment check below. Reads/publication
+            # retain their existing pinned-parent and no-follow handle checks.
+            candidate = (
+                candidate.resolve()
+                if reparse
+                else candidate.parent.resolve() / candidate.name
+            )
+        else:
+            candidate = candidate.resolve()
         if candidate != self.root and self.root not in candidate.parents:
             raise FederationValidationError(
                 "artifact-object-key-escape",
