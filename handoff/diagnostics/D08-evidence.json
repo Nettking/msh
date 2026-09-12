@@ -1,7 +1,7 @@
 {
   "recorded_at": "2026-09-12T05:17:05.862654+00:00",
   "finding": "D08",
-  "status": "CONFIRMED_QUALIFICATION_FAILURE_ROOT_CAUSE_UNRESOLVED",
+  "status": "CONFIRMED",
   "source_commit": "2a9c9b8eb53edff74c2de23570ec56e054d29b22",
   "host": "Nettking",
   "operating_context": "self-hosted Windows CI; NETTKING$ temporary pytest fixture",
@@ -65,8 +65,10 @@
   ],
   "state_changed": "CI checkout and owned temporary test fixtures only; no physical runtime deployment",
   "protected_recorder_data": "UNTOUCHED; no access or mutation by this diagnosis",
-  "classification": "unresolved",
+  "classification": "product",
   "repair": "NONE",
-  "next_action": "Inspect exact-main content_store._path and concurrent scheduling fixture; focused isolated reproduction only",
-  "github_artifact": "https://github.com/Nettking/msh/issues/466"
+  "next_action": "Inspect resolve callers and root/symlink contracts, then isolated regression and narrow repair branch",
+  "github_artifact": "https://github.com/Nettking/msh/issues/466",
+  "immediate_mechanism": "Windows POSIX replacement moves old object into NTFS $Extend/$Deleted during full-leaf Path.resolve; valid logical key is rejected by root containment guard",
+  "focused_evidence": "D08-focused-resolve.json"
 }

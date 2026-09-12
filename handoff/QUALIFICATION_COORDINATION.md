@@ -8,7 +8,7 @@ Clean detached qualification checkout is verified. All13 workflows are running o
 completed (six existing push runs plus seven single guarded dispatches). Next:
 poll_merged_main_state.py, retain only new native logs, then final artifact review.
 Current result:36/37 required successful, F85-Windows FAILED;3/3 companions successful.
-D08 immediate error: concurrent analysis artifact-object-key-escape; classification unresolved.
+D08 immediate error: concurrent analysis artifact-object-key-escape; confirmed Windows leaf-resolution/publication race (D08/#466).
 Main2a9c9b8e is not yet qualified or frozen as a physical candidate.
 Do not requalify PR heads or intermediate main. Physical runtime remains
 M`9b286f931497bf6291e215f6340443c5162826b0`; admission stopped, no physical PASS
@@ -2242,3 +2242,5 @@ Only required absent gates may be dispatched; no physical deployment or candidat
 2026-09-12T05:17:05.862654+00:00: D08 confirmed required qualification failure persisted with exact command, native checkout/hash and traceback. F85-Windows actual2a9 main reports artifact-object-key-escape from concurrent analysis;1 failed,728 passed,1 skipped. Independent product root cause not established; no blind rerun. Next: publish GitHub issue referencing diagnostics/D08.md and D08-evidence.json, then inspect exact-source mechanism. Protected Recorder data and all physical runtimes untouched.
 
 05:17UTC: D08 published as GitHub issue466 with source-bound evidence and impact. Next: exact-main path-validation/concurrent scheduling analysis; only isolated owned-fixture repro if justified. Do not retry F85 or create/qualify a new candidate until failure classification establishes the appropriate action.
+
+05:19UTC D08 product mechanism confirmed on clean actual main: public store concurrent writes/resolve with old stream open returns NTFS $Extend/$Deleted path from Path.resolve for valid key, triggering artifact-object-key-escape. Focused13 writes/1396 resolves/two captured errors; exact frames retained. No source modification, external state, protected data or physical runtime touched. Next: update issue466 with focused evidence, inspect resolve callers/symlink guard contracts, then isolated D08 regression/repair branch. No F85 retry, final-main PASS, candidate freeze or physical admission.

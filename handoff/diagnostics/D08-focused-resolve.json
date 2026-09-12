@@ -1,0 +1,41 @@
+{
+  "recorded_at": "2026-09-12T05:19:46.425638+00:00",
+  "source_commit": "2a9c9b8eb53edff74c2de23570ec56e054d29b22",
+  "diagnostic_only": true,
+  "source_modified": false,
+  "command": "audit Python -B handoff/diagnostics/reproduce_d08_resolve.py",
+  "owned_root": "C:\\wsl\\fcp-v1-fba508-nettking-20260910\\.acceptance\\d08-resolve-ku191byw",
+  "counts": {
+    "writes": 13,
+    "resolves": 1396
+  },
+  "failures": [
+    {
+      "root": "\\\\?\\C:\\wsl\\fcp-v1-fba508-nettking-20260910\\.acceptance\\d08-resolve-ku191byw\\artifacts",
+      "key": "analysis/session/work/plan.json",
+      "candidate": "\\\\?\\C:\\$Extend\\$Deleted\\04E30000003ACE336FB9446F",
+      "error": "object_key: resolved outside the artifact content root (artifact-object-key-escape)"
+    },
+    {
+      "root": "\\\\?\\C:\\wsl\\fcp-v1-fba508-nettking-20260910\\.acceptance\\d08-resolve-ku191byw\\artifacts",
+      "key": "analysis/session/work/plan.json",
+      "candidate": "\\\\?\\C:\\$Extend\\$Deleted\\04E30000003ACE336FB9446F",
+      "error": "object_key: resolved outside the artifact content root (artifact-object-key-escape)"
+    }
+  ],
+  "exceptions": [
+    {
+      "thread": "reader",
+      "type": "FederationValidationError",
+      "error": "object_key: resolved outside the artifact content root (artifact-object-key-escape)"
+    },
+    {
+      "thread": "reader",
+      "type": "FederationValidationError",
+      "error": "object_key: resolved outside the artifact content root (artifact-object-key-escape)"
+    }
+  ],
+  "script_sha256": "0ae11dccafb8aac793c6273e4790b3adf6aecbc46347a965b45262d129e42bc1",
+  "protected_recorder_data": "UNTOUCHED",
+  "physical_runtime_changed": false
+}
