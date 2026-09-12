@@ -2029,3 +2029,8 @@ head2c1a8d93. All six absent-gate dispatches confirmed/pushed; no active local
 execution remains. Next: state-change poll463, retain new native evidence, then
 normal merge when qualified/reviewed and final actual-main qualification once.
 Do not poll or requalify merged465. Physical M/protected Recorder data unchanged.
+
+01:33UTC: PR463 integrated head2c1a8d93 unchanged. Automatic sharding completed
+success2/2; one CFI2 companion succeeded. All required workflows exist, no
+reported failure. Next: retain new native logs and verify source before counting
+or deciding whether completed sharding needs an exact-head dispatch.
