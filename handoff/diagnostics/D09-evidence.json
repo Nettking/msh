@@ -1,0 +1,77 @@
+{
+  "finding": "D09",
+  "status": "CONFIRMED",
+  "recorded_at": "2026-09-12T12:01:03.558120+00:00",
+  "candidate_sha": "f3abe5452db2f21593a688bc62bc5f4b22d5c40e",
+  "hosts": [
+    "Nettking-Linux (self-hosted CI, runner27)"
+  ],
+  "physical_stage": "NONE; CI migration product-branding check",
+  "command": "python scripts/check_product_branding.py",
+  "observed": "exit1: retired product spelling in file: docs/implementation/f7_ci_consolidation.md",
+  "expected": "exit0 without retired product spellings in new documentation",
+  "classification": "CI migration documentation regression; branding harness is correct, not a runtime or hosted-billing failure",
+  "mechanism": "Two repository-URL links in the new document contain the prohibited repository slug; the file has no scoped exception. Do not weaken the checker or add an exception.",
+  "acceptance_impact": "PR468 cannot merge as-is; completed main17ab qualification and first F7 proof remain valid for their exact sources; no physical acceptance",
+  "safe_continuation": "YES: preserve running immutable CI and develop a documentation-only correction on a separate branch; do not update PR468/469 source while doing so would cancel their valid active jobs",
+  "records": [
+    {
+      "pr": 468,
+      "run_id": 34689990970,
+      "job_id": 103543444121,
+      "head_sha": "f3abe5452db2f21593a688bc62bc5f4b22d5c40e",
+      "checkout_sha": "b0fbb8a1a4e216b8696b8015a35594c1007319de",
+      "log_receipt": {
+        "job_id": 103543444121,
+        "run_id": 34689990970,
+        "name": "product-branding",
+        "runner_name": "Nettking-Linux",
+        "conclusion": "failure",
+        "bytes": 15006,
+        "sha256": "42f8343b0a7756d3a8e27d4098757a11cec141da4fd057f572945f4055236ec2",
+        "checkout_commits": [
+          "b0fbb8a1a4e216b8696b8015a35594c1007319de"
+        ],
+        "checkout_matches": true
+      },
+      "error_excerpts": [
+        "2026-09-12T11:40:35.0783950Z ##[group]Run python scripts/check_product_branding.py",
+        "2026-09-12T11:40:35.0784482Z \u001b[36;1mpython scripts/check_product_branding.py\u001b[0m",
+        "2026-09-12T11:40:35.9432849Z retired product spelling in file: docs/implementation/f7_ci_consolidation.md",
+        "2026-09-12T11:40:35.9554400Z ##[error]Process completed with exit code 1."
+      ]
+    },
+    {
+      "pr": 469,
+      "run_id": 34690234307,
+      "job_id": 103544075485,
+      "head_sha": "660bf23269893305c7e8ffcc4c910a7efaed567d",
+      "checkout_sha": "aa7b41d328d8d6cab756951ec8739a370099756b",
+      "log_receipt": {
+        "job_id": 103544075485,
+        "run_id": 34690234307,
+        "name": "product-branding",
+        "runner_name": "Nettking-Linux",
+        "conclusion": "failure",
+        "bytes": 13526,
+        "sha256": "72d5795e7397b2fee2b212bb320525bafa2f18acc37ce8b23915da0545a64ad5",
+        "checkout_commits": [
+          "aa7b41d328d8d6cab756951ec8739a370099756b"
+        ],
+        "checkout_matches": true
+      },
+      "error_excerpts": [
+        "2026-09-12T11:44:16.2811650Z ##[group]Run python scripts/check_product_branding.py",
+        "2026-09-12T11:44:16.2812146Z \u001b[36;1mpython scripts/check_product_branding.py\u001b[0m",
+        "2026-09-12T11:44:16.6561574Z retired product spelling in file: docs/implementation/f7_ci_consolidation.md",
+        "2026-09-12T11:44:16.6652580Z ##[error]Process completed with exit code 1."
+      ]
+    }
+  ],
+  "state_changed": "CI-owned checkout/venv only; investigation read-only",
+  "protected_recorder_data": "UNTOUCHED",
+  "physical_runtime_sha": "9b286f931497bf6291e215f6340443c5162826b0",
+  "github_artifact": "https://github.com/Nettking/msh/pull/468",
+  "repair": "planned documentation-only branch; not yet developed",
+  "next_action": "Replace the two raw repository URLs with explicit coordination branch/path references; run unchanged branding checker and diff hygiene; push isolated repair branch and link from draft PR468. Promote to PR468 only after existing runs finish."
+}

@@ -11,18 +11,17 @@ all17 D08 cases across native platforms, original scheduler failure and explicit
 platform exclusions reconciled. No job was rerun for historical hosted billing reds.
 All prior PR/failed-main evidence retained under its own source. No further17ab CI
 polling or qualification is needed unless a concrete new contract reason appears.
-Next highest-value action: review native F7 replacement evidence for draft
-[PR468](https://github.com/Nettking/msh/pull/468), exact head
-f3abe5452db2f21593a688bc62bc5f4b22d5c40e. Stage1 extension is pushed;
-29 focused coverage-contract checks and lint/format/diff checks passed.
-Automatic F7 run34689990990 completed green on Nettking native Windows
-and Nettking-Linux at11:07Z; native logs/JUnit are now reconciled (1 of 2 required green runs). Preserve
-all automatic PR468 runs. Disposable JS-only PR469 is open against this migration branch. Its automatic
-F7 run34690234286 proves the path event, with unchanged workflow blob and just
-one inert JS comment. Native matrix queued at11:08Z. Never merge PR469. Next:
-review queued canary F7 run34690234286 at the next scheduled check; retain the
-completed PR468 proof unchanged (diagnostics/ci-f7-pr468-native-proof.json).
-Two complete green native executions are still required before retirement.
+Next highest-value action: resolve the CI-only documentation blocker D09 in draft
+PR468 (current head f3abe5452db2f21593a688bc62bc5f4b22d5c40e). The unchanged
+branding check rejects two repository URLs in the new migration document.
+Evidence: diagnostics/D09.md. Prepare/push a docs-only repair on a separate branch;
+do not update current PR468/469 heads while their automatic runs are active.
+Keep the checker and all workflow/product semantics unchanged.
+First F7 native proof remains reviewed green. JS-only canary PR469/run34690234286
+has Linux green and Windows queued at11:57Z; no second complete proof yet.
+PR468 F6/F8 and Phase2 pairs are green; both PRs have active/queued release work
+with no release failure at the snapshot. Preserve all running/completed evidence.
+Hourly snapshot: diagnostics/ci-migration-auto-runs-20260912T1157.json.
 No duplicate37-job dispatch is needed for replacement proof. F7 jobs have30min
 limits; check near expected completion, long release jobs no sooner than45-60min.
 Plan: CI_COVERAGE_MIGRATION_PLAN.md; mapping: diagnostics/ci-migration-equivalence-matrix.json.
@@ -2504,3 +2503,12 @@ Protected Recorder data untouched; no candidate freeze or physical PASS/P07/P12.
 
 PR468 proof comment: https://github.com/Nettking/msh/pull/468#issuecomment-5645545367 . Heartbeat updated to this
 checkpoint; next scheduled inspection11:55Z, quiet unless actionable.
+
+## 2026-09-12T12:01:03.558120+00:00 — D09 confirmed before repair
+
+New independent CI documentation blocker recorded in the accumulating table and
+D09 evidence. Native branding executed and failed on both source-bound PRs; do
+not group it with zero-step hosted billing reds. The two new document URLs are
+the immediate cause. Next: isolated docs-only correction and unchanged focused
+branding check; keep active PR heads stable until automatic CI finishes.
+Canary Linux F7 has completed green; Windows remains queued. No physical changes.
