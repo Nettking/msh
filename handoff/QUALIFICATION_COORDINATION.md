@@ -2034,3 +2034,7 @@ Do not poll or requalify merged465. Physical M/protected Recorder data unchanged
 success2/2; one CFI2 companion succeeded. All required workflows exist, no
 reported failure. Next: retain new native logs and verify source before counting
 or deciding whether completed sharding needs an exact-head dispatch.
+
+01:34UTC: three native logs retained. CFI2-Linux verifies exact2c1a8d93 (required
+0/37, companion1/3). Both completed sharding jobs prove synthetic2cc004b3. Next:
+dispatch that sole demonstrated exact-head gap once; leave active runs untouched.

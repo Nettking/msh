@@ -1,1 +1,45 @@
-{"source_commit":"2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee","records":[]}
+{
+  "source_commit": "2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee",
+  "records": [
+    {
+      "job_id": 103473479504,
+      "run_id": 34664467275,
+      "name": "Shard contract (Windows, shared-pool)",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 25552,
+      "sha256": "f35bc893c451f345fdcffcc79b61c4622e5a366400738045a2e6bc05c5c0fbb6",
+      "checkout_commits": [
+        "2cc004b3529ab3b0d99e10e1cdffbe1391f27231"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103473479647,
+      "run_id": 34664467275,
+      "name": "Shard contract (Linux, shared-pool)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 31919,
+      "sha256": "cd2985a97e06f551865ee19fd9d5160a3c711a5e579326cf5d5efd39d331c348",
+      "checkout_commits": [
+        "2cc004b3529ab3b0d99e10e1cdffbe1391f27231"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103473852910,
+      "run_id": 34664591540,
+      "name": "onboarding (Linux, fcp-test-linux, bash, 3.12.13)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 58414,
+      "sha256": "bb68bf9df6d2905cd174871155c2f9bda91369212610bc3abedff1e51ba5b476",
+      "checkout_commits": [
+        "2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee"
+      ],
+      "checkout_matches": true
+    }
+  ],
+  "retained_at": "2026-09-12T01:33:45.399503+00:00"
+}
