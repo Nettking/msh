@@ -1031,7 +1031,10 @@
     "initial_run": 34689990990,
     "focused_contract_tests": 29,
     "native_runs_verified": 0,
-    "js_only_event_verified": false,
-    "legacy_retired": []
+    "js_only_event_verified": true,
+    "legacy_retired": [],
+    "js_only_canary_pr": 469,
+    "js_only_canary_head": "660bf23269893305c7e8ffcc4c910a7efaed567d",
+    "js_only_canary_run": 34690234286
   }
 }

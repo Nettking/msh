@@ -17,9 +17,11 @@ f3abe5452db2f21593a688bc62bc5f4b22d5c40e. Stage1 extension is pushed;
 29 focused coverage-contract checks and lint/format/diff checks passed.
 Initial automatic F7 run34689990990 started correctly on Nettking native Windows
 and Nettking-Linux; Linux passed, Windows tests in progress at11:05Z. Preserve
-all automatic PR468 runs. Next independent action: create the planned disposable
-JS-only canary PR against this migration branch, retain its actual event/run/source
-proof, then review two complete green native F7 executions before any retirement.
+all automatic PR468 runs. Disposable JS-only PR469 is open against this migration branch. Its automatic
+F7 run34690234286 proves the path event, with unchanged workflow blob and just
+one inert JS comment. Native matrix queued at11:08Z. Never merge PR469. Next:
+review both F7 runs (34689990990 and34690234286) and their native logs/JUnit.
+Two complete green native executions are still required before retirement.
 No duplicate37-job dispatch is needed for replacement proof. F7 jobs have30min
 limits; check near expected completion, long release jobs no sooner than45-60min.
 Plan: CI_COVERAGE_MIGRATION_PLAN.md; mapping: diagnostics/ci-migration-equivalence-matrix.json.
@@ -2449,3 +2451,18 @@ known CI infrastructure condition, not product failure; do not restart passing
 jobs or broaden this eight-workflow migration into an unreviewed docs rewrite.
 Next: JS-only canary, then source/log/JUnit reconciliation and second green proof.
 No physical state changed; protected Recorder data remained untouched.
+
+## 2026-09-12T11:09Z — actual JS-only trigger demonstrated
+
+Disposable draft [PR469](https://github.com/Nettking/msh/pull/469), head
+660bf23269893305c7e8ffcc4c910a7efaed567d, targets PR468 branch at f3abe545.
+GitHub confirms exactly one changed file and one inert comment, with identical
+F7 workflow blob143db0b43c870bc5791c3629e34fd61a72293c47 at base/head.
+Actual pull_request event started F7 run34690234286 (both native jobs queued).
+Receipt: diagnostics/ci-f7-js-only-trigger-proof.json. This proves triggering,
+not green equivalence or acceptance. Do not merge canary or deploy its source.
+Legacy F7.7 run34690234289 hit the existing hosted billing admission failure;
+zero-step/runner0 annotations retained. Automatic replacement/release runs remain
+untouched. Next: inspect the two bounded F7 completions near their expected finish,
+retain/review native source/command/JUnit proofs, and keep long release checks hourly.
+No protected Recorder or physical state changed.
