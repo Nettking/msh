@@ -1,0 +1,75 @@
+{
+  "recorded_at": "2026-09-12T15:10:04.189367+00:00",
+  "status": "CLEAN_RETIREMENT_HEAD_LIGHTWEIGHT_AND_SOURCE_CONTRACT_PASS",
+  "head_sha": "440123f6bc6dc358eef3d233236bc14f91af60e0",
+  "base_sha": "b7194820d8f1940ae60b8c9639e09b7f61e65c55",
+  "clean": true,
+  "changed_paths": [
+    "D\t.github/workflows/phase-f71-job-contracts.yml",
+    "D\t.github/workflows/phase-f72-provider-selection.yml",
+    "D\t.github/workflows/phase-f73-durable-job-ownership.yml",
+    "D\t.github/workflows/phase-f74-worker-dispatch.yml",
+    "D\t.github/workflows/phase-f75-retry-cancellation.yml",
+    "D\t.github/workflows/phase-f76-artifact-authorization.yml",
+    "D\t.github/workflows/phase-f77-ai-runtime-integration.yml",
+    "D\t.github/workflows/phase-f84-compute-worker-activation.yml",
+    "M\tdocs/implementation/f7_ci_consolidation.md",
+    "M\tdocs/implementation/federation_v1_cleanup_manifest.md",
+    "M\tdocs/implementation/osl_integration/02_current_fcp_architecture.md",
+    "M\tdocs/implementation/osl_integration/08_validation_testing_and_ci.md"
+  ],
+  "unchanged_tracked_entries": 1406,
+  "unchanged_entry_digest": "fb83169d537d02ce0d8218902658bbac9895c0999fd440bbc73a54459490d29e",
+  "all_remaining_workflows_tests_runtime_commands_dependencies_runner_configuration_identical": true,
+  "remaining_literal_legacy_file_references": [],
+  "checks": [
+    {
+      "command": [
+        "C:\\wsl\\fcp-v1-fba508-nettking-20260910\\.venv\\Scripts\\python.exe",
+        "-B",
+        "scripts/check_product_branding.py"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "C:\\wsl\\fcp-v1-fba508-nettking-20260910\\.venv\\Scripts\\python.exe",
+        "-B",
+        "-m",
+        "pytest",
+        "-o",
+        "addopts=",
+        "-p",
+        "no:cacheprovider",
+        "-q",
+        "catalog/common/tests/test_f7_ci_coverage.py",
+        "--junitxml=C:\\wsl\\fcp-v1-fba508-nettking-20260910\\.acceptance\\phase-retirement-final-lightweight.xml"
+      ],
+      "exit_code": 0,
+      "stdout": ".............................                                            [100%]\n29 passed in 0.22s\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check",
+        "b7194820d8f1940ae60b8c9639e09b7f61e65c55",
+        "440123f6bc6dc358eef3d233236bc14f91af60e0"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "previous_native_evidence_preserved": [
+    "ci-f7-two-native-greens.json",
+    "ci-f7-js-only-trigger-proof.json",
+    "phase-workflow-retirement-preflight.json"
+  ],
+  "next_gate": "Open separate draft retirement PR, obtain scoped native F7 execution on this exact head via existing workflow_dispatch plus applicable automatic release evidence. Do not repeat the two original native proof matrices or actual JS-only event; their source remains unchanged. Do not merge before exact final-source native validation.",
+  "physical_acceptance": false,
+  "protected_recorder_data": "UNTOUCHED"
+}
