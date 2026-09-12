@@ -320,6 +320,36 @@
       "response": {
         "http_status": 204
       }
+    },
+    {
+      "pr": 467,
+      "sha": "84c66f8185c1411d9dc8c5c33244a2f564845ce7",
+      "ref": "codex/analysis-content-resolve-race",
+      "workflow": "phase-f85-operator-federation-surface.yml",
+      "requested_at": "2026-09-12T07:41:54.533809+00:00",
+      "reason": "Completed successful PR jobs checked out synthetic SHA, not intended head",
+      "native_proof": [
+        {
+          "job_id": 103506523865,
+          "run_id": 34676251432,
+          "checkout_commits": [
+            "fcf8603b93e114d5367dcf0adf79d14410b612d8"
+          ],
+          "sha256": "1c6d143736a48059c551fb551f895a79a77e68e9c0cc4a3f4a8546f450adb6a0"
+        },
+        {
+          "job_id": 103506524038,
+          "run_id": 34676251432,
+          "checkout_commits": [
+            "fcf8603b93e114d5367dcf0adf79d14410b612d8"
+          ],
+          "sha256": "8ae422fbf90a011aa7b120d56b83d6ebc9b1adc7bb7f726cd18dac39e8ca52d3"
+        }
+      ],
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
     }
   ]
 }
