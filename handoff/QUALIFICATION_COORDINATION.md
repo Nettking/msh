@@ -1895,3 +1895,6 @@ exact-head PASS preserved. An audit helper retarget typo was caught by its run
 count assertion and corrected before producing the receipt; no gate was weakened.
 Next: dispatch the three demonstrated source gaps once (release,ICSE,CF7B), then
 resume state-change polling. No physical acceptance or candidate freeze.
+
+00:24:33UTC: PR465 exact-head4749ab66 gap dispatched: federation-v1-release.yml (HTTP204).
+Native source proof and dispatch ledger committed; no duplicate or physical change.
