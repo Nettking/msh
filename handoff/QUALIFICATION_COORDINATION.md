@@ -2205,3 +2205,5 @@ Only required absent gates may be dispatched; no physical deployment or candidat
 04:14:50UTC: absent final-main2a9c9b8e gate ci-test-sharding.yml dispatched once; guarded request and response persisted in merged-main-gap-dispatches.json. Existing push evidence preserved; no physical action. Next: remaining absent gates, then state-change poll and native retention.
 
 04:14:55UTC: absent final-main2a9c9b8e gate phase-f85-operator-federation-surface.yml dispatched once; guarded request and response persisted in merged-main-gap-dispatches.json. Existing push evidence preserved; no physical action. Next: remaining absent gates, then state-change poll and native retention.
+
+04:15:00UTC: absent final-main2a9c9b8e gate release-image-metadata.yml dispatched once; guarded request and response persisted in merged-main-gap-dispatches.json. Existing push evidence preserved; no physical action. Next: remaining absent gates, then state-change poll and native retention.

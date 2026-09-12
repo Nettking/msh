@@ -66,6 +66,17 @@
       "response": {
         "http_status": 204
       }
+    },
+    {
+      "workflow": "release-image-metadata.yml",
+      "source_commit": "2a9c9b8eb53edff74c2de23570ec56e054d29b22",
+      "ref": "main",
+      "requested_at": "2026-09-12T04:14:59.617945+00:00",
+      "workflow_sha256": "e56a36549dbcf7a9fb171a317f6b3a2db159d0d716afbe390c1beeecfc06c522",
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
     }
   ]
 }
