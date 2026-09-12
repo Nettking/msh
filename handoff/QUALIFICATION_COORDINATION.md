@@ -1932,3 +1932,10 @@ retain only newly completed evidence. Physical M and protected data unchanged.
 now has eight successful jobs and ICSE three; both parent runs remain active.
 Next: retain newly terminal native evidence only. Preserve existing20/37 plus3/3
 proofs and do not dispatch duplicates. No physical or PR463 state change.
+
+00:58UTC: seven new native logs all verify4749ab66, including Windows
+capability-product, PostgreSQL, Linux shards1/3 and all three ICSE execution jobs.
+Required native evidence now27/37 plus3/3 companions. Release and ICSE publication
+remain incomplete; no final qualification verdict. Next: poll_pr465_state.py on
+next state check; retain new native evidence and completed publication artifacts.
+No duplicate jobs, physical acceptance claim, deployment or Recorder-data change.
