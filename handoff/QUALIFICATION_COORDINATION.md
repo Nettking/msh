@@ -1927,3 +1927,8 @@ release Linux checks and fixed suite order. Required native proof now20/37 plus
 3/3 companions. Preserve every completed job; no further dispatch is needed.
 Next: python -B handoff/diagnostics/poll_pr465_state.py at next state check;
 retain only newly completed evidence. Physical M and protected data unchanged.
+
+00:57UTC: PR465 head4749ab66 unchanged, no reported failure. Exact-head release
+now has eight successful jobs and ICSE three; both parent runs remain active.
+Next: retain newly terminal native evidence only. Preserve existing20/37 plus3/3
+proofs and do not dispatch duplicates. No physical or PR463 state change.
