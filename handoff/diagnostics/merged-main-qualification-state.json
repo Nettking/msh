@@ -2,22 +2,22 @@
   "source_commit": "2a9c9b8eb53edff74c2de23570ec56e054d29b22",
   "actual_main": "2a9c9b8eb53edff74c2de23570ec56e054d29b22",
   "main_matches": true,
-  "recorded_at": "2026-09-12T05:00:58.581129+00:00",
+  "recorded_at": "2026-09-12T05:12:27.653550+00:00",
   "workflows": [
     {
       "workflow": "federation-v1-release.yml",
       "run_id": 34672364135,
       "event": "push",
       "api_head_sha": "2a9c9b8eb53edff74c2de23570ec56e054d29b22",
-      "status": "queued",
-      "conclusion": null,
+      "status": "completed",
+      "conclusion": "success",
       "attempt": 1,
       "required_count": 16,
       "signature": {
-        "status": "queued",
-        "conclusion": null,
+        "status": "completed",
+        "conclusion": "success",
         "run_attempt": 1,
-        "updated_at": "2026-09-12T04:11:45Z"
+        "updated_at": "2026-09-12T05:04:41Z"
       },
       "jobs": [
         {
@@ -59,11 +59,11 @@
         {
           "id": 103496010739,
           "name": "Release checks (Windows)",
-          "status": "in_progress",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "runner_name": "Nettking",
           "started_at": "2026-09-12T05:00:27Z",
-          "completed_at": null
+          "completed_at": "2026-09-12T05:04:09Z"
         },
         {
           "id": 103496010750,
@@ -113,11 +113,11 @@
         {
           "id": 103496010847,
           "name": "Linux regression shard (0)",
-          "status": "in_progress",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "runner_name": "Nettking-Linux",
           "started_at": "2026-09-12T05:00:33Z",
-          "completed_at": null
+          "completed_at": "2026-09-12T05:04:03Z"
         },
         {
           "id": 103496010857,
@@ -131,11 +131,38 @@
         {
           "id": 103501411925,
           "name": "Clean-checkout suite order independence",
-          "status": "queued",
-          "conclusion": null,
-          "runner_name": "",
-          "started_at": "2026-09-12T04:57:45Z",
-          "completed_at": null
+          "status": "completed",
+          "conclusion": "success",
+          "runner_name": "Nettking-Linux",
+          "started_at": "2026-09-12T05:04:05Z",
+          "completed_at": "2026-09-12T05:04:10Z"
+        },
+        {
+          "id": 103502170378,
+          "name": "Release matrix (Windows)",
+          "status": "completed",
+          "conclusion": "success",
+          "runner_name": "Nettking-Linux",
+          "started_at": "2026-09-12T05:04:12Z",
+          "completed_at": "2026-09-12T05:04:22Z"
+        },
+        {
+          "id": 103502170407,
+          "name": "Release matrix (Linux)",
+          "status": "completed",
+          "conclusion": "success",
+          "runner_name": "Nettking-Linux",
+          "started_at": "2026-09-12T05:04:24Z",
+          "completed_at": "2026-09-12T05:04:33Z"
+        },
+        {
+          "id": 103502214129,
+          "name": "Federation v1 automated release verdict",
+          "status": "completed",
+          "conclusion": "success",
+          "runner_name": "Nettking-Linux",
+          "started_at": "2026-09-12T05:04:35Z",
+          "completed_at": "2026-09-12T05:04:40Z"
         }
       ]
     },
@@ -333,15 +360,15 @@
       "run_id": 34672479567,
       "event": "workflow_dispatch",
       "api_head_sha": "2a9c9b8eb53edff74c2de23570ec56e054d29b22",
-      "status": "queued",
-      "conclusion": null,
+      "status": "completed",
+      "conclusion": "success",
       "attempt": 1,
       "required_count": 2,
       "signature": {
-        "status": "queued",
-        "conclusion": null,
+        "status": "completed",
+        "conclusion": "success",
         "run_attempt": 1,
-        "updated_at": "2026-09-12T04:14:27Z"
+        "updated_at": "2026-09-12T05:08:44Z"
       },
       "jobs": [
         {
@@ -356,11 +383,11 @@
         {
           "id": 103496345578,
           "name": "harness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Byp...",
-          "status": "queued",
-          "conclusion": null,
-          "runner_name": "",
-          "started_at": "2026-09-12T04:14:29Z",
-          "completed_at": null
+          "status": "completed",
+          "conclusion": "success",
+          "runner_name": "Nettking",
+          "started_at": "2026-09-12T05:04:11Z",
+          "completed_at": "2026-09-12T05:08:43Z"
         }
       ]
     },
@@ -477,25 +504,25 @@
       "run_id": 34672495196,
       "event": "workflow_dispatch",
       "api_head_sha": "2a9c9b8eb53edff74c2de23570ec56e054d29b22",
-      "status": "queued",
-      "conclusion": null,
+      "status": "completed",
+      "conclusion": "success",
       "attempt": 1,
       "required_count": 2,
       "signature": {
-        "status": "queued",
-        "conclusion": null,
+        "status": "completed",
+        "conclusion": "success",
         "run_attempt": 1,
-        "updated_at": "2026-09-12T04:14:50Z"
+        "updated_at": "2026-09-12T05:09:28Z"
       },
       "jobs": [
         {
           "id": 103496391321,
           "name": "Shard contract (Windows, shared-pool)",
-          "status": "queued",
-          "conclusion": null,
-          "runner_name": "",
-          "started_at": "2026-09-12T04:14:52Z",
-          "completed_at": null
+          "status": "completed",
+          "conclusion": "success",
+          "runner_name": "Nettking",
+          "started_at": "2026-09-12T05:08:45Z",
+          "completed_at": "2026-09-12T05:09:27Z"
         },
         {
           "id": 103496391402,
@@ -513,24 +540,24 @@
       "run_id": 34672498480,
       "event": "workflow_dispatch",
       "api_head_sha": "2a9c9b8eb53edff74c2de23570ec56e054d29b22",
-      "status": "queued",
+      "status": "in_progress",
       "conclusion": null,
       "attempt": 1,
       "required_count": 2,
       "signature": {
-        "status": "queued",
+        "status": "in_progress",
         "conclusion": null,
         "run_attempt": 1,
-        "updated_at": "2026-09-12T04:14:55Z"
+        "updated_at": "2026-09-12T05:09:29Z"
       },
       "jobs": [
         {
           "id": 103496400575,
           "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
-          "status": "queued",
+          "status": "in_progress",
           "conclusion": null,
-          "runner_name": "",
-          "started_at": "2026-09-12T04:14:56Z",
+          "runner_name": "Nettking",
+          "started_at": "2026-09-12T05:09:29Z",
           "completed_at": null
         },
         {
