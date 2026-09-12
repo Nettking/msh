@@ -1,35 +1,50 @@
 {
-  "observed_at": "2026-09-12T00:11:49.959529+00:00",
+  "observed_at": "2026-09-12T00:22:48.997830+00:00",
   "changes": {
     "465": [
+      {
+        "workflow": "cf7b-product-physical-acceptance.yml",
+        "run_id": 34656348375,
+        "event": "pull_request",
+        "status": "completed",
+        "conclusion": "success",
+        "jobs": [
+          {
+            "id": 103449515153,
+            "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
       {
         "workflow": "federation-v1-release.yml",
         "run_id": 34656348410,
         "event": "pull_request",
-        "status": "in_progress",
-        "conclusion": null,
+        "status": "completed",
+        "conclusion": "success",
         "jobs": [
-          {
-            "id": 103453726200,
-            "name": "Windows regressions (journal-artifacts)",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
-            "id": 103453726216,
-            "name": "Windows regressions (capability-product)",
-            "status": "completed",
-            "conclusion": "success"
-          },
           {
             "id": 103453726290,
             "name": "Windows regressions (transport-storage)",
-            "status": "in_progress",
-            "conclusion": null
+            "status": "completed",
+            "conclusion": "success"
           },
           {
-            "id": 103457898256,
-            "name": "Clean-checkout suite order independence",
+            "id": 103463415300,
+            "name": "Release matrix (Linux)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103463415424,
+            "name": "Release matrix (Windows)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103463483478,
+            "name": "Federation v1 automated release verdict",
             "status": "completed",
             "conclusion": "success"
           }
@@ -39,35 +54,29 @@
         "workflow": "icse-tool-demo.yml",
         "run_id": 34656348432,
         "event": "pull_request",
-        "status": "in_progress",
-        "conclusion": null,
-        "jobs": [
-          {
-            "id": 103449516273,
-            "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
-            "id": 103462678187,
-            "name": "publication-bundle",
-            "status": "in_progress",
-            "conclusion": null
-          }
-        ]
-      },
-      {
-        "workflow": "phase2-federation.yml",
-        "run_id": 34658824145,
-        "event": "workflow_dispatch",
         "status": "completed",
         "conclusion": "success",
         "jobs": [
           {
-            "id": 103456873518,
-            "name": "linux",
+            "id": 103462678187,
+            "name": "publication-bundle",
             "status": "completed",
             "conclusion": "success"
+          }
+        ]
+      },
+      {
+        "workflow": "cf8-role-retirement.yml",
+        "run_id": 34656512238,
+        "event": "workflow_dispatch",
+        "status": "in_progress",
+        "conclusion": null,
+        "jobs": [
+          {
+            "id": 103450006534,
+            "name": "role-retirement (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+            "status": "in_progress",
+            "conclusion": null
           }
         ]
       }
