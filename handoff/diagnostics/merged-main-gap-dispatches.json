@@ -44,6 +44,17 @@
       "response": {
         "http_status": 204
       }
+    },
+    {
+      "workflow": "ci-test-sharding.yml",
+      "source_commit": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
+      "ref": "main",
+      "requested_at": "2026-09-12T08:51:41.452580+00:00",
+      "workflow_sha256": "ec92d1a338be6ed83597546d19cd9e6d8f477cf284971c167808c948f9c6a267",
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
     }
   ]
 }
