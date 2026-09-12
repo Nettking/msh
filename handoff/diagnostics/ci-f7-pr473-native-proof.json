@@ -1,0 +1,225 @@
+{
+  "reviewed_at": "2026-09-12T15:57:41.244555+00:00",
+  "status": "EXACT_RETIREMENT_HEAD_NATIVE_F7_VALIDATION_REVIEWED",
+  "pr": 473,
+  "run_id": 34701516368,
+  "api_head_sha": "440123f6bc6dc358eef3d233236bc14f91af60e0",
+  "actual_checkout": "440123f6bc6dc358eef3d233236bc14f91af60e0",
+  "checkout_tree_identical_to_head": true,
+  "workflow_blob": "143db0b43c870bc5791c3629e34fd61a72293c47",
+  "event": "workflow_dispatch",
+  "native_jobs": [
+    {
+      "os": "Windows",
+      "job_id": 103574001903,
+      "runner_name": "AQG7NCC-Windows",
+      "runner_id": 30,
+      "labels": [
+        "self-hosted",
+        "fcp-windows"
+      ],
+      "checkout_commit": "440123f6bc6dc358eef3d233236bc14f91af60e0",
+      "log_sha256": "61a7a9ccea415077b55e47216dc5cfc54588702a0f43fb7c5c7d06e65417da81",
+      "log_bytes": 68203,
+      "log_excerpts": [
+        "2026-09-12T15:18:32.4857721Z Runner name: 'AQG7NCC-Windows'",
+        "2026-09-12T15:18:48.3042699Z 440123f6bc6dc358eef3d233236bc14f91af60e0",
+        "2026-09-12T15:18:48.8220270Z 440123f6bc6dc358eef3d233236bc14f91af60e0",
+        "2026-09-12T15:18:49.4878048Z 3.12.10",
+        "2026-09-12T15:23:51.1526614Z ##[group]Run python -m compileall catalog/capabilities catalog/ai catalog/common/tests/test_f7_ci_coverage.py catalog/flask_app/ai_routes.py catalog/flask_app/tests/test_ai_explainer_chat.py catalog/flask_app/tests/test_ai_runtime_integration.py catalog/flask_app/tests/test_connected_ai_provider.py catalog/flask_app/tests/test_model_provider_compose.py catalog/relay/tests/test_phase_f74_capability_dispatch.py catalog/relay/tests/test_phase_f75_retry_cancellation.py",
+        "2026-09-12T15:23:56.5820049Z ##[group]Run python -m pytest -o addopts= -q --junitxml=\"C:\\fcp-ci-AQG7NCC\\runner\\_work\\_temp/f7-closeout-Windows.xml\" catalog/common/tests/test_f7_ci_coverage.py catalog/capabilities/tests catalog/ai/tests catalog/flask_app/tests/test_ai_explainer_chat.py catalog/flask_app/tests/test_ai_runtime_integration.py catalog/flask_app/tests/test_connected_ai_provider.py catalog/flask_app/tests/test_model_provider_compose.py catalog/relay/tests/test_phase_f74_capability_dispatch.py catalog/relay/tests/test_phase_f75_retry_cancellation.py catalog/federation/tests/test_phase0.py catalog/federation/tests/test_phase1.py catalog/federation/tests/test_phase_f641_chunk_contract.py catalog/node/tests/test_phase_f642_verified_chunk_transfer.py catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py",
+        "2026-09-12T15:29:09.6043035Z ##[group]Run python -m ruff check catalog/capabilities catalog/ai catalog/common/tests/test_f7_ci_coverage.py catalog/flask_app/ai_routes.py catalog/flask_app/tests/test_ai_runtime_integration.py --ignore I001,RUF022,B008,C408,PLC0206,UP035",
+        "2026-09-12T15:29:11.5429724Z ##[group]Run python -m ruff check catalog/capabilities --select UP035",
+        "2026-09-12T15:29:11.8577239Z ##[group]Run python -m ruff check catalog/relay/tests/test_phase_f74_capability_dispatch.py catalog/relay/tests/test_phase_f75_retry_cancellation.py --ignore I001,RUF022,B008,C408,PLC0206",
+        "2026-09-12T15:29:12.1787483Z ##[group]Run docker compose config --quiet",
+        "2026-09-12T15:29:12.7632999Z ##[group]Run git diff --check origin/main...HEAD"
+      ],
+      "python": "3.12.10",
+      "shell": "WindowsPowerShell",
+      "all_required_steps_success": true,
+      "tests": 722,
+      "passed": 717,
+      "skipped": 5,
+      "failures": 0,
+      "errors": 0,
+      "all_unique_mapped_modules_passed": {
+        "catalog/ai/tests/test_ai_explainer.py": 8,
+        "catalog/ai/tests/test_ai_explainer_cache.py": 2,
+        "catalog/ai/tests/test_grounding.py": 4,
+        "catalog/ai/tests/test_ollama_client.py": 15,
+        "catalog/ai/tests/test_runtime.py": 17,
+        "catalog/ai/tests/test_runtime_manager.py": 6,
+        "catalog/ai/tests/test_runtime_manager_reconciliation.py": 1,
+        "catalog/flask_app/tests/test_ai_explainer_chat.py": 4,
+        "catalog/flask_app/tests/test_connected_ai_provider.py": 15,
+        "catalog/flask_app/tests/test_model_provider_compose.py": 2,
+        "catalog/relay/tests/test_phase_f74_capability_dispatch.py": 1,
+        "catalog/relay/tests/test_phase_f75_retry_cancellation.py": 2,
+        "catalog/federation/tests/test_phase_f641_chunk_contract.py": 19,
+        "catalog/node/tests/test_phase_f642_verified_chunk_transfer.py": 12,
+        "catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py": 9,
+        "catalog/common/tests/test_f7_ci_coverage.py": 29
+      },
+      "skip_details": [
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_preserves_real_link_containment[False-False]",
+          "reason": "Windows symlink privilege unavailable"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_preserves_real_link_containment[False-True]",
+          "reason": "Windows symlink privilege unavailable"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_preserves_real_link_containment[True-False]",
+          "reason": "Windows symlink privilege unavailable"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_preserves_real_link_containment[True-True]",
+          "reason": "Windows symlink privilege unavailable"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_workspace_reconciliation",
+          "name": "test_reparse_or_symlink_attempt_is_never_followed",
+          "reason": "directory symlinks are unavailable on this runner"
+        }
+      ],
+      "artifact": {
+        "run_id": 34701516368,
+        "id": 10301065501,
+        "name": "f7-closeout-Windows",
+        "digest": "sha256:c2d6d96427e31cb42ea2d77952025d5bb00a92873214ffb9dd4cc42641f30f35",
+        "bytes": 16759,
+        "created_at": "2026-09-12T15:29:17Z",
+        "api_workflow_head": "440123f6bc6dc358eef3d233236bc14f91af60e0"
+      },
+      "retained_zip": "ci-f7-native-evidence/10301065501.zip",
+      "junit_sha256": "4940ebfd8a3c4e1632c84b6a7dd60e972df0d07764b7c6ff8607fc6811ef7d6e"
+    },
+    {
+      "os": "Linux",
+      "job_id": 103574001987,
+      "runner_name": "Beast-Linux-WSL",
+      "runner_id": 29,
+      "labels": [
+        "self-hosted",
+        "fcp-linux-fast"
+      ],
+      "checkout_commit": "440123f6bc6dc358eef3d233236bc14f91af60e0",
+      "log_sha256": "7aadaace03d545b92c21725aaa180a8cece32076c92004814587468af54f1130",
+      "log_bytes": 67627,
+      "log_excerpts": [
+        "2026-09-12T15:12:51.8003432Z Runner name: 'Beast-Linux-WSL'",
+        "2026-09-12T15:12:53.7017728Z HEAD is now at 0355023f Merge 440123f6bc6dc358eef3d233236bc14f91af60e0 into b7194820d8f1940ae60b8c9639e09b7f61e65c55",
+        "2026-09-12T15:12:54.4874791Z 440123f6bc6dc358eef3d233236bc14f91af60e0",
+        "2026-09-12T15:12:54.5018415Z Previous HEAD position was 0355023f Merge 440123f6bc6dc358eef3d233236bc14f91af60e0 into b7194820d8f1940ae60b8c9639e09b7f61e65c55",
+        "2026-09-12T15:12:54.5134756Z 440123f6bc6dc358eef3d233236bc14f91af60e0",
+        "2026-09-12T15:12:54.5804969Z 3.12.13",
+        "2026-09-12T15:13:55.2905707Z Runner meets the product host-resource precondition.",
+        "2026-09-12T15:13:55.2985924Z ##[group]Run python -m compileall catalog/capabilities catalog/ai catalog/common/tests/test_f7_ci_coverage.py catalog/flask_app/ai_routes.py catalog/flask_app/tests/test_ai_explainer_chat.py catalog/flask_app/tests/test_ai_runtime_integration.py catalog/flask_app/tests/test_connected_ai_provider.py catalog/flask_app/tests/test_model_provider_compose.py catalog/relay/tests/test_phase_f74_capability_dispatch.py catalog/relay/tests/test_phase_f75_retry_cancellation.py",
+        "2026-09-12T15:13:55.5932988Z ##[group]Run python -m pytest -o addopts= -q --junitxml=\"/opt/actions-runner/_work/_temp/f7-closeout-Linux.xml\" catalog/common/tests/test_f7_ci_coverage.py catalog/capabilities/tests catalog/ai/tests catalog/flask_app/tests/test_ai_explainer_chat.py catalog/flask_app/tests/test_ai_runtime_integration.py catalog/flask_app/tests/test_connected_ai_provider.py catalog/flask_app/tests/test_model_provider_compose.py catalog/relay/tests/test_phase_f74_capability_dispatch.py catalog/relay/tests/test_phase_f75_retry_cancellation.py catalog/federation/tests/test_phase0.py catalog/federation/tests/test_phase1.py catalog/federation/tests/test_phase_f641_chunk_contract.py catalog/node/tests/test_phase_f642_verified_chunk_transfer.py catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py",
+        "2026-09-12T15:17:33.4311912Z ##[group]Run python -m ruff check catalog/capabilities catalog/ai catalog/common/tests/test_f7_ci_coverage.py catalog/flask_app/ai_routes.py catalog/flask_app/tests/test_ai_runtime_integration.py --ignore I001,RUF022,B008,C408,PLC0206,UP035",
+        "2026-09-12T15:17:33.4785837Z ##[group]Run python -m ruff check catalog/capabilities --select UP035",
+        "2026-09-12T15:17:33.5133808Z ##[group]Run python -m ruff check catalog/relay/tests/test_phase_f74_capability_dispatch.py catalog/relay/tests/test_phase_f75_retry_cancellation.py --ignore I001,RUF022,B008,C408,PLC0206",
+        "2026-09-12T15:17:33.5430973Z ##[group]Run docker compose config --quiet",
+        "2026-09-12T15:17:33.9475857Z ##[group]Run git diff --check origin/main...HEAD"
+      ],
+      "python": "3.12.13",
+      "shell": "/usr/bin/bash",
+      "all_required_steps_success": true,
+      "tests": 722,
+      "passed": 713,
+      "skipped": 9,
+      "failures": 0,
+      "errors": 0,
+      "all_unique_mapped_modules_passed": {
+        "catalog/ai/tests/test_ai_explainer.py": 8,
+        "catalog/ai/tests/test_ai_explainer_cache.py": 2,
+        "catalog/ai/tests/test_grounding.py": 4,
+        "catalog/ai/tests/test_ollama_client.py": 15,
+        "catalog/ai/tests/test_runtime.py": 17,
+        "catalog/ai/tests/test_runtime_manager.py": 6,
+        "catalog/ai/tests/test_runtime_manager_reconciliation.py": 1,
+        "catalog/flask_app/tests/test_ai_explainer_chat.py": 4,
+        "catalog/flask_app/tests/test_connected_ai_provider.py": 15,
+        "catalog/flask_app/tests/test_model_provider_compose.py": 2,
+        "catalog/relay/tests/test_phase_f74_capability_dispatch.py": 1,
+        "catalog/relay/tests/test_phase_f75_retry_cancellation.py": 2,
+        "catalog/federation/tests/test_phase_f641_chunk_contract.py": 19,
+        "catalog/node/tests/test_phase_f642_verified_chunk_transfer.py": 12,
+        "catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py": 9,
+        "catalog/common/tests/test_f7_ci_coverage.py": 29
+      },
+      "skip_details": [
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_survives_native_leaf_replacement[x-False]",
+          "reason": "Windows deleted-file final name"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_survives_native_leaf_replacement[x-True]",
+          "reason": "Windows deleted-file final name"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_survives_native_leaf_replacement[analysis/session/work/plan.json-False]",
+          "reason": "Windows deleted-file final name"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_survives_native_leaf_replacement[analysis/session/work/plan.json-True]",
+          "reason": "Windows deleted-file final name"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_preserves_real_junction_containment[False-False]",
+          "reason": "Windows junction containment"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_preserves_real_junction_containment[False-True]",
+          "reason": "Windows junction containment"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_preserves_real_junction_containment[True-False]",
+          "reason": "Windows junction containment"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_preserves_real_junction_containment[True-True]",
+          "reason": "Windows junction containment"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_store",
+          "name": "test_unsupported_native_publication_preserves_existing_artifact",
+          "reason": "Windows native publication failure"
+        }
+      ],
+      "artifact": {
+        "run_id": 34701516368,
+        "id": 10300174027,
+        "name": "f7-closeout-Linux",
+        "digest": "sha256:c15b8c183647e5552b0a4f23cd708c71e006acf6f71035177aa9da6767957436",
+        "bytes": 16345,
+        "created_at": "2026-09-12T15:17:35Z",
+        "api_workflow_head": "440123f6bc6dc358eef3d233236bc14f91af60e0"
+      },
+      "retained_zip": "ci-f7-native-evidence/10300174027.zip",
+      "junit_sha256": "3005658a3950dc46cc909a1ed8af82b63557f2c29aedded09b94c3bb8d8af279"
+    }
+  ],
+  "union_passed_test_identities": 722,
+  "every_skip_passes_on_other_native_os": true,
+  "required_green_runs": 2,
+  "retirement_authorized_by_this_single_receipt": false,
+  "physical_acceptance": false,
+  "protected_recorder_data": "UNTOUCHED",
+  "preserved_original_replacement_proof": "ci-f7-two-native-greens.json",
+  "preserved_real_js_only_event": "ci-f7-js-only-trigger-proof.json",
+  "purpose": "Required exact final-source validation, not another two-execution replacement-proof campaign."
+}

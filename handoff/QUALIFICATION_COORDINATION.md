@@ -2800,3 +2800,14 @@ Beast-Linux-WSL. Snapshot: diagnostics/pr473-scoped-20260912T155616.json.
 Next retain/review native checkout, commands, prerequisites and JUnit identities.
 No long release jobs were polled before their15:58Z boundary. Existing two-green
 replacement proof remains preserved, no duplicate jobs or source changes.
+
+## 2026-09-12T15:58Z — final-source native F7 evidence reviewed
+
+Receipt diagnostics/ci-f7-pr473-native-proof.json verifies exact440123f6 checkout
+on both native jobs, unchanged workflow blob, all seven commands, Python/runtime,
+Linux storage and native Windows shell/temp prerequisites. Linux713PASS/9skips;
+Windows717PASS/5skips. All722 identities pass across the native pair; all12 mapped
+AI modules, three transfer modules and29CI contracts pass without skips. JUnit ZIPs
+are retained under diagnostics/ci-f7-native-evidence. Original2/2 proof and real
+JS-only event remain separate. Next assess due automatic CI and unresolved host
+findings; PR473 remains draft until the complete gate is reviewed.

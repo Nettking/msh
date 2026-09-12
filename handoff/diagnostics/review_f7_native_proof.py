@@ -5,9 +5,15 @@ PRIVATE=pathlib.Path(r'C:\wsl\fcp-v1-fba508-nettking-20260910\.acceptance')
 SOURCE=pathlib.Path(r'C:\wsl\fcp-ci-f7-consolidation-20260912')
 def digest(raw):return hashlib.sha256(raw).hexdigest()
 def main():
-    p=argparse.ArgumentParser();p.add_argument('pr',type=int,choices=[468,469]);args=p.parse_args()
-    snapshot=json.loads((ROOT/'ci-f7-replacement-runs-latest.json').read_text())
-    row=next(r for r in snapshot['runs'] if r['pr']==args.pr)
+    p=argparse.ArgumentParser();p.add_argument('pr',type=int,choices=[468,469,473]);args=p.parse_args()
+    if args.pr==473:
+        snapshot=json.loads((ROOT/'pr473-scoped-20260912T155616.json').read_text())
+        native_run=snapshot['runs'][0]
+        blob=subprocess.check_output(['git','-C',str(SOURCE),'rev-parse',snapshot['head_sha']+':.github/workflows/phase-f7-closeout.yml'],text=True).strip()
+        row={**native_run,'pr':473,'api_head_sha':snapshot['head_sha'],'actual_checkout_expected':snapshot['head_sha'],'retention_label':'pr473-f7-final','run_id':native_run['id'],'workflow_blob':blob}
+    else:
+        snapshot=json.loads((ROOT/'ci-f7-replacement-runs-latest.json').read_text())
+        row=next(r for r in snapshot['runs'] if r['pr']==args.pr)
     assert row['status']=='completed' and row['conclusion']=='success'
     label=row['retention_label'];ret=json.loads((PRIVATE/(label+'-native-retention.json')).read_text())
     artifacts=json.loads((PRIVATE/(label+'-raw-artifact-retention.json')).read_text())['records']
@@ -32,7 +38,7 @@ def main():
         log=raw.decode('utf-8');actual=re.findall(r'##\[group\]Run ([^\r\n]+)',log)
         def normalize(c):return re.sub(r'--junitxml="[^"]+"','--junitxml=JUNIT',c)
         for c in commands:
-            c=c.replace("${{ github.base_ref || 'main' }}",'main' if args.pr==468 else 'codex/ci-f7-coverage-consolidation')
+            c=c.replace("${{ github.base_ref || 'main' }}",'codex/ci-f7-coverage-consolidation' if args.pr==469 else 'main')
             assert normalize(c) in [normalize(a) for a in actual],c
         version='3.12.10' if osname=='Windows' else '3.12.13'
         assert re.search(r'Z '+re.escape(version)+r'\r?\n',log)
@@ -60,6 +66,11 @@ def main():
     assert outcomes['Windows'].keys()==outcomes['Linux'].keys()
     assert all(outcomes['Windows'][k]=='pass' or outcomes['Linux'][k]=='pass' for k in outcomes['Linux'])
     out={'reviewed_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'status':'ONE_COMPLETE_GREEN_NATIVE_REPLACEMENT_EXECUTION_REVIEWED','pr':args.pr,'run_id':row['run_id'],'api_head_sha':row['api_head_sha'],'actual_checkout':row['actual_checkout_expected'],'checkout_tree_identical_to_head':True,'workflow_blob':row['workflow_blob'],'event':row['event'],'native_jobs':native,'union_passed_test_identities':722,'every_skip_passes_on_other_native_os':True,'required_green_runs':2,'retirement_authorized_by_this_single_receipt':False,'physical_acceptance':False,'protected_recorder_data':'UNTOUCHED'}
+    if args.pr==473:
+        out['status']='EXACT_RETIREMENT_HEAD_NATIVE_F7_VALIDATION_REVIEWED'
+        out['preserved_original_replacement_proof']='ci-f7-two-native-greens.json'
+        out['preserved_real_js_only_event']='ci-f7-js-only-trigger-proof.json'
+        out['purpose']='Required exact final-source validation, not another two-execution replacement-proof campaign.'
     (ROOT/('ci-f7-pr'+str(args.pr)+'-native-proof.json')).write_text(json.dumps(out,indent=2)+'\n',encoding='utf-8')
     print(json.dumps({'pr':args.pr,'status':out['status'],'jobs':[{'os':r['os'],'passed':r['passed'],'skipped':r['skipped'],'all_unique_modules_passed':True} for r in native],'union':722}))
 if __name__=='__main__':main()
