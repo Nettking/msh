@@ -1,0 +1,6 @@
+{
+  "recorded_at": "2026-09-12T19:25:31.248512+00:00",
+  "validation": "PASS:2externalPythonAST,2inlinePythonAST,4bash-n,YAML exact source/trigger/existing runner labels",
+  "candidate_source": "UNCHANGED5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "purpose": "DIAGNOSTIC_ONLY; queue on original offlineAQG, no new admission or qualification"
+}

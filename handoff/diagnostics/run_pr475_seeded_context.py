@@ -12,11 +12,16 @@ import time
 
 group = sys.argv[1]
 assert group in {"D14", "D15"}
-source = pathlib.Path('/mnt/c/wsl/fcp-fix-d13-windows-refusal-response-20260912')
+native_ci = os.environ.get('PR475_CONTEXT_MODE') == 'aqg-ci'
+source = pathlib.Path(os.environ['GITHUB_WORKSPACE']) if native_ci else pathlib.Path('/mnt/c/wsl/fcp-fix-d13-windows-refusal-response-20260912')
 diagnostics = pathlib.Path(__file__).resolve().parent
-output = pathlib.Path('/mnt/c/wsl/fcp-v1-fba508-nettking-20260910/.acceptance') / (group + '-seeded-context')
+output = (diagnostics if native_ci else pathlib.Path('/mnt/c/wsl/fcp-v1-fba508-nettking-20260910/.acceptance')) / (group + '-seeded-context')
 output.mkdir(exist_ok=False)
-git = ['/mnt/c/Program Files/Git/cmd/git.exe', '-C', r'C:\wsl\fcp-fix-d13-windows-refusal-response-20260912']
+git = ['git', '-C', str(source)] if native_ci else ['/mnt/c/Program Files/Git/cmd/git.exe', '-C', r'C:\wsl\fcp-fix-d13-windows-refusal-response-20260912']
+if native_ci:
+    assert os.environ['RUNNER_NAME'] == 'AQG7NCC-Linux'
+    assert platform.node().lower() == 'aqg7ncc'
+    assert source.resolve() == pathlib.Path('/home/fcp-ci-aqg7ncc/actions-runner/_work/msh/msh')
 def read_git(*args):
     return subprocess.check_output([*git, *args], text=True, timeout=30).strip()
 sha = read_git('rev-parse', 'HEAD')
@@ -39,7 +44,8 @@ env = dict(os.environ, PYTHONDONTWRITEBYTECODE='1',
 receipt = {'recorded_at': datetime.datetime.now(datetime.timezone.utc).isoformat(), 'group': group,
            'candidate_sha': sha, 'host': platform.node(), 'python': sys.version,
            'executable': sys.executable, 'command': args, 'cwd': str(source),
-           'qualification': False, 'context_limitation': 'NETTKING WSL development; different from original AQG runner; bounded predecessor selection only',
+           'qualification': False, 'context_limitation': ('Original AQG runner; bounded predecessor selection only, not original full-order/load history' if native_ci else 'NETTKING WSL development; different from original AQG runner; bounded predecessor selection only'),
+           'control_sha': os.environ.get('GITHUB_SHA') if native_ci else None,
            'protected_recorder_data': 'UNTOUCHED', 'timeout_seconds': 180}
 def save():
     (output/'receipt.json').write_text(json.dumps(receipt, indent=2)+'\n', encoding='utf-8')
