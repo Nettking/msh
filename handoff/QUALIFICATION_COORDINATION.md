@@ -4,7 +4,7 @@
 
 No original D16 failure reproduced. Observed population retained voter0 leader, three ready voters, term1 and commit/applied3 to9. Later follower and isolated-leader refusals are expected assertions. These isolated diagnostic passes are neither a repair nor release/physical acceptance evidence; D16/#478 remains unresolved.
 
-NEXT HIGHEST VALUE ACTION: inspect the original Windows journal JUnit predecessor context and lifecycle/election failure mechanisms, then choose a bounded context reproduction only if supported. No blind retry of complete journal/full suites. Keep D11/#471,D14/#476,D15/#477 separate pending root-cause evidence. Never relax deadlines, CSRF, quorum or authority.
+NEXT HIGHEST VALUE ACTION: implement the persisted D16_PREDECESSOR_CONTEXT_PLAN.md: original JUnit index175 follows two release-bootstrap recovery cases and one witnessed-chunk recovery case. One four-test sequence on original Beast will observe predecessor threads and D16 lifecycle exceptions without changed source/guards. If no reproduction, stop short-context D16 retries and shift to D14/D15. No blind retry of complete journal/full suites. Keep D11/#471,D14/#476,D15/#477 separate pending root-cause evidence. Never relax deadlines, CSRF, quorum or authority.
 
 All automatic PR475 CI is completed: branding/update/CF7-B/Phase2/ICSE pass; release34707260030 fails in two underlying jobs(D14/D15 rotating and D16 Windows journal) plus four dependent aggregates. No jobs to poll. D13/#474 repair's native and actual discovery boundary passes retained. Reviews were empty17:57Z, not a completed correctness review. PR4755e6 and PR473440 stay draft/fixed; no merge, candidate freeze or new full qualification.
 

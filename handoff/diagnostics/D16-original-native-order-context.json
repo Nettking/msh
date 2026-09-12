@@ -1,0 +1,101 @@
+{
+  "candidate_sha": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "run": 34707260030,
+  "job": 103589446088,
+  "artifact": 10302606648,
+  "index": 175,
+  "xml": "windows-journal-artifacts.xml",
+  "neighbors": [
+    {
+      "index": 165,
+      "class": "catalog.federation.tests.test_control_plane_port_probe_ownership",
+      "test": "test_allocator_refuses_unverified_native_tcp_range[unrecognized output]",
+      "seconds": "0.002",
+      "failed": false
+    },
+    {
+      "index": 166,
+      "class": "catalog.federation.tests.test_control_plane_port_probe_ownership",
+      "test": "test_allocator_refuses_unverified_native_tcp_range[Startport : 49152\\n]",
+      "seconds": "0.002",
+      "failed": false
+    },
+    {
+      "index": 167,
+      "class": "catalog.federation.tests.test_control_plane_port_probe_ownership",
+      "test": "test_allocator_refuses_unverified_native_tcp_range[Startport : 49152\\nAntall porter : 0\\n]",
+      "seconds": "0.002",
+      "failed": false
+    },
+    {
+      "index": 168,
+      "class": "catalog.federation.tests.test_control_plane_port_probe_ownership",
+      "test": "test_allocator_refuses_unverified_native_tcp_range[Start Port : 65530\\nNumber of Ports : 100\\n]",
+      "seconds": "0.002",
+      "failed": false
+    },
+    {
+      "index": 169,
+      "class": "catalog.federation.tests.test_control_plane_port_probe_ownership",
+      "test": "test_failed_real_probe_is_closed_before_garbage_collection",
+      "seconds": "0.039",
+      "failed": false
+    },
+    {
+      "index": 170,
+      "class": "catalog.federation.tests.test_control_plane_port_probe_ownership",
+      "test": "test_failed_real_probe_emits_no_resource_warning",
+      "seconds": "0.003",
+      "failed": false
+    },
+    {
+      "index": 171,
+      "class": "catalog.federation.tests.test_control_plane_port_probe_ownership",
+      "test": "test_probe_conflict_rearms_after_real_blocker_acquisition_failure",
+      "seconds": "0.003",
+      "failed": false
+    },
+    {
+      "index": 172,
+      "class": "catalog.federation.tests.test_control_plane_release_bootstrap_recovery",
+      "test": "test_actual_release_voters_resume_interrupted_fresh_bootstrap[after-genesis]",
+      "seconds": "16.753",
+      "failed": false
+    },
+    {
+      "index": 173,
+      "class": "catalog.federation.tests.test_control_plane_release_bootstrap_recovery",
+      "test": "test_actual_release_voters_resume_interrupted_fresh_bootstrap[after-journal-before-seal]",
+      "seconds": "15.779",
+      "failed": false
+    },
+    {
+      "index": 174,
+      "class": "catalog.federation.tests.test_control_plane_witnessed_chunk_recovery",
+      "test": "test_different_voter_completes_exact_witnessed_prefix_after_first_real_chunk",
+      "seconds": "42.034",
+      "failed": false
+    },
+    {
+      "index": 175,
+      "class": "catalog.federation.tests.test_control_plane_session_authority",
+      "test": "test_reachable_isolated_leader_cannot_report_current_session_authority",
+      "seconds": "21.636",
+      "failed": true
+    },
+    {
+      "index": 176,
+      "class": "catalog.federation.tests.test_control_plane_session_authority",
+      "test": "test_real_committed_unsealed_bootstrap_cannot_grant_session_authority",
+      "seconds": "9.469",
+      "failed": false
+    },
+    {
+      "index": 177,
+      "class": "catalog.federation.tests.test_control_plane_health_leadership_race",
+      "test": "test_peer_election_before_health_journal_lock_keeps_sweep_local",
+      "seconds": "4.926",
+      "failed": false
+    }
+  ]
+}
