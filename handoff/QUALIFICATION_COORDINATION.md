@@ -2873,3 +2873,13 @@ Actual Beast NETWORK SERVICE job34704678898/103582477854 added one exact CI safe
 ## 2026-09-12T16:20:34.072688+00:00 — D12 corrected-host retry precondition
 
 One run-metadata check following verified host correction returned completed for PR473 release34701429430. Decision: READY_FOR_ONE_AFFECTED_FAILED_JOB_RETRY. Receipt diagnostics/pr473-D12-revalidation-precondition.json. No active jobs interrupted or rerun; no additional routine poll until due. Exact PR head440123f6 unchanged.
+
+## 2026-09-12T16:20:51Z — corrected-host PR473 check retry accepted
+
+After verified D12 host correction, the enclosing release run was confirmed
+completed. Every other underlying job passed, including AQG Linux shard2; three
+red aggregates depended on the Windows check. One retry of job103573774515 in
+run34701429430 was accepted. Receipt: diagnostics/pr473-D12-corrected-host-retry-
+dispatch.json. No successful suites or original native proofs were repeated.
+PR473 head440123f6 remains fixed. Next record new attempt/runner startup once,
+then retain outcome near completion. Original D11/D12 evidence remains intact.

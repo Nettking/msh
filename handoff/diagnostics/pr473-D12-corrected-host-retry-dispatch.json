@@ -1,0 +1,19 @@
+{
+  "recorded_at": "2026-09-12T16:20:51Z",
+  "status": "ONE_AFFECTED_FAILED_JOB_RETRY_ACCEPTED_AFTER_VERIFIED_HOST_CORRECTION",
+  "head_sha": "440123f6bc6dc358eef3d233236bc14f91af60e0",
+  "actual_pr_checkout": "0355023f27c4c6886ab6beb48bb9a998b3ab2904",
+  "run_id": 34701429430,
+  "original_failed_job_id": 103573774515,
+  "tool": "github_rerun_workflow_job",
+  "response": {"success": true},
+  "precondition_receipt": "pr473-D12-revalidation-precondition.json",
+  "host_correction_receipt": "D12-host-repair-reviewed.json",
+  "other_underlying_release_jobs": "All successful, including AQG Linux shard2; the three red release aggregates were dependent on the failed Windows check.",
+  "successful_jobs_manually_repeated": [],
+  "original_replacement_proof_repeated": false,
+  "next_action": "Confirm new attempt/runner starts once. Retain native result after completion. No further retry without a new demonstrated correction.",
+  "source_changes": [],
+  "physical_acceptance": false,
+  "protected_recorder_data": "UNTOUCHED"
+}
