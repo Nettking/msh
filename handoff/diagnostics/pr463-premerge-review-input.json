@@ -1,0 +1,448 @@
+{
+  "recorded_at": "2026-09-12T04:10:59.767069+00:00",
+  "head": "2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee",
+  "base": "b6a96b218a513fe241ef4d6f051cf166444643ac",
+  "mergeable": true,
+  "mergeable_state": "clean",
+  "draft": false,
+  "requested_reviewers": [],
+  "reviews": [
+    {
+      "id": 5182569992,
+      "state": "COMMENTED",
+      "body": "\n### \ud83d\udca1 Codex Review\n\nHere are some automated review suggestions for this pull request.\n\n**Reviewed commit:** `7286f30d30`\n    \n\n<details> <summary>\u2139\ufe0f About Codex in GitHub</summary>\n<br/>\n\n[Your team has set up Codex to review pull requests in this repo](https://chatgpt.com/codex/cloud/settings/general). Reviews are triggered when you\n- Open a pull request for review\n- Mark a draft as ready\n- Comment \"@codex review\".\n\nIf Codex has suggestions, it will comment; otherwise it will react with \ud83d\udc4d.\n\n\n\n\nCodex can also answer questions or update the PR. Try commenting \"@codex address that feedback\".\n            \n</details>",
+      "commit_id": "7286f30d30e20c94c13cc9acebb2fd6d61bc1163",
+      "submitted_at": "2026-09-11T19:14:36Z"
+    }
+  ],
+  "comments": [
+    {
+      "id": 3992592227,
+      "body": "**<sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub>  Preserve the backup shutdown timeout and error contract**\n\nWhen a responder takes between 5 and 10 seconds to exit after SIGTERM, this newly raised exception bypasses `backup_recovery._quiesce_responder`, which imports this helper and intentionally allows `RESPONDER_STOP_TIMEOUT_SECONDS = 10.0`. The backup CLI catches only `BackupError` and `ValueError`, so it now aborts after five seconds with an uncaught traceback instead of waiting its documented bound and reporting `responder_stop_unverified`; either keep this helper's boolean contract or translate/configure the timeout in the backup caller.\n\nUseful? React with \ud83d\udc4d\u00a0/ \ud83d\udc4e.",
+      "path": "catalog/federation/tailnet_join_responder.py",
+      "line": null,
+      "commit_id": "7286f30d30e20c94c13cc9acebb2fd6d61bc1163"
+    }
+  ],
+  "checks": [
+    {
+      "id": 103494832193,
+      "name": "publication-bundle",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103494470620,
+      "name": "Federation v1 automated release verdict",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103494428638,
+      "name": "Release matrix (Windows)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103494428628,
+      "name": "Release matrix (Linux)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103493414866,
+      "name": "Clean-checkout suite order independence",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103489294416,
+      "name": "update-contracts (Linux, fcp-linux-fast, bash)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103489294287,
+      "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103489279046,
+      "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103489279017,
+      "name": "reviewer-compose",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103489278896,
+      "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103489264609,
+      "name": "Linux regression shard (0)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103489264566,
+      "name": "Linux regression shard (1)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103489264540,
+      "name": "Release checks (Windows)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103489264491,
+      "name": "Windows regressions (transport-storage)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103489264485,
+      "name": "Linux regression shard (3)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103489264479,
+      "name": "Linux regression shard (2)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103489264471,
+      "name": "Windows regressions (journal-artifacts)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103489264470,
+      "name": "Full-suite order (fixed)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103489264468,
+      "name": "Full-suite order (rotating)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103489264464,
+      "name": "Windows regressions (capability-product)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103489264458,
+      "name": "PostgreSQL storage release check",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103489264385,
+      "name": "Release checks (Linux)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103488255324,
+      "name": "publication-bundle",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103487772581,
+      "name": "Federation v1 automated release verdict",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103487684003,
+      "name": "Release matrix (Linux)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103487683972,
+      "name": "Release matrix (Windows)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103484877504,
+      "name": "windows",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103484877403,
+      "name": "linux",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103484305279,
+      "name": "Clean-checkout suite order independence",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103481851242,
+      "name": "acceptance (Linux, fcp-linux-fast, bash)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103481851157,
+      "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103477205459,
+      "name": "product-branding",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103475612973,
+      "name": "Shard contract (Windows, shared-pool)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103475612834,
+      "name": "Shard contract (Linux, shared-pool)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103473858031,
+      "name": "Verify immutable release image metadata",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103473852910,
+      "name": "onboarding (Linux, fcp-test-linux, bash, 3.12.13)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103473852827,
+      "name": "onboarding (Windows, fcp-test-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103473850351,
+      "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103473850257,
+      "name": "operator-surface (Linux, fcp-linux-fast, bash)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103473846451,
+      "name": "role-retirement (Linux, fcp-linux-fast, bash)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103473846384,
+      "name": "role-retirement (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103473842803,
+      "name": "readiness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy B...",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103473842659,
+      "name": "readiness (Linux, fcp-linux-fast, bash)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103473838973,
+      "name": "harness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Byp...",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103473838845,
+      "name": "harness (Linux, fcp-linux-fast, bash)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103473479671,
+      "name": "reviewer-compose",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103473479670,
+      "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103473479647,
+      "name": "Shard contract (Linux, shared-pool)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103473479609,
+      "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103473479504,
+      "name": "Shard contract (Windows, shared-pool)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103473479500,
+      "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103473479499,
+      "name": "Windows regressions (transport-storage)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103473479487,
+      "name": "Windows regressions (capability-product)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103473479479,
+      "name": "update-contracts (Linux, fcp-linux-fast, bash)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103473479476,
+      "name": "linux",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103473479473,
+      "name": "Linux regression shard (0)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103473479453,
+      "name": "acceptance (Linux, fcp-linux-fast, bash)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103473479432,
+      "name": "Linux regression shard (3)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103473479429,
+      "name": "Release checks (Linux)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103473479417,
+      "name": "Release checks (Windows)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103473479415,
+      "name": "Windows regressions (journal-artifacts)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103473479394,
+      "name": "Linux regression shard (1)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103473479388,
+      "name": "Full-suite order (rotating)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103473479380,
+      "name": "PostgreSQL storage release check",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103473479376,
+      "name": "Linux regression shard (2)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103473479330,
+      "name": "windows",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103473479287,
+      "name": "Full-suite order (fixed)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103473479267,
+      "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103473479204,
+      "name": "product-branding",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "status": {
+    "state": "pending",
+    "total_count": 0,
+    "statuses": []
+  }
+}
