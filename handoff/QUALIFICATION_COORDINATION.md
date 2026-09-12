@@ -2819,3 +2819,7 @@ Main b719 release34701018870 completed16/16green; preserve exact native/artifact
 ## 2026-09-12T16:01:27.386283+00:00 — F7/F8 failures classified as D12 Git context
 
 Beast jobs103572679136/103572679035 passed their native tests and failed final Git diff with explicit Not a git repository exit129. Evidence and full logs are preserved in diagnostics/D12-f7-f8-git-discovery.json. This narrows D12 to a failing native Git discovery context; exact cause remains open. No retry/source change. Continue classifying the other completed failed jobs individually.
+
+## 2026-09-12T16:04:05.016436+00:00 — D12 host ownership cause confirmed
+
+Update-smoke job103572678961 exposes actual Git dubious-ownership stderr: CI path owned by Beast/nksra, runner is NETWORK SERVICE S-1-5-20. PR473 Windows release job103573774515 fails three launcher tests at unreadable-commit guard; exact synthetic0355023f tree equals440123f6. Source-specific evidence/complete logs pushed in diagnostics/D12-confirmed-ownership-root-cause.json. D12 is host/environment configuration, no product repair. Plan only a controlled narrow CI-workspace trust/ownership correction under the unchanged runner identity; no action applied, no wildcard bypass or account change. Next classify the remaining AQG Phase2 failure before repair decisions.

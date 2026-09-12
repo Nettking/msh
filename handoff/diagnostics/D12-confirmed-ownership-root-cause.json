@@ -1,0 +1,57 @@
+{
+  "recorded_at": "2026-09-12T16:04:05.016436+00:00",
+  "finding": "D12",
+  "status": "CONFIRMED_HOST_CONFIGURATION_ROOT_CAUSE_FOR_GIT_REJECTION",
+  "candidate_shas": [
+    "b7194820d8f1940ae60b8c9639e09b7f61e65c55",
+    "440123f6bc6dc358eef3d233236bc14f91af60e0"
+  ],
+  "pr_checkout": "0355023f27c4c6886ab6beb48bb9a998b3ab2904",
+  "pr_checkout_tree_identical": true,
+  "host": "BEAST native Windows runner28",
+  "stages": [
+    "Postmerge update-contracts recorder-supervisor smoke",
+    "PR473 Discovery authority and bounded startup regressions",
+    "Related previously retained Go VCS and F7/F8 diff failures"
+  ],
+  "observed": "Actual git rev-parse stderr rejects C:/actions-runner/_work/msh/msh as dubious ownership: owner Beast/nksra SID S-1-5-21-2697059779-2177400912-248823070-1001; executing identity NETWORK SERVICE SID S-1-5-20. Recorder smoke then calls Trim on missing output; PR473 launcher tests fail closed with no readable commit (3failed/147passed/7skipped).",
+  "expected": "The authorized CI checkout is recognized under the unchanged runner service identity so native Git provenance reads work. Protected recorder/runtime execution is not involved.",
+  "classification": "HOST/ENVIRONMENT configuration defect: repository ownership/trust mismatch is explicitly confirmed. It explains the shared Git-provenance boundary; do not assert every prior unrelated error has the same cause without evidence.",
+  "acceptance_impact": "Blocks native Beast Go/provenance/diff/supervisor checks and PR473 Windows release check. Does not invalidate otherwise-proven command/OS/trigger equivalence or turn successful tests into failures. PR473 remains draft pending resolution of its required check.",
+  "safe_continuation": "YES: preserve independent CI evidence and prepare controlled original-host repair. No further blind retry or global wildcard trust bypass.",
+  "state_changed": "No host repair, account/ownership/trust change, source/workflow modification, deployment or protected-data access. Only CI evidence retained.",
+  "protected_recorder_data": "UNTOUCHED",
+  "github_artifact": "https://github.com/Nettking/msh/issues/472",
+  "repair": "NONE APPLIED",
+  "next_diagnostic_action": "Plan a narrowly scoped repair for the CI-owned checkout under the actual NETWORK SERVICE runner identity, preserving the service account and ownership safety checks. Verify current exact resolved checkout, owner and global Git context first. Use only an authenticated/authorized original-host execution channel; SSH identity/account request remains pending if needed for repair. Retry only affected failed checks after a demonstrated correction.",
+  "evidence": [
+    {
+      "job_id": 103572678961,
+      "run_id": 34701018863,
+      "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+      "runner_name": "Beast",
+      "conclusion": "failure",
+      "bytes": 60310,
+      "sha256": "843be4d77a4a891165dc5aae1b209496ec6c1f43c21cd88b99f173d2f17c5a4f",
+      "checkout_commits": [
+        "b7194820d8f1940ae60b8c9639e09b7f61e65c55"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103573774515,
+      "run_id": 34701429430,
+      "name": "Release checks (Windows)",
+      "runner_name": "Beast",
+      "conclusion": "failure",
+      "bytes": 69333,
+      "sha256": "69eefa64e2a5b10da64de22e58c1cbd5dfacb90add0b5a55be337191e369fcf0",
+      "checkout_commits": [
+        "0355023f27c4c6886ab6beb48bb9a998b3ab2904"
+      ],
+      "checkout_matches": true
+    }
+  ],
+  "durable_logs": "D12-ownership-and-launcher-logs.zip",
+  "actual_stderr": "D12-ownership-stderr.log"
+}

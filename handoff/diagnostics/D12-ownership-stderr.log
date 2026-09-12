@@ -1,0 +1,17 @@
+2026-09-12T15:24:59.8584597Z fatal: detected dubious ownership in repository at 'C:/actions-runner/_work/msh/msh'
+2026-09-12T15:24:59.8585071Z 'C:/actions-runner/_work/msh/msh' is owned by:
+2026-09-12T15:24:59.8585463Z 	Beast/nksra (S-1-5-21-2697059779-2177400912-248823070-1001)
+2026-09-12T15:24:59.8585746Z but the current user is:
+2026-09-12T15:24:59.8585985Z 	NT-MYNDIGHET/NETTVERKSTJENESTE (S-1-5-20)
+2026-09-12T15:24:59.8586269Z To add an exception for this directory, call:
+2026-09-12T15:24:59.8586427Z 
+2026-09-12T15:24:59.8586641Z 	git config --global --add safe.directory C:/actions-runner/_work/msh/msh
+2026-09-12T15:24:59.9778276Z You cannot call a method on a null-valued expression.
+2026-09-12T15:24:59.9778824Z At C:\actions-runner\_work\msh\msh\scripts\windows\tests\fcp_recorder_supervisor_restart_smoke.ps1:180 char:5
+2026-09-12T15:24:59.9779379Z +     $headCommit = (& git -C $repoRoot rev-parse --verify 'HEAD^{commi ...
+2026-09-12T15:24:59.9779744Z +     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+2026-09-12T15:24:59.9780515Z     + CategoryInfo          : InvalidOperation: (:) [], ParentContainsErrorRecordException
+2026-09-12T15:24:59.9780936Z     + FullyQualifiedErrorId : InvokeMethodOnNull
+2026-09-12T15:24:59.9781175Z  
+2026-09-12T15:25:00.1362975Z ##[error]Process completed with exit code 1.
+2026-09-12T15:25:00.1598916Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
