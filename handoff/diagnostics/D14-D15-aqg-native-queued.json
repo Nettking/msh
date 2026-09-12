@@ -1,0 +1,50 @@
+{
+  "recorded_at": "2026-09-12T19:25:57.690517+00:00",
+  "control_sha": "e55b5425972794b6b9b268a0d735635f8e687e5d",
+  "candidate_sha": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "runs": [
+    {
+      "id": 34714139932,
+      "name": "PR475 bounded original-AQG context diagnostic",
+      "path": ".github/workflows/ci-pr475-aqg-context-diagnostic.yml",
+      "status": "queued",
+      "conclusion": null,
+      "created_at": "2026-09-12T19:25:39Z",
+      "updated_at": "2026-09-12T19:25:39Z",
+      "html_url": "https://github.com/Nettking/msh/actions/runs/34714139932",
+      "jobs": [
+        {
+          "id": 103608092230,
+          "run_id": 34714139932,
+          "workflow_name": "PR475 bounded original-AQG context diagnostic",
+          "head_branch": "codex/federation-v1-diagnostic-sweep-20260911",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34714139932",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYH4YGRg",
+          "head_sha": "e55b5425972794b6b9b268a0d735635f8e687e5d",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103608092230",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34714139932/job/103608092230",
+          "status": "queued",
+          "conclusion": null,
+          "created_at": "2026-09-12T19:25:39Z",
+          "started_at": "2026-09-12T19:25:39Z",
+          "completed_at": null,
+          "name": "original-aqg",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103608092230",
+          "labels": [
+            "self-hosted",
+            "Linux",
+            "X64",
+            "aqg7ncc-linux-admission",
+            "fcp-test-linux"
+          ],
+          "runner_id": null,
+          "runner_name": null,
+          "runner_group_id": null,
+          "runner_group_name": null
+        }
+      ]
+    }
+  ]
+}

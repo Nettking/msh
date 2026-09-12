@@ -32,8 +32,16 @@
   ],
   "github_artifact": "https://github.com/Nettking/msh/issues/476",
   "repair": "NONE",
-  "next_diagnostic_action": "Continue independently with the planned2-test D15 predecessor context; do not repeat D14 contexts or claim repair.",
+  "next_diagnostic_action": "Wait for original AQG runner/job transition; confirm started preflight then inspect near bounded completion. Preserve outcome before continuation. No duplicate job, runner change or extra short context on NETTKING.",
   "recorded_at": "2026-09-12T18:00:49.086503+00:00",
   "focused_followup": "2PASS,1warning on NETTKING Ubuntu WSL; one D14 and one D15 test. Pytest deduplicated repeated node arguments; no claim of five D15 executions. Different host and isolated selection, without complete rotating-order predecessor history. Neither original failure reproduced or invalidated.",
-  "seeded_context": "D14-seeded-context-reviewed.json"
+  "seeded_context": "D14-seeded-context-reviewed.json",
+  "original_aqg_queued": {
+    "run": 34714139932,
+    "job": 103608092230,
+    "control_sha": "e55b5425972794b6b9b268a0d735635f8e687e5d",
+    "status": "QUEUED; original AQG runner offline",
+    "candidate_sha": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+    "evidence": "D14-D15-aqg-native-queued.json"
+  }
 }
