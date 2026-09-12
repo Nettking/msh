@@ -2157,3 +2157,7 @@ physical action. Next: state-change poll463 and retain new terminal evidence.
 03:16:54UTC: integrated PR463 exact-head2c1a8d93 gap dispatched once:
 icse-tool-demo.yml (HTTP204). Native proof and ledger preserved; no duplicate job or
 physical action. Next: state-change poll463 and retain new terminal evidence.
+
+03:17:01UTC: integrated PR463 exact-head2c1a8d93 gap dispatched once:
+federation-software-update.yml (HTTP204). Native proof and ledger preserved; no duplicate job or
+physical action. Next: state-change poll463 and retain new terminal evidence.
