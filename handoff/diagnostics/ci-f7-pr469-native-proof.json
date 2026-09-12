@@ -1,0 +1,220 @@
+{
+  "reviewed_at": "2026-09-12T12:57:05.913605+00:00",
+  "status": "ONE_COMPLETE_GREEN_NATIVE_REPLACEMENT_EXECUTION_REVIEWED",
+  "pr": 469,
+  "run_id": 34690234286,
+  "api_head_sha": "660bf23269893305c7e8ffcc4c910a7efaed567d",
+  "actual_checkout": "aa7b41d328d8d6cab756951ec8739a370099756b",
+  "checkout_tree_identical_to_head": true,
+  "workflow_blob": "143db0b43c870bc5791c3629e34fd61a72293c47",
+  "event": "pull_request",
+  "native_jobs": [
+    {
+      "os": "Windows",
+      "job_id": 103544075521,
+      "runner_name": "Nettking",
+      "runner_id": 22,
+      "labels": [
+        "self-hosted",
+        "fcp-windows"
+      ],
+      "checkout_commit": "aa7b41d328d8d6cab756951ec8739a370099756b",
+      "log_sha256": "987024b0672e2d5694bddc8b8ef4eb36fa90540e4e9549c644a78f0a91979773",
+      "log_bytes": 68474,
+      "log_excerpts": [
+        "2026-09-12T12:03:21.4988338Z Runner name: 'Nettking'",
+        "2026-09-12T12:03:27.7910603Z [command]\"C:\\Program Files\\Git\\bin\\git.exe\" -c protocol.version=2 fetch --prune --no-recurse-submodules origin +refs/heads/*:refs/remotes/origin/* +refs/tags/*:refs/tags/* +aa7b41d328d8d6cab756951ec8739a370099756b:refs/remotes/pull/469/merge",
+        "2026-09-12T12:03:28.9630043Z aa7b41d328d8d6cab756951ec8739a370099756b",
+        "2026-09-12T12:03:29.2265638Z 3.12.10",
+        "2026-09-12T12:05:49.1260821Z ##[group]Run python -m compileall catalog/capabilities catalog/ai catalog/common/tests/test_f7_ci_coverage.py catalog/flask_app/ai_routes.py catalog/flask_app/tests/test_ai_explainer_chat.py catalog/flask_app/tests/test_ai_runtime_integration.py catalog/flask_app/tests/test_connected_ai_provider.py catalog/flask_app/tests/test_model_provider_compose.py catalog/relay/tests/test_phase_f74_capability_dispatch.py catalog/relay/tests/test_phase_f75_retry_cancellation.py",
+        "2026-09-12T12:05:49.9673045Z ##[group]Run python -m pytest -o addopts= -q --junitxml=\"C:\\actions-runner\\_work\\_temp/f7-closeout-Windows.xml\" catalog/common/tests/test_f7_ci_coverage.py catalog/capabilities/tests catalog/ai/tests catalog/flask_app/tests/test_ai_explainer_chat.py catalog/flask_app/tests/test_ai_runtime_integration.py catalog/flask_app/tests/test_connected_ai_provider.py catalog/flask_app/tests/test_model_provider_compose.py catalog/relay/tests/test_phase_f74_capability_dispatch.py catalog/relay/tests/test_phase_f75_retry_cancellation.py catalog/federation/tests/test_phase0.py catalog/federation/tests/test_phase1.py catalog/federation/tests/test_phase_f641_chunk_contract.py catalog/node/tests/test_phase_f642_verified_chunk_transfer.py catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py",
+        "2026-09-12T12:07:58.4652869Z ##[group]Run python -m ruff check catalog/capabilities catalog/ai catalog/common/tests/test_f7_ci_coverage.py catalog/flask_app/ai_routes.py catalog/flask_app/tests/test_ai_runtime_integration.py --ignore I001,RUF022,B008,C408,PLC0206,UP035",
+        "2026-09-12T12:07:59.6175406Z ##[group]Run python -m ruff check catalog/capabilities --select UP035",
+        "2026-09-12T12:07:59.8934804Z ##[group]Run python -m ruff check catalog/relay/tests/test_phase_f74_capability_dispatch.py catalog/relay/tests/test_phase_f75_retry_cancellation.py --ignore I001,RUF022,B008,C408,PLC0206",
+        "2026-09-12T12:08:00.1605893Z ##[group]Run docker compose config --quiet",
+        "2026-09-12T12:08:00.5977510Z ##[group]Run git diff --check origin/codex/ci-f7-coverage-consolidation...HEAD"
+      ],
+      "python": "3.12.10",
+      "shell": "WindowsPowerShell",
+      "all_required_steps_success": true,
+      "tests": 722,
+      "passed": 717,
+      "skipped": 5,
+      "failures": 0,
+      "errors": 0,
+      "all_unique_mapped_modules_passed": {
+        "catalog/ai/tests/test_ai_explainer.py": 8,
+        "catalog/ai/tests/test_ai_explainer_cache.py": 2,
+        "catalog/ai/tests/test_grounding.py": 4,
+        "catalog/ai/tests/test_ollama_client.py": 15,
+        "catalog/ai/tests/test_runtime.py": 17,
+        "catalog/ai/tests/test_runtime_manager.py": 6,
+        "catalog/ai/tests/test_runtime_manager_reconciliation.py": 1,
+        "catalog/flask_app/tests/test_ai_explainer_chat.py": 4,
+        "catalog/flask_app/tests/test_connected_ai_provider.py": 15,
+        "catalog/flask_app/tests/test_model_provider_compose.py": 2,
+        "catalog/relay/tests/test_phase_f74_capability_dispatch.py": 1,
+        "catalog/relay/tests/test_phase_f75_retry_cancellation.py": 2,
+        "catalog/federation/tests/test_phase_f641_chunk_contract.py": 19,
+        "catalog/node/tests/test_phase_f642_verified_chunk_transfer.py": 12,
+        "catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py": 9,
+        "catalog/common/tests/test_f7_ci_coverage.py": 29
+      },
+      "skip_details": [
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_preserves_real_link_containment[False-False]",
+          "reason": "Windows symlink privilege unavailable"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_preserves_real_link_containment[False-True]",
+          "reason": "Windows symlink privilege unavailable"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_preserves_real_link_containment[True-False]",
+          "reason": "Windows symlink privilege unavailable"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_preserves_real_link_containment[True-True]",
+          "reason": "Windows symlink privilege unavailable"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_workspace_reconciliation",
+          "name": "test_reparse_or_symlink_attempt_is_never_followed",
+          "reason": "directory symlinks are unavailable on this runner"
+        }
+      ],
+      "artifact": {
+        "run_id": 34690234286,
+        "id": 10297826628,
+        "name": "f7-closeout-Windows",
+        "digest": "sha256:cd1b75037f27003ddda6cedfd7db4174ec690e148182240e552d85eb86eca8d4",
+        "bytes": 16469,
+        "created_at": "2026-09-12T12:08:02Z",
+        "api_workflow_head": "660bf23269893305c7e8ffcc4c910a7efaed567d"
+      },
+      "retained_zip": "ci-f7-native-evidence/10297826628.zip",
+      "junit_sha256": "77e938763225fbe4e134a772b231e44cb5fd955b59bac6f7e06c12a4c859fce6"
+    },
+    {
+      "os": "Linux",
+      "job_id": 103544075635,
+      "runner_name": "Nettking-Linux",
+      "runner_id": 27,
+      "labels": [
+        "self-hosted",
+        "fcp-linux-fast"
+      ],
+      "checkout_commit": "aa7b41d328d8d6cab756951ec8739a370099756b",
+      "log_sha256": "1efb874ba530b52590a40ab399c4f17d1b50864ea8a05881a6c31a37263583f5",
+      "log_bytes": 68696,
+      "log_excerpts": [
+        "2026-09-12T11:35:28.9102059Z Runner name: 'Nettking-Linux'",
+        "2026-09-12T11:35:32.7773434Z [command]/usr/bin/git -c protocol.version=2 fetch --prune --no-recurse-submodules origin +refs/heads/*:refs/remotes/origin/* +refs/tags/*:refs/tags/* +aa7b41d328d8d6cab756951ec8739a370099756b:refs/remotes/pull/469/merge",
+        "2026-09-12T11:35:33.5004298Z aa7b41d328d8d6cab756951ec8739a370099756b",
+        "2026-09-12T11:35:33.5793396Z 3.12.13",
+        "2026-09-12T11:36:07.8134492Z Runner meets the product host-resource precondition.",
+        "2026-09-12T11:36:07.8221987Z ##[group]Run python -m compileall catalog/capabilities catalog/ai catalog/common/tests/test_f7_ci_coverage.py catalog/flask_app/ai_routes.py catalog/flask_app/tests/test_ai_explainer_chat.py catalog/flask_app/tests/test_ai_runtime_integration.py catalog/flask_app/tests/test_connected_ai_provider.py catalog/flask_app/tests/test_model_provider_compose.py catalog/relay/tests/test_phase_f74_capability_dispatch.py catalog/relay/tests/test_phase_f75_retry_cancellation.py",
+        "2026-09-12T11:36:08.2823245Z ##[group]Run python -m pytest -o addopts= -q --junitxml=\"/home/gha/actions-runner/_work/_temp/f7-closeout-Linux.xml\" catalog/common/tests/test_f7_ci_coverage.py catalog/capabilities/tests catalog/ai/tests catalog/flask_app/tests/test_ai_explainer_chat.py catalog/flask_app/tests/test_ai_runtime_integration.py catalog/flask_app/tests/test_connected_ai_provider.py catalog/flask_app/tests/test_model_provider_compose.py catalog/relay/tests/test_phase_f74_capability_dispatch.py catalog/relay/tests/test_phase_f75_retry_cancellation.py catalog/federation/tests/test_phase0.py catalog/federation/tests/test_phase1.py catalog/federation/tests/test_phase_f641_chunk_contract.py catalog/node/tests/test_phase_f642_verified_chunk_transfer.py catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py",
+        "2026-09-12T11:37:18.8883345Z ##[group]Run python -m ruff check catalog/capabilities catalog/ai catalog/common/tests/test_f7_ci_coverage.py catalog/flask_app/ai_routes.py catalog/flask_app/tests/test_ai_runtime_integration.py --ignore I001,RUF022,B008,C408,PLC0206,UP035",
+        "2026-09-12T11:37:18.9461086Z ##[group]Run python -m ruff check catalog/capabilities --select UP035",
+        "2026-09-12T11:37:18.9849956Z ##[group]Run python -m ruff check catalog/relay/tests/test_phase_f74_capability_dispatch.py catalog/relay/tests/test_phase_f75_retry_cancellation.py --ignore I001,RUF022,B008,C408,PLC0206",
+        "2026-09-12T11:37:19.0162589Z ##[group]Run docker compose config --quiet",
+        "2026-09-12T11:37:19.1405858Z ##[group]Run git diff --check origin/codex/ci-f7-coverage-consolidation...HEAD"
+      ],
+      "python": "3.12.13",
+      "shell": "/usr/bin/bash",
+      "all_required_steps_success": true,
+      "tests": 722,
+      "passed": 713,
+      "skipped": 9,
+      "failures": 0,
+      "errors": 0,
+      "all_unique_mapped_modules_passed": {
+        "catalog/ai/tests/test_ai_explainer.py": 8,
+        "catalog/ai/tests/test_ai_explainer_cache.py": 2,
+        "catalog/ai/tests/test_grounding.py": 4,
+        "catalog/ai/tests/test_ollama_client.py": 15,
+        "catalog/ai/tests/test_runtime.py": 17,
+        "catalog/ai/tests/test_runtime_manager.py": 6,
+        "catalog/ai/tests/test_runtime_manager_reconciliation.py": 1,
+        "catalog/flask_app/tests/test_ai_explainer_chat.py": 4,
+        "catalog/flask_app/tests/test_connected_ai_provider.py": 15,
+        "catalog/flask_app/tests/test_model_provider_compose.py": 2,
+        "catalog/relay/tests/test_phase_f74_capability_dispatch.py": 1,
+        "catalog/relay/tests/test_phase_f75_retry_cancellation.py": 2,
+        "catalog/federation/tests/test_phase_f641_chunk_contract.py": 19,
+        "catalog/node/tests/test_phase_f642_verified_chunk_transfer.py": 12,
+        "catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py": 9,
+        "catalog/common/tests/test_f7_ci_coverage.py": 29
+      },
+      "skip_details": [
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_survives_native_leaf_replacement[x-False]",
+          "reason": "Windows deleted-file final name"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_survives_native_leaf_replacement[x-True]",
+          "reason": "Windows deleted-file final name"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_survives_native_leaf_replacement[analysis/session/work/plan.json-False]",
+          "reason": "Windows deleted-file final name"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_survives_native_leaf_replacement[analysis/session/work/plan.json-True]",
+          "reason": "Windows deleted-file final name"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_preserves_real_junction_containment[False-False]",
+          "reason": "Windows junction containment"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_preserves_real_junction_containment[False-True]",
+          "reason": "Windows junction containment"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_preserves_real_junction_containment[True-False]",
+          "reason": "Windows junction containment"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_preserves_real_junction_containment[True-True]",
+          "reason": "Windows junction containment"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_store",
+          "name": "test_unsupported_native_publication_preserves_existing_artifact",
+          "reason": "Windows native publication failure"
+        }
+      ],
+      "artifact": {
+        "run_id": 34690234286,
+        "id": 10297179007,
+        "name": "f7-closeout-Linux",
+        "digest": "sha256:5a0ac2b91467afc6fa11528fe9fe253a18bcfd54659ef6fef55ba6bd120c7a52",
+        "bytes": 16229,
+        "created_at": "2026-09-12T11:37:20Z",
+        "api_workflow_head": "660bf23269893305c7e8ffcc4c910a7efaed567d"
+      },
+      "retained_zip": "ci-f7-native-evidence/10297179007.zip",
+      "junit_sha256": "0994245f990ea6278cec33d216be865dbc8c929583de7518164633198b3d6f8d"
+    }
+  ],
+  "union_passed_test_identities": 722,
+  "every_skip_passes_on_other_native_os": true,
+  "required_green_runs": 2,
+  "retirement_authorized_by_this_single_receipt": false,
+  "physical_acceptance": false,
+  "protected_recorder_data": "UNTOUCHED"
+}

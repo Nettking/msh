@@ -11,19 +11,19 @@ all17 D08 cases across native platforms, original scheduler failure and explicit
 platform exclusions reconciled. No job was rerun for historical hosted billing reds.
 All prior PR/failed-main evidence retained under its own source. No further17ab CI
 polling or qualification is needed unless a concrete new contract reason appears.
-Next highest-value action: WAIT for the existing PR469 canary Windows job in
-F7 run34690234286 to resolve. Do not move PR468 HEAD f3abe5452db2f21593a688bc62bc5f4b22d5c40e
-while that proof is queued/running. D09 repair ba44100ec1e4cde19daba0d3723b991c11742316
-remains separate on codex/ci-f7-branding-doc-fix; user accepted this handling.
-If Windows passes, retain/review the complete second native pair before proceeding.
-If it fails, diagnose against unchanged source before integrating D09.
-After canary evidence is safely pushed, integrate docs-only repair with clean,
-fast-forward history where possible; preserve unrelated active qualification.
-Then verify the actual final PR head/delta and run unchanged branding plus required
-lightweight final-head/reference/status-contract checks. Preserve the two expensive
-native proofs when executable/workflow content is byte-identical, unless an explicit
-checked-in contract demands whole-final-commit rebinding. Do not manually repeat
-those complete runs merely for this documentation change.
+Next highest-value action: integrate the separate D09 docs-only repair into PR468
+through clean history, then validate the actual head and source equivalence.
+The existing canary Windows job PASSED at12:08Z. Both native replacement runs
+are fully reviewed (2/2), with exact source/command/runtime/JUnit evidence:
+diagnostics/ci-f7-two-native-greens.json. The actual JS-only event is verified.
+Canary660bf232 must never be merged; PR468 remains f3abe545 until D09 integration.
+The13:00-bound snapshot found all PR468/469 automatic jobs completed; preserve
+all successes. Separate release failures occurred at checkout on Beast in three
+Windows regression jobs; their aggregates are consequences. Inspect the exact
+checkout error and persist its classification before any merge or rerun.
+After integrating ba44100e, rerun branding and required lightweight final-head/
+reference/status checks, preserve unchanged native coverage with original provenance,
+and require all replacement proof before merge or legacy retirement.
 Pre-integration comparison: diagnostics/D09-preintegration-source-comparison.json.
 Base f3abe545 -> repair ba44100e changes one document; all1417 other tracked entries
 (mode/type/object/path) match. Actual canary660bf232 has its separately documented
@@ -2560,3 +2560,17 @@ Next12:55Z: inspect current canary, persist completion/failure and native proof,
 then follow the accepted conditional integration path. Do not merge or delete
 legacy gates until proof and final source/reference/status contracts are satisfied.
 Physical runtime, Recorder data and unrelated active qualification stay untouched.
+
+## 2026-09-12T12:58:10.997241+00:00 — 2/2 native replacement proof retained
+
+Canary Windows103544075521 and Linux103544075635 both passed, using exact
+checkout aa7b41d328d8d6cab756951ec8739a370099756b with the660bf232 tree.
+Both native pairs have722 identities passing across platforms; all12 mapped AI
+modules, three transfer modules, strict lint/runtime/Compose/hygiene guards pass.
+Original digest-verified JUnit ZIPs and native receipts are retained. This meets
+the two-run replacement proof requirement, not final-head validation or acceptance.
+
+All PR468/469 automatic runs completed. New release failures are localized to
+Beast checkout (three Windows shard jobs), with downstream red aggregates; exact
+logs/classification are next. D09 branding and hosted billing reds remain separate.
+No source head moved, CI restarted, physical runtime or Recorder data changed.

@@ -1,0 +1,32 @@
+{
+  "recorded_at": "2026-09-12T12:58:10.997241+00:00",
+  "status": "TWO_COMPLETE_GREEN_NATIVE_REPLACEMENT_EXECUTIONS_REVIEWED",
+  "reviewed_runs": [
+    {
+      "pr": 468,
+      "run_id": 34689990990,
+      "head_sha": "f3abe5452db2f21593a688bc62bc5f4b22d5c40e",
+      "checkout_sha": "b0fbb8a1a4e216b8696b8015a35594c1007319de",
+      "receipt": "ci-f7-pr468-native-proof.json"
+    },
+    {
+      "pr": 469,
+      "run_id": 34690234286,
+      "head_sha": "660bf23269893305c7e8ffcc4c910a7efaed567d",
+      "checkout_sha": "aa7b41d328d8d6cab756951ec8739a370099756b",
+      "receipt": "ci-f7-pr469-native-proof.json"
+    }
+  ],
+  "native_executions": 4,
+  "workflow_blob": "143db0b43c870bc5791c3629e34fd61a72293c47",
+  "test_identities_per_native_matrix": 722,
+  "all_unique_windows_ai_modules_passed": 12,
+  "all_transfer_modules_passed": 3,
+  "real_js_only_pull_request_event_verified": true,
+  "trigger_receipt": "ci-f7-js-only-trigger-proof.json",
+  "canary_inert_comment_not_part_of_candidate": true,
+  "required_next_gate": "Integrate D09 after this receipt is pushed; validate actual new head, unchanged executable source and branding/reference/status contracts. Diagnose separate release checkout failure before merge.",
+  "retirement_or_merge_approved": false,
+  "physical_acceptance": false,
+  "protected_recorder_data": "UNTOUCHED"
+}
