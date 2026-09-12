@@ -1,26 +1,36 @@
 # Federation v1 qualification coordination
 
-**Current actionable checkpoint (2026-09-12T16:41:38.856769+00:00):** PR473 stays fixed at
+**Current actionable checkpoint (2026-09-12T16:47:17.958904+00:00):** PR473 stays fixed at
 440123f6bc6dc358eef3d233236bc14f91af60e0. Its native F7 final-source proof,
 original2/2 replacement proof and real JS-only event remain valid and retained.
 
 The single affected-check retry34701429430/attempt2/job103583206021 completed
-on Nettking with a DIFFERENT failure: D13 unknown-path refusal logged404 but
-the client received WinError10053.149passed/7skipped/1failed; three red aggregates
-are dependent consequences. Exact checkout0355023f/tree==440 verified in native
-logs. See diagnostics/D13.md and full logs/receipt linked there. No further retry.
-D13 issue474 is published. Next inspect unchanged socket lifecycle and
-perform only a bounded isolated loopback reproduction with current deadlines.
+on Nettking with a DIFFERENT failure, D13/#474: unknown-path refusal logged404
+but client received WinError10053.149passed/7skipped/1failed. Three red aggregates
+are dependent consequences. Actual0355023f checkout/tree==440 verified in native
+logs. No live jobs remain in this run; no further CI retry. PR473 remains draft.
 
-D12 Beast scoped Git trust repair remains verified on the actual original runner;
-the three former launcher failures did not recur on Nettking, but this does not
-prove their original-host CI resolution. D11 remains unresolved on AQG; neither
-finding is reclassified by D13. Main b719 release16/16 evidence is archived, its
-companion failures preserved. Last fully qualified candidate17ab3a05(37+3) remains.
-No merge/new candidate or blanket rerun. No physical PASS/P07/P12, deployment,
-protected Recorder-data access, Docker reset/prune or new runner/account changes.
-Physical runtime9b286f93 remains untouched. The coordination maintenance workflow
-must never enter a candidate. No live jobs remain in the targeted release run.
+D13 reproduced on iteration2 of the unchanged test in clean440 under NETTKING/
+Martin, separate from Actions. Bounded framing contrast: empty-body20/20PASS,
+ordinary two-byte POST19PASS/1same failure, single-send headers+body20/20PASS.
+Unknown path returns before reading request body; standard client sends headers
+and body separately. Unread-body/close race is a supported hypothesis, not a
+proven safe repair. Cause remains unresolved; do not classify as capacity/Git.
+Receipts: diagnostics/D13.md, D13-unchanged-local-reproduction.json,
+D13-request-framing-contrast.json; full original logs archived and issue474 linked.
+NEXT: one bounded controlled split-request transport diagnosis against unchanged
+440 handler. Preserve5s deadline and authority guards; ephemeral loopback only.
+Any repair belongs in a separate PR/worktree, not in CI cleanup473. Do not merge
+or dispatch another full qualification merely because runners are idle.
+
+D12 Beast scoped Git trust repair remains verified on original runner. Its former
+launcher failures did not recur on Nettking; this is not original-host CI proof.
+D11/#471 remains unresolved on AQG; D10 remains separate. Main b719 release16/16
+native/artifact proof is archived, companion failures preserved. Last fully
+qualified candidate17ab3a05(37+3) remains. No new candidate or physical acceptance.
+Physical runtime9b286f93 and protected Recorder data untouched. No P07/P12,
+deployment, Docker reset/prune or new runner/account/pool changes. Coordination-
+only Beast maintenance workflow must never enter a release candidate.
 
 Current user direction, September 11 2026: execute on state changes, using this
 checkpoint and the completed diagnostic sweep report; do not repeat the sweep.

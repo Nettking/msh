@@ -1,0 +1,339 @@
+{
+  "recorded_at": "2026-09-12T16:44:59.624931+00:00",
+  "candidate_sha": "440123f6bc6dc358eef3d233236bc14f91af60e0",
+  "host": "Nettking",
+  "user_context": "nettking\\martin",
+  "python": "3.12.10",
+  "deadline_seconds": 5,
+  "procedure": "20 attempts per framing case, on fresh ephemeral loopback unchanged product responder; server shutdown plus explicit fixture close after each attempt.",
+  "state_changed": "Diagnostic-owned ephemeral sockets only; source and production services unchanged.",
+  "protected_recorder_data": "UNTOUCHED",
+  "qualification": false,
+  "cases": [
+    {
+      "case": "urllib_empty_body",
+      "passed": 20,
+      "failed": 0,
+      "attempts": [
+        {
+          "iteration": 1,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 2,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 3,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 4,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 5,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 6,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 7,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 8,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 9,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 10,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 11,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 12,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 13,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 14,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 15,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 16,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 17,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 18,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 19,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 20,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        }
+      ]
+    },
+    {
+      "case": "urllib_two_byte_body",
+      "passed": 19,
+      "failed": 1,
+      "attempts": [
+        {
+          "iteration": 1,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 2,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 3,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 4,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 5,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 6,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 7,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 8,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 9,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 10,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 11,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 12,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 13,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 14,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 15,
+          "outcome": "failure",
+          "exception": "ConnectionAbortedError",
+          "message": "[WinError 10053] En etablert tilkobling ble avbrutt av programvaren p\u00e5 vertsmaskinen",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 16,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 17,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 18,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 19,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 20,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        }
+      ]
+    },
+    {
+      "case": "single_send_two_byte_body",
+      "passed": 20,
+      "failed": 0,
+      "attempts": [
+        {
+          "iteration": 1,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 2,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 3,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 4,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 5,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 6,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 7,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 8,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 9,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 10,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 11,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 12,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 13,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 14,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 15,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 16,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 17,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 18,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 19,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        },
+        {
+          "iteration": 20,
+          "outcome": "pass",
+          "server_stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+        }
+      ]
+    }
+  ],
+  "elapsed_seconds": 30.234,
+  "source_clean_after": true
+}
