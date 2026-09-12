@@ -1,5 +1,5 @@
 {
-  "observed_at": "2026-09-12T00:35:19.380010+00:00",
+  "observed_at": "2026-09-12T00:46:23.290038+00:00",
   "prs": {
     "465": {
       "number": 465,
@@ -95,11 +95,11 @@
             {
               "id": 103464901160,
               "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-12T00:24:49Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking",
+              "started_at": "2026-09-12T00:38:45Z",
+              "completed_at": "2026-09-12T00:43:11Z"
             },
             {
               "id": 103464901268,
@@ -117,15 +117,15 @@
           "run_id": 34659536814,
           "event": "workflow_dispatch",
           "api_head_sha": "4749ab6689315a7ad953c11ce4b2ec942433d71a",
-          "status": "in_progress",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "attempt": 1,
           "required_count": 2,
           "signature": {
-            "status": "in_progress",
-            "conclusion": null,
+            "status": "completed",
+            "conclusion": "success",
             "run_attempt": 1,
-            "updated_at": "2026-09-12T00:31:52Z"
+            "updated_at": "2026-09-12T00:38:44Z"
           },
           "jobs": [
             {
@@ -140,11 +140,11 @@
             {
               "id": 103458969834,
               "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
-              "status": "in_progress",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "runner_name": "Nettking",
               "started_at": "2026-09-12T00:31:52Z",
-              "completed_at": null
+              "completed_at": "2026-09-12T00:38:43Z"
             }
           ]
         },
@@ -176,19 +176,19 @@
             {
               "id": 103464860195,
               "name": "Release checks (Linux)",
-              "status": "in_progress",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "runner_name": "Nettking-Linux",
               "started_at": "2026-09-12T00:34:44Z",
-              "completed_at": null
+              "completed_at": "2026-09-12T00:36:16Z"
             },
             {
               "id": 103464860198,
               "name": "PostgreSQL storage release check",
-              "status": "queued",
+              "status": "in_progress",
               "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-12T00:24:35Z",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-12T00:46:11Z",
               "completed_at": null
             },
             {
@@ -221,11 +221,11 @@
             {
               "id": 103464860262,
               "name": "Full-suite order (fixed)",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-12T00:24:35Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-12T00:36:18Z",
+              "completed_at": "2026-09-12T00:46:09Z"
             },
             {
               "id": 103464860273,
@@ -271,6 +271,15 @@
               "runner_name": "",
               "started_at": "2026-09-12T00:24:35Z",
               "completed_at": null
+            },
+            {
+              "id": 103468376856,
+              "name": "Clean-checkout suite order independence",
+              "status": "queued",
+              "conclusion": null,
+              "runner_name": null,
+              "started_at": "2026-09-12T00:46:10Z",
+              "completed_at": null
             }
           ]
         },
@@ -311,10 +320,10 @@
             {
               "id": 103464879836,
               "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
-              "status": "queued",
+              "status": "in_progress",
               "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-12T00:24:42Z",
+              "runner_name": "Nettking",
+              "started_at": "2026-09-12T00:43:13Z",
               "completed_at": null
             }
           ]
