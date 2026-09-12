@@ -1,18 +1,19 @@
 # Federation v1 qualification coordination
 
-**Current actionable checkpoint (2026-09-12T04:12:06.620483+00:00):** PR463/D06 exact head
-`2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee` qualified37/37 plus3/3 and
-normally merged as **`2a9c9b8eb53edff74c2de23570ec56e054d29b22`**.
-PR465/D07 previously qualified and merged asb6a96b21. All required fixes are merged.
-Clean detached qualification checkout is verified. All13 workflows are running or
-completed (six existing push runs plus seven single guarded dispatches). Next:
-poll_merged_main_state.py, retain only new native logs, then final artifact review.
-Current result:36/37 required successful, F85-Windows FAILED;3/3 companions successful.
-D08 immediate error: concurrent analysis artifact-object-key-escape; confirmed Windows leaf-resolution/publication race (D08/#466).
-Main2a9c9b8e is not yet qualified or frozen as a physical candidate.
-Do not requalify PR heads or intermediate main. Physical runtime remains
-M`9b286f931497bf6291e215f6340443c5162826b0`; admission stopped, no physical PASS
-or P07/P12 timers. Protected Recorder data unchanged. Chronological deltas follow.
+**Current actionable checkpoint (2026-09-12T05:22:38.789489+00:00):** actual merged main
+`2a9c9b8eb53edff74c2de23570ec56e054d29b22` is **NOT QUALIFIED**:36/37 required
+jobs successful,3/3 companions successful; F85-Windows failed as **D08/#466**.
+Read [D08](diagnostics/D08.md) and its focused evidence before substantive work.
+Confirmed product mechanism: full-leaf Path.resolve races Windows POSIX publication,
+returning NTFS $Extend/$Deleted for a valid key and raising artifact-object-key-escape.
+All required prior fixes463/465 are merged. No PR-head or passing main reruns.
+Next: inspect containment/symlink contracts, develop a narrow separate D08 regression
+and repair in isolated branch codex/analysis-content-resolve-race from2a9c9b8e;
+push a draft PR with focused evidence before deciding new qualification scope.
+No repair branch/source edit exists yet. Current release9/ICSE6 artifact reviews
+remain valid for2a9; final verdict helper must not pass while F85 is failed.
+Physical runtime remains M`9b286f931497bf6291e215f6340443c5162826b0`;
+admission stopped, protected Recorder data untouched, no candidate freeze/PASS/timers.
 
 Current user direction, September 11 2026: execute on state changes, using this
 checkpoint and the completed diagnostic sweep report; do not repeat the sweep.
@@ -2244,3 +2245,22 @@ Only required absent gates may be dispatched; no physical deployment or candidat
 05:17UTC: D08 published as GitHub issue466 with source-bound evidence and impact. Next: exact-main path-validation/concurrent scheduling analysis; only isolated owned-fixture repro if justified. Do not retry F85 or create/qualify a new candidate until failure classification establishes the appropriate action.
 
 05:19UTC D08 product mechanism confirmed on clean actual main: public store concurrent writes/resolve with old stream open returns NTFS $Extend/$Deleted path from Path.resolve for valid key, triggering artifact-object-key-escape. Focused13 writes/1396 resolves/two captured errors; exact frames retained. No source modification, external state, protected data or physical runtime touched. Next: update issue466 with focused evidence, inspect resolve callers/symlink guard contracts, then isolated D08 regression/repair branch. No F85 retry, final-main PASS, candidate freeze or physical admission.
+
+2026-09-12T05:22:38.789489+00:00: D08 issue466 comment5643728004 contains confirmed public-API mechanism.
+Automation retargeted to D08 repair; routine qualification polling is no longer
+useful until the repair/classification stage changes. No blanket F85 retry.
+Source caller inspection: only production external resolve caller is
+analysis/scheduler.py:_ensure_slice_archive; all content-store reads/writes also
+call resolve. Existing containment test is test_analysis_artifact_access.py near379.
+Proposed parent/leaf-validation approach is a hypothesis, not a selected repair:
+preserve true root-escape/symlink rejection and stable-handle/identity semantics.
+Exact next read: from clean C:/wsl/fcp-v1-2a9c9b8e-merged-main-20260912,
+read catalog/capabilities/tests/test_analysis_artifact_access.py lines350-390,
+catalog/capabilities/artifact_contracts.py:_logical_key, and checked-in stable
+filesystem directory/leaf reparse rules. Then create isolated worktree from2a9,
+add a deterministic Windows deleted-name interleaving regression plus concurrent
+public-API and real root-escape negative controls, confirm red on unchanged source,
+and repair only after the safe path contract is concrete. No full qualification
+merely because a patch exists; push branch/draft PR/focused results first.
+Private retained repro root is .acceptance/d08-resolve-ku191byw; no cleanup needed.
+All current work is pushed; product/physical checkouts remain clean and unchanged.
