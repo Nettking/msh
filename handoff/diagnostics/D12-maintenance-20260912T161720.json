@@ -1,0 +1,85 @@
+{
+  "recorded_at": "2026-09-12T16:17:20.151247+00:00",
+  "control_workflow_sha": "22abd041ada72b9e7c43c7c90307bc9494147068",
+  "purpose": "Dedicated CI host maintenance without checkout/product deployment",
+  "runs": [
+    {
+      "id": 34704678898,
+      "path": ".github/workflows/ci-beast-git-context-maintenance.yml",
+      "head_sha": "22abd041ada72b9e7c43c7c90307bc9494147068",
+      "status": "completed",
+      "conclusion": "success",
+      "event": "push",
+      "run_attempt": 1,
+      "created_at": "2026-09-12T16:15:36Z",
+      "updated_at": "2026-09-12T16:15:48Z",
+      "html_url": "https://github.com/Nettking/msh/actions/runs/34704678898",
+      "jobs": [
+        {
+          "id": 103582477854,
+          "run_id": 34704678898,
+          "workflow_name": "D12 bounded Beast CI Git context maintenance",
+          "head_branch": "codex/federation-v1-diagnostic-sweep-20260911",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34704678898",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYHf8uHg",
+          "head_sha": "22abd041ada72b9e7c43c7c90307bc9494147068",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103582477854",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34704678898/job/103582477854",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-12T16:15:36Z",
+          "started_at": "2026-09-12T16:15:38Z",
+          "completed_at": "2026-09-12T16:15:48Z",
+          "name": "scoped-host-repair",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-12T16:15:39Z",
+              "completed_at": "2026-09-12T16:15:41Z"
+            },
+            {
+              "name": "Verify identity and repair only the authorized CI path trust",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-12T16:15:41Z",
+              "completed_at": "2026-09-12T16:15:43Z"
+            },
+            {
+              "name": "Preserve exact before and after host evidence",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-12T16:15:43Z",
+              "completed_at": "2026-09-12T16:15:46Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-12T16:15:46Z",
+              "completed_at": "2026-09-12T16:15:46Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103582477854",
+          "labels": [
+            "self-hosted",
+            "Windows",
+            "X64",
+            "beast-windows",
+            "fcp-windows"
+          ],
+          "runner_id": 28,
+          "runner_name": "Beast",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        }
+      ]
+    }
+  ]
+}

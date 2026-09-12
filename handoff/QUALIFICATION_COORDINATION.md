@@ -2857,3 +2857,11 @@ is actually demonstrated. This workflow is excluded from all release branches.
 ## 2026-09-12T16:16:40.752375+00:00 — successful b719 release evidence retained
 
 All16 native release logs and9digest-verified artifacts are durably bundled; all four source-bound clean shard manifests pass the checked-in verifier. Every retained JUnit has zero errors/failures. Four existing b719 executions of D11 test pass (shard2, fixed, rotating, Windows transport), retained distinctly from the failed AQG Phase2 stage. Receipt: diagnostics/main-b719-release-reviewed.json. This is the automatic release run only, not a complete candidate qualification or physical acceptance. No job rerun.
+
+## 2026-09-12T16:17Z — dedicated Beast maintenance job completed
+
+Control workflow22abd041 run34704678898/job103582477854 completed SUCCESS on
+Beast. Initial outcome: diagnostics/D12-maintenance-20260912T161720.json. No other
+workflow was triggered by that control commit. Before claiming repair verified,
+retain/review the before/after artifact and unchanged existing checkout identity.
+No product checkout/deployment was part of this job; PR473 source stays fixed.
