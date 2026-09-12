@@ -1,17 +1,16 @@
 # Federation v1 qualification coordination
 
-**Current actionable checkpoint (2026-09-12T07:41Z; last CI snapshot07:39UTC):** PR467/D08 is ready for review at
+**Current actionable checkpoint (2026-09-12T07:43Z; last new-run snapshot07:42UTC):** PR467/D08 is ready for review at
 exact head84c66f8185c1411d9dc8c5c33244a2f564845ce7, clean repair checkout.
 Prequalification correctness/scope review completed with no findings;37+3 exact-head
-qualification active. Nine exact-head dispatches recorded once (seven absent gates
-plus completed branding and CF7B source gaps). All selected runs completed successfully;
+qualification active. Thirteen exact-head dispatches recorded once; nine exact-head workflows completed successfully, four newly accepted/queued.
 Current native proof:13/37 required plus3/3 companions (07:41UTC); twenty-five
 synthetic-source logs and two reviewed dependency aggregates are retained separately and excluded. No required failure observed.
 **Polling policy:** long-running jobs normally take1–2+ hours. After confirmed start/progress,
 wait at least45–60 minutes between checks unless expected completion is sooner; prefer
 checking near expected completion. The existing heartbeat is now hourly and quiet for
-unchanged/non-actionable progress. Last CI snapshot:2026-09-12T07:38:59Z.
-**Next eligible routine CI check:2026-09-12T08:39:00Z or later.** Do not poll before
+unchanged/non-actionable progress. Last new-run acceptance snapshot:2026-09-12T07:42Z.
+**Next eligible routine CI check:2026-09-12T08:42:00Z or later.** Do not poll before
 then unless an actionable completion/failure/timeout/head change is independently delivered.
 Do not create a new work cycle merely to report unchanged progress. On subsequent
 meaningful transitions, record last/next check times and preserve this policy across sessions.
@@ -2353,3 +2352,16 @@ and await the next eligible hourly snapshot. No passing exact-head evidence reru
 07:41:59UTC: PR467 exact84c66f81 phase-f85-operator-federation-surface.yml dispatched once after completed native synthetic-source proof (and release aggregate review where applicable). Request/response persisted in pr467-gap-dispatch-ledger.json. No valid exact-head rerun or physical action. Next: finish only the other proven source-gap dispatches, confirm new run acceptance, then hourly waiting.
 
 07:42:07UTC: PR467 exact84c66f81 icse-tool-demo.yml dispatched once after completed native synthetic-source proof (and release aggregate review where applicable). Request/response persisted in pr467-gap-dispatch-ledger.json. No valid exact-head rerun or physical action. Next: finish only the other proven source-gap dispatches, confirm new run acceptance, then hourly waiting.
+
+07:43UTC: all four final exact-head source-gap dispatches accepted and discovered:
+release34681393241, update34681399822, F8534681406486, ICSE34681414877.
+All four queued at07:42 snapshot; no failures or missing workflows. Thirteen dispatches
+total are now accounted for exactly once. Current native proof remains13/37 plus3/3;
+no new native result inferred from dispatch acceptance. Existing heartbeat updated to
+this stage and hourly cadence. Next routine check08:42UTC or later, preferably near
+expected completion; no intervening routine polling. Exact next command when due:
+C:/wsl/fcp-v1-fba508-nettking-20260910/.venv/Scripts/python.exe -B
+handoff/diagnostics/poll_pr467_state.py. Retain new terminal logs, then reconcile full
+release/ICSE/native skip and regression evidence before current-review/guarded merge.
+No source-gap dispatch remains justified. Repair and diagnostic branches are pushed;
+no source/physical state changes, protected Recorder data untouched, no physical PASS.
