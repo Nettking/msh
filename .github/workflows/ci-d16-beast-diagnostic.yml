@@ -1,0 +1,78 @@
+name: D16 bounded original-Beast diagnostic
+
+# Coordination branch only. Never merge into a candidate or acceptance contract.
+on:
+  push:
+    branches: [codex/federation-v1-diagnostic-sweep-20260911]
+    paths:
+      - ".github/workflows/ci-d16-beast-diagnostic.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: d16-original-beast-diagnostic
+  cancel-in-progress: false
+
+jobs:
+  original-beast:
+    runs-on: [self-hosted, Windows, X64, beast-windows, fcp-windows]
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+    steps:
+      - name: Verify existing native CI context
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:GITHUB_REPOSITORY -cne 'Nettking/msh') { throw 'unexpected repository' }
+          if ($env:GITHUB_REF -cne 'refs/heads/codex/federation-v1-diagnostic-sweep-20260911') { throw 'unexpected branch' }
+          if ($env:RUNNER_NAME -cne 'Beast' -or $env:COMPUTERNAME -ine 'BEAST') { throw 'unexpected runner or host' }
+          $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+          if ($identity.User.Value -ne 'S-1-5-20') { throw 'runner identity changed' }
+          $workspace = [IO.Path]::GetFullPath($env:GITHUB_WORKSPACE).TrimEnd('\')
+          if ($workspace -ine 'C:\actions-runner\_work\msh\msh') { throw 'unexpected workspace' }
+          if ((Get-Item -LiteralPath $workspace -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'workspace is a reparse point' }
+          $evidence = Join-Path $env:RUNNER_TEMP ('d16-evidence-' + $env:GITHUB_RUN_ID + '-' + $env:GITHUB_RUN_ATTEMPT)
+          New-Item -ItemType Directory -Path $evidence -ErrorAction Stop | Out-Null
+          "D16_EVIDENCE=$evidence" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          @{ host=$env:COMPUTERNAME; runner=$env:RUNNER_NAME; sid=$identity.User.Value; identity=$identity.Name; control_sha=$env:GITHUB_SHA; protected_recorder_data='UNTOUCHED' } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence 'host.json') -Encoding UTF8
+
+      - uses: actions/checkout@v4
+        with:
+          ref: 5e6f184311019b9982e8544a18f3dc02c1b16e98
+          set-safe-directory: false
+
+      - uses: ./.github/actions/self-hosted-python
+        with:
+          python-version: 3.12.10
+
+      - name: Install unchanged constrained test dependencies
+        run: |
+          python -m pip install --upgrade pip==26.2.1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m pip install -r requirements.txt -c constraints-release.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m pip install pytest==9.1.1 -c constraints-release.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Extract external observer from exact control commit
+        run: |
+          git fetch --no-tags --depth=1 origin $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B -c "import os,pathlib,subprocess; root=pathlib.Path(os.environ['D16_EVIDENCE']); sha=os.environ['GITHUB_SHA']; names=('d16_beast_observer.py','run_d16_beast_diagnostic.py'); [(root/name).write_bytes(subprocess.check_output(['git','show',sha+':handoff/diagnostics/'+name],timeout=30)) for name in names]"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Run bounded original and observed D16 test
+        run: |
+          python -B (Join-Path $env:D16_EVIDENCE 'run_d16_beast_diagnostic.py')
+          exit $LASTEXITCODE
+
+      - name: Retain diagnostic evidence regardless of test result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: d16-original-beast-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.D16_EVIDENCE }}
+          if-no-files-found: error
+          retention-days: 30

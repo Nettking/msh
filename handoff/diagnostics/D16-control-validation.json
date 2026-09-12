@@ -1,0 +1,12 @@
+{
+  "recorded_at": "2026-09-12T18:48:50.096124+00:00",
+  "purpose": "D16 diagnostic only",
+  "validation": {
+    "python_AST": "PASS both scripts",
+    "PowerShell_parser": "PASS four blocks",
+    "YAML_structure": "PASS using isolated development PyYAML6.0.3",
+    "diff_hygiene": "PASS",
+    "source_unchanged": "5e6f184311019b9982e8544a18f3dc02c1b16e98 / tree1c671f446fa215c99a6a58a155806de394aa569a"
+  },
+  "local_validation_note": "Linux development venv did not have PyYAML; installed validation dependency only into separate Windows development tool directory, outside candidate. No test/dependency/runtime changes on candidate."
+}
