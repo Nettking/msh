@@ -1,0 +1,781 @@
+{
+  "recorded_at": "2026-09-12T08:57:05.802712+00:00",
+  "current_main": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
+  "pr": 467,
+  "pr_head": "84c66f8185c1411d9dc8c5c33244a2f564845ce7",
+  "records": [
+    {
+      "workflow": ".github/workflows/phase-f72-provider-selection.yml",
+      "run_id": 34676251421,
+      "head_sha": "84c66f8185c1411d9dc8c5c33244a2f564845ce7",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "failure",
+      "jobs": [
+        {
+          "id": 103506523730,
+          "name": "provider-selection (ubuntu-latest)",
+          "status": "completed",
+          "conclusion": "failure",
+          "runner_id": 0,
+          "runner_name": "",
+          "labels": [
+            "ubuntu-latest"
+          ],
+          "started_at": "2026-09-12T05:42:02Z",
+          "completed_at": "2026-09-12T05:42:04Z",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103506523730",
+          "annotations": [
+            {
+              "path": ".github",
+              "blob_href": "https://github.com/Nettking/msh/blob/84c66f8185c1411d9dc8c5c33244a2f564845ce7/.github",
+              "start_line": 1,
+              "start_column": null,
+              "end_line": 1,
+              "end_column": null,
+              "annotation_level": "failure",
+              "title": "",
+              "message": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings",
+              "raw_details": ""
+            }
+          ]
+        },
+        {
+          "id": 103506523789,
+          "name": "provider-selection (windows-latest)",
+          "status": "completed",
+          "conclusion": "failure",
+          "runner_id": 0,
+          "runner_name": "",
+          "labels": [
+            "windows-latest"
+          ],
+          "started_at": "2026-09-12T05:42:02Z",
+          "completed_at": "2026-09-12T05:42:06Z",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103506523789",
+          "annotations": [
+            {
+              "path": ".github",
+              "blob_href": "https://github.com/Nettking/msh/blob/84c66f8185c1411d9dc8c5c33244a2f564845ce7/.github",
+              "start_line": 1,
+              "start_column": null,
+              "end_line": 1,
+              "end_column": null,
+              "annotation_level": "failure",
+              "title": "",
+              "message": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings",
+              "raw_details": ""
+            }
+          ]
+        },
+        {
+          "id": 103506523814,
+          "name": "repository-hygiene",
+          "status": "completed",
+          "conclusion": "failure",
+          "runner_id": 0,
+          "runner_name": "",
+          "labels": [
+            "ubuntu-latest"
+          ],
+          "started_at": "2026-09-12T05:42:02Z",
+          "completed_at": "2026-09-12T05:42:04Z",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103506523814",
+          "annotations": [
+            {
+              "path": ".github",
+              "blob_href": "https://github.com/Nettking/msh/blob/84c66f8185c1411d9dc8c5c33244a2f564845ce7/.github",
+              "start_line": 1,
+              "start_column": null,
+              "end_line": 1,
+              "end_column": null,
+              "annotation_level": "failure",
+              "title": "",
+              "message": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings",
+              "raw_details": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "workflow": ".github/workflows/phase-f77-ai-runtime-integration.yml",
+      "run_id": 34676251431,
+      "head_sha": "84c66f8185c1411d9dc8c5c33244a2f564845ce7",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "failure",
+      "jobs": [
+        {
+          "id": 103506523721,
+          "name": "ai-runtime (ubuntu-latest)",
+          "status": "completed",
+          "conclusion": "failure",
+          "runner_id": 0,
+          "runner_name": "",
+          "labels": [
+            "ubuntu-latest"
+          ],
+          "started_at": "2026-09-12T05:42:02Z",
+          "completed_at": "2026-09-12T05:42:04Z",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103506523721",
+          "annotations": [
+            {
+              "path": ".github",
+              "blob_href": "https://github.com/Nettking/msh/blob/84c66f8185c1411d9dc8c5c33244a2f564845ce7/.github",
+              "start_line": 1,
+              "start_column": null,
+              "end_line": 1,
+              "end_column": null,
+              "annotation_level": "failure",
+              "title": "",
+              "message": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings",
+              "raw_details": ""
+            }
+          ]
+        },
+        {
+          "id": 103506523850,
+          "name": "ai-runtime (windows-latest)",
+          "status": "completed",
+          "conclusion": "failure",
+          "runner_id": 0,
+          "runner_name": "",
+          "labels": [
+            "windows-latest"
+          ],
+          "started_at": "2026-09-12T05:42:02Z",
+          "completed_at": "2026-09-12T05:42:06Z",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103506523850",
+          "annotations": [
+            {
+              "path": ".github",
+              "blob_href": "https://github.com/Nettking/msh/blob/84c66f8185c1411d9dc8c5c33244a2f564845ce7/.github",
+              "start_line": 1,
+              "start_column": null,
+              "end_line": 1,
+              "end_column": null,
+              "annotation_level": "failure",
+              "title": "",
+              "message": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings",
+              "raw_details": ""
+            }
+          ]
+        },
+        {
+          "id": 103506523907,
+          "name": "repository-hygiene",
+          "status": "completed",
+          "conclusion": "failure",
+          "runner_id": 0,
+          "runner_name": "",
+          "labels": [
+            "ubuntu-latest"
+          ],
+          "started_at": "2026-09-12T05:42:02Z",
+          "completed_at": "2026-09-12T05:42:05Z",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103506523907",
+          "annotations": [
+            {
+              "path": ".github",
+              "blob_href": "https://github.com/Nettking/msh/blob/84c66f8185c1411d9dc8c5c33244a2f564845ce7/.github",
+              "start_line": 1,
+              "start_column": null,
+              "end_line": 1,
+              "end_column": null,
+              "annotation_level": "failure",
+              "title": "",
+              "message": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings",
+              "raw_details": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "workflow": ".github/workflows/phase-f71-job-contracts.yml",
+      "run_id": 34676251465,
+      "head_sha": "84c66f8185c1411d9dc8c5c33244a2f564845ce7",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "failure",
+      "jobs": [
+        {
+          "id": 103506523708,
+          "name": "job-contracts (ubuntu-latest)",
+          "status": "completed",
+          "conclusion": "failure",
+          "runner_id": 0,
+          "runner_name": "",
+          "labels": [
+            "ubuntu-latest"
+          ],
+          "started_at": "2026-09-12T05:42:02Z",
+          "completed_at": "2026-09-12T05:42:04Z",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103506523708",
+          "annotations": [
+            {
+              "path": ".github",
+              "blob_href": "https://github.com/Nettking/msh/blob/84c66f8185c1411d9dc8c5c33244a2f564845ce7/.github",
+              "start_line": 1,
+              "start_column": null,
+              "end_line": 1,
+              "end_column": null,
+              "annotation_level": "failure",
+              "title": "",
+              "message": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings",
+              "raw_details": ""
+            }
+          ]
+        },
+        {
+          "id": 103506523785,
+          "name": "repository-hygiene",
+          "status": "completed",
+          "conclusion": "failure",
+          "runner_id": 0,
+          "runner_name": "",
+          "labels": [
+            "ubuntu-latest"
+          ],
+          "started_at": "2026-09-12T05:42:02Z",
+          "completed_at": "2026-09-12T05:42:04Z",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103506523785",
+          "annotations": [
+            {
+              "path": ".github",
+              "blob_href": "https://github.com/Nettking/msh/blob/84c66f8185c1411d9dc8c5c33244a2f564845ce7/.github",
+              "start_line": 1,
+              "start_column": null,
+              "end_line": 1,
+              "end_column": null,
+              "annotation_level": "failure",
+              "title": "",
+              "message": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings",
+              "raw_details": ""
+            }
+          ]
+        },
+        {
+          "id": 103506523804,
+          "name": "job-contracts (windows-latest)",
+          "status": "completed",
+          "conclusion": "failure",
+          "runner_id": 0,
+          "runner_name": "",
+          "labels": [
+            "windows-latest"
+          ],
+          "started_at": "2026-09-12T05:42:02Z",
+          "completed_at": "2026-09-12T05:42:06Z",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103506523804",
+          "annotations": [
+            {
+              "path": ".github",
+              "blob_href": "https://github.com/Nettking/msh/blob/84c66f8185c1411d9dc8c5c33244a2f564845ce7/.github",
+              "start_line": 1,
+              "start_column": null,
+              "end_line": 1,
+              "end_column": null,
+              "annotation_level": "failure",
+              "title": "",
+              "message": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings",
+              "raw_details": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "workflow": ".github/workflows/phase-f84-compute-worker-activation.yml",
+      "run_id": 34676251398,
+      "head_sha": "84c66f8185c1411d9dc8c5c33244a2f564845ce7",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "failure",
+      "jobs": [
+        {
+          "id": 103506523605,
+          "name": "compute-worker (windows-latest)",
+          "status": "completed",
+          "conclusion": "failure",
+          "runner_id": 0,
+          "runner_name": "",
+          "labels": [
+            "windows-latest"
+          ],
+          "started_at": "2026-09-12T05:42:02Z",
+          "completed_at": "2026-09-12T05:42:04Z",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103506523605",
+          "annotations": [
+            {
+              "path": ".github",
+              "blob_href": "https://github.com/Nettking/msh/blob/84c66f8185c1411d9dc8c5c33244a2f564845ce7/.github",
+              "start_line": 1,
+              "start_column": null,
+              "end_line": 1,
+              "end_column": null,
+              "annotation_level": "failure",
+              "title": "",
+              "message": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings",
+              "raw_details": ""
+            }
+          ]
+        },
+        {
+          "id": 103506523755,
+          "name": "compute-worker (ubuntu-latest)",
+          "status": "completed",
+          "conclusion": "failure",
+          "runner_id": 0,
+          "runner_name": "",
+          "labels": [
+            "ubuntu-latest"
+          ],
+          "started_at": "2026-09-12T05:42:02Z",
+          "completed_at": "2026-09-12T05:42:05Z",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103506523755",
+          "annotations": [
+            {
+              "path": ".github",
+              "blob_href": "https://github.com/Nettking/msh/blob/84c66f8185c1411d9dc8c5c33244a2f564845ce7/.github",
+              "start_line": 1,
+              "start_column": null,
+              "end_line": 1,
+              "end_column": null,
+              "annotation_level": "failure",
+              "title": "",
+              "message": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings",
+              "raw_details": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "workflow": ".github/workflows/phase-f76-artifact-authorization.yml",
+      "run_id": 34676251414,
+      "head_sha": "84c66f8185c1411d9dc8c5c33244a2f564845ce7",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "failure",
+      "jobs": [
+        {
+          "id": 103506523666,
+          "name": "repository-hygiene",
+          "status": "completed",
+          "conclusion": "failure",
+          "runner_id": 0,
+          "runner_name": "",
+          "labels": [
+            "ubuntu-latest"
+          ],
+          "started_at": "2026-09-12T05:42:02Z",
+          "completed_at": "2026-09-12T05:42:04Z",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103506523666",
+          "annotations": [
+            {
+              "path": ".github",
+              "blob_href": "https://github.com/Nettking/msh/blob/84c66f8185c1411d9dc8c5c33244a2f564845ce7/.github",
+              "start_line": 1,
+              "start_column": null,
+              "end_line": 1,
+              "end_column": null,
+              "annotation_level": "failure",
+              "title": "",
+              "message": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings",
+              "raw_details": ""
+            }
+          ]
+        },
+        {
+          "id": 103506523781,
+          "name": "artifact-authorization (windows-latest)",
+          "status": "completed",
+          "conclusion": "failure",
+          "runner_id": 0,
+          "runner_name": "",
+          "labels": [
+            "windows-latest"
+          ],
+          "started_at": "2026-09-12T05:42:02Z",
+          "completed_at": "2026-09-12T05:42:06Z",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103506523781",
+          "annotations": [
+            {
+              "path": ".github",
+              "blob_href": "https://github.com/Nettking/msh/blob/84c66f8185c1411d9dc8c5c33244a2f564845ce7/.github",
+              "start_line": 1,
+              "start_column": null,
+              "end_line": 1,
+              "end_column": null,
+              "annotation_level": "failure",
+              "title": "",
+              "message": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings",
+              "raw_details": ""
+            }
+          ]
+        },
+        {
+          "id": 103506523797,
+          "name": "artifact-authorization (ubuntu-latest)",
+          "status": "completed",
+          "conclusion": "failure",
+          "runner_id": 0,
+          "runner_name": "",
+          "labels": [
+            "ubuntu-latest"
+          ],
+          "started_at": "2026-09-12T05:42:02Z",
+          "completed_at": "2026-09-12T05:42:05Z",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103506523797",
+          "annotations": [
+            {
+              "path": ".github",
+              "blob_href": "https://github.com/Nettking/msh/blob/84c66f8185c1411d9dc8c5c33244a2f564845ce7/.github",
+              "start_line": 1,
+              "start_column": null,
+              "end_line": 1,
+              "end_column": null,
+              "annotation_level": "failure",
+              "title": "",
+              "message": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings",
+              "raw_details": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "workflow": ".github/workflows/phase-f73-durable-job-ownership.yml",
+      "run_id": 34676251390,
+      "head_sha": "84c66f8185c1411d9dc8c5c33244a2f564845ce7",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "failure",
+      "jobs": [
+        {
+          "id": 103506523504,
+          "name": "repository-hygiene",
+          "status": "completed",
+          "conclusion": "failure",
+          "runner_id": 0,
+          "runner_name": "",
+          "labels": [
+            "ubuntu-latest"
+          ],
+          "started_at": "2026-09-12T05:42:02Z",
+          "completed_at": "2026-09-12T05:42:04Z",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103506523504",
+          "annotations": [
+            {
+              "path": ".github",
+              "blob_href": "https://github.com/Nettking/msh/blob/84c66f8185c1411d9dc8c5c33244a2f564845ce7/.github",
+              "start_line": 1,
+              "start_column": null,
+              "end_line": 1,
+              "end_column": null,
+              "annotation_level": "failure",
+              "title": "",
+              "message": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings",
+              "raw_details": ""
+            }
+          ]
+        },
+        {
+          "id": 103506523624,
+          "name": "durable-job-ownership (ubuntu-latest)",
+          "status": "completed",
+          "conclusion": "failure",
+          "runner_id": 0,
+          "runner_name": "",
+          "labels": [
+            "ubuntu-latest"
+          ],
+          "started_at": "2026-09-12T05:42:02Z",
+          "completed_at": "2026-09-12T05:42:04Z",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103506523624",
+          "annotations": [
+            {
+              "path": ".github",
+              "blob_href": "https://github.com/Nettking/msh/blob/84c66f8185c1411d9dc8c5c33244a2f564845ce7/.github",
+              "start_line": 1,
+              "start_column": null,
+              "end_line": 1,
+              "end_column": null,
+              "annotation_level": "failure",
+              "title": "",
+              "message": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings",
+              "raw_details": ""
+            }
+          ]
+        },
+        {
+          "id": 103506523654,
+          "name": "durable-job-ownership (windows-latest)",
+          "status": "completed",
+          "conclusion": "failure",
+          "runner_id": 0,
+          "runner_name": "",
+          "labels": [
+            "windows-latest"
+          ],
+          "started_at": "2026-09-12T05:42:02Z",
+          "completed_at": "2026-09-12T05:42:04Z",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103506523654",
+          "annotations": [
+            {
+              "path": ".github",
+              "blob_href": "https://github.com/Nettking/msh/blob/84c66f8185c1411d9dc8c5c33244a2f564845ce7/.github",
+              "start_line": 1,
+              "start_column": null,
+              "end_line": 1,
+              "end_column": null,
+              "annotation_level": "failure",
+              "title": "",
+              "message": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings",
+              "raw_details": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "workflow": ".github/workflows/phase-f74-worker-dispatch.yml",
+      "run_id": 34676251441,
+      "head_sha": "84c66f8185c1411d9dc8c5c33244a2f564845ce7",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "failure",
+      "jobs": [
+        {
+          "id": 103506523620,
+          "name": "worker-dispatch (ubuntu-latest)",
+          "status": "completed",
+          "conclusion": "failure",
+          "runner_id": 0,
+          "runner_name": "",
+          "labels": [
+            "ubuntu-latest"
+          ],
+          "started_at": "2026-09-12T05:42:02Z",
+          "completed_at": "2026-09-12T05:42:04Z",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103506523620",
+          "annotations": [
+            {
+              "path": ".github",
+              "blob_href": "https://github.com/Nettking/msh/blob/84c66f8185c1411d9dc8c5c33244a2f564845ce7/.github",
+              "start_line": 1,
+              "start_column": null,
+              "end_line": 1,
+              "end_column": null,
+              "annotation_level": "failure",
+              "title": "",
+              "message": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings",
+              "raw_details": ""
+            }
+          ]
+        },
+        {
+          "id": 103506523771,
+          "name": "repository-hygiene",
+          "status": "completed",
+          "conclusion": "failure",
+          "runner_id": 0,
+          "runner_name": "",
+          "labels": [
+            "ubuntu-latest"
+          ],
+          "started_at": "2026-09-12T05:42:02Z",
+          "completed_at": "2026-09-12T05:42:06Z",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103506523771",
+          "annotations": [
+            {
+              "path": ".github",
+              "blob_href": "https://github.com/Nettking/msh/blob/84c66f8185c1411d9dc8c5c33244a2f564845ce7/.github",
+              "start_line": 1,
+              "start_column": null,
+              "end_line": 1,
+              "end_column": null,
+              "annotation_level": "failure",
+              "title": "",
+              "message": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings",
+              "raw_details": ""
+            }
+          ]
+        },
+        {
+          "id": 103506523839,
+          "name": "worker-dispatch (windows-latest)",
+          "status": "completed",
+          "conclusion": "failure",
+          "runner_id": 0,
+          "runner_name": "",
+          "labels": [
+            "windows-latest"
+          ],
+          "started_at": "2026-09-12T05:42:02Z",
+          "completed_at": "2026-09-12T05:42:08Z",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103506523839",
+          "annotations": [
+            {
+              "path": ".github",
+              "blob_href": "https://github.com/Nettking/msh/blob/84c66f8185c1411d9dc8c5c33244a2f564845ce7/.github",
+              "start_line": 1,
+              "start_column": null,
+              "end_line": 1,
+              "end_column": null,
+              "annotation_level": "failure",
+              "title": "",
+              "message": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings",
+              "raw_details": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "workflow": ".github/workflows/phase-f75-retry-cancellation.yml",
+      "run_id": 34676251419,
+      "head_sha": "84c66f8185c1411d9dc8c5c33244a2f564845ce7",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "failure",
+      "jobs": [
+        {
+          "id": 103506523659,
+          "name": "repository-hygiene",
+          "status": "completed",
+          "conclusion": "failure",
+          "runner_id": 0,
+          "runner_name": "",
+          "labels": [
+            "ubuntu-latest"
+          ],
+          "started_at": "2026-09-12T05:42:02Z",
+          "completed_at": "2026-09-12T05:42:04Z",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103506523659",
+          "annotations": [
+            {
+              "path": ".github",
+              "blob_href": "https://github.com/Nettking/msh/blob/84c66f8185c1411d9dc8c5c33244a2f564845ce7/.github",
+              "start_line": 1,
+              "start_column": null,
+              "end_line": 1,
+              "end_column": null,
+              "annotation_level": "failure",
+              "title": "",
+              "message": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings",
+              "raw_details": ""
+            }
+          ]
+        },
+        {
+          "id": 103506523777,
+          "name": "retry-cancellation (windows-latest)",
+          "status": "completed",
+          "conclusion": "failure",
+          "runner_id": 0,
+          "runner_name": "",
+          "labels": [
+            "windows-latest"
+          ],
+          "started_at": "2026-09-12T05:42:02Z",
+          "completed_at": "2026-09-12T05:42:04Z",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103506523777",
+          "annotations": [
+            {
+              "path": ".github",
+              "blob_href": "https://github.com/Nettking/msh/blob/84c66f8185c1411d9dc8c5c33244a2f564845ce7/.github",
+              "start_line": 1,
+              "start_column": null,
+              "end_line": 1,
+              "end_column": null,
+              "annotation_level": "failure",
+              "title": "",
+              "message": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings",
+              "raw_details": ""
+            }
+          ]
+        },
+        {
+          "id": 103506523787,
+          "name": "retry-cancellation (ubuntu-latest)",
+          "status": "completed",
+          "conclusion": "failure",
+          "runner_id": 0,
+          "runner_name": "",
+          "labels": [
+            "ubuntu-latest"
+          ],
+          "started_at": "2026-09-12T05:42:02Z",
+          "completed_at": "2026-09-12T05:42:10Z",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103506523787",
+          "annotations": [
+            {
+              "path": ".github",
+              "blob_href": "https://github.com/Nettking/msh/blob/84c66f8185c1411d9dc8c5c33244a2f564845ce7/.github",
+              "start_line": 1,
+              "start_column": null,
+              "end_line": 1,
+              "end_column": null,
+              "annotation_level": "failure",
+              "title": "",
+              "message": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings",
+              "raw_details": ""
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "branch_policy": {
+    "/branches/main": {
+      "name": "main",
+      "protected": false,
+      "protection": {
+        "enabled": false,
+        "required_status_checks": {
+          "enforcement_level": "off",
+          "contexts": [],
+          "checks": []
+        }
+      }
+    },
+    "/branches/main/protection": {
+      "http_status": 403,
+      "message": "Upgrade to GitHub Pro or make this repository public to enable this feature."
+    },
+    "/rulesets?includes_parents=true": {
+      "http_status": 403,
+      "message": "Upgrade to GitHub Pro or make this repository public to enable this feature."
+    }
+  },
+  "state_changed": false,
+  "physical_runtime_changed": false,
+  "protected_recorder_data_untouched": true,
+  "scope": "Historical hosted-job infrastructure inspection only; preserve all qualification evidence"
+}
