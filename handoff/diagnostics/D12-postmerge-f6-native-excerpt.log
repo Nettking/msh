@@ -1,0 +1,368 @@
+2026-09-12T15:05:38.0429794Z ##[group]Run go mod tidy
+2026-09-12T15:05:38.0430056Z [36;1mgo mod tidy[0m
+2026-09-12T15:05:38.0430250Z [36;1mgit diff --exit-code -- go.mod go.sum[0m
+2026-09-12T15:05:38.0430493Z [36;1mgo test ./...[0m
+2026-09-12T15:05:38.0430670Z [36;1mgo build -trimpath .[0m
+2026-09-12T15:05:38.0545601Z shell: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.EXE -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+2026-09-12T15:05:38.0546838Z env:
+2026-09-12T15:05:38.0546980Z   TEMP: C:\fcp-qtmp
+2026-09-12T15:05:38.0547130Z   TMP: C:\fcp-qtmp
+2026-09-12T15:05:38.0547465Z   PSMODULEPATH: C:\Windows\System32\WindowsPowerShell\v1.0\Modules;C:\Program Files\WindowsPowerShell\Modules
+2026-09-12T15:05:38.0547844Z ##[endgroup]
+2026-09-12T15:05:38.4071519Z warning: in the working copy of 'go.mod', LF will be replaced by CRLF the next time Git touches it
+2026-09-12T15:05:38.4072166Z warning: in the working copy of 'go.sum', LF will be replaced by CRLF the next time Git touches it
+2026-09-12T15:05:38.4077718Z diff --git a/go.mod b/go.sum
+2026-09-12T15:05:38.4077989Z index f962071..9560780 100644
+2026-09-12T15:05:38.4078202Z --- a/go.mod
+2026-09-12T15:05:38.4078376Z +++ b/go.sum
+2026-09-12T15:05:38.4079516Z @@ -1,95 +1,234 @@
+2026-09-12T15:05:38.4079844Z -module github.com/Nettking/msh/cmd/fcp-peer-sidecar
+2026-09-12T15:05:38.4080110Z -
+2026-09-12T15:05:38.4080291Z -go 1.25.7
+2026-09-12T15:05:38.4080446Z -
+2026-09-12T15:05:38.4080609Z -require (
+2026-09-12T15:05:38.4080852Z -	github.com/libp2p/go-libp2p v0.49.0
+2026-09-12T15:05:38.4081150Z -	github.com/multiformats/go-multiaddr v0.16.1
+2026-09-12T15:05:38.4081392Z -)
+2026-09-12T15:05:38.4081584Z -
+2026-09-12T15:05:38.4081820Z -require (
+2026-09-12T15:05:38.4082116Z -	filippo.io/bigmod v0.1.1-0.20260103110540-f8a47775ebe5 // indirect
+2026-09-12T15:05:38.4082450Z -	filippo.io/keygen v1.0.0 // indirect
+2026-09-12T15:05:38.4082737Z -	github.com/benbjohnson/clock v1.3.5 // indirect
+2026-09-12T15:05:38.4083040Z -	github.com/beorn7/perks v1.0.1 // indirect
+2026-09-12T15:05:38.4083339Z -	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+2026-09-12T15:05:38.4083742Z -	github.com/davidlazar/go-crypto v0.0.0-20200604182044-b73af7476f6c // indirect
+2026-09-12T15:05:38.4084163Z -	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.1 // indirect
+2026-09-12T15:05:38.4084505Z -	github.com/dunglas/httpsfv v1.1.0 // indirect
+2026-09-12T15:05:38.4084842Z -	github.com/filecoin-project/go-clock v0.1.0 // indirect
+2026-09-12T15:05:38.4085151Z -	github.com/flynn/noise v1.1.0 // indirect
+2026-09-12T15:05:38.4085423Z -	github.com/google/uuid v1.6.0 // indirect
+2026-09-12T15:05:38.4085709Z -	github.com/gorilla/websocket v1.5.3 // indirect
+2026-09-12T15:05:38.4085993Z -	github.com/huin/goupnp v1.3.0 // indirect
+2026-09-12T15:05:38.4086263Z -	github.com/ipfs/go-cid v0.6.2 // indirect
+2026-09-12T15:05:38.4086554Z -	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
+2026-09-12T15:05:38.4086897Z -	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect
+2026-09-12T15:05:38.4087229Z -	github.com/klauspost/cpuid/v2 v2.4.0 // indirect
+2026-09-12T15:05:38.4087532Z -	github.com/koron/go-ssdp v0.9.1 // indirect
+2026-09-12T15:05:38.4087839Z -	github.com/libp2p/go-buffer-pool v0.1.0 // indirect
+2026-09-12T15:05:38.4088169Z -	github.com/libp2p/go-flow-metrics v0.3.0 // indirect
+2026-09-12T15:05:38.4088516Z -	github.com/libp2p/go-libp2p-asn-util v0.4.1 // indirect
+2026-09-12T15:05:38.4088865Z -	github.com/libp2p/go-msgio v0.3.0 // indirect
+2026-09-12T15:05:38.4089168Z -	github.com/libp2p/go-netroute v0.4.0 // indirect
+2026-09-12T15:05:38.4089478Z -	github.com/libp2p/go-reuseport v0.4.0 // indirect
+2026-09-12T15:05:38.4089785Z -	github.com/libp2p/go-yamux/v5 v5.1.0 // indirect
+2026-09-12T15:05:38.4090179Z -	github.com/marten-seemann/tcp v0.0.0-20210406111302-dfbc87cc63fd // indirect
+2026-09-12T15:05:38.4090635Z -	github.com/mikioh/tcpinfo v0.0.0-20190314235526-30a79bb1804b // indirect
+2026-09-12T15:05:38.4092537Z -	github.com/mikioh/tcpopt v0.0.0-20190314235656-172688c1accc // indirect
+2026-09-12T15:05:38.4092975Z -	github.com/minio/sha256-simd v1.0.1 // indirect
+2026-09-12T15:05:38.4093284Z -	github.com/mr-tron/base58 v1.3.0 // indirect
+2026-09-12T15:05:38.4093597Z -	github.com/multiformats/go-base32 v0.1.0 // indirect
+2026-09-12T15:05:38.4093926Z -	github.com/multiformats/go-base36 v0.2.0 // indirect
+2026-09-12T15:05:38.4094481Z -	github.com/multiformats/go-multiaddr-dns v0.6.0 // indirect
+2026-09-12T15:05:38.4094855Z -	github.com/multiformats/go-multiaddr-fmt v0.1.0 // indirect
+2026-09-12T15:05:38.4095208Z -	github.com/multiformats/go-multibase v0.3.0 // indirect
+2026-09-12T15:05:38.4095559Z -	github.com/multiformats/go-multicodec v0.10.0 // indirect
+2026-09-12T15:05:38.4095908Z -	github.com/multiformats/go-multihash v0.2.3 // indirect
+2026-09-12T15:05:38.4096254Z -	github.com/multiformats/go-multistream v0.6.1 // indirect
+2026-09-12T15:05:38.4096669Z -	github.com/multiformats/go-varint v0.1.0 // indirect
+2026-09-12T15:05:38.4097084Z -	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
+2026-09-12T15:05:38.4097602Z -	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58 // indirect
+2026-09-12T15:05:38.4097972Z -	github.com/pion/datachannel v1.5.10 // indirect
+2026-09-12T15:05:38.4098265Z -	github.com/pion/dtls/v3 v3.1.2 // indirect
+2026-09-12T15:05:38.4098541Z -	github.com/pion/ice/v4 v4.0.10 // indirect
+2026-09-12T15:05:38.4098836Z -	github.com/pion/interceptor v0.1.40 // indirect
+2026-09-12T15:05:38.4099128Z -	github.com/pion/logging v0.2.4 // indirect
+2026-09-12T15:05:38.4099399Z -	github.com/pion/mdns/v2 v2.0.7 // indirect
+2026-09-12T15:05:38.4099678Z -	github.com/pion/randutil v0.1.0 // indirect
+2026-09-12T15:05:38.4099953Z -	github.com/pion/rtcp v1.2.16 // indirect
+2026-09-12T15:05:38.4100218Z -	github.com/pion/rtp v1.8.19 // indirect
+2026-09-12T15:05:38.4100484Z -	github.com/pion/sctp v1.8.39 // indirect
+2026-09-12T15:05:38.4100753Z -	github.com/pion/sdp/v3 v3.0.18 // indirect
+2026-09-12T15:05:38.4101030Z -	github.com/pion/srtp/v3 v3.0.6 // indirect
+2026-09-12T15:05:38.4101301Z -	github.com/pion/stun/v3 v3.1.1 // indirect
+2026-09-12T15:05:38.4101590Z -	github.com/pion/transport/v3 v3.0.7 // indirect
+2026-09-12T15:05:38.4101897Z -	github.com/pion/transport/v4 v4.0.1 // indirect
+2026-09-12T15:05:38.4102183Z -	github.com/pion/turn/v4 v4.0.2 // indirect
+2026-09-12T15:05:38.4102466Z -	github.com/pion/webrtc/v4 v4.1.2 // indirect
+2026-09-12T15:05:38.4102794Z -	github.com/prometheus/client_golang v1.24.1 // indirect
+2026-09-12T15:05:38.4103132Z -	github.com/prometheus/client_model v0.6.2 // indirect
+2026-09-12T15:05:38.4103450Z -	github.com/prometheus/common v0.70.1 // indirect
+2026-09-12T15:05:38.4103756Z -	github.com/prometheus/procfs v0.21.1 // indirect
+2026-09-12T15:05:38.4104048Z -	github.com/quic-go/qpack v0.6.0 // indirect
+2026-09-12T15:05:38.4104336Z -	github.com/quic-go/quic-go v0.60.0 // indirect
+2026-09-12T15:05:38.4104660Z -	github.com/quic-go/webtransport-go v0.11.1 // indirect
+2026-09-12T15:05:38.4104993Z -	github.com/spaolacci/murmur3 v1.1.0 // indirect
+2026-09-12T15:05:38.4105278Z -	github.com/wlynxg/anet v0.0.5 // indirect
+2026-09-12T15:05:38.4105540Z -	go.uber.org/dig v1.19.0 // indirect
+2026-09-12T15:05:38.4105783Z -	go.uber.org/fx v1.24.0 // indirect
+2026-09-12T15:05:38.4106023Z -	go.uber.org/mock v0.6.0 // indirect
+2026-09-12T15:05:38.4106285Z -	go.uber.org/multierr v1.11.0 // indirect
+2026-09-12T15:05:38.4106548Z -	go.uber.org/zap v1.28.0 // indirect
+2026-09-12T15:05:38.4106801Z -	golang.org/x/crypto v0.54.0 // indirect
+2026-09-12T15:05:38.4107137Z -	golang.org/x/exp v0.0.0-20260718201538-764159d718ef // indirect
+2026-09-12T15:05:38.4107451Z -	golang.org/x/mod v0.38.0 // indirect
+2026-09-12T15:05:38.4107710Z -	golang.org/x/net v0.57.0 // indirect
+2026-09-12T15:05:38.4107956Z -	golang.org/x/sync v0.22.0 // indirect
+2026-09-12T15:05:38.4108204Z -	golang.org/x/sys v0.47.0 // indirect
+2026-09-12T15:05:38.4109013Z -	golang.org/x/telemetry v0.0.0-20260717140457-bdb89881bb75 // indirect
+2026-09-12T15:05:38.4109393Z -	golang.org/x/text v0.40.0 // indirect
+2026-09-12T15:05:38.4109646Z -	golang.org/x/time v0.15.0 // indirect
+2026-09-12T15:05:38.4109897Z -	golang.org/x/tools v0.48.0 // indirect
+2026-09-12T15:05:38.4110194Z -	google.golang.org/protobuf v1.36.11 // indirect
+2026-09-12T15:05:38.4110493Z -	lukechampine.com/blake3 v1.4.1 // indirect
+2026-09-12T15:05:38.4110892Z -)
+2026-09-12T15:05:38.4111306Z +filippo.io/bigmod v0.1.1-0.20260103110540-f8a47775ebe5 h1:JA0fFr+kxpqTdxR9LOBiTWpGNchqmkcsgmdeJZRclZ0=
+2026-09-12T15:05:38.4111978Z +filippo.io/bigmod v0.1.1-0.20260103110540-f8a47775ebe5/go.mod h1:OjOXDNlClLblvXdwgFFOQFJEocLhhtai8vGLy0JCZlI=
+2026-09-12T15:05:38.4112544Z +filippo.io/keygen v1.0.0 h1:u0/Fhxlgz3uPv+XxhfgTq3BJt5VesIPM5ue/OuG7qjQ=
+2026-09-12T15:05:38.4113029Z +filippo.io/keygen v1.0.0/go.mod h1:9nnw1SlYHYuPSo/3wjQzNjSbeHlq2NsKo5iEtfJPWP0=
+2026-09-12T15:05:38.4113550Z +github.com/benbjohnson/clock v1.3.5 h1:VvXlSJBzZpA/zum6Sj74hxwYI2DIxRWuNIoXAzHZz5o=
+2026-09-12T15:05:38.4114100Z +github.com/benbjohnson/clock v1.3.5/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
+2026-09-12T15:05:38.4114631Z +github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
+2026-09-12T15:05:38.4115143Z +github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
+2026-09-12T15:05:38.4115790Z +github.com/canonical/go-sp800.90a-drbg v0.0.0-20210314144037-6eeb1040d6c3 h1:oe6fCvaEpkhyW3qAicT0TnGtyht/UrgvOwMcEgLb7Aw=
+2026-09-12T15:05:38.4116568Z +github.com/canonical/go-sp800.90a-drbg v0.0.0-20210314144037-6eeb1040d6c3/go.mod h1:qdP0gaj0QtgX2RUZhnlVrceJ+Qln8aSlDyJwelLLFeM=
+2026-09-12T15:05:38.4117283Z +github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=
+2026-09-12T15:05:38.4117819Z +github.com/cespare/xxhash/v2 v2.3.0/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
+2026-09-12T15:05:38.4118357Z +github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
+2026-09-12T15:05:38.4118890Z +github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+2026-09-12T15:05:38.4119537Z +github.com/davidlazar/go-crypto v0.0.0-20200604182044-b73af7476f6c h1:pFUpOrbxDR6AkioZ1ySsx5yxlDQZ8stG2b88gTPxgJU=
+2026-09-12T15:05:38.4120280Z +github.com/davidlazar/go-crypto v0.0.0-20200604182044-b73af7476f6c/go.mod h1:6UhI8N9EjYm1c2odKpFpAYeR8dsBeM7PtzQhRgxRr9U=
+2026-09-12T15:05:38.4120946Z +github.com/decred/dcrd/crypto/blake256 v1.1.0 h1:zPMNGQCm0g4QTY27fOCorQW7EryeQ/U0x++OzVrdms8=
+2026-09-12T15:05:38.4121554Z +github.com/decred/dcrd/crypto/blake256 v1.1.0/go.mod h1:2OfgNZ5wDpcsFmHmCK5gZTPcCXqlm2ArzUIkw9czNJo=
+2026-09-12T15:05:38.4122164Z +github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.1 h1:5RVFMOWjMyRy8cARdy79nAmgYw3hK/4HUq48LQ6Wwqo=
+2026-09-12T15:05:38.4122783Z +github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.1/go.mod h1:ZXNYxsqcloTdSy/rNShjYzMhyjf0LaoftYK0p+A3h40=
+2026-09-12T15:05:38.4123355Z +github.com/dunglas/httpsfv v1.1.0 h1:Jw76nAyKWKZKFrpMMcL76y35tOpYHqQPzHQiwDvpe54=
+2026-09-12T15:05:38.4123891Z +github.com/dunglas/httpsfv v1.1.0/go.mod h1:zID2mqw9mFsnt7YC3vYQ9/cjq30q41W+1AnDwH8TiMg=
+2026-09-12T15:05:38.4124447Z +github.com/filecoin-project/go-clock v0.1.0 h1:SFbYIM75M8NnFm1yMHhN9Ahy3W5bEZV9gd6MPfXbKVU=
+2026-09-12T15:05:38.4125037Z +github.com/filecoin-project/go-clock v0.1.0/go.mod h1:4uB/O4PvOjlx1VCMdZ9MyDZXRm//gkj1ELEbxfI1AZs=
+2026-09-12T15:05:38.4125583Z +github.com/flynn/noise v1.1.0 h1:KjPQoQCEFdZDiP03phOvGi11+SVVhBG2wOWAorLsstg=
+2026-09-12T15:05:38.4126097Z +github.com/flynn/noise v1.1.0/go.mod h1:xbMo+0i6+IGbYdJhF31t2eR1BIU0CYc12+BNAKwUTag=
+2026-09-12T15:05:38.4126602Z +github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
+2026-09-12T15:05:38.4127174Z +github.com/google/go-cmp v0.7.0/go.mod h1:pXiqmnSA92OHEEa9HXL2W4E7lf9JzCmGVUdgjX3N/iU=
+2026-09-12T15:05:38.4127697Z +github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
+2026-09-12T15:05:38.4128332Z +github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
+2026-09-12T15:05:38.4128869Z +github.com/gorilla/websocket v1.5.3 h1:saDtZ6Pbx/0u+bgYQ3q96pZgCzfhKXGPqt7kZ72aNNg=
+2026-09-12T15:05:38.4129420Z +github.com/gorilla/websocket v1.5.3/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
+2026-09-12T15:05:38.4129939Z +github.com/huin/goupnp v1.3.0 h1:UvLUlWDNpoUdYzb2TCn+MuTWtcjXKSza2n6CBdQ0xXc=
+2026-09-12T15:05:38.4130573Z +github.com/huin/goupnp v1.3.0/go.mod h1:gnGPsThkYa7bFi/KWmEysQRf48l2dvR5bxr2OFckNX8=
+2026-09-12T15:05:38.4131065Z +github.com/ipfs/go-cid v0.6.2 h1:VuGwJd+KJTaMJ4S4d5EEf9SXc17YUblS5axCbocn9YE=
+2026-09-12T15:05:38.4131563Z +github.com/ipfs/go-cid v0.6.2/go.mod h1:Xhwg8NzHeK9xPCEZkCw4idzPiuNMpX3fARuI5Iwj1Lo=
+2026-09-12T15:05:38.4132081Z +github.com/jackpal/go-nat-pmp v1.0.2 h1:KzKSgb7qkJvOUTqYl9/Hg/me3pWgBmERKrTGD7BdWus=
+2026-09-12T15:05:38.4132630Z +github.com/jackpal/go-nat-pmp v1.0.2/go.mod h1:QPH045xvCAeXUZOxsnwmrtiCoxIr9eob+4orBN1SBKc=
+2026-09-12T15:05:38.4133205Z +github.com/jbenet/go-temp-err-catcher v0.1.0 h1:zpb3ZH6wIE8Shj2sKS+khgRvf7T7RABoLk/+KKHggpk=
+2026-09-12T15:05:38.4133815Z +github.com/jbenet/go-temp-err-catcher v0.1.0/go.mod h1:0kJRvmDZXNMIiJirNPEYfhpPwbGVtZVWC34vc5WLsDk=
+2026-09-12T15:05:38.4134411Z +github.com/klauspost/cpuid/v2 v2.4.0 h1:S6Hrbc7+ywsr0r+RLapfGBHfyefhCTwEh3A0tV913Dw=
+2026-09-12T15:05:38.4134952Z +github.com/klauspost/cpuid/v2 v2.4.0/go.mod h1:19jmZ9mjzoF//ddRSUsv0zfBTJWh3QJh9FNxZTMrGxU=
+2026-09-12T15:05:38.4135484Z +github.com/koron/go-ssdp v0.9.1 h1:zvxbAAuJftJIZ8Jh8mda+LI7V92hYZf/sKprmOxpxwA=
+2026-09-12T15:05:38.4136000Z +github.com/koron/go-ssdp v0.9.1/go.mod h1:C43c047jWkDaeg9YuZlSh/QGqOieuWV6dbhWi/jcaLk=
+2026-09-12T15:05:38.4136508Z +github.com/kr/pretty v0.2.1/go.mod h1:ipq/a2n7PKx3OHsz4KJII5eveXtPO4qwEXGdVfWzfnI=
+2026-09-12T15:05:38.4137356Z +github.com/kr/pretty v0.3.1 h1:flRD4NNwYAUpkphVc1HcthR4KEIFJ65n8Mw5qdRn3LE=
+2026-09-12T15:05:38.4138209Z +github.com/kr/pretty v0.3.1/go.mod h1:hoEshYVHaxMs3cyo3Yncou5ZscifuDolrwPKZanG3xk=
+2026-09-12T15:05:38.4138950Z +github.com/kr/pty v1.1.1/go.mod h1:pFQYn66WHrOpPYNljwOMqo10TkYh1fy3cYio2l3bCsQ=
+2026-09-12T15:05:38.4139471Z +github.com/kr/text v0.1.0/go.mod h1:4Jbv+DJW3UT/LiOwJeYQe1efqtUx/iVham/4vfdArNI=
+2026-09-12T15:05:38.4139948Z +github.com/kr/text v0.2.0 h1:5Nx0Ya0ZqY2ygV366QzturHI13Jq95ApcVaJBhpS+AY=
+2026-09-12T15:05:38.4140427Z +github.com/kr/text v0.2.0/go.mod h1:eLer722TekiGuMkidMxC/pM04lWEeraHUUmBw8l2grE=
+2026-09-12T15:05:38.4140963Z +github.com/libp2p/go-buffer-pool v0.1.0 h1:oK4mSFcQz7cTQIfqbe4MIj9gLW+mnanjyFtc6cdF0Y8=
+2026-09-12T15:05:38.4141545Z +github.com/libp2p/go-buffer-pool v0.1.0/go.mod h1:N+vh8gMqimBzdKkSMVuydVDq+UV5QTWy5HSiZacSbPg=
+2026-09-12T15:05:38.4142125Z +github.com/libp2p/go-flow-metrics v0.3.0 h1:q31zcHUvHnwDO0SHaukewPYgwOBSxtt830uJtUx6784=
+2026-09-12T15:05:38.4142717Z +github.com/libp2p/go-flow-metrics v0.3.0/go.mod h1:nuhlreIwEguM1IvHAew3ij7A8BMlyHQJ279ao24eZZo=
+2026-09-12T15:05:38.4143275Z +github.com/libp2p/go-libp2p v0.49.0 h1:ibXuYPIHmMIPShob1BktQvSuFQkq/MemhQOLKfGujjw=
+2026-09-12T15:05:38.4143822Z +github.com/libp2p/go-libp2p v0.49.0/go.mod h1:lzjVcOBk5fCn1QD2XbSOKLZesB6gEsry8SLjCsAAGT4=
+2026-09-12T15:05:38.4144386Z +github.com/libp2p/go-libp2p-asn-util v0.4.1 h1:xqL7++IKD9TBFMgnLPZR6/6iYhawHKHl950SO9L6n94=
+2026-09-12T15:05:38.4144973Z +github.com/libp2p/go-libp2p-asn-util v0.4.1/go.mod h1:d/NI6XZ9qxw67b4e+NgpQexCIiFYJjErASrYW4PFDN8=
+2026-09-12T15:05:38.4145568Z +github.com/libp2p/go-libp2p-testing v0.12.0 h1:EPvBb4kKMWO29qP4mZGyhVzUyR25dvfUIK5WDu6iPUA=
+2026-09-12T15:05:38.4146163Z +github.com/libp2p/go-libp2p-testing v0.12.0/go.mod h1:KcGDRXyN7sQCllucn1cOOS+Dmm7ujhfEyXQL5lvkcPg=
+2026-09-12T15:05:38.4146722Z +github.com/libp2p/go-msgio v0.3.0 h1:mf3Z8B1xcFN314sWX+2vOTShIE0Mmn2TXn3YCUQGNj0=
+2026-09-12T15:05:38.4147246Z +github.com/libp2p/go-msgio v0.3.0/go.mod h1:nyRM819GmVaF9LX3l03RMh10QdOroF++NBbxAb0mmDM=
+2026-09-12T15:05:38.4147771Z +github.com/libp2p/go-netroute v0.4.0 h1:sZZx9hyANYUx9PZyqcgE/E1GUG3iEtTZHUEvdtXT7/Q=
+2026-09-12T15:05:38.4148824Z +github.com/libp2p/go-netroute v0.4.0/go.mod h1:Nkd5ShYgSMS5MUKy/MU2T57xFoOKvvLR92Lic48LEyA=
+2026-09-12T15:05:38.4149402Z +github.com/libp2p/go-reuseport v0.4.0 h1:nR5KU7hD0WxXCJbmw7r2rhRYruNRl2koHw8fQscQm2s=
+2026-09-12T15:05:38.4149956Z +github.com/libp2p/go-reuseport v0.4.0/go.mod h1:ZtI03j/wO5hZVDFo2jKywN6bYKWLOy8Se6DrI2E1cLU=
+2026-09-12T15:05:38.4150496Z +github.com/libp2p/go-yamux/v5 v5.1.0 h1:8Qlxj4E9JGJAQVW6+uj2o7mqkqsIVlSUGmTWhlXzoHE=
+2026-09-12T15:05:38.4151201Z +github.com/libp2p/go-yamux/v5 v5.1.0/go.mod h1:tgIQ07ObtRR/I0IWsFOyQIL9/dR5UXgc2s8xKmNZv1o=
+2026-09-12T15:05:38.4151729Z +github.com/marcopolo/simnet v0.0.7 h1:DpH8BMGsF9+1w13L8rvCaAhb6nYJdY+dIXncDrssvUs=
+2026-09-12T15:05:38.4152268Z +github.com/marcopolo/simnet v0.0.7/go.mod h1:tfQF1u2DmaB6WHODMtQaLtClEf3a296CKQLq5gAsIS0=
+2026-09-12T15:05:38.4152909Z +github.com/marten-seemann/tcp v0.0.0-20210406111302-dfbc87cc63fd h1:br0buuQ854V8u83wA0rVZ8ttrq5CpaPZdvrK0LP2lOk=
+2026-09-12T15:05:38.4153646Z +github.com/marten-seemann/tcp v0.0.0-20210406111302-dfbc87cc63fd/go.mod h1:QuCEs1Nt24+FYQEqAAncTDPJIuGs+LxK1MCiFL25pMU=
+2026-09-12T15:05:38.4154339Z +github.com/mikioh/tcp v0.0.0-20190314235350-803a9b46060c h1:bzE/A84HN25pxAuk9Eej1Kz9OUelF97nAc82bDquQI8=
+2026-09-12T15:05:38.4154991Z +github.com/mikioh/tcp v0.0.0-20190314235350-803a9b46060c/go.mod h1:0SQS9kMwD2VsyFEB++InYyBJroV/FRmBgcydeSUcJms=
+2026-09-12T15:05:38.4155663Z +github.com/mikioh/tcpinfo v0.0.0-20190314235526-30a79bb1804b h1:z78hV3sbSMAUoyUMM0I83AUIT6Hu17AWfgjzIbtrYFc=
+2026-09-12T15:05:38.4156359Z +github.com/mikioh/tcpinfo v0.0.0-20190314235526-30a79bb1804b/go.mod h1:lxPUiZwKoFL8DUUmalo2yJJUCxbPKtm8OKfqr2/FTNU=
+2026-09-12T15:05:38.4157047Z +github.com/mikioh/tcpopt v0.0.0-20190314235656-172688c1accc h1:PTfri+PuQmWDqERdnNMiD9ZejrlswWrCpBEZgWOiTrc=
+2026-09-12T15:05:38.4157726Z +github.com/mikioh/tcpopt v0.0.0-20190314235656-172688c1accc/go.mod h1:cGKTAVKx4SxOuR/czcZ/E2RSJ3sfHs8FpHhQ5CWMf9s=
+2026-09-12T15:05:38.4158485Z +github.com/minio/blake2b-simd v0.0.0-20160723061019-3f5f724cb5b1/go.mod h1:pD8RvIylQ358TN4wwqatJ8rNavkEINozVn9DtGI3dfQ=
+2026-09-12T15:05:38.4159218Z +github.com/minio/sha256-simd v0.1.1-0.20190913151208-6de447530771/go.mod h1:B5e1o+1/KgNmWrSQK08Y6Z1Vb5pwIktudl0J58iy0KM=
+2026-09-12T15:05:38.4159836Z +github.com/minio/sha256-simd v1.0.1 h1:6kaan5IFmwTNynnKKpDHe6FWHohJOHhCPchzK49dzMM=
+2026-09-12T15:05:38.4160389Z +github.com/minio/sha256-simd v1.0.1/go.mod h1:Pz6AKMiUdngCLpeTL/RJY1M9rUuPMYujV5xJjtbRSN8=
+2026-09-12T15:05:38.4160937Z +github.com/mr-tron/base58 v1.1.2/go.mod h1:BinMc/sQntlIE1frQmRFPUoPA1Zkr8VRgBdjWI2mNwc=
+2026-09-12T15:05:38.4161449Z +github.com/mr-tron/base58 v1.3.0 h1:K6Y13R2h+dku0wOqKtecgRnBUBPrZzLZy5aIj8lCcJI=
+2026-09-12T15:05:38.4161964Z +github.com/mr-tron/base58 v1.3.0/go.mod h1:2BuubE67DCSWwVfx37JWNG8emOC0sHEU4/HpcYgCLX8=
+2026-09-12T15:05:38.4162512Z +github.com/multiformats/go-base32 v0.1.0 h1:pVx9xoSPqEIQG8o+UbAe7DNi51oej1NtK+aGkbLYxPE=
+2026-09-12T15:05:38.4163086Z +github.com/multiformats/go-base32 v0.1.0/go.mod h1:Kj3tFY6zNr+ABYMqeUNeGvkIC/UYgtWibDcT0rExnbI=
+2026-09-12T15:05:38.4163656Z +github.com/multiformats/go-base36 v0.2.0 h1:lFsAbNOGeKtuKozrtBsAkSVhv1p9D0/qedU9rQyccr0=
+2026-09-12T15:05:38.4164226Z +github.com/multiformats/go-base36 v0.2.0/go.mod h1:qvnKE++v+2MWCfePClUEjE78Z7P2a1UV0xHgWc0hkp4=
+2026-09-12T15:05:38.4164819Z +github.com/multiformats/go-multiaddr v0.1.1/go.mod h1:aMKBKNEYmzmDmxfX88/vz+J5IU55txyt0p4aiWVohjo=
+2026-09-12T15:05:38.4165414Z +github.com/multiformats/go-multiaddr v0.16.1 h1:fgJ0Pitow+wWXzN9do+1b8Pyjmo8m5WhGfzpL82MpCw=
+2026-09-12T15:05:38.4166013Z +github.com/multiformats/go-multiaddr v0.16.1/go.mod h1:JSVUmXDjsVFiW7RjIFMP7+Ev+h1DTbiJgVeTV/tcmP0=
+2026-09-12T15:05:38.4166622Z +github.com/multiformats/go-multiaddr-dns v0.6.0 h1:yKIW08WJHSPJ8bDAT2O/5fypCaUu9Bjl8r/1eJ4XAW8=
+2026-09-12T15:05:38.4167240Z +github.com/multiformats/go-multiaddr-dns v0.6.0/go.mod h1:dwIQwdORZfnNQCeS7xLXyn+7626oRmMsVP30Uronhf0=
+2026-09-12T15:05:38.4168549Z +github.com/multiformats/go-multiaddr-fmt v0.1.0 h1:WLEFClPycPkp4fnIzoFoV9FVd49/eQsuaL3/CWe167E=
+2026-09-12T15:05:38.4169235Z +github.com/multiformats/go-multiaddr-fmt v0.1.0/go.mod h1:hGtDIW4PU4BqJ50gW2quDuPVjyWNZxToGUh/HwTZYJo=
+2026-09-12T15:05:38.4169844Z +github.com/multiformats/go-multibase v0.3.0 h1:8helZD2+4Db7NNWFiktk2NePbF0boolBe6bDQvM4r68=
+2026-09-12T15:05:38.4176796Z +github.com/multiformats/go-multibase v0.3.0/go.mod h1:MoBLQPCkRTOL3eveIPO81860j2AQY8JwcnNlRkGRUfI=
+2026-09-12T15:05:38.4177717Z +github.com/multiformats/go-multicodec v0.10.0 h1:UpP223cig/Cx8J76jWt91njpK3GTAO1w02sdcjZDSuc=
+2026-09-12T15:05:38.4178337Z +github.com/multiformats/go-multicodec v0.10.0/go.mod h1:wg88pM+s2kZJEQfRCKBNU+g32F5aWBEjyFHXvZLTcLI=
+2026-09-12T15:05:38.4179023Z +github.com/multiformats/go-multihash v0.0.8/go.mod h1:YSLudS+Pi8NHE7o6tb3D8vrpKa63epEDmG8nTduyAew=
+2026-09-12T15:05:38.4179617Z +github.com/multiformats/go-multihash v0.2.3 h1:7Lyc8XfX/IY2jWb/gI7JP+o7JEq9hOa7BFvVU9RSh+U=
+2026-09-12T15:05:38.4180221Z +github.com/multiformats/go-multihash v0.2.3/go.mod h1:dXgKXCXjBzdscBLk9JkjINiEsCKRVch90MdaGiKsvSM=
+2026-09-12T15:05:38.4180827Z +github.com/multiformats/go-multistream v0.6.1 h1:4aoX5v6T+yWmc2raBHsTvzmFhOI8WVOer28DeBBEYdQ=
+2026-09-12T15:05:38.4181433Z +github.com/multiformats/go-multistream v0.6.1/go.mod h1:ksQf6kqHAb6zIsyw7Zm+gAuVo57Qbq84E27YlYqavqw=
+2026-09-12T15:05:38.4182020Z +github.com/multiformats/go-varint v0.1.0 h1:i2wqFp4sdl3IcIxfAonHQV9qU5OsZ4Ts9IOoETFs5dI=
+2026-09-12T15:05:38.4182599Z +github.com/multiformats/go-varint v0.1.0/go.mod h1:5KVAVXegtfmNQQm/lCY+ATvDzvJJhSkUlGQV9wgObdI=
+2026-09-12T15:05:38.4183246Z +github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 h1:C3w9PqII01/Oq1c1nUAm88MOHcQC9l5mIlSMApZMrHA=
+2026-09-12T15:05:38.4183951Z +github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822/go.mod h1:+n7T8mK8HuQTcFwEeznm/DIxMOiR9yIdICNftLE1DvQ=
+2026-09-12T15:05:38.4184652Z +github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58 h1:onHthvaw9LFnH4t2DcNVpwGmV9E1BkGknEliJkfwQj0=
+2026-09-12T15:05:38.4185348Z +github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58/go.mod h1:DXv8WO4yhMYhSNPKjeNKa5WY9YCIEBRbNzFFPJbWO6Y=
+2026-09-12T15:05:38.4185955Z +github.com/pion/datachannel v1.5.10 h1:ly0Q26K1i6ZkGf42W7D4hQYR90pZwzFOjTq5AuCKk4o=
+2026-09-12T15:05:38.4186510Z +github.com/pion/datachannel v1.5.10/go.mod h1:p/jJfC9arb29W7WrxyKbepTU20CFgyx5oLo8Rs4Py/M=
+2026-09-12T15:05:38.4187033Z +github.com/pion/dtls/v3 v3.1.2 h1:gqEdOUXLtCGW+afsBLO0LtDD8GnuBBjEy6HRtyofZTc=
+2026-09-12T15:05:38.4187540Z +github.com/pion/dtls/v3 v3.1.2/go.mod h1:Hw/igcX4pdY69z1Hgv5x7wJFrUkdgHwAn/Q/uo7YHRo=
+2026-09-12T15:05:38.4188036Z +github.com/pion/ice/v4 v4.0.10 h1:P59w1iauC/wPk9PdY8Vjl4fOFL5B+USq1+xbDcN6gT4=
+2026-09-12T15:05:38.4188893Z +github.com/pion/ice/v4 v4.0.10/go.mod h1:y3M18aPhIxLlcO/4dn9X8LzLLSma84cx6emMSu14FGw=
+2026-09-12T15:05:38.4189440Z +github.com/pion/interceptor v0.1.40 h1:e0BjnPcGpr2CFQgKhrQisBU7V3GXK6wrfYrGYaU6Jq4=
+2026-09-12T15:05:38.4189997Z +github.com/pion/interceptor v0.1.40/go.mod h1:Z6kqH7M/FYirg3frjGJ21VLSRJGBXB/KqaTIrdqnOic=
+2026-09-12T15:05:38.4190530Z +github.com/pion/logging v0.2.4 h1:tTew+7cmQ+Mc1pTBLKH2puKsOvhm32dROumOZ655zB8=
+2026-09-12T15:05:38.4191042Z +github.com/pion/logging v0.2.4/go.mod h1:DffhXTKYdNZU+KtJ5pyQDjvOAh/GsNSyv1lbkFbe3so=
+2026-09-12T15:05:38.4191544Z +github.com/pion/mdns/v2 v2.0.7 h1:c9kM8ewCgjslaAmicYMFQIde2H9/lrZpjBkN8VwoVtM=
+2026-09-12T15:05:38.4192043Z +github.com/pion/mdns/v2 v2.0.7/go.mod h1:vAdSYNAT0Jy3Ru0zl2YiW3Rm/fJCwIeM0nToenfOJKA=
+2026-09-12T15:05:38.4192571Z +github.com/pion/randutil v0.1.0 h1:CFG1UdESneORglEsnimhUjf33Rwjubwj6xfiOXBa3mA=
+2026-09-12T15:05:38.4193091Z +github.com/pion/randutil v0.1.0/go.mod h1:XcJrSMMbbMRhASFVOlj/5hQial/Y8oH/HVo7TBZq+j8=
+2026-09-12T15:05:38.4193600Z +github.com/pion/rtcp v1.2.16 h1:fk1B1dNW4hsI78XUCljZJlC4kZOPk67mNRuQ0fcEkSo=
+2026-09-12T15:05:38.4194093Z +github.com/pion/rtcp v1.2.16/go.mod h1:/as7VKfYbs5NIb4h6muQ35kQF/J0ZVNz2Z3xKoCBYOo=
+2026-09-12T15:05:38.4194574Z +github.com/pion/rtp v1.8.19 h1:jhdO/3XhL/aKm/wARFVmvTfq0lC/CvN1xwYKmduly3c=
+2026-09-12T15:05:38.4195228Z +github.com/pion/rtp v1.8.19/go.mod h1:bAu2UFKScgzyFqvUKmbvzSdPr+NGbZtv6UB2hesqXBk=
+2026-09-12T15:05:38.4195746Z +github.com/pion/sctp v1.8.39 h1:PJma40vRHa3UTO3C4MyeJDQ+KIobVYRZQZ0Nt7SjQnE=
+2026-09-12T15:05:38.4196249Z +github.com/pion/sctp v1.8.39/go.mod h1:cNiLdchXra8fHQwmIoqw0MbLLMs+f7uQ+dGMG2gWebE=
+2026-09-12T15:05:38.4196762Z +github.com/pion/sdp/v3 v3.0.18 h1:l0bAXazKHpepazVdp+tPYnrsy9dfh7ZbT8DxesH5ZnI=
+2026-09-12T15:05:38.4197416Z +github.com/pion/sdp/v3 v3.0.18/go.mod h1:ZREGo6A9ZygQ9XkqAj5xYCQtQpif0i6Pa81HOiAdqQ8=
+2026-09-12T15:05:38.4197910Z +github.com/pion/srtp/v3 v3.0.6 h1:E2gyj1f5X10sB/qILUGIkL4C2CqK269Xq167PbGCc/4=
+2026-09-12T15:05:38.4198457Z +github.com/pion/srtp/v3 v3.0.6/go.mod h1:BxvziG3v/armJHAaJ87euvkhHqWe9I7iiOy50K2QkhY=
+2026-09-12T15:05:38.4198966Z +github.com/pion/stun/v3 v3.1.1 h1:CkQxveJ4xGQjulGSROXbXq94TAWu8gIX2dT+ePhUkqw=
+2026-09-12T15:05:38.4199469Z +github.com/pion/stun/v3 v3.1.1/go.mod h1:qC1DfmcCTQjl9PBaMa5wSn3x9IPmKxSdcCsxBcDBndM=
+2026-09-12T15:05:38.4199999Z +github.com/pion/transport/v3 v3.0.7 h1:iRbMH05BzSNwhILHoBoAPxoB9xQgOaJk+591KC9P1o0=
+2026-09-12T15:05:38.4200551Z +github.com/pion/transport/v3 v3.0.7/go.mod h1:YleKiTZ4vqNxVwh77Z0zytYi7rXHl7j6uPLGhhz9rwo=
+2026-09-12T15:05:38.4201089Z +github.com/pion/transport/v4 v4.0.1 h1:sdROELU6BZ63Ab7FrOLn13M6YdJLY20wldXW2Cu2k8o=
+2026-09-12T15:05:38.4201629Z +github.com/pion/transport/v4 v4.0.1/go.mod h1:nEuEA4AD5lPdcIegQDpVLgNoDGreqM/YqmEx3ovP4jM=
+2026-09-12T15:05:38.4202208Z +github.com/pion/turn/v4 v4.0.2 h1:ZqgQ3+MjP32ug30xAbD6Mn+/K4Sxi3SdNOTFf+7mpps=
+2026-09-12T15:05:38.4202708Z +github.com/pion/turn/v4 v4.0.2/go.mod h1:pMMKP/ieNAG/fN5cZiN4SDuyKsXtNTr0ccN7IToA1zs=
+2026-09-12T15:05:38.4203216Z +github.com/pion/webrtc/v4 v4.1.2 h1:mpuUo/EJ1zMNKGE79fAdYNFZBX790KE7kQQpLMjjR54=
+2026-09-12T15:05:38.4203750Z +github.com/pion/webrtc/v4 v4.1.2/go.mod h1:xsCXiNAmMEjIdFxAYU0MbB3RwRieJsegSB2JZsGN+8U=
+2026-09-12T15:05:38.4204291Z +github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
+2026-09-12T15:05:38.4204847Z +github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
+2026-09-12T15:05:38.4205431Z +github.com/prometheus/client_golang v1.24.1 h1:JnJkREXzWxUdCuPFpIWZiPispT9xVV59uiuyR2bPlnU=
+2026-09-12T15:05:38.4206037Z +github.com/prometheus/client_golang v1.24.1/go.mod h1:F+oSRECHg4sse5ucfYpYDeIv/hu68Zo0uoHKetWnzcE=
+2026-09-12T15:05:38.4206620Z +github.com/prometheus/client_model v0.6.2 h1:oBsgwpGs7iVziMvrGhE53c/GrLUsZdHnqNwqPLxwZyk=
+2026-09-12T15:05:38.4207373Z +github.com/prometheus/client_model v0.6.2/go.mod h1:y3m2F6Gdpfy6Ut/GBsUqTWZqCUvMVzSfMLjcu6wAwpE=
+2026-09-12T15:05:38.4207941Z +github.com/prometheus/common v0.70.1 h1:1HvjP4D5oL3t8RsPlwxA9onvvStjtIHYE5XuuwOi/PY=
+2026-09-12T15:05:38.4208498Z +github.com/prometheus/common v0.70.1/go.mod h1:VdFUQDMZK3VLkurFUVhia6uys/0suUp86TJz5qbJRhc=
+2026-09-12T15:05:38.4209044Z +github.com/prometheus/procfs v0.21.1 h1:GljZCt+zSTS+NZq88cyQ1LjZ+RCHp3uVuabBWA5+OJI=
+2026-09-12T15:05:38.4209606Z +github.com/prometheus/procfs v0.21.1/go.mod h1:aB55Cww9pdSJVHk0hUf0inxWyyjPogFIjmHKYgMKmtY=
+2026-09-12T15:05:38.4210172Z +github.com/quic-go/go-ossfuzz-seeds v0.1.0 h1:APacT+iIaNF6fd8AGEiN3bT/Jtkd2jz4v4TzM7MFjy0=
+2026-09-12T15:05:38.4210760Z +github.com/quic-go/go-ossfuzz-seeds v0.1.0/go.mod h1:3IOHRbJIc+L6YKMwfDtJAM9Vj9k0YY4muhuyUYk5tbk=
+2026-09-12T15:05:38.4211307Z +github.com/quic-go/qpack v0.6.0 h1:g7W+BMYynC1LbYLSqRt8PBg5Tgwxn214ZZR34VIOjz8=
+2026-09-12T15:05:38.4211832Z +github.com/quic-go/qpack v0.6.0/go.mod h1:lUpLKChi8njB4ty2bFLX2x4gzDqXwUpaO1DP9qMDZII=
+2026-09-12T15:05:38.4212501Z +github.com/quic-go/quic-go v0.60.0 h1:xcQioE8OM66UQLeUMHltK1CCcOu3JbVB4JAQdDQSB+0=
+2026-09-12T15:05:38.4213037Z +github.com/quic-go/quic-go v0.60.0/go.mod h1:wpKpjmPpftl30sL6pFh7REVpjbcCVy4zt2vDyK1TuJk=
+2026-09-12T15:05:38.4213593Z +github.com/quic-go/webtransport-go v0.11.1 h1:rrFQMO+7/52ZDJ04fsrjIaWqn6q1z1MYo9iVFq6JtbA=
+2026-09-12T15:05:38.4214324Z +github.com/quic-go/webtransport-go v0.11.1/go.mod h1:SHgEzUFVyj+9WUSuGB1P6Zd351Pww2leWV3SwlTovkA=
+2026-09-12T15:05:38.4214923Z +github.com/rogpeppe/go-internal v1.10.0 h1:TMyTOH3F/DB16zRVcYyreMH6GnZZrwQVAoYjRBZyWFQ=
+2026-09-12T15:05:38.4215488Z +github.com/rogpeppe/go-internal v1.10.0/go.mod h1:UQnix2H7Ngw/k4C5ijL5+65zddjncjaFoBhdsK/akog=
+2026-09-12T15:05:38.4216044Z +github.com/spaolacci/murmur3 v1.1.0 h1:7c1g84S4BPRrfL5Xrdp6fOJ206sU9y293DDHaoy0bLI=
+2026-09-12T15:05:38.4216599Z +github.com/spaolacci/murmur3 v1.1.0/go.mod h1:JwIasOWyU6f++ZhiEuf87xNszmSA2myDM2Kzu9HwQUA=
+2026-09-12T15:05:38.4217436Z +github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=
+2026-09-12T15:05:38.4217985Z +github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
+2026-09-12T15:05:38.4218501Z +github.com/wlynxg/anet v0.0.5 h1:J3VJGi1gvo0JwZ/P1/Yc/8p63SoW98B5dHkYDmpgvvU=
+2026-09-12T15:05:38.4218996Z +github.com/wlynxg/anet v0.0.5/go.mod h1:eay5PRQr7fIVAMbTbchTnO9gG65Hg/uYGdc7mguHxoA=
+2026-09-12T15:05:38.4219487Z +go.uber.org/dig v1.19.0 h1:BACLhebsYdpQ7IROQ1AGPjrXcP5dF80U3gKoFzbaq/4=
+2026-09-12T15:05:38.4219957Z +go.uber.org/dig v1.19.0/go.mod h1:Us0rSJiThwCv2GteUN0Q7OKvU7n5J4dxZ9JKUXozFdE=
+2026-09-12T15:05:38.4220410Z +go.uber.org/fx v1.24.0 h1:wE8mruvpg2kiiL1Vqd0CC+tr0/24XIB10Iwp2lLWzkg=
+2026-09-12T15:05:38.4220862Z +go.uber.org/fx v1.24.0/go.mod h1:AmDeGyS+ZARGKM4tlH4FY2Jr63VjbEDJHtqXTGP5hbo=
+2026-09-12T15:05:38.4221338Z +go.uber.org/goleak v1.3.0 h1:2K3zAYmnTNqV73imy9J1T3WC+gmCePx2hEGkimedGto=
+2026-09-12T15:05:38.4221827Z +go.uber.org/goleak v1.3.0/go.mod h1:CoHD4mav9JJNrW/WLlf7HGZPjdw8EucARQHekz1X6bE=
+2026-09-12T15:05:38.4222286Z +go.uber.org/mock v0.6.0 h1:hyF9dfmbgIX5EfOdasqLsWD6xqpNZlXblLB/Dbnwv3Y=
+2026-09-12T15:05:38.4222892Z +go.uber.org/mock v0.6.0/go.mod h1:KiVJ4BqZJaMj4svdfmHM0AUx4NJYO8ZNpPnZn1Z+BBU=
+2026-09-12T15:05:38.4223374Z +go.uber.org/multierr v1.11.0 h1:blXXJkSxSSfBVBlC76pxqeO+LN3aDfLQo+309xJstO0=
+2026-09-12T15:05:38.4223864Z +go.uber.org/multierr v1.11.0/go.mod h1:20+QtiLqy0Nd6FdQB9TLXag12DsQkrbs3htMFfDN80Y=
+2026-09-12T15:05:38.4224339Z +go.uber.org/zap v1.28.0 h1:IZzaP1Fv73/T/pBMLk4VutPl36uNC+OSUh3JLG3FIjo=
+2026-09-12T15:05:38.4224796Z +go.uber.org/zap v1.28.0/go.mod h1:rDLpOi171uODNm/mxFcuYWxDsqWSAVkFdX4XojSKg/Q=
+2026-09-12T15:05:38.4225254Z +go.yaml.in/yaml/v2 v2.4.4 h1:tuyd0P+2Ont/d6e2rl3be67goVK4R6deVxCUX5vyPaQ=
+2026-09-12T15:05:38.4225727Z +go.yaml.in/yaml/v2 v2.4.4/go.mod h1:gMZqIpDtDqOfM0uNfy0SkpRhvUryYH0Z6wdMYcacYXQ=
+2026-09-12T15:05:38.4226199Z +go.yaml.in/yaml/v3 v3.0.4 h1:tfq32ie2Jv2UxXFdLJdh3jXuOzWiL1fo0bu/FbuKpbc=
+2026-09-12T15:05:38.4226672Z +go.yaml.in/yaml/v3 v3.0.4/go.mod h1:DhzuOOF2ATzADvBadXxruRBLzYTpT36CKvDb3+aBEFg=
+2026-09-12T15:05:38.4227271Z +golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
+2026-09-12T15:05:38.4228063Z +golang.org/x/crypto v0.0.0-20190611184440-5c40567a22f8/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=
+2026-09-12T15:05:38.4228743Z +golang.org/x/crypto v0.0.0-20200602180216-279210d13fed/go.mod h1:LzIPMQfyMNhhGPhUkYOs5KpL4U8rLKemX1yGLhDgUto=
+2026-09-12T15:05:38.4229419Z +golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2/go.mod h1:T9bdIzuCu7OtxOm1hfPfRQxPLYneinmdGuTeoZ9dtd4=
+2026-09-12T15:05:38.4229989Z +golang.org/x/crypto v0.54.0 h1:YLIA59K4fiNzHzjnZt2tUJQjQtUWfWbeHBqKtk3eScw=
+2026-09-12T15:05:38.4230493Z +golang.org/x/crypto v0.54.0/go.mod h1:KWL8ny2AZdGR2cWmzeHrp2azQPGogOv+HeQaVEXC2dk=
+2026-09-12T15:05:38.4231057Z +golang.org/x/exp v0.0.0-20260718201538-764159d718ef h1:LkZ48HFgy/TvhTI0bcWkjgFkgLyKUwcTbDjS0DUjw+A=
+2026-09-12T15:05:38.4231686Z +golang.org/x/exp v0.0.0-20260718201538-764159d718ef/go.mod h1:EdfpwwqSu+0Li0mzskwHU6FWDV3t9Q+RZDo3QMUtL3Q=
+2026-09-12T15:05:38.4232235Z +golang.org/x/mod v0.38.0 h1:MECBjubtXD7yj4HrhIUcywNaGeNVUdfVnxmPajOk4yk=
+2026-09-12T15:05:38.4232825Z +golang.org/x/mod v0.38.0/go.mod h1:V6Xz0pq8TQ3dGqVQ1FVHuelZpAL0uNhSkk9ogYP3c40=
+2026-09-12T15:05:38.4233421Z +golang.org/x/net v0.0.0-20190404232315-eb5bcb51f2a3/go.mod h1:t9HGtf8HONx5eT2rtn7q6eTqICYqUVnKs3thJo3Qplg=
+2026-09-12T15:05:38.4234236Z +golang.org/x/net v0.0.0-20210119194325-5f4716e94777/go.mod h1:m0MpNAwzfU5UDzcl9v0D8zg8gWTRqZa9RBIspLL5mdg=
+2026-09-12T15:05:38.4234907Z +golang.org/x/net v0.0.0-20210226172049-e18ecbb05110/go.mod h1:m0MpNAwzfU5UDzcl9v0D8zg8gWTRqZa9RBIspLL5mdg=
+2026-09-12T15:05:38.4235444Z +golang.org/x/net v0.57.0 h1:K5+3DljvIuDG9/Jv9rvyMywYNFCQ9RSUY6OOTTkT+tE=
+2026-09-12T15:05:38.4235911Z +golang.org/x/net v0.57.0/go.mod h1:KpXc8iv+r3XplLAG/f7Jsf9RPszJzdR0f58q9vGOuEU=
+2026-09-12T15:05:38.4237187Z +golang.org/x/sync v0.0.0-20210220032951-036812b2e83c/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
+2026-09-12T15:05:38.4237732Z +golang.org/x/sync v0.22.0 h1:SZjpbeLmrCk4xhRSZFNZW5gFUeCeFgjekvI/+gfScek=
+2026-09-12T15:05:38.4238353Z +golang.org/x/sync v0.22.0/go.mod h1:9xrNwdLfx4jkKbNva9FpL6vEN7evnE43NNNJQ2LF3+0=
+2026-09-12T15:05:38.4238942Z +golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
+2026-09-12T15:05:38.4239594Z +golang.org/x/sys v0.0.0-20190412213103-97732733099d/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+2026-09-12T15:05:38.4240246Z +golang.org/x/sys v0.0.0-20200602225109-6fdc65e7d980/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+2026-09-12T15:05:38.4240894Z +golang.org/x/sys v0.0.0-20201119102817-f84b799fce68/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+2026-09-12T15:05:38.4241437Z +golang.org/x/sys v0.47.0 h1:o7XGOvZQCADBQQ4Y7VNq2dRWQR7JmOUW8Kxx4ZsNgWs=
+2026-09-12T15:05:38.4241912Z +golang.org/x/sys v0.47.0/go.mod h1:4GL1E5IUh+htKOUEOaiffhrAeqysfVGipDYzABqnCmw=
+2026-09-12T15:05:38.4242490Z +golang.org/x/telemetry v0.0.0-20260717140457-bdb89881bb75 h1:I9ygRooEYoVHV0SRNOSr/KVjTf5EeJ52BuNkVjsP2GU=
+2026-09-12T15:05:38.4243256Z +golang.org/x/telemetry v0.0.0-20260717140457-bdb89881bb75/go.mod h1:LV7u5Oco+Z/g6XI7PqN+EUUUGGkEcmB1uj2ceI0fOVg=
+2026-09-12T15:05:38.4243933Z +golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1/go.mod h1:bj7SfCRtBDWHUb9snDiAeCFNEtKQo2Wmx5Cou7ajbmo=
+2026-09-12T15:05:38.4244508Z +golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
+2026-09-12T15:05:38.4244998Z +golang.org/x/text v0.3.3/go.mod h1:5Zoc/QRtKVWzQhOtBMvqHzDpF6irO9z98xDceosuGiQ=
+2026-09-12T15:05:38.4245467Z +golang.org/x/text v0.40.0 h1:Ub2Z6/xjgF1WrYQz2nuITOEegKFtiIy+rieRJ5lHZKs=
+2026-09-12T15:05:38.4245938Z +golang.org/x/text v0.40.0/go.mod h1:hpnzDAfGV753zIKo+wk3u1bVKCGPbrnF7+7LBF/UHVY=
+2026-09-12T15:05:38.4246423Z +golang.org/x/time v0.15.0 h1:bbrp8t3bGUeFOx08pvsMYRTCVSMk89u4tKbNOZbp88U=
+2026-09-12T15:05:38.4246894Z +golang.org/x/time v0.15.0/go.mod h1:Y4YMaQmXwGQZoFaVFk4YpCt4FLQMYKZe9oeV/f4MSno=
+2026-09-12T15:05:38.4247485Z +golang.org/x/tools v0.0.0-20180917221912-90fa682c2a6e/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=
+2026-09-12T15:05:38.4248102Z +golang.org/x/tools v0.48.0 h1:3+hClM1aLL5mjMKm5ovokw9epgRXPuu2tILgismM6RE=
+2026-09-12T15:05:38.4248632Z +golang.org/x/tools v0.48.0/go.mod h1:08xX0orndb/F7jJxGDicx061tyd5pcMto75YMAXr6lk=
+2026-09-12T15:05:38.4249204Z +golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 h1:go1bK/D/BFZV2I8cIQd1NKEZ+0owSTG1fDTci4IqFcE=
+2026-09-12T15:05:38.4249864Z +golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
+2026-09-12T15:05:38.4250482Z +google.golang.org/protobuf v1.36.11 h1:fV6ZwhNocDyBLK0dj+fg8ektcVegBBuEolpbTQyBNVE=
+2026-09-12T15:05:38.4251036Z +google.golang.org/protobuf v1.36.11/go.mod h1:HTf+CrKn2C3g5S8VImy6tdcUvCska2kB7j23XfzDpco=
+2026-09-12T15:05:38.4251647Z +gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c h1:Hei/4ADfdWqJk1ZMxUNpqntNwaWcugrBjAiHlqqRiVk=
+2026-09-12T15:05:38.4252279Z +gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c/go.mod h1:JHkPIbrfpd72SG/EVd6muEfDQjcINNoR0C8j2r3qZ4Q=
+2026-09-12T15:05:38.4252818Z +gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
+2026-09-12T15:05:38.4253386Z +gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
+2026-09-12T15:05:38.4254369Z +lukechampine.com/blake3 v1.4.1 h1:I3Smz7gso8w4/TunLKec6K2fn+kyKtDxr/xcQEN84Wg=
+2026-09-12T15:05:38.4254935Z +lukechampine.com/blake3 v1.4.1/go.mod h1:QFosUxmjB8mnrWFSNwKmvxHpfY72bmD2tQ0kBMM3kwo=
+2026-09-12T15:05:39.1257737Z ok  	github.com/Nettking/msh/cmd/fcp-peer-sidecar	(cached)
+2026-09-12T15:05:39.4680308Z error obtaining VCS status: exit status 128
+2026-09-12T15:05:39.4680663Z 	Use -buildvcs=false to disable VCS stamping.
+2026-09-12T15:05:39.6151886Z ##[error]Process completed with exit code 1.
+2026-09-12T15:05:39.6413882Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-09-12T15:05:39.6416888Z Post job cleanup.
+2026-09-12T15:05:39.7532980Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-09-12T15:05:39.7792175Z git version 2.55.0.windows.3
+2026-09-12T15:05:39.7842202Z Temporarily overriding HOME='C:\actions-runner\_work\_temp\821aa6fa-9dab-4ff8-a6b7-d9eb3f5b9e32' before making global git config changes
+2026-09-12T15:05:39.7842903Z Adding repository directory to the temporary git global config as a safe directory
+2026-09-12T15:05:39.7848752Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory C:\actions-runner\_work\msh\msh
+2026-09-12T15:05:39.8163316Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-09-12T15:05:39.8472641Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-09-12T15:05:40.4278952Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-09-12T15:05:40.4587550Z http.https://github.com/.extraheader
+2026-09-12T15:05:40.4626499Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
+2026-09-12T15:05:40.4962798Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-09-12T15:05:41.0722265Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-09-12T15:05:41.1029476Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-09-12T15:05:41.6519206Z Cleaning up orphan processes
+2026-09-12T15:05:41.6658937Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-go@v5. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

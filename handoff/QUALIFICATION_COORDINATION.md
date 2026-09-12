@@ -2771,3 +2771,7 @@ Draft PR473 has exact head440123f6. Existing automatic runs are listed in diagno
 ## 2026-09-12T15:12:13.418525+00:00 — PR473 native F7 dispatch accepted
 
 One exact-head checked-in F7 dispatch returned204; receipt diagnostics/pr473-native-validation-dispatch.json. No duplicate dispatch, source change or full37 campaign. Confirm startup once, then defer progress review until15:55Z.
+
+## 2026-09-12T15:14:24.969886+00:00 — D12 recurs in post-merge F6; no blind retry
+
+Initial b719/PR473 snapshot found F6 Windows job103572678982 failed on Beast at15:05Z after passing Go tests, same VCS status exit128. Exact logs retained and recurrence recorded under existing issue472, not a duplicate defect. See diagnostics/D12-postmerge-f6-recurrence.json. Native PR473 F7 run34701516368 is queued on both OS; automatic release34701429430/update34701429438 queued/running, branding green. Main b719 automatic jobs remain active with F6 Linux/other completed checks green; preserve them. Next read-only Beast Git-context diagnosis, no source/config/account changes or retries. Next routine queue check15:55Z.

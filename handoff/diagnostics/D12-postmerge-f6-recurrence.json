@@ -1,0 +1,40 @@
+{
+  "recorded_at": "2026-09-12T15:14:24.969886+00:00",
+  "finding": "D12",
+  "status": "CONFIRMED_RECURRING_ON_ORIGINAL_HOST",
+  "candidate_sha": "b7194820d8f1940ae60b8c9639e09b7f61e65c55",
+  "host": "BEAST Windows runner28",
+  "physical_stage": "None; automatic merged-main F6 Verify Go node-agent boundary",
+  "run_id": 34701018860,
+  "job_id": 103572678982,
+  "procedure": "F6 sidecar directory: go mod tidy; git diff --exit-code -- go.mod go.sum; go test ./...; go build -trimpath .",
+  "observed": "Go tests pass cached; Go build fails obtaining VCS status exit128. Same symptom as original Phase2 failure on Beast, now reproduced by another checked-in workflow.",
+  "expected": "Default Go VCS stamping obtains Git provenance and build succeeds.",
+  "classification": "Host/toolchain Git-context failure; underlying Git stderr/root cause still unresolved. No product test failure observed.",
+  "acceptance_impact": "F6 post-merge check fails; no final candidate freeze/qualification completion from this state. PR473 remains draft pending source validation and assessment.",
+  "safe_continuation": "YES for independent queued CI and read-only Beast Git-context diagnostics; no additional blind retry, source repair, VCS bypass, workspace cleanup or service-account change.",
+  "state_changed": "Only CI-owned workspace/dependency generated files and GitHub failure state; no physical deployment/runner configuration change.",
+  "protected_recorder_data": "UNTOUCHED",
+  "evidence": {
+    "source_commit": "b7194820d8f1940ae60b8c9639e09b7f61e65c55",
+    "retained_at": "2026-09-12T15:13:07.065713+00:00",
+    "records": [
+      {
+        "job_id": 103572678982,
+        "run_id": 34701018860,
+        "name": "transport-closeout (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executio...",
+        "runner_name": "Beast",
+        "conclusion": "failure",
+        "bytes": 76495,
+        "sha256": "41548c837faa4b1375ceb8e62eb7af8ed419edd2f780a22938dbc1274868b357",
+        "checkout_commits": [
+          "b7194820d8f1940ae60b8c9639e09b7f61e65c55"
+        ],
+        "checkout_matches": true
+      }
+    ]
+  },
+  "github_artifact": "https://github.com/Nettking/msh/issues/472",
+  "repair": "NONE",
+  "next_diagnostic_action": "Obtain actual Git VCS status stderr under Beast runner28 service identity/cwd/env through a read-only channel when safely accessible. Compare which git.exe Go resolves and repository ownership/HOME/safe-directory context. Do not change account, configuration or stamping to mask failure."
+}
