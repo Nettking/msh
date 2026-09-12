@@ -11,9 +11,7 @@ all17 D08 cases across native platforms, original scheduler failure and explicit
 platform exclusions reconciled. No job was rerun for historical hosted billing reds.
 All prior PR/failed-main evidence retained under its own source. No further17ab CI
 polling or qualification is needed unless a concrete new contract reason appears.
-Next highest-value action: prepare the user-authorized minimal coverage-preserving
-self-hosted CI migration plan and old/new trigger/OS/lint/test/service matrix BEFORE
-workflow edits. Read handoff/CI_WORKFLOW_RETIREMENT_REVIEW.md and its audit receipts.
+Next highest-value action: implement/review the already-persisted one-workflow migration proposal in an isolated CI-only branch. Plan: CI_COVERAGE_MIGRATION_PLAN.md; exact matrix: diagnostics/ci-migration-equivalence-matrix.json. Retain legacy files until replacement evidence exists. Read handoff/CI_WORKFLOW_RETIREMENT_REVIEW.md and its audit receipts.
 Verify reported AQG7NCC native fcp-windows capacity without changing labels/accounts
 or admitting a runner to fcp-test release pools. Prefer retained workflow extensions,
 preserveUP035, relay lint and12Windows AI-trigger modules; require equivalent green
@@ -2424,3 +2422,5 @@ permanent cancellation of the newly authorized migration objective.
 2026-09-12T10:03:02.1133040Z: post-gate runner metadata verifies AQG7NCC-Windows id30 has Windows/fcp-windows labels, but API currently reports offline and os=unknown; distinct Linux runner id31 is also offline. User-reported availability is not currently confirmed. This does not invalidate completed native evidence. Nettking Windows(id22,fcp-windows) and Nettking-Linux(id27,fcp-linux-fast) are online; migration planning can proceed without AQG dependency. No runner mutation/admission. Runtime suitability must be proven by checked-in job preconditions before counting replacement evidence.
 
 2026-09-12T10:06:49.5015114Z: migration plan and explicit old/new matrix prepared before source edits: extend only existing F7 closeout, same2OS jobs,8added paths, separate capabilitiesUP035,strict2-file relay lint,3transfer test modules. Existing release/F6/F8 unchanged. Stage1 retains legacy files; require trueJS-only event and two full green native replacement executions before partial/coherent retirement. AQG Windows label is correct but current API offline/osunknown; existing Nettking capacity supports plan. Local read-only Ruff0.16.3UP035 and strict relay-scope probes on unchanged17ab returned no findings; no product/CI workflow edits or qualification reruns. Exact plan: handoff/CI_COVERAGE_MIGRATION_PLAN.md; matrix: diagnostics/ci-migration-equivalence-matrix.json. Next: isolated stage1 CI-only implementation/review, then controlled replacement evidence.
+
+2026-09-12T10:08:09.7495438Z: heartbeat now targets persisted stage1 migration proposal and stops polling fully qualified17ab/467. Proposal is reviewable in GitHub; zero workflow/product edits made so far. Next: isolated CI branch, F7-only extension plus focused contract validation, draft PR and source-bound replacement evidence, with retirement withheld. All source/evidence branches pushed; physical runtime unchanged.
