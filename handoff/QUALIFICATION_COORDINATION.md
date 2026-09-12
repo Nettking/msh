@@ -10,7 +10,8 @@ All required prior fixes463/465 are merged. No PR-head or passing main reruns.
 Next: inspect containment/symlink contracts, develop a narrow separate D08 regression
 and repair in isolated branch codex/analysis-content-resolve-race from2a9c9b8e;
 push a draft PR with focused evidence before deciding new qualification scope.
-No repair branch/source edit exists yet. Current release9/ICSE6 artifact reviews
+Repair branch codex/analysis-content-resolve-race exists with pushed red tests;
+product source is still unchanged at this checkpoint. Current release9/ICSE6 artifact reviews
 remain valid for2a9; final verdict helper must not pass while F85 is failed.
 Physical runtime remains M`9b286f931497bf6291e215f6340443c5162826b0`;
 admission stopped, protected Recorder data untouched, no candidate freeze/PASS/timers.
@@ -2264,3 +2265,5 @@ and repair only after the safe path contract is concrete. No full qualification
 merely because a patch exists; push branch/draft PR/focused results first.
 Private retained repro root is .acceptance/d08-resolve-ku191byw; no cleanup needed.
 All current work is pushed; product/physical checkouts remain clean and unchanged.
+
+2026-09-12T05:37:55.084846+00:00: D08 red test checkpoint pushed on isolated repair branch ata9f8271feb361856e234c2db2d391278fda39a6b. Four native deleted-name interleavings (plain/extended roots and short/nested keys) plus concurrent public-API reproduction fail on unchanged2a9 product source;4 basic cases pass,4 symlink cases skip for Martin lacking Windows symlink privilege. Next: narrow Windows non-reparse leaf resolution fix, preserve full resolution for actual links/reparse entries, add unprivileged real junction containment tests and focused validation. No CI qualification dispatched; no physical changes.

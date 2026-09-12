@@ -1,0 +1,43 @@
+{
+  "recorded_at": "2026-09-12T05:37:55.084846+00:00",
+  "source_base": "2a9c9b8eb53edff74c2de23570ec56e054d29b22",
+  "test_commit": "a9f8271feb361856e234c2db2d391278fda39a6b",
+  "branch": "codex/analysis-content-resolve-race",
+  "product_source_unchanged": true,
+  "host": "Nettking",
+  "context": "Martin isolated native Python3.12 test checkout",
+  "command": "audit Python -B -m pytest -o addopts= -q catalog/capabilities/tests/test_analysis_content_path_resolution.py",
+  "failed": [
+    "test_resolution_survives_native_leaf_replacement[x-True]",
+    "test_concurrent_publication_keeps_logical_resolution_inside_root",
+    "test_resolution_survives_native_leaf_replacement[analysis/session/work/plan.json-True]",
+    "test_resolution_survives_native_leaf_replacement[analysis/session/work/plan.json-False]",
+    "test_resolution_survives_native_leaf_replacement[x-False]"
+  ],
+  "skips": [
+    {
+      "name": "test_resolution_preserves_real_link_containment[False-False]",
+      "reason": "Windows symlink privilege unavailable"
+    },
+    {
+      "name": "test_resolution_preserves_real_link_containment[True-False]",
+      "reason": "Windows symlink privilege unavailable"
+    },
+    {
+      "name": "test_resolution_preserves_real_link_containment[True-True]",
+      "reason": "Windows symlink privilege unavailable"
+    },
+    {
+      "name": "test_resolution_preserves_real_link_containment[False-True]",
+      "reason": "Windows symlink privilege unavailable"
+    }
+  ],
+  "passed": 4,
+  "logs": {
+    "D08-red.xml": "0c751a1caf4197535c2539e9d03433dfcce8d29685793fe60dba389cfb65ce0e",
+    "D08-red.log": "a6d0bca65ec30e1bf1eaf510685cc75eea912311d9840c84e445bd3d47b8b1ad"
+  },
+  "protected_recorder_data": "UNTOUCHED",
+  "physical_runtime_changed": false,
+  "next_action": "Narrow Windows non-reparse leaf path fix; real junction containment controls supplement unavailable symlink privilege"
+}
