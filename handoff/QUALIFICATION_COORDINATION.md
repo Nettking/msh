@@ -2681,3 +2681,5 @@ UNRESOLVED: timeout is confirmed; product, test-harness timing, host load/admiss
 Exact SHA/logs/procedure and protected-data invariant are persisted in
 diagnostics/D11.md. Publish its durable GitHub artifact before further
 investigation. Retain the failed shard manifest/JUnit and inspect the exact result/timeout boundary in test_live_storage_reinstatement.py and live_storage_reinstatement.py. Check prior native same-test outcomes and AQG31 admission evidence before a focused unchanged-source reproduction. Do not extend deadlines or weaken authority/acknowledgement guards.
+
+D11 durable artifact: https://github.com/Nettking/msh/issues/471.

@@ -34,7 +34,7 @@
   "state_changed": "CI-owned checkout/test fixtures/dependency caches and failed build/test work only; investigation read retained logs. No manual host mutation.",
   "protected_recorder_data": "UNTOUCHED",
   "physical_runtime_sha": "9b286f931497bf6291e215f6340443c5162826b0",
-  "github_artifact": "PENDING",
+  "github_artifact": "https://github.com/Nettking/msh/issues/471",
   "repair": "NONE",
   "next_diagnostic_action": "Retain the failed shard manifest/JUnit and inspect the exact result/timeout boundary in test_live_storage_reinstatement.py and live_storage_reinstatement.py. Check prior native same-test outcomes and AQG31 admission evidence before a focused unchanged-source reproduction. Do not extend deadlines or weaken authority/acknowledgement guards."
 }
