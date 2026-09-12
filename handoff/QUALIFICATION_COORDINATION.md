@@ -2583,3 +2583,5 @@ exact logs are persisted in D10; underlying ACL/open-handle cause remains unknow
 Missing JUnit and release aggregate reds are consequences. Next publish its durable
 issue, then continue D09 integration; it is independent of the verified 2/2 native
 replacement proof. No failing test is being relabeled or suppressed.
+
+D10 durable GitHub artifact: https://github.com/Nettking/msh/issues/470. No product repair proposed.

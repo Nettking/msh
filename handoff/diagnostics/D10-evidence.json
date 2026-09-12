@@ -84,7 +84,7 @@
       ]
     }
   ],
-  "github_artifact": "PENDING_ISSUE_PUBLICATION",
+  "github_artifact": "https://github.com/Nettking/msh/issues/470",
   "repair": "NONE; no product or runner-account/label change",
   "next_action": "Publish host-environment issue with exact run/log references. Before retrying Beast jobs, inspect only CI-owned cache owner/ACL/reparse/open-handle state and current workload through an authorized read-only channel; preserve concurrent work. Continue separate D09 integration after 2/2 proof."
 }
