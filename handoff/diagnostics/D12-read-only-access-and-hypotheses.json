@@ -1,0 +1,74 @@
+{
+  "recorded_at": "2026-09-12T15:19:19.120955+00:00",
+  "finding": "D12",
+  "status": "RECURRENCE_PERSISTED_READ_ONLY_HOST_ACCESS_PENDING_TRUSTED_IDENTITY",
+  "candidate_sha": "b7194820d8f1940ae60b8c9639e09b7f61e65c55",
+  "host": "Beast Windows runner28",
+  "confirmed_observations": [
+    "Checkout and cleanup use native Git successfully in the repository root. Initial checkout resolves C:/Program Files/Git/cmd/git.exe, later setup adds Git/bin to PATH, and cleanup resolves Git/bin/git.exe.",
+    "During F6 sidecar step, git diff --exit-code -- go.mod go.sum outputs diff --git a/go.mod b/go.sum. This compares the two files, rather than a tracked-file working-tree delta.",
+    "Go test passes, but default-stamped Go build reports VCS status exit128. Same original host fails both Phase2 and F6."
+  ],
+  "hypotheses_not_confirmed": [
+    "Git repository discovery or safe-directory/ownership context differs under the sidecar/native step.",
+    "PATH resolution, HOME/global config scope or a concurrent host filesystem context contributes.",
+    "PowerShell continuation after an earlier native command failure may conceal additional harness effects; no independent defect/repair is established by this observation."
+  ],
+  "read_only_access": {
+    "tailscale_dns": "beast.tail4ccd2b.ts.net",
+    "tailscale_ipv4": "100.85.20.75",
+    "online": true,
+    "attempt": "ssh -o BatchMode=yes -o ConnectTimeout=8 -o StrictHostKeyChecking=yes -o LogLevel=ERROR Martin@beast.tail4ccd2b.ts.net whoami",
+    "observed": "No ED25519 host key is known; Host key verification failed. Authentication not reached. Martin account remains unverified.",
+    "existing_known_host_aliases_found": [],
+    "scanned_untrusted_fingerprint": "SHA256:Dnx+GNIif4iX8N7Xy6slA8Oys4FK2J+P5gan1NTmvmY",
+    "question_pending": "User asked asynchronously to verify fingerprint from a trusted Beast context and provide SSH account. Do not treat a scanned key alone as verification."
+  },
+  "state_changed": "No SSH session, trust-store modification, remote command, runtime deployment, runner config/account or protected-data access. Public host key scanned only.",
+  "protected_recorder_data": "UNTOUCHED",
+  "next_action": "Continue independent PR473 validation. If trusted Beast identity/account is provided, obtain read-only Git executable/cwd/HOME/safe-directory/ownership and git status stderr under actual runner identity; do not equate an unrelated interactive account with runner context. No further blind retry.",
+  "pr473_known_hosted_failure": {
+    "run_id": 34701429475,
+    "classification": "Existing hosted billing/admission infrastructure failure before execution; no product failure",
+    "jobs": [
+      {
+        "job_id": 103573774480,
+        "step_count": 0,
+        "runner": "",
+        "annotations": [
+          {
+            "path": ".github",
+            "blob_href": "https://github.com/Nettking/msh/blob/440123f6bc6dc358eef3d233236bc14f91af60e0/.github",
+            "start_line": 1,
+            "start_column": null,
+            "end_line": 1,
+            "end_column": null,
+            "annotation_level": "failure",
+            "title": "",
+            "message": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings",
+            "raw_details": ""
+          }
+        ]
+      },
+      {
+        "job_id": 103573774550,
+        "step_count": 0,
+        "runner": "",
+        "annotations": [
+          {
+            "path": ".github",
+            "blob_href": "https://github.com/Nettking/msh/blob/440123f6bc6dc358eef3d233236bc14f91af60e0/.github",
+            "start_line": 1,
+            "start_column": null,
+            "end_line": 1,
+            "end_column": null,
+            "annotation_level": "failure",
+            "title": "",
+            "message": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings",
+            "raw_details": ""
+          }
+        ]
+      }
+    ]
+  }
+}
