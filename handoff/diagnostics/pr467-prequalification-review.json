@@ -1,0 +1,38 @@
+{
+  "recorded_at": "2026-09-12T05:56:34.428810+00:00",
+  "source_commit": "84c66f8185c1411d9dc8c5c33244a2f564845ce7",
+  "base": "2a9c9b8eb53edff74c2de23570ec56e054d29b22",
+  "clean": true,
+  "changed_files": [
+    "catalog/capabilities/analysis/content_store.py",
+    "catalog/capabilities/tests/test_analysis_content_path_resolution.py"
+  ],
+  "changed_methods": [
+    "LocalArtifactContentStore.resolve"
+  ],
+  "unchanged_boundaries": [
+    "logical-key validation",
+    "registered identity and opened handle reads",
+    "stable-directory no-follow and atomic publication",
+    "scheduler archive publication",
+    "POSIX full-path resolution"
+  ],
+  "reviewed_cases": [
+    "non-reparse/missing Windows leaf uses canonical parent and lexical leaf",
+    "real reparse entry retains full target and root containment",
+    "internal aliases remain supported; external aliases refused",
+    "root-dot and missing parents preserve prior resolution contract",
+    "unexpected lstat errors propagate; only absence uses non-strict missing-path behavior",
+    "no deleted-namespace allowlist, retry, weaker deadline or guard"
+  ],
+  "findings": [],
+  "native_symlink_limitation": "4 Windows symlink cases need privilege unavailable on Martin;4 real junction cases pass. Full native Windows/POSIX CI must reconcile new test outcomes.",
+  "required_qualification": {
+    "jobs": 37,
+    "companion_jobs": 3,
+    "reason": "New product repair changes the Windows artifact-read/write resolution boundary after confirmed required F85 failure. Completed sweep and all other repair PRs are closed; this exact PR head is the remaining coherent repair, requiring its own source-bound gates before merge.",
+    "preserve": "Reuse existing auto runs if native source matches; fill only absent or demonstrated completed source gaps, never retry successful evidence."
+  },
+  "next_action": "Mark draft ready for review, retain current review state, inspect existing CI source provenance before dispatching any missing gates",
+  "physical_acceptance": false
+}
