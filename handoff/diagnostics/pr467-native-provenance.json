@@ -91,7 +91,33 @@
         "fcf8603b93e114d5367dcf0adf79d14410b612d8"
       ],
       "checkout_matches": false
+    },
+    {
+      "job_id": 103506523662,
+      "run_id": 34676251393,
+      "name": "Release checks (Windows)",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 55658,
+      "sha256": "004c7425839c29427dc403bb6d498ff35006e1ca4059dd099f7a381e83b133ed",
+      "checkout_commits": [
+        "fcf8603b93e114d5367dcf0adf79d14410b612d8"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103506523717,
+      "run_id": 34676251420,
+      "name": "update-contracts (Linux, fcp-linux-fast, bash)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 50593,
+      "sha256": "8b72faddb3bf9a90b6a44d89411ececda1931a987ad4063e983c2cb04e7552bf",
+      "checkout_commits": [
+        "fcf8603b93e114d5367dcf0adf79d14410b612d8"
+      ],
+      "checkout_matches": false
     }
   ],
-  "retained_at": "2026-09-12T05:57:42.110462+00:00"
+  "retained_at": "2026-09-12T06:00:54.330888+00:00"
 }

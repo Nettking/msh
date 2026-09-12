@@ -1,18 +1,19 @@
 # Federation v1 qualification coordination
 
-**Current actionable checkpoint (2026-09-12T05:43:20.975418+00:00):** D08/#466 repair is
-pushed as draft **PR467**, exact head `84c66f8185c1411d9dc8c5c33244a2f564845ce7`,
-branch codex/analysis-content-resolve-race, clean isolated worktree
-C:/wsl/fcp-analysis-content-resolve-race-20260912. Five baseline regressions fail;
-repair focused suite70pass/4symlink-privilege skips; final formatted extended-path
-run13pass/4skips, including4 real junction boundary cases. No qualification dispatch.
-Next: review exact draft head, containment/reparse/reader contracts and current
-review findings; preserve automatically scheduled evidence, then decide required
-qualification from the completed repair review. Do not qualify merely because a
-patch exists or retry the failed F85 job on unchanged main.
+**Current actionable checkpoint (2026-09-12T06:02:13.067030+00:00):** PR467/D08 is ready for review at
+exact head84c66f8185c1411d9dc8c5c33244a2f564845ce7, clean repair checkout.
+Prequalification correctness/scope review completed with no findings;37+3 exact-head
+qualification active. Eight exact-head dispatches recorded once (seven absent gates
+plus completed branding source gap). Five original auto workflows remain active;
+nine retained native logs prove syntheticfcf8603b93e114d5367dcf0adf79d14410b612d8,
+so none yet counts as exact-head qualification. No required failure observed.
+Next command: audit Python -B handoff/diagnostics/poll_pr467_state.py; persist only
+material transitions, retain new terminal logs via retain_pr467_new_native_logs.py,
+and use dispatch_pr467_completed_gap.py only for completed proven source gaps.
+Release requires additional aggregate dependency proof. No duplicate jobs/reviews.
 Actual main2a9c9b8eb53edff74c2de23570ec56e054d29b22 remains NOT QUALIFIED
-(36/37 successful, F85-Windows D08 failed;3/3 companions successful).
-All prior repairs463/465 are merged; native2a9 release/ICSE artifact reviews retained.
+(D08 failure); its native release/ICSE artifact evidence is retained, never relabelled.
+After467 qualification/review, normal merge then actual merged-main qualification once.
 Physical runtime stays M9b286f931497bf6291e215f6340443c5162826b0; no candidate
 freeze, physical PASS, P07/P12 or protected Recorder-data changes.
 
@@ -2297,3 +2298,5 @@ All current work is pushed; product/physical checkouts remain clean and unchange
 05:59:54UTC: PR467 branding completed synthetic-source gap dispatched once on exact84c66f81 after native proof. No existing valid job rerun. Next: state-change poll467, retain new terminal logs and fill remaining auto-source gaps only after completion/proof; review current findings before merge.
 
 06:00UTC: all13 selected PR467 required/companion workflows now present. Eight exact-head dispatches recorded once (seven initially absent plus proven branding source gap); five original automatic workflows remain active. No required failures and current review threads empty. Two additional automatic jobs became successful; next retain their native logs before counting. Remaining source-gap helpers may run only after each complete native source proof (release also requires aggregate dependency review). No physical action or qualification claim.
+
+2026-09-12T06:02:13.067030+00:00: two new automatic logs also prove syntheticfcf8603b; total9 native synthetic receipts retained,0 exact-head jobs verified yet. PR body and automation now reflect ready/qualification stage. Current review threads empty. All13 selected workflows present, eight guarded dispatches accounted for; next state-change poll467 and retention only. Product/physical source unchanged, no acceptance claims.
