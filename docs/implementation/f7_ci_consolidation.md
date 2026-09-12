@@ -34,7 +34,7 @@ service assumptions, then recheck filename/status-policy/documentation consumers
 Retire only proven gates, with exact final-source validation; retain valid earlier
 qualification under its original SHA. CI evidence is never physical acceptance.
 
-The accepted audit, migration plan and per-run receipts are maintained on the
-coordination branch:
-[migration plan](https://github.com/Nettking/msh/blob/codex/federation-v1-diagnostic-sweep-20260911/handoff/CI_COVERAGE_MIGRATION_PLAN.md),
-[equivalence matrix](https://github.com/Nettking/msh/blob/codex/federation-v1-diagnostic-sweep-20260911/handoff/diagnostics/ci-migration-equivalence-matrix.json).
+The accepted audit, migration plan and per-run receipts are maintained on branch
+`codex/federation-v1-diagnostic-sweep-20260911`, in
+`handoff/CI_COVERAGE_MIGRATION_PLAN.md` and
+`handoff/diagnostics/ci-migration-equivalence-matrix.json`.
