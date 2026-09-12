@@ -5,8 +5,8 @@ exact head84c66f8185c1411d9dc8c5c33244a2f564845ce7, clean repair checkout.
 Prequalification correctness/scope review completed with no findings;37+3 exact-head
 qualification active. Eight exact-head dispatches recorded once (seven absent gates
 plus completed branding source gap). Five original auto workflows remain active;
-nine retained native logs prove syntheticfcf8603b93e114d5367dcf0adf79d14410b612d8,
-so none yet counts as exact-head qualification. No required failure observed.
+Current native proof:2/37 required exact-head successes (06:12UTC); eleven
+synthetic-source logs are separately retained and excluded. No required failure observed.
 Next command: audit Python -B handoff/diagnostics/poll_pr467_state.py; persist only
 material transitions, retain new terminal logs via retain_pr467_new_native_logs.py,
 and use dispatch_pr467_completed_gap.py only for completed proven source gaps.
@@ -2302,3 +2302,5 @@ All current work is pushed; product/physical checkouts remain clean and unchange
 2026-09-12T06:02:13.067030+00:00: two new automatic logs also prove syntheticfcf8603b; total9 native synthetic receipts retained,0 exact-head jobs verified yet. PR body and automation now reflect ready/qualification stage. Current review threads empty. All13 selected workflows present, eight guarded dispatches accounted for; next state-change poll467 and retention only. Product/physical source unchanged, no acceptance claims.
 
 06:12UTC: PR467 remains exact84c66f8185c1411d9dc8c5c33244a2f564845ce7. Four new successful terminal jobs: automatic release2 and exact-dispatch CF7/phase2 one each. No failed or missing workflow; five auto parents still active, so no new source-gap dispatch justified. Next: retain four native logs and verify checkout provenance before counting. No physical action.
+
+06:12UTC native retention: CF7-Linux and phase2-Linux verify exact84c66f8185c1411d9dc8c5c33244a2f564845ce7, now2/37 required jobs. Two new automatic release logs prove syntheticfcf8603b, bringing retained synthetic logs to11; no cross-SHA proof carried. Next exact command: audit Python -B handoff/diagnostics/poll_pr467_state.py; retain new terminal logs and dispatch remaining source gaps only after completed native evidence, with release aggregate review. No duplicate job or physical action.

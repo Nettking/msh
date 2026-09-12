@@ -117,7 +117,59 @@
         "fcf8603b93e114d5367dcf0adf79d14410b612d8"
       ],
       "checkout_matches": false
+    },
+    {
+      "job_id": 103506523680,
+      "run_id": 34676251393,
+      "name": "Windows regressions (journal-artifacts)",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 55121,
+      "sha256": "067cd47c0662a7acb79bcfe5d1c7f0fe6d947c5b65c0c0a98c33041be962fd0e",
+      "checkout_commits": [
+        "fcf8603b93e114d5367dcf0adf79d14410b612d8"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103506523696,
+      "run_id": 34676251393,
+      "name": "Full-suite order (fixed)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 67822,
+      "sha256": "ad65c66645f5b9e73d8badca29e9e05906cc7f4b229482124dbde3856e32ddd3",
+      "checkout_commits": [
+        "fcf8603b93e114d5367dcf0adf79d14410b612d8"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103508392401,
+      "run_id": 34676954227,
+      "name": "harness (Linux, fcp-linux-fast, bash)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 62414,
+      "sha256": "99fe1b7a91164f59da8c7c718fe229247438e5be7ed6f1ecbaa4373c70225534",
+      "checkout_commits": [
+        "84c66f8185c1411d9dc8c5c33244a2f564845ce7"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103508450249,
+      "run_id": 34676975243,
+      "name": "linux",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 196148,
+      "sha256": "de7cb37e46c850920db2456e720c7c03daaf7e7dc1ca6646152cbb0638db5baf",
+      "checkout_commits": [
+        "84c66f8185c1411d9dc8c5c33244a2f564845ce7"
+      ],
+      "checkout_matches": true
     }
   ],
-  "retained_at": "2026-09-12T06:00:54.330888+00:00"
+  "retained_at": "2026-09-12T06:13:28.309362+00:00"
 }
