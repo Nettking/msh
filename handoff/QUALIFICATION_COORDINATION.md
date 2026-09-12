@@ -16,7 +16,8 @@ through clean history, then validate the actual head and source equivalence.
 The existing canary Windows job PASSED at12:08Z. Both native replacement runs
 are fully reviewed (2/2), with exact source/command/runtime/JUnit evidence:
 diagnostics/ci-f7-two-native-greens.json. The actual JS-only event is verified.
-Canary660bf232 must never be merged; PR468 remains f3abe545 until D09 integration.
+Canary660bf232 is closed without merge. PR468 was cleanly fast-forwarded to
+ba44100ec1e4cde19daba0d3723b991c11742316 after the complete proof was pushed.
 The13:00-bound snapshot found all PR468/469 automatic jobs completed; preserve
 all successes. Separate release failures occurred at checkout on Beast in three
 Windows regression jobs; their aggregates are consequences. Inspect the exact
@@ -2592,3 +2593,11 @@ PR469 is closed after its complete 2/2 replacement proof was pushed at afc16d07.
 The inert JS comment was not merged. All original automatic runs had completed;
 new Beast checkout failures are tracked in issue470. Next: fast-forward PR468
 from f3abe545 to its docs-only child ba44100e, then verify the actual final head.
+
+## 2026-09-12T13:04:13.703006+00:00 — D09 integrated through clean fast-forward
+
+Actual GitHub PR468 head is ba44100ec1e4cde19daba0d3723b991c11742316, draft/open.
+PR469 is closed and unmerged; original native proof remains preserved at afc16d07.
+Receipt: diagnostics/D09-pr468-integration.json. Next verify the final exact tree
+delta, run branding and required lightweight CI/reference/status checks. No manual
+full native rerun, legacy deletion, merge or physical change has occurred.

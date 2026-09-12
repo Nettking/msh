@@ -1,0 +1,15 @@
+{
+  "recorded_at": "2026-09-12T13:04:13.703006+00:00",
+  "pr": 468,
+  "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+  "previous_head": "f3abe5452db2f21593a688bc62bc5f4b22d5c40e",
+  "base_sha": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
+  "merge_commit_sha": "f18e91adae2cb198fb5cebad61ee202a38d2bd8e",
+  "draft": true,
+  "history": "normal fast-forward to existing direct child; no rebase, cherry-pick or force push",
+  "canary_closed_without_merge": true,
+  "two_green_evidence_pushed_before_integration": "afc16d07",
+  "final_head_validation": "PENDING",
+  "product_runtime_changed": false,
+  "physical_acceptance": false
+}
