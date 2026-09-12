@@ -1,0 +1,510 @@
+{
+  "recorded_at": "2026-09-12T05:43:20.975418+00:00",
+  "status": "RESOLVED-IN-BRANCH_PENDING_REVIEW_AND_QUALIFICATION",
+  "base": "2a9c9b8eb53edff74c2de23570ec56e054d29b22",
+  "repair_head": "84c66f8185c1411d9dc8c5c33244a2f564845ce7",
+  "branch": "codex/analysis-content-resolve-race",
+  "pr": "https://github.com/Nettking/msh/pull/467",
+  "host": "Nettking",
+  "operator": "Martin",
+  "worktree": "C:\\wsl\\fcp-analysis-content-resolve-race-20260912",
+  "clean": true,
+  "source_blobs": {
+    "catalog/capabilities/analysis/content_store.py": "e0abd363042f50fad4fc932a338524cfc2198224",
+    "catalog/capabilities/tests/test_analysis_content_path_resolution.py": "1209dbfe1707fc7ec223f2bf119c0c3642611474"
+  },
+  "runs": [
+    {
+      "label": "D08-focused-green",
+      "stage": "Focused store/artifact-access/scheduling suite before import/line-format normalization",
+      "passed": 70,
+      "skipped": 4,
+      "tests": [
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_path_resolution.test_resolution_preserves_real_junction_containment[True-True]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_path_resolution.test_resolution_retains_missing_paths_and_root_identity[new]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_path_resolution.test_concurrent_publication_keeps_logical_resolution_inside_root",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_path_resolution.test_resolution_preserves_real_link_containment[True-False]",
+          "result": "SKIP",
+          "reason": "Windows symlink privilege unavailable"
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_path_resolution.test_resolution_preserves_real_junction_containment[False-True]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_path_resolution.test_resolution_survives_native_leaf_replacement[x-False]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_path_resolution.test_resolution_survives_native_leaf_replacement[analysis/session/work/plan.json-False]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_path_resolution.test_resolution_retains_missing_paths_and_root_identity[.]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_path_resolution.test_resolution_preserves_real_junction_containment[False-False]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_path_resolution.test_resolution_survives_native_leaf_replacement[x-True]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_path_resolution.test_resolution_preserves_real_junction_containment[True-False]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_path_resolution.test_resolution_preserves_real_link_containment[False-True]",
+          "result": "SKIP",
+          "reason": "Windows symlink privilege unavailable"
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_path_resolution.test_resolution_retains_missing_paths_and_root_identity[./new]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_path_resolution.test_resolution_preserves_real_link_containment[True-True]",
+          "result": "SKIP",
+          "reason": "Windows symlink privilege unavailable"
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_path_resolution.test_resolution_survives_native_leaf_replacement[analysis/session/work/plan.json-True]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_path_resolution.test_resolution_retains_missing_paths_and_root_identity[missing/parent/new]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_path_resolution.test_resolution_preserves_real_link_containment[False-False]",
+          "result": "SKIP",
+          "reason": "Windows symlink privilege unavailable"
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_store.test_publication_preserves_open_reader_snapshot[x-True]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_store.test_unsupported_native_publication_preserves_existing_artifact",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_store.test_publication_preserves_open_reader_snapshot[x-False]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_store.test_publication_preserves_open_reader_snapshot[analysis/session/work/plan.json-False]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_store.test_replacement_does_not_relax_registered_identity",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_store.test_publication_preserves_open_reader_snapshot[analysis/session/work/plan.json-True]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_scheduling.test_concurrent_submission_beside_the_running_driver_strands_nothing",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_scheduling.test_restart_preserves_the_durable_job",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_scheduling.test_materially_changed_input_creates_new_work",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_scheduling.test_a_second_coordinator_cannot_take_over_a_queued_job",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_scheduling.test_ownership_and_grant_exist_before_the_worker_is_reached",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_scheduling.test_incompatible_provider_is_rejected[override3-provider-status-draining]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_scheduling.test_only_the_granting_coordinator_may_dispatch_or_authorize",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_scheduling.test_incompatible_provider_is_rejected[override5-insufficient-available-slots]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_scheduling.test_pending_work_is_found_past_the_newest_page_of_the_index",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_scheduling.test_the_pending_scan_drops_settled_jobs_and_keeps_unfinished_ones",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_scheduling.test_clock_is_injected_rather_than_read_from_the_wall",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_scheduling.test_expired_provider_report_is_not_selectable",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_scheduling.test_an_activated_provider_is_selected_and_executes",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_scheduling.test_incompatible_provider_is_rejected[override2-capability-protocol-version-incompatible]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_scheduling.test_provider_from_another_federation_session_is_rejected",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_scheduling.test_incompatible_provider_is_rejected[override4-requirement-mismatch]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_scheduling.test_a_restart_rebuilds_the_pending_set_from_durable_state_alone",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_scheduling.test_expired_lease_is_rejected_by_the_worker",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_scheduling.test_incompatible_provider_is_rejected[override1-capability-type-mismatch]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_scheduling.test_worker_failure_marks_the_attempt_failed",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_scheduling.test_without_an_approved_provider_nothing_is_offered",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_scheduling.test_a_settled_job_leaves_the_lifecycle_scan_but_not_the_product_view",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_scheduling.test_successful_execution_commits_exactly_one_durable_result",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_scheduling.test_incompatible_provider_is_rejected[override0-capability-protocol-mismatch]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_scheduling.test_unreachable_worker_releases_ownership_for_another_attempt",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_scheduling.test_submission_queues_a_durable_job_without_owning_it",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_scheduling.test_selection_uses_the_real_provider_health_authority",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_scheduling.test_scheduling_pass_reports_every_pending_job",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_scheduling.test_repeated_submission_recognizes_the_existing_job",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_scheduling.test_stale_attempt_cannot_overwrite_a_newer_attempt",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_scheduling.test_duplicate_dispatch_of_one_attempt_executes_once",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_artifact_access.test_slice_archive_cannot_deliver_a_symlink",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_artifact_access.test_slice_archive_is_bounded",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_artifact_access.test_grant_dies_with_the_attempt_that_owned_it",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_artifact_access.test_expired_authorization_fails_closed",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_artifact_access.test_content_store_rejects_traversal_keys[/absolute.json]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_artifact_access.test_unauthorized_provider_cannot_retrieve_the_input",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_artifact_access.test_failed_attempt_immediately_loses_artifact_access",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_artifact_access.test_reference_that_lies_about_content_identity_is_refused",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_artifact_access.test_integrity_failure_prevents_execution",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_artifact_access.test_unauthorized_worker_node_cannot_retrieve_the_input",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_artifact_access.test_denied_access_is_audited",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_artifact_access.test_content_store_rejects_traversal_keys[../escape.json]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_artifact_access.test_another_federation_session_cannot_retrieve_the_input",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_artifact_access.test_authorized_worker_receives_the_job_input",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_artifact_access.test_content_store_rejects_traversal_keys[nested/../../escape.json]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_artifact_access.test_artifact_outside_the_grant_allowlist_is_refused",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_artifact_access.test_worker_workspace_is_removed_after_execution",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_artifact_access.test_slice_archive_member_cannot_escape_the_workspace",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_artifact_access.test_content_store_rejects_traversal_keys[a\\\\b.json]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_artifact_access.test_input_moves_on_the_f6_object_transfer_contract",
+          "result": "PASS",
+          "reason": null
+        }
+      ],
+      "hashes": {
+        ".xml": "38cd72f4b3bb99b908c6b34fdaafdd701c003b2a58404b3955ffd7dc7fcdedab",
+        ".log": "4e48cacfeeac3bc41201a02441721688b6ea3851a290e8fe4cb3a6c381277e2a"
+      }
+    },
+    {
+      "label": "D08-extended-green",
+      "stage": "Final formatted repair tree, CI-style extended temp paths",
+      "passed": 13,
+      "skipped": 4,
+      "tests": [
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_path_resolution.test_resolution_retains_missing_paths_and_root_identity[missing/parent/new]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_path_resolution.test_resolution_preserves_real_link_containment[False-True]",
+          "result": "SKIP",
+          "reason": "Windows symlink privilege unavailable"
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_path_resolution.test_resolution_survives_native_leaf_replacement[analysis/session/work/plan.json-False]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_path_resolution.test_resolution_preserves_real_junction_containment[False-True]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_path_resolution.test_resolution_preserves_real_link_containment[True-True]",
+          "result": "SKIP",
+          "reason": "Windows symlink privilege unavailable"
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_path_resolution.test_resolution_survives_native_leaf_replacement[x-True]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_path_resolution.test_resolution_preserves_real_link_containment[True-False]",
+          "result": "SKIP",
+          "reason": "Windows symlink privilege unavailable"
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_path_resolution.test_resolution_preserves_real_link_containment[False-False]",
+          "result": "SKIP",
+          "reason": "Windows symlink privilege unavailable"
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_path_resolution.test_resolution_preserves_real_junction_containment[True-True]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_path_resolution.test_resolution_preserves_real_junction_containment[True-False]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_path_resolution.test_resolution_survives_native_leaf_replacement[analysis/session/work/plan.json-True]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_path_resolution.test_resolution_retains_missing_paths_and_root_identity[new]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_path_resolution.test_concurrent_publication_keeps_logical_resolution_inside_root",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_path_resolution.test_resolution_retains_missing_paths_and_root_identity[.]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_path_resolution.test_resolution_preserves_real_junction_containment[False-False]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_path_resolution.test_resolution_survives_native_leaf_replacement[x-False]",
+          "result": "PASS",
+          "reason": null
+        },
+        {
+          "test": "catalog.capabilities.tests.test_analysis_content_path_resolution.test_resolution_retains_missing_paths_and_root_identity[./new]",
+          "result": "PASS",
+          "reason": null
+        }
+      ],
+      "hashes": {
+        ".xml": "8a917996a522f89679a9b53ff5fe98369f5915a11dc28150a2f9d108f6d34674",
+        ".log": "7a8ef008b1e5695560a8c0f36b4b23c1d72d1697c6064e99f61c995a2a8ba511"
+      }
+    }
+  ],
+  "static_checks": [
+    "ruff check PASS",
+    "ruff format --check PASS",
+    "git diff --check PASS"
+  ],
+  "limitations": [
+    "4 symbolic-link cases skipped on Martin due Windows privilege1314;4 real junction cases pass, including leaf/parent and inside/outside targets",
+    "Focused 70-case group preceded formatting only;17-case extended-root run uses final formatted source",
+    "No full release qualification requested; no POSIX execution claimed"
+  ],
+  "physical_runtime_changed": false,
+  "protected_recorder_data": "UNTOUCHED",
+  "next_action": "Review draft467 exact head, caller/reparse race boundaries and CI auto-review feedback; preserve automatically scheduled evidence without dispatching blanket qualification"
+}

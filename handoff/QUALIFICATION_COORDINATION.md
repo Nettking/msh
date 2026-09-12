@@ -1,20 +1,20 @@
 # Federation v1 qualification coordination
 
-**Current actionable checkpoint (2026-09-12T05:22:38.789489+00:00):** actual merged main
-`2a9c9b8eb53edff74c2de23570ec56e054d29b22` is **NOT QUALIFIED**:36/37 required
-jobs successful,3/3 companions successful; F85-Windows failed as **D08/#466**.
-Read [D08](diagnostics/D08.md) and its focused evidence before substantive work.
-Confirmed product mechanism: full-leaf Path.resolve races Windows POSIX publication,
-returning NTFS $Extend/$Deleted for a valid key and raising artifact-object-key-escape.
-All required prior fixes463/465 are merged. No PR-head or passing main reruns.
-Next: inspect containment/symlink contracts, develop a narrow separate D08 regression
-and repair in isolated branch codex/analysis-content-resolve-race from2a9c9b8e;
-push a draft PR with focused evidence before deciding new qualification scope.
-Repair branch codex/analysis-content-resolve-race exists with pushed red tests;
-product source is still unchanged at this checkpoint. Current release9/ICSE6 artifact reviews
-remain valid for2a9; final verdict helper must not pass while F85 is failed.
-Physical runtime remains M`9b286f931497bf6291e215f6340443c5162826b0`;
-admission stopped, protected Recorder data untouched, no candidate freeze/PASS/timers.
+**Current actionable checkpoint (2026-09-12T05:43:20.975418+00:00):** D08/#466 repair is
+pushed as draft **PR467**, exact head `84c66f8185c1411d9dc8c5c33244a2f564845ce7`,
+branch codex/analysis-content-resolve-race, clean isolated worktree
+C:/wsl/fcp-analysis-content-resolve-race-20260912. Five baseline regressions fail;
+repair focused suite70pass/4symlink-privilege skips; final formatted extended-path
+run13pass/4skips, including4 real junction boundary cases. No qualification dispatch.
+Next: review exact draft head, containment/reparse/reader contracts and current
+review findings; preserve automatically scheduled evidence, then decide required
+qualification from the completed repair review. Do not qualify merely because a
+patch exists or retry the failed F85 job on unchanged main.
+Actual main2a9c9b8eb53edff74c2de23570ec56e054d29b22 remains NOT QUALIFIED
+(36/37 successful, F85-Windows D08 failed;3/3 companions successful).
+All prior repairs463/465 are merged; native2a9 release/ICSE artifact reviews retained.
+Physical runtime stays M9b286f931497bf6291e215f6340443c5162826b0; no candidate
+freeze, physical PASS, P07/P12 or protected Recorder-data changes.
 
 Current user direction, September 11 2026: execute on state changes, using this
 checkpoint and the completed diagnostic sweep report; do not repeat the sweep.
@@ -2267,3 +2267,5 @@ Private retained repro root is .acceptance/d08-resolve-ku191byw; no cleanup need
 All current work is pushed; product/physical checkouts remain clean and unchanged.
 
 2026-09-12T05:37:55.084846+00:00: D08 red test checkpoint pushed on isolated repair branch ata9f8271feb361856e234c2db2d391278fda39a6b. Four native deleted-name interleavings (plain/extended roots and short/nested keys) plus concurrent public-API reproduction fail on unchanged2a9 product source;4 basic cases pass,4 symlink cases skip for Martin lacking Windows symlink privilege. Next: narrow Windows non-reparse leaf resolution fix, preserve full resolution for actual links/reparse entries, add unprivileged real junction containment tests and focused validation. No CI qualification dispatched; no physical changes.
+
+2026-09-12T05:43:20.975418+00:00: D08 repair84c66f81 pushed clean; draft467 published with baseline/red and focused/green evidence. Current exact source blobs, test lists, log hashes and explicit privilege/formatting limitations persisted in diagnostics/D08-repair-focused.json. No full qualification dispatch or physical operation. Next exact action: read current draft467 reviews/threads, inspect diff against2a9 and its two changed files; if no correctness issue remains, plan minimum exact-head qualification under checked-in policy without repeating old successful SHA evidence.
