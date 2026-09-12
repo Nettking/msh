@@ -1,0 +1,746 @@
+{
+  "recorded_at": "2026-09-12T08:45:17.391493+00:00",
+  "source_commit": "84c66f8185c1411d9dc8c5c33244a2f564845ce7",
+  "run_id": 34681393241,
+  "records": [
+    {
+      "artifact_id": 10295030225,
+      "name": "linux-regression-shard-2",
+      "job_id": 103520554948,
+      "source_checkout_verified": true,
+      "tests": 1114,
+      "failures": 0,
+      "errors": 0,
+      "skips": [
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_store",
+          "name": "test_unsupported_native_publication_preserves_existing_artifact",
+          "reason": "Windows native publication failure"
+        },
+        {
+          "class": "catalog.federation.tests.test_c03_offline_creator_migration",
+          "name": "test_legacy_witness_reads_extended_windows_path_without_modifying_history",
+          "reason": "Windows extended filesystem path"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_model_resource_admission_paths",
+          "name": "test_windows_model_pull_script_has_valid_powershell_syntax",
+          "reason": "Windows PowerShell parser check"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_volume_name_selection",
+          "name": "test_windows_powershell_keeps_complete_single_volume_name",
+          "reason": "Windows PowerShell scalar/array semantics"
+        },
+        {
+          "class": "catalog.mtconnect_recorder.tests.test_tailscale_recorder_launcher",
+          "name": "test_windows_probe_rejects_runtime_that_cannot_import_exact_entrypoint",
+          "reason": "Windows launcher execution"
+        },
+        {
+          "class": "catalog.mtconnect_recorder.tests.test_tailscale_recorder_launcher",
+          "name": "test_windows_wrapper_scrubs_legacy_secret_and_forwards_recorder_options",
+          "reason": "Windows launcher execution"
+        },
+        {
+          "class": "catalog.mtconnect_recorder.tests.test_tailscale_recorder_launcher",
+          "name": "test_root_cmd_preserves_spaced_argument_and_nonzero_exit",
+          "reason": "Windows launcher execution"
+        }
+      ]
+    },
+    {
+      "artifact_id": 10294596875,
+      "name": "windows-regression-transport-storage",
+      "job_id": 103520554952,
+      "source_checkout_verified": true,
+      "tests": 371,
+      "failures": 0,
+      "errors": 0,
+      "skips": [
+        {
+          "class": "catalog.node.tests.test_identity",
+          "name": "test_identity_files_have_restrictive_permissions",
+          "reason": "Windows does not expose POSIX mode bits"
+        }
+      ]
+    },
+    {
+      "artifact_id": 10294517146,
+      "name": "full-suite-order-rotating",
+      "job_id": 103520554966,
+      "source_checkout_verified": true,
+      "tests": 4457,
+      "failures": 0,
+      "errors": 0,
+      "skips": [
+        {
+          "class": "catalog.flask_app.tests.test_windows_fresh_shutdown",
+          "name": "test_shutdown_timeout_recovers_without_hanging",
+          "reason": "Windows process-tree recovery contract"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_model_resource_admission_paths",
+          "name": "test_windows_model_pull_script_has_valid_powershell_syntax",
+          "reason": "Windows PowerShell parser check"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_migration_script",
+          "name": "test_windows_migration_script_has_valid_powershell_syntax",
+          "reason": "Windows PowerShell parser check"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_migration_script",
+          "name": "test_windows_migration_fast_forwards_fake_legacy_checkout_and_resumes",
+          "reason": "Windows migration smoke"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_start_script",
+          "name": "test_windows_host_scripts_have_valid_powershell_syntax[scripts/windows/fcp_update_agent_runner.ps1]",
+          "reason": "Windows PowerShell parser check"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_start_script",
+          "name": "test_start_cmd_expands_reachable_client_base_url[0.0.0.0-127.0.0.1]",
+          "reason": "Windows cmd expansion regression"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_start_script",
+          "name": "test_windows_host_scripts_have_valid_powershell_syntax[scripts/windows/resolve_fcp_web_port.ps1]",
+          "reason": "Windows PowerShell parser check"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_start_script",
+          "name": "test_start_cmd_expands_reachable_client_base_url[127.0.0.1-127.0.0.1]",
+          "reason": "Windows cmd expansion regression"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_start_script",
+          "name": "test_windows_host_scripts_have_valid_powershell_syntax[scripts/windows/fcp_host_build.ps1]",
+          "reason": "Windows PowerShell parser check"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_start_script",
+          "name": "test_windows_host_scripts_have_valid_powershell_syntax[scripts/windows/fcp_update_engine.ps1]",
+          "reason": "Windows PowerShell parser check"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_start_script",
+          "name": "test_windows_host_scripts_have_valid_powershell_syntax[scripts/windows/fcp_update_agent.ps1]",
+          "reason": "Windows PowerShell parser check"
+        },
+        {
+          "class": "catalog.federation.tests.test_c03_offline_creator_migration",
+          "name": "test_legacy_witness_reads_extended_windows_path_without_modifying_history",
+          "reason": "Windows extended filesystem path"
+        },
+        {
+          "class": "catalog.federation.tests.test_phase_d2_postgres",
+          "name": "test_shared_provider_rejects_dataset_schema_conflict[postgresql]",
+          "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
+        },
+        {
+          "class": "catalog.federation.tests.test_phase_d2_postgres",
+          "name": "test_shared_provider_rejects_idempotency_conflict[postgresql]",
+          "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
+        },
+        {
+          "class": "catalog.federation.tests.test_phase_d2_postgres",
+          "name": "test_postgresql_provider_survives_reconstruction",
+          "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
+        },
+        {
+          "class": "catalog.federation.tests.test_phase_d2_postgres",
+          "name": "test_postgresql_provider_migrates_legacy_schema",
+          "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
+        },
+        {
+          "class": "catalog.federation.tests.test_phase_d2_postgres",
+          "name": "test_shared_provider_rejects_dataset_identity_conflict[postgresql]",
+          "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
+        },
+        {
+          "class": "catalog.federation.tests.test_phase_d2_postgres",
+          "name": "test_postgresql_invalid_hash_is_not_committed",
+          "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
+        },
+        {
+          "class": "catalog.federation.tests.test_phase_d2_postgres",
+          "name": "test_shared_provider_conformance[postgresql]",
+          "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_fresh_url_output",
+          "name": "test_fresh_onboarding_query_is_printed_without_executing_reset_fragment",
+          "reason": "Windows cmd metacharacter regression"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_relay_volume_selector",
+          "name": "test_selector_pulls_python_probe_and_identifies_pc3_identity",
+          "reason": "Windows PowerShell regression"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_relay_volume_selector",
+          "name": "test_selector_survives_missing_current_images_and_reuses_existing_relay_volume",
+          "reason": "Windows PowerShell regression"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_store",
+          "name": "test_unsupported_native_publication_preserves_existing_artifact",
+          "reason": "Windows native publication failure"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_update_script",
+          "name": "test_update_cmd_exits_without_external_dependencies",
+          "reason": "Windows batch execution regression"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_runtime_state_resolver",
+          "name": "test_encoded_python_survives_windows_powershell_native_argument_forwarding",
+          "reason": "Windows PowerShell native argument check"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_survives_native_leaf_replacement[x-False]",
+          "reason": "Windows deleted-file final name"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_preserves_real_junction_containment[False-False]",
+          "reason": "Windows junction containment"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_survives_native_leaf_replacement[x-True]",
+          "reason": "Windows deleted-file final name"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_preserves_real_junction_containment[False-True]",
+          "reason": "Windows junction containment"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_survives_native_leaf_replacement[analysis/session/work/plan.json-False]",
+          "reason": "Windows deleted-file final name"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_survives_native_leaf_replacement[analysis/session/work/plan.json-True]",
+          "reason": "Windows deleted-file final name"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_preserves_real_junction_containment[True-True]",
+          "reason": "Windows junction containment"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_preserves_real_junction_containment[True-False]",
+          "reason": "Windows junction containment"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_volume_name_selection",
+          "name": "test_windows_powershell_keeps_complete_single_volume_name",
+          "reason": "Windows PowerShell scalar/array semantics"
+        },
+        {
+          "class": "catalog.federation.tests.test_host_mutation_activation",
+          "name": "test_windows_activation_lease_has_valid_powershell_syntax",
+          "reason": "Windows PowerShell parser check"
+        },
+        {
+          "class": "catalog.mtconnect_recorder.tests.test_tailscale_recorder_launcher",
+          "name": "test_windows_wrapper_scrubs_legacy_secret_and_forwards_recorder_options",
+          "reason": "Windows launcher execution"
+        },
+        {
+          "class": "catalog.mtconnect_recorder.tests.test_tailscale_recorder_launcher",
+          "name": "test_windows_probe_rejects_runtime_that_cannot_import_exact_entrypoint",
+          "reason": "Windows launcher execution"
+        },
+        {
+          "class": "catalog.mtconnect_recorder.tests.test_tailscale_recorder_launcher",
+          "name": "test_root_cmd_preserves_spaced_argument_and_nonzero_exit",
+          "reason": "Windows launcher execution"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_first_federation_start",
+          "name": "test_windows_scaffolding_repair_restores_real_dirty_checkout",
+          "reason": "requires real Windows cmd.exe and git"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_first_federation_start",
+          "name": "test_windows_fresh_start_executes_real_batch_with_reset_stdin",
+          "reason": "requires real Windows cmd.exe"
+        }
+      ]
+    },
+    {
+      "artifact_id": 10294366395,
+      "name": "full-suite-order-fixed",
+      "job_id": 103520554955,
+      "source_checkout_verified": true,
+      "tests": 4457,
+      "failures": 0,
+      "errors": 0,
+      "skips": [
+        {
+          "class": "catalog.flask_app.tests.test_windows_update_script",
+          "name": "test_update_cmd_exits_without_external_dependencies",
+          "reason": "Windows batch execution regression"
+        },
+        {
+          "class": "catalog.federation.tests.test_phase_d2_postgres",
+          "name": "test_shared_provider_rejects_idempotency_conflict[postgresql]",
+          "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
+        },
+        {
+          "class": "catalog.federation.tests.test_phase_d2_postgres",
+          "name": "test_postgresql_provider_survives_reconstruction",
+          "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
+        },
+        {
+          "class": "catalog.federation.tests.test_phase_d2_postgres",
+          "name": "test_shared_provider_conformance[postgresql]",
+          "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
+        },
+        {
+          "class": "catalog.federation.tests.test_phase_d2_postgres",
+          "name": "test_postgresql_invalid_hash_is_not_committed",
+          "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
+        },
+        {
+          "class": "catalog.federation.tests.test_phase_d2_postgres",
+          "name": "test_shared_provider_rejects_dataset_schema_conflict[postgresql]",
+          "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
+        },
+        {
+          "class": "catalog.federation.tests.test_phase_d2_postgres",
+          "name": "test_shared_provider_rejects_dataset_identity_conflict[postgresql]",
+          "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
+        },
+        {
+          "class": "catalog.federation.tests.test_phase_d2_postgres",
+          "name": "test_postgresql_provider_migrates_legacy_schema",
+          "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_model_resource_admission_paths",
+          "name": "test_windows_model_pull_script_has_valid_powershell_syntax",
+          "reason": "Windows PowerShell parser check"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_store",
+          "name": "test_unsupported_native_publication_preserves_existing_artifact",
+          "reason": "Windows native publication failure"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_first_federation_start",
+          "name": "test_windows_fresh_start_executes_real_batch_with_reset_stdin",
+          "reason": "requires real Windows cmd.exe"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_first_federation_start",
+          "name": "test_windows_scaffolding_repair_restores_real_dirty_checkout",
+          "reason": "requires real Windows cmd.exe and git"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_start_script",
+          "name": "test_windows_host_scripts_have_valid_powershell_syntax[scripts/windows/fcp_update_agent.ps1]",
+          "reason": "Windows PowerShell parser check"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_start_script",
+          "name": "test_start_cmd_expands_reachable_client_base_url[0.0.0.0-127.0.0.1]",
+          "reason": "Windows cmd expansion regression"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_start_script",
+          "name": "test_windows_host_scripts_have_valid_powershell_syntax[scripts/windows/resolve_fcp_web_port.ps1]",
+          "reason": "Windows PowerShell parser check"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_start_script",
+          "name": "test_windows_host_scripts_have_valid_powershell_syntax[scripts/windows/fcp_host_build.ps1]",
+          "reason": "Windows PowerShell parser check"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_start_script",
+          "name": "test_start_cmd_expands_reachable_client_base_url[127.0.0.1-127.0.0.1]",
+          "reason": "Windows cmd expansion regression"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_start_script",
+          "name": "test_windows_host_scripts_have_valid_powershell_syntax[scripts/windows/fcp_update_engine.ps1]",
+          "reason": "Windows PowerShell parser check"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_start_script",
+          "name": "test_windows_host_scripts_have_valid_powershell_syntax[scripts/windows/fcp_update_agent_runner.ps1]",
+          "reason": "Windows PowerShell parser check"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_relay_volume_selector",
+          "name": "test_selector_survives_missing_current_images_and_reuses_existing_relay_volume",
+          "reason": "Windows PowerShell regression"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_relay_volume_selector",
+          "name": "test_selector_pulls_python_probe_and_identifies_pc3_identity",
+          "reason": "Windows PowerShell regression"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_migration_script",
+          "name": "test_windows_migration_script_has_valid_powershell_syntax",
+          "reason": "Windows PowerShell parser check"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_migration_script",
+          "name": "test_windows_migration_fast_forwards_fake_legacy_checkout_and_resumes",
+          "reason": "Windows migration smoke"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_preserves_real_junction_containment[False-True]",
+          "reason": "Windows junction containment"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_preserves_real_junction_containment[False-False]",
+          "reason": "Windows junction containment"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_preserves_real_junction_containment[True-False]",
+          "reason": "Windows junction containment"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_preserves_real_junction_containment[True-True]",
+          "reason": "Windows junction containment"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_survives_native_leaf_replacement[analysis/session/work/plan.json-False]",
+          "reason": "Windows deleted-file final name"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_survives_native_leaf_replacement[x-True]",
+          "reason": "Windows deleted-file final name"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_survives_native_leaf_replacement[analysis/session/work/plan.json-True]",
+          "reason": "Windows deleted-file final name"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_survives_native_leaf_replacement[x-False]",
+          "reason": "Windows deleted-file final name"
+        },
+        {
+          "class": "catalog.federation.tests.test_host_mutation_activation",
+          "name": "test_windows_activation_lease_has_valid_powershell_syntax",
+          "reason": "Windows PowerShell parser check"
+        },
+        {
+          "class": "catalog.federation.tests.test_c03_offline_creator_migration",
+          "name": "test_legacy_witness_reads_extended_windows_path_without_modifying_history",
+          "reason": "Windows extended filesystem path"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_volume_name_selection",
+          "name": "test_windows_powershell_keeps_complete_single_volume_name",
+          "reason": "Windows PowerShell scalar/array semantics"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_fresh_url_output",
+          "name": "test_fresh_onboarding_query_is_printed_without_executing_reset_fragment",
+          "reason": "Windows cmd metacharacter regression"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_fresh_shutdown",
+          "name": "test_shutdown_timeout_recovers_without_hanging",
+          "reason": "Windows process-tree recovery contract"
+        },
+        {
+          "class": "catalog.mtconnect_recorder.tests.test_tailscale_recorder_launcher",
+          "name": "test_root_cmd_preserves_spaced_argument_and_nonzero_exit",
+          "reason": "Windows launcher execution"
+        },
+        {
+          "class": "catalog.mtconnect_recorder.tests.test_tailscale_recorder_launcher",
+          "name": "test_windows_probe_rejects_runtime_that_cannot_import_exact_entrypoint",
+          "reason": "Windows launcher execution"
+        },
+        {
+          "class": "catalog.mtconnect_recorder.tests.test_tailscale_recorder_launcher",
+          "name": "test_windows_wrapper_scrubs_legacy_secret_and_forwards_recorder_options",
+          "reason": "Windows launcher execution"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_runtime_state_resolver",
+          "name": "test_encoded_python_survives_windows_powershell_native_argument_forwarding",
+          "reason": "Windows PowerShell native argument check"
+        }
+      ]
+    },
+    {
+      "artifact_id": 10294345960,
+      "name": "linux-regression-shard-1",
+      "job_id": 103520554932,
+      "source_checkout_verified": true,
+      "tests": 1114,
+      "failures": 0,
+      "errors": 0,
+      "skips": [
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_survives_native_leaf_replacement[x-False]",
+          "reason": "Windows deleted-file final name"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_survives_native_leaf_replacement[x-True]",
+          "reason": "Windows deleted-file final name"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_survives_native_leaf_replacement[analysis/session/work/plan.json-False]",
+          "reason": "Windows deleted-file final name"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_survives_native_leaf_replacement[analysis/session/work/plan.json-True]",
+          "reason": "Windows deleted-file final name"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_preserves_real_junction_containment[False-False]",
+          "reason": "Windows junction containment"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_preserves_real_junction_containment[False-True]",
+          "reason": "Windows junction containment"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_preserves_real_junction_containment[True-False]",
+          "reason": "Windows junction containment"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_preserves_real_junction_containment[True-True]",
+          "reason": "Windows junction containment"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_first_federation_start",
+          "name": "test_windows_fresh_start_executes_real_batch_with_reset_stdin",
+          "reason": "requires real Windows cmd.exe"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_first_federation_start",
+          "name": "test_windows_scaffolding_repair_restores_real_dirty_checkout",
+          "reason": "requires real Windows cmd.exe and git"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_migration_script",
+          "name": "test_windows_migration_script_has_valid_powershell_syntax",
+          "reason": "Windows PowerShell parser check"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_migration_script",
+          "name": "test_windows_migration_fast_forwards_fake_legacy_checkout_and_resumes",
+          "reason": "Windows migration smoke"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_runtime_state_resolver",
+          "name": "test_encoded_python_survives_windows_powershell_native_argument_forwarding",
+          "reason": "Windows PowerShell native argument check"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_update_script",
+          "name": "test_update_cmd_exits_without_external_dependencies",
+          "reason": "Windows batch execution regression"
+        }
+      ]
+    },
+    {
+      "artifact_id": 10294123898,
+      "name": "linux-regression-shard-3",
+      "job_id": 103520554869,
+      "source_checkout_verified": true,
+      "tests": 1114,
+      "failures": 0,
+      "errors": 0,
+      "skips": [
+        {
+          "class": "catalog.federation.tests.test_phase_d2_postgres",
+          "name": "test_shared_provider_conformance[postgresql]",
+          "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
+        },
+        {
+          "class": "catalog.federation.tests.test_phase_d2_postgres",
+          "name": "test_shared_provider_rejects_idempotency_conflict[postgresql]",
+          "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
+        },
+        {
+          "class": "catalog.federation.tests.test_phase_d2_postgres",
+          "name": "test_shared_provider_rejects_dataset_identity_conflict[postgresql]",
+          "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
+        },
+        {
+          "class": "catalog.federation.tests.test_phase_d2_postgres",
+          "name": "test_shared_provider_rejects_dataset_schema_conflict[postgresql]",
+          "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
+        },
+        {
+          "class": "catalog.federation.tests.test_phase_d2_postgres",
+          "name": "test_postgresql_provider_survives_reconstruction",
+          "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
+        },
+        {
+          "class": "catalog.federation.tests.test_phase_d2_postgres",
+          "name": "test_postgresql_provider_migrates_legacy_schema",
+          "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
+        },
+        {
+          "class": "catalog.federation.tests.test_phase_d2_postgres",
+          "name": "test_postgresql_invalid_hash_is_not_committed",
+          "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_fresh_shutdown",
+          "name": "test_shutdown_timeout_recovers_without_hanging",
+          "reason": "Windows process-tree recovery contract"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_relay_volume_selector",
+          "name": "test_selector_survives_missing_current_images_and_reuses_existing_relay_volume",
+          "reason": "Windows PowerShell regression"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_relay_volume_selector",
+          "name": "test_selector_pulls_python_probe_and_identifies_pc3_identity",
+          "reason": "Windows PowerShell regression"
+        }
+      ]
+    },
+    {
+      "artifact_id": 10294039740,
+      "name": "linux-regression-shard-0",
+      "job_id": 103520554941,
+      "source_checkout_verified": true,
+      "tests": 1115,
+      "failures": 0,
+      "errors": 0,
+      "skips": [
+        {
+          "class": "catalog.federation.tests.test_host_mutation_activation",
+          "name": "test_windows_activation_lease_has_valid_powershell_syntax",
+          "reason": "Windows PowerShell parser check"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_fresh_url_output",
+          "name": "test_fresh_onboarding_query_is_printed_without_executing_reset_fragment",
+          "reason": "Windows cmd metacharacter regression"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_start_script",
+          "name": "test_windows_host_scripts_have_valid_powershell_syntax[scripts/windows/resolve_fcp_web_port.ps1]",
+          "reason": "Windows PowerShell parser check"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_start_script",
+          "name": "test_windows_host_scripts_have_valid_powershell_syntax[scripts/windows/fcp_host_build.ps1]",
+          "reason": "Windows PowerShell parser check"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_start_script",
+          "name": "test_windows_host_scripts_have_valid_powershell_syntax[scripts/windows/fcp_update_agent.ps1]",
+          "reason": "Windows PowerShell parser check"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_start_script",
+          "name": "test_windows_host_scripts_have_valid_powershell_syntax[scripts/windows/fcp_update_agent_runner.ps1]",
+          "reason": "Windows PowerShell parser check"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_start_script",
+          "name": "test_windows_host_scripts_have_valid_powershell_syntax[scripts/windows/fcp_update_engine.ps1]",
+          "reason": "Windows PowerShell parser check"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_start_script",
+          "name": "test_start_cmd_expands_reachable_client_base_url[127.0.0.1-127.0.0.1]",
+          "reason": "Windows cmd expansion regression"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_windows_start_script",
+          "name": "test_start_cmd_expands_reachable_client_base_url[0.0.0.0-127.0.0.1]",
+          "reason": "Windows cmd expansion regression"
+        }
+      ]
+    },
+    {
+      "artifact_id": 10293343829,
+      "name": "windows-regression-capability-product",
+      "job_id": 103520554917,
+      "source_checkout_verified": true,
+      "tests": 895,
+      "failures": 0,
+      "errors": 0,
+      "skips": [
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_preserves_real_link_containment[False-False]",
+          "reason": "Windows symlink privilege unavailable"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_preserves_real_link_containment[False-True]",
+          "reason": "Windows symlink privilege unavailable"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_preserves_real_link_containment[True-False]",
+          "reason": "Windows symlink privilege unavailable"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_content_path_resolution",
+          "name": "test_resolution_preserves_real_link_containment[True-True]",
+          "reason": "Windows symlink privilege unavailable"
+        },
+        {
+          "class": "catalog.capabilities.tests.test_analysis_workspace_reconciliation",
+          "name": "test_reparse_or_symlink_attempt_is_never_followed",
+          "reason": "directory symlinks are unavailable on this runner"
+        }
+      ]
+    },
+    {
+      "artifact_id": 10293329882,
+      "name": "windows-regression-journal-artifacts",
+      "job_id": 103520554937,
+      "source_checkout_verified": true,
+      "tests": 298,
+      "failures": 0,
+      "errors": 0,
+      "skips": [
+        {
+          "class": "catalog.federation.tests.test_icse_network_provenance",
+          "name": "test_extracted_source_symlink_is_rejected_even_with_identical_target_bytes",
+          "reason": "host privilege or filesystem does not support creating symlinks"
+        }
+      ]
+    }
+  ],
+  "missing_artifacts": [],
+  "complete_artifact_set": true,
+  "shard_verifier_blob": "20ab1321e692762dc17dd43eacff28dbb97518c7",
+  "test_nodeids_covered": 4457,
+  "qualification_boundary": "Native artifact review only; required workflow verdicts and physical acceptance remain separate."
+}
