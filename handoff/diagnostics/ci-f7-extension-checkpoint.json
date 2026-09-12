@@ -1,0 +1,34 @@
+{
+  "recorded_at": "2026-09-12T11:02:15.0899456Z",
+  "source_commit": "f3abe5452db2f21593a688bc62bc5f4b22d5c40e",
+  "base": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
+  "branch": "codex/ci-f7-coverage-consolidation",
+  "worktree": "C:/wsl/fcp-ci-f7-consolidation-20260912",
+  "changed_files": [
+    ".github/workflows/phase-f7-closeout.yml",
+    "catalog/common/tests/test_f7_ci_coverage.py",
+    "docs/implementation/f7_ci_consolidation.md",
+    "docs/implementation/federation_v1_cleanup_manifest.md"
+  ],
+  "source_blobs": {
+    "docs/implementation/f7_ci_consolidation.md": "0295b6df032897a0119c270184f96015bded2670",
+    "catalog/common/tests/test_f7_ci_coverage.py": "4b226fa54f484a6b812db42277549104020d420f",
+    "docs/implementation/federation_v1_cleanup_manifest.md": "72eebba08881d3144ebde4b55b42a516d278c7d4",
+    ".github/workflows/phase-f7-closeout.yml": "143db0b43c870bc5791c3629e34fd61a72293c47"
+  },
+  "clean": true,
+  "focused_tests": {
+    "passed": 29,
+    "junit": "ci-f7-focused-green.xml",
+    "skipped": 0,
+    "log": "ci-f7-focused-green.log"
+  },
+  "ruff": "check and format PASS",
+  "diff_hygiene": "PASS",
+  "native_replacement_executions_verified": 0,
+  "js_only_automatic_event_verified": false,
+  "legacy_retired": [],
+  "product_runtime_changed": false,
+  "physical_acceptance": false,
+  "note": "Focused contract tests, not replacement qualification. One existing matrix, eight added product paths plus CI test self-path, three product test modules plus CI contract module, and JUnit retention; zero new jobs/workflows."
+}
