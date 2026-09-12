@@ -1,0 +1,618 @@
+{
+  "recorded_at": "2026-09-12T01:15:31.723610+00:00",
+  "head": "4749ab6689315a7ad953c11ce4b2ec942433d71a",
+  "base": "9b286f931497bf6291e215f6340443c5162826b0",
+  "mergeable": true,
+  "mergeable_state": "unstable",
+  "draft": false,
+  "requested_reviewers": [],
+  "reviews": [],
+  "comments": [],
+  "checks": [
+    {
+      "id": 103471560829,
+      "name": "Federation v1 automated release verdict",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103471498904,
+      "name": "Release matrix (Windows)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103471498901,
+      "name": "Release matrix (Linux)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103469401180,
+      "name": "publication-bundle",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103468376856,
+      "name": "Clean-checkout suite order independence",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103464901268,
+      "name": "acceptance (Linux, fcp-linux-fast, bash)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103464901160,
+      "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103464879836,
+      "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103464879770,
+      "name": "reviewer-compose",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103464879657,
+      "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103464860402,
+      "name": "Linux regression shard (0)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103464860302,
+      "name": "Linux regression shard (2)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103464860290,
+      "name": "Linux regression shard (3)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103464860281,
+      "name": "Windows regressions (capability-product)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103464860273,
+      "name": "Linux regression shard (1)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103464860262,
+      "name": "Full-suite order (fixed)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103464860261,
+      "name": "Windows regressions (journal-artifacts)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103464860254,
+      "name": "Windows regressions (transport-storage)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103464860238,
+      "name": "Release checks (Windows)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103464860198,
+      "name": "PostgreSQL storage release check",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103464860195,
+      "name": "Release checks (Linux)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103464860129,
+      "name": "Full-suite order (rotating)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103463483478,
+      "name": "Federation v1 automated release verdict",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103463415424,
+      "name": "Release matrix (Windows)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103463415300,
+      "name": "Release matrix (Linux)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103462678187,
+      "name": "publication-bundle",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103458969834,
+      "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103458969699,
+      "name": "update-contracts (Linux, fcp-linux-fast, bash)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103458955385,
+      "name": "operator-surface (Linux, fcp-linux-fast, bash)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103458955227,
+      "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103457898256,
+      "name": "Clean-checkout suite order independence",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103456873518,
+      "name": "linux",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103456873389,
+      "name": "windows",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103453726290,
+      "name": "Windows regressions (transport-storage)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103453726216,
+      "name": "Windows regressions (capability-product)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103453726200,
+      "name": "Windows regressions (journal-artifacts)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103453726189,
+      "name": "Linux regression shard (3)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103453726159,
+      "name": "Release checks (Linux)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103453726153,
+      "name": "Full-suite order (rotating)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103453726152,
+      "name": "Linux regression shard (0)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103453726148,
+      "name": "Release checks (Windows)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103453726136,
+      "name": "Linux regression shard (1)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103453726126,
+      "name": "PostgreSQL storage release check",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103453726123,
+      "name": "Linux regression shard (2)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103453725966,
+      "name": "Full-suite order (fixed)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103452693940,
+      "name": "product-branding",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103450017218,
+      "name": "Verify immutable release image metadata",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103450012556,
+      "name": "onboarding (Linux, fcp-test-linux, bash, 3.12.13)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103450012404,
+      "name": "onboarding (Windows, fcp-test-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103450006534,
+      "name": "role-retirement (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103450006392,
+      "name": "role-retirement (Linux, fcp-linux-fast, bash)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103450002024,
+      "name": "readiness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy B...",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103450001845,
+      "name": "readiness (Linux, fcp-linux-fast, bash)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103449995646,
+      "name": "harness (Linux, fcp-linux-fast, bash)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103449995519,
+      "name": "harness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Byp...",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103449989175,
+      "name": "Shard contract (Windows, shared-pool)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103449988860,
+      "name": "Shard contract (Linux, shared-pool)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103449516273,
+      "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103449515903,
+      "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103449515755,
+      "name": "reviewer-compose",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103449515262,
+      "name": "acceptance (Linux, fcp-linux-fast, bash)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103449515153,
+      "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103449515149,
+      "name": "capability-closeout (Linux, fcp-linux-fast, bash)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103449515101,
+      "name": "capability-closeout (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103449514985,
+      "name": "linux",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103449514749,
+      "name": "windows",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103449514527,
+      "name": "operator-surface (Linux, fcp-linux-fast, bash)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103449514247,
+      "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103449514175,
+      "name": "trusted-provider-closeout (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -E...",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103449514001,
+      "name": "trusted-provider-closeout (Linux, fcp-linux-fast, bash)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103449513532,
+      "name": "artifact-authorization (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 103449513492,
+      "name": "artifact-authorization (windows-latest)",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 103449513327,
+      "name": "repository-hygiene",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 103449513028,
+      "name": "worker-dispatch (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 103449512849,
+      "name": "repository-hygiene",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 103449512698,
+      "name": "worker-dispatch (windows-latest)",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 103449512680,
+      "name": "durable-job-ownership (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 103449512641,
+      "name": "durable-job-ownership (windows-latest)",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 103449512554,
+      "name": "repository-hygiene",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 103449512400,
+      "name": "Admission boundary (windows-latest)",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 103449512362,
+      "name": "retry-cancellation (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 103449512360,
+      "name": "retry-cancellation (windows-latest)",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 103449512303,
+      "name": "compute-worker (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 103449512278,
+      "name": "efficiency-learning (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 103449512259,
+      "name": "repository-hygiene",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 103449512244,
+      "name": "job-contracts (windows-latest)",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 103449512235,
+      "name": "repository-hygiene",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 103449512221,
+      "name": "repository-hygiene",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 103449512185,
+      "name": "repository-hygiene",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 103449512170,
+      "name": "provider-selection (windows-latest)",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 103449512144,
+      "name": "ai-runtime (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 103449512128,
+      "name": "job-contracts (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 103449512120,
+      "name": "Admission boundary (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 103449512058,
+      "name": "ai-runtime (windows-latest)",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 103449512044,
+      "name": "update-contracts (Linux, fcp-linux-fast, bash)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103449512023,
+      "name": "efficiency-learning (windows-latest)",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 103449511958,
+      "name": "provider-selection (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 103449511893,
+      "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103449511877,
+      "name": "compute-worker (windows-latest)",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 103449511865,
+      "name": "repository-hygiene",
+      "status": "completed",
+      "conclusion": "failure"
+    }
+  ],
+  "status": {
+    "state": "pending",
+    "total_count": 0,
+    "statuses": []
+  }
+}

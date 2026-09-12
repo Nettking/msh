@@ -1975,3 +1975,10 @@ No candidate freeze or physical qualification; D06/PR463 remains required.
 01:14:39UTC: PR465 marked ready for review at the qualified exact head4749ab66.
 Published final qualification in its PR description. Next: inspect current
 review/check state and normal merge eligibility; no override of branch policy.
+
+01:16UTC: live premerge input confirms exact qualified465 head, ready state and
+no review/comments/requested reviewers. GitHub reports mergeable but unstable
+due to28 failed legacy hosted checks outside the retained required set; commit
+status has zero entries. Do not infer product regressions or ignore these blindly.
+Next: inspect their annotations/execution status and compare the documented
+legacy-hosted disposition before normal merge. Required37+3 proof remains valid.
