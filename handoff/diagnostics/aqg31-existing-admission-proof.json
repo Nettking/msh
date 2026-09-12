@@ -1,0 +1,173 @@
+{
+  "recorded_at": "2026-09-12T14:11:52.881177+00:00",
+  "status": "EXISTING_ADMISSION_EVIDENCE_VERIFIED_NO_RERUN",
+  "runner_id": 31,
+  "runner_name": "AQG7NCC-Linux",
+  "source_sha": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
+  "run_id": 34684352823,
+  "job_id": 103528608892,
+  "started_at": "2026-09-12T08:56:48Z",
+  "completed_at": "2026-09-12T08:57:15Z",
+  "native_receipt": {
+    "job_id": 103528608892,
+    "run_id": 34684352823,
+    "name": "Shard contract (Linux, shared-pool)",
+    "runner_name": "AQG7NCC-Linux",
+    "conclusion": "success",
+    "bytes": 33538,
+    "sha256": "754adfcded6318ab49c0618416df2a0025cd85feee0bb46bc19326c35c145d73",
+    "checkout_commits": [
+      "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05"
+    ],
+    "checkout_matches": true
+  },
+  "steps": [
+    {
+      "name": "Set up job",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 1,
+      "started_at": "2026-09-12T08:56:49Z",
+      "completed_at": "2026-09-12T08:56:53Z"
+    },
+    {
+      "name": "Run actions/checkout@v4",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 2,
+      "started_at": "2026-09-12T08:56:53Z",
+      "completed_at": "2026-09-12T08:56:55Z"
+    },
+    {
+      "name": "Run ./.github/actions/self-hosted-python",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 3,
+      "started_at": "2026-09-12T08:56:55Z",
+      "completed_at": "2026-09-12T08:56:57Z"
+    },
+    {
+      "name": "Install CI tooling only",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 4,
+      "started_at": "2026-09-12T08:56:57Z",
+      "completed_at": "2026-09-12T08:57:00Z"
+    },
+    {
+      "name": "Check shard tooling",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 5,
+      "started_at": "2026-09-12T08:57:00Z",
+      "completed_at": "2026-09-12T08:57:00Z"
+    },
+    {
+      "name": "Verify complete coverage, stable allocation and failure propagation",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 6,
+      "started_at": "2026-09-12T08:57:00Z",
+      "completed_at": "2026-09-12T08:57:02Z"
+    },
+    {
+      "name": "Run actions/setup-go@v5",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 7,
+      "started_at": "2026-09-12T08:57:02Z",
+      "completed_at": "2026-09-12T08:57:02Z"
+    },
+    {
+      "name": "Verify Go and Compose prerequisites",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 8,
+      "started_at": "2026-09-12T08:57:02Z",
+      "completed_at": "2026-09-12T08:57:02Z"
+    },
+    {
+      "name": "Linux storage precondition",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 9,
+      "started_at": "2026-09-12T08:57:02Z",
+      "completed_at": "2026-09-12T08:57:02Z"
+    },
+    {
+      "name": "Linux Buildx prerequisite",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 10,
+      "started_at": "2026-09-12T08:57:02Z",
+      "completed_at": "2026-09-12T08:57:02Z"
+    },
+    {
+      "name": "Admit Linux Docker with an isolated disposable database",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 11,
+      "started_at": "2026-09-12T08:57:02Z",
+      "completed_at": "2026-09-12T08:57:08Z"
+    },
+    {
+      "name": "Verify the disposable database",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 12,
+      "started_at": "2026-09-12T08:57:08Z",
+      "completed_at": "2026-09-12T08:57:08Z"
+    },
+    {
+      "name": "Remove only this job's database",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 13,
+      "started_at": "2026-09-12T08:57:08Z",
+      "completed_at": "2026-09-12T08:57:09Z"
+    },
+    {
+      "name": "Post Run actions/setup-go@v5",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 25,
+      "started_at": "2026-09-12T08:57:09Z",
+      "completed_at": "2026-09-12T08:57:09Z"
+    },
+    {
+      "name": "Post Run actions/checkout@v4",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 26,
+      "started_at": "2026-09-12T08:57:09Z",
+      "completed_at": "2026-09-12T08:57:09Z"
+    },
+    {
+      "name": "Complete job",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 27,
+      "started_at": "2026-09-12T08:57:09Z",
+      "completed_at": "2026-09-12T08:57:09Z"
+    }
+  ],
+  "excerpt": [
+    "2026-09-12T08:56:49.9815750Z Runner name: 'AQG7NCC-Linux'",
+    "2026-09-12T08:56:55.0673028Z   python-version: 3.12.13",
+    "2026-09-12T08:56:55.0781665Z \u001b[36;1mpython=/opt/fcp-ci/python/3.12.13/bin/python3.12\u001b[0m",
+    "2026-09-12T08:56:55.0782312Z \u001b[36;1m\"$python\" -c 'import os, platform; v=platform.python_version(); assert v == \"3.12.13\", v; assert v == os.environ[\"REQUIRED_PYTHON\"] or os.environ[\"REQUIRED_PYTHON\"] == \"3.12\", v; print(v)'\u001b[0m",
+    "2026-09-12T08:56:55.0818866Z   REQUIRED_PYTHON: 3.12.13",
+    "2026-09-12T08:56:55.1015239Z 3.12.13",
+    "2026-09-12T08:57:02.3000841Z 10 passed in 1.64s",
+    "2026-09-12T08:57:02.4786741Z go version go1.25.7 linux/amd64",
+    "2026-09-12T08:57:02.5036500Z go version go1.25.7 linux/amd64",
+    "2026-09-12T08:57:02.6338542Z Runner meets the product host-resource precondition.",
+    "2026-09-12T08:57:02.6441400Z ##[group]Run docker buildx version",
+    "2026-09-12T08:57:02.6441741Z \u001b[36;1mdocker buildx version\u001b[0m",
+    "2026-09-12T08:57:02.7530513Z ##[start-action display=Start isolated PostgreSQL;id=__self_3.__run]",
+    "2026-09-12T08:57:08.5428678Z ##[start-action display=Remove this job's disposable PostgreSQL;id=__self_3.__run_2]",
+    "2026-09-12T08:57:08.7318278Z ##[start-action display=Start isolated PostgreSQL;id=__self_4.__run]",
+    "2026-09-12T08:57:08.7323284Z ##[start-action display=Remove this job's disposable PostgreSQL;id=__self_4.__run_2]"
+  ],
+  "interpretation": "The checked-in CI test sharding workflow passed on this exact runner at08:57Z with Python/shell/Go/storage/Buildx/isolated PostgreSQL prerequisites. Earlier lookup after10:01Z excluded it. Existing main qualification was not repeated. No new runner admission or label mutation occurred."
+}

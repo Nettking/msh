@@ -11,23 +11,21 @@ all17 D08 cases across native platforms, original scheduler failure and explicit
 platform exclusions reconciled. No job was rerun for historical hosted billing reds.
 All prior PR/failed-main evidence retained under its own source. No further17ab CI
 polling or qualification is needed unless a concrete new contract reason appears.
-Next highest-value action: inspect the necessary exact-head automatic CI/status
-checks for PR468 at ba44100ec1e4cde19daba0d3723b991c11742316, then resolve
-remaining merge/retirement gates without repeating proven native coverage.
-D09 is integrated through clean fast-forward. Final-head branding,29 focused
-CI contracts and diff hygiene PASS; only docs/implementation/f7_ci_consolidation.md
-changed from f3abe545, with all1417 other entries byte-identical.
-Receipt: diagnostics/pr468-ba44100e-final-validation.json. Two complete native
-replacement runs and real JS-only event are reviewed and pushed; canary469 is
-closed without merge. Preserve original source attribution; no manual native rerun.
-Literal reference scan found no external executable consumers of the eight legacy
-workflow names/files; existing manifest and two OSL references remain for retirement
-updates. All eight legacy workflows are still present. Detailed GitHub protection/
-ruleset endpoints return403, so invisible policy content is not asserted.
-Separate D10/#470: three old-source Beast Windows shards failed checkout on the
-runner-owned .pytest_cache (EPERM), before tests. Aggregates are downstream;
-no product repair proposed. Preserve those errors and all passing qualification.
-No PR468 merge or legacy retirement has occurred; do not disturb unrelated work.
+Next highest-value action: diagnose/retry only the two failed final-head checks
+on unchanged ba44100ec1e4cde19daba0d3723b991c11742316, after original evidence
+retention. D11/#471 is AQG Linux shard2 live-reinstatement TimeoutError; D12/#472
+is Beast Phase2 Go build VCS-status exit128 after Go tests passed. Root causes
+remain unresolved; no product repair is justified yet. Red release aggregates
+are consequences. F6/F7/F8 and other final-head checks passed.
+D11 comparison proves same-source fixed/rotating full suites and Windows transport
+passed the identical test; original failed shard ZIP is durably retained. One
+targeted failed-shard retry can test recurrence without rerunning successes.
+AQG31 admission is now VERIFIED from existing08:57Z run34684352823/job103528608892
+and retained native Python/Go/storage/Buildx/PostgreSQL evidence. The earlier
+post10:01Z lookup missed it. No new admission or main qualification was performed.
+D09 is resolved at final head, 2/2 native replacement and real JS-only event are
+retained, but PR468 remains unmerged and all eight legacy files remain pending
+resolution/classification of the two required failures. No physical/runtime change.
 Pre-integration comparison: diagnostics/D09-preintegration-source-comparison.json.
 Base f3abe545 -> repair ba44100e changes one document; all1417 other tracked entries
 (mode/type/object/path) match. Actual canary660bf232 has its separately documented
@@ -2694,3 +2692,13 @@ diagnostics/D12.md. Publish its durable GitHub artifact before further
 investigation. Inspect the unchanged workflow/toolchain and same-runner Git cwd/HOME/safe-directory/ownership diagnostics through a read-only channel. Obtain the actual Git error before repair or targeted retry. Do not disable VCS stamping, add broad safe.directory exceptions or change service accounts.
 
 D12 durable artifact: https://github.com/Nettking/msh/issues/472.
+
+## 2026-09-12T14:11:52.926603+00:00 — prior admission found; D11 comparison retained
+
+The checked-in CI test sharding workflow passed on this exact runner at08:57Z with Python/shell/Go/storage/Buildx/isolated PostgreSQL prerequisites. Earlier lookup after10:01Z excluded it. Existing main qualification was not repeated. No new runner admission or label mutation occurred.
+
+Existing identical-source results constrain D11 to a non-deterministic/contextual
+failure so far. The original failed ZIP is pushed before any targeted retry.
+No complete native proof or passing job will be repeated. Next assess D12
+with unchanged-source Go build context and select at most one targeted retry
+per failed job. Keep PR468 source fixed and preserve each attempt separately.

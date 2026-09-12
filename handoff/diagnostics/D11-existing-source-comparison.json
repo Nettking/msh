@@ -1,0 +1,137 @@
+{
+  "recorded_at": "2026-09-12T14:11:52.926603+00:00",
+  "candidate_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+  "actual_checkout": "f18e91adae2cb198fb5cebad61ee202a38d2bd8e",
+  "outcomes": [
+    {
+      "artifact": {
+        "run_id": 34695331201,
+        "id": 10298951195,
+        "name": "linux-regression-shard-2",
+        "digest": "sha256:d5d3b44afa0ccfec6557bd0655371488140257fce3d038a796f571fa90277457",
+        "bytes": 165141,
+        "created_at": "2026-09-12T13:21:34Z",
+        "api_workflow_head": "ba44100ec1e4cde19daba0d3723b991c11742316"
+      },
+      "member": "junit-2.xml",
+      "classname": "catalog.node.tests.test_live_storage_reinstatement",
+      "test": "test_live_reinstatement_restores_replica_and_acknowledgement_policy",
+      "seconds": 49.573,
+      "failure": true,
+      "skipped": false
+    },
+    {
+      "artifact": {
+        "run_id": 34695331201,
+        "id": 10298632332,
+        "name": "full-suite-order-rotating",
+        "digest": "sha256:6cb8f0bcaf08f689454abf95abd2516553dc2a2df27a963d5f1461149ba60dd6",
+        "bytes": 107632,
+        "created_at": "2026-09-12T13:28:58Z",
+        "api_workflow_head": "ba44100ec1e4cde19daba0d3723b991c11742316"
+      },
+      "member": "order-rotating.xml",
+      "classname": "catalog.node.tests.test_live_storage_reinstatement",
+      "test": "test_live_reinstatement_restores_replica_and_acknowledgement_policy",
+      "seconds": 2.539,
+      "failure": false,
+      "skipped": false
+    },
+    {
+      "artifact": {
+        "run_id": 34695331201,
+        "id": 10298549789,
+        "name": "full-suite-order-fixed",
+        "digest": "sha256:37b1d7cd5dd79301676ce6d12315ddeb1cc4a5c6f0dd9f96a040a8741c5fff6c",
+        "bytes": 107416,
+        "created_at": "2026-09-12T13:17:54Z",
+        "api_workflow_head": "ba44100ec1e4cde19daba0d3723b991c11742316"
+      },
+      "member": "order-fixed.xml",
+      "classname": "catalog.node.tests.test_live_storage_reinstatement",
+      "test": "test_live_reinstatement_restores_replica_and_acknowledgement_policy",
+      "seconds": 3.945,
+      "failure": false,
+      "skipped": false
+    },
+    {
+      "artifact": {
+        "run_id": 34695331201,
+        "id": 10298003614,
+        "name": "windows-regression-transport-storage",
+        "digest": "sha256:406463c63d16a111302020af6f774cb5375fe467ca36ef006637e29a1ab2294b",
+        "bytes": 8811,
+        "created_at": "2026-09-12T13:07:28Z",
+        "api_workflow_head": "ba44100ec1e4cde19daba0d3723b991c11742316"
+      },
+      "member": "windows-transport-storage.xml",
+      "classname": "catalog.node.tests.test_live_storage_reinstatement",
+      "test": "test_live_reinstatement_restores_replica_and_acknowledgement_policy",
+      "seconds": 6.707,
+      "failure": false,
+      "skipped": false
+    }
+  ],
+  "passing_native_provenance": {
+    "source_commit": "f18e91adae2cb198fb5cebad61ee202a38d2bd8e",
+    "retained_at": "2026-09-12T14:07:22.992114+00:00",
+    "records": [
+      {
+        "job_id": 103557723445,
+        "run_id": 34695331201,
+        "name": "Windows regressions (transport-storage)",
+        "runner_name": "Nettking",
+        "conclusion": "success",
+        "bytes": 56084,
+        "sha256": "47235017e0d3e4f4cbb7e02347fefb1276be7a146858a42864f6abcb95b1f055",
+        "checkout_commits": [
+          "f18e91adae2cb198fb5cebad61ee202a38d2bd8e"
+        ],
+        "checkout_matches": true
+      },
+      {
+        "job_id": 103557723447,
+        "run_id": 34695331201,
+        "name": "Full-suite order (fixed)",
+        "runner_name": "Nettking-Linux",
+        "conclusion": "success",
+        "bytes": 67925,
+        "sha256": "92c534d81b6ab221be378e741f7f3c75612c2fd7033f3ab717ec87ca642e0ea6",
+        "checkout_commits": [
+          "f18e91adae2cb198fb5cebad61ee202a38d2bd8e"
+        ],
+        "checkout_matches": true
+      },
+      {
+        "job_id": 103557723517,
+        "run_id": 34695331201,
+        "name": "Full-suite order (rotating)",
+        "runner_name": "Nettking-Linux",
+        "conclusion": "success",
+        "bytes": 70031,
+        "sha256": "6550435f933fdfbd490b496b764e64212eea7d08c4deed6fbb79fdae6a0bdc4e",
+        "checkout_commits": [
+          "f18e91adae2cb198fb5cebad61ee202a38d2bd8e"
+        ],
+        "checkout_matches": true
+      }
+    ]
+  },
+  "failed_manifest": {
+    "source_sha": "f18e91adae2cb198fb5cebad61ee202a38d2bd8e",
+    "source_identity_before": {
+      "sha": "f18e91adae2cb198fb5cebad61ee202a38d2bd8e",
+      "tree": "403cf4d2bcf1560d940842fba365196441096951"
+    },
+    "source_identity_after": {
+      "sha": "f18e91adae2cb198fb5cebad61ee202a38d2bd8e",
+      "tree": "403cf4d2bcf1560d940842fba365196441096951"
+    },
+    "source_error": null,
+    "exit_code": 1,
+    "collection_complete": true
+  },
+  "durable_original_failure_zip": "D11-original-shard-2.zip",
+  "conclusion": "Existing same-source fixed/rotating full suites and Windows transport run passed this test; AQG shard2 failed with TimeoutError. Failure is not shown to be deterministic or caused by the CI/docs change. Host/timing/order cause remains unresolved.",
+  "next_action": "One targeted unchanged-source retry of failed shard2 is justified for reproducibility after retaining original artifacts and verifying AQG admission; preserve all successful shards/full suites. No deadline/assertion/authority changes."
+}
