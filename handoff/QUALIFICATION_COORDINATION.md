@@ -2527,3 +2527,7 @@ PR468/469 jobs, preserve/review new completed evidence, then integrate the docs
 correction only when it will not disrupt those runs. Two reviewed native greens
 and final reference/required-status proof still precede any legacy retirement.
 The accepted retirement audit and completed main17ab qualification remain intact.
+
+D09 pushed-repair PR artifact: https://github.com/Nettking/msh/pull/468#issuecomment-5645763798 .
+Hourly snapshot helper now writes timestamped files; reviewed F7 proof is reused
+without polling completed runs. Next scheduled observation remains12:55Z.

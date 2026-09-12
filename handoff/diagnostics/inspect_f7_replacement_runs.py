@@ -9,7 +9,14 @@ EXPECTED={468:(34689990990,'f3abe5452db2f21593a688bc62bc5f4b22d5c40e','b0fbb8a1a
 def git(*args):return subprocess.check_output(['git','-C',WORKTREE,*args],text=True).strip()
 def main():
     api=client();rows=[]
+    cache_path=ROOT/'ci-f7-replacement-runs-latest.json'
+    cached=json.loads(cache_path.read_text())['runs'] if cache_path.exists() else []
     for pr,(rid,head,merge) in EXPECTED.items():
+        proof_path=ROOT/('ci-f7-pr'+str(pr)+'-native-proof.json')
+        if proof_path.exists():
+            proof=json.loads(proof_path.read_text());assert proof['api_head_sha']==head and proof['run_id']==rid
+            previous=next(r for r in cached if r['pr']==pr);assert previous['conclusion']=='success'
+            rows.append(previous);print(json.dumps({'pr':pr,'run_id':rid,'status':'REUSED_EXISTING_REVIEWED_PROOF_NO_POLL'}));continue
         r=api('/actions/runs/'+str(rid));assert r['head_sha']==head and r['event']=='pull_request'
         jobs=api('/actions/runs/'+str(rid)+'/jobs?per_page=100')['jobs']
         assert len(jobs)==2
