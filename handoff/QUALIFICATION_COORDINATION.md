@@ -1,30 +1,27 @@
 # Federation v1 qualification coordination
 
-**Current actionable checkpoint (2026-09-12T08:54Z):** actual merged main
-17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05 is undergoing its single qualification.
-PR467 exact84c66f8185c1411d9dc8c5c33244a2f564845ce7 qualified37/37 plus3companions,
-with full native/artifact/skip/D06-D08 review, then merged normally with head guard.
-Receipts: diagnostics/pr467-final-qualification.json and pr467-merge-receipt.json.
-Clean audit worktree:C:/wsl/fcp-v1-17ab3a05-merged-main-20260912. All six qualified
-repair heads are ancestors; identical tree to467 is recorded but not qualification.
-All13 main workflows present: six original push runs plus seven absent gates dispatched
-once, each persisted. Current exact-main native proof:2/37 required plus0/3companions.
-Last initial progress snapshot2026-09-12T08:52:42Z:2successful,3executing,no failures.
-Main release34684218734; ICSE34684218746; F8534684218733. Complete run inventory:
-diagnostics/merged-main-qualification-state.json; no missing/duplicate jobs.
-**Next routine CI check:2026-09-12T09:53:00Z or later**, preferably near expected
-completion. Hourly cadence;45–60minute minimum after confirmed progress, absent
-independently delivered actionable events. No unchanged-progress notifications.
-Exact next command when due: C:/wsl/fcp-v1-fba508-nettking-20260910/.venv/Scripts/python.exe
--B handoff/diagnostics/poll_merged_main_state.py. Persist meaningful delta, then
-retain only new terminal logs via retain_merged_main_jobs.py. No more dispatch is
-justified. Prior2a9 failed-main receipts archived in diagnostics/archive-main-2a9c9b8e.
-After all37+3 complete, adapt PR467 artifact/finalization reviewers to actual main
-SHA/ref/events/run IDs and verify4457identities, full orders, ICSE exact export and
-D06-D08 native regressions/skips. Do not run older2a9-bound main review scripts blindly.
-After this gate resolves, the next priority is the user-authorized coverage-preserving CI migration plan and equivalence matrix; prepare and persist that plan before workflow edits. Defer physical restart while this CI source decision is pending.
-Physical runtime remains9b286f931497bf6291e215f6340443c5162826b0. No candidate freeze,
-physical PASS, P07/P12 or protected Recorder-data changes. Do not repeat old PR CI.
+**Current actionable checkpoint (2026-09-12T10:00Z):** actual merged main
+17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05 is QUALIFIED_ACTUAL_MERGED_MAIN.
+Receipt: diagnostics/merged-main-final-qualification.json. All37 required plus3
+companions passed;40 native logs reconciled (38 exact checkouts,2 dependency-only
+release aggregates),9 release artifacts/4457identities in4shards and both full orders.
+ICSE exact1414-file source export/19checksums/components4/4 on3executions and
+network10/10 plus teardown onboth native platforms verified. D06-D08 regressions,
+all17 D08 cases across native platforms, original scheduler failure and explicit
+platform exclusions reconciled. No job was rerun for historical hosted billing reds.
+All prior PR/failed-main evidence retained under its own source. No further17ab CI
+polling or qualification is needed unless a concrete new contract reason appears.
+Next highest-value action: prepare the user-authorized minimal coverage-preserving
+self-hosted CI migration plan and old/new trigger/OS/lint/test/service matrix BEFORE
+workflow edits. Read handoff/CI_WORKFLOW_RETIREMENT_REVIEW.md and its audit receipts.
+Verify reported AQG7NCC native fcp-windows capacity without changing labels/accounts
+or admitting a runner to fcp-test release pools. Prefer retained workflow extensions,
+preserveUP035, relay lint and12Windows AI-trigger modules; require equivalent green
+replacement evidence twice before partial/coherent retirement. No eight duplicates.
+Clean qualified checkout:C:/wsl/fcp-v1-17ab3a05-merged-main-20260912.
+Physical runtime remains9b286f931497bf6291e215f6340443c5162826b0; freeze/revalidation
+and physical restart deferred while CI source decision is pending. No physical PASS,
+P07/P12, deployment or protected Recorder-data changes.
 Current user direction, September 11 2026: execute on state changes, using this
 checkpoint and the completed diagnostic sweep report; do not repeat the sweep.
 
@@ -2422,3 +2419,5 @@ permanent cancellation of the newly authorized migration objective.
 2026-09-12T09:11:45.8055993Z: existing heartbeat updated to hourly at minute55, first eligible routine qualification check09:55UTC, and to perform migration planning after current-main gate resolution. No CI polling, dispatch, cancellation or source/runtime change performed for this steering update.
 
 2026-09-12T09:57:37.6994318Z: hourly snapshot confirms all37 required plus3 companion jobs successful on actual main17ab3a05; no missing/failed workflows and main unchanged. Next: retain38 new native logs and current release/ICSE artifacts, finalize exact-source/aggregate/platform/skip review before recording qualified. After that receipt is pushed, prepare authorized minimal coverage-preserving migration plan and matrix. No physical operation or CI rerun.
+
+2026-09-12T10:00:21.5382061Z: actual17ab main qualification FINAL PASS37+3 with all native and release/ICSE/skip/D06-D08 regression evidence independently reconciled. Receipt and current-main target now qualified; candidate_frozen/physical_acceptance remain false. Next: verify native Windows runner metadata and persist minimal migration plan before source edits. Stop polling completed17ab workflows.

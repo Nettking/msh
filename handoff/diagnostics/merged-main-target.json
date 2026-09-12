@@ -1,5 +1,5 @@
 {
-  "recorded_at": "2026-09-12T08:50:30.372317+00:00",
+  "recorded_at": "2026-09-12T10:50:30.372317+02:00",
   "source_commit": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
   "worktree": "C:\\wsl\\fcp-v1-17ab3a05-merged-main-20260912",
   "clean": true,
@@ -12,7 +12,7 @@
     "84c66f8185c1411d9dc8c5c33244a2f564845ce7"
   ],
   "tree_identical_to_qualified_pr467": true,
-  "final_merged_main_qualified": false,
+  "final_merged_main_qualified": true,
   "candidate_frozen": false,
   "runtime_sha": "9b286f931497bf6291e215f6340443c5162826b0",
   "previous_main_receipts": "archive-main-2a9c9b8e",
@@ -62,5 +62,5 @@
       "sha256": "1c5f7e13f2057a2300c67abbc662b80c7c427888f8cb3b6cf2240588bac7f198"
     }
   ],
-  "next_action": "Select existing actual-main push runs; dispatch only absent required gates once; no PR evidence reuse"
+  "next_action": "Prepare and persist coverage-preserving self-hosted migration plan/equivalence matrix before source changes; physical restart deferred."
 }

@@ -1,8 +1,37 @@
 {
-  "recorded_at": "2026-09-12T08:50:30.372317+00:00",
-  "source_commit": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
-  "status": "PENDING",
-  "previous_main_receipts": "archive-main-2a9c9b8e",
-  "physical_acceptance": false,
-  "candidate_frozen": false
+  "recorded_at": "2026-09-12T09:59:31.880391+00:00",
+  "source_sha": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
+  "icse_run": 34684218746,
+  "source_export_exact": true,
+  "source_files": 1414,
+  "outer_sha256": "bc31d450e64028ea38a72f185d3c3cd11bb61e2416b466e7bf285e411b232174",
+  "publication_sha256": "feeaa151c234fe809eb557d98d90246d0d08df6226dc4d60d405b30b6e708c48",
+  "checksum_entries": 19,
+  "component": [
+    {
+      "execution": "Linux",
+      "passed": 4
+    },
+    {
+      "execution": "Windows",
+      "passed": 4
+    },
+    {
+      "execution": "compose",
+      "passed": 4
+    }
+  ],
+  "network": [
+    {
+      "execution": "Linux",
+      "required_checks_passed": 10,
+      "teardown": true
+    },
+    {
+      "execution": "Windows",
+      "required_checks_passed": 10,
+      "teardown": true
+    }
+  ],
+  "physical_acceptance": false
 }

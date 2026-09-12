@@ -1,8 +1,59 @@
 {
-  "recorded_at": "2026-09-12T08:50:30.372317+00:00",
-  "source_commit": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
-  "status": "PENDING",
-  "previous_main_receipts": "archive-main-2a9c9b8e",
-  "physical_acceptance": false,
-  "candidate_frozen": false
+  "recorded_at": "2026-09-12T09:57:50.171861+00:00",
+  "records": [
+    {
+      "run_id": 34684218746,
+      "id": 10296035782,
+      "name": "icse-network-summary-Linux",
+      "digest": "sha256:e46fc9c9a001fa7ee3fd6edc57029d0c94321ee67593aa1ae808e96a76cd49b6",
+      "bytes": 8248,
+      "created_at": "2026-09-12T09:27:09Z",
+      "api_workflow_head": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05"
+    },
+    {
+      "run_id": 34684218746,
+      "id": 10295951000,
+      "name": "icse-summary-Linux",
+      "digest": "sha256:94a7be0c347de39d4f86f7ddfe9112d7f0b9c9182800479d15a0625fb443c188",
+      "bytes": 1036,
+      "created_at": "2026-09-12T09:26:47Z",
+      "api_workflow_head": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05"
+    },
+    {
+      "run_id": 34684218746,
+      "id": 10295851526,
+      "name": "icse-network-summary-Windows",
+      "digest": "sha256:64787b78756c8882d19cd6ea4e772d6969f699309b7e0516aaa71a040d5b1ac4",
+      "bytes": 8320,
+      "created_at": "2026-09-12T09:32:32Z",
+      "api_workflow_head": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05"
+    },
+    {
+      "run_id": 34684218746,
+      "id": 10295681756,
+      "name": "icse-summary-Windows",
+      "digest": "sha256:a30294df60a479fc16fa51814dd370200b22d7dd4c871c5b6183bd827b55e3ca",
+      "bytes": 1045,
+      "created_at": "2026-09-12T09:31:48Z",
+      "api_workflow_head": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05"
+    },
+    {
+      "run_id": 34684218746,
+      "id": 10295597069,
+      "name": "fcp-icse-tool-demo-bundle-17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
+      "digest": "sha256:bc31d450e64028ea38a72f185d3c3cd11bb61e2416b466e7bf285e411b232174",
+      "bytes": 4222067,
+      "created_at": "2026-09-12T09:33:07Z",
+      "api_workflow_head": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05"
+    },
+    {
+      "run_id": 34684218746,
+      "id": 10294254461,
+      "name": "icse-summary-compose",
+      "digest": "sha256:ad331dbb1df456cfa305f967e8cad2706a927fc520793c8f14403bd6833e401a",
+      "bytes": 1036,
+      "created_at": "2026-09-12T08:49:04Z",
+      "api_workflow_head": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05"
+    }
+  ]
 }

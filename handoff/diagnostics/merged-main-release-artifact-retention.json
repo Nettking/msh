@@ -1,8 +1,86 @@
 {
-  "recorded_at": "2026-09-12T08:50:30.372317+00:00",
-  "source_commit": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
-  "status": "PENDING",
-  "previous_main_receipts": "archive-main-2a9c9b8e",
-  "physical_acceptance": false,
-  "candidate_frozen": false
+  "recorded_at": "2026-09-12T09:57:52.454335+00:00",
+  "records": [
+    {
+      "run_id": 34684218734,
+      "id": 10295591185,
+      "name": "windows-regression-journal-artifacts",
+      "digest": "sha256:84e957d77dc66eeccfe22d8124bf251a7ceeb4599552f360f96b37cceee25891",
+      "bytes": 7015,
+      "created_at": "2026-09-12T09:20:00Z",
+      "api_workflow_head": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05"
+    },
+    {
+      "run_id": 34684218734,
+      "id": 10295515682,
+      "name": "linux-regression-shard-2",
+      "digest": "sha256:1e35f70ba6ff815a72b59853ec9754885a279d07295300dded38a872216f4d73",
+      "bytes": 160618,
+      "created_at": "2026-09-12T09:10:26Z",
+      "api_workflow_head": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05"
+    },
+    {
+      "run_id": 34684218734,
+      "id": 10295446422,
+      "name": "full-suite-order-fixed",
+      "digest": "sha256:a0da1437aa6f53322631482440ac3a34c52fefb74a8cb5a27c3c06d297d17441",
+      "bytes": 107487,
+      "created_at": "2026-09-12T09:18:04Z",
+      "api_workflow_head": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05"
+    },
+    {
+      "run_id": 34684218734,
+      "id": 10295247316,
+      "name": "linux-regression-shard-3",
+      "digest": "sha256:fa10a03b2a59aa1f92b8b8579c12830ccaf44c9490721c3769048cea78b5fb50",
+      "bytes": 160198,
+      "created_at": "2026-09-12T09:03:53Z",
+      "api_workflow_head": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05"
+    },
+    {
+      "run_id": 34684218734,
+      "id": 10295179179,
+      "name": "windows-regression-capability-product",
+      "digest": "sha256:da2db7cab9622a8ab65b525bf40d184dedf34c5ad689abb01298f9c7d2f0ed97",
+      "bytes": 21423,
+      "created_at": "2026-09-12T09:41:46Z",
+      "api_workflow_head": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05"
+    },
+    {
+      "run_id": 34684218734,
+      "id": 10295018812,
+      "name": "linux-regression-shard-1",
+      "digest": "sha256:49ae259820d71897a294f3d6b32feec31ed2f7545311e3a2e0119ca68f62f964",
+      "bytes": 160127,
+      "created_at": "2026-09-12T08:56:39Z",
+      "api_workflow_head": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05"
+    },
+    {
+      "run_id": 34684218734,
+      "id": 10294933536,
+      "name": "linux-regression-shard-0",
+      "digest": "sha256:65c02456b6d7ef7220737ead9caff5650d2a1c06d329c818d4b0d06c31a143ff",
+      "bytes": 159399,
+      "created_at": "2026-09-12T08:54:07Z",
+      "api_workflow_head": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05"
+    },
+    {
+      "run_id": 34684218734,
+      "id": 10294874493,
+      "name": "full-suite-order-rotating",
+      "digest": "sha256:e4720ad594d3f4acdd51efaf6648c6fd683c1a70b430bb124dbc092c10a86fb4",
+      "bytes": 108606,
+      "created_at": "2026-09-12T09:07:12Z",
+      "api_workflow_head": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05"
+    },
+    {
+      "run_id": 34684218734,
+      "id": 10294704907,
+      "name": "windows-regression-transport-storage",
+      "digest": "sha256:65471a0df18beb840c4641aeaf7a31c9c9f505723c31641d273d4f6c9a1e7125",
+      "bytes": 8794,
+      "created_at": "2026-09-12T09:06:53Z",
+      "api_workflow_head": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05"
+    }
+  ]
 }

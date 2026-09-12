@@ -1,8 +1,496 @@
 {
-  "recorded_at": "2026-09-12T08:50:30.372317+00:00",
+  "recorded_at": "2026-09-12T09:59:35.623641+00:00",
   "source_commit": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
-  "status": "PENDING",
-  "previous_main_receipts": "archive-main-2a9c9b8e",
+  "required_jobs": 37,
+  "additional_cfi2_registry_jobs": 3,
+  "workflows": [
+    {
+      "workflow": "cf7-acceptance-harness.yml",
+      "run_id": 34684336496,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "phase2-federation.yml",
+      "run_id": 34684358475,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "cf7b-product-physical-acceptance.yml",
+      "run_id": 34684218682,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "product-branding.yml",
+      "run_id": 34684218723,
+      "jobs": 1,
+      "result": "PASS"
+    },
+    {
+      "workflow": "federation-software-update.yml",
+      "run_id": 34684218744,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "cf7c-physical-test-readiness.yml",
+      "run_id": 34684340863,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "icse-tool-demo.yml",
+      "run_id": 34684218746,
+      "jobs": 4,
+      "result": "PASS"
+    },
+    {
+      "workflow": "cf8-role-retirement.yml",
+      "run_id": 34684344381,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "phase-f85-operator-federation-surface.yml",
+      "run_id": 34684218733,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "federation-v1-release.yml",
+      "run_id": 34684218734,
+      "jobs": 16,
+      "result": "PASS"
+    },
+    {
+      "workflow": "ci-test-sharding.yml",
+      "run_id": 34684352823,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "cfi2-onboarding-composition.yml",
+      "run_id": 34684348208,
+      "jobs": 2,
+      "result": "PASS"
+    },
+    {
+      "workflow": "release-image-metadata.yml",
+      "run_id": 34684364551,
+      "jobs": 1,
+      "result": "PASS"
+    }
+  ],
+  "release_native_checkouts": 14,
+  "source_bound_aggregates": 2,
+  "collected_test_identities": 4457,
+  "full_orders_exact_test_identities": true,
+  "skips_with_pass_elsewhere": 26,
+  "skips_covered_by_native_nonartifact_log": 10,
+  "unchanged_intentional_posix_exclusions": [
+    {
+      "test": "catalog.flask_app.tests.test_model_resource_admission_paths.test_windows_model_pull_script_has_valid_powershell_syntax",
+      "reason": "Windows PowerShell parser check"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_first_federation_start.test_windows_fresh_start_executes_real_batch_with_reset_stdin",
+      "reason": "requires real Windows cmd.exe"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_first_federation_start.test_windows_scaffolding_repair_restores_real_dirty_checkout",
+      "reason": "requires real Windows cmd.exe and git"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_relay_volume_selector.test_selector_survives_missing_current_images_and_reuses_existing_relay_volume",
+      "reason": "Windows PowerShell regression"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_relay_volume_selector.test_selector_pulls_python_probe_and_identifies_pc3_identity",
+      "reason": "Windows PowerShell regression"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_migration_script.test_windows_migration_script_has_valid_powershell_syntax",
+      "reason": "Windows PowerShell parser check"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_migration_script.test_windows_migration_fast_forwards_fake_legacy_checkout_and_resumes",
+      "reason": "Windows migration smoke"
+    },
+    {
+      "test": "catalog.federation.tests.test_host_mutation_activation.test_windows_activation_lease_has_valid_powershell_syntax",
+      "reason": "Windows PowerShell parser check"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_fresh_url_output.test_fresh_onboarding_query_is_printed_without_executing_reset_fragment",
+      "reason": "Windows cmd metacharacter regression"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_fresh_shutdown.test_shutdown_timeout_recovers_without_hanging",
+      "reason": "Windows process-tree recovery contract"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_runtime_state_resolver.test_encoded_python_survives_windows_powershell_native_argument_forwarding",
+      "reason": "Windows PowerShell native argument check"
+    }
+  ],
+  "native_skip_map_sha256": "32a4ea08131ead38f4d3208b6d5230f33456b9e9c840d13e05e17a034195c63a",
+  "windows_focused_skip_accounting": {
+    "total": 157,
+    "passed": 150,
+    "linux_only_skipped": 7,
+    "linux_only_cases": {
+      "test_main_waits_for_previous_process_to_release_its_listener": 2,
+      "test_linux_wait_requires_exit_readiness_within_the_bound": 5
+    },
+    "recorder_windows_cases_passed": [
+      "test_windows_probe_rejects_runtime_that_cannot_import_exact_entrypoint",
+      "test_windows_wrapper_scrubs_legacy_secret_and_forwards_recorder_options",
+      "test_root_cmd_preserves_spaced_argument_and_nonzero_exit"
+    ]
+  },
+  "release_artifact_sha256": "e7f5fbeb6bcde832e7bd61be030ad81014c4f164c9c6c9d392502b00bcc4eb17",
+  "icse_review_sha256": "63c57caa231e7045a1adb0e511b53ce1c7739415d3f91a2f2a8b10420e556326",
+  "manual_reviewed_files": [
+    "catalog/capabilities/analysis/content_store.py",
+    "catalog/capabilities/tests/test_analysis_content_path_resolution.py"
+  ],
+  "review_findings": [],
+  "resolved_review_threads": [],
+  "reviewed_boundaries": [
+    "non-reparse/missing Windows leaf uses canonical parent and lexical leaf",
+    "real reparse entry retains full target and root containment",
+    "internal aliases remain supported; external aliases refused",
+    "root-dot and missing parents preserve prior resolution contract",
+    "unexpected lstat errors propagate; only absence uses non-strict missing-path behavior",
+    "no deleted-namespace allowlist, retry, weaker deadline or guard"
+  ],
+  "regression_artifacts": [
+    {
+      "artifact_id": 10295515682,
+      "tests": 6,
+      "passed": 5
+    },
+    {
+      "artifact_id": 10295446422,
+      "module": "test_tailnet_join_responder_exit",
+      "tests": 11,
+      "passed": 11
+    },
+    {
+      "artifact_id": 10295446422,
+      "module": "test_tailnet_join_responder",
+      "tests": 32,
+      "passed": 32
+    },
+    {
+      "artifact_id": 10295446422,
+      "module": "test_backup_recovery",
+      "tests": 17,
+      "passed": 17
+    },
+    {
+      "artifact_id": 10295446422,
+      "tests": 6,
+      "passed": 5
+    },
+    {
+      "artifact_id": 10295179179,
+      "tests": 6,
+      "passed": 6
+    },
+    {
+      "artifact_id": 10294874493,
+      "module": "test_tailnet_join_responder_exit",
+      "tests": 11,
+      "passed": 11
+    },
+    {
+      "artifact_id": 10294874493,
+      "module": "test_tailnet_join_responder",
+      "tests": 32,
+      "passed": 32
+    },
+    {
+      "artifact_id": 10294874493,
+      "module": "test_backup_recovery",
+      "tests": 17,
+      "passed": 17
+    },
+    {
+      "artifact_id": 10294874493,
+      "tests": 6,
+      "passed": 5
+    }
+  ],
+  "d08_regression_artifacts": [
+    {
+      "artifact_id": 10295446422,
+      "artifact_name": "full-suite-order-fixed",
+      "tests": 17,
+      "passed": 9,
+      "skipped": {
+        "test_resolution_preserves_real_junction_containment[False-True]": "Windows junction containment",
+        "test_resolution_preserves_real_junction_containment[False-False]": "Windows junction containment",
+        "test_resolution_preserves_real_junction_containment[True-False]": "Windows junction containment",
+        "test_resolution_preserves_real_junction_containment[True-True]": "Windows junction containment",
+        "test_resolution_survives_native_leaf_replacement[analysis/session/work/plan.json-False]": "Windows deleted-file final name",
+        "test_resolution_survives_native_leaf_replacement[x-True]": "Windows deleted-file final name",
+        "test_resolution_survives_native_leaf_replacement[analysis/session/work/plan.json-True]": "Windows deleted-file final name",
+        "test_resolution_survives_native_leaf_replacement[x-False]": "Windows deleted-file final name"
+      },
+      "original_failing_scheduler_test": "PASS",
+      "cases": [
+        {
+          "name": "test_resolution_preserves_real_junction_containment[False-True]",
+          "result": "SKIP"
+        },
+        {
+          "name": "test_resolution_retains_missing_paths_and_root_identity[missing/parent/new]",
+          "result": "PASS"
+        },
+        {
+          "name": "test_concurrent_publication_keeps_logical_resolution_inside_root",
+          "result": "PASS"
+        },
+        {
+          "name": "test_resolution_preserves_real_link_containment[True-False]",
+          "result": "PASS"
+        },
+        {
+          "name": "test_resolution_preserves_real_junction_containment[False-False]",
+          "result": "SKIP"
+        },
+        {
+          "name": "test_resolution_retains_missing_paths_and_root_identity[new]",
+          "result": "PASS"
+        },
+        {
+          "name": "test_resolution_preserves_real_junction_containment[True-False]",
+          "result": "SKIP"
+        },
+        {
+          "name": "test_resolution_preserves_real_link_containment[False-True]",
+          "result": "PASS"
+        },
+        {
+          "name": "test_resolution_preserves_real_junction_containment[True-True]",
+          "result": "SKIP"
+        },
+        {
+          "name": "test_resolution_survives_native_leaf_replacement[analysis/session/work/plan.json-False]",
+          "result": "SKIP"
+        },
+        {
+          "name": "test_resolution_preserves_real_link_containment[True-True]",
+          "result": "PASS"
+        },
+        {
+          "name": "test_resolution_retains_missing_paths_and_root_identity[.]",
+          "result": "PASS"
+        },
+        {
+          "name": "test_resolution_preserves_real_link_containment[False-False]",
+          "result": "PASS"
+        },
+        {
+          "name": "test_resolution_survives_native_leaf_replacement[x-True]",
+          "result": "SKIP"
+        },
+        {
+          "name": "test_resolution_retains_missing_paths_and_root_identity[./new]",
+          "result": "PASS"
+        },
+        {
+          "name": "test_resolution_survives_native_leaf_replacement[analysis/session/work/plan.json-True]",
+          "result": "SKIP"
+        },
+        {
+          "name": "test_resolution_survives_native_leaf_replacement[x-False]",
+          "result": "SKIP"
+        }
+      ]
+    },
+    {
+      "artifact_id": 10295179179,
+      "artifact_name": "windows-regression-capability-product",
+      "tests": 17,
+      "passed": 13,
+      "skipped": {
+        "test_resolution_preserves_real_link_containment[False-False]": "Windows symlink privilege unavailable",
+        "test_resolution_preserves_real_link_containment[False-True]": "Windows symlink privilege unavailable",
+        "test_resolution_preserves_real_link_containment[True-False]": "Windows symlink privilege unavailable",
+        "test_resolution_preserves_real_link_containment[True-True]": "Windows symlink privilege unavailable"
+      },
+      "original_failing_scheduler_test": "PASS",
+      "cases": [
+        {
+          "name": "test_resolution_survives_native_leaf_replacement[x-False]",
+          "result": "PASS"
+        },
+        {
+          "name": "test_resolution_survives_native_leaf_replacement[x-True]",
+          "result": "PASS"
+        },
+        {
+          "name": "test_resolution_survives_native_leaf_replacement[analysis/session/work/plan.json-False]",
+          "result": "PASS"
+        },
+        {
+          "name": "test_resolution_survives_native_leaf_replacement[analysis/session/work/plan.json-True]",
+          "result": "PASS"
+        },
+        {
+          "name": "test_concurrent_publication_keeps_logical_resolution_inside_root",
+          "result": "PASS"
+        },
+        {
+          "name": "test_resolution_preserves_real_link_containment[False-False]",
+          "result": "SKIP"
+        },
+        {
+          "name": "test_resolution_preserves_real_link_containment[False-True]",
+          "result": "SKIP"
+        },
+        {
+          "name": "test_resolution_preserves_real_link_containment[True-False]",
+          "result": "SKIP"
+        },
+        {
+          "name": "test_resolution_preserves_real_link_containment[True-True]",
+          "result": "SKIP"
+        },
+        {
+          "name": "test_resolution_preserves_real_junction_containment[False-False]",
+          "result": "PASS"
+        },
+        {
+          "name": "test_resolution_preserves_real_junction_containment[False-True]",
+          "result": "PASS"
+        },
+        {
+          "name": "test_resolution_preserves_real_junction_containment[True-False]",
+          "result": "PASS"
+        },
+        {
+          "name": "test_resolution_preserves_real_junction_containment[True-True]",
+          "result": "PASS"
+        },
+        {
+          "name": "test_resolution_retains_missing_paths_and_root_identity[new]",
+          "result": "PASS"
+        },
+        {
+          "name": "test_resolution_retains_missing_paths_and_root_identity[missing/parent/new]",
+          "result": "PASS"
+        },
+        {
+          "name": "test_resolution_retains_missing_paths_and_root_identity[.]",
+          "result": "PASS"
+        },
+        {
+          "name": "test_resolution_retains_missing_paths_and_root_identity[./new]",
+          "result": "PASS"
+        }
+      ]
+    },
+    {
+      "artifact_id": 10294874493,
+      "artifact_name": "full-suite-order-rotating",
+      "tests": 17,
+      "passed": 9,
+      "skipped": {
+        "test_resolution_survives_native_leaf_replacement[x-False]": "Windows deleted-file final name",
+        "test_resolution_preserves_real_junction_containment[True-False]": "Windows junction containment",
+        "test_resolution_survives_native_leaf_replacement[analysis/session/work/plan.json-True]": "Windows deleted-file final name",
+        "test_resolution_preserves_real_junction_containment[False-True]": "Windows junction containment",
+        "test_resolution_survives_native_leaf_replacement[x-True]": "Windows deleted-file final name",
+        "test_resolution_preserves_real_junction_containment[False-False]": "Windows junction containment",
+        "test_resolution_preserves_real_junction_containment[True-True]": "Windows junction containment",
+        "test_resolution_survives_native_leaf_replacement[analysis/session/work/plan.json-False]": "Windows deleted-file final name"
+      },
+      "original_failing_scheduler_test": "PASS",
+      "cases": [
+        {
+          "name": "test_resolution_survives_native_leaf_replacement[x-False]",
+          "result": "SKIP"
+        },
+        {
+          "name": "test_resolution_preserves_real_junction_containment[True-False]",
+          "result": "SKIP"
+        },
+        {
+          "name": "test_concurrent_publication_keeps_logical_resolution_inside_root",
+          "result": "PASS"
+        },
+        {
+          "name": "test_resolution_preserves_real_link_containment[False-False]",
+          "result": "PASS"
+        },
+        {
+          "name": "test_resolution_preserves_real_link_containment[True-True]",
+          "result": "PASS"
+        },
+        {
+          "name": "test_resolution_survives_native_leaf_replacement[analysis/session/work/plan.json-True]",
+          "result": "SKIP"
+        },
+        {
+          "name": "test_resolution_preserves_real_junction_containment[False-True]",
+          "result": "SKIP"
+        },
+        {
+          "name": "test_resolution_survives_native_leaf_replacement[x-True]",
+          "result": "SKIP"
+        },
+        {
+          "name": "test_resolution_preserves_real_junction_containment[False-False]",
+          "result": "SKIP"
+        },
+        {
+          "name": "test_resolution_preserves_real_junction_containment[True-True]",
+          "result": "SKIP"
+        },
+        {
+          "name": "test_resolution_retains_missing_paths_and_root_identity[missing/parent/new]",
+          "result": "PASS"
+        },
+        {
+          "name": "test_resolution_preserves_real_link_containment[False-True]",
+          "result": "PASS"
+        },
+        {
+          "name": "test_resolution_retains_missing_paths_and_root_identity[.]",
+          "result": "PASS"
+        },
+        {
+          "name": "test_resolution_survives_native_leaf_replacement[analysis/session/work/plan.json-False]",
+          "result": "SKIP"
+        },
+        {
+          "name": "test_resolution_retains_missing_paths_and_root_identity[./new]",
+          "result": "PASS"
+        },
+        {
+          "name": "test_resolution_preserves_real_link_containment[True-False]",
+          "result": "PASS"
+        },
+        {
+          "name": "test_resolution_retains_missing_paths_and_root_identity[new]",
+          "result": "PASS"
+        }
+      ]
+    }
+  ],
+  "d08_all_17_cases_have_native_pass": true,
+  "f85_windows_repaired_path": {
+    "job_id": 103528236162,
+    "sha256": "3828b65e874a558109de06e5fb5f0c065b677718208024ba15dbd52575ac1d53",
+    "summary": "742 passed, 5 skipped"
+  },
+  "status": "QUALIFIED_ACTUAL_MERGED_MAIN",
+  "next_gate": "Persist migration plan and equivalence matrix before CI source changes; no physical restart while candidate content is undecided.",
   "physical_acceptance": false,
   "candidate_frozen": false
 }
