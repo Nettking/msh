@@ -1,6 +1,6 @@
 {
   "finding": "D13",
-  "status": "CONFIRMED",
+  "status": "RESOLVED-IN-BRANCH; focused Windows proof, Linux/required CI/review pending",
   "recorded_at": "2026-09-12T16:41:38.856769+00:00",
   "candidate_sha": "440123f6bc6dc358eef3d233236bc14f91af60e0",
   "actual_checkout": "0355023f27c4c6886ab6beb48bb9a998b3ab2904",
@@ -20,12 +20,12 @@
   "state_changed": "Only CI checkout, installed temporary dependencies and ephemeral test fixture resources; no new host repair during this retry.",
   "protected_recorder_data": "UNTOUCHED",
   "physical_runtime": "UNCHANGED;9b286f931497bf6291e215f6340443c5162826b0",
-  "repair": "NONE; separate product repair required, outside PR473",
+  "repair": "https://github.com/Nettking/msh/pull/475 head5e6f184311019b9982e8544a18f3dc02c1b16e98",
   "github_artifact": "https://github.com/Nettking/msh/issues/474",
   "hypotheses": [
     "Unread data arriving during close is the likely OS-level reset mechanism; packet-level close/reset sequence has not been captured. This remaining low-level detail does not invalidate the controlled product behavior defect."
   ],
-  "next_diagnostic_action": "Prepare an isolated D13 repair branch from the intended base after reviewing bounded rejection-response teardown. Preserve immediate refusal, request-size bounds, deadlines and no-authority behavior. Add regression with deterministic segmented POST plus incomplete/oversized-body safety coverage; do not alter PR473 head, deploy repair or launch full candidate qualification.",
+  "next_diagnostic_action": "Run only responder module on native WSL Python3.12.13 against clean exact repair SHA; persist native XML. Inspect automatic PR475 workflow startup once, do not dispatch full qualification.",
   "evidence": [
     "pr473-corrected-host-retry-failed-native-retention.json",
     "pr473-corrected-host-retry-failed-logs.zip",
@@ -33,7 +33,8 @@
     "pr473-D12-retry-20260912T163928.json",
     "D13-unchanged-local-reproduction.json",
     "D13-request-framing-contrast.json",
-    "D13-controlled-split-request.json"
+    "D13-controlled-split-request.json",
+    "D13-draft-repair.json"
   ],
   "D12_note": "Beast trust repair remains verified on Beast. Three prior launcher failures did not recur in this Nettking execution; different-host pass does not establish their original-host CI resolution.",
   "reproduction": "Same WinError10053 on iteration2 of unchanged test in clean440123f6 source under NETTKING/Martin; stopped immediately. Separate Python3.12.10 installation from Actions; no production access.",

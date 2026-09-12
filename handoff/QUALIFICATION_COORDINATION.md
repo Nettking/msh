@@ -18,11 +18,7 @@ fail-closed. Packet-level reset details are not captured, but client-visible
 segmentation failure is demonstrated on unchanged440 native Windows.
 Original test also failed on iteration2 outside Actions. Full receipts:
 diagnostics/D13.md and D13-controlled-split-request.json; issue474 linked.
-NEXT: isolated separate D13 product repair branch, reviewing bounded rejection
-teardown before edits. Preserve immediate refusal, size/deadline bounds and
-authority guards; regress segmented, incomplete and oversized requests. No PR473
-head/product changes, deployment or full candidate qualification merely because
-runners are idle. PR473 merge remains paused; all prior valid proof retained.
+D13 isolated repair is PUSHED as draft PR475, exact5e6f184311019b9982e8544a18f3dc02c1b16e98, based on actual main b719. Only responder/test changed.46Windows responder tests and lint/syntax pass. New synchronized regression proves baseline premature close. Broader Windows discovery has163PASS/7skips; one local PATH-precondition failure passes alone with child-only CI-equivalent venv PATH; original evidence preserved. Linux disposable Python3.12.13 dependencies ready. NEXT: native Linux responder module on clean repair head; retain evidence and inspect automatic PR475 CI startup once. No full candidate qualification or PR473 change. Receipt diagnostics/D13-draft-repair.json. Required CI/correctness review pending.
 
 D12 Beast scoped Git trust repair remains verified on original runner. Its former
 launcher failures did not recur on Nettking; this is not original-host CI proof.

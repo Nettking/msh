@@ -1,0 +1,25 @@
+{
+  "recorded_at": "2026-09-12T17:09:03.328322+00:00",
+  "repair_sha": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "base_sha": "b7194820d8f1940ae60b8c9639e09b7f61e65c55",
+  "branch": "codex/fix-d13-windows-refusal-response",
+  "pr": "https://github.com/Nettking/msh/pull/475",
+  "status": "DRAFT; Windows development proof PASS, native Linux proof next; required CI/correctness review unresolved",
+  "changed_paths": [
+    "catalog/federation/tailnet_join_responder.py",
+    "catalog/federation/tests/test_tailnet_join_responder.py"
+  ],
+  "clean_pushed": true,
+  "no_workflow_dependency_runner_or_other_product_change": true,
+  "source_blobs": {
+    "catalog/federation/tailnet_join_responder.py": "3154531b2193cd1f2e09522fa13f385377c64589",
+    "catalog/federation/tests/test_tailnet_join_responder.py": "e250c8b058de39c3f218d8f1fbd832fe06da815b"
+  },
+  "windows_responder": "46PASS before commit on byte-identical changed source",
+  "windows_discovery": "163PASS/7skips plus one local PATH-precondition failure; failed test alone1PASS with CI-equivalent child PATH; original result preserved",
+  "linux_precondition": "Initial minimal disposable venv lacked psycopg at collection; installed checked-in full requirements under constraints. No test result claimed for collection failure. Dedicated Python3.12.13 /tmp/fcp-d13-development-20260912.",
+  "next": "Run only responder module on native WSL Python3.12.13 against clean exact repair SHA; persist native XML. Inspect automatic PR475 workflow startup once, do not dispatch full qualification.",
+  "protected_recorder_data": "UNTOUCHED",
+  "physical_runtime": "UNCHANGED",
+  "pr473_head": "440123f6bc6dc358eef3d233236bc14f91af60e0"
+}
