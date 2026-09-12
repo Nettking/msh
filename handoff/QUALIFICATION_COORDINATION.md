@@ -2893,3 +2893,7 @@ then retain outcome near completion. Original D11/D12 evidence remains intact.
 ## 2026-09-12T16:44:11.140654+00:00 — D13 reproduced outside Actions
 
 Same WinError10053 on iteration2 of unchanged test in clean440123f6 source under NETTKING/Martin; stopped immediately. Separate Python3.12.10 installation from Actions; no production access. [Exact receipt](diagnostics/D13-unchanged-local-reproduction.json). Root-cause classification remains unresolved; preserve failure, do not retry CI. Next: Compare bounded empty-body, ordinary two-byte POST, and single-send two-byte POST against unchanged handler on ephemeral loopback sockets, keeping5s deadline.
+
+## 2026-09-12T17:00:08.874701+00:00 — D13 isolated regression proves baseline failure
+
+Repair worktree is C:/wsl/fcp-fix-d13-windows-refusal-response-20260912 on codex/fix-d13-windows-refusal-response, based on unchanged actual main b7194820. New development test receives404 before sending body and observes the premature server close:1expectedFAIL on unchanged product. Receipt diagnostics/D13-baseline-regression.json and XML/patch retained. Next implement the persisted bounded refusal-body cleanup plan, with no PR473 or physical changes.

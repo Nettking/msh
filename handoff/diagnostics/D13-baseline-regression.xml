@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="1" time="0.782" timestamp="2026-09-12T18:59:31.258348+02:00" hostname="Nettking"><testcase classname="catalog.federation.tests.test_tailnet_join_responder" name="test_unknown_path_response_precedes_segmented_body_and_graceful_close" time="0.531"><failure message="AssertionError: closed before the declared body arrived&#10;assert not True&#10; +  where True = wait(0.1)&#10; +    where wait = &lt;threading.Event at 0x1c9e3d735f0: set&gt;.wait">def test_unknown_path_response_precedes_segmented_body_and_graceful_close() -&gt; None:
+        def forbidden(**_kwargs):
+            raise AssertionError("refusal must not access identity or pairing authority")
+    
+        server, port = _serve(forbidden, forbidden)
+        closed = threading.Event()
+        original_shutdown = server.shutdown_request
+    
+        def observe_shutdown(request):
+            try:
+                original_shutdown(request)
+            finally:
+                closed.set()
+    
+        server.shutdown_request = observe_shutdown
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=5) as connection:
+                connection.sendall(
+                    b"POST /anything-else HTTP/1.1\r\nHost: localhost\r\n"
+                    b"Content-Length: 2\r\nConnection: close\r\n\r\n"
+                )
+                response = http.client.HTTPResponse(connection)
+                response.begin()
+                assert response.status == 404  # Refusal must not wait for the body.
+&gt;               assert not closed.wait(0.1), "closed before the declared body arrived"
+E               AssertionError: closed before the declared body arrived
+E               assert not True
+E                +  where True = wait(0.1)
+E                +    where wait = &lt;threading.Event at 0x1c9e3d735f0: set&gt;.wait
+
+catalog\federation\tests\test_tailnet_join_responder.py:166: AssertionError</failure></testcase></testsuite></testsuites>

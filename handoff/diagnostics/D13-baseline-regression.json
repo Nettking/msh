@@ -1,0 +1,14 @@
+{
+  "recorded_at": "2026-09-12T17:00:08.874701+00:00",
+  "base_sha": "b7194820d8f1940ae60b8c9639e09b7f61e65c55",
+  "product_blob": "f3476eb4c40b30251206102893aa7aa326d6211b",
+  "product_source_unchanged": true,
+  "development_test_only_delta": "D13-baseline-regression.patch",
+  "host": "NETTKING/Martin native Windows Python3.12.10",
+  "command": "python -B -m pytest -o addopts= -p no:cacheprovider -q catalog/federation/tests/test_tailnet_join_responder.py::test_unknown_path_response_precedes_segmented_body_and_graceful_close --junitxml=<private>/D13-baseline-regression.xml",
+  "observed": "1failed: closed before the declared body arrived; HTTP404 already received. Deterministic server-close event, no timing-only error assertion.",
+  "expected": "Write404 immediately, retain connection until bounded valid body consumed or deadline/EOF.",
+  "qualification": false,
+  "protected_recorder_data": "UNTOUCHED",
+  "state_changed": "Isolated development test file only, ephemeral loopback sockets and evidence outputs."
+}

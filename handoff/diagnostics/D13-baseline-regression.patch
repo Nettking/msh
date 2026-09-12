@@ -1,0 +1,54 @@
+diff --git a/catalog/federation/tests/test_tailnet_join_responder.py b/catalog/federation/tests/test_tailnet_join_responder.py
+index 6cb0e1ce..80287fa0 100644
+--- a/catalog/federation/tests/test_tailnet_join_responder.py
++++ b/catalog/federation/tests/test_tailnet_join_responder.py
+@@ -7,6 +7,8 @@ same-tailnet, same-owner peer must end without a grant.
+ from __future__ import annotations
+ 
+ import json
++import http.client
++import socket
+ import subprocess
+ import sys
+ import threading
+@@ -137,6 +139,41 @@ def test_unknown_paths_are_refused() -> None:
+     assert status == 404
+ 
+ 
++def test_unknown_path_response_precedes_segmented_body_and_graceful_close() -> None:
++    def forbidden(**_kwargs):
++        raise AssertionError("refusal must not access identity or pairing authority")
++
++    server, port = _serve(forbidden, forbidden)
++    closed = threading.Event()
++    original_shutdown = server.shutdown_request
++
++    def observe_shutdown(request):
++        try:
++            original_shutdown(request)
++        finally:
++            closed.set()
++
++    server.shutdown_request = observe_shutdown
++    try:
++        with socket.create_connection(("127.0.0.1", port), timeout=5) as connection:
++            connection.sendall(
++                b"POST /anything-else HTTP/1.1\r\nHost: localhost\r\n"
++                b"Content-Length: 2\r\nConnection: close\r\n\r\n"
++            )
++            response = http.client.HTTPResponse(connection)
++            response.begin()
++            assert response.status == 404  # Refusal must not wait for the body.
++            assert not closed.wait(0.1), "closed before the declared body arrived"
++            connection.sendall(b"{}")
++            assert json.loads(response.read()) == {
++                "accepted": False, "error": "unknown-path",
++            }
++            assert closed.wait(5), "completed request did not close"
++    finally:
++        server.shutdown()
++        server.server_close()
++
++
+ def test_health_endpoint_reports_readiness_without_granting(monkeypatch) -> None:
+     monkeypatch.setattr(responder, "local_tailnet_identity", lambda: PEER)
