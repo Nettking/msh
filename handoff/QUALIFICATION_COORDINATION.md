@@ -2062,3 +2062,8 @@ change; required2/37 plus companion1/3 native PASS preserved.
 01:56UTC: PR463 head2c1a8d93 unchanged, no reported failure. Automatic phase2
 and release each gained one successful job; parent runs remain active. Next:
 retain only these newly terminal native logs; no new dispatch justified.
+
+01:57UTC: both new logs prove synthetic2cc004b3 (journal-artifacts and phase2
+Linux); no exact-head count change. Preserve required2/37 plus companion1/3.
+Next: poll_pr463_state.py at next state change check, retaining new terminal
+evidence only. Active workflows remain untouched; physical M unchanged.

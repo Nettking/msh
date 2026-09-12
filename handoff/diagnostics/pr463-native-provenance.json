@@ -104,7 +104,33 @@
         "2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee"
       ],
       "checkout_matches": true
+    },
+    {
+      "job_id": 103473479415,
+      "run_id": 34664467237,
+      "name": "Windows regressions (journal-artifacts)",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 51169,
+      "sha256": "ceeef8cef879c4fb4758df5a6d35d72298fa02103de578e64bed43b23785ec17",
+      "checkout_commits": [
+        "2cc004b3529ab3b0d99e10e1cdffbe1391f27231"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103473479476,
+      "run_id": 34664467273,
+      "name": "linux",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 195878,
+      "sha256": "812e99e3922651f753aa3c56cf2cbc82f7a862a2a0368f34092e3c453183db6a",
+      "checkout_commits": [
+        "2cc004b3529ab3b0d99e10e1cdffbe1391f27231"
+      ],
+      "checkout_matches": false
     }
   ],
-  "retained_at": "2026-09-12T01:45:18.909460+00:00"
+  "retained_at": "2026-09-12T01:56:49.237989+00:00"
 }
