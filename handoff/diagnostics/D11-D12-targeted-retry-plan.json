@@ -1,0 +1,28 @@
+{
+  "recorded_at": "2026-09-12T14:14:07.059472+00:00",
+  "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+  "attempt_limit": 1,
+  "status": "PLANNED_NOT_DISPATCHED",
+  "jobs": [
+    {
+      "finding": "D11",
+      "run_id": 34695331201,
+      "job_id": 103557723475,
+      "reason": "One contextual timeout; three same-source native passes, prior AQG admission verified; original failed ZIP retained. Retry only failed shard and required dependent aggregates.",
+      "verified_run_attempt": 1
+    },
+    {
+      "finding": "D12",
+      "run_id": 34695331247,
+      "job_id": 103557723740,
+      "reason": "VCS-status introspection failure after passing Go tests; same-source F6 Go build passed another native Windows host. Retry only failed Windows job, without altering stamping or source.",
+      "verified_run_attempt": 1
+    }
+  ],
+  "passing_jobs_to_rerun": [],
+  "complete_native_replacement_runs_to_rerun": [],
+  "source_or_workflow_changes": [],
+  "merge_or_retirement": false,
+  "physical_acceptance": false,
+  "protected_recorder_data": "UNTOUCHED"
+}

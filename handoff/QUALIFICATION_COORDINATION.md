@@ -2702,3 +2702,19 @@ failure so far. The original failed ZIP is pushed before any targeted retry.
 No complete native proof or passing job will be repeated. Next assess D12
 with unchanged-source Go build context and select at most one targeted retry
 per failed job. Keep PR468 source fixed and preserve each attempt separately.
+
+## 2026-09-12T14:14:07.059472+00:00 — one targeted retry per failed job planned
+
+Original D11/D12 failures, issues and source-specific logs are durable. D11 original
+ZIP is protected from rerun overwrite, and all successful shard/full-order evidence
+is retained. AQG admission is verified from already-valid evidence. D12 same-source
+F6 Go build passed AQG native Windows with VCS stamping unchanged. Host/timing/
+toolchain mechanisms remain unresolved; there is no basis for product modification.
+
+Plan: diagnostics/D11-D12-targeted-retry-plan.json. Both runs are completed attempt1
+and current PR head is unchanged ba44100e. Retry only D11 failed shard2 and D12
+failed Windows job once; GitHub may rerun required dependent aggregates. Do not
+repeat successful jobs or the two complete replacement executions. Persist new
+attempt/runner provenance; do not treat a retry pass as erasure of the failure.
+If either recurs, preserve it and obtain focused host/stage diagnostics instead
+of entering a blind retry loop. No deadline, authority or VCS checks are weakened.

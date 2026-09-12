@@ -1,0 +1,31 @@
+{
+  "recorded_at": "2026-09-12T14:14:07.058472+00:00",
+  "source_head": "ba44100ec1e4cde19daba0d3723b991c11742316",
+  "actual_checkout": "f18e91adae2cb198fb5cebad61ee202a38d2bd8e",
+  "existing_native_go_build_pass": {
+    "source_commit": "f18e91adae2cb198fb5cebad61ee202a38d2bd8e",
+    "retained_at": "2026-09-12T14:14:04.940651+00:00",
+    "records": [
+      {
+        "job_id": 103557723553,
+        "run_id": 34695331194,
+        "name": "transport-closeout (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executio...",
+        "runner_name": "AQG7NCC-Windows",
+        "conclusion": "success",
+        "bytes": 61184,
+        "sha256": "30161b1913e640a6e1398d91305bf518ffea824dd429bf45f6377e61b798bb76",
+        "checkout_commits": [
+          "f18e91adae2cb198fb5cebad61ee202a38d2bd8e"
+        ],
+        "checkout_matches": true
+      }
+    ]
+  },
+  "command_excerpts": [
+    "2026-09-12T13:04:06.5893799Z go version go1.25.7 windows/amd64",
+    "2026-09-12T13:09:00.5828364Z \u001b[36;1mgo test ./...\u001b[0m",
+    "2026-09-12T13:09:00.5829358Z \u001b[36;1mgo build -trimpath .\u001b[0m"
+  ],
+  "interpretation": "Same-source Go tests and default-VCS-stamping build passed F6 on AQG Windows; Phase2 Go tests passed Beast, then VCS introspection failed. Source inspection found no Git/env writes in sidecar Go tests. Host/toolchain context remains the leading unresolved mechanism; no product repair or provenance bypass is justified.",
+  "next": "One unchanged-source targeted Phase2 Windows retry for reproducibility; keep VCS stamping, source/workflow, accounts and deadlines unchanged."
+}
