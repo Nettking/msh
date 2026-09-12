@@ -1,8 +1,186 @@
 {
-  "recorded_at": "2026-09-12T08:50:30.372317+00:00",
+  "recorded_at": "2026-09-12T08:50:36.958746+00:00",
   "source_commit": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
-  "status": "PENDING",
-  "previous_main_receipts": "archive-main-2a9c9b8e",
-  "physical_acceptance": false,
-  "candidate_frozen": false
+  "changes": [
+    {
+      "workflow": "cf7b-product-physical-acceptance.yml",
+      "run_id": 34684218682,
+      "status": "queued",
+      "conclusion": null,
+      "jobs": [
+        {
+          "id": 103528235814,
+          "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
+          "status": "in_progress",
+          "conclusion": null
+        },
+        {
+          "id": 103528235952,
+          "name": "acceptance (Linux, fcp-linux-fast, bash)",
+          "status": "queued",
+          "conclusion": null
+        }
+      ]
+    },
+    {
+      "workflow": "product-branding.yml",
+      "run_id": 34684218723,
+      "status": "queued",
+      "conclusion": null,
+      "jobs": [
+        {
+          "id": 103528235886,
+          "name": "product-branding",
+          "status": "queued",
+          "conclusion": null
+        }
+      ]
+    },
+    {
+      "workflow": "phase-f85-operator-federation-surface.yml",
+      "run_id": 34684218733,
+      "status": "queued",
+      "conclusion": null,
+      "jobs": [
+        {
+          "id": 103528236162,
+          "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+          "status": "queued",
+          "conclusion": null
+        },
+        {
+          "id": 103528236224,
+          "name": "operator-surface (Linux, fcp-linux-fast, bash)",
+          "status": "queued",
+          "conclusion": null
+        }
+      ]
+    },
+    {
+      "workflow": "federation-v1-release.yml",
+      "run_id": 34684218734,
+      "status": "queued",
+      "conclusion": null,
+      "jobs": [
+        {
+          "id": 103528236062,
+          "name": "PostgreSQL storage release check",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 103528236126,
+          "name": "Linux regression shard (0)",
+          "status": "in_progress",
+          "conclusion": null
+        },
+        {
+          "id": 103528236139,
+          "name": "Windows regressions (transport-storage)",
+          "status": "queued",
+          "conclusion": null
+        },
+        {
+          "id": 103528236144,
+          "name": "Linux regression shard (1)",
+          "status": "in_progress",
+          "conclusion": null
+        },
+        {
+          "id": 103528236152,
+          "name": "Full-suite order (rotating)",
+          "status": "queued",
+          "conclusion": null
+        },
+        {
+          "id": 103528236168,
+          "name": "Windows regressions (journal-artifacts)",
+          "status": "queued",
+          "conclusion": null
+        },
+        {
+          "id": 103528236170,
+          "name": "Release checks (Windows)",
+          "status": "queued",
+          "conclusion": null
+        },
+        {
+          "id": 103528236193,
+          "name": "Windows regressions (capability-product)",
+          "status": "queued",
+          "conclusion": null
+        },
+        {
+          "id": 103528236209,
+          "name": "Full-suite order (fixed)",
+          "status": "queued",
+          "conclusion": null
+        },
+        {
+          "id": 103528236219,
+          "name": "Linux regression shard (2)",
+          "status": "queued",
+          "conclusion": null
+        },
+        {
+          "id": 103528236229,
+          "name": "Linux regression shard (3)",
+          "status": "queued",
+          "conclusion": null
+        },
+        {
+          "id": 103528236243,
+          "name": "Release checks (Linux)",
+          "status": "queued",
+          "conclusion": null
+        }
+      ]
+    },
+    {
+      "workflow": "federation-software-update.yml",
+      "run_id": 34684218744,
+      "status": "queued",
+      "conclusion": null,
+      "jobs": [
+        {
+          "id": 103528235880,
+          "name": "update-contracts (Linux, fcp-linux-fast, bash)",
+          "status": "queued",
+          "conclusion": null
+        },
+        {
+          "id": 103528236082,
+          "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+          "status": "queued",
+          "conclusion": null
+        }
+      ]
+    },
+    {
+      "workflow": "icse-tool-demo.yml",
+      "run_id": 34684218746,
+      "status": "queued",
+      "conclusion": null,
+      "jobs": [
+        {
+          "id": 103528235851,
+          "name": "reviewer-compose",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 103528235985,
+          "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
+          "status": "queued",
+          "conclusion": null
+        },
+        {
+          "id": 103528236017,
+          "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
+          "status": "queued",
+          "conclusion": null
+        }
+      ]
+    }
+  ]
 }
