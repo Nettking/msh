@@ -7,7 +7,8 @@ PR465/D07 previously qualified and merged asb6a96b21. All required fixes are mer
 Clean detached qualification checkout is verified. All13 workflows are running or
 completed (six existing push runs plus seven single guarded dispatches). Next:
 poll_merged_main_state.py, retain only new native logs, then final artifact review.
-Current verified proof:28/37 required plus3/3 companions (05:00UTC).
+Current result:36/37 required successful, F85-Windows FAILED;3/3 companions successful.
+D08 immediate error: concurrent analysis artifact-object-key-escape; classification unresolved.
 Main2a9c9b8e is not yet qualified or frozen as a physical candidate.
 Do not requalify PR heads or intermediate main. Physical runtime remains
 M`9b286f931497bf6291e215f6340443c5162826b0`; admission stopped, no physical PASS
@@ -2237,3 +2238,5 @@ Only required absent gates may be dispatched; no physical deployment or candidat
 05:15:11UTC: exact-main artifact review verifies9/9 release artifacts,4440 test identities, both full-order sets and zero failures/errors. ICSE current native bundle equals1413 exported source files,19 checksums;4/4 components on three runtimes and10/10 network checks with teardown on both platforms. Skip map35 unique/14 pass elsewhere; final review script includes explicit7 Linux-only skips in Windows focused group, previous11 intentional exclusions and D06/D07 regressions. Current-main helpers created; no test rerun. Next: check last F85-Windows transition, retain its native log if terminal, then run finalize_current_main_qualification.py only after all37+3 complete.
 
 05:15:33UTC: required F85-Windows job103496400575 in run34672498480 failed on actual main2a9c9b8eb53edff74c2de23570ec56e054d29b22; all other selected required/companion jobs completed successfully. Final-main qualification cannot pass; source/cause not yet classified. Next exact action: retain_merged_main_jobs.py for the failed native log, inspect its failing stage/traceback, classify before any retry or edit. Current artifact reviews remain valid on this SHA. No candidate freeze, product edit or physical action.
+
+2026-09-12T05:17:05.862654+00:00: D08 confirmed required qualification failure persisted with exact command, native checkout/hash and traceback. F85-Windows actual2a9 main reports artifact-object-key-escape from concurrent analysis;1 failed,728 passed,1 skipped. Independent product root cause not established; no blind rerun. Next: publish GitHub issue referencing diagnostics/D08.md and D08-evidence.json, then inspect exact-source mechanism. Protected Recorder data and all physical runtimes untouched.

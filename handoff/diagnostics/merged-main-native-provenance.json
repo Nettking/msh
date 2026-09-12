@@ -503,7 +503,20 @@
         "2a9c9b8eb53edff74c2de23570ec56e054d29b22"
       ],
       "checkout_matches": true
+    },
+    {
+      "job_id": 103496400575,
+      "run_id": 34672498480,
+      "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+      "runner_name": "Nettking",
+      "conclusion": "failure",
+      "bytes": 104878,
+      "sha256": "a8b0f204aefb67e0513a5973d7454d48f314b219a49ebf41e207ac6139d5dc17",
+      "checkout_commits": [
+        "2a9c9b8eb53edff74c2de23570ec56e054d29b22"
+      ],
+      "checkout_matches": true
     }
   ],
-  "retained_at": "2026-09-12T05:13:06.452386+00:00"
+  "retained_at": "2026-09-12T05:15:38.385959+00:00"
 }
