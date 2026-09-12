@@ -2781,3 +2781,13 @@ Initial b719/PR473 snapshot found F6 Windows job103572678982 failed on Beast at1
 D12 actual Git stderr remains unavailable. SSH to confirmed Tailscale Beast stopped before authentication because no trusted host key is configured. A concise user question for verified fingerprint/account is pending; scanned public key and exact command are in diagnostics/D12-read-only-access-and-hypotheses.json. No host-key policy/configuration was bypassed. Original-host diagnosis can resume on trusted access; PR473 validation continues independently. Git no-index-like diff/PATH/HOME/ownership explanations are hypotheses, not new confirmed product defects.
 
 PR473 docs-portal34701429475 is the known spending-limit admission failure: both jobs have zero steps/no runner, verified annotations. Native branding green. Current-source snapshots were last read15:12Z; review scoped F7 near15:55Z. Do not repoll long release jobs before15:58Z (45minutes after first snapshot); if an hourly heartbeat fires earlier, leave them until a later due check unless an actionable completion/failure is independently delivered. All source branches/checkpoints are pushed. PR473 remains draft at440123f6.
+
+## 2026-09-12 — continuation monitor updated
+
+Heartbeat fortsett-federation-v1-p-nettking now follows PR473 exact440123f6 and
+post-merge b719 automatic CI, retaining the45-minute minimum for long-run checks.
+It preserves D12 recurrence, pending trusted SSH identity/account, and independent
+native validation. Initial progress is in pr473-initial-native-progress.json;
+future snapshots must use new timestamped filenames instead of overwriting it.
+No duplicate dispatch or additional blind retry is planned. All source and
+coordination branches are pushed; current worktree is clean after this checkpoint.
