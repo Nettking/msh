@@ -2767,3 +2767,7 @@ Branch codex/ci-phase-workflow-retirement-20260912 at 440123f6bc6dc358eef3d23323
 ## 2026-09-12T15:12:09.354326+00:00 — PR473 opened; single native validation planned
 
 Draft PR473 has exact head440123f6. Existing automatic runs are listed in diagnostics/pr473-native-validation-plan.json; no F7 run exists yet. One checked-in F7 workflow dispatch is planned solely for required exact deletion-source validation. No full campaign or original two-proof repetitions.
+
+## 2026-09-12T15:12:13.418525+00:00 — PR473 native F7 dispatch accepted
+
+One exact-head checked-in F7 dispatch returned204; receipt diagnostics/pr473-native-validation-dispatch.json. No duplicate dispatch, source change or full37 campaign. Confirm startup once, then defer progress review until15:55Z.

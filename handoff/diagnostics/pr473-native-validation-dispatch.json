@@ -1,0 +1,10 @@
+{
+  "recorded_at": "2026-09-12T15:12:13.418525+00:00",
+  "head_sha": "440123f6bc6dc358eef3d233236bc14f91af60e0",
+  "workflow": "phase-f7-closeout.yml",
+  "ref": "codex/ci-phase-workflow-retirement-20260912",
+  "status": "DISPATCH_ACCEPTED",
+  "response": {
+    "http_status": 204
+  }
+}
