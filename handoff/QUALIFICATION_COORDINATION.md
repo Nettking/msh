@@ -1997,3 +1997,10 @@ b6a96b218a513fe241ef4d6f051cf166444643ac. No bypass or repository-policy change.
 Next: verify463 live head/clean worktree, integrate this merged main so463 also
 contains D07, then qualify the resulting new PR head. Preserve historical proofs;
 no deliberate intermediate-main qualification and no physical deployment.
+
+01:19:47UTC: PR463 clean83955f65 integrated actual mainb6a96b21 without conflicts
+and pushed new head2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee. The merge added only
+the three qualified D07 files; PR diff against current main remains the five D06
+files. No repair deployed. Next: archive83955f65 proof, verify unchanged D06/D07
+source blobs, initialize new-head qualification state and dispatch only absent
+required gates. New head evidence starts empty; no cross-SHA qualification carry.
