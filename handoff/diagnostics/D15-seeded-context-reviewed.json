@@ -1,0 +1,102 @@
+{
+  "recorded_at": "2026-09-12T19:19:56.606629+00:00",
+  "finding": "D15",
+  "receipt": {
+    "recorded_at": "2026-09-12T19:17:59.830190+00:00",
+    "group": "D15",
+    "candidate_sha": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+    "host": "Nettking",
+    "python": "3.12.13 (main, Sep  9 2026, 20:28:49) [GCC 11.4.0]",
+    "executable": "/tmp/fcp-d13-development-20260912/bin/python",
+    "command": [
+      "/tmp/fcp-d13-development-20260912/bin/python",
+      "-B",
+      "-m",
+      "pytest",
+      "-o",
+      "addopts=",
+      "-p",
+      "no:cacheprovider",
+      "-p",
+      "pr475_context_observer",
+      "-p",
+      "randomly",
+      "--randomly-seed=1702",
+      "--randomly-dont-reorganize",
+      "-q",
+      "-x",
+      "--durations=10",
+      "--basetemp=/tmp/fcp-d15-seeded-kt76ac74/pytest",
+      "--junitxml=/mnt/c/wsl/fcp-v1-fba508-nettking-20260910/.acceptance/D15-seeded-context/result.xml",
+      "catalog/federation/tests/cf7_acceptance/test_product_acceptance.py::test_fresh_product_flow_finishes_restarts_and_reruns_expired_evidence",
+      "catalog/federation/tests/cf7_acceptance/test_product_acceptance.py::test_three_device_federation_keeps_ai_compute_and_storage_authority_separate"
+    ],
+    "cwd": "/mnt/c/wsl/fcp-fix-d13-windows-refusal-response-20260912",
+    "qualification": false,
+    "context_limitation": "NETTKING WSL development; different from original AQG runner; bounded predecessor selection only",
+    "protected_recorder_data": "UNTOUCHED",
+    "timeout_seconds": 180,
+    "exit_code": 0,
+    "elapsed_seconds": 33.68256935302634,
+    "final_sha": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+    "final_tracked_status": ""
+  },
+  "junit": [
+    {
+      "test": "test_fresh_product_flow_finishes_restarts_and_reruns_expired_evidence",
+      "seconds": "21.883"
+    },
+    {
+      "test": "test_three_device_federation_keeps_ai_compute_and_storage_authority_separate",
+      "seconds": "1.588"
+    }
+  ],
+  "result": "2PASS in original predecessor order with pytest-randomly4.1.0 seed1702 per-test reseeding. Fresh/restart/expiry then three-device test. D15 not reproduced on NETTKING WSL; different host/subset, original AQG failure remains unresolved.",
+  "validation_events": [
+    {
+      "stage": "inspection_validation",
+      "monotonic": 455998.3906929,
+      "wall_time": 1789240712.8171463,
+      "supplied_present": true,
+      "expected_present": true,
+      "equal": true
+    },
+    {
+      "stage": "inspection_validation",
+      "monotonic": 455998.441820228,
+      "wall_time": 1789240712.8682735,
+      "supplied_present": true,
+      "expected_present": true,
+      "equal": true
+    },
+    {
+      "stage": "inspection_validation",
+      "monotonic": 455998.491245762,
+      "wall_time": 1789240712.917699,
+      "supplied_present": true,
+      "expected_present": true,
+      "equal": true
+    }
+  ],
+  "thread_snapshots": [
+    {
+      "test": "catalog/federation/tests/cf7_acceptance/test_product_acceptance.py::test_fresh_product_flow_finishes_restarts_and_reruns_expired_evidence",
+      "threads": [
+        {
+          "name": "MainThread",
+          "daemon": false
+        }
+      ]
+    },
+    {
+      "test": "catalog/federation/tests/cf7_acceptance/test_product_acceptance.py::test_three_device_federation_keeps_ai_compute_and_storage_authority_separate",
+      "threads": [
+        {
+          "name": "MainThread",
+          "daemon": false
+        }
+      ]
+    }
+  ],
+  "next": "No repeated short D14/D15/D16 contexts. Inspect original AQG job clock/timing and current original-host availability/qualified diagnostic access; preserve unknown403 reason rather than inventing CSRF root cause."
+}

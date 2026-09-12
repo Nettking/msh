@@ -31,7 +31,8 @@
   ],
   "github_artifact": "https://github.com/Nettking/msh/issues/477",
   "repair": "NONE",
-  "next_diagnostic_action": "Inspect exact /onboarding/inspect403 branches and owner client/session token lifecycle; retain same-source passing CF7-B artifact. If needed capture the actual forbidden response in a bounded isolated reproduction on unchanged source, preserving CSRF and authority guards.",
+  "next_diagnostic_action": "No repeated short D14/D15/D16 contexts. Inspect original AQG job clock/timing and current original-host availability/qualified diagnostic access; preserve unknown403 reason rather than inventing CSRF root cause.",
   "recorded_at": "2026-09-12T18:02:42.606962+00:00",
-  "focused_followup": "2PASS,1warning on NETTKING Ubuntu WSL; one D14 and one D15 test. Pytest deduplicated repeated node arguments; no claim of five D15 executions. Different host and isolated selection, without complete rotating-order predecessor history. Neither original failure reproduced or invalidated."
+  "focused_followup": "2PASS,1warning on NETTKING Ubuntu WSL; one D14 and one D15 test. Pytest deduplicated repeated node arguments; no claim of five D15 executions. Different host and isolated selection, without complete rotating-order predecessor history. Neither original failure reproduced or invalidated.",
+  "seeded_context": "D15-seeded-context-reviewed.json"
 }
