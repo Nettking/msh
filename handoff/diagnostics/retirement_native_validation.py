@@ -62,11 +62,18 @@ elif mode=='dispatch':
     p=root/'QUALIFICATION_COORDINATION.md';s=p.read_text(encoding='utf-8')+'\n## '+now+' — PR473 native F7 dispatch accepted\n\nOne exact-head checked-in F7 dispatch returned204; receipt diagnostics/pr473-native-validation-dispatch.json. No duplicate dispatch, source change or full37 campaign. Confirm startup once, then defer progress review until15:55Z.\n';p.write_text(s,encoding='utf-8');print(json.dumps(record))
 elif mode=='snapshot':
     rows=[]
-    for source in [head,base]:
-        for r in api('/actions/runs?head_sha='+source+'&per_page=100')['workflow_runs']:
+    scoped=len(sys.argv)>2 and sys.argv[2]=='scoped'
+    if scoped:
+        groups=[[api('/actions/runs/34701516368')]]
+    else:
+        assert now>='2026-09-12T15:58:00','Long-run polling boundary has not arrived'
+        groups=[api('/actions/runs?head_sha='+source+'&per_page=100')['workflow_runs'] for source in [head,base]]
+    for group in groups:
+        for r in group:
             row={k:r.get(k) for k in ['id','path','head_sha','status','conclusion','event','run_attempt','created_at','updated_at','html_url']}
             row['jobs']=api('/actions/runs/'+str(r['id'])+'/jobs?per_page=100')['jobs'];rows.append(row)
-    snap={'recorded_at':now,'pr':473,'head_sha':head,'merged_base':base,'pr_merge_checkout':pr['merge_commit_sha'],'purpose':'Initial current-source progress; preserve postmerge/PR automatic jobs, no repeats','runs':rows}
-    (dest/'pr473-initial-native-progress.json').write_text(json.dumps(snap,indent=2)+'\n',encoding='utf-8')
-    print(json.dumps({'snapshot':'pr473-initial-native-progress.json','runs':[{'id':r['id'],'source':r['head_sha'][:8],'path':r['path'],'status':r['status'],'conclusion':r['conclusion'],'jobs':[{'id':j['id'],'name':j['name'],'status':j['status'],'conclusion':j['conclusion'],'runner':j['runner_name']} for j in r['jobs']]} for r in rows]}))
+    snap={'recorded_at':now,'pr':473,'head_sha':head,'merged_base':base,'pr_merge_checkout':pr['merge_commit_sha'],'purpose':'Due scoped F7 check' if scoped else 'Due current-source check; preserve earlier immutable snapshots','runs':rows}
+    snapshot_name='pr473-'+('scoped-' if scoped else 'current-')+datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%S')+'.json'
+    (dest/snapshot_name).write_text(json.dumps(snap,indent=2)+'\n',encoding='utf-8')
+    print(json.dumps({'snapshot':snapshot_name,'runs':[{'id':r['id'],'source':r['head_sha'][:8],'path':r['path'],'status':r['status'],'conclusion':r['conclusion'],'jobs':[{'id':j['id'],'name':j['name'],'status':j['status'],'conclusion':j['conclusion'],'runner':j['runner_name']} for j in r['jobs']]} for r in rows]}))
 else:raise ValueError(mode)

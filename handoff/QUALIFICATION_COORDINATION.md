@@ -2791,3 +2791,12 @@ native validation. Initial progress is in pr473-initial-native-progress.json;
 future snapshots must use new timestamped filenames instead of overwriting it.
 No duplicate dispatch or additional blind retry is planned. All source and
 coordination branches are pushed; current worktree is clean after this checkpoint.
+
+## 2026-09-12T15:56Z — PR473 exact-head native F7 matrix green
+
+Scoped run34701516368 completed SUCCESS on unchanged retirement head440123f6.
+Windows job103574001903 ran AQG7NCC-Windows; Linux job103574001987 ran
+Beast-Linux-WSL. Snapshot: diagnostics/pr473-scoped-20260912T155616.json.
+Next retain/review native checkout, commands, prerequisites and JUnit identities.
+No long release jobs were polled before their15:58Z boundary. Existing two-green
+replacement proof remains preserved, no duplicate jobs or source changes.
