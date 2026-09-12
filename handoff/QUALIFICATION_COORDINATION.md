@@ -22,7 +22,7 @@ justified. Prior2a9 failed-main receipts archived in diagnostics/archive-main-2a
 After all37+3 complete, adapt PR467 artifact/finalization reviewers to actual main
 SHA/ref/events/run IDs and verify4457identities, full orders, ICSE exact export and
 D06-D08 native regressions/skips. Do not run older2a9-bound main review scripts blindly.
-Only fully qualified actual main may then be frozen/revalidated for fresh physical work.
+After this gate resolves, the next priority is the user-authorized coverage-preserving CI migration plan and equivalence matrix; prepare and persist that plan before workflow edits. Defer physical restart while this CI source decision is pending.
 Physical runtime remains9b286f931497bf6291e215f6340443c5162826b0. No candidate freeze,
 physical PASS, P07/P12 or protected Recorder-data changes. Do not repeat old PR CI.
 Current user direction, September 11 2026: execute on state changes, using this
@@ -2399,3 +2399,23 @@ no source/physical state changes, protected Recorder data untouched, no physical
 2026-09-12T08:57:44.7255194Z: subordinate read-only legacy-CI audit confirmed all8 user-named PR467 workflows failed23jobs before any step/runner assignment; each annotation reports payment/spending-limit admission denial. Classification: CI infrastructure, not product or invalidation of37+3 proof. Exact job IDs/annotations and branch-policy visibility recorded in phase-workflow-hosted-failures.json. Main reports protection off/empty required checks; protection/ruleset APIs403(plan limitation). No workflow edits/reruns/runner changes. Next cleanup action: exact command/OS/trigger/reference comparison; stop retirement if any coverage assumption fails. Main qualification remains primary, next routine check09:53UTC.
 
 2026-09-12T09:04:03.7017302Z: user-requested eight-workflow cleanup path STOPPED after independent non-equivalence proof: UP035 remains enforced by legacyF7.1-F7.6, and JS-only AI changes lose12Windows test modules ifF7.7 is removed. Static test/compile overlap is insufficient; no deletion/cleanup PR/runner migration or duplicate CI. Full audit: handoff/CI_WORKFLOW_RETIREMENT_REVIEW.md plus source/command/trigger and hosted-failure JSON receipts. This is a cleanup-precondition contradiction, not a new product/physical defect. Existing PR46737+3 evidence and main17ab running qualification preserved. Next highest-value action remains due main qualification check09:53UTC or actionable delivered event.
+
+2026-09-12T09:11:25.2007919Z: user accepted the retirement audit and authorized a coverage-preserving
+self-hosted consolidation AFTER the current17ab merged-main qualification gate
+resolves. Do not alter, cancel, duplicate or rerun current qualification to perform
+cleanup. No extra CI poll now (09:10UTC; last08:52:42,next eligible09:53UTC).
+User reports native Windows AQG7NCC now has fcp-windows and is available. Treat this
+as reported capacity pending independent label/runtime/scheduler verification;
+keep separate from its Linux/WSL runner and do not infer fcp-test release-pool admission.
+After completing/persisting the current gate, propose the smallest extension of
+retained self-hosted workflows using fcp-linux-fast and native fcp-windows. Persist
+old-to-new trigger/OS/lint/test/service mapping before source changes. PreserveUP035,
+F7.4/F7.5 relay lint, all12Windows modules on the F7.7 JS-only trigger, and relevant
+path semantics. Show representative trigger proof and the manifest's two green
+replacement runs before any retirement. Partial/coherent retirement is permitted
+only after independent equivalence and reference/status-contract checks. No eight
+replacement workflows or duplicate work by default. No product semantics, runner
+account/pool qualifications, Recorder data, physical evidence or P07/P12 changes.
+Next exact action remains due main snapshot/retention/final artifact review; migration
+design follows gate resolution. Accepted audit remains historical evidence, not a
+permanent cancellation of the newly authorized migration objective.
