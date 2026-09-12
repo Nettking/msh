@@ -1,0 +1,37 @@
+{
+  "recorded_at": "2026-09-12T16:43:28.439547+00:00",
+  "candidate_sha": "440123f6bc6dc358eef3d233236bc14f91af60e0",
+  "host": "Nettking",
+  "user_context": "nettking\\martin",
+  "python": "3.12.10",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "procedure": "Call the unchanged test_unknown_paths_are_refused up to30 times; stop on first failure; original5s client timeout and server lifecycle.",
+  "qualification": false,
+  "context_limitation": "Interactive Martin context, not the NETWORK SERVICE Actions context.",
+  "protected_recorder_data": "UNTOUCHED",
+  "physical_runtime": "UNCHANGED",
+  "state_changed": "Only ephemeral loopback test responders and diagnostic output; no production service or source changes.",
+  "source_blobs": {
+    "catalog/federation/tests/test_tailnet_join_responder.py": "6cb0e1ce6d3b4edd189be80fb8ee8e26f5c2d9d2",
+    "catalog/federation/tailnet_join_responder.py": "f3476eb4c40b30251206102893aa7aa326d6211b"
+  },
+  "attempts": [
+    {
+      "iteration": 1,
+      "outcome": "pass",
+      "seconds": 0.547,
+      "stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+    },
+    {
+      "iteration": 2,
+      "outcome": "failure",
+      "exception": "ConnectionAbortedError",
+      "message": "[WinError 10053] En etablert tilkobling ble avbrutt av programvaren p\u00e5 vertsmaskinen",
+      "traceback": "Traceback (most recent call last):\n  File \"C:\\wsl\\fcp-v1-diagnostic-sweep-20260911\\handoff\\diagnostics\\reproduce_D13_unchanged.py\", line 45, in <module>\n    module.test_unknown_paths_are_refused()\n  File \"C:\\wsl\\fcp-ci-phase-workflow-retirement-20260912\\catalog\\federation\\tests\\test_tailnet_join_responder.py\", line 133, in test_unknown_paths_are_refused\n    status, _payload = _post(port, \"/anything-else\")\n                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\wsl\\fcp-ci-phase-workflow-retirement-20260912\\catalog\\federation\\tests\\test_tailnet_join_responder.py\", line 58, in _post\n    with urllib.request.urlopen(request, timeout=5) as response:\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\Martin\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\urllib\\request.py\", line 215, in urlopen\n    return opener.open(url, data, timeout)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\Martin\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\urllib\\request.py\", line 515, in open\n    response = self._open(req, data)\n               ^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\Martin\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\urllib\\request.py\", line 532, in _open\n    result = self._call_chain(self.handle_open, protocol, protocol +\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\Martin\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\urllib\\request.py\", line 492, in _call_chain\n    result = func(*args)\n             ^^^^^^^^^^^\n  File \"C:\\Users\\Martin\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\urllib\\request.py\", line 1373, in http_open\n    return self.do_open(http.client.HTTPConnection, req)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\Martin\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\urllib\\request.py\", line 1348, in do_open\n    r = h.getresponse()\n        ^^^^^^^^^^^^^^^\n  File \"C:\\Users\\Martin\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\http\\client.py\", line 1430, in getresponse\n    response.begin()\n  File \"C:\\Users\\Martin\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\http\\client.py\", line 331, in begin\n    version, status, reason = self._read_status()\n                              ^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\Martin\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\http\\client.py\", line 292, in _read_status\n    line = str(self.fp.readline(_MAXLINE + 1), \"iso-8859-1\")\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\Martin\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\socket.py\", line 720, in readinto\n    return self._sock.recv_into(b)\n           ^^^^^^^^^^^^^^^^^^^^^^^\nConnectionAbortedError: [WinError 10053] En etablert tilkobling ble avbrutt av programvaren p\u00e5 vertsmaskinen\n",
+      "seconds": 0.531,
+      "stderr": "tailnet-join responder: \"POST /anything-else HTTP/1.1\" 404 -\n"
+    }
+  ],
+  "elapsed_seconds": 1.078,
+  "source_clean_after": true
+}

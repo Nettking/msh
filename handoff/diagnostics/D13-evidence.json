@@ -25,12 +25,14 @@
   "hypotheses": [
     "Unknown-path handler returns before reading POST body; unread bytes and close behavior may abort the Windows socket. Not yet established as root cause."
   ],
-  "next_diagnostic_action": "Inspect unchanged responder/test socket lifecycle, then run only the failing test in a bounded isolated NETTKING loopback reproduction with existing deadlines and no production services.",
+  "next_diagnostic_action": "Compare bounded empty-body, ordinary two-byte POST, and single-send two-byte POST against unchanged handler on ephemeral loopback sockets, keeping5s deadline.",
   "evidence": [
     "pr473-corrected-host-retry-failed-native-retention.json",
     "pr473-corrected-host-retry-failed-logs.zip",
     "D13-native-excerpt.log",
-    "pr473-D12-retry-20260912T163928.json"
+    "pr473-D12-retry-20260912T163928.json",
+    "D13-unchanged-local-reproduction.json"
   ],
-  "D12_note": "Beast trust repair remains verified on Beast. Three prior launcher failures did not recur in this Nettking execution; different-host pass does not establish their original-host CI resolution."
+  "D12_note": "Beast trust repair remains verified on Beast. Three prior launcher failures did not recur in this Nettking execution; different-host pass does not establish their original-host CI resolution.",
+  "reproduction": "Same WinError10053 on iteration2 of unchanged test in clean440123f6 source under NETTKING/Martin; stopped immediately. Separate Python3.12.10 installation from Actions; no production access."
 }

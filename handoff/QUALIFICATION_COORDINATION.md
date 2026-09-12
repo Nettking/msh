@@ -2878,3 +2878,7 @@ run34701429430 was accepted. Receipt: diagnostics/pr473-D12-corrected-host-retry
 dispatch.json. No successful suites or original native proofs were repeated.
 PR473 head440123f6 remains fixed. Next record new attempt/runner startup once,
 then retain outcome near completion. Original D11/D12 evidence remains intact.
+
+## 2026-09-12T16:44:11.140654+00:00 — D13 reproduced outside Actions
+
+Same WinError10053 on iteration2 of unchanged test in clean440123f6 source under NETTKING/Martin; stopped immediately. Separate Python3.12.10 installation from Actions; no production access. [Exact receipt](diagnostics/D13-unchanged-local-reproduction.json). Root-cause classification remains unresolved; preserve failure, do not retry CI. Next: Compare bounded empty-body, ordinary two-byte POST, and single-send two-byte POST against unchanged handler on ephemeral loopback sockets, keeping5s deadline.
