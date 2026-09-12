@@ -1,0 +1,190 @@
+{
+  "source_sha": "2a9c9b8eb53edff74c2de23570ec56e054d29b22",
+  "collected": 4440,
+  "unique_skips": 35,
+  "skips_with_pass_elsewhere": 14,
+  "uncovered": [
+    {
+      "test": "catalog.federation.tests.test_phase_d2_postgres.test_shared_provider_conformance[postgresql]",
+      "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
+    },
+    {
+      "test": "catalog.federation.tests.test_phase_d2_postgres.test_shared_provider_rejects_idempotency_conflict[postgresql]",
+      "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
+    },
+    {
+      "test": "catalog.federation.tests.test_phase_d2_postgres.test_shared_provider_rejects_dataset_identity_conflict[postgresql]",
+      "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
+    },
+    {
+      "test": "catalog.federation.tests.test_phase_d2_postgres.test_shared_provider_rejects_dataset_schema_conflict[postgresql]",
+      "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
+    },
+    {
+      "test": "catalog.federation.tests.test_phase_d2_postgres.test_postgresql_provider_survives_reconstruction",
+      "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
+    },
+    {
+      "test": "catalog.federation.tests.test_phase_d2_postgres.test_postgresql_provider_migrates_legacy_schema",
+      "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
+    },
+    {
+      "test": "catalog.federation.tests.test_phase_d2_postgres.test_postgresql_invalid_hash_is_not_committed",
+      "reason": "PostgreSQL integration service unavailable: connection failed: connection to server at \"127.0.0.1\", port 5432 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_first_federation_start.test_windows_fresh_start_executes_real_batch_with_reset_stdin",
+      "reason": "requires real Windows cmd.exe"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_first_federation_start.test_windows_scaffolding_repair_restores_real_dirty_checkout",
+      "reason": "requires real Windows cmd.exe and git"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_fresh_url_output.test_fresh_onboarding_query_is_printed_without_executing_reset_fragment",
+      "reason": "Windows cmd metacharacter regression"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_migration_script.test_windows_migration_script_has_valid_powershell_syntax",
+      "reason": "Windows PowerShell parser check"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_migration_script.test_windows_migration_fast_forwards_fake_legacy_checkout_and_resumes",
+      "reason": "Windows migration smoke"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_fresh_shutdown.test_shutdown_timeout_recovers_without_hanging",
+      "reason": "Windows process-tree recovery contract"
+    },
+    {
+      "test": "catalog.federation.tests.test_host_mutation_activation.test_windows_activation_lease_has_valid_powershell_syntax",
+      "reason": "Windows PowerShell parser check"
+    },
+    {
+      "test": "catalog.mtconnect_recorder.tests.test_tailscale_recorder_launcher.test_windows_probe_rejects_runtime_that_cannot_import_exact_entrypoint",
+      "reason": "Windows launcher execution"
+    },
+    {
+      "test": "catalog.mtconnect_recorder.tests.test_tailscale_recorder_launcher.test_windows_wrapper_scrubs_legacy_secret_and_forwards_recorder_options",
+      "reason": "Windows launcher execution"
+    },
+    {
+      "test": "catalog.mtconnect_recorder.tests.test_tailscale_recorder_launcher.test_root_cmd_preserves_spaced_argument_and_nonzero_exit",
+      "reason": "Windows launcher execution"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_runtime_state_resolver.test_encoded_python_survives_windows_powershell_native_argument_forwarding",
+      "reason": "Windows PowerShell native argument check"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_relay_volume_selector.test_selector_survives_missing_current_images_and_reuses_existing_relay_volume",
+      "reason": "Windows PowerShell regression"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_windows_relay_volume_selector.test_selector_pulls_python_probe_and_identifies_pc3_identity",
+      "reason": "Windows PowerShell regression"
+    },
+    {
+      "test": "catalog.flask_app.tests.test_model_resource_admission_paths.test_windows_model_pull_script_has_valid_powershell_syntax",
+      "reason": "Windows PowerShell parser check"
+    }
+  ],
+  "matched": [
+    {
+      "job_id": 103496010690,
+      "name": "update-contracts (Linux, fcp-linux-fast, bash)",
+      "sha256": "fdde0c05562130b0dc1df28db37202896c112eb7118cbd733a11fb3c9afa553f",
+      "modules": [
+        "catalog/flask_app/tests/test_windows_migration_script.py",
+        "catalog/flask_app/tests/test_windows_relay_volume_selector.py"
+      ],
+      "commands": [
+        "2026-09-12T04:12:33.8338072Z ##[group]Run python -m pytest -o addopts= -q catalog/federation/tests/test_software_update.py catalog/federation/tests/test_docker_resources.py catalog/federation/tests/test_host_build.py catalog/federation/tests/test_host_build_resource_admission.py catalog/federation/tests/test_windows_docker_resource_contract.py catalog/federation/tests/test_model_resource_pull.py catalog/flask_app/tests/test_federation_update_runtime.py catalog/flask_app/tests/test_federation_update_orchestration.py catalog/flask_app/tests/test_federation_update_host_agents.py catalog/flask_app/tests/test_termux_federation_update_agent.py catalog/flask_app/tests/test_windows_migration_script.py catalog/flask_app/tests/test_windows_relay_volume_selector.py catalog/mtconnect_recorder/tests/test_native_recorder_update_agent.py catalog/mtconnect_recorder/tests/test_native_recorder_branch_trial.py catalog/mtconnect_recorder/tests/test_native_recorder_supervisor_boundary.py catalog/mtconnect_recorder/tests/test_recorder_federation_update.py catalog/flask_app/tests/test_federation_software_version.py",
+        "2026-09-12T04:12:33.8343812Z python -m pytest -o addopts= -q catalog/federation/tests/test_software_update.py catalog/federation/tests/test_docker_resources.py catalog/federation/tests/test_host_build.py catalog/federation/tests/test_host_build_resource_admission.py catalog/federation/tests/test_windows_docker_resource_contract.py catalog/federation/tests/test_model_resource_pull.py catalog/flask_app/tests/test_federation_update_runtime.py catalog/flask_app/tests/test_federation_update_orchestration.py catalog/flask_app/tests/test_federation_update_host_agents.py catalog/flask_app/tests/test_termux_federation_update_agent.py catalog/flask_app/tests/test_windows_migration_script.py catalog/flask_app/tests/test_windows_relay_volume_selector.py catalog/mtconnect_recorder/tests/test_native_recorder_update_agent.py catalog/mtconnect_recorder/tests/test_native_recorder_branch_trial.py catalog/mtconnect_recorder/tests/test_native_recorder_supervisor_boundary.py catalog/mtconnect_recorder/tests/test_recorder_federation_update.py catalog/flask_app/tests/test_federation_software_version.py"
+      ],
+      "summaries": [
+        "2026-09-12T04:13:03.1816075Z 312 passed, 4 skipped, 1 warning in 28.44s"
+      ]
+    },
+    {
+      "job_id": 103496010625,
+      "name": "Release checks (Linux)",
+      "sha256": "f2aff4bf476aca912b434c6f646184651a833a437ee6f9a39341d997f7132be3",
+      "modules": [
+        "catalog/mtconnect_recorder/tests/test_tailscale_recorder_launcher.py"
+      ],
+      "commands": [
+        "2026-09-12T04:14:45.2425084Z ##[group]Run python -m pytest -o addopts= -q catalog/federation/tests/test_tailscale_discovery_budget.py catalog/federation/tests/test_tailscale_host_discovery.py catalog/federation/tests/test_tailscale_discovery_snapshot_roundtrip.py catalog/federation/tests/test_tailnet_join_responder.py catalog/federation/tests/test_tailnet_join_responder_exit.py catalog/federation/tests/test_tailnet_join_client.py catalog/federation/tests/test_tailscale_peer_identity.py catalog/flask_app/tests/test_discovery_read_only_metadata.py catalog/flask_app/tests/test_tailscale_discovery_onboarding.py catalog/flask_app/tests/test_tailnet_join_grant_route.py catalog/flask_app/tests/test_tailnet_join_auto_redeem.py catalog/flask_app/tests/test_tailnet_join_launcher.py catalog/mtconnect_recorder/tests/test_tailscale_recorder_launcher.py",
+        "2026-09-12T04:14:45.2429842Z python -m pytest -o addopts= -q catalog/federation/tests/test_tailscale_discovery_budget.py catalog/federation/tests/test_tailscale_host_discovery.py catalog/federation/tests/test_tailscale_discovery_snapshot_roundtrip.py catalog/federation/tests/test_tailnet_join_responder.py catalog/federation/tests/test_tailnet_join_responder_exit.py catalog/federation/tests/test_tailnet_join_client.py catalog/federation/tests/test_tailscale_peer_identity.py catalog/flask_app/tests/test_discovery_read_only_metadata.py catalog/flask_app/tests/test_tailscale_discovery_onboarding.py catalog/flask_app/tests/test_tailnet_join_grant_route.py catalog/flask_app/tests/test_tailnet_join_auto_redeem.py catalog/flask_app/tests/test_tailnet_join_launcher.py catalog/mtconnect_recorder/tests/test_tailscale_recorder_launcher.py"
+      ],
+      "summaries": [
+        "2026-09-12T04:14:43.7018828Z 18 passed in 12.66s",
+        "2026-09-12T04:15:04.1127483Z 154 passed, 3 skipped in 18.16s"
+      ]
+    },
+    {
+      "job_id": 103496010723,
+      "name": "PostgreSQL storage release check",
+      "sha256": "c3b357adaf4e038c020a9ce08672e71a8d4062f3e5b0894cb69c1d17373afb8e",
+      "modules": [
+        "catalog/federation/tests/test_phase_d2_postgres.py"
+      ],
+      "commands": [
+        "2026-09-12T04:16:01.1500992Z ##[group]Run python -m pytest -o addopts= -q catalog/federation/tests/test_phase_d2_postgres.py",
+        "2026-09-12T04:16:01.1501490Z python -m pytest -o addopts= -q catalog/federation/tests/test_phase_d2_postgres.py"
+      ],
+      "summaries": [
+        "2026-09-12T04:16:02.5210111Z 11 passed in 0.62s"
+      ]
+    },
+    {
+      "job_id": 103496010805,
+      "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+      "sha256": "068d721904d216d19d5a900d4946c69201f10dc4f46ba255a7e8c2ba92500dbf",
+      "modules": [
+        "catalog/flask_app/tests/test_windows_migration_script.py",
+        "catalog/flask_app/tests/test_windows_relay_volume_selector.py"
+      ],
+      "commands": [
+        "2026-09-12T04:21:25.9258088Z ##[group]Run python -m pytest -o addopts= -q catalog/federation/tests/test_software_update.py catalog/federation/tests/test_docker_resources.py catalog/federation/tests/test_host_build.py catalog/federation/tests/test_host_build_resource_admission.py catalog/federation/tests/test_windows_docker_resource_contract.py catalog/federation/tests/test_model_resource_pull.py catalog/flask_app/tests/test_federation_update_runtime.py catalog/flask_app/tests/test_federation_update_orchestration.py catalog/flask_app/tests/test_federation_update_host_agents.py catalog/flask_app/tests/test_termux_federation_update_agent.py catalog/flask_app/tests/test_windows_migration_script.py catalog/flask_app/tests/test_windows_relay_volume_selector.py catalog/mtconnect_recorder/tests/test_native_recorder_update_agent.py catalog/mtconnect_recorder/tests/test_native_recorder_branch_trial.py catalog/mtconnect_recorder/tests/test_native_recorder_supervisor_boundary.py catalog/mtconnect_recorder/tests/test_recorder_federation_update.py catalog/flask_app/tests/test_federation_software_version.py",
+        "2026-09-12T04:21:25.9273581Z python -m pytest -o addopts= -q catalog/federation/tests/test_software_update.py catalog/federation/tests/test_docker_resources.py catalog/federation/tests/test_host_build.py catalog/federation/tests/test_host_build_resource_admission.py catalog/federation/tests/test_windows_docker_resource_contract.py catalog/federation/tests/test_model_resource_pull.py catalog/flask_app/tests/test_federation_update_runtime.py catalog/flask_app/tests/test_federation_update_orchestration.py catalog/flask_app/tests/test_federation_update_host_agents.py catalog/flask_app/tests/test_termux_federation_update_agent.py catalog/flask_app/tests/test_windows_migration_script.py catalog/flask_app/tests/test_windows_relay_volume_selector.py catalog/mtconnect_recorder/tests/test_native_recorder_update_agent.py catalog/mtconnect_recorder/tests/test_native_recorder_branch_trial.py catalog/mtconnect_recorder/tests/test_native_recorder_supervisor_boundary.py catalog/mtconnect_recorder/tests/test_recorder_federation_update.py catalog/flask_app/tests/test_federation_software_version.py"
+      ],
+      "summaries": [
+        "2026-09-12T04:25:03.0198467Z 311 passed, 5 skipped, 1 warning in 214.87s (0:03:34)"
+      ]
+    },
+    {
+      "job_id": 103496011104,
+      "name": "linux",
+      "sha256": "5e6a2c73f730f3b1b3f07b75889d3f1074c18d336ff4bf8fbc5733d635976a49",
+      "modules": [
+        "catalog/federation/tests/test_phase_d2_postgres.py"
+      ],
+      "commands": [
+        "2026-09-12T04:21:05.0813079Z ##[group]Run python -m pytest -o addopts= -q catalog/federation/tests/test_storage_protocol.py catalog/federation/tests/test_local_storage.py catalog/federation/tests/test_phase_d2_postgres.py catalog/federation/tests/test_phase_d3_control_plane.py catalog/federation/tests/test_phase_d4_write_authority.py catalog/federation/tests/test_phase_d5_logical_storage.py catalog/federation/tests/test_phase_d6_replication.py catalog/federation/tests/test_phase_d7_d8_ack_handover.py catalog/federation/tests/test_phase_e0_contracts.py catalog/federation/tests/test_phase_e1_manifest_store.py catalog/federation/tests/test_phase_e1_service_manifest.py catalog/federation/tests/test_phase_e2_watermarks.py catalog/federation/tests/test_phase_e3_reports.py catalog/federation/tests/test_phase_e4_selection.py catalog/federation/tests/test_phase_e5_degraded_state.py catalog/federation/tests/test_phase_e6_promotion_transaction.py catalog/federation/tests/test_phase_e63_provider_fencing.py catalog/federation/tests/test_phase_e64_authority_grant.py catalog/federation/tests/test_phase_e65_finalization.py catalog/federation/tests/test_phase_e66_recovery.py catalog/federation/tests/test_phase_e67_coordinator_publication.py catalog/federation/tests/test_phase_e71_former_primary_recovery.py catalog/federation/tests/test_phase_e72_former_primary_transfer.py catalog/federation/tests/test_phase_e78_former_primary_completion.py",
+        "2026-09-12T04:21:05.0822300Z python -m pytest -o addopts= -q catalog/federation/tests/test_storage_protocol.py catalog/federation/tests/test_local_storage.py catalog/federation/tests/test_phase_d2_postgres.py catalog/federation/tests/test_phase_d3_control_plane.py catalog/federation/tests/test_phase_d4_write_authority.py catalog/federation/tests/test_phase_d5_logical_storage.py catalog/federation/tests/test_phase_d6_replication.py catalog/federation/tests/test_phase_d7_d8_ack_handover.py catalog/federation/tests/test_phase_e0_contracts.py catalog/federation/tests/test_phase_e1_manifest_store.py catalog/federation/tests/test_phase_e1_service_manifest.py catalog/federation/tests/test_phase_e2_watermarks.py catalog/federation/tests/test_phase_e3_reports.py catalog/federation/tests/test_phase_e4_selection.py catalog/federation/tests/test_phase_e5_degraded_state.py catalog/federation/tests/test_phase_e6_promotion_transaction.py catalog/federation/tests/test_phase_e63_provider_fencing.py catalog/federation/tests/test_phase_e64_authority_grant.py catalog/federation/tests/test_phase_e65_finalization.py catalog/federation/tests/test_phase_e66_recovery.py catalog/federation/tests/test_phase_e67_coordinator_publication.py catalog/federation/tests/test_phase_e71_former_primary_recovery.py catalog/federation/tests/test_phase_e72_former_primary_transfer.py catalog/federation/tests/test_phase_e78_former_primary_completion.py"
+      ],
+      "summaries": [
+        "2026-09-12T04:21:05.0195510Z 65 passed in 0.97s",
+        "2026-09-12T04:21:28.7440184Z 253 passed in 22.95s",
+        "2026-09-12T04:22:05.4236769Z 282 passed in 36.00s"
+      ]
+    },
+    {
+      "job_id": 103496010739,
+      "name": "Release checks (Windows)",
+      "sha256": "4681c385f141f4ec6808c29e096e3574a27c6dd3e3eef3be2fa65ba5adc0ee21",
+      "modules": [
+        "catalog/mtconnect_recorder/tests/test_tailscale_recorder_launcher.py"
+      ],
+      "commands": [
+        "2026-09-12T05:03:31.6852761Z ##[group]Run python -m pytest -o addopts= -q catalog/federation/tests/test_tailscale_discovery_budget.py catalog/federation/tests/test_tailscale_host_discovery.py catalog/federation/tests/test_tailscale_discovery_snapshot_roundtrip.py catalog/federation/tests/test_tailnet_join_responder.py catalog/federation/tests/test_tailnet_join_responder_exit.py catalog/federation/tests/test_tailnet_join_client.py catalog/federation/tests/test_tailscale_peer_identity.py catalog/flask_app/tests/test_discovery_read_only_metadata.py catalog/flask_app/tests/test_tailscale_discovery_onboarding.py catalog/flask_app/tests/test_tailnet_join_grant_route.py catalog/flask_app/tests/test_tailnet_join_auto_redeem.py catalog/flask_app/tests/test_tailnet_join_launcher.py catalog/mtconnect_recorder/tests/test_tailscale_recorder_launcher.py",
+        "2026-09-12T05:03:31.6861841Z python -m pytest -o addopts= -q catalog/federation/tests/test_tailscale_discovery_budget.py catalog/federation/tests/test_tailscale_host_discovery.py catalog/federation/tests/test_tailscale_discovery_snapshot_roundtrip.py catalog/federation/tests/test_tailnet_join_responder.py catalog/federation/tests/test_tailnet_join_responder_exit.py catalog/federation/tests/test_tailnet_join_client.py catalog/federation/tests/test_tailscale_peer_identity.py catalog/flask_app/tests/test_discovery_read_only_metadata.py catalog/flask_app/tests/test_tailscale_discovery_onboarding.py catalog/flask_app/tests/test_tailnet_join_grant_route.py catalog/flask_app/tests/test_tailnet_join_auto_redeem.py catalog/flask_app/tests/test_tailnet_join_launcher.py catalog/mtconnect_recorder/tests/test_tailscale_recorder_launcher.py"
+      ],
+      "summaries": [
+        "2026-09-12T05:03:28.7679238Z 18 passed in 16.33s",
+        "2026-09-12T05:04:01.4041418Z 150 passed, 7 skipped in 28.75s"
+      ]
+    }
+  ]
+}

@@ -1,16 +1,66 @@
 {
-  "recorded_at": "2026-09-12T04:13:17.555049+00:00",
-  "source_commit": "2a9c9b8eb53edff74c2de23570ec56e054d29b22",
-  "worktree": "C:\\wsl\\fcp-v1-2a9c9b8e-merged-main-20260912",
+  "recorded_at": "2026-09-12T08:50:30.372317+00:00",
+  "source_commit": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
+  "worktree": "C:\\wsl\\fcp-v1-17ab3a05-merged-main-20260912",
   "clean": true,
   "qualified_heads_are_ancestors": [
+    "1a0c634f47f8a247b6d1d2d1a219f5c12590587d",
+    "143fe7a9082193114af3d34dc437b85f845849a2",
+    "5b826c6806ab1bdb960412ba20ca78192971fb1d",
     "4749ab6689315a7ad953c11ce4b2ec942433d71a",
-    "2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee"
+    "2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee",
+    "84c66f8185c1411d9dc8c5c33244a2f564845ce7"
   ],
-  "tree_identical_to_qualified_pr463": true,
+  "tree_identical_to_qualified_pr467": true,
   "final_merged_main_qualified": false,
   "candidate_frozen": false,
   "runtime_sha": "9b286f931497bf6291e215f6340443c5162826b0",
-  "previous_main_receipts": "archive-main-9b286f93",
-  "next_action": "Poll current main workflows; dispatch only absent required gates once; retain and qualify this exact main independently"
+  "previous_main_receipts": "archive-main-2a9c9b8e",
+  "archive_inventory": [
+    {
+      "file": "merged-main-final-qualification.json",
+      "sha256": "126880c9379f309647a2d8835d0fc4785baed692672daae0ae51f76ddd0bbb94"
+    },
+    {
+      "file": "merged-main-gap-dispatches.json",
+      "sha256": "913eb2eb70a2af27fae62a664c583e08de483338d013543928a0a65e63d0c903"
+    },
+    {
+      "file": "merged-main-icse-artifact-retention.json",
+      "sha256": "948a0c2a6d8437ca88762bc6dd15abb9ad269111fb791b4c7cf9820836ff65da"
+    },
+    {
+      "file": "merged-main-icse-artifact-review.json",
+      "sha256": "b2b5f8eef477c297b38578924ca6322478884cd1d4b087a36a5f24e953d9c7ab"
+    },
+    {
+      "file": "merged-main-last-transition.json",
+      "sha256": "8277b33c40c26fead48103a0def70cec027958355d6048a64c197f79c12fa03f"
+    },
+    {
+      "file": "merged-main-native-provenance.json",
+      "sha256": "8998284c9ba791845ce06c8ba14fecc89847e70e4174581e3955dc214d880a3f"
+    },
+    {
+      "file": "merged-main-qualification-state.json",
+      "sha256": "a26cd71981ff65e618c30eb7f1febb2bbd11c1ebc728b5a0a1bc27b10da11b43"
+    },
+    {
+      "file": "merged-main-release-artifact-retention.json",
+      "sha256": "b2660ee310460df72d886db8ede114762c24971828b37b1ccb8995726db35bb6"
+    },
+    {
+      "file": "merged-main-release-artifact-review.json",
+      "sha256": "7de3a11aaf0d219912e21df41fae7d97aa8a71663b117e48e51e5712867b1d70"
+    },
+    {
+      "file": "merged-main-skip-native-map.json",
+      "sha256": "9ac1d5087cb01ee806e3685572fce6d55ba2d19c66846a042a250e293ca48cb5"
+    },
+    {
+      "file": "merged-main-target.json",
+      "sha256": "1c5f7e13f2057a2300c67abbc662b80c7c427888f8cb3b6cf2240588bac7f198"
+    }
+  ],
+  "next_action": "Select existing actual-main push runs; dispatch only absent required gates once; no PR evidence reuse"
 }

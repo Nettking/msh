@@ -1,0 +1,82 @@
+{
+  "source_commit": "2a9c9b8eb53edff74c2de23570ec56e054d29b22",
+  "dispatches": [
+    {
+      "workflow": "cf7-acceptance-harness.yml",
+      "source_commit": "2a9c9b8eb53edff74c2de23570ec56e054d29b22",
+      "ref": "main",
+      "requested_at": "2026-09-12T04:14:26.494727+00:00",
+      "workflow_sha256": "dc7a4143e27b6cb54a597897ccbfb7801f02149df675886d3f18f9aab1014bd6",
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "cf7c-physical-test-readiness.yml",
+      "source_commit": "2a9c9b8eb53edff74c2de23570ec56e054d29b22",
+      "ref": "main",
+      "requested_at": "2026-09-12T04:14:32.937280+00:00",
+      "workflow_sha256": "1d015b626c9acbfd91aa9e5df06fdb245cd3eb2650da1cdb06ba3965c0461c84",
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "cf8-role-retirement.yml",
+      "source_commit": "2a9c9b8eb53edff74c2de23570ec56e054d29b22",
+      "ref": "main",
+      "requested_at": "2026-09-12T04:14:38.673394+00:00",
+      "workflow_sha256": "c7a825604fe63bacf9e84408658121a97e3480d5b8d059a5d396f188f823bc5a",
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "cfi2-onboarding-composition.yml",
+      "source_commit": "2a9c9b8eb53edff74c2de23570ec56e054d29b22",
+      "ref": "main",
+      "requested_at": "2026-09-12T04:14:44.202445+00:00",
+      "workflow_sha256": "a96153508c41bc25844e2a84282d753713a5a3c7d1a354c2bf482cbd7b114a8e",
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "ci-test-sharding.yml",
+      "source_commit": "2a9c9b8eb53edff74c2de23570ec56e054d29b22",
+      "ref": "main",
+      "requested_at": "2026-09-12T04:14:49.613810+00:00",
+      "workflow_sha256": "ec92d1a338be6ed83597546d19cd9e6d8f477cf284971c167808c948f9c6a267",
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "phase-f85-operator-federation-surface.yml",
+      "source_commit": "2a9c9b8eb53edff74c2de23570ec56e054d29b22",
+      "ref": "main",
+      "requested_at": "2026-09-12T04:14:54.688606+00:00",
+      "workflow_sha256": "f47d1251ca9f41b4ceae15d49b933602e285dcc7eb35e203b9b4fc590c081813",
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "release-image-metadata.yml",
+      "source_commit": "2a9c9b8eb53edff74c2de23570ec56e054d29b22",
+      "ref": "main",
+      "requested_at": "2026-09-12T04:14:59.617945+00:00",
+      "workflow_sha256": "e56a36549dbcf7a9fb171a317f6b3a2db159d0d716afbe390c1beeecfc06c522",
+      "status": "DISPATCHED",
+      "response": {
+        "http_status": 204
+      }
+    }
+  ]
+}
