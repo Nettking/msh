@@ -24,8 +24,8 @@
     "pr475-completed-failures-native-retention.json",
     "pr475-completed-failures-logs.zip (103589446088.log lines435-554)"
   ],
-  "github_artifact": "PENDING immediate issue publication",
+  "github_artifact": "https://github.com/Nettking/msh/issues/478",
   "repair": "NONE",
   "next_diagnostic_action": "Retain journal-artifact JUnit and inspect _cluster readiness, _populate capability announcement and quorum guard evidence; compare existing same-source Linux/fixed passes. Reproduce only on ephemeral test fixtures if needed; do not retry full CI or weaken fail-closed behavior.",
-  "recorded_at": "2026-09-12T18:02:45.721843+00:00"
+  "recorded_at": "2026-09-12T18:03:21.669139+00:00"
 }
