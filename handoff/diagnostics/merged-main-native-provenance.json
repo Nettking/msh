@@ -234,7 +234,85 @@
         "2a9c9b8eb53edff74c2de23570ec56e054d29b22"
       ],
       "checkout_matches": true
+    },
+    {
+      "job_id": 103496010754,
+      "run_id": 34672364135,
+      "name": "Full-suite order (rotating)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 68298,
+      "sha256": "842d9203e0cbfea0cf5a79e45e15004dd14dbf61949a76fe308b681a24d81697",
+      "checkout_commits": [
+        "2a9c9b8eb53edff74c2de23570ec56e054d29b22"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103496010783,
+      "run_id": 34672364156,
+      "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 53940,
+      "sha256": "d397fe0d7c5d4aed48a0ce594e767726fec72c5a77d80d3ec9b278b2e5c3f85e",
+      "checkout_commits": [
+        "2a9c9b8eb53edff74c2de23570ec56e054d29b22"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103499607818,
+      "run_id": 34672364156,
+      "name": "publication-bundle",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 22702,
+      "sha256": "8dbe6e1054b0ec8feb9ef58523eee761d4faf1ef76f67f3a2ad9b63725f02ecc",
+      "checkout_commits": [
+        "2a9c9b8eb53edff74c2de23570ec56e054d29b22"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103496010761,
+      "run_id": 34672364171,
+      "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 71545,
+      "sha256": "28512b3952552056f01f43d32ef7be508aa9b6649169d4c76b0845ab965ccc8b",
+      "checkout_commits": [
+        "2a9c9b8eb53edff74c2de23570ec56e054d29b22"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103496379954,
+      "run_id": 34672491622,
+      "name": "onboarding (Windows, fcp-test-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 57955,
+      "sha256": "7e2c1781e0d59e0774987cb3be6421a0d78b5565bedef3425b932a02eb87e87b",
+      "checkout_commits": [
+        "2a9c9b8eb53edff74c2de23570ec56e054d29b22"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103496391402,
+      "run_id": 34672495196,
+      "name": "Shard contract (Linux, shared-pool)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 33189,
+      "sha256": "e24ceaef1158665b5748dad135cc7d30a497d09f757a4ee07ecdf9ad3d7cdce6",
+      "checkout_commits": [
+        "2a9c9b8eb53edff74c2de23570ec56e054d29b22"
+      ],
+      "checkout_matches": true
     }
   ],
-  "retained_at": "2026-09-12T04:38:18.738441+00:00"
+  "retained_at": "2026-09-12T04:49:52.544308+00:00"
 }

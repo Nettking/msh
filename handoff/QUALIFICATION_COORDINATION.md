@@ -7,7 +7,7 @@ PR465/D07 previously qualified and merged asb6a96b21. All required fixes are mer
 Clean detached qualification checkout is verified. All13 workflows are running or
 completed (six existing push runs plus seven single guarded dispatches). Next:
 poll_merged_main_state.py, retain only new native logs, then final artifact review.
-Current verified proof:16/37 required plus2/3 companions (04:37UTC).
+Current verified proof:21/37 required plus3/3 companions (04:49UTC).
 Main2a9c9b8e is not yet qualified or frozen as a physical candidate.
 Do not requalify PR heads or intermediate main. Physical runtime remains
 M`9b286f931497bf6291e215f6340443c5162826b0`; admission stopped, no physical PASS
@@ -2223,3 +2223,5 @@ Only required absent gates may be dispatched; no physical deployment or candidat
 04:37UTC native retention: all seven new terminal logs prove exact2a9c9b8eb53edff74c2de23570ec56e054d29b22; required proof now16/37 plus2/3 companions, including immutable registry metadata. No source mismatch or new defect. Next exact command: audit Python -B handoff/diagnostics/poll_merged_main_state.py; retain only new terminal jobs with retain_merged_main_jobs.py. Final artifact/skip/ICSE review remains pending full completion; physical admission stopped, no timers.
 
 04:49UTC: actual main remains2a9c9b8eb53edff74c2de23570ec56e054d29b22; six new successful terminal jobs. ICSE,CF7B,CFI2 completed successfully; full-suite rotating and Linux sharding contract also passed. No failed or missing required workflow. Next: retain new terminal native logs, verify source, then continue state-change checks; final artifact reconciliation remains pending. No dispatch or physical action.
+
+04:49UTC native retention: all six new terminal logs verify exact2a9c9b8eb53edff74c2de23570ec56e054d29b22; required proof now21/37 plus3/3 companions. ICSE4/4 native source proofs complete; publication artifact review still required. No new defect or duplicate job. Next exact command: audit Python -B handoff/diagnostics/poll_merged_main_state.py; retain only new terminal jobs with retain_merged_main_jobs.py and complete current-main artifact/skip/ICSE review once required runs finish. Physical admission remains stopped; no timers.
