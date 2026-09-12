@@ -2127,3 +2127,8 @@ Windows capability/transport and ICSE compose); exact-head count stays9/37 plus
 2/3 companions. No failed tests or completed new source-gap parent. Next:
 poll_pr463_state.py at next state check; retain only new terminal evidence.
 No extra jobs, merge, deployment or protected Recorder-data operation.
+
+03:03UTC: PR463 head2c1a8d93 unchanged. CFI2 exact-head companion run completed;
+phase2 gained one success and automatic release two. No failed jobs. Next:
+retain new terminal native logs and verify checkout. Other parents remain active;
+no additional dispatch is justified yet.

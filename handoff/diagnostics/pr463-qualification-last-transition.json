@@ -1,5 +1,5 @@
 {
-  "observed_at": "2026-09-12T02:52:52.930252+00:00",
+  "observed_at": "2026-09-12T03:03:53.820588+00:00",
   "changes": {
     "463": [
       {
@@ -10,43 +10,22 @@
         "conclusion": null,
         "jobs": [
           {
-            "id": 103473479376,
-            "name": "Linux regression shard (2)",
+            "id": 103473479394,
+            "name": "Linux regression shard (1)",
             "status": "completed",
             "conclusion": "success"
           },
           {
-            "id": 103473479432,
-            "name": "Linux regression shard (3)",
+            "id": 103473479429,
+            "name": "Release checks (Linux)",
             "status": "completed",
             "conclusion": "success"
           },
           {
-            "id": 103473479487,
-            "name": "Windows regressions (capability-product)",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
-            "id": 103473479499,
-            "name": "Windows regressions (transport-storage)",
-            "status": "completed",
-            "conclusion": "success"
-          }
-        ]
-      },
-      {
-        "workflow": "icse-tool-demo.yml",
-        "run_id": 34664467253,
-        "event": "pull_request",
-        "status": "queued",
-        "conclusion": null,
-        "jobs": [
-          {
-            "id": 103473479671,
-            "name": "reviewer-compose",
-            "status": "completed",
-            "conclusion": "success"
+            "id": 103473479473,
+            "name": "Linux regression shard (0)",
+            "status": "in_progress",
+            "conclusion": null
           }
         ]
       },
@@ -60,13 +39,22 @@
           {
             "id": 103484877403,
             "name": "linux",
-            "status": "in_progress",
-            "conclusion": null
-          },
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
+      {
+        "workflow": "federation-software-update.yml",
+        "run_id": 34664467309,
+        "event": "pull_request",
+        "status": "in_progress",
+        "conclusion": null,
+        "jobs": [
           {
-            "id": 103484877504,
-            "name": "windows",
-            "status": "queued",
+            "id": 103473479500,
+            "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+            "status": "in_progress",
             "conclusion": null
           }
         ]
@@ -75,14 +63,14 @@
         "workflow": "cfi2-onboarding-composition.yml",
         "run_id": 34664591540,
         "event": "workflow_dispatch",
-        "status": "in_progress",
-        "conclusion": null,
+        "status": "completed",
+        "conclusion": "success",
         "jobs": [
           {
             "id": 103473852827,
             "name": "onboarding (Windows, fcp-test-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
-            "status": "in_progress",
-            "conclusion": null
+            "status": "completed",
+            "conclusion": "success"
           }
         ]
       }
