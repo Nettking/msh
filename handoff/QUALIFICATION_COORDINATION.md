@@ -1939,3 +1939,9 @@ Required native evidence now27/37 plus3/3 companions. Release and ICSE publicati
 remain incomplete; no final qualification verdict. Next: poll_pr465_state.py on
 next state check; retain new native evidence and completed publication artifacts.
 No duplicate jobs, physical acceptance claim, deployment or Recorder-data change.
+
+01:08UTC: PR465 exact head4749ab66 now reports all37 required jobs plus3 companion
+jobs successful. Final release34661528639 and ICSE34661535011 completed. This is
+not yet a final qualification verdict: next retain remaining native logs, audit
+release/ICSE artifacts and current reviews, then record the exact-head verdict
+before normal merge. No rerun, candidate freeze or physical change.

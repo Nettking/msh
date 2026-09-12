@@ -1,19 +1,19 @@
 {
-  "observed_at": "2026-09-12T00:57:19.947900+00:00",
+  "observed_at": "2026-09-12T01:08:49.828447+00:00",
   "changes": {
     "465": [
       {
         "workflow": "cf7b-product-physical-acceptance.yml",
         "run_id": 34661541571,
         "event": "workflow_dispatch",
-        "status": "in_progress",
-        "conclusion": null,
+        "status": "completed",
+        "conclusion": "success",
         "jobs": [
           {
             "id": 103464901268,
             "name": "acceptance (Linux, fcp-linux-fast, bash)",
-            "status": "in_progress",
-            "conclusion": null
+            "status": "completed",
+            "conclusion": "success"
           }
         ]
       },
@@ -21,36 +21,54 @@
         "workflow": "federation-v1-release.yml",
         "run_id": 34661528639,
         "event": "workflow_dispatch",
-        "status": "queued",
-        "conclusion": null,
+        "status": "completed",
+        "conclusion": "success",
         "jobs": [
           {
-            "id": 103464860198,
-            "name": "PostgreSQL storage release check",
+            "id": 103464860254,
+            "name": "Windows regressions (transport-storage)",
             "status": "completed",
             "conclusion": "success"
           },
           {
             "id": 103464860261,
             "name": "Windows regressions (journal-artifacts)",
-            "status": "in_progress",
-            "conclusion": null
-          },
-          {
-            "id": 103464860273,
-            "name": "Linux regression shard (1)",
             "status": "completed",
             "conclusion": "success"
           },
           {
-            "id": 103464860281,
-            "name": "Windows regressions (capability-product)",
+            "id": 103464860302,
+            "name": "Linux regression shard (2)",
             "status": "completed",
             "conclusion": "success"
           },
           {
-            "id": 103464860290,
-            "name": "Linux regression shard (3)",
+            "id": 103464860402,
+            "name": "Linux regression shard (0)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103468376856,
+            "name": "Clean-checkout suite order independence",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103471498901,
+            "name": "Release matrix (Linux)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103471498904,
+            "name": "Release matrix (Windows)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 103471560829,
+            "name": "Federation v1 automated release verdict",
             "status": "completed",
             "conclusion": "success"
           }
@@ -60,32 +78,14 @@
         "workflow": "icse-tool-demo.yml",
         "run_id": 34661535011,
         "event": "workflow_dispatch",
-        "status": "queued",
-        "conclusion": null,
+        "status": "completed",
+        "conclusion": "success",
         "jobs": [
-          {
-            "id": 103464879657,
-            "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
-            "id": 103464879770,
-            "name": "reviewer-compose",
-            "status": "completed",
-            "conclusion": "success"
-          },
-          {
-            "id": 103464879836,
-            "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
-            "status": "completed",
-            "conclusion": "success"
-          },
           {
             "id": 103469401180,
             "name": "publication-bundle",
-            "status": "queued",
-            "conclusion": null
+            "status": "completed",
+            "conclusion": "success"
           }
         ]
       }
