@@ -2078,3 +2078,7 @@ CF7C-Linux and F85-Linux: required5/37 plus companion1/3 native PASS. CF7B/updat
 Linux and release Windows checks use synthetic2cc004b3; their parents remain
 active. Next: poll_pr463_state.py at next state check; no additional dispatch,
 merge or physical change. All completed exact-head evidence preserved.
+
+02:18UTC: PR463 head2c1a8d93 unchanged. Automatic CF7B and exact-head registry
+completed success; no failed jobs. Next: retain their new native logs, verify
+source, and fill CF7B only if its completed source gap is demonstrated.

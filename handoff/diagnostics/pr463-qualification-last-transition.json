@@ -1,98 +1,32 @@
 {
-  "observed_at": "2026-09-12T02:07:23.503193+00:00",
+  "observed_at": "2026-09-12T02:18:54.676723+00:00",
   "changes": {
     "463": [
       {
         "workflow": "cf7b-product-physical-acceptance.yml",
         "run_id": 34664467227,
         "event": "pull_request",
-        "status": "in_progress",
-        "conclusion": null,
+        "status": "completed",
+        "conclusion": "success",
         "jobs": [
           {
             "id": 103473479267,
             "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
-            "status": "in_progress",
-            "conclusion": null
-          },
-          {
-            "id": 103473479453,
-            "name": "acceptance (Linux, fcp-linux-fast, bash)",
             "status": "completed",
             "conclusion": "success"
           }
         ]
       },
       {
-        "workflow": "federation-v1-release.yml",
-        "run_id": 34664467237,
-        "event": "pull_request",
-        "status": "queued",
-        "conclusion": null,
-        "jobs": [
-          {
-            "id": 103473479417,
-            "name": "Release checks (Windows)",
-            "status": "completed",
-            "conclusion": "success"
-          }
-        ]
-      },
-      {
-        "workflow": "ci-test-sharding.yml",
-        "run_id": 34665214234,
+        "workflow": "release-image-metadata.yml",
+        "run_id": 34664592951,
         "event": "workflow_dispatch",
         "status": "completed",
         "conclusion": "success",
         "jobs": [
           {
-            "id": 103475612834,
-            "name": "Shard contract (Linux, shared-pool)",
-            "status": "completed",
-            "conclusion": "success"
-          }
-        ]
-      },
-      {
-        "workflow": "federation-software-update.yml",
-        "run_id": 34664467309,
-        "event": "pull_request",
-        "status": "queued",
-        "conclusion": null,
-        "jobs": [
-          {
-            "id": 103473479479,
-            "name": "update-contracts (Linux, fcp-linux-fast, bash)",
-            "status": "completed",
-            "conclusion": "success"
-          }
-        ]
-      },
-      {
-        "workflow": "cf7c-physical-test-readiness.yml",
-        "run_id": 34664588193,
-        "event": "workflow_dispatch",
-        "status": "queued",
-        "conclusion": null,
-        "jobs": [
-          {
-            "id": 103473842659,
-            "name": "readiness (Linux, fcp-linux-fast, bash)",
-            "status": "completed",
-            "conclusion": "success"
-          }
-        ]
-      },
-      {
-        "workflow": "phase-f85-operator-federation-surface.yml",
-        "run_id": 34664590472,
-        "event": "workflow_dispatch",
-        "status": "queued",
-        "conclusion": null,
-        "jobs": [
-          {
-            "id": 103473850257,
-            "name": "operator-surface (Linux, fcp-linux-fast, bash)",
+            "id": 103473858031,
+            "name": "Verify immutable release image metadata",
             "status": "completed",
             "conclusion": "success"
           }

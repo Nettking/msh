@@ -1,5 +1,5 @@
 {
-  "observed_at": "2026-09-12T02:07:23.503193+00:00",
+  "observed_at": "2026-09-12T02:18:54.676723+00:00",
   "prs": {
     "463": {
       "number": 463,
@@ -18,25 +18,25 @@
           "run_id": 34664467227,
           "event": "pull_request",
           "api_head_sha": "2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee",
-          "status": "in_progress",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "attempt": 1,
           "required_count": 2,
           "signature": {
-            "status": "in_progress",
-            "conclusion": null,
+            "status": "completed",
+            "conclusion": "success",
             "run_attempt": 1,
-            "updated_at": "2026-09-12T02:05:57Z"
+            "updated_at": "2026-09-12T02:10:32Z"
           },
           "jobs": [
             {
               "id": 103473479267,
               "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
-              "status": "in_progress",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "runner_name": "Nettking",
               "started_at": "2026-09-12T02:05:56Z",
-              "completed_at": null
+              "completed_at": "2026-09-12T02:10:31Z"
             },
             {
               "id": 103473479453,
@@ -540,25 +540,25 @@
           "run_id": 34664592951,
           "event": "workflow_dispatch",
           "api_head_sha": "2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee",
-          "status": "queued",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "attempt": 1,
           "required_count": null,
           "signature": {
-            "status": "queued",
-            "conclusion": null,
+            "status": "completed",
+            "conclusion": "success",
             "run_attempt": 1,
-            "updated_at": "2026-09-12T01:21:52Z"
+            "updated_at": "2026-09-12T02:08:15Z"
           },
           "jobs": [
             {
               "id": 103473858031,
               "name": "Verify immutable release image metadata",
-              "status": "queued",
-              "conclusion": null,
-              "runner_name": "",
-              "started_at": "2026-09-12T01:21:54Z",
-              "completed_at": null
+              "status": "completed",
+              "conclusion": "success",
+              "runner_name": "Nettking-Linux",
+              "started_at": "2026-09-12T02:08:05Z",
+              "completed_at": "2026-09-12T02:08:14Z"
             }
           ]
         }
