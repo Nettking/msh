@@ -1,0 +1,54 @@
+{
+  "recorded_at": "2026-09-12T16:01:27.386283+00:00",
+  "finding": "D12",
+  "status": "CONFIRMED_HOST_GIT_DISCOVERY_FAILURE_ROOT_CAUSE_OPEN",
+  "candidate_sha": "b7194820d8f1940ae60b8c9639e09b7f61e65c55",
+  "host": "Beast native Windows runner28",
+  "physical_stage": "None; F7/F8 Diff hygiene CI steps",
+  "command": "git diff --check origin/main...HEAD",
+  "observed": "F7/F8 native tests and prior steps pass, then Git reports Not a git repository and exits129. Checkout/cleanup Git commands work.",
+  "expected": "The checked-out repository remains discoverable for final diff verification.",
+  "classification": "Host/environment Git execution-context failure. Actual ownership/HOME/PATH/filesystem cause remains unconfirmed. Related to D12 provenance boundary; do not assert a shared root cause with D10.",
+  "acceptance_impact": "Postmerge F7/F8 checks fail; tests are not reclassified as product failures. Preserve separately passing equivalent checks on other native hosts.",
+  "safe_continuation": "YES: independent CI and read-only diagnosis; no additional retries or source/guard changes.",
+  "state_changed": "CI-owned workspaces only; no host configuration, physical runtime, trust-store or protected-data change.",
+  "protected_recorder_data": "UNTOUCHED",
+  "evidence": [
+    {
+      "job_id": 103572679035,
+      "run_id": 34701018859,
+      "name": "trusted-provider-closeout (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -E...",
+      "runner_name": "Beast",
+      "conclusion": "failure",
+      "bytes": 75997,
+      "sha256": "37703e5df17ae91f05ad713c5379407cbac90cc0841cdef37012657a10539f2f",
+      "checkout_commits": [
+        "b7194820d8f1940ae60b8c9639e09b7f61e65c55"
+      ],
+      "checkout_matches": true,
+      "test_summaries": [
+        "689 passed, 5 skipped, 8 warnings in 322.64s (0:05:22)"
+      ]
+    },
+    {
+      "job_id": 103572679136,
+      "run_id": 34701018850,
+      "name": "capability-closeout (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
+      "runner_name": "Beast",
+      "conclusion": "failure",
+      "bytes": 80380,
+      "sha256": "35cbc59db5fd84adf7ff9e47ce45009f549728f53c3d3ce48a4c96f298bd6fa1",
+      "checkout_commits": [
+        "b7194820d8f1940ae60b8c9639e09b7f61e65c55"
+      ],
+      "checkout_matches": true,
+      "test_summaries": [
+        "717 passed, 5 skipped, 7 warnings in 176.54s (0:02:56)"
+      ]
+    }
+  ],
+  "durable_logs": "D12-f7-f8-git-discovery-logs.zip",
+  "github_artifact": "https://github.com/Nettking/msh/issues/472",
+  "repair": "NONE",
+  "next_diagnostic_action": "Pending trusted SSH identity/account: inspect Git executable, cwd, repository ownership, HOME/global configuration and git status stderr under Beast runner28 context. Do not bypass stamping or safe-directory guards."
+}

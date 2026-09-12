@@ -1,0 +1,24 @@
+2026-09-12T15:14:02.6798705Z ##[group]Run git diff --check origin/main...HEAD
+2026-09-12T15:14:02.6799039Z [36;1mgit diff --check origin/main...HEAD[0m
+2026-09-12T15:14:02.6885579Z shell: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.EXE -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+2026-09-12T15:14:02.6886243Z env:
+2026-09-12T15:14:02.6886391Z   TEMP: C:\fcp-qtmp
+2026-09-12T15:14:02.6886551Z   TMP: C:\fcp-qtmp
+2026-09-12T15:14:02.6886897Z   PSMODULEPATH: C:\Windows\System32\WindowsPowerShell\v1.0\Modules;C:\Program Files\WindowsPowerShell\Modules
+2026-09-12T15:14:02.6887291Z ##[endgroup]
+2026-09-12T15:14:02.8585669Z warning: Not a git repository. Use --no-index to compare two paths outside a working tree
+2026-09-12T15:14:02.8586178Z usage: git diff --no-index [<options>] <path> <path> [<pathspec>...]
+2026-09-12T15:14:02.8586404Z 
+2026-09-12T15:14:02.8586514Z Diff output format options
+2026-09-12T15:19:56.2687323Z ##[group]Run git diff --check origin/main...HEAD
+2026-09-12T15:19:56.2687634Z [36;1mgit diff --check origin/main...HEAD[0m
+2026-09-12T15:19:56.2772119Z shell: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.EXE -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+2026-09-12T15:19:56.2772587Z env:
+2026-09-12T15:19:56.2772722Z   TEMP: C:\fcp-qtmp
+2026-09-12T15:19:56.2772874Z   TMP: C:\fcp-qtmp
+2026-09-12T15:19:56.2773213Z   PSMODULEPATH: C:\Windows\System32\WindowsPowerShell\v1.0\Modules;C:\Program Files\WindowsPowerShell\Modules
+2026-09-12T15:19:56.2773617Z ##[endgroup]
+2026-09-12T15:19:56.4408998Z warning: Not a git repository. Use --no-index to compare two paths outside a working tree
+2026-09-12T15:19:56.4416013Z usage: git diff --no-index [<options>] <path> <path> [<pathspec>...]
+2026-09-12T15:19:56.4416295Z 
+2026-09-12T15:19:56.4416450Z Diff output format options

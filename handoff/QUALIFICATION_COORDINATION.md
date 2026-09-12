@@ -2815,3 +2815,7 @@ findings; PR473 remains draft until the complete gate is reviewed.
 ## 2026-09-12T15:59:19.234106+00:00 — due automatic checks expose additional failures
 
 Main b719 release34701018870 completed16/16green; preserve exact native/artifact evidence. PR473 release34701429430 has a failed Windows release check and shard2 still running. Post-merge F7/F8/update Windows on Beast and Phase2 Windows on AQG also failed. Native classification is pending; do not infer they share D12. Snapshot and selected failing steps are durable in diagnostics/pr473-current-20260912T155828.json and diagnostics/pr473-due-failure-triage-plan.json. Next retain/read only newly failing logs, classify each mechanism and publish independent findings immediately. No retries/source changes. PR473 stays draft.
+
+## 2026-09-12T16:01:27.386283+00:00 — F7/F8 failures classified as D12 Git context
+
+Beast jobs103572679136/103572679035 passed their native tests and failed final Git diff with explicit Not a git repository exit129. Evidence and full logs are preserved in diagnostics/D12-f7-f8-git-discovery.json. This narrows D12 to a failing native Git discovery context; exact cause remains open. No retry/source change. Continue classifying the other completed failed jobs individually.
