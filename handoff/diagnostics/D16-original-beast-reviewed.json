@@ -1,0 +1,25 @@
+{
+  "recorded_at": "2026-09-12T18:58:30.118984+00:00",
+  "finding": "D16",
+  "status": "CONFIRMED / ROOT CAUSE UNRESOLVED",
+  "candidate_sha": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "control_sha": "f96ec892ca0c85c087f7fa24fcbacc67117d8987",
+  "run_id": 34712329572,
+  "job_id": 103603211803,
+  "host": "BEAST / Beast / NetworkService SID S-1-5-20",
+  "result": "Original1PASS28.829s JUnit; observed1PASS13.990s JUnit. Process durations30.828s and15.719s. Exact candidate clean before/after; native Python3.12.10.",
+  "observation": "Observed population: all three ready, term1, voter0 leader; all commit/applied indices3 to9. No population exception. Subsequent follower refusal and isolated-leader quorum refusal are expected test assertions. No D16 reproduction.",
+  "limitations": "Single isolated original and observed execution; no original journal-suite predecessor state/load. Observer snapshots are sequential and may perturb timing. Neither execution is qualification or physical acceptance evidence. Original native failure remains valid.",
+  "evidence": [
+    "D16-original-beast-native-artifact.zip",
+    "D16-original-beast-native-logs.zip",
+    "D16-original-beast-native-retention.json",
+    "D16-original-beast-raw-artifact-retention.json",
+    "D16-original-beast-receipt.json",
+    "D16-original-beast-observer.json",
+    "D16-original-beast-host.json"
+  ],
+  "state_changed": "Only normal CI checkout, new venv/dependency installation and owned test fixtures. No source, runner/account/pool, product runtime or protected Recorder data change.",
+  "protected_recorder_data": "UNTOUCHED",
+  "next_action": "Inspect the original Windows journal JUnit predecessor context and lifecycle/election failure mechanisms; prepare a bounded context reproduction only if the reviewed evidence supports it. No full-suite retry, deadline/guard change or product repair inferred from isolated passes."
+}

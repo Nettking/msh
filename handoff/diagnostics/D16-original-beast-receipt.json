@@ -1,0 +1,66 @@
+{
+  "recorded_at": "2026-09-12T18:50:59.289464+00:00",
+  "candidate_sha": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "tree": "1c671f446fa215c99a6a58a155806de394aa569a",
+  "control_sha": "f96ec892ca0c85c087f7fa24fcbacc67117d8987",
+  "run_id": "34712329572",
+  "host": "Beast",
+  "runner": "Beast",
+  "python": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+  "executable": "C:\\actions-runner\\_work\\_temp\\fcp-python-b27aa084828e4039abfb8ff8e487666a\\Scripts\\python.exe",
+  "source": "C:\\actions-runner\\_work\\msh\\msh",
+  "owned_tmp": "C:\\fcp-qtmp\\d16-38e9c19782b04e45",
+  "diagnostic_only": true,
+  "protected_recorder_data": "UNTOUCHED",
+  "physical_runtime": "UNCHANGED",
+  "observer_sha256": "26b965a6137f30b08cacf2cc2335a15b648d17d820d28dfd8e7acc609da7882f",
+  "executions": [
+    {
+      "mode": "original",
+      "command": [
+        "C:\\actions-runner\\_work\\_temp\\fcp-python-b27aa084828e4039abfb8ff8e487666a\\Scripts\\python.exe",
+        "-B",
+        "-m",
+        "pytest",
+        "-o",
+        "addopts=",
+        "-p",
+        "no:cacheprovider",
+        "-q",
+        "--durations=5",
+        "--basetemp=C:\\fcp-qtmp\\d16-38e9c19782b04e45\\original",
+        "--junitxml=C:\\actions-runner\\_work\\_temp\\d16-evidence-34712329572-1\\original.xml",
+        "catalog/federation/tests/test_control_plane_session_authority.py::test_reachable_isolated_leader_cannot_report_current_session_authority"
+      ],
+      "timeout_seconds": 180,
+      "returncode": 0,
+      "elapsed_seconds": 30.82799999997951
+    },
+    {
+      "mode": "observed",
+      "command": [
+        "C:\\actions-runner\\_work\\_temp\\fcp-python-b27aa084828e4039abfb8ff8e487666a\\Scripts\\python.exe",
+        "-B",
+        "-m",
+        "pytest",
+        "-o",
+        "addopts=",
+        "-p",
+        "no:cacheprovider",
+        "-q",
+        "--durations=5",
+        "--basetemp=C:\\fcp-qtmp\\d16-38e9c19782b04e45\\observed",
+        "--junitxml=C:\\actions-runner\\_work\\_temp\\d16-evidence-34712329572-1\\observed.xml",
+        "-p",
+        "d16_beast_observer",
+        "catalog/federation/tests/test_control_plane_session_authority.py::test_reachable_isolated_leader_cannot_report_current_session_authority"
+      ],
+      "timeout_seconds": 180,
+      "returncode": 0,
+      "elapsed_seconds": 15.719000000040978
+    }
+  ],
+  "final_sha": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "final_tracked_status": "",
+  "completed_at": "2026-09-12T18:51:45.946051+00:00"
+}
