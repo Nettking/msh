@@ -1,0 +1,17 @@
+{
+  "recorded_at": "2026-09-12T08:49:01.6725955Z",
+  "pr": 467,
+  "qualified_head": "84c66f8185c1411d9dc8c5c33244a2f564845ce7",
+  "qualification": "pr467-final-qualification.json",
+  "qualification_comment_id": 5644834781,
+  "merge_method": "merge",
+  "expected_head_guard": true,
+  "merged": true,
+  "merge_commit": "17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05",
+  "merged_main_qualified": false,
+  "physical_runtime": "9b286f931497bf6291e215f6340443c5162826b0",
+  "candidate_frozen": false,
+  "physical_acceptance": false,
+  "protected_recorder_data_changed": false,
+  "next_action": "Fetch actual main, verify merge/ancestry and clean isolated checkout, archive prior main receipts, select actual new-main workflow runs and fill only absent required gates once."
+}
