@@ -9,7 +9,7 @@ sys.path.insert(0, str(audit))
 from github_qualification import client
 
 root = pathlib.Path(__file__).resolve().parent
-sha = '83955f65b7e6bb36de8e90f34608b97070fed33b'
+sha = '2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee'
 ref = 'codex/responder-replacement-exit-wait'
 allowed = {'phase2-federation.yml', 'federation-v1-release.yml', 'ci-test-sharding.yml',
            'icse-tool-demo.yml', 'product-branding.yml', 'cf7b-product-physical-acceptance.yml',
@@ -67,3 +67,4 @@ row['response'] = api('/actions/workflows/' + workflow + '/dispatches', {'ref': 
 row['status'] = 'DISPATCHED'
 path.write_text(json.dumps(ledger, indent=2) + '\n', encoding='utf-8')
 print(json.dumps(row))
+

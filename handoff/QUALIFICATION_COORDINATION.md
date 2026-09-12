@@ -2004,3 +2004,9 @@ the three qualified D07 files; PR diff against current main remains the five D06
 files. No repair deployed. Next: archive83955f65 proof, verify unchanged D06/D07
 source blobs, initialize new-head qualification state and dispatch only absent
 required gates. New head evidence starts empty; no cross-SHA qualification carry.
+
+01:20:28UTC: integration verified by identical Git blobs for all five D06 files
+against83955f65 and all three D07 files against qualified4749ab66. Historical
+83955f65 state/native proof archived as diagnostics/pr463-head-83955f65-*.json.
+PR463 polling/retention/gap helpers now require2c1a8d93; current native proof is
+empty. Next: poll_pr463_state.py and fill only absent new-head workflows.

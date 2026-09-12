@@ -13,7 +13,7 @@ root=pathlib.Path(__file__).resolve().parent
 path=root/'pr463-qualification-state.json'
 previous=json.loads(path.read_text()) if path.exists() else {}
 api=client()
-targets=[(463,'83955f65b7e6bb36de8e90f34608b97070fed33b')]
+targets=[(463,'2c1a8d9389a75fcaf4dd224ba63c3f83f02a0cee')]
 wanted=set(REQUIRED)|{'cfi2-onboarding-composition.yml','release-image-metadata.yml'}
 def poll(target):
     number,intended=target
@@ -75,3 +75,4 @@ path.write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
 if changes:
     (root/'pr463-qualification-last-transition.json').write_text(json.dumps(dict(observed_at=report['observed_at'],changes=changes),indent=2)+'\n',encoding='utf-8')
 print(json.dumps({'material_change':bool(changes),'head':report['prs']['463']['head'],'missing':report['prs']['463']['missing_workflows'],'runs':[{'workflow':w['workflow'],'id':w['run_id'],'status':w['status'],'conclusion':w['conclusion'],'passed':sum(j['conclusion']=='success' for j in w['jobs']),'failed':[j['name'] for j in w['jobs'] if j['conclusion'] in ('failure','timed_out','cancelled')]} for w in report['prs']['463']['workflows']]}))
+
