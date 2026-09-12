@@ -2010,3 +2010,8 @@ against83955f65 and all three D07 files against qualified4749ab66. Historical
 83955f65 state/native proof archived as diagnostics/pr463-head-83955f65-*.json.
 PR463 polling/retention/gap helpers now require2c1a8d93; current native proof is
 empty. Next: poll_pr463_state.py and fill only absent new-head workflows.
+
+01:21:38UTC: first new-head463 snapshot confirms2c1a8d93 and seven automatic
+workflows queued, no completed proof. Missing:CF7,CF7C,CF8,F85 plus CFI2/registry
+companions. Next: dispatch only these six absent workflows through the guarded
+helper; existing seven automatic workflows remain untouched.
