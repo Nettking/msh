@@ -1,52 +1,38 @@
 # Federation v1 qualification coordination
 
-**Current actionable checkpoint (2026-09-12T13:15Z):** actual merged main
-17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05 is QUALIFIED_ACTUAL_MERGED_MAIN.
-Receipt: diagnostics/merged-main-final-qualification.json. All37 required plus3
-companions passed;40 native logs reconciled (38 exact checkouts,2 dependency-only
-release aggregates),9 release artifacts/4457identities in4shards and both full orders.
-ICSE exact1414-file source export/19checksums/components4/4 on3executions and
-network10/10 plus teardown onboth native platforms verified. D06-D08 regressions,
-all17 D08 cases across native platforms, original scheduler failure and explicit
-platform exclusions reconciled. No job was rerun for historical hosted billing reds.
-All prior PR/failed-main evidence retained under its own source. No further17ab CI
-polling or qualification is needed unless a concrete new contract reason appears.
-Next highest-value action: diagnose/retry only the two failed final-head checks
-on unchanged ba44100ec1e4cde19daba0d3723b991c11742316, after original evidence
-retention. D11/#471 is AQG Linux shard2 live-reinstatement TimeoutError; D12/#472
-is Beast Phase2 Go build VCS-status exit128 after Go tests passed. Root causes
-remain unresolved; no product repair is justified yet. Red release aggregates
-are consequences. F6/F7/F8 and other final-head checks passed.
-D11 comparison proves same-source fixed/rotating full suites and Windows transport
-passed the identical test; original failed shard ZIP is durably retained. One
-targeted failed-shard retry can test recurrence without rerunning successes.
-AQG31 admission is now VERIFIED from existing08:57Z run34684352823/job103528608892
-and retained native Python/Go/storage/Buildx/PostgreSQL evidence. The earlier
-post10:01Z lookup missed it. No new admission or main qualification was performed.
-D09 is resolved at final head, 2/2 native replacement and real JS-only event are
-retained, but PR468 remains unmerged and all eight legacy files remain pending
-resolution/classification of the two required failures. No physical/runtime change.
-Pre-integration comparison: diagnostics/D09-preintegration-source-comparison.json.
-Base f3abe545 -> repair ba44100e changes one document; all1417 other tracked entries
-(mode/type/object/path) match. Actual canary660bf232 has its separately documented
-inert JS comment; direct canary -> repair also removes that comment. Never merge
-that canary or claim those complete trees differ only in documentation.
-First F7 native proof remains reviewed green; real JS-only event is proved.
-Last canary observation11:57Z: Linux green, Windows queued. Next check12:55Z;
-no early CI poll was made for this user clarification. PR468 F6/F8/Phase2 pairs
-are green; preserve automatic jobs and their exact source-specific evidence.
-No PR468 merge or legacy retirement before every replacement-proof requirement,
-including final-source validation and the actual JS-only event, is satisfied.
-No duplicate37-job dispatch is needed for replacement proof. F7 jobs have30min
-limits; check near expected completion, long release jobs no sooner than45-60min.
-Plan: CI_COVERAGE_MIGRATION_PLAN.md; mapping: diagnostics/ci-migration-equivalence-matrix.json.
-All eight legacy workflows remain. Release/F6/F8 and runner accounts/pools unchanged.
-AQG Windows has fcp-windows but was offline at10:01Z, separate from AQG Linux;
-Nettking supplies both current native jobs. No runner admission changes.
-Clean qualified checkout:C:/wsl/fcp-v1-17ab3a05-merged-main-20260912.
-Physical runtime remains9b286f931497bf6291e215f6340443c5162826b0; freeze/revalidation
-and physical restart deferred while CI source decision is pending. No physical PASS,
-P07/P12, deployment or protected Recorder-data changes.
+**Current actionable checkpoint (2026-09-12T14:18Z):** PR468 stays draft,
+unmerged at ba44100ec1e4cde19daba0d3723b991c11742316. D09 documentation repair
+is integrated and branding/final-source checks pass. The original two native
+replacement executions and real AI-JavaScript-only automatic event are retained;
+1417 non-document tracked entries are byte-identical to the proven source.
+
+Actual merged main17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05 remains fully qualified
+(37 required +3 companions). Do not poll or rerun that completed qualification.
+Receipt: diagnostics/merged-main-final-qualification.json.
+
+Final-head F6/F7/F8 and other independent checks passed. Two failures remain:
+D11/#471 AQG Linux shard2 live-reinstatement retryable TimeoutError, and D12/#472
+Beast Phase2 Windows Go VCS-status exit128 after Go tests passed. Root causes
+remain unresolved. Three existing same-source native executions passed D11's
+test; existing F6 on AQG Windows built the same Go source with VCS stamping.
+AQG31 admission is VERIFIED from already-valid08:57Z evidence; no new admission.
+
+Exactly one retry per failed job was accepted at14:18Z: D11 job103557723475 in
+run34695331201; D12 job103557723740 in run34695331247. No successful job or full
+native replacement matrix was manually repeated. GitHub may rerun dependent
+release aggregates. Original failed D11 ZIP/logs and both issues were durably
+retained first. Receipt: diagnostics/D11-D12-targeted-retry-dispatch.json.
+Inspect retries near completion, no later than14:55Z; retain new job/attempt/
+runner/source evidence. If either recurs, diagnose the actual stage/host instead
+of another blind retry. A retry pass does not erase the original failure.
+
+All eight legacy workflows remain. No merge or retirement until replacement-proof
+and required final-source/status gates are satisfied. No product/workflow change,
+runner account/pool change, physical deployment or protected Recorder access.
+Physical runtime remains9b286f931497bf6291e215f6340443c5162826b0. No physical PASS;
+P07/P12 have not started. Plans: CI_COVERAGE_MIGRATION_PLAN.md and diagnostics/
+ci-migration-equivalence-matrix.json. Historical deltas below retain original dates.
+
 Current user direction, September 11 2026: execute on state changes, using this
 checkpoint and the completed diagnostic sweep report; do not repeat the sweep.
 
@@ -2718,3 +2704,7 @@ repeat successful jobs or the two complete replacement executions. Persist new
 attempt/runner provenance; do not treat a retry pass as erasure of the failure.
 If either recurs, preserve it and obtain focused host/stage diagnostics instead
 of entering a blind retry loop. No deadline, authority or VCS checks are weakened.
+
+## 2026-09-12T14:18:58.767183+00:00 — targeted retries dispatched
+
+Both single-job API requests returned success. See diagnostics/D11-D12-targeted-retry-dispatch.json for the initial attempt/runner/progress snapshot. No source, workflow, runner, physical runtime or protected Recorder state was changed.
