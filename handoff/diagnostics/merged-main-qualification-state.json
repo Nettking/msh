@@ -2,7 +2,7 @@
   "source_commit": "2a9c9b8eb53edff74c2de23570ec56e054d29b22",
   "actual_main": "2a9c9b8eb53edff74c2de23570ec56e054d29b22",
   "main_matches": true,
-  "recorded_at": "2026-09-12T05:12:27.653550+00:00",
+  "recorded_at": "2026-09-12T05:15:16.866622+00:00",
   "workflows": [
     {
       "workflow": "federation-v1-release.yml",
@@ -540,25 +540,25 @@
       "run_id": 34672498480,
       "event": "workflow_dispatch",
       "api_head_sha": "2a9c9b8eb53edff74c2de23570ec56e054d29b22",
-      "status": "in_progress",
-      "conclusion": null,
+      "status": "completed",
+      "conclusion": "failure",
       "attempt": 1,
       "required_count": 2,
       "signature": {
-        "status": "in_progress",
-        "conclusion": null,
+        "status": "completed",
+        "conclusion": "failure",
         "run_attempt": 1,
-        "updated_at": "2026-09-12T05:09:29Z"
+        "updated_at": "2026-09-12T05:14:41Z"
       },
       "jobs": [
         {
           "id": 103496400575,
           "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
-          "status": "in_progress",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "failure",
           "runner_name": "Nettking",
           "started_at": "2026-09-12T05:09:29Z",
-          "completed_at": null
+          "completed_at": "2026-09-12T05:14:40Z"
         },
         {
           "id": 103496400650,

@@ -1,90 +1,18 @@
 {
-  "recorded_at": "2026-09-12T05:12:27.653550+00:00",
+  "recorded_at": "2026-09-12T05:15:16.866622+00:00",
   "source_commit": "2a9c9b8eb53edff74c2de23570ec56e054d29b22",
   "changes": [
     {
-      "workflow": "federation-v1-release.yml",
-      "run_id": 34672364135,
-      "status": "completed",
-      "conclusion": "success",
-      "jobs": [
-        {
-          "id": 103496010739,
-          "name": "Release checks (Windows)",
-          "status": "completed",
-          "conclusion": "success"
-        },
-        {
-          "id": 103496010847,
-          "name": "Linux regression shard (0)",
-          "status": "completed",
-          "conclusion": "success"
-        },
-        {
-          "id": 103501411925,
-          "name": "Clean-checkout suite order independence",
-          "status": "completed",
-          "conclusion": "success"
-        },
-        {
-          "id": 103502170378,
-          "name": "Release matrix (Windows)",
-          "status": "completed",
-          "conclusion": "success"
-        },
-        {
-          "id": 103502170407,
-          "name": "Release matrix (Linux)",
-          "status": "completed",
-          "conclusion": "success"
-        },
-        {
-          "id": 103502214129,
-          "name": "Federation v1 automated release verdict",
-          "status": "completed",
-          "conclusion": "success"
-        }
-      ]
-    },
-    {
-      "workflow": "cf7-acceptance-harness.yml",
-      "run_id": 34672479567,
-      "status": "completed",
-      "conclusion": "success",
-      "jobs": [
-        {
-          "id": 103496345578,
-          "name": "harness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Byp...",
-          "status": "completed",
-          "conclusion": "success"
-        }
-      ]
-    },
-    {
-      "workflow": "ci-test-sharding.yml",
-      "run_id": 34672495196,
-      "status": "completed",
-      "conclusion": "success",
-      "jobs": [
-        {
-          "id": 103496391321,
-          "name": "Shard contract (Windows, shared-pool)",
-          "status": "completed",
-          "conclusion": "success"
-        }
-      ]
-    },
-    {
       "workflow": "phase-f85-operator-federation-surface.yml",
       "run_id": 34672498480,
-      "status": "in_progress",
-      "conclusion": null,
+      "status": "completed",
+      "conclusion": "failure",
       "jobs": [
         {
           "id": 103496400575,
           "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
-          "status": "in_progress",
-          "conclusion": null
+          "status": "completed",
+          "conclusion": "failure"
         }
       ]
     }
