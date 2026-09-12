@@ -1,0 +1,40 @@
+{
+  "finding": "D11",
+  "status": "CONFIRMED_FAILURE_ROOT_CAUSE_UNRESOLVED",
+  "recorded_at": "2026-09-12T14:00:00.583114+00:00",
+  "candidate_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+  "actual_checkout_sha": "f18e91adae2cb198fb5cebad61ee202a38d2bd8e",
+  "checkout_tree_identical_to_candidate": true,
+  "host": "AQG7NCC-Linux, runner31",
+  "physical_stage": "Linux release regression shard2; no physical stage",
+  "command": "python -m scripts.ci_pytest_shards run --index 2 --count 4 --manifest <runner.temp>/release-shards/shard-2.json -- -o addopts= -q --durations=20 --junitxml=<runner.temp>/release-shards/junit-2.xml",
+  "observed": "test_live_reinstatement_restores_replica_and_acknowledgement_policy ends retryable/TimeoutError instead of completed at catalog/node/tests/test_live_storage_reinstatement.py:410; 1 failed,1101 passed,19 skipped,3365 deselected; failing case49.57s.",
+  "expected": "The final reinstatement succeeds after the test exercises rollback/retry, restoring replica and acknowledgement policy.",
+  "classification": "UNRESOLVED: timeout is confirmed; product, test-harness timing, host load/admission or transient transport cause is not established.",
+  "acceptance_impact": "Release shard2 and dependent aggregates fail on this PR source. Preserve prior main17ab and F7 equivalence evidence; do not call this a documentation regression or physical acceptance.",
+  "safe_continuation": "YES: independent read-only/focused diagnosis on unchanged source; no merge or retirement while required failures remain unclassified/unresolved.",
+  "evidence": {
+    "run_id": 34695331201,
+    "job_id": 103557723475,
+    "native_log_receipt": {
+      "job_id": 103557723475,
+      "run_id": 34695331201,
+      "name": "Linux regression shard (2)",
+      "runner_name": "AQG7NCC-Linux",
+      "conclusion": "failure",
+      "bytes": 121628,
+      "sha256": "fbb1bfd75b2c80a6f4339eeae25f8e1bcfa78168479d91ba0a6949961c58c519",
+      "checkout_commits": [
+        "f18e91adae2cb198fb5cebad61ee202a38d2bd8e"
+      ],
+      "checkout_matches": true
+    },
+    "durable_excerpt": "D11-native-excerpt.log"
+  },
+  "state_changed": "CI-owned checkout/test fixtures/dependency caches and failed build/test work only; investigation read retained logs. No manual host mutation.",
+  "protected_recorder_data": "UNTOUCHED",
+  "physical_runtime_sha": "9b286f931497bf6291e215f6340443c5162826b0",
+  "github_artifact": "PENDING",
+  "repair": "NONE",
+  "next_diagnostic_action": "Retain the failed shard manifest/JUnit and inspect the exact result/timeout boundary in test_live_storage_reinstatement.py and live_storage_reinstatement.py. Check prior native same-test outcomes and AQG31 admission evidence before a focused unchanged-source reproduction. Do not extend deadlines or weaken authority/acknowledgement guards."
+}

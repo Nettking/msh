@@ -1,0 +1,853 @@
+2026-09-12T13:21:30.9770846Z =================================== FAILURES ===================================
+2026-09-12T13:21:30.9772438Z _____ test_live_reinstatement_restores_replica_and_acknowledgement_policy ______
+2026-09-12T13:21:30.9773347Z 
+2026-09-12T13:21:30.9774515Z tmp_path = PosixPath('/home/fcp-ci-aqg7ncc/actions-runner/_work/_temp/fcp-test-tmp/pytest-of-fcp-ci-aqg7ncc/pytest-0/test_live_reinstatement_restor0')
+2026-09-12T13:21:30.9775303Z 
+2026-09-12T13:21:30.9775661Z     def test_live_reinstatement_restores_replica_and_acknowledgement_policy(
+2026-09-12T13:21:30.9776106Z         tmp_path: Path,
+2026-09-12T13:21:30.9776562Z     ) -> None:
+2026-09-12T13:21:30.9776891Z         async def scenario() -> None:
+2026-09-12T13:21:30.9777293Z             relay: RelayServer | None = None
+2026-09-12T13:21:30.9777743Z             authority: RelayNodeClient | None = None
+2026-09-12T13:21:30.9778281Z             authority_endpoint: RelayStorageEndpoint | None = None
+2026-09-12T13:21:30.9778855Z             failover: StorageFailoverCoordinator | None = None
+2026-09-12T13:21:30.9779391Z             former_primary: LiveStorageNodeAgent | None = None
+2026-09-12T13:21:30.9780317Z             promoted: LiveStorageNodeAgent | None = None
+2026-09-12T13:21:30.9781148Z             bootstrap_tasks: list[asyncio.Task[None]] = []
+2026-09-12T13:21:30.9781919Z             try:
+2026-09-12T13:21:30.9782500Z                 coordinator = SessionCoordinator(
+2026-09-12T13:21:30.9784572Z                     tmp_path / "relay" / "control.sqlite3",
+2026-09-12T13:21:30.9785071Z                     clock=lambda: NOW,
+2026-09-12T13:21:30.9785664Z                 )
+2026-09-12T13:21:30.9786040Z                 relay = RelayServer(
+2026-09-12T13:21:30.9786497Z                     coordinator,
+2026-09-12T13:21:30.9786898Z                     host="127.0.0.1",
+2026-09-12T13:21:30.9787281Z                     port=0,
+2026-09-12T13:21:30.9787742Z                     auth_timeout_seconds=TIMEOUT,
+2026-09-12T13:21:30.9788637Z                     send_timeout_seconds=TIMEOUT,
+2026-09-12T13:21:30.9789079Z                     heartbeat_timeout_seconds=300,
+2026-09-12T13:21:30.9789668Z                     sweep_interval_seconds=300,
+2026-09-12T13:21:30.9790218Z                 )
+2026-09-12T13:21:30.9790479Z                 await relay.start()
+2026-09-12T13:21:30.9790818Z                 authority = RelayNodeClient(
+2026-09-12T13:21:30.9791259Z                     state_directory=tmp_path / "authority-node",
+2026-09-12T13:21:30.9791931Z                     relay_url=relay.url,
+2026-09-12T13:21:30.9792442Z                     display_name="Storage authority",
+2026-09-12T13:21:30.9792942Z                     allow_insecure_local=True,
+2026-09-12T13:21:30.9793400Z                     heartbeat_interval=300,
+2026-09-12T13:21:30.9793911Z                     request_timeout=TIMEOUT,
+2026-09-12T13:21:30.9794377Z                     clock=lambda: NOW,
+2026-09-12T13:21:30.9795058Z                 )
+2026-09-12T13:21:30.9795546Z                 await _enroll(relay, authority)
+2026-09-12T13:21:30.9796426Z                 session = await authority.create_session("Physical federation F4.2")
+2026-09-12T13:21:30.9796954Z                 session_id = str(session["session_id"])
+2026-09-12T13:21:30.9797325Z     
+2026-09-12T13:21:30.9797589Z                 former_config = _write_config(
+2026-09-12T13:21:30.9797945Z                     tmp_path / "former-primary",
+2026-09-12T13:21:30.9798266Z                     relay_url=relay.url,
+2026-09-12T13:21:30.9798595Z                     session_id=session_id,
+2026-09-12T13:21:30.9798988Z                     display_name="Former primary storage",
+2026-09-12T13:21:30.9799373Z                     provider_id="provider-primary",
+2026-09-12T13:21:30.9799620Z                 )
+2026-09-12T13:21:30.9799904Z                 promoted_config = _write_config(
+2026-09-12T13:21:30.9800417Z                     tmp_path / "promoted",
+2026-09-12T13:21:30.9800775Z                     relay_url=relay.url,
+2026-09-12T13:21:30.9801103Z                     session_id=session_id,
+2026-09-12T13:21:30.9801593Z                     display_name="Promoted storage",
+2026-09-12T13:21:30.9802143Z                     provider_id="provider-replica",
+2026-09-12T13:21:30.9802602Z                 )
+2026-09-12T13:21:30.9802917Z                 former_primary = LiveStorageNodeAgent(
+2026-09-12T13:21:30.9803227Z                     former_config,
+2026-09-12T13:21:30.9803641Z                     control_authority_node_id=authority.node_id,
+2026-09-12T13:21:30.9804021Z                     control_sync_timeout=TIMEOUT,
+2026-09-12T13:21:30.9804386Z                     clock=lambda: NOW,
+2026-09-12T13:21:30.9804757Z                 )
+2026-09-12T13:21:30.9805068Z                 promoted = LiveStorageNodeAgent(
+2026-09-12T13:21:30.9805392Z                     promoted_config,
+2026-09-12T13:21:30.9806150Z                     control_authority_node_id=authority.node_id,
+2026-09-12T13:21:30.9807050Z                     control_sync_timeout=TIMEOUT,
+2026-09-12T13:21:30.9807548Z                     clock=lambda: NOW,
+2026-09-12T13:21:30.9807800Z                 )
+2026-09-12T13:21:30.9807968Z     
+2026-09-12T13:21:30.9808990Z                 control_path = tmp_path / "authority-storage-control.sqlite3"
+2026-09-12T13:21:30.9809819Z                 control = PhaseDControlPlane(control_path)
+2026-09-12T13:21:30.9810760Z                 control.create_group(session_id, authority.node_id, "storage-main")
+2026-09-12T13:21:30.9811748Z                 control.register_provider(
+2026-09-12T13:21:30.9812204Z                     session_id,
+2026-09-12T13:21:30.9812603Z                     authority.node_id,
+2026-09-12T13:21:30.9812898Z                     _registration(
+2026-09-12T13:21:30.9813526Z                         session_id,
+2026-09-12T13:21:30.9814026Z                         "provider-primary",
+2026-09-12T13:21:30.9814802Z                         former_primary.node_id,
+2026-09-12T13:21:30.9815312Z                     ),
+2026-09-12T13:21:30.9815881Z                 )
+2026-09-12T13:21:30.9816193Z                 control.register_provider(
+2026-09-12T13:21:30.9816619Z                     session_id,
+2026-09-12T13:21:30.9816954Z                     authority.node_id,
+2026-09-12T13:21:30.9817248Z                     _registration(
+2026-09-12T13:21:30.9817541Z                         session_id,
+2026-09-12T13:21:30.9817872Z                         "provider-replica",
+2026-09-12T13:21:30.9818218Z                         promoted.node_id,
+2026-09-12T13:21:30.9818479Z                     ),
+2026-09-12T13:21:30.9818805Z                 )
+2026-09-12T13:21:30.9819117Z                 control.change_assignment(
+2026-09-12T13:21:30.9821273Z                     session_id,
+2026-09-12T13:21:30.9821868Z                     authority.node_id,
+2026-09-12T13:21:30.9822329Z                     "storage-main",
+2026-09-12T13:21:30.9822685Z                     "provider-primary",
+2026-09-12T13:21:30.9823007Z                     ("provider-replica",),
+2026-09-12T13:21:30.9823247Z                 )
+2026-09-12T13:21:30.9823543Z                 control.set_acknowledgement_policy(
+2026-09-12T13:21:30.9823840Z                     session_id,
+2026-09-12T13:21:30.9824149Z                     "storage-main",
+2026-09-12T13:21:30.9824677Z                     AcknowledgementMode.ONE_REPLICA,
+2026-09-12T13:21:30.9824983Z                 )
+2026-09-12T13:21:30.9825396Z                 control.grant_leader(
+2026-09-12T13:21:30.9825728Z                     session_id,
+2026-09-12T13:21:30.9826028Z                     authority.node_id,
+2026-09-12T13:21:30.9826322Z                     "storage-main",
+2026-09-12T13:21:30.9826801Z                     "provider-primary",
+2026-09-12T13:21:30.9827107Z                     "grant-1",
+2026-09-12T13:21:30.9827337Z                     1,
+2026-09-12T13:21:30.9827550Z                     1,
+2026-09-12T13:21:30.9827921Z                     lease_expires_at=NOW + timedelta(minutes=15),
+2026-09-12T13:21:30.9828270Z                     occurred_at=NOW,
+2026-09-12T13:21:30.9828500Z                 )
+2026-09-12T13:21:30.9828652Z     
+2026-09-12T13:21:30.9828967Z                 authority_endpoint = RelayStorageEndpoint(
+2026-09-12T13:21:30.9829277Z                     authority,
+2026-09-12T13:21:30.9829586Z                     request_timeout=TIMEOUT,
+2026-09-12T13:21:30.9829821Z                 )
+2026-09-12T13:21:30.9830106Z                 await authority_endpoint.start()
+2026-09-12T13:21:30.9845029Z                 publication_store = StorageControlPublicationStore(
+2026-09-12T13:21:30.9845889Z                     tmp_path / "authority-publications.sqlite3"
+2026-09-12T13:21:30.9846199Z                 )
+2026-09-12T13:21:30.9846612Z                 failover_store_path = tmp_path / "authority-failover.sqlite3"
+2026-09-12T13:21:30.9847114Z                 failover_store = LiveFailoverStore(failover_store_path)
+2026-09-12T13:21:30.9847525Z                 channel = StorageControlRelayChannel(
+2026-09-12T13:21:30.9848264Z                     authority,
+2026-09-12T13:21:30.9848597Z                     authority_endpoint,
+2026-09-12T13:21:30.9848926Z                     timeout=TIMEOUT,
+2026-09-12T13:21:30.9849184Z                 )
+2026-09-12T13:21:30.9849631Z                 failover = StorageFailoverCoordinator(
+2026-09-12T13:21:30.9850044Z                     session_coordinator=coordinator,
+2026-09-12T13:21:30.9850412Z                     control_plane=control,
+2026-09-12T13:21:30.9850835Z                     publication_store=publication_store,
+2026-09-12T13:21:30.9851511Z                     credentials=authority.credentials,
+2026-09-12T13:21:30.9851910Z                     channel=channel,
+2026-09-12T13:21:30.9852299Z                     failover_store=failover_store,
+2026-09-12T13:21:30.9852637Z                     session_id=session_id,
+2026-09-12T13:21:30.9852950Z                     lease_seconds=300,
+2026-09-12T13:21:30.9853247Z                     clock=lambda: NOW,
+2026-09-12T13:21:30.9853469Z                 )
+2026-09-12T13:21:30.9853827Z                 await failover.start()
+2026-09-12T13:21:30.9854023Z     
+2026-09-12T13:21:30.9854331Z                 former_bootstrap = asyncio.create_task(
+2026-09-12T13:21:30.9854793Z                     former_primary.bootstrap(
+2026-09-12T13:21:30.9855271Z                         enrollment_token=str(
+2026-09-12T13:21:30.9855744Z                             coordinator.create_enrollment_token(
+2026-09-12T13:21:30.9856173Z                                 ttl_seconds=60,
+2026-09-12T13:21:30.9856538Z                                 max_uses=1,
+2026-09-12T13:21:30.9856858Z                             )["token"]
+2026-09-12T13:21:30.9857123Z                         ),
+2026-09-12T13:21:30.9857461Z                         session_invitation=str(
+2026-09-12T13:21:30.9857756Z                             (
+2026-09-12T13:21:30.9858221Z                                 await authority.create_invitation(
+2026-09-12T13:21:30.9858638Z                                     session_id,
+2026-09-12T13:21:30.9859052Z                                     ttl_seconds=60,
+2026-09-12T13:21:30.9859444Z                                     max_uses=1,
+2026-09-12T13:21:30.9859793Z                                 )
+2026-09-12T13:21:30.9860302Z                             )["token"]
+2026-09-12T13:21:30.9860570Z                         ),
+2026-09-12T13:21:30.9860780Z                     )
+2026-09-12T13:21:30.9860980Z                 )
+2026-09-12T13:21:30.9861310Z                 promoted_bootstrap = asyncio.create_task(
+2026-09-12T13:21:30.9861888Z                     promoted.bootstrap(
+2026-09-12T13:21:30.9862568Z                         enrollment_token=str(
+2026-09-12T13:21:30.9863118Z                             coordinator.create_enrollment_token(
+2026-09-12T13:21:30.9863721Z                                 ttl_seconds=60,
+2026-09-12T13:21:30.9864105Z                                 max_uses=1,
+2026-09-12T13:21:30.9864419Z                             )["token"]
+2026-09-12T13:21:30.9864774Z                         ),
+2026-09-12T13:21:30.9865295Z                         session_invitation=str(
+2026-09-12T13:21:30.9865590Z                             (
+2026-09-12T13:21:30.9866177Z                                 await authority.create_invitation(
+2026-09-12T13:21:30.9866613Z                                     session_id,
+2026-09-12T13:21:30.9867138Z                                     ttl_seconds=60,
+2026-09-12T13:21:30.9867572Z                                     max_uses=1,
+2026-09-12T13:21:30.9868026Z                                 )
+2026-09-12T13:21:30.9868610Z                             )["token"]
+2026-09-12T13:21:30.9869007Z                         ),
+2026-09-12T13:21:30.9869652Z                     )
+2026-09-12T13:21:30.9870186Z                 )
+2026-09-12T13:21:30.9870660Z                 bootstrap_tasks.extend((former_bootstrap, promoted_bootstrap))
+2026-09-12T13:21:30.9871039Z                 await asyncio.gather(
+2026-09-12T13:21:30.9871532Z                     _wait_for_control_waiting(former_primary, former_bootstrap),
+2026-09-12T13:21:30.9872086Z                     _wait_for_control_waiting(promoted, promoted_bootstrap),
+2026-09-12T13:21:30.9872370Z                 )
+2026-09-12T13:21:30.9872645Z                 await failover.publish_current(
+2026-09-12T13:21:30.9873230Z                     (former_primary.node_id, promoted.node_id)
+2026-09-12T13:21:30.9873503Z                 )
+2026-09-12T13:21:30.9873854Z                 await asyncio.wait_for(former_bootstrap, TIMEOUT)
+2026-09-12T13:21:30.9874936Z                 await asyncio.wait_for(promoted_bootstrap, TIMEOUT)
+2026-09-12T13:21:30.9875258Z     
+2026-09-12T13:21:30.9875611Z                 acknowledgements = DurableAcknowledgementStore(
+2026-09-12T13:21:30.9876118Z                     tmp_path / "authority-acks.sqlite3"
+2026-09-12T13:21:30.9876395Z                 )
+2026-09-12T13:21:30.9876713Z                 logical = PhaseDLogicalStorageClient(
+2026-09-12T13:21:30.9877062Z                     session_id=session_id,
+2026-09-12T13:21:30.9877435Z                     actor_node_id=authority.node_id,
+2026-09-12T13:21:30.9877874Z                     control_plane=control,
+2026-09-12T13:21:30.9878404Z                     transport=authority_endpoint,
+2026-09-12T13:21:30.9878831Z                     acknowledgements=acknowledgements,
+2026-09-12T13:21:30.9879177Z                     clock=lambda: NOW,
+2026-09-12T13:21:30.9879424Z                 )
+2026-09-12T13:21:30.9879690Z                 contents = {
+2026-09-12T13:21:30.9880303Z                     "batch-1": {"sequence": 1, "phase": "before-failover"},
+2026-09-12T13:21:30.9880896Z                     "batch-2": {"sequence": 2, "phase": "after-failover"},
+2026-09-12T13:21:30.9881411Z                     "batch-3": {"sequence": 3, "phase": "after-failover"},
+2026-09-12T13:21:30.9881953Z                     "batch-4": {"sequence": 4, "phase": "admission-race"},
+2026-09-12T13:21:30.9882479Z                     "batch-5": {"sequence": 5, "phase": "restored-redundancy"},
+2026-09-12T13:21:30.9882804Z                 }
+2026-09-12T13:21:30.9883120Z                 first = await logical.ingest_batch(
+2026-09-12T13:21:30.9883496Z                     group_id="storage-main",
+2026-09-12T13:21:30.9883913Z                     dataset_id="telemetry",
+2026-09-12T13:21:30.9884247Z                     batch_id="batch-1",
+2026-09-12T13:21:30.9884604Z                     idempotency_key="f42:batch-1",
+2026-09-12T13:21:30.9885110Z                     content=contents["batch-1"],
+2026-09-12T13:21:30.9885448Z                     created_at=NOW,
+2026-09-12T13:21:30.9885703Z                 )
+2026-09-12T13:21:30.9885955Z                 assert first.committed
+2026-09-12T13:21:30.9886491Z                 old_node_id = former_primary.node_id
+2026-09-12T13:21:30.9887235Z                 await former_primary.close()
+2026-09-12T13:21:30.9887856Z                 promotion = await _wait_for_promotion(failover)
+2026-09-12T13:21:30.9888403Z                 assert promotion.promoted_provider_id == "provider-replica"
+2026-09-12T13:21:30.9888822Z     
+2026-09-12T13:21:30.9889133Z                 for batch_id in ("batch-2", "batch-3"):
+2026-09-12T13:21:30.9889574Z                     committed = await logical.ingest_batch(
+2026-09-12T13:21:30.9890019Z                         group_id="storage-main",
+2026-09-12T13:21:30.9890372Z                         dataset_id="telemetry",
+2026-09-12T13:21:30.9890860Z                         batch_id=batch_id,
+2026-09-12T13:21:30.9891274Z                         idempotency_key=f"f42:{batch_id}",
+2026-09-12T13:21:30.9891675Z                         content=contents[batch_id],
+2026-09-12T13:21:30.9892004Z                         created_at=NOW,
+2026-09-12T13:21:30.9892239Z                     )
+2026-09-12T13:21:30.9892537Z                     assert committed.committed
+2026-09-12T13:21:30.9892737Z     
+2026-09-12T13:21:30.9893028Z                 former_primary = LiveStorageNodeAgent(
+2026-09-12T13:21:30.9893341Z                     former_config,
+2026-09-12T13:21:30.9893743Z                     control_authority_node_id=authority.node_id,
+2026-09-12T13:21:30.9894123Z                     control_sync_timeout=TIMEOUT,
+2026-09-12T13:21:30.9894433Z                     clock=lambda: NOW,
+2026-09-12T13:21:30.9894649Z                 )
+2026-09-12T13:21:30.9895043Z                 await asyncio.wait_for(former_primary.bootstrap(), TIMEOUT)
+2026-09-12T13:21:30.9895474Z                 assert former_primary.node_id == old_node_id
+2026-09-12T13:21:30.9895922Z                 assert former_primary.status()["provider"]["groups"] == [
+2026-09-12T13:21:30.9896550Z                     {"group_id": "storage-main", "role": "unassigned"}
+2026-09-12T13:21:30.9896821Z                 ]
+2026-09-12T13:21:30.9896964Z     
+2026-09-12T13:21:30.9897229Z                 catchup_store = LiveCatchupStore(
+2026-09-12T13:21:30.9897616Z                     tmp_path / "authority-catchup.sqlite3"
+2026-09-12T13:21:30.9897863Z                 )
+2026-09-12T13:21:30.9898204Z                 catchup = LiveFormerPrimaryCatchupCoordinator(
+2026-09-12T13:21:30.9898604Z                     session_coordinator=coordinator,
+2026-09-12T13:21:30.9899000Z                     control_plane=control,
+2026-09-12T13:21:30.9899351Z                     failover_store=failover_store,
+2026-09-12T13:21:30.9899755Z                     transport=authority_endpoint,
+2026-09-12T13:21:30.9900131Z                     credentials=authority.credentials,
+2026-09-12T13:21:30.9900490Z                     catchup_store=catchup_store,
+2026-09-12T13:21:30.9900814Z                     session_id=session_id,
+2026-09-12T13:21:30.9901117Z                     clock=lambda: NOW,
+2026-09-12T13:21:30.9901338Z                 )
+2026-09-12T13:21:30.9901770Z                 caught_up = await catchup.run_once(
+2026-09-12T13:21:30.9902270Z                     group_id="storage-main",
+2026-09-12T13:21:30.9902676Z                     returning_provider_id="provider-primary",
+2026-09-12T13:21:30.9902928Z                 )
+2026-09-12T13:21:30.9903308Z                 assert caught_up.status == "caught-up", caught_up.to_dict()
+2026-09-12T13:21:30.9903566Z     
+2026-09-12T13:21:30.9903951Z                 reinstatement = LiveFormerPrimaryReinstatementCoordinator(
+2026-09-12T13:21:30.9904352Z                     control_plane=control,
+2026-09-12T13:21:30.9904730Z                     publication_store=publication_store,
+2026-09-12T13:21:30.9905291Z                     failover_store=failover_store,
+2026-09-12T13:21:30.9905648Z                     catchup_store=catchup_store,
+2026-09-12T13:21:30.9905947Z                     catchup=catchup,
+2026-09-12T13:21:30.9906227Z                     channel=channel,
+2026-09-12T13:21:30.9906580Z                     credentials=authority.credentials,
+2026-09-12T13:21:30.9906911Z                     session_id=session_id,
+2026-09-12T13:21:30.9907207Z                     clock=lambda: NOW,
+2026-09-12T13:21:30.9907423Z                 )
+2026-09-12T13:21:30.9907568Z     
+2026-09-12T13:21:30.9907835Z                 original_publish = channel.publish
+2026-09-12T13:21:30.9908170Z                 admission_write_injected = False
+2026-09-12T13:21:30.9908372Z     
+2026-09-12T13:21:30.9908752Z                 async def publish_with_admission_write(plan, target_node_ids):
+2026-09-12T13:21:30.9909185Z                     nonlocal admission_write_injected
+2026-09-12T13:21:30.9909481Z                     group = next(
+2026-09-12T13:21:30.9909805Z                         item
+2026-09-12T13:21:30.9912230Z                         for item in plan.groups
+2026-09-12T13:21:30.9913650Z                         if item["group_id"] == "storage-main"
+2026-09-12T13:21:30.9914475Z                     )
+2026-09-12T13:21:30.9915093Z                     if (
+2026-09-12T13:21:30.9916233Z                         not admission_write_injected
+2026-09-12T13:21:30.9917871Z                         and "provider-primary" in group["replica_provider_ids"]
+2026-09-12T13:21:30.9919490Z                         and group["acknowledgement_mode"] == "primary"
+2026-09-12T13:21:30.9920275Z                     ):
+2026-09-12T13:21:30.9921880Z                         # The coordinator assignment is committed, but the returning
+2026-09-12T13:21:30.9923451Z                         # node has not applied it yet. A primary-only write may commit
+2026-09-12T13:21:30.9924997Z                         # while that node still rejects normal replica traffic.
+2026-09-12T13:21:30.9926188Z                         admission_write_injected = True
+2026-09-12T13:21:30.9927458Z                         committed = await logical.ingest_batch(
+2026-09-12T13:21:30.9928931Z                             group_id="storage-main",
+2026-09-12T13:21:30.9930140Z                             dataset_id="telemetry",
+2026-09-12T13:21:30.9931409Z                             batch_id="batch-4",
+2026-09-12T13:21:30.9932766Z                             idempotency_key="f42:batch-4",
+2026-09-12T13:21:30.9934063Z                             content=contents["batch-4"],
+2026-09-12T13:21:30.9935243Z                             created_at=NOW,
+2026-09-12T13:21:30.9935961Z                         )
+2026-09-12T13:21:30.9937718Z                         assert committed.committed
+2026-09-12T13:21:30.9939178Z                         admission_status = acknowledgements.status(
+2026-09-12T13:21:30.9940350Z                             session_id, "storage-main", "batch-4"
+2026-09-12T13:21:30.9941324Z                         )
+2026-09-12T13:21:30.9943416Z                         assert admission_status is not None
+2026-09-12T13:21:30.9944945Z                         assert admission_status.required_replica_acks == 0
+2026-09-12T13:21:30.9946502Z                         assert admission_status.acknowledged_replica_ids == ()
+2026-09-12T13:21:30.9947883Z                     return await original_publish(plan, target_node_ids)
+2026-09-12T13:21:30.9948582Z     
+2026-09-12T13:21:30.9949582Z                 channel.publish = publish_with_admission_write
+2026-09-12T13:21:30.9950689Z                 first_reinstatement = await reinstatement.run_once(
+2026-09-12T13:21:30.9951712Z                     group_id="storage-main",
+2026-09-12T13:21:30.9952816Z                     returning_provider_id="provider-primary",
+2026-09-12T13:21:30.9953436Z                 )
+2026-09-12T13:21:30.9954197Z                 channel.publish = original_publish
+2026-09-12T13:21:30.9955070Z                 assert admission_write_injected
+2026-09-12T13:21:30.9956365Z                 assert first_reinstatement.status == "retryable", (
+2026-09-12T13:21:30.9957541Z                     first_reinstatement.to_dict()
+2026-09-12T13:21:30.9958160Z                 )
+2026-09-12T13:21:30.9959144Z                 assert (
+2026-09-12T13:21:30.9960031Z                     first_reinstatement.code
+2026-09-12T13:21:30.9961054Z                     == "reinstatement-tail-catchup-required"
+2026-09-12T13:21:30.9961729Z                 )
+2026-09-12T13:21:30.9962999Z                 after_rollback = control.snapshot(session_id).groups["storage-main"]
+2026-09-12T13:21:30.9964661Z                 assert after_rollback.primary_provider_id == "provider-replica"
+2026-09-12T13:21:30.9966031Z                 assert after_rollback.replica_provider_ids == ()
+2026-09-12T13:21:30.9967082Z                 assert control.acknowledgement_policy(
+2026-09-12T13:21:30.9967919Z                     session_id,
+2026-09-12T13:21:30.9968673Z                     "storage-main",
+2026-09-12T13:21:30.9969364Z                 ).mode is AcknowledgementMode.PRIMARY
+2026-09-12T13:21:30.9970240Z                 assert control.storage_degraded_state(
+2026-09-12T13:21:30.9971259Z                     session_id,
+2026-09-12T13:21:30.9971905Z                     "storage-main",
+2026-09-12T13:21:30.9972554Z                 ) is not None
+2026-09-12T13:21:30.9973796Z                 assert former_primary.status()["provider"]["groups"] == [
+2026-09-12T13:21:30.9974995Z                     {"group_id": "storage-main", "role": "unassigned"}
+2026-09-12T13:21:30.9975688Z                 ]
+2026-09-12T13:21:30.9976087Z     
+2026-09-12T13:21:30.9977457Z                 restarted = LiveFormerPrimaryReinstatementCoordinator(
+2026-09-12T13:21:30.9978796Z                     control_plane=PhaseDControlPlane(control_path),
+2026-09-12T13:21:30.9980536Z                     publication_store=StorageControlPublicationStore(
+2026-09-12T13:21:30.9982510Z                         tmp_path / "authority-publications.sqlite3"
+2026-09-12T13:21:30.9983242Z                     ),
+2026-09-12T13:21:30.9984381Z                     failover_store=LiveFailoverStore(failover_store_path),
+2026-09-12T13:21:30.9985384Z                     catchup_store=LiveCatchupStore(
+2026-09-12T13:21:30.9986966Z                         tmp_path / "authority-catchup.sqlite3"
+2026-09-12T13:21:30.9987733Z                     ),
+2026-09-12T13:21:30.9988678Z                     catchup=LiveFormerPrimaryCatchupCoordinator(
+2026-09-12T13:21:30.9989703Z                         session_coordinator=coordinator,
+2026-09-12T13:21:30.9991194Z                         control_plane=PhaseDControlPlane(control_path),
+2026-09-12T13:21:30.9993036Z                         failover_store=LiveFailoverStore(failover_store_path),
+2026-09-12T13:21:30.9994679Z                         transport=authority_endpoint,
+2026-09-12T13:21:30.9995673Z                         credentials=authority.credentials,
+2026-09-12T13:21:30.9996901Z                         catchup_store=LiveCatchupStore(
+2026-09-12T13:21:30.9998070Z                             tmp_path / "authority-catchup.sqlite3"
+2026-09-12T13:21:30.9998858Z                         ),
+2026-09-12T13:21:31.0000438Z                         session_id=session_id,
+2026-09-12T13:21:31.0001377Z                         clock=lambda: NOW,
+2026-09-12T13:21:31.0002586Z                     ),
+2026-09-12T13:21:31.0003527Z                     channel=channel,
+2026-09-12T13:21:31.0004599Z                     credentials=authority.credentials,
+2026-09-12T13:21:31.0017684Z                     session_id=session_id,
+2026-09-12T13:21:31.0018747Z                     clock=lambda: NOW,
+2026-09-12T13:21:31.0019448Z                 )
+2026-09-12T13:21:31.0020265Z                 completed = await restarted.run_once(
+2026-09-12T13:21:31.0021298Z                     group_id="storage-main",
+2026-09-12T13:21:31.0023171Z                     returning_provider_id="provider-primary",
+2026-09-12T13:21:31.0023939Z                 )
+2026-09-12T13:21:31.0025181Z                 assert completed.status == "completed", completed.to_dict()
+2026-09-12T13:21:31.0026677Z                 assert completed.record is not None
+2026-09-12T13:21:31.0027971Z                 assert completed.record.state == "completed"
+2026-09-12T13:21:31.0029322Z                 assert completed.record.final_report_revision is not None
+2026-09-12T13:21:31.0030676Z                 assert completed.record.final_report_hash is not None
+2026-09-12T13:21:31.0032367Z                 assert completed.record.final_publication is not None
+2026-09-12T13:21:31.0033233Z     
+2026-09-12T13:21:31.0034306Z                 snapshot = control.snapshot(session_id)
+2026-09-12T13:21:31.0035408Z                 assignment = snapshot.groups["storage-main"]
+2026-09-12T13:21:31.0037110Z                 assert assignment.primary_provider_id == "provider-replica"
+2026-09-12T13:21:31.0038770Z                 assert assignment.replica_provider_ids == ("provider-primary",)
+2026-09-12T13:21:31.0040147Z                 grant = snapshot.leader_grants["storage-main"]
+2026-09-12T13:21:31.0041487Z                 assert grant["provider_id"] == "provider-replica"
+2026-09-12T13:21:31.0042820Z                 assert grant["term"] == promotion.term
+2026-09-12T13:21:31.0044203Z                 assert grant["fencing_token"] == promotion.fencing_token
+2026-09-12T13:21:31.0045435Z                 assert control.acknowledgement_policy(
+2026-09-12T13:21:31.0046348Z                     session_id,
+2026-09-12T13:21:31.0047171Z                     "storage-main",
+2026-09-12T13:21:31.0048010Z                 ).mode is AcknowledgementMode.ONE_REPLICA
+2026-09-12T13:21:31.0049159Z                 assert control.storage_degraded_state(
+2026-09-12T13:21:31.0050037Z                     session_id,
+2026-09-12T13:21:31.0050827Z                     "storage-main",
+2026-09-12T13:21:31.0051509Z                 ) is None
+2026-09-12T13:21:31.0052595Z                 assert former_primary.status()["provider"]["groups"] == [
+2026-09-12T13:21:31.0054136Z                     {"group_id": "storage-main", "role": "replica"}
+2026-09-12T13:21:31.0054909Z                 ]
+2026-09-12T13:21:31.0056027Z                 assessment = control.latest_storage_replica_assessment(
+2026-09-12T13:21:31.0057131Z                     session_id,
+2026-09-12T13:21:31.0059181Z                     "storage-main",
+2026-09-12T13:21:31.0060161Z                     "provider-primary",
+2026-09-12T13:21:31.0060811Z                 )
+2026-09-12T13:21:31.0061992Z                 assert assessment is not None
+2026-09-12T13:21:31.0063000Z                 assert assessment.accepted
+2026-09-12T13:21:31.0064000Z                 assert assessment.eligibility
+2026-09-12T13:21:31.0064578Z     
+2026-09-12T13:21:31.0065420Z                 final_write = await logical.ingest_batch(
+2026-09-12T13:21:31.0066990Z                     group_id="storage-main",
+2026-09-12T13:21:31.0068005Z                     dataset_id="telemetry",
+2026-09-12T13:21:31.0068969Z                     batch_id="batch-5",
+2026-09-12T13:21:31.0070050Z                     idempotency_key="f42:batch-5",
+2026-09-12T13:21:31.0071151Z                     content=contents["batch-5"],
+2026-09-12T13:21:31.0072064Z                     created_at=NOW,
+2026-09-12T13:21:31.0072593Z                 )
+2026-09-12T13:21:31.0073399Z                 assert final_write.committed
+2026-09-12T13:21:31.0074602Z                 final_status = acknowledgements.status(
+2026-09-12T13:21:31.0076932Z                     session_id, "storage-main", "batch-5"
+2026-09-12T13:21:31.0077394Z                 )
+2026-09-12T13:21:31.0078150Z                 assert final_status is not None
+2026-09-12T13:21:31.0079445Z                 assert final_status.required_replica_acks == 1
+2026-09-12T13:21:31.0080140Z                 assert final_status.acknowledged_replica_ids == (
+2026-09-12T13:21:31.0080522Z                     "provider-primary",
+2026-09-12T13:21:31.0080812Z                 )
+2026-09-12T13:21:31.0081129Z                 for agent in (former_primary, promoted):
+2026-09-12T13:21:31.0081595Z                     assert agent.provider.read(
+2026-09-12T13:21:31.0082120Z                         session_id=session_id,
+2026-09-12T13:21:31.0082648Z                         group_id="storage-main",
+2026-09-12T13:21:31.0083068Z                         batch_id="batch-5",
+2026-09-12T13:21:31.0083391Z                     ) == contents["batch-5"]
+2026-09-12T13:21:31.0083823Z                     assert agent.storage.inbound_listener_ports == ()
+2026-09-12T13:21:31.0084068Z     
+2026-09-12T13:21:31.0084336Z                 replay = await restarted.run_once(
+2026-09-12T13:21:31.0084839Z                     group_id="storage-main",
+2026-09-12T13:21:31.0085279Z                     returning_provider_id="provider-primary",
+2026-09-12T13:21:31.0085556Z                 )
+2026-09-12T13:21:31.0085922Z                 assert replay.status == "completed", replay.to_dict()
+2026-09-12T13:21:31.0086416Z                 assert replay.reinstatement_id == completed.reinstatement_id
+2026-09-12T13:21:31.0086726Z             finally:
+2026-09-12T13:21:31.0087007Z                 for task in bootstrap_tasks:
+2026-09-12T13:21:31.0087320Z                     if not task.done():
+2026-09-12T13:21:31.0087627Z                         task.cancel()
+2026-09-12T13:21:31.0087907Z                 if bootstrap_tasks:
+2026-09-12T13:21:31.0088404Z                     await asyncio.gather(*bootstrap_tasks, return_exceptions=True)
+2026-09-12T13:21:31.0088813Z                 if former_primary is not None:
+2026-09-12T13:21:31.0089164Z                     await former_primary.close()
+2026-09-12T13:21:31.0089476Z                 if promoted is not None:
+2026-09-12T13:21:31.0089799Z                     await promoted.close()
+2026-09-12T13:21:31.0090209Z                 if failover is not None:
+2026-09-12T13:21:31.0090524Z                     await failover.close()
+2026-09-12T13:21:31.0090866Z                 elif authority_endpoint is not None:
+2026-09-12T13:21:31.0091248Z                     await authority_endpoint.close()
+2026-09-12T13:21:31.0091728Z                 if authority is not None and authority.connected_event.is_set():
+2026-09-12T13:21:31.0092159Z                     await authority.disconnect()
+2026-09-12T13:21:31.0092461Z                 if relay is not None:
+2026-09-12T13:21:31.0093132Z                     await relay.stop()
+2026-09-12T13:21:31.0093331Z     
+2026-09-12T13:21:31.0093504Z >       asyncio.run(scenario())
+2026-09-12T13:21:31.0093638Z 
+2026-09-12T13:21:31.0093774Z catalog/node/tests/test_live_storage_reinstatement.py:495: 
+2026-09-12T13:21:31.0094079Z _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+2026-09-12T13:21:31.0094414Z /opt/fcp-ci/python/3.12.13/lib/python3.12/asyncio/runners.py:195: in run
+2026-09-12T13:21:31.0094950Z     return runner.run(main)
+2026-09-12T13:21:31.0095190Z            ^^^^^^^^^^^^^^^^
+2026-09-12T13:21:31.0095453Z /opt/fcp-ci/python/3.12.13/lib/python3.12/asyncio/runners.py:118: in run
+2026-09-12T13:21:31.0095789Z     return self._loop.run_until_complete(task)
+2026-09-12T13:21:31.0096083Z            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-09-12T13:21:31.0096421Z /opt/fcp-ci/python/3.12.13/lib/python3.12/asyncio/base_events.py:691: in run_until_complete
+2026-09-12T13:21:31.0096772Z     return future.result()
+2026-09-12T13:21:31.0096989Z            ^^^^^^^^^^^^^^^
+2026-09-12T13:21:31.0097211Z _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+2026-09-12T13:21:31.0097390Z 
+2026-09-12T13:21:31.0097503Z     async def scenario() -> None:
+2026-09-12T13:21:31.0097762Z         relay: RelayServer | None = None
+2026-09-12T13:21:31.0098048Z         authority: RelayNodeClient | None = None
+2026-09-12T13:21:31.0098397Z         authority_endpoint: RelayStorageEndpoint | None = None
+2026-09-12T13:21:31.0098774Z         failover: StorageFailoverCoordinator | None = None
+2026-09-12T13:21:31.0099127Z         former_primary: LiveStorageNodeAgent | None = None
+2026-09-12T13:21:31.0099468Z         promoted: LiveStorageNodeAgent | None = None
+2026-09-12T13:21:31.0099804Z         bootstrap_tasks: list[asyncio.Task[None]] = []
+2026-09-12T13:21:31.0100045Z         try:
+2026-09-12T13:21:31.0100301Z             coordinator = SessionCoordinator(
+2026-09-12T13:21:31.0100669Z                 tmp_path / "relay" / "control.sqlite3",
+2026-09-12T13:21:31.0100966Z                 clock=lambda: NOW,
+2026-09-12T13:21:31.0101173Z             )
+2026-09-12T13:21:31.0101696Z             relay = RelayServer(
+2026-09-12T13:21:31.0102125Z                 coordinator,
+2026-09-12T13:21:31.0102540Z                 host="127.0.0.1",
+2026-09-12T13:21:31.0102910Z                 port=0,
+2026-09-12T13:21:31.0103208Z                 auth_timeout_seconds=TIMEOUT,
+2026-09-12T13:21:31.0103530Z                 send_timeout_seconds=TIMEOUT,
+2026-09-12T13:21:31.0103863Z                 heartbeat_timeout_seconds=300,
+2026-09-12T13:21:31.0104179Z                 sweep_interval_seconds=300,
+2026-09-12T13:21:31.0104402Z             )
+2026-09-12T13:21:31.0104771Z             await relay.start()
+2026-09-12T13:21:31.0105084Z             authority = RelayNodeClient(
+2026-09-12T13:21:31.0105462Z                 state_directory=tmp_path / "authority-node",
+2026-09-12T13:21:31.0105782Z                 relay_url=relay.url,
+2026-09-12T13:21:31.0106105Z                 display_name="Storage authority",
+2026-09-12T13:21:31.0106421Z                 allow_insecure_local=True,
+2026-09-12T13:21:31.0106712Z                 heartbeat_interval=300,
+2026-09-12T13:21:31.0107017Z                 request_timeout=TIMEOUT,
+2026-09-12T13:21:31.0107295Z                 clock=lambda: NOW,
+2026-09-12T13:21:31.0107503Z             )
+2026-09-12T13:21:31.0107741Z             await _enroll(relay, authority)
+2026-09-12T13:21:31.0108183Z             session = await authority.create_session("Physical federation F4.2")
+2026-09-12T13:21:31.0108589Z             session_id = str(session["session_id"])
+2026-09-12T13:21:31.0108800Z     
+2026-09-12T13:21:31.0109032Z             former_config = _write_config(
+2026-09-12T13:21:31.0109344Z                 tmp_path / "former-primary",
+2026-09-12T13:21:31.0109628Z                 relay_url=relay.url,
+2026-09-12T13:21:31.0109921Z                 session_id=session_id,
+2026-09-12T13:21:31.0110265Z                 display_name="Former primary storage",
+2026-09-12T13:21:31.0110783Z                 provider_id="provider-primary",
+2026-09-12T13:21:31.0111023Z             )
+2026-09-12T13:21:31.0111275Z             promoted_config = _write_config(
+2026-09-12T13:21:31.0111572Z                 tmp_path / "promoted",
+2026-09-12T13:21:31.0111845Z                 relay_url=relay.url,
+2026-09-12T13:21:31.0112122Z                 session_id=session_id,
+2026-09-12T13:21:31.0112442Z                 display_name="Promoted storage",
+2026-09-12T13:21:31.0112877Z                 provider_id="provider-replica",
+2026-09-12T13:21:31.0113137Z             )
+2026-09-12T13:21:31.0113402Z             former_primary = LiveStorageNodeAgent(
+2026-09-12T13:21:31.0113692Z                 former_config,
+2026-09-12T13:21:31.0114062Z                 control_authority_node_id=authority.node_id,
+2026-09-12T13:21:31.0114411Z                 control_sync_timeout=TIMEOUT,
+2026-09-12T13:21:31.0114837Z                 clock=lambda: NOW,
+2026-09-12T13:21:31.0115056Z             )
+2026-09-12T13:21:31.0115313Z             promoted = LiveStorageNodeAgent(
+2026-09-12T13:21:31.0115600Z                 promoted_config,
+2026-09-12T13:21:31.0115965Z                 control_authority_node_id=authority.node_id,
+2026-09-12T13:21:31.0116309Z                 control_sync_timeout=TIMEOUT,
+2026-09-12T13:21:31.0116588Z                 clock=lambda: NOW,
+2026-09-12T13:21:31.0116788Z             )
+2026-09-12T13:21:31.0116928Z     
+2026-09-12T13:21:31.0117277Z             control_path = tmp_path / "authority-storage-control.sqlite3"
+2026-09-12T13:21:31.0117688Z             control = PhaseDControlPlane(control_path)
+2026-09-12T13:21:31.0118143Z             control.create_group(session_id, authority.node_id, "storage-main")
+2026-09-12T13:21:31.0118511Z             control.register_provider(
+2026-09-12T13:21:31.0118792Z                 session_id,
+2026-09-12T13:21:31.0121759Z                 authority.node_id,
+2026-09-12T13:21:31.0122303Z                 _registration(
+2026-09-12T13:21:31.0122929Z                     session_id,
+2026-09-12T13:21:31.0123593Z                     "provider-primary",
+2026-09-12T13:21:31.0124276Z                     former_primary.node_id,
+2026-09-12T13:21:31.0124839Z                 ),
+2026-09-12T13:21:31.0125182Z             )
+2026-09-12T13:21:31.0125710Z             control.register_provider(
+2026-09-12T13:21:31.0126295Z                 session_id,
+2026-09-12T13:21:31.0127134Z                 authority.node_id,
+2026-09-12T13:21:31.0127459Z                 _registration(
+2026-09-12T13:21:31.0127772Z                     session_id,
+2026-09-12T13:21:31.0128104Z                     "provider-replica",
+2026-09-12T13:21:31.0128451Z                     promoted.node_id,
+2026-09-12T13:21:31.0128709Z                 ),
+2026-09-12T13:21:31.0128983Z             )
+2026-09-12T13:21:31.0129277Z             control.change_assignment(
+2026-09-12T13:21:31.0130589Z                 session_id,
+2026-09-12T13:21:31.0131251Z                 authority.node_id,
+2026-09-12T13:21:31.0131866Z                 "storage-main",
+2026-09-12T13:21:31.0132502Z                 "provider-primary",
+2026-09-12T13:21:31.0133198Z                 ("provider-replica",),
+2026-09-12T13:21:31.0133697Z             )
+2026-09-12T13:21:31.0134290Z             control.set_acknowledgement_policy(
+2026-09-12T13:21:31.0134919Z                 session_id,
+2026-09-12T13:21:31.0135495Z                 "storage-main",
+2026-09-12T13:21:31.0136282Z                 AcknowledgementMode.ONE_REPLICA,
+2026-09-12T13:21:31.0136845Z             )
+2026-09-12T13:21:31.0137335Z             control.grant_leader(
+2026-09-12T13:21:31.0137897Z                 session_id,
+2026-09-12T13:21:31.0138507Z                 authority.node_id,
+2026-09-12T13:21:31.0139104Z                 "storage-main",
+2026-09-12T13:21:31.0139714Z                 "provider-primary",
+2026-09-12T13:21:31.0140278Z                 "grant-1",
+2026-09-12T13:21:31.0140728Z                 1,
+2026-09-12T13:21:31.0141148Z                 1,
+2026-09-12T13:21:31.0142789Z                 lease_expires_at=NOW + timedelta(minutes=15),
+2026-09-12T13:21:31.0144527Z                 occurred_at=NOW,
+2026-09-12T13:21:31.0145224Z             )
+2026-09-12T13:21:31.0145713Z     
+2026-09-12T13:21:31.0146626Z             authority_endpoint = RelayStorageEndpoint(
+2026-09-12T13:21:31.0147622Z                 authority,
+2026-09-12T13:21:31.0148346Z                 request_timeout=TIMEOUT,
+2026-09-12T13:21:31.0148858Z             )
+2026-09-12T13:21:31.0149426Z             await authority_endpoint.start()
+2026-09-12T13:21:31.0151059Z             publication_store = StorageControlPublicationStore(
+2026-09-12T13:21:31.0152298Z                 tmp_path / "authority-publications.sqlite3"
+2026-09-12T13:21:31.0152890Z             )
+2026-09-12T13:21:31.0153835Z             failover_store_path = tmp_path / "authority-failover.sqlite3"
+2026-09-12T13:21:31.0154944Z             failover_store = LiveFailoverStore(failover_store_path)
+2026-09-12T13:21:31.0155847Z             channel = StorageControlRelayChannel(
+2026-09-12T13:21:31.0156513Z                 authority,
+2026-09-12T13:21:31.0157099Z                 authority_endpoint,
+2026-09-12T13:21:31.0157741Z                 timeout=TIMEOUT,
+2026-09-12T13:21:31.0158234Z             )
+2026-09-12T13:21:31.0158971Z             failover = StorageFailoverCoordinator(
+2026-09-12T13:21:31.0160221Z                 session_coordinator=coordinator,
+2026-09-12T13:21:31.0161310Z                 control_plane=control,
+2026-09-12T13:21:31.0162612Z                 publication_store=publication_store,
+2026-09-12T13:21:31.0164509Z                 credentials=authority.credentials,
+2026-09-12T13:21:31.0165769Z                 channel=channel,
+2026-09-12T13:21:31.0166988Z                 failover_store=failover_store,
+2026-09-12T13:21:31.0168226Z                 session_id=session_id,
+2026-09-12T13:21:31.0169227Z                 lease_seconds=300,
+2026-09-12T13:21:31.0169949Z                 clock=lambda: NOW,
+2026-09-12T13:21:31.0170657Z             )
+2026-09-12T13:21:31.0171248Z             await failover.start()
+2026-09-12T13:21:31.0171864Z     
+2026-09-12T13:21:31.0172590Z             former_bootstrap = asyncio.create_task(
+2026-09-12T13:21:31.0173446Z                 former_primary.bootstrap(
+2026-09-12T13:21:31.0174367Z                     enrollment_token=str(
+2026-09-12T13:21:31.0175485Z                         coordinator.create_enrollment_token(
+2026-09-12T13:21:31.0176538Z                             ttl_seconds=60,
+2026-09-12T13:21:31.0194225Z                             max_uses=1,
+2026-09-12T13:21:31.0195093Z                         )["token"]
+2026-09-12T13:21:31.0195939Z                     ),
+2026-09-12T13:21:31.0196693Z                     session_invitation=str(
+2026-09-12T13:21:31.0197353Z                         (
+2026-09-12T13:21:31.0198480Z                             await authority.create_invitation(
+2026-09-12T13:21:31.0199673Z                                 session_id,
+2026-09-12T13:21:31.0200635Z                                 ttl_seconds=60,
+2026-09-12T13:21:31.0201782Z                                 max_uses=1,
+2026-09-12T13:21:31.0202615Z                             )
+2026-09-12T13:21:31.0203296Z                         )["token"]
+2026-09-12T13:21:31.0204084Z                     ),
+2026-09-12T13:21:31.0204726Z                 )
+2026-09-12T13:21:31.0205118Z             )
+2026-09-12T13:21:31.0205813Z             promoted_bootstrap = asyncio.create_task(
+2026-09-12T13:21:31.0206591Z                 promoted.bootstrap(
+2026-09-12T13:21:31.0207383Z                     enrollment_token=str(
+2026-09-12T13:21:31.0208462Z                         coordinator.create_enrollment_token(
+2026-09-12T13:21:31.0209353Z                             ttl_seconds=60,
+2026-09-12T13:21:31.0210119Z                             max_uses=1,
+2026-09-12T13:21:31.0210809Z                         )["token"]
+2026-09-12T13:21:31.0211498Z                     ),
+2026-09-12T13:21:31.0212562Z                     session_invitation=str(
+2026-09-12T13:21:31.0213500Z                         (
+2026-09-12T13:21:31.0215842Z                             await authority.create_invitation(
+2026-09-12T13:21:31.0217309Z                                 session_id,
+2026-09-12T13:21:31.0218877Z                                 ttl_seconds=60,
+2026-09-12T13:21:31.0220253Z                                 max_uses=1,
+2026-09-12T13:21:31.0221100Z                             )
+2026-09-12T13:21:31.0223087Z                         )["token"]
+2026-09-12T13:21:31.0223959Z                     ),
+2026-09-12T13:21:31.0224811Z                 )
+2026-09-12T13:21:31.0225166Z             )
+2026-09-12T13:21:31.0226000Z             bootstrap_tasks.extend((former_bootstrap, promoted_bootstrap))
+2026-09-12T13:21:31.0226830Z             await asyncio.gather(
+2026-09-12T13:21:31.0227766Z                 _wait_for_control_waiting(former_primary, former_bootstrap),
+2026-09-12T13:21:31.0228971Z                 _wait_for_control_waiting(promoted, promoted_bootstrap),
+2026-09-12T13:21:31.0229555Z             )
+2026-09-12T13:21:31.0229985Z             await failover.publish_current(
+2026-09-12T13:21:31.0230660Z                 (former_primary.node_id, promoted.node_id)
+2026-09-12T13:21:31.0231106Z             )
+2026-09-12T13:21:31.0231680Z             await asyncio.wait_for(former_bootstrap, TIMEOUT)
+2026-09-12T13:21:31.0232415Z             await asyncio.wait_for(promoted_bootstrap, TIMEOUT)
+2026-09-12T13:21:31.0232820Z     
+2026-09-12T13:21:31.0233346Z             acknowledgements = DurableAcknowledgementStore(
+2026-09-12T13:21:31.0234058Z                 tmp_path / "authority-acks.sqlite3"
+2026-09-12T13:21:31.0234524Z             )
+2026-09-12T13:21:31.0234997Z             logical = PhaseDLogicalStorageClient(
+2026-09-12T13:21:31.0235617Z                 session_id=session_id,
+2026-09-12T13:21:31.0236261Z                 actor_node_id=authority.node_id,
+2026-09-12T13:21:31.0236793Z                 control_plane=control,
+2026-09-12T13:21:31.0237326Z                 transport=authority_endpoint,
+2026-09-12T13:21:31.0238084Z                 acknowledgements=acknowledgements,
+2026-09-12T13:21:31.0238614Z                 clock=lambda: NOW,
+2026-09-12T13:21:31.0238960Z             )
+2026-09-12T13:21:31.0239276Z             contents = {
+2026-09-12T13:21:31.0239957Z                 "batch-1": {"sequence": 1, "phase": "before-failover"},
+2026-09-12T13:21:31.0240824Z                 "batch-2": {"sequence": 2, "phase": "after-failover"},
+2026-09-12T13:21:31.0241668Z                 "batch-3": {"sequence": 3, "phase": "after-failover"},
+2026-09-12T13:21:31.0242494Z                 "batch-4": {"sequence": 4, "phase": "admission-race"},
+2026-09-12T13:21:31.0243378Z                 "batch-5": {"sequence": 5, "phase": "restored-redundancy"},
+2026-09-12T13:21:31.0244121Z             }
+2026-09-12T13:21:31.0244612Z             first = await logical.ingest_batch(
+2026-09-12T13:21:31.0245197Z                 group_id="storage-main",
+2026-09-12T13:21:31.0245732Z                 dataset_id="telemetry",
+2026-09-12T13:21:31.0246238Z                 batch_id="batch-1",
+2026-09-12T13:21:31.0246805Z                 idempotency_key="f42:batch-1",
+2026-09-12T13:21:31.0247412Z                 content=contents["batch-1"],
+2026-09-12T13:21:31.0247912Z                 created_at=NOW,
+2026-09-12T13:21:31.0248225Z             )
+2026-09-12T13:21:31.0248612Z             assert first.committed
+2026-09-12T13:21:31.0249163Z             old_node_id = former_primary.node_id
+2026-09-12T13:21:31.0249686Z             await former_primary.close()
+2026-09-12T13:21:31.0250325Z             promotion = await _wait_for_promotion(failover)
+2026-09-12T13:21:31.0251123Z             assert promotion.promoted_provider_id == "provider-replica"
+2026-09-12T13:21:31.0251596Z     
+2026-09-12T13:21:31.0252045Z             for batch_id in ("batch-2", "batch-3"):
+2026-09-12T13:21:31.0252721Z                 committed = await logical.ingest_batch(
+2026-09-12T13:21:31.0253349Z                     group_id="storage-main",
+2026-09-12T13:21:31.0253921Z                     dataset_id="telemetry",
+2026-09-12T13:21:31.0254528Z                     batch_id=batch_id,
+2026-09-12T13:21:31.0255536Z                     idempotency_key=f"f42:{batch_id}",
+2026-09-12T13:21:31.0256279Z                     content=contents[batch_id],
+2026-09-12T13:21:31.0256812Z                     created_at=NOW,
+2026-09-12T13:21:31.0257170Z                 )
+2026-09-12T13:21:31.0257622Z                 assert committed.committed
+2026-09-12T13:21:31.0257991Z     
+2026-09-12T13:21:31.0258516Z             former_primary = LiveStorageNodeAgent(
+2026-09-12T13:21:31.0259224Z                 former_config,
+2026-09-12T13:21:31.0259877Z                 control_authority_node_id=authority.node_id,
+2026-09-12T13:21:31.0260517Z                 control_sync_timeout=TIMEOUT,
+2026-09-12T13:21:31.0261230Z                 clock=lambda: NOW,
+2026-09-12T13:21:31.0261781Z             )
+2026-09-12T13:21:31.0262542Z             await asyncio.wait_for(former_primary.bootstrap(), TIMEOUT)
+2026-09-12T13:21:31.0263249Z             assert former_primary.node_id == old_node_id
+2026-09-12T13:21:31.0264200Z             assert former_primary.status()["provider"]["groups"] == [
+2026-09-12T13:21:31.0265087Z                 {"group_id": "storage-main", "role": "unassigned"}
+2026-09-12T13:21:31.0265562Z             ]
+2026-09-12T13:21:31.0265804Z     
+2026-09-12T13:21:31.0266253Z             catchup_store = LiveCatchupStore(
+2026-09-12T13:21:31.0266877Z                 tmp_path / "authority-catchup.sqlite3"
+2026-09-12T13:21:31.0267283Z             )
+2026-09-12T13:21:31.0267814Z             catchup = LiveFormerPrimaryCatchupCoordinator(
+2026-09-12T13:21:31.0268484Z                 session_coordinator=coordinator,
+2026-09-12T13:21:31.0269019Z                 control_plane=control,
+2026-09-12T13:21:31.0269583Z                 failover_store=failover_store,
+2026-09-12T13:21:31.0270227Z                 transport=authority_endpoint,
+2026-09-12T13:21:31.0270936Z                 credentials=authority.credentials,
+2026-09-12T13:21:31.0271309Z                 catchup_store=catchup_store,
+2026-09-12T13:21:31.0271613Z                 session_id=session_id,
+2026-09-12T13:21:31.0271886Z                 clock=lambda: NOW,
+2026-09-12T13:21:31.0272088Z             )
+2026-09-12T13:21:31.0272338Z             caught_up = await catchup.run_once(
+2026-09-12T13:21:31.0272649Z                 group_id="storage-main",
+2026-09-12T13:21:31.0273013Z                 returning_provider_id="provider-primary",
+2026-09-12T13:21:31.0273253Z             )
+2026-09-12T13:21:31.0273592Z             assert caught_up.status == "caught-up", caught_up.to_dict()
+2026-09-12T13:21:31.0273846Z     
+2026-09-12T13:21:31.0274187Z             reinstatement = LiveFormerPrimaryReinstatementCoordinator(
+2026-09-12T13:21:31.0274557Z                 control_plane=control,
+2026-09-12T13:21:31.0274896Z                 publication_store=publication_store,
+2026-09-12T13:21:31.0275231Z                 failover_store=failover_store,
+2026-09-12T13:21:31.0275612Z                 catchup_store=catchup_store,
+2026-09-12T13:21:31.0275886Z                 catchup=catchup,
+2026-09-12T13:21:31.0276141Z                 channel=channel,
+2026-09-12T13:21:31.0276450Z                 credentials=authority.credentials,
+2026-09-12T13:21:31.0276797Z                 session_id=session_id,
+2026-09-12T13:21:31.0277137Z                 clock=lambda: NOW,
+2026-09-12T13:21:31.0277429Z             )
+2026-09-12T13:21:31.0277628Z     
+2026-09-12T13:21:31.0277964Z             original_publish = channel.publish
+2026-09-12T13:21:31.0278400Z             admission_write_injected = False
+2026-09-12T13:21:31.0278610Z     
+2026-09-12T13:21:31.0278963Z             async def publish_with_admission_write(plan, target_node_ids):
+2026-09-12T13:21:31.0279355Z                 nonlocal admission_write_injected
+2026-09-12T13:21:31.0279632Z                 group = next(
+2026-09-12T13:21:31.0279863Z                     item
+2026-09-12T13:21:31.0280145Z                     for item in plan.groups
+2026-09-12T13:21:31.0280527Z                     if item["group_id"] == "storage-main"
+2026-09-12T13:21:31.0280771Z                 )
+2026-09-12T13:21:31.0281183Z                 if (
+2026-09-12T13:21:31.0281559Z                     not admission_write_injected
+2026-09-12T13:21:31.0282030Z                     and "provider-primary" in group["replica_provider_ids"]
+2026-09-12T13:21:31.0282510Z                     and group["acknowledgement_mode"] == "primary"
+2026-09-12T13:21:31.0282772Z                 ):
+2026-09-12T13:21:31.0283207Z                     # The coordinator assignment is committed, but the returning
+2026-09-12T13:21:31.0283850Z                     # node has not applied it yet. A primary-only write may commit
+2026-09-12T13:21:31.0284542Z                     # while that node still rejects normal replica traffic.
+2026-09-12T13:21:31.0284944Z                     admission_write_injected = True
+2026-09-12T13:21:31.0285344Z                     committed = await logical.ingest_batch(
+2026-09-12T13:21:31.0285771Z                         group_id="storage-main",
+2026-09-12T13:21:31.0286275Z                         dataset_id="telemetry",
+2026-09-12T13:21:31.0287947Z                         batch_id="batch-4",
+2026-09-12T13:21:31.0288636Z                         idempotency_key="f42:batch-4",
+2026-09-12T13:21:31.0289342Z                         content=contents["batch-4"],
+2026-09-12T13:21:31.0289889Z                         created_at=NOW,
+2026-09-12T13:21:31.0290307Z                     )
+2026-09-12T13:21:31.0290817Z                     assert committed.committed
+2026-09-12T13:21:31.0291560Z                     admission_status = acknowledgements.status(
+2026-09-12T13:21:31.0292345Z                         session_id, "storage-main", "batch-4"
+2026-09-12T13:21:31.0292788Z                     )
+2026-09-12T13:21:31.0293311Z                     assert admission_status is not None
+2026-09-12T13:21:31.0294037Z                     assert admission_status.required_replica_acks == 0
+2026-09-12T13:21:31.0294840Z                     assert admission_status.acknowledged_replica_ids == ()
+2026-09-12T13:21:31.0295617Z                 return await original_publish(plan, target_node_ids)
+2026-09-12T13:21:31.0295999Z     
+2026-09-12T13:21:31.0296443Z             channel.publish = publish_with_admission_write
+2026-09-12T13:21:31.0297087Z             first_reinstatement = await reinstatement.run_once(
+2026-09-12T13:21:31.0297660Z                 group_id="storage-main",
+2026-09-12T13:21:31.0298298Z                 returning_provider_id="provider-primary",
+2026-09-12T13:21:31.0298694Z             )
+2026-09-12T13:21:31.0299117Z             channel.publish = original_publish
+2026-09-12T13:21:31.0299632Z             assert admission_write_injected
+2026-09-12T13:21:31.0300244Z             assert first_reinstatement.status == "retryable", (
+2026-09-12T13:21:31.0300844Z                 first_reinstatement.to_dict()
+2026-09-12T13:21:31.0301221Z             )
+2026-09-12T13:21:31.0302153Z             assert (
+2026-09-12T13:21:31.0302619Z                 first_reinstatement.code
+2026-09-12T13:21:31.0303188Z                 == "reinstatement-tail-catchup-required"
+2026-09-12T13:21:31.0303601Z             )
+2026-09-12T13:21:31.0304220Z             after_rollback = control.snapshot(session_id).groups["storage-main"]
+2026-09-12T13:21:31.0305285Z             assert after_rollback.primary_provider_id == "provider-replica"
+2026-09-12T13:21:31.0305981Z             assert after_rollback.replica_provider_ids == ()
+2026-09-12T13:21:31.0306508Z             assert control.acknowledgement_policy(
+2026-09-12T13:21:31.0307039Z                 session_id,
+2026-09-12T13:21:31.0307436Z                 "storage-main",
+2026-09-12T13:21:31.0307902Z             ).mode is AcknowledgementMode.PRIMARY
+2026-09-12T13:21:31.0308459Z             assert control.storage_degraded_state(
+2026-09-12T13:21:31.0308912Z                 session_id,
+2026-09-12T13:21:31.0309293Z                 "storage-main",
+2026-09-12T13:21:31.0309630Z             ) is not None
+2026-09-12T13:21:31.0310205Z             assert former_primary.status()["provider"]["groups"] == [
+2026-09-12T13:21:31.0311487Z                 {"group_id": "storage-main", "role": "unassigned"}
+2026-09-12T13:21:31.0311944Z             ]
+2026-09-12T13:21:31.0312157Z     
+2026-09-12T13:21:31.0312683Z             restarted = LiveFormerPrimaryReinstatementCoordinator(
+2026-09-12T13:21:31.0313422Z                 control_plane=PhaseDControlPlane(control_path),
+2026-09-12T13:21:31.0314164Z                 publication_store=StorageControlPublicationStore(
+2026-09-12T13:21:31.0314930Z                     tmp_path / "authority-publications.sqlite3"
+2026-09-12T13:21:31.0316235Z                 ),
+2026-09-12T13:21:31.0316841Z                 failover_store=LiveFailoverStore(failover_store_path),
+2026-09-12T13:21:31.0317440Z                 catchup_store=LiveCatchupStore(
+2026-09-12T13:21:31.0318074Z                     tmp_path / "authority-catchup.sqlite3"
+2026-09-12T13:21:31.0318474Z                 ),
+2026-09-12T13:21:31.0319008Z                 catchup=LiveFormerPrimaryCatchupCoordinator(
+2026-09-12T13:21:31.0319680Z                     session_coordinator=coordinator,
+2026-09-12T13:21:31.0320503Z                     control_plane=PhaseDControlPlane(control_path),
+2026-09-12T13:21:31.0321381Z                     failover_store=LiveFailoverStore(failover_store_path),
+2026-09-12T13:21:31.0322103Z                     transport=authority_endpoint,
+2026-09-12T13:21:31.0322775Z                     credentials=authority.credentials,
+2026-09-12T13:21:31.0323471Z                     catchup_store=LiveCatchupStore(
+2026-09-12T13:21:31.0324151Z                         tmp_path / "authority-catchup.sqlite3"
+2026-09-12T13:21:31.0324599Z                     ),
+2026-09-12T13:21:31.0325321Z                     session_id=session_id,
+2026-09-12T13:21:31.0325869Z                     clock=lambda: NOW,
+2026-09-12T13:21:31.0326241Z                 ),
+2026-09-12T13:21:31.0326709Z                 channel=channel,
+2026-09-12T13:21:31.0327284Z                 credentials=authority.credentials,
+2026-09-12T13:21:31.0327813Z                 session_id=session_id,
+2026-09-12T13:21:31.0328303Z                 clock=lambda: NOW,
+2026-09-12T13:21:31.0328616Z             )
+2026-09-12T13:21:31.0329080Z             completed = await restarted.run_once(
+2026-09-12T13:21:31.0329607Z                 group_id="storage-main",
+2026-09-12T13:21:31.0330170Z                 returning_provider_id="provider-primary",
+2026-09-12T13:21:31.0330675Z             )
+2026-09-12T13:21:31.0331007Z >           assert completed.status == "completed", completed.to_dict()
+2026-09-12T13:21:31.0331992Z E           AssertionError: {'schema': 'fcp.live_storage_reinstatement_result.v1', 'status': 'retryable', 'code': 'live-reinstatement-retryable', 'reason': 'TimeoutError', ...}
+2026-09-12T13:21:31.0332912Z E           assert 'retryable' == 'completed'
+2026-09-12T13:21:31.0333248Z E             
+2026-09-12T13:21:31.0333514Z E             - completed
+2026-09-12T13:21:31.0333812Z E             + retryable
+2026-09-12T13:21:31.0333988Z 
+2026-09-12T13:21:31.0334272Z catalog/node/tests/test_live_storage_reinstatement.py:410: AssertionError
+2026-09-12T13:21:30.9772438Z _____ test_live_reinstatement_restores_replica_and_acknowledgement_policy ______
+2026-09-12T13:21:31.0331992Z E           AssertionError: {'schema': 'fcp.live_storage_reinstatement_result.v1', 'status': 'retryable', 'code': 'live-reinstatement-retryable', 'reason': 'TimeoutError', ...}
+2026-09-12T13:21:31.4792809Z 49.57s call     catalog/node/tests/test_live_storage_reinstatement.py::test_live_reinstatement_restores_replica_and_acknowledgement_policy
+2026-09-12T13:21:31.4851067Z FAILED catalog/node/tests/test_live_storage_reinstatement.py::test_live_reinstatement_restores_replica_and_acknowledgement_policy - AssertionError: {'schema': 'fcp.live_storage_reinstatement_result.v1', 'status': 'retryable', 'code': 'live-reinstatement-retryable', 'reason': 'TimeoutError', ...}
+2026-09-12T13:21:31.4856733Z 1 failed, 1101 passed, 19 skipped, 3365 deselected, 15 warnings in 385.62s (0:06:25)

@@ -2672,3 +2672,12 @@ Nettking22/27 and does not depend on this unresolved admission review.
 No code, runtime, service account, runner label/pool or protected Recorder changes
 were made beyond the reviewed documentation fast-forward. GitHub contains the
 complete transition history and exact next action. No physical PASS/P07/P12.
+
+## 2026-09-12T14:00:00.583114+00:00 — D11 confirmed before deeper diagnosis
+
+test_live_reinstatement_restores_replica_and_acknowledgement_policy ends retryable/TimeoutError instead of completed at catalog/node/tests/test_live_storage_reinstatement.py:410; 1 failed,1101 passed,19 skipped,3365 deselected; failing case49.57s.
+
+UNRESOLVED: timeout is confirmed; product, test-harness timing, host load/admission or transient transport cause is not established.
+Exact SHA/logs/procedure and protected-data invariant are persisted in
+diagnostics/D11.md. Publish its durable GitHub artifact before further
+investigation. Retain the failed shard manifest/JUnit and inspect the exact result/timeout boundary in test_live_storage_reinstatement.py and live_storage_reinstatement.py. Check prior native same-test outcomes and AQG31 admission evidence before a focused unchanged-source reproduction. Do not extend deadlines or weaken authority/acknowledgement guards.
