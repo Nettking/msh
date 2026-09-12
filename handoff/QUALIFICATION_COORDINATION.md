@@ -1,29 +1,24 @@
 # Federation v1 qualification coordination
 
-**Current actionable checkpoint (2026-09-12T07:43Z; last new-run snapshot07:42UTC):** PR467/D08 is ready for review at
-exact head84c66f8185c1411d9dc8c5c33244a2f564845ce7, clean repair checkout.
-Prequalification correctness/scope review completed with no findings;37+3 exact-head
-qualification active. Thirteen exact-head dispatches recorded once; nine exact-head workflows completed successfully, four newly accepted/queued.
-Current native proof:13/37 required plus3/3 companions (07:41UTC); twenty-five
-synthetic-source logs and two reviewed dependency aggregates are retained separately and excluded. No required failure observed.
-**Polling policy:** long-running jobs normally take1–2+ hours. After confirmed start/progress,
-wait at least45–60 minutes between checks unless expected completion is sooner; prefer
-checking near expected completion. The existing heartbeat is now hourly and quiet for
-unchanged/non-actionable progress. Last new-run acceptance snapshot:2026-09-12T07:42Z.
-**Next eligible routine CI check:2026-09-12T08:42:00Z or later.** Do not poll before
-then unless an actionable completion/failure/timeout/head change is independently delivered.
-Do not create a new work cycle merely to report unchanged progress. On subsequent
-meaningful transitions, record last/next check times and preserve this policy across sessions.
-Next command, only when due: audit Python -B handoff/diagnostics/poll_pr467_state.py; persist only
-material transitions, retain new terminal logs via retain_pr467_new_native_logs.py,
-and use dispatch_pr467_completed_gap.py only for completed proven source gaps.
-Release requires additional aggregate dependency proof. No duplicate jobs/reviews.
-Actual main2a9c9b8eb53edff74c2de23570ec56e054d29b22 remains NOT QUALIFIED
-(D08 failure); its native release/ICSE artifact evidence is retained, never relabelled.
-After467 qualification/review, normal merge then actual merged-main qualification once.
-Physical runtime stays M9b286f931497bf6291e215f6340443c5162826b0; no candidate
-freeze, physical PASS, P07/P12 or protected Recorder-data changes.
-
+**Current actionable checkpoint (2026-09-12T08:47Z):** PR467 exact head
+84c66f8185c1411d9dc8c5c33244a2f564845ce7 is QUALIFIED_REQUIRED_PR_HEAD_SCOPE:
+37/37 required jobs plus3/3 companions, all40 native receipts reconciled;38 exact
+checkouts and2 reviewed dependency-only aggregates. Nine release artifacts cover
+4457 identities in4 disjoint shards and both complete orders. ICSE1414-file export,
+19checksums, components4/4 on3executions and network10/10 onboth native platforms.
+D08: all17new cases have native pass across platforms; Windows13PASS/4explicit
+symlink-privilege skips, Linux9PASS/8Windows-only skips. Original failing scheduler
+case passes Windows and both Linux orders; F85-Windows742PASS/5skips.
+D06/D07 regressions retained; existing11intentional POSIX exclusions unchanged.
+Current correctness/review findings: none. Clean source; no product changes made.
+Receipt: diagnostics/pr467-final-qualification.json. Next: current merge-readiness
+check and normal expected-head-guarded merge467, then qualify actual resulting main
+once. Do not reuse PR-head proof as merged-main qualification. Do not rerun prior
+passing jobs or failed old main2a9c9b8e. Keep all prior native/artifact evidence.
+Long CI policy remains hourly (45–60 minutes minimum after confirmed progress,
+prefer near expected completion). No further PR467 routine polling is needed.
+Physical runtime stays9b286f931497bf6291e215f6340443c5162826b0. No candidate freeze,
+repair deployment, physical PASS, P07/P12 or protected Recorder-data change.
 Current user direction, September 11 2026: execute on state changes, using this
 checkpoint and the completed diagnostic sweep report; do not repeat the sweep.
 
@@ -2370,3 +2365,5 @@ no source/physical state changes, protected Recorder data untouched, no physical
 2026-09-12T08:44:16.4291635Z: all24 new native job logs retained,22 source jobs verify exact84c66f81 and2 release dependency aggregates have no checkout by contract. Current PR467 review threads/reviews both empty. Next: artifact/aggregate/skip/regression reconciliation before final qualification receipt; no merge yet.
 
 2026-09-12T08:45:52.1442568Z: all9 native release artifacts retained/reviewed on exact84c66f81,4457 test identities across4 disjoint shards and both complete orders,zero failures/errors. Six ICSE artifacts retained; bundle verifies1414 exact exported source files,19 checksums,4/4 components onLinux/Windows/compose and10/10 network checks plus teardown onboth native platforms. Skip map created; next finish source-bound aggregate/native skip/D06-D08 regression and current-review reconciliation before merge. No tests rerun or publication rebuilt.
+
+2026-09-12T08:47:55.3565859Z: final PR467 exact84c66f81 qualification receipt PASS37+3 and native/artifact/D06-D08/skip review persisted. Current reviews/comments empty, base2a9 unchanged, clean repair checkout. Next: normal guarded merge after current readiness check, persist merge receipt, prepare isolated actual-main qualification without physical deployment.
