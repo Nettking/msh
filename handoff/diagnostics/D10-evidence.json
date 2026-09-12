@@ -1,0 +1,90 @@
+{
+  "finding": "D10",
+  "status": "CONFIRMED",
+  "recorded_at": "2026-09-12T13:00:29.002580+00:00",
+  "candidate_sha": "f3abe5452db2f21593a688bc62bc5f4b22d5c40e (intended PR source; checkout failed)",
+  "hosts": [
+    "Beast self-hosted Windows release runner"
+  ],
+  "physical_stage": "NONE; CI actions/checkout before Windows release shards",
+  "procedure": "actions/checkout@v4 clean/reset; fallback recreation of the runner-owned work directory",
+  "observed": "EPERM removing C:\\actions-runner\\_work\\msh\\msh\\.pytest_cache; no successful candidate checkout, Python setup or test execution",
+  "expected": "Runner-owned checkout is writable/cleanable and selected source is checked out before tests.",
+  "classification": "host/environment; immediate filesystem access failure. Underlying ACL/owner/open-handle cause remains unverified.",
+  "acceptance_impact": "Three automatic release shard jobs blocked; missing-artifact and three aggregate errors per run are downstream, not separate product regressions. Existing main17ab and two F7 native proofs unaffected.",
+  "safe_continuation": "YES: D09 docs integration/final-head review and independent healthy CI. Do not claim failed shards passed or rerun complete suites to mask the host issue.",
+  "state_changed": "Checkout action attempted clean/reset/recreate of its own CI workdir; investigation only read retained logs. No manual host mutation.",
+  "protected_recorder_data": "UNTOUCHED",
+  "physical_runtime_sha": "9b286f931497bf6291e215f6340443c5162826b0",
+  "records": [
+    {
+      "pr": 468,
+      "intended_head_sha": "f3abe5452db2f21593a688bc62bc5f4b22d5c40e",
+      "expected_pr_merge_sha": "b0fbb8a1a4e216b8696b8015a35594c1007319de",
+      "actual_candidate_checkout_completed": false,
+      "retained_log": {
+        "job_id": 103543444403,
+        "run_id": 34689991000,
+        "name": "Windows regressions (capability-product)",
+        "runner_name": "Beast",
+        "conclusion": "failure",
+        "bytes": 9010,
+        "sha256": "af21e7f29d39cfd8c4ee0fa1048718171baa88bc3c526bc672bd4f6a0b11a83d",
+        "checkout_commits": [],
+        "checkout_matches": null
+      },
+      "error_excerpts": [
+        "2026-09-12T12:16:03.2258553Z warning: could not open directory '.pytest_cache/': Permission denied",
+        "2026-09-12T12:16:03.2541435Z warning: failed to remove .pytest_cache/: Directory not empty",
+        "2026-09-12T12:16:03.3561302Z ##[warning]Unable to clean or reset the repository. The repository will be recreated instead.",
+        "2026-09-12T12:16:05.2870791Z ##[error]File was unable to be removed Error: EPERM: operation not permitted, rmdir 'C:\\actions-runner\\_work\\msh\\msh\\.pytest_cache'",
+        "2026-09-12T12:16:05.8030571Z ##[error]No files were found with the provided path: C:\\actions-runner\\_work\\_temp/windows-capability-product.xml. No artifacts will be uploaded."
+      ]
+    },
+    {
+      "pr": 468,
+      "intended_head_sha": "f3abe5452db2f21593a688bc62bc5f4b22d5c40e",
+      "expected_pr_merge_sha": "b0fbb8a1a4e216b8696b8015a35594c1007319de",
+      "actual_candidate_checkout_completed": false,
+      "retained_log": {
+        "job_id": 103543444443,
+        "run_id": 34689991000,
+        "name": "Windows regressions (journal-artifacts)",
+        "runner_name": "Beast",
+        "conclusion": "failure",
+        "bytes": 5605,
+        "sha256": "c357db1ffc5e0e617ff35014db0ea065e33a2b61a6866fac29a50be612cadcf8",
+        "checkout_commits": [],
+        "checkout_matches": null
+      },
+      "error_excerpts": [
+        "2026-09-12T12:16:16.2401551Z ##[error]File was unable to be removed Error: EPERM: operation not permitted, rmdir 'C:\\actions-runner\\_work\\msh\\msh\\.pytest_cache'",
+        "2026-09-12T12:16:16.7363509Z ##[error]No files were found with the provided path: C:\\actions-runner\\_work\\_temp/windows-journal-artifacts.xml. No artifacts will be uploaded."
+      ]
+    },
+    {
+      "pr": 469,
+      "intended_head_sha": "660bf23269893305c7e8ffcc4c910a7efaed567d",
+      "expected_pr_merge_sha": "aa7b41d328d8d6cab756951ec8739a370099756b",
+      "actual_candidate_checkout_completed": false,
+      "retained_log": {
+        "job_id": 103544075720,
+        "run_id": 34690234261,
+        "name": "Windows regressions (journal-artifacts)",
+        "runner_name": "Beast",
+        "conclusion": "failure",
+        "bytes": 5605,
+        "sha256": "2922357940c6b207fe3298d79962299e70e5f79fe58c3d4320d58938469e210f",
+        "checkout_commits": [],
+        "checkout_matches": null
+      },
+      "error_excerpts": [
+        "2026-09-12T12:16:27.1573318Z ##[error]File was unable to be removed Error: EPERM: operation not permitted, rmdir 'C:\\actions-runner\\_work\\msh\\msh\\.pytest_cache'",
+        "2026-09-12T12:16:27.6696280Z ##[error]No files were found with the provided path: C:\\actions-runner\\_work\\_temp/windows-journal-artifacts.xml. No artifacts will be uploaded."
+      ]
+    }
+  ],
+  "github_artifact": "PENDING_ISSUE_PUBLICATION",
+  "repair": "NONE; no product or runner-account/label change",
+  "next_action": "Publish host-environment issue with exact run/log references. Before retrying Beast jobs, inspect only CI-owned cache owner/ACL/reparse/open-handle state and current workload through an authorized read-only channel; preserve concurrent work. Continue separate D09 integration after 2/2 proof."
+}

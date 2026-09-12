@@ -2574,3 +2574,12 @@ All PR468/469 automatic runs completed. New release failures are localized to
 Beast checkout (three Windows shard jobs), with downstream red aggregates; exact
 logs/classification are next. D09 branding and hosted billing reds remain separate.
 No source head moved, CI restarted, physical runtime or Recorder data changed.
+
+## 2026-09-12T13:00:29.002580+00:00 — D10 checkout blocker classified before integration
+
+Three Beast release shard jobs failed to remove runner-owned .pytest_cache with
+EPERM before candidate checkout/test execution. The host/environment blocker and
+exact logs are persisted in D10; underlying ACL/open-handle cause remains unknown.
+Missing JUnit and release aggregate reds are consequences. Next publish its durable
+issue, then continue D09 integration; it is independent of the verified 2/2 native
+replacement proof. No failing test is being relabeled or suppressed.
