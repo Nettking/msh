@@ -2731,3 +2731,28 @@ API snapshot and selected actual reexecutions are persisted in diagnostics/D11-D
 ## 2026-09-12T15:00:49.158561+00:00 — retry native evidence reviewed
 
 D11 test PASS2.20s, shard1102PASS/19skips; clean manifest has unchanged f18e91ad source before/after. D12 default-stamped Go build PASS then381PythonPASS/1skip. Actual checkout verified for both and both release matrix verifiers; verdict is dependency-only. Original issues471/472 remain open, not repaired. Required final-head checks are green under the existing failed-job retry contract. Next finish the independent CI-extension merge/reference review; keep host causes distinct from migration and physical evidence. Receipt: diagnostics/D11-D12-reviewed-retry-pass.json.
+
+## 2026-09-12T15:07Z — PR468 replacement gate complete, ready for merge
+
+Exact head ba44100ec1e4cde19daba0d3723b991c11742316 remains clean with the
+reviewed four-file CI/document/test-only scope; base/main17ab3a05 unchanged.
+Original2/2 native F7 proof and real JS-only event are durable. D09 only changes
+one document relative to original f3abe545; all1417 other entries match.
+Final native branding,29focused checks, F6/F7/F8 and16/16release+2/2Phase2 gates
+pass. Original D11/D12 issues remain open after the bounded successful retries;
+no known product repair is inferred or hidden. These findings do not invalidate
+coverage equivalence or become physical evidence. The existing checked-in shard
+retry contract permits retained successful same-source jobs.
+
+PR468 was marked ready; PR description now reports exact evidence and limitations.
+Current review submissions/threads are empty. Main metadata has no required status
+contexts; detailed policy APIs remain unavailable403, so no invisible policy is
+claimed or bypassed. Known hosted docs-portal admission failures explain remaining
+red aggregate metadata and are not product failures.
+
+Next use ordinary merge with expected head ba44100e (no bypass), then persist
+actual merged SHA. This completes the coverage extension only. A separate
+retirement change will update references and validate its exact source. Preserve
+automatic post-merge CI; do not dispatch an intermediate37-job campaign or freeze
+a physical candidate before the coherent cleanup state and host findings are
+reconciled. Physical runtime and protected Recorder data remain untouched.
