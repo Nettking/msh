@@ -1,0 +1,19 @@
+{
+  "recorded_at": "2026-09-12T15:03:27.538445+00:00",
+  "pr": 468,
+  "head_sha": "ba44100ec1e4cde19daba0d3723b991c11742316",
+  "merge_sha": "b7194820d8f1940ae60b8c9639e09b7f61e65c55",
+  "merged_at": "2026-09-12T15:02:21Z",
+  "merge_method": "ordinary merge with expected-head guard; no bypass",
+  "proof_checkpoint": "75b1191d",
+  "current_main": "b7194820d8f1940ae60b8c9639e09b7f61e65c55",
+  "next_action": "Prepare a separate coverage-proven workflow retirement change, verify existing F8 evidence before including F8.4, update documentation/manifest references, and validate exact retirement head. Preserve automatic main CI; do not dispatch an intermediate37-job campaign.",
+  "original_host_findings_open": [
+    470,
+    471,
+    472
+  ],
+  "physical_runtime": "9b286f931497bf6291e215f6340443c5162826b0",
+  "physical_acceptance": false,
+  "protected_recorder_data": "UNTOUCHED"
+}

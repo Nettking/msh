@@ -1,6 +1,6 @@
 # Coverage-preserving self-hosted CI migration
 
-Status: **STAGE1 IMPLEMENTED in draft [PR468](https://github.com/Nettking/msh/pull/468); native equivalence proof 2/2 reviewed green; JS-only automatic event and final-head lightweight validation verified.**
+Status: **STAGE1 MERGED as b7194820 in [PR468](https://github.com/Nettking/msh/pull/468); native equivalence proof 2/2 reviewed green; JS-only automatic event and final-head lightweight validation verified.**
 Plan/matrix were pushed at41d89c63 before source edits. Current exact PR head: ba44100ec1e4cde19daba0d3723b991c11742316. Native proof sources retain f3abe545 and canary660bf232 attribution; the documentation-only integration preserves every executable/workflow byte.
 Qualified baseline: `17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05`.
 [Final main qualification](diagnostics/merged-main-final-qualification.json) is
@@ -104,15 +104,13 @@ Nitro's online status is not admission to any requested or release runner pool.
 
 ## Current action
 
-The first gate is finished and this minimal proposal is now durable. Next:
-preserve the reviewed PR468 native proof and inspect queued JS-only PR469
-run34690234286 near completion. One of two required native executions is reviewed
-green; actual JS-only automatic triggering is proved. Focused29
-contract checks passed; see diagnostics/ci-f7-extension-checkpoint.json. Keep the acceptance campaign paused
-while the source decision is pending. The23 hosted admission failures remain
-infrastructure observations; no successful job is restarted to erase old red checks.
+PR468 is merged as b7194820d8f1940ae60b8c9639e09b7f61e65c55. Two native
+replacement proofs, real JS-only event, final-source comparison, branding,
+focused29 contracts and required final PR checks pass. See diagnostics/pr468-merge.json
+and diagnostics/D11-D12-reviewed-retry-pass.json. Original host findings remain
+open and are not physical evidence. All eight legacy files remain.
 
-Current receipts: diagnostics/ci-f7-two-native-greens.json and
-diagnostics/pr468-ba44100e-final-validation.json. Canary469 is closed unmerged.
-All eight legacy files remain. D10/#470 records the separate Beast CI checkout
-blocker; do not weaken product or runner contracts to address it.
+Next create the separate retirement branch from actual merged b7194820. Reuse
+already-valid F7 equivalence evidence, review existing F8 proof before including
+F8.4, update known manifest/OSL consumers and validate the exact deletion source.
+No intermediate full37 campaign; preserve any automatic post-merge jobs.

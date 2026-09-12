@@ -1,36 +1,28 @@
 # Federation v1 qualification coordination
 
-**Current actionable checkpoint (2026-09-12T14:57Z):** PR468 stays draft,
-unmerged at ba44100ec1e4cde19daba0d3723b991c11742316. D09 documentation repair
-is integrated and branding/final-source checks pass. The original two native
-replacement executions and real AI-JavaScript-only automatic event are retained;
-1417 non-document tracked entries are byte-identical to the proven source.
+**Current actionable checkpoint (2026-09-12T15:02Z):** PR468 is MERGED as
+b7194820d8f1940ae60b8c9639e09b7f61e65c55 from reviewed ba44100e. Normal merge
+used an expected-head guard; no status bypass. Receipt: diagnostics/pr468-merge.json.
 
-Actual merged main17ab3a05c9c506e0f92adfaa4fa0bac231ac2c05 remains fully qualified
-(37 required +3 companions). Do not poll or rerun that completed qualification.
-Receipt: diagnostics/merged-main-final-qualification.json.
+The original2/2 native F7 replacement executions, real JS-only automatic event,
+D09 documentation-only source comparison, branding and29focused contracts are
+durable. Final PR release16/16 and Phase2 2/2 are green after one bounded retry
+of each failed job; exact native outcomes reviewed. Issues470/471/472 remain
+open for original-host root causes, without source repair or physical evidence.
+AQG31 admission is verified from already-valid08:57Z evidence. No extra admission.
 
-Final-head F6/F7/F8 and other independent checks passed. Two failures remain:
-D11/#471 AQG Linux shard2 live-reinstatement retryable TimeoutError, and D12/#472
-Beast Phase2 Windows Go VCS-status exit128 after Go tests passed. Root causes
-remain unresolved. Three existing same-source native executions passed D11's
-test; existing F6 on AQG Windows built the same Go source with VCS stamping.
-AQG31 admission is VERIFIED from already-valid08:57Z evidence; no new admission.
+All eight legacy workflows remain. Next prepare a separate retirement change
+using the explicit equivalence matrix, final references and manifest rules.
+Review existing two-green F8 native evidence before including F8.4; otherwise
+retire the proven F7 group independently. Update two OSL references and cleanup
+manifest. Validate the exact retirement head and preserve automatic post-merge
+CI. Do not manually launch an intermediate37-job campaign; final merged-main
+qualification belongs to the final coherent cleanup state.
 
-Both bounded retries have now completed SUCCESS on the unchanged PR head:
-release34695331201 attempt2 is16/16 green; Phase2 run34695331247 attempt2 is2/2
-green. New executions ran on Nettking Linux/Windows. Original AQG/Beast failures
-remain durable and their root causes unresolved; no retry pass erases them.
-Receipt: diagnostics/D11-D12-targeted-retry-outcome.json. Next retain/review actual
-native checkout/test/build evidence and new shard artifacts, then assess remaining
-final-source/reference/retirement gates. No further retry or full qualification.
-
-All eight legacy workflows remain. No merge or retirement until replacement-proof
-and required final-source/status gates are satisfied. No product/workflow change,
-runner account/pool change, physical deployment or protected Recorder access.
-Physical runtime remains9b286f931497bf6291e215f6340443c5162826b0. No physical PASS;
-P07/P12 have not started. Plans: CI_COVERAGE_MIGRATION_PLAN.md and diagnostics/
-ci-migration-equivalence-matrix.json. Historical deltas below retain original dates.
+Actual main17ab3a05 remains the last fully qualified candidate (37+3); preserve
+its evidence. b7194820 is a merged CI extension, not a newly frozen physical
+candidate. Physical runtime9b286f93 unchanged; no physical PASS, P07/P12,
+deployment, runner-account/pool changes or protected Recorder-data access.
 
 Current user direction, September 11 2026: execute on state changes, using this
 checkpoint and the completed diagnostic sweep report; do not repeat the sweep.
@@ -2732,7 +2724,7 @@ API snapshot and selected actual reexecutions are persisted in diagnostics/D11-D
 
 D11 test PASS2.20s, shard1102PASS/19skips; clean manifest has unchanged f18e91ad source before/after. D12 default-stamped Go build PASS then381PythonPASS/1skip. Actual checkout verified for both and both release matrix verifiers; verdict is dependency-only. Original issues471/472 remain open, not repaired. Required final-head checks are green under the existing failed-job retry contract. Next finish the independent CI-extension merge/reference review; keep host causes distinct from migration and physical evidence. Receipt: diagnostics/D11-D12-reviewed-retry-pass.json.
 
-## 2026-09-12T15:07Z — PR468 replacement gate complete, ready for merge
+## 2026-09-12T15:02Z — PR468 replacement gate complete, ready for merge
 
 Exact head ba44100ec1e4cde19daba0d3723b991c11742316 remains clean with the
 reviewed four-file CI/document/test-only scope; base/main17ab3a05 unchanged.
@@ -2756,3 +2748,7 @@ retirement change will update references and validate its exact source. Preserve
 automatic post-merge CI; do not dispatch an intermediate37-job campaign or freeze
 a physical candidate before the coherent cleanup state and host findings are
 reconciled. Physical runtime and protected Recorder data remain untouched.
+
+## 2026-09-12T15:03:27.538445+00:00 — PR468 merged
+
+Ordinary expected-head merge returned b7194820d8f1940ae60b8c9639e09b7f61e65c55. API confirms merged state and unchanged intended head. All eight legacy files remain; no physical/runtime or protected-data change. Next separate retirement preparation under the existing conditional user authorization.
