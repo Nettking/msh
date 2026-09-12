@@ -1,0 +1,37 @@
+{
+  "reviewed_at": "2026-09-12T00:23:58.087785+00:00",
+  "source_commit": "4749ab6689315a7ad953c11ce4b2ec942433d71a",
+  "run_id": 34656348410,
+  "synthetic_commit": "2be67d18c2c58bde4b4be09c2f7b97b6a42dd83c",
+  "workflow_path": ".github/workflows/federation-v1-release.yml",
+  "workflow_sha256": "aa4bd41c625b2f4faea7fb63328b34a10ce806e2324cb0726c2f49bab5a53d27",
+  "workflow_identical_on_head_and_synthetic": true,
+  "source_jobs": 14,
+  "aggregates": [
+    {
+      "job_id": 103457898256,
+      "name": "Clean-checkout suite order independence",
+      "sha256": "b1d78324d4e67a9d7cedf4534eb09010e07eaf3bacd52cf26461b41de1b0bff9",
+      "dependency_job_ids": [
+        103453725966,
+        103453726153
+      ],
+      "classification": "dependency aggregate; no checkout by contract",
+      "source_disposition": "Dependencies ultimately used synthetic SHA; not exact-head qualification"
+    },
+    {
+      "job_id": 103463483478,
+      "name": "Federation v1 automated release verdict",
+      "sha256": "e8488b3af8f9ec0bbc91f16c9cd9e7fef46a3bb4f88abca912e09a21421af47a",
+      "dependency_job_ids": [
+        103463415300,
+        103463415424,
+        103453726126,
+        103457898256
+      ],
+      "classification": "dependency aggregate; no checkout by contract",
+      "source_disposition": "Dependencies ultimately used synthetic SHA; not exact-head qualification"
+    }
+  ],
+  "decision": "Exact-head release dispatch justified; retain all existing native evidence"
+}

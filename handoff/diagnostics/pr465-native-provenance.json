@@ -492,7 +492,83 @@
         "4749ab6689315a7ad953c11ce4b2ec942433d71a"
       ],
       "checkout_matches": true
+    },
+    {
+      "job_id": 103449515153,
+      "run_id": 34656348375,
+      "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 70139,
+      "sha256": "9665ac06e7722566c492751d0a7ad02110317a82737c1ae4ddd89c99b35c78ec",
+      "checkout_commits": [
+        "2be67d18c2c58bde4b4be09c2f7b97b6a42dd83c"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103453726290,
+      "run_id": 34656348410,
+      "name": "Windows regressions (transport-storage)",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 52747,
+      "sha256": "a7fabbb61cb6a32bcd45d002ed2ff26195b923b0e3c48f078b64cbd650b8e38e",
+      "checkout_commits": [
+        "2be67d18c2c58bde4b4be09c2f7b97b6a42dd83c"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103463415300,
+      "run_id": 34656348410,
+      "name": "Release matrix (Linux)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 15200,
+      "sha256": "218bc58275967d6b590d0212d67e030c4ec71757af52f568b8643213271357a4",
+      "checkout_commits": [
+        "2be67d18c2c58bde4b4be09c2f7b97b6a42dd83c"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103463415424,
+      "run_id": 34656348410,
+      "name": "Release matrix (Windows)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 15030,
+      "sha256": "c2eb46b2b1fe834fccac821a424cca0d8bca39c4481cdce708faa1177fefba9a",
+      "checkout_commits": [
+        "2be67d18c2c58bde4b4be09c2f7b97b6a42dd83c"
+      ],
+      "checkout_matches": false
+    },
+    {
+      "job_id": 103463483478,
+      "run_id": 34656348410,
+      "name": "Federation v1 automated release verdict",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 1189,
+      "sha256": "e8488b3af8f9ec0bbc91f16c9cd9e7fef46a3bb4f88abca912e09a21421af47a",
+      "checkout_commits": [],
+      "checkout_matches": null
+    },
+    {
+      "job_id": 103462678187,
+      "run_id": 34656348432,
+      "name": "publication-bundle",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 26859,
+      "sha256": "374ced225400ac763a205793dd602301224520bcdd0ffbdca99e31d82a71c1a4",
+      "checkout_commits": [
+        "2be67d18c2c58bde4b4be09c2f7b97b6a42dd83c"
+      ],
+      "checkout_matches": false
     }
   ],
-  "retained_at": "2026-09-12T00:12:17.189057+00:00"
+  "retained_at": "2026-09-12T00:23:19.464573+00:00"
 }

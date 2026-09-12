@@ -1886,3 +1886,12 @@ No active-source gap dispatch, merge or physical change is justified now.
 success16/16; automatic CF7B and ICSE also completed success. No failed jobs
 reported. Next: retain new terminal native logs, inspect source/aggregate proof,
 then fill only demonstrated completed exact-head gaps. Preserve12/37 plus3/3.
+
+00:24UTC: completed CF7B/ICSE source jobs all prove synthetic2be67d18. Release
+review confirms14 source-bearing jobs use that synthetic SHA; its two no-checkout
+aggregates have verified successful dependency logs and identical workflow source.
+Receipt: diagnostics/pr465-release-aggregate-review.json. Required12/37 plus3/3
+exact-head PASS preserved. An audit helper retarget typo was caught by its run
+count assertion and corrected before producing the receipt; no gate was weakened.
+Next: dispatch the three demonstrated source gaps once (release,ICSE,CF7B), then
+resume state-change polling. No physical acceptance or candidate freeze.
