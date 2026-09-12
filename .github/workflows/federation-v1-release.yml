@@ -210,6 +210,7 @@ jobs:
           catalog/federation/tests/test_tailscale_host_discovery.py
           catalog/federation/tests/test_tailscale_discovery_snapshot_roundtrip.py
           catalog/federation/tests/test_tailnet_join_responder.py
+          catalog/federation/tests/test_tailnet_join_responder_exit.py
           catalog/federation/tests/test_tailnet_join_client.py
           catalog/federation/tests/test_tailscale_peer_identity.py
           catalog/flask_app/tests/test_discovery_read_only_metadata.py

@@ -327,17 +327,19 @@ def test_a_stale_responder_is_replaced_instead_of_blocking_the_port(
         ),
         encoding="utf-8",
     )
-    terminated: list[tuple[int, str]] = []
+    terminated: list[tuple[int, str, bool]] = []
     monkeypatch.setattr(
         responder,
         "terminate_process_if_same_instance",
-        lambda pid, token: terminated.append((pid, token)) or True,
+        lambda pid, token, *, wait_for_exit: (
+            terminated.append((pid, token, wait_for_exit)) or True
+        ),
     )
 
     replaced = responder.stop_previous_instance(pid_file)
 
     assert replaced == 4242
-    assert terminated == [(4242, "boot-a:100")]
+    assert terminated == [(4242, "boot-a:100", True)]
 
 
 def test_a_reused_pid_is_not_terminated(tmp_path: Path, monkeypatch) -> None:
@@ -355,7 +357,7 @@ def test_a_reused_pid_is_not_terminated(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(
         responder,
         "terminate_process_if_same_instance",
-        lambda pid, token: False,
+        lambda pid, token, **kwargs: False,
     )
 
     assert responder.stop_previous_instance(pid_file) is None
@@ -368,7 +370,7 @@ def test_a_legacy_bare_pid_file_is_never_trusted(tmp_path: Path, monkeypatch) ->
     monkeypatch.setattr(
         responder,
         "terminate_process_if_same_instance",
-        lambda pid, token: terminated.append((pid, token)) or True,
+        lambda pid, token, **kwargs: terminated.append((pid, token)) or True,
     )
 
     assert responder.stop_previous_instance(pid_file) is None
@@ -381,7 +383,7 @@ def test_a_dead_or_missing_pid_is_not_treated_as_a_running_responder(
     monkeypatch.setattr(
         responder,
         "terminate_process_if_same_instance",
-        lambda pid, token: False,
+        lambda pid, token, **kwargs: False,
     )
 
     missing = tmp_path / "absent.pid"
@@ -423,9 +425,7 @@ def test_the_responder_never_terminates_itself(tmp_path: Path) -> None:
     assert responder.stop_previous_instance(pid_file) is None
 
 
-def test_the_pid_file_records_the_live_responder(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_the_pid_file_records_the_live_responder(tmp_path: Path, monkeypatch) -> None:
     import os as _os
 
     pid_file = tmp_path / "nested" / "responder.pid"
@@ -484,10 +484,13 @@ def test_linux_process_identity_is_checked_after_pinning_the_process(
     assert closed == [91]
 
 
+@pytest.mark.parametrize("wait_for_exit", [False, True])
 def test_linux_matching_identity_signals_only_the_pinned_process(
     monkeypatch,
+    wait_for_exit,
 ) -> None:
     signalled: list[tuple[int, int]] = []
+    waited: list[int] = []
     closed: list[int] = []
     monkeypatch.setattr(responder.os, "name", "posix")
     monkeypatch.setattr(responder.sys, "platform", "linux")
@@ -513,9 +516,20 @@ def test_linux_matching_identity_signals_only_the_pinned_process(
         "close",
         lambda descriptor: closed.append(descriptor),
     )
+    monkeypatch.setattr(
+        responder,
+        "_wait_linux_process_exit",
+        lambda descriptor: waited.append(descriptor) or True,
+    )
 
-    assert responder.terminate_process_if_same_instance(4242, "boot-a:100")
+    if wait_for_exit:
+        assert responder.terminate_process_if_same_instance(
+            4242, "boot-a:100", wait_for_exit=True
+        )
+    else:
+        assert responder.terminate_process_if_same_instance(4242, "boot-a:100")
     assert signalled == [(91, responder.signal.SIGTERM)]
+    assert waited == ([91] if wait_for_exit else [])
     assert closed == [91]
 
 
@@ -550,7 +564,10 @@ def test_a_matching_child_process_instance_can_be_terminated() -> None:
             if token is None:
                 time.sleep(0.05)
         assert token is not None
-        assert responder.terminate_process_if_same_instance(child.pid, token)
+        assert responder.terminate_process_if_same_instance(
+            child.pid, token, wait_for_exit=True
+        )
+        assert child.poll() is not None, "success must confirm exit, not just signal"
         child.wait(timeout=5.0)
     finally:
         if child.poll() is None:
