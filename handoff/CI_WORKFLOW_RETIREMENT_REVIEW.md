@@ -56,7 +56,7 @@ Thus static test-set inclusion is insufficient to retireF7.7 safely.
 
 F7.1–F7.6 omitUP035 from their command-local ignore lists; retained capability
 lint explicitly ignoresUP035. Effective Ruff settings were compared read-only
-with identical file/config and only the two ignore lists differing;UP035 is the
+with available Ruff0.16.3, identical file/config and only the two ignore lists differing;UP035 is the
 enabled-rule delta. No lint rule was relaxed. F7.4/F7.5 also lint relay test files
 outside the four retained lint scopes; Phase2 lints relay but does not trigger on
 capability-only changes. No new product lint failure is alleged by this review.
