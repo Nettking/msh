@@ -1,5 +1,5 @@
 {
-  "recorded_at": "2026-09-12T04:49:26.411814+00:00",
+  "recorded_at": "2026-09-12T05:00:58.581129+00:00",
   "source_commit": "2a9c9b8eb53edff74c2de23570ec56e054d29b22",
   "changes": [
     {
@@ -9,48 +9,52 @@
       "conclusion": null,
       "jobs": [
         {
-          "id": 103496010754,
-          "name": "Full-suite order (rotating)",
+          "id": 103496010739,
+          "name": "Release checks (Windows)",
+          "status": "in_progress",
+          "conclusion": null
+        },
+        {
+          "id": 103496010787,
+          "name": "Windows regressions (transport-storage)",
           "status": "completed",
           "conclusion": "success"
         },
         {
           "id": 103496010801,
           "name": "Full-suite order (fixed)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 103496010847,
+          "name": "Linux regression shard (0)",
           "status": "in_progress",
+          "conclusion": null
+        },
+        {
+          "id": 103496010857,
+          "name": "Linux regression shard (1)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 103501411925,
+          "name": "Clean-checkout suite order independence",
+          "status": "queued",
           "conclusion": null
         }
       ]
     },
     {
-      "workflow": "icse-tool-demo.yml",
-      "run_id": 34672364156,
+      "workflow": "product-branding.yml",
+      "run_id": 34672364194,
       "status": "completed",
       "conclusion": "success",
       "jobs": [
         {
-          "id": 103496010783,
-          "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
-          "status": "completed",
-          "conclusion": "success"
-        },
-        {
-          "id": 103499607818,
-          "name": "publication-bundle",
-          "status": "completed",
-          "conclusion": "success"
-        }
-      ]
-    },
-    {
-      "workflow": "cf7b-product-physical-acceptance.yml",
-      "run_id": 34672364171,
-      "status": "completed",
-      "conclusion": "success",
-      "jobs": [
-        {
-          "id": 103496010761,
-          "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
+          "id": 103496010741,
+          "name": "product-branding",
           "status": "completed",
           "conclusion": "success"
         }
@@ -59,40 +63,40 @@
     {
       "workflow": "phase2-federation.yml",
       "run_id": 34672364216,
-      "status": "in_progress",
-      "conclusion": null,
-      "jobs": [
-        {
-          "id": 103496011201,
-          "name": "windows",
-          "status": "in_progress",
-          "conclusion": null
-        }
-      ]
-    },
-    {
-      "workflow": "cfi2-onboarding-composition.yml",
-      "run_id": 34672491622,
       "status": "completed",
       "conclusion": "success",
       "jobs": [
         {
-          "id": 103496379954,
-          "name": "onboarding (Windows, fcp-test-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+          "id": 103496011201,
+          "name": "windows",
           "status": "completed",
           "conclusion": "success"
         }
       ]
     },
     {
-      "workflow": "ci-test-sharding.yml",
-      "run_id": 34672495196,
-      "status": "queued",
-      "conclusion": null,
+      "workflow": "cf7c-physical-test-readiness.yml",
+      "run_id": 34672483585,
+      "status": "completed",
+      "conclusion": "success",
       "jobs": [
         {
-          "id": 103496391402,
-          "name": "Shard contract (Linux, shared-pool)",
+          "id": 103496356715,
+          "name": "readiness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy B...",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "workflow": "cf8-role-retirement.yml",
+      "run_id": 34672487812,
+      "status": "completed",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "id": 103496368578,
+          "name": "role-retirement (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
           "status": "completed",
           "conclusion": "success"
         }
