@@ -2086,3 +2086,8 @@ source, and fill CF7B only if its completed source gap is demonstrated.
 02:19UTC: registry verifies exact2c1a8d93; preserve required5/37 plus companion2/3.
 Both completed CF7B jobs prove synthetic2cc004b3. Next: guarded one-time CF7B
 exact-head dispatch; all active/passing runs remain untouched.
+
+02:19:43UTC: CF7B exact-head2c1a8d93 dispatched once (HTTP204), both native
+source proofs retained in ledger. Nine new-head dispatches total. Next: poll
+via poll_pr463_state.py at next state check; retain new terminal evidence only.
+No new defect, merge, candidate or physical state change.
