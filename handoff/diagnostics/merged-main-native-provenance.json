@@ -1,4 +1,19 @@
 {
   "source_commit": "2a9c9b8eb53edff74c2de23570ec56e054d29b22",
-  "records": []
+  "records": [
+    {
+      "job_id": 103496010690,
+      "run_id": 34672364185,
+      "name": "update-contracts (Linux, fcp-linux-fast, bash)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 51398,
+      "sha256": "fdde0c05562130b0dc1df28db37202896c112eb7118cbd733a11fb3c9afa553f",
+      "checkout_commits": [
+        "2a9c9b8eb53edff74c2de23570ec56e054d29b22"
+      ],
+      "checkout_matches": true
+    }
+  ],
+  "retained_at": "2026-09-12T04:13:48.839976+00:00"
 }
