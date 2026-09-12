@@ -2091,3 +2091,8 @@ exact-head dispatch; all active/passing runs remain untouched.
 source proofs retained in ledger. Nine new-head dispatches total. Next: poll
 via poll_pr463_state.py at next state check; retain new terminal evidence only.
 No new defect, merge, candidate or physical state change.
+
+02:30UTC: PR463 head2c1a8d93 unchanged, no reported failure. Exact branding
+completed success; CF8 and automatic ICSE gained one successful job. Next: retain
+only new terminal native logs and verify checkout; no source-gap dispatch is
+justified while remaining automatic parents are active.

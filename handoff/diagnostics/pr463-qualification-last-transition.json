@@ -1,32 +1,98 @@
 {
-  "observed_at": "2026-09-12T02:18:54.676723+00:00",
+  "observed_at": "2026-09-12T02:30:21.649296+00:00",
   "changes": {
     "463": [
       {
         "workflow": "cf7b-product-physical-acceptance.yml",
-        "run_id": 34664467227,
-        "event": "pull_request",
-        "status": "completed",
-        "conclusion": "success",
+        "run_id": 34667348711,
+        "event": "workflow_dispatch",
+        "status": "queued",
+        "conclusion": null,
         "jobs": [
           {
-            "id": 103473479267,
+            "id": 103481851157,
             "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
+            "status": "queued",
+            "conclusion": null
+          },
+          {
+            "id": 103481851242,
+            "name": "acceptance (Linux, fcp-linux-fast, bash)",
+            "status": "queued",
+            "conclusion": null
+          }
+        ]
+      },
+      {
+        "workflow": "federation-v1-release.yml",
+        "run_id": 34664467237,
+        "event": "pull_request",
+        "status": "queued",
+        "conclusion": null,
+        "jobs": [
+          {
+            "id": 103473479388,
+            "name": "Full-suite order (rotating)",
+            "status": "in_progress",
+            "conclusion": null
+          }
+        ]
+      },
+      {
+        "workflow": "icse-tool-demo.yml",
+        "run_id": 34664467253,
+        "event": "pull_request",
+        "status": "queued",
+        "conclusion": null,
+        "jobs": [
+          {
+            "id": 103473479609,
+            "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
             "status": "completed",
             "conclusion": "success"
           }
         ]
       },
       {
-        "workflow": "release-image-metadata.yml",
-        "run_id": 34664592951,
+        "workflow": "product-branding.yml",
+        "run_id": 34665765899,
         "event": "workflow_dispatch",
         "status": "completed",
         "conclusion": "success",
         "jobs": [
           {
-            "id": 103473858031,
-            "name": "Verify immutable release image metadata",
+            "id": 103477205459,
+            "name": "product-branding",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
+      {
+        "workflow": "cf7-acceptance-harness.yml",
+        "run_id": 34664586934,
+        "event": "workflow_dispatch",
+        "status": "in_progress",
+        "conclusion": null,
+        "jobs": [
+          {
+            "id": 103473838973,
+            "name": "harness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Byp...",
+            "status": "in_progress",
+            "conclusion": null
+          }
+        ]
+      },
+      {
+        "workflow": "cf8-role-retirement.yml",
+        "run_id": 34664589243,
+        "event": "workflow_dispatch",
+        "status": "queued",
+        "conclusion": null,
+        "jobs": [
+          {
+            "id": 103473846451,
+            "name": "role-retirement (Linux, fcp-linux-fast, bash)",
             "status": "completed",
             "conclusion": "success"
           }
