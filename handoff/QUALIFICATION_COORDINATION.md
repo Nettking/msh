@@ -1,17 +1,17 @@
 # Federation v1 qualification coordination
 
-**Current actionable checkpoint (2026-09-12T06:33Z policy update; last CI snapshot06:24UTC):** PR467/D08 is ready for review at
+**Current actionable checkpoint (2026-09-12T07:41Z; last CI snapshot07:39UTC):** PR467/D08 is ready for review at
 exact head84c66f8185c1411d9dc8c5c33244a2f564845ce7, clean repair checkout.
 Prequalification correctness/scope review completed with no findings;37+3 exact-head
 qualification active. Nine exact-head dispatches recorded once (seven absent gates
-plus completed branding and CF7B source gaps). Four original auto workflows remain active;
-Current native proof:4/37 required plus1/3 companions (06:24UTC); sixteen
-synthetic-source logs are separately retained and excluded. No required failure observed.
+plus completed branding and CF7B source gaps). All selected runs completed successfully;
+Current native proof:13/37 required plus3/3 companions (07:41UTC); twenty-five
+synthetic-source logs and two reviewed dependency aggregates are retained separately and excluded. No required failure observed.
 **Polling policy:** long-running jobs normally take1–2+ hours. After confirmed start/progress,
 wait at least45–60 minutes between checks unless expected completion is sooner; prefer
 checking near expected completion. The existing heartbeat is now hourly and quiet for
-unchanged/non-actionable progress. Last CI snapshot:2026-09-12T06:24:00Z.
-**Next eligible routine CI check:2026-09-12T07:24:00Z or later.** Do not poll before
+unchanged/non-actionable progress. Last CI snapshot:2026-09-12T07:38:59Z.
+**Next eligible routine CI check:2026-09-12T08:39:00Z or later.** Do not poll before
 then unless an actionable completion/failure/timeout/head change is independently delivered.
 Do not create a new work cycle merely to report unchanged progress. On subsequent
 meaningful transitions, record last/next check times and preserve this policy across sessions.
@@ -2337,3 +2337,12 @@ terminal automatic runs. Next: retain only new terminal native logs; count exact
 proof only, then review completed synthetic source gaps including release aggregates
 before any guarded dispatch. Last CI snapshot07:38:59UTC; next routine snapshot
 08:39UTC or later unless an actionable event arrives. No physical action or PASS.
+
+07:41UTC: native source receipts now verify13/37 required plus all3companions on
+exact84c66f81. Twenty-five synthetic-source native logs and two reviewed dependency
+aggregates are preserved separately. Completed release/update/F85/ICSE automated
+runs are proven source gaps; release workflow blobs match head/synthetic and14source
+jobs plus2dependency aggregates were reconciled (pr467-release-aggregate-review.json).
+Next: dispatch exactly these four missing exact-head gates individually with immediate
+ledger/checkpoint commit and push after each; then confirm the new jobs were accepted
+and await the next eligible hourly snapshot. No passing exact-head evidence rerun.
