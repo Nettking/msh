@@ -11,9 +11,9 @@ from catalog.capabilities.analysis.contracts import (
     ANALYSIS_CAPABILITY_TYPE,
     ORIGIN_AUTOMATIC_DISCOVERY,
 )
+from catalog.capabilities.analysis.provisioning import analysis_capability_id
 from catalog.capabilities.jobs import JobStatus
 from catalog.orchestrator import analysis_runtime
-from catalog.capabilities.analysis.provisioning import analysis_capability_id
 from catalog.orchestrator.analysis_runtime import (
     AnalysisIdentity,
     AnalysisRuntime,
@@ -159,6 +159,32 @@ def test_local_provider_is_advertised_as_an_ordinary_provider(tmp_path: Path) ->
     assert reports[0].capability_id == runtime.identity.provider_id
     assert reports[0].node_id == runtime.identity.node_id
     assert reports[0].session_id == runtime.identity.session_id
+
+
+def test_topology_changed_during_binding_is_not_recorded_as_current(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    generation = {"value": 1}
+    bindings = []
+
+    def bind(identity, capability_root, clock):
+        bindings.append(generation["value"])
+        # Storage can restore or replace its view while analysis is constructing.
+        generation["value"] = 2
+
+    monkeypatch.setattr(analysis_runtime, "repo_root", lambda: tmp_path)
+    analysis_runtime.register_identity_supplier(lambda: ("session-a", "node-a"))
+    analysis_runtime.register_federation_supplier(
+        bind, generation_supplier=lambda: generation["value"])
+    try:
+        first = analysis_runtime.get_analysis_runtime()
+        assert first.federation_generation == 1
+        replacement = analysis_runtime.get_analysis_runtime()
+        assert replacement is not first
+        assert replacement.federation_generation == 2
+        assert bindings == [1, 2]
+    finally:
+        analysis_runtime.reset_analysis_runtime()
 
 
 def test_a_federation_of_one_schedules_and_runs_its_own_slice(tmp_path: Path) -> None:
