@@ -551,11 +551,15 @@ function Invoke-ControlledCoreBuild([string]$BackingPath) {
     )
 
     try {
+        # Retain the native process handle. Start-Process -PassThru can expose
+        # a null ExitCode after a short-lived child exits; casting that to int
+        # would turn a failed Docker build into success with existing images.
         $process = Start-Process `
             -FilePath $docker `
             -ArgumentList $arguments `
             -NoNewWindow `
             -PassThru
+        $null = $process.Handle
     }
     catch {
         throw 'core_image_build_failed'
@@ -590,8 +594,9 @@ function Invoke-ControlledCoreBuild([string]$BackingPath) {
         Start-Sleep -Milliseconds $BuildPollMilliseconds
     }
 
-    $exit = [int]$process.ExitCode
-    if ($exit -ne 0) {
+    $process.WaitForExit()
+    $exit = $process.ExitCode
+    if ($null -eq $exit -or $exit -ne 0) {
         $cleanupOk = Invoke-BuildCachePrune
         if (-not $cleanupOk) {
             if (-not (Stop-FcpBuildWriter $name)) {
@@ -599,6 +604,7 @@ function Invoke-ControlledCoreBuild([string]$BackingPath) {
             }
             throw 'build_failed_and_cache_prune_failed'
         }
+        if ($null -eq $exit) { throw 'core_image_build_exit_unavailable' }
         throw "core_image_build_failed:$exit"
     }
     if (-not (Invoke-BuildCachePrune)) {

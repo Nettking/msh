@@ -1,12 +1,80 @@
 from __future__ import annotations
 
+import json
+import os
+import subprocess
+import sys
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).resolve().parents[3]
 
 
 def _read(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
+
+
+@pytest.mark.skipif(os.name != "nt", reason="native Windows process exit status")
+@pytest.mark.parametrize("child_exit", [0, 7])
+def test_native_build_child_exit_controls_success_and_cleanup(
+    tmp_path: Path, child_exit: int,
+) -> None:
+    # Execute the real controller function with a real native child process.
+    # Its Python script stands in for Docker; only disk/builder I/O is stubbed.
+    source = _read("scripts/windows/fcp_host_build.ps1")
+    function = source[
+        source.index("function Invoke-ControlledCoreBuild"):
+        source.index("function Get-NonEmptyTextLines")
+    ]
+    (tmp_path / "compose").write_text(
+        "import sys\nprint('native-build-stdout', flush=True)\n"
+        "print('native-build-stderr', file=sys.stderr, flush=True)\n"
+        f"raise SystemExit({child_exit})\n"
+    )
+    def quote(value: object) -> str:
+        return "'" + str(value).replace("'", "''") + "'"
+
+    script = tmp_path / "native-exit.ps1"
+    script.write_text(
+        "$ErrorActionPreference = 'Stop'\n"
+        "Set-StrictMode -Version Latest\n"
+        f"$RepoRoot = {quote(tmp_path)}\n"
+        f"$script:DockerExe = {quote(sys.executable)}\n"
+        "Set-Location -LiteralPath $RepoRoot\n"
+        "[Environment]::CurrentDirectory = $RepoRoot\n"
+        "$BuildTimeoutSeconds = 10\n$BuildPollMilliseconds = 10\n"
+        "$script:prunes = 0\n$script:writerStopped = $false\n"
+        "function Ensure-FcpControllableBuilder { return 'fcp-build-test' }\n"
+        "function Get-FcpResourceFreeBytes { return 1099511627776 }\n"
+        "function Get-FcpResourcePressureLevel { return 'normal' }\n"
+        "function Invoke-BuildCachePrune { $script:prunes++; "
+        "$script:writerStopped = $true; return $true }\n"
+        "function Stop-FcpBuildWriter { $script:writerStopped = $true; "
+        "return $true }\n"
+        + function
+        + "\n$failure = $null\n"
+        "try { Invoke-ControlledCoreBuild 'unused' } "
+        "catch { $failure = $_.Exception.Message }\n"
+        "@{ failure=$failure; prunes=$script:prunes; "
+        "writerStopped=$script:writerStopped } | ConvertTo-Json -Compress\n",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy",
+         "Bypass", "-File", str(script)],
+        cwd=tmp_path, capture_output=True, text=True, timeout=20,
+        check=False,
+        creationflags=subprocess.CREATE_NO_WINDOW,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "native-build-stdout" in result.stdout
+    assert "native-build-stderr" in result.stderr
+    outcome = json.loads(result.stdout.splitlines()[-1])
+    expected = f"core_image_build_failed:{child_exit}" if child_exit else None
+    assert outcome["failure"] == expected
+    assert outcome["prunes"] == 1
+    assert outcome["writerStopped"] is True
 
 
 def test_windows_host_build_owns_a_checkout_scoped_buildkit_writer() -> None:
