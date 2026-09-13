@@ -1,5 +1,5 @@
 """One real missing-Dockerfile failure through the frozen host build controller."""
-import datetime,hashlib,json,os,pathlib,subprocess,sys
+import datetime,hashlib,json,os,pathlib,re,subprocess,sys
 windows=os.name=='nt';sha='1aac6148759d7b2fd488ec26b97e1a786bdafa80'
 h=pathlib.Path('C:/wsl/fcp-v1-1aac6148-main-20260913' if windows else '/home/martin/fcp-v1-1aac6148-main-20260913/source')
 r=pathlib.Path('C:/wsl/fcp-v1-73c779-nettking-runtime-20260910' if windows else '/home/martin/fcp-v1-73c779-nitro-20260910/source')
@@ -36,7 +36,7 @@ def cores():
  return rows
 save()
 try:
- before=cores();prep=call([*runner,'prepare',*target],'P01-build-failure-prepare');status['prepare_id']=prep['prepare_id'];save()
+ before=cores();status['core_before']=before;save();prep=call([*runner,'prepare',*target],'P01-build-failure-prepare');status['prepare_id']=prep['prepare_id'];save()
  missing='.__fcp_p01_intentionally_missing_Dockerfile__';assert not (r/missing).exists()
  override=c/'P01-missing-dockerfile.compose.json';assert not override.exists()
  override.write_text(json.dumps({'services':{svc:{'build':{'dockerfile':missing}} for svc in ['flask','relay','recorder']}},indent=2)+'\n')
@@ -55,7 +55,7 @@ try:
  with log.open('wb') as error,stdout.open('wb') as output:
   p=subprocess.run(command,cwd=r,env=fault_env,stdin=subprocess.DEVNULL,stdout=output,stderr=error,timeout=1100,**({'creationflags':subprocess.CREATE_NO_WINDOW} if windows else {}))
  text=log.read_text(errors='replace')+stdout.read_text(errors='replace')
- status.update(controller_exit_code=p.returncode,missing_dockerfile_error_observed=missing in text and 'no such file' in text.lower(),controller_refused_build='core_image_build_failed' in text,success_marker_written=marker.exists(),owned_builder=builder);save()
+ status.update(controller_exit_code=p.returncode,missing_dockerfile_error_observed=missing in text and 'no such file' in text.lower(),controller_refused_build=bool(re.search(r'FCP\s+host\s+build\s+refused:\s*core_image_\s*build_failed(?::1)?',text)),success_marker_written=marker.exists(),owned_builder=builder);save()
  assert p.returncode!=0 and status['missing_dockerfile_error_observed'] and status['controller_refused_build'] and not marker.exists(),'Unexpected fault result; do not record PASS'
  if not windows:assert not stdout.read_text().strip(),'Failed POSIX build published a success commit'
  assert cores()==before,'A core changed during the build-only fault'

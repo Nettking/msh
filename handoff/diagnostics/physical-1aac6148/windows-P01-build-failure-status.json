@@ -1,0 +1,48 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "harness_sha": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "host": "nettking",
+  "status": "COMPLETED",
+  "started_at": "2026-09-13T16:49:46.843295+00:00",
+  "physical_pass": false,
+  "runtime_activation_requested": false,
+  "protected_data_accessed": false,
+  "prepare_id": "731e076506e84dd694a013db47014f6e",
+  "controller_exit_code": 1,
+  "missing_dockerfile_error_observed": true,
+  "controller_refused_build": true,
+  "success_marker_written": false,
+  "owned_builder": "fcp-build-D2A163948EB20562776A1D58",
+  "owned_writer_stopped": true,
+  "cores_verified_after_fault": [
+    {
+      "service": "flask",
+      "container": "3e5c100aa22074c472160633f03ba385399cdf9ab4e6b1c7690497db8e388a5a",
+      "image": "sha256:bda3c9f1e10f966382afd4f63f6d7b0643fb235def339be7333dc3167d54dae1",
+      "restart_count": 0,
+      "started_at": "2026-09-13T15:44:26.115885669Z"
+    },
+    {
+      "service": "relay",
+      "container": "be442ffdc88e74f51609d550636c925ccde0ccffc43afbd014fc752b386f1e9d",
+      "image": "sha256:a15d875c3815ce9dbc407ad65821699c0c599c01df98ebbe8b21e39dab7b9036",
+      "restart_count": 0,
+      "started_at": "2026-09-13T15:44:25.135001256Z"
+    },
+    {
+      "service": "recorder",
+      "container": "8a7ac514a4bd3b5178d40ac2119bea79b2afc16dedcca14dfe7d9c741a94cdc7",
+      "image": "sha256:bb71b4e2b273a2d1f8b625ae2c048299320186e4c6c0f0adcd03f7502ca0435d",
+      "restart_count": 0,
+      "started_at": "2026-09-13T15:44:25.122488786Z"
+    }
+  ],
+  "core_continuity_basis": "same previously verified candidate images, StartedAt before fault, and RestartCount zero; immediate pre-fault IDs were not saved",
+  "log_sha256": "f1fe9922d4fde75ddb5bc0e53bdd0163d7b39efb00e3195f1b3fcebad25ed78c",
+  "stdout_sha256": "91769d908b5013fd6158e165ca83f45ede004151a9a6cb49d5d8097e91f1316c",
+  "parser_classification": "deterministic local evidence-helper defect: terminal line wrapping",
+  "build_repeated": false,
+  "original_parser_stop_retained": true,
+  "verdict": "pass",
+  "finished_at": "2026-09-13T16:52:10.344320+00:00"
+}

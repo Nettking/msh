@@ -1,0 +1,83 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "harness_sha": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "P01": "PASS",
+  "native_assertions_passed": 10,
+  "native_hosts": [
+    "nettking",
+    "nitro"
+  ],
+  "contract_result": {
+    "scenario": "P01",
+    "title": "Repeated Federation update growth and failure cleanup",
+    "passed": true,
+    "missing_assertions": [],
+    "failing_assertions": [],
+    "elapsed_seconds": 0.0,
+    "required_elapsed_seconds": 0,
+    "sample_count": 0,
+    "required_samples": 0,
+    "timed_sessions": []
+  },
+  "imported_native_packets": [
+    {
+      "name": "20260913T160210634356Z-sample-b42528fd.json",
+      "sha256": "9af7834aec25dacebdbe4dc3dd7a1e6ad2b632a688ed035f745bf5ef39920b4f"
+    },
+    {
+      "name": "20260913T160331166928Z-prepare-a8b9152c.json",
+      "sha256": "4170874514783b9a6aea336b78af0e9da554acfeae1828a4bf5451c9cd57e0cf"
+    },
+    {
+      "name": "20260913T161050615304Z-sample-ce9d81f7.json",
+      "sha256": "974acdd93c075feca93b279b68c3ce46060e5056dd8fd5a106574e6d0573243e"
+    },
+    {
+      "name": "20260913T161411084850Z-sample-a40abcae.json",
+      "sha256": "71433885db4227d9f825b3fcf537dc0117d3540ef2d666a65590925ce5c809c6"
+    },
+    {
+      "name": "20260913T161732768283Z-sample-3685be42.json",
+      "sha256": "6af32e2b54f71632d58f171db200db5d8dc50e4d89a1dd0cb32a1b820ab16f74"
+    },
+    {
+      "name": "20260913T161733455508Z-operator-action-1a480793.json",
+      "sha256": "eadda9e347cf97b6ed86a0578a65cb94e4446d7f483131e56d69dacaca0ca84e"
+    },
+    {
+      "name": "20260913T161734370324Z-assertion-6bbb1e13.json",
+      "sha256": "9f037dd38fa5275046b530da7e3fda89bb53c0d6e7c89ad6c27d2076162057d8"
+    },
+    {
+      "name": "20260913T161734895462Z-assertion-a0029674.json",
+      "sha256": "578979335028ddffbf35885d8e10996a3a9c1c3a734a69a8dc5f7af392d87e61"
+    },
+    {
+      "name": "20260913T162804357107Z-assertion-a7459cd8.json",
+      "sha256": "46d0ec8767404951d4c12b8e21ea5af1cca662ebe9fa745745127ab733a93714"
+    },
+    {
+      "name": "20260913T162805593924Z-assertion-5990e31c.json",
+      "sha256": "777f57963f03ee0d337e09c1ec41e137909a54dc4907bbf55212d6842b97e248"
+    },
+    {
+      "name": "20260913T163204955506Z-prepare-adcf4539.json",
+      "sha256": "b3bebeec4b7912ea8f1eab2229b42b8e73e32caa8335635c5db7d046420d53c7"
+    },
+    {
+      "name": "20260913T163228772609Z-operator-action-ce4bf350.json",
+      "sha256": "027b8e444dd381f40f8af8654bebb548b76da79dd4f66b75c74e5464fb08a005"
+    },
+    {
+      "name": "20260913T163231302803Z-assertion-82a378fd.json",
+      "sha256": "b6c511bf0525d185007be3fa3c65b9841bf04ebbe1fe985a9457acc18df2bac0"
+    }
+  ],
+  "packet_bytes_preserved": true,
+  "original_windows_failure_retained": true,
+  "archive_sha256": "d0cc087ad920d8a2bd76fc79807f301efdf5134c4d4d02037bb6d9a96c74f46c",
+  "physical_campaign_pass": false,
+  "P07": "NOT_STARTED",
+  "P12": "NOT_STARTED",
+  "protected_data_accessed": false
+}

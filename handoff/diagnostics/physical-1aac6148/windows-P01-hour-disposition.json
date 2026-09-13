@@ -1,0 +1,36 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "hourly_growth": "PASS",
+  "growth_detail": {
+    "elapsed_hours": 1.0004,
+    "growth_bytes_per_hour": 820288256,
+    "max_growth_bytes_per_hour": 1073741824,
+    "restart_amplification": [],
+    "restart_states": {
+      "flask": {
+        "consecutive_unclean": 0,
+        "state": "stable"
+      },
+      "recorder": {
+        "consecutive_unclean": 0,
+        "state": "stable"
+      },
+      "relay": {
+        "consecutive_unclean": 0,
+        "state": "unknown"
+      }
+    },
+    "run_id_bound": false,
+    "sample_count": 5,
+    "used_bytes_delta": 820604928
+  },
+  "original_packet_bytes_unchanged": true,
+  "initial_short_window_failure_retained": true,
+  "follow_up_samples_added": 1,
+  "ceiling_changed": false,
+  "archive_sha256": "5aa1689a27adbaedf88cf67f9cdc0d757a21de2ad2d965dc8754c5356fe37f79",
+  "classification": "unresolved but non-demonstrated candidate defect; declared sustained-growth check passed",
+  "decision": "The single real-hour follow-up passes with every earlier sample retained and unchanged ceiling. No sustained candidate growth defect is demonstrated; close this bounded observation and continue physical acceptance without another diagnostic run.",
+  "physical_pass": false,
+  "protected_data_accessed": false
+}

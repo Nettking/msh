@@ -1,0 +1,36 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "status": "COMPLETED",
+  "sample_not_before": "2026-09-13T16:41:05.365965+00:00",
+  "initial_failure_retained": true,
+  "all_existing_samples_retained": true,
+  "physical_pass": false,
+  "runtime_activation_requested": false,
+  "sample": {
+    "evidence": "evidence/v1-physical/observations/P01/20260913T164114478379Z-sample-a1c256f4.json",
+    "scenario": "P01",
+    "series": [
+      "cpu_ram",
+      "history",
+      "orphan",
+      "publication",
+      "recorder"
+    ]
+  },
+  "growth": {
+    "assertion": "windows-growth-bounded",
+    "classification": "automated-probe",
+    "evidence": "evidence/v1-physical/observations/P01/20260913T164115455461Z-assertion-ff7963f6.json",
+    "probes": [
+      {
+        "probe_id": "growth-analysis",
+        "status": "pass",
+        "summary": "no unexplained growth or restart amplification across the samples"
+      }
+    ],
+    "recorded": true,
+    "scenario": "P01",
+    "verdict": "pass"
+  },
+  "finished_at": "2026-09-13T16:41:15.490246+00:00"
+}
