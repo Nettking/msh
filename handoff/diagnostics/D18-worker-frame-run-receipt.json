@@ -1,0 +1,102 @@
+{
+  "recorded_at": "2026-09-13T09:10:36.704664+00:00",
+  "activation_commit": "4f253ae6d626f5d51c9c8888b1de3347ee8c36db",
+  "runs": [
+    {
+      "id": 34749055328,
+      "name": "D18 single unchanged worker-frame capture",
+      "path": ".github/workflows/ci-d18-worker-frame-capture.yml",
+      "html_url": "https://github.com/Nettking/msh/actions/runs/34749055328",
+      "head_sha": "4f253ae6d626f5d51c9c8888b1de3347ee8c36db",
+      "status": "in_progress",
+      "conclusion": null,
+      "run_attempt": 1,
+      "created_at": "2026-09-13T09:10:18Z",
+      "jobs": [
+        {
+          "id": 103702121271,
+          "name": "worker-frames",
+          "status": "in_progress",
+          "conclusion": null,
+          "runner_name": "Beast-Linux-WSL",
+          "started_at": "2026-09-13T09:10:21Z",
+          "completed_at": null,
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-13T09:10:22Z",
+              "completed_at": "2026-09-13T09:10:24Z"
+            },
+            {
+              "name": "Verify original host and allocate owned evidence",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-13T09:10:24Z",
+              "completed_at": "2026-09-13T09:10:24Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-13T09:10:24Z",
+              "completed_at": "2026-09-13T09:10:26Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-13T09:10:26Z",
+              "completed_at": "2026-09-13T09:10:28Z"
+            },
+            {
+              "name": "Preserve original ICSE dependency commands",
+              "status": "in_progress",
+              "conclusion": null,
+              "number": 5,
+              "started_at": "2026-09-13T09:10:28Z",
+              "completed_at": null
+            },
+            {
+              "name": "Extract external collector without modifying candidate source",
+              "status": "pending",
+              "conclusion": null,
+              "number": 6,
+              "started_at": null,
+              "completed_at": null
+            },
+            {
+              "name": "Execute unchanged network command exactly once and capture safe frames",
+              "status": "pending",
+              "conclusion": null,
+              "number": 7,
+              "started_at": null,
+              "completed_at": null
+            },
+            {
+              "name": "Preserve only sanitized receipt and existing public outputs",
+              "status": "pending",
+              "conclusion": null,
+              "number": 8,
+              "started_at": null,
+              "completed_at": null
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "pending",
+              "conclusion": null,
+              "number": 16,
+              "started_at": null,
+              "completed_at": null
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
