@@ -1,6 +1,8 @@
 # Federation v1 qualification coordination
 
-**Current actionable checkpoint: 2026-09-13T02:31:14.514658+00:00. PR475 required release attempt2 started.**
+**Current actionable checkpoint: 2026-09-13 03:02UTC. PR475 required release attempt2 completed SUCCESS.**
+
+Run34707260030 attempt2 completed02:40:53UTC; all16 jobs report success, including two fresh test jobs and four new aggregates. Ten prior successes retained. Head5e6/expected nativea5e unchanged. API receipt diagnostics/pr475-required-release-retry-completed-state.json. NEXT: retain/review six new native logs and new JUnit artifacts, then reconcile required exact-source qualification and relevant correctness disposition before any merge. Do not rerun completed successes or infer physical acceptance. Earlier startup/next-check instructions below are historical and superseded by this completion.
 
 Run34707260030 failed-jobs-only retry accepted at02:29UTC. Two fresh executions both started02:29:35UTC: rotating full suite103659667010 on Nettking-Linux; Windows journal/artifacts103659667021 on Nettking. Ten successful jobs are preserved with identical original completion and step timestamps (GitHub assigns new API job IDs to these carried results). Four failed dependent aggregates await their inputs. No completed passing job was rerun. Receipts: [retry-reviewed](diagnostics/pr475-required-release-retry-reviewed.json), [startup API](diagnostics/pr475-required-release-retry-startup.json); pre-dispatch plan checkpoint599ae856 and [retry plan](PR475_REQUIRED_RELEASE_RETRY_PLAN.md).
 
