@@ -1,0 +1,310 @@
+{
+  "source_commit": "83d059fba6d22b7d8f526be1b7e563c9bc3c0a68",
+  "review_head": "70163ea908741baa1999a9c1084f0805d85dea64",
+  "workflows": [
+    {
+      "workflow": "phase2-federation.yml",
+      "run_id": 34744552389,
+      "jobs": [
+        {
+          "id": 103689932146,
+          "run_id": 34744552389,
+          "workflow_name": "Phase 2 federation",
+          "head_branch": "codex/fix-d20-icse-failure-evidence",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34744552389",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYJGbNcg",
+          "head_sha": "70163ea908741baa1999a9c1084f0805d85dea64",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103689932146",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34744552389/job/103689932146",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-13T07:10:07Z",
+          "started_at": "2026-09-13T07:23:34Z",
+          "completed_at": "2026-09-13T07:27:30Z",
+          "name": "windows",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-13T07:23:35Z",
+              "completed_at": "2026-09-13T07:23:37Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-13T07:23:37Z",
+              "completed_at": "2026-09-13T07:23:41Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-13T07:23:41Z",
+              "completed_at": "2026-09-13T07:23:49Z"
+            },
+            {
+              "name": "Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-13T07:23:49Z",
+              "completed_at": "2026-09-13T07:23:50Z"
+            },
+            {
+              "name": "Install dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-13T07:23:50Z",
+              "completed_at": "2026-09-13T07:25:59Z"
+            },
+            {
+              "name": "Go direct peer sidecar",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-13T07:25:59Z",
+              "completed_at": "2026-09-13T07:26:03Z"
+            },
+            {
+              "name": "Identity, state, protocol, relay, and Phase F tests",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-13T07:26:03Z",
+              "completed_at": "2026-09-13T07:27:24Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-09-13T07:27:24Z",
+              "completed_at": "2026-09-13T07:27:24Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14,
+              "started_at": "2026-09-13T07:27:24Z",
+              "completed_at": "2026-09-13T07:27:26Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-09-13T07:27:26Z",
+              "completed_at": "2026-09-13T07:27:26Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103689932146",
+          "labels": [
+            "self-hosted",
+            "fcp-windows"
+          ],
+          "runner_id": 22,
+          "runner_name": "Nettking",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103689932243,
+          "run_id": 34744552389,
+          "workflow_name": "Phase 2 federation",
+          "head_branch": "codex/fix-d20-icse-failure-evidence",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34744552389",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYJGbN0w",
+          "head_sha": "70163ea908741baa1999a9c1084f0805d85dea64",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103689932243",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34744552389/job/103689932243",
+          "status": "completed",
+          "conclusion": "failure",
+          "created_at": "2026-09-13T07:10:07Z",
+          "started_at": "2026-09-13T07:10:21Z",
+          "completed_at": "2026-09-13T07:15:09Z",
+          "name": "linux",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-13T07:10:22Z",
+              "completed_at": "2026-09-13T07:10:24Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-13T07:10:24Z",
+              "completed_at": "2026-09-13T07:10:25Z"
+            },
+            {
+              "name": "Start disposable PostgreSQL 16",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-13T07:10:25Z",
+              "completed_at": "2026-09-13T07:10:32Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-13T07:10:32Z",
+              "completed_at": "2026-09-13T07:10:34Z"
+            },
+            {
+              "name": "Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-13T07:10:34Z",
+              "completed_at": "2026-09-13T07:10:34Z"
+            },
+            {
+              "name": "Install dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-13T07:10:34Z",
+              "completed_at": "2026-09-13T07:11:36Z"
+            },
+            {
+              "name": "Go direct peer sidecar",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-13T07:11:36Z",
+              "completed_at": "2026-09-13T07:11:42Z"
+            },
+            {
+              "name": "Capture Go module lock",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-13T07:11:42Z",
+              "completed_at": "2026-09-13T07:11:44Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-13T07:11:44Z",
+              "completed_at": "2026-09-13T07:11:44Z"
+            },
+            {
+              "name": "Compile",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-09-13T07:11:44Z",
+              "completed_at": "2026-09-13T07:11:46Z"
+            },
+            {
+              "name": "Phase 0 and 1 regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-09-13T07:11:46Z",
+              "completed_at": "2026-09-13T07:11:50Z"
+            },
+            {
+              "name": "Phase D and E storage tests",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-09-13T07:11:50Z",
+              "completed_at": "2026-09-13T07:12:57Z"
+            },
+            {
+              "name": "Phase 2 unit and integration tests",
+              "status": "completed",
+              "conclusion": "failure",
+              "number": 13,
+              "started_at": "2026-09-13T07:12:57Z",
+              "completed_at": "2026-09-13T07:15:03Z"
+            },
+            {
+              "name": "Ruff federation code",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 14,
+              "started_at": "2026-09-13T07:15:03Z",
+              "completed_at": "2026-09-13T07:15:03Z"
+            },
+            {
+              "name": "Compose validation",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 15,
+              "started_at": "2026-09-13T07:15:03Z",
+              "completed_at": "2026-09-13T07:15:03Z"
+            },
+            {
+              "name": "Diff hygiene",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 16,
+              "started_at": "2026-09-13T07:15:03Z",
+              "completed_at": "2026-09-13T07:15:03Z"
+            },
+            {
+              "name": "Remove disposable PostgreSQL 16",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-09-13T07:15:03Z",
+              "completed_at": "2026-09-13T07:15:04Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 33,
+              "started_at": "2026-09-13T07:15:04Z",
+              "completed_at": "2026-09-13T07:15:04Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 34,
+              "started_at": "2026-09-13T07:15:04Z",
+              "completed_at": "2026-09-13T07:15:04Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 35,
+              "started_at": "2026-09-13T07:15:04Z",
+              "completed_at": "2026-09-13T07:15:04Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103689932243",
+          "labels": [
+            "self-hosted",
+            "fcp-linux-fast"
+          ],
+          "runner_id": 29,
+          "runner_name": "Beast-Linux-WSL",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        }
+      ]
+    }
+  ]
+}

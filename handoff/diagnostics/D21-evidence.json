@@ -1,0 +1,22 @@
+{
+  "finding": "D21",
+  "status": "CONFIRMED observation; cause unresolved",
+  "candidate_sha": "70163ea908741baa1999a9c1084f0805d85dea64",
+  "actual_checked_in_sha": "83d059fba6d22b7d8f526be1b7e563c9bc3c0a68",
+  "host": "Beast-Linux-WSL, Python3.12.13",
+  "physical_stage": "None; Phase2 CI replica restart/reconnect",
+  "run": 34744552389,
+  "job": 103689932243,
+  "command": "python -m pytest -o addopts= -q catalog/federation/tests/test_phase2_unit.py catalog/node/tests catalog/relay/tests",
+  "failing_test": "catalog/node/tests/test_live_storage_replication.py::test_two_live_storage_nodes_replicate_and_replica_restarts",
+  "observed": "replica.bootstrap at test line424 -> live_storage_agent.py178 -> client.py196 -> websockets opening timeout while awaiting asyncio connection-transport waiter. Server reports EOF while reading HTTP request line / InvalidMessage.1failed281passed125.45s.",
+  "expected": "Restarted replica reconnects within unchanged configured deadline and completes replication assertions",
+  "classification": "Unresolved product/harness/host timing; no immediate root-cause attribution",
+  "acceptance_impact": "Blocks native Phase2 Linux result on PR483 source; no physical acceptance claim",
+  "safe_continuation": "YES: preserve evidence and continue isolated unrelated D13/D20 integration. Do not silently close timeout, weaken deadlines, restart full qualification, or touch production state.",
+  "state_changed": "Existing CI synthetic temporary tests/owned disposable PostgreSQL cleanup; agent only evidence files",
+  "protected_recorder_data": "Not accessed/changed",
+  "github_artifact": "Issue publication next",
+  "repair": "NONE",
+  "next_diagnostic_action": "After immediate issue/checkpoint publication, compare exact same-source existing full-suite/shard JUnit for this test and read only replica restart/client-connect lines. Shared cause with D17/D18 is only a hypothesis, not established."
+}
