@@ -1,0 +1,20 @@
+{
+  "recorded_at_utc": "2026-09-13T03:10:39.855996+00:00",
+  "plan_checkpoint": "e70280bc",
+  "source_commit": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "ref": "codex/fix-d13-windows-refusal-response",
+  "stage": "cf7-acceptance-harness",
+  "records": [
+    {
+      "workflow": "cf7-acceptance-harness.yml",
+      "action": "dispatch_requested",
+      "requested_at_utc": "2026-09-13T03:10:38.321598+00:00",
+      "response": {
+        "http_status": 204
+      }
+    }
+  ],
+  "next_ordinary_check_utc": "2026-09-13T04:01:37Z",
+  "physical_state_changed": false,
+  "protected_recorder_data": "Not accessed or changed"
+}
