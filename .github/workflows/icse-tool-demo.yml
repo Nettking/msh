@@ -85,11 +85,14 @@ jobs:
           name: icse-summary-${{ matrix.os }}
           path: ${{ runner.temp }}/fcp-icse-components-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}/icse-summary.json
       - name: Run independent-node network demonstration
+        id: network_demo
         run: >-
           python -B -m demo.icse.network.run
           --source-sha "${{ github.sha }}"
           --output "${{ runner.temp }}/fcp-icse-network-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}"
-      - uses: actions/upload-artifact@v4
+      - name: Preserve network evidence even after failure
+        if: ${{ always() && (steps.network_demo.outcome == 'success' || steps.network_demo.outcome == 'failure') }}
+        uses: actions/upload-artifact@v4
         with:
           name: icse-network-summary-${{ matrix.os }}
           path: ${{ runner.temp }}/fcp-icse-network-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}/public/
