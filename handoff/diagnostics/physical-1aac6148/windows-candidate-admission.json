@@ -1,0 +1,34 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "host": "nettking",
+  "status": "COMPLETED",
+  "started_at": "2026-09-13T15:37:36.332749+00:00",
+  "operation": "one supported activation of the owned acceptance installation",
+  "runtime_source_clean": true,
+  "physical_pass": false,
+  "protected_data_accessed": false,
+  "launcher_exit_code": 0,
+  "log_sha256": "d4829d416c67098ecbcdbce316e3819ced809fe21d0d1f510761b1cdb6bb3a0d",
+  "core_images": [
+    {
+      "service": "flask",
+      "container": "b236a1571310a2ab57bdcd34450d08c9261d5eb9148331981220d26d30c3302f",
+      "image": "sha256:bda3c9f1e10f966382afd4f63f6d7b0643fb235def339be7333dc3167d54dae1",
+      "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80"
+    },
+    {
+      "service": "relay",
+      "container": "0db16bc3a8ea1ff311fa3b408d72d45b69013386c7e3f7d102f55100c50c02a3",
+      "image": "sha256:a15d875c3815ce9dbc407ad65821699c0c599c01df98ebbe8b21e39dab7b9036",
+      "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80"
+    },
+    {
+      "service": "recorder",
+      "container": "6bf0627e8f9b523e946daeb95cd57436150500b194fa14658246a49f436d6360",
+      "image": "sha256:bb71b4e2b273a2d1f8b625ae2c048299320186e4c6c0f0adcd03f7502ca0435d",
+      "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80"
+    }
+  ],
+  "configured_http_status": 200,
+  "finished_at": "2026-09-13T15:38:39.191622+00:00"
+}

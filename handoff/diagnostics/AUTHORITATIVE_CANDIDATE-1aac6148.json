@@ -1,0 +1,19 @@
+{
+  "frozen_at": "2026-09-13T15:23:14.453785+00:00",
+  "candidate_sha": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "tree": "8fd60c5e2886dfedb0248959fda6cbfc60413d2f",
+  "state": "AUTHORITATIVE_FROZEN_CANDIDATE",
+  "actual_main_verified": true,
+  "required_jobs_passed": 37,
+  "companion_jobs_passed": 3,
+  "native_checkout_proofs": 38,
+  "qualification_sha256": "46b68a1a0dfdab2dc69ae16912344e78ea21c34a261cebaf61c3caddaa8dc665",
+  "qualification": "main-1aac6148-qualification/qualification.json",
+  "supersedes_blocked_candidate": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+  "reason": "Normal merge of qualified shared-volume tooling and Windows build exit-status repair; actual resulting main qualified once.",
+  "physical_acceptance": "NOT_PASSED",
+  "P07": "NOT_STARTED",
+  "P12": "NOT_STARTED",
+  "protected_recorder_data": "UNTOUCHED",
+  "tag_or_publication_created": false
+}

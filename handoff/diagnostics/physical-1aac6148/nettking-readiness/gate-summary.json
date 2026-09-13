@@ -1,0 +1,37 @@
+{
+  "accepted": false,
+  "checks": [
+    {
+      "duration_seconds": 64.672,
+      "name": "cf7-acceptance",
+      "passed": true,
+      "returncode": 0
+    },
+    {
+      "duration_seconds": 44.015,
+      "name": "capability-routes",
+      "passed": true,
+      "returncode": 0
+    },
+    {
+      "duration_seconds": 0.453,
+      "name": "compose-config",
+      "passed": true,
+      "returncode": 0
+    },
+    {
+      "duration_seconds": 0.078,
+      "name": "diff-hygiene",
+      "passed": true,
+      "returncode": 0
+    }
+  ],
+  "command_log": "evidence/windows/commands.txt",
+  "commit_sha": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "executed_at": "2026-09-13T15:25:23.356702Z",
+  "machine": "local-ai",
+  "note": "Local gates do not replace physical scenarios.",
+  "os_family": "windows",
+  "passed": true,
+  "schema": "fcp.cf7.physical-readiness.v1"
+}

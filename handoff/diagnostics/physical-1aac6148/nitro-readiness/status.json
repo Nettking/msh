@@ -1,0 +1,88 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "host": "nitro",
+  "os": "Linux",
+  "status": "COMPLETED",
+  "started_at": "2026-09-13T15:23:35.397562+00:00",
+  "reused_native_python_environment": true,
+  "dependency_declarations_unchanged_from": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+  "physical_pass": false,
+  "runtime_activated": false,
+  "protected_data_accessed": false,
+  "python_version": "Python 3.12.13",
+  "preflight": {
+    "accepted": false,
+    "checked_at": "2026-09-13T15:23:57.539855Z",
+    "checkout": {
+      "commit_sha": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+      "fresh_checkout_confirmed_by_operator": false,
+      "repository_clean": true
+    },
+    "machine": "school-control",
+    "note": "Preflight readiness is not physical acceptance.",
+    "os_family": "linux",
+    "physical_probe": {
+      "all_peers_reachable": true,
+      "peer_count": 2,
+      "peers": [
+        {
+          "alias": "configured-peer-0",
+          "latency_seconds": 0.029,
+          "reachable": true
+        },
+        {
+          "alias": "configured-peer-2",
+          "latency_seconds": 0.083,
+          "reachable": true
+        }
+      ],
+      "private_targets_persisted": false,
+      "service": "peer-connectivity"
+    },
+    "python_version": "3.12.13",
+    "roles": [
+      "control",
+      "registered-compute",
+      "storage-candidate"
+    ],
+    "schema": "fcp.cf7.physical-readiness.v1"
+  },
+  "gate_summary": {
+    "accepted": false,
+    "checks": [
+      {
+        "duration_seconds": 220.799,
+        "name": "cf7-acceptance",
+        "passed": true,
+        "returncode": 0
+      },
+      {
+        "duration_seconds": 149.057,
+        "name": "capability-routes",
+        "passed": true,
+        "returncode": 0
+      },
+      {
+        "duration_seconds": 0.357,
+        "name": "compose-config",
+        "passed": true,
+        "returncode": 0
+      },
+      {
+        "duration_seconds": 0.026,
+        "name": "diff-hygiene",
+        "passed": true,
+        "returncode": 0
+      }
+    ],
+    "command_log": "evidence/linux/commands.txt",
+    "commit_sha": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+    "executed_at": "2026-09-13T15:30:10.216019Z",
+    "machine": "school-control",
+    "note": "Local gates do not replace physical scenarios.",
+    "os_family": "linux",
+    "passed": true,
+    "schema": "fcp.cf7.physical-readiness.v1"
+  },
+  "finished_at": "2026-09-13T15:30:18.829775+00:00"
+}

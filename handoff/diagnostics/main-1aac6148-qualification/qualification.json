@@ -1,0 +1,169 @@
+{
+  "reviewed_at": "2026-09-13T15:23:03.945161+00:00",
+  "source": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "tree": "8fd60c5e2886dfedb0248959fda6cbfc60413d2f",
+  "status": "ACTUAL_MAIN_AUTOMATED_QUALIFIED",
+  "required_jobs_passed": 37,
+  "companion_jobs_passed": 3,
+  "native_checkout_proofs": 38,
+  "aggregate_jobs_without_checkout": 2,
+  "disjoint_complete_linux_test_coverage": 4528,
+  "release_artifacts": [
+    {
+      "id": 10320910369,
+      "name": "linux-regression-shard-0",
+      "digest": "sha256:bc57b8005a59a161b23d660d864c6e46e0685f288cf291907ca781a515ef3adc",
+      "files": [
+        {
+          "name": "shard-0.json",
+          "sha256": "e1b9fc1a51b2d2db0aeea0560a5c1ba540e47537f72abef549714b8e1acd744e"
+        },
+        {
+          "name": "junit-0.xml",
+          "sha256": "23bee8f34ee49bef7189526b5b0598b7fe1883abe36c1b78c50c7fcba7618ffd",
+          "tests": 1132,
+          "skipped": 9
+        }
+      ]
+    },
+    {
+      "id": 10320615783,
+      "name": "linux-regression-shard-1",
+      "digest": "sha256:650908cd922465755af155d4edbb496217d357874ac5f44932972180a7e9344c",
+      "files": [
+        {
+          "name": "shard-1.json",
+          "sha256": "2462d044d722d810175f8859be2ff4e537e2b577cab7732348b2b93cfb04336c"
+        },
+        {
+          "name": "junit-1.xml",
+          "sha256": "4eede97f6dc6c01a44f2b3f208ca38f7b8d3bcc238e5cf453dcc23d64a1d505a",
+          "tests": 1132,
+          "skipped": 16
+        }
+      ]
+    },
+    {
+      "id": 10320555630,
+      "name": "linux-regression-shard-3",
+      "digest": "sha256:aa21e4be011dd5fff9fc06fbded0c58e03fe5e8a61dcaeeec39bf1a51c0c57f1",
+      "files": [
+        {
+          "name": "shard-3.json",
+          "sha256": "3063151788747f9e41385f8883f4f1c9812e656925c8b57cccbd077c6f45f909"
+        },
+        {
+          "name": "junit-3.xml",
+          "sha256": "5391da54f176c33d8bc1d4de1092fd661c6445755bece54869202aa1a2b0f4b6",
+          "tests": 1132,
+          "skipped": 10
+        }
+      ]
+    },
+    {
+      "id": 10320165167,
+      "name": "windows-regression-transport-storage",
+      "digest": "sha256:c86346772a2edee3c7515617113f33a220133bf9455aa5c56b5176ba557015a3",
+      "files": [
+        {
+          "name": "windows-transport-storage.xml",
+          "sha256": "e34b4ac564705eb85f80e2354ae0019e28a3711de0225a24095fc907e84d6dab",
+          "tests": 371,
+          "skipped": 1
+        }
+      ]
+    },
+    {
+      "id": 10320085851,
+      "name": "windows-regression-journal-artifacts",
+      "digest": "sha256:5640ae42ba97c1aa7d01f53a063fd8d19a81ebbf35b8db403c1924bb9434c49c",
+      "files": [
+        {
+          "name": "windows-journal-artifacts.xml",
+          "sha256": "882f4a94ed05d950e9b6c930962442a2e24b7bb88a01c796e33b6ac98c263cab",
+          "tests": 298,
+          "skipped": 1
+        }
+      ]
+    },
+    {
+      "id": 10320016033,
+      "name": "linux-regression-shard-2",
+      "digest": "sha256:ff0efa0a4865a1498316fb2d002af55a1b361a09764c04dd86dce54984e36f39",
+      "files": [
+        {
+          "name": "shard-2.json",
+          "sha256": "9dc398b403852902cdab71da05d4323bc4bdecd37eb591e564b96b4e24ed66bd"
+        },
+        {
+          "name": "junit-2.xml",
+          "sha256": "39c57a3eb2031bcbe1717705dedc7d895bd245bea5cda00788a4f2f23d61eea1",
+          "tests": 1132,
+          "skipped": 7
+        }
+      ]
+    },
+    {
+      "id": 10319918255,
+      "name": "windows-regression-capability-product",
+      "digest": "sha256:77c43466718394db29b597bf53a7a9f440eb66f3534a7bd5dfe71c25a01fa868",
+      "files": [
+        {
+          "name": "windows-capability-product.xml",
+          "sha256": "bd6ab05a264616ac28851c56bfb2ab3d765e12250c9c1238bf4b41191776522e",
+          "tests": 895,
+          "skipped": 5
+        }
+      ]
+    },
+    {
+      "id": 10319554500,
+      "name": "full-suite-order-rotating",
+      "digest": "sha256:f6eabc692096888c850f746f7d678d2f1a2bcaa1d60fd233c0213355d1480bc4",
+      "files": [
+        {
+          "name": "order-rotating.xml",
+          "sha256": "de6ab654fdc569eaf8d87dbf98778c4bf95ae5e701f344ef68838aa1408e4fbe",
+          "tests": 4528,
+          "skipped": 42
+        }
+      ]
+    },
+    {
+      "id": 10319214982,
+      "name": "full-suite-order-fixed",
+      "digest": "sha256:7203b2142fad211598152a2ea56c5248d5ba44c2b6f4ebd9cec1494f9954d56f",
+      "files": [
+        {
+          "name": "order-fixed.xml",
+          "sha256": "cd551c68079566af903c8efcb64e1e1f1830b3f84843a1a7007fbcbe38be42af",
+          "tests": 4528,
+          "skipped": 42
+        }
+      ]
+    }
+  ],
+  "cf8_junit": [
+    {
+      "artifact_id": 10319727840,
+      "tests": 12,
+      "skipped": 0
+    },
+    {
+      "artifact_id": 10318954807,
+      "tests": 12,
+      "skipped": 0
+    }
+  ],
+  "publication_artifact": 10318929498,
+  "publication_digest": "sha256:6823965159e47a7f22374154b36138f754d07638e2a9add7044715af4a8666f4",
+  "publication_source_matches_git_archive": true,
+  "network_checks": {
+    "Linux": "10/10 PASS",
+    "Windows": "10/10 PASS"
+  },
+  "component_checks": "4/4 PASS Linux, Windows, Compose",
+  "physical_acceptance": "NOT_PASSED",
+  "protected_recorder_data": "UNTOUCHED",
+  "live_main": "1aac6148759d7b2fd488ec26b97e1a786bdafa80"
+}

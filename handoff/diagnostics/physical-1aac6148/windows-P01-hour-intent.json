@@ -1,0 +1,19 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "declared_at": "2026-09-13T15:50:33.485792+00:00",
+  "original_baseline": "2026-09-13T15:41:05.365965Z",
+  "sample_not_before": "2026-09-13T16:41:05.365965+00:00",
+  "follow_up_samples": 1,
+  "ceiling_bytes_per_hour": 1073741824,
+  "initial_result": "FAIL",
+  "initial_used_bytes_delta": 135884800,
+  "initial_projected_bytes_per_hour": 2324568721,
+  "initial_sample_count": 4,
+  "three_activations_retained": "PASS",
+  "classification": "unresolved but non-demonstrated candidate defect",
+  "decision": "Preserve the failed short interval. One predeclared follow-up will measure the same candidate and backing filesystem across a real hour, retaining all original samples and the unchanged ceiling. No more Windows activation/fault work during this observation window.",
+  "physical_pass": false,
+  "P07_started": false,
+  "P12_started": false,
+  "runtime_activation_requested": false
+}

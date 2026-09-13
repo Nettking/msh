@@ -1,0 +1,18 @@
+{
+  "host": "nettking",
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "harness_sha": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "results": [
+    {
+      "assertion": "windows-resource-baseline",
+      "exit_code": 0,
+      "verdict": "pass"
+    },
+    {
+      "assertion": "windows-runtime-state",
+      "exit_code": 0,
+      "verdict": "pass"
+    }
+  ],
+  "physical_pass": false
+}

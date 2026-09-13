@@ -1,0 +1,22 @@
+[
+  {
+    "host": "nitro",
+    "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+    "native_python": "Python 3.12.13",
+    "preflight": "PASS",
+    "local_gates": "4/4 PASS",
+    "inputs_preserve_live_configuration": true,
+    "runtime_activated": false,
+    "physical_pass": false
+  },
+  {
+    "host": "nettking",
+    "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+    "native_python": "Python 3.12.10",
+    "preflight": "PASS",
+    "local_gates": "4/4 PASS",
+    "inputs_preserve_live_configuration": true,
+    "runtime_activated": false,
+    "physical_pass": false
+  }
+]

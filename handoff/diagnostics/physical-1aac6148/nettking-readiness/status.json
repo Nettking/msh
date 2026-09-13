@@ -1,0 +1,78 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "host": "nettking",
+  "os": "Windows",
+  "status": "COMPLETED",
+  "started_at": "2026-09-13T15:23:29.181112+00:00",
+  "reused_native_python_environment": true,
+  "dependency_declarations_unchanged_from": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+  "physical_pass": false,
+  "runtime_activated": false,
+  "protected_data_accessed": false,
+  "python_version": "Python 3.12.10",
+  "preflight": {
+    "accepted": false,
+    "checked_at": "2026-09-13T15:23:33.139557Z",
+    "checkout": {
+      "commit_sha": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+      "fresh_checkout_confirmed_by_operator": false,
+      "repository_clean": true
+    },
+    "machine": "local-ai",
+    "note": "Preflight readiness is not physical acceptance.",
+    "os_family": "windows",
+    "physical_probe": {
+      "inventory_count": 5,
+      "latency_seconds": 0.125,
+      "private_endpoint_persisted": false,
+      "reachable": true,
+      "service": "ollama",
+      "target_model": "llama3.2:3b",
+      "target_model_present": true
+    },
+    "python_version": "3.12.10",
+    "roles": [
+      "language-model",
+      "desktop-browser"
+    ],
+    "schema": "fcp.cf7.physical-readiness.v1"
+  },
+  "gate_summary": {
+    "accepted": false,
+    "checks": [
+      {
+        "duration_seconds": 64.672,
+        "name": "cf7-acceptance",
+        "passed": true,
+        "returncode": 0
+      },
+      {
+        "duration_seconds": 44.015,
+        "name": "capability-routes",
+        "passed": true,
+        "returncode": 0
+      },
+      {
+        "duration_seconds": 0.453,
+        "name": "compose-config",
+        "passed": true,
+        "returncode": 0
+      },
+      {
+        "duration_seconds": 0.078,
+        "name": "diff-hygiene",
+        "passed": true,
+        "returncode": 0
+      }
+    ],
+    "command_log": "evidence/windows/commands.txt",
+    "commit_sha": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+    "executed_at": "2026-09-13T15:25:23.356702Z",
+    "machine": "local-ai",
+    "note": "Local gates do not replace physical scenarios.",
+    "os_family": "windows",
+    "passed": true,
+    "schema": "fcp.cf7.physical-readiness.v1"
+  },
+  "finished_at": "2026-09-13T15:25:23.425700+00:00"
+}

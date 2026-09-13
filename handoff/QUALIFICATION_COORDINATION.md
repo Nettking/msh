@@ -1,75 +1,77 @@
 # Federation v1 current release checkpoint
 
-Updated 2026-09-13T14:40Z. Active context: clean handoff + this file + live GitHub.
+Updated 2026-09-13T16:00Z. Active context: clean handoff + this file + live GitHub.
 Historical coordination is evidence only; consult it for a concrete current need.
 
 ## Current source / heads
-- Actual main=1aac6148759d7b2fd488ec26b97e1a786bdafa80 after normal PR486 merge.
-- Tree=8fd60c5e2886dfedb0248959fda6cbfc60413d2f equals the qualified repair tree.
-- Main worktree: C:/wsl/fcp-v1-1aac6148-main-20260913, clean, detached at actual main.
-- PR486 head=fe21bdc59bc1414fd7c4cdcf1aa4f6d6aa9048fe; qualified merge source
-  94567b0d9ac916eec9e4f094d2f6754562b966aa. PR485 tooling merged beforehand.
-- Previous frozen C=e6a9b74a1d555609eed6bf40c800e1258f1c9077 remains BLOCKED;
-  it can falsely report a failed Windows build as successful. No replacement freeze.
-- Nettking/Nitro owned runtimes still run C; Recorder owned voter remains fba50818.
-  No new runtime activation, release tag, publication, or complete physical PASS.
+- Authoritative frozen candidate C=1aac6148759d7b2fd488ec26b97e1a786bdafa80.
+- Live main=C; tree=8fd60c5e2886dfedb0248959fda6cbfc60413d2f. PR485 then PR486
+  merged normally. Freeze: diagnostics/AUTHORITATIVE_CANDIDATE-1aac6148.json.
+- Windows harness: C:/wsl/fcp-v1-1aac6148-main-20260913, clean detached C.
+- Nitro harness: /home/martin/fcp-v1-1aac6148-main-20260913/source, clean detached C.
+- Both owned runtime source checkouts are C. Windows installed C, verified three
+  core image labels and configured HTTP200. Nitro activation is still RUNNING;
+  its final image/HTTP verification is pending. Recorder owned voter remains fba50818.
+- No tag, public release, or complete physical PASS. Old e6a9b74a freeze is blocked
+  and superseded; never repeat qualification or physical acceptance on that source.
 
-## Current green evidence
-- PR486 combined source945 qualified: 37/37 required +3/3 companions PASS.
-  Release34760641401 16/16; ICSE34760641469 Windows/Linux10/10, Compose4/4.
-  Native source proof:38 exact checkouts +2 aggregates;4528 disjoint Linux test IDs.
-  Publication source equals exact Git archive; all digests and native artifacts checked.
-  Proof: diagnostics/repair-94567b0d-qualification/qualification.json and archives.
-- Windows repair: native20/20 tests PASS; real missing-Dockerfile red-to-green
-  refuses the failure and writes no success marker, leaving core containers unchanged.
-  Proof: diagnostics/physical-e6a9b74a/windows-build-exit-defect.json.
-- One bounded PR486 failed-job recovery completed: Windows transport370 passed,
-  1 skipped; ICSE10/10 and publication PASS. No source, assertion, or runner-label change.
-  Original failures were storage-ingest timeout and reviewer-join timeout after quorum
-  bootstrap PASS. No shared mechanism or deterministic candidate defect demonstrated.
-  Retained originals/disposition: diagnostics/repair-94567b0d-qualification/.
-- PR485 shared-volume accounting tooling qualified and merged normally.
-  Earlier C gates and original ICSE capture are retained evidence; never rerun C
-  or reopen that completed diagnostic sweep.
+## Current green gates
+- Actual resulting main qualified once: 37/37 required +3/3 companion jobs PASS,
+  all first attempts. All 13 workflows complete; no additional dispatch or retry.
+- Release34763230099:16/16 PASS. ICSE34763230042: Windows/Linux10/10,
+  Compose4/4 and publication PASS. Native38 checkouts +2 aggregates verified;
+  4528 disjoint Linux test IDs and every native/JUnit/artifact digest checked.
+- Publication artifact10318929498 exports exactly git archive C. Proof:
+  diagnostics/main-1aac6148-qualification/qualification.json and immutable archives.
+- Checked-in revalidation from e6a9b74a PASS: all 12 physical scenarios fresh,
+  zero carry-forward, no unknown paths. Proof: diagnostics/physical-1aac6148/.
+- Both native hosts: preflight and 4/4 readiness gates PASS. Python3.12.10 Windows,
+  3.12.13 Linux; existing venvs reused with unchanged dependency declarations.
+- Windows fresh P01: three activations, resource baseline, runtime state PASS.
+  These are partial observations, not complete P01 or physical acceptance.
+- Original ICSE trace and bounded PR486 failed-job recovery have valid dispositions;
+  no shared or deterministic candidate mechanism demonstrated. Evidence remains in
+  prior diagnostics and repair-94567b0d-qualification; do not reopen the broad sweep.
 
 ## Actual blockers / disposition
-- Actual-main qualification is incomplete. At14:40 all13 workflows exist, queued
-  or running, no reported failure. Seven auto-started; six gaps dispatched once.
-  Receipt/state: diagnostics/main-1aac6148-qualification/{gap-dispatch,
-  qualification-current}.json. Never dispatch duplicate workflows.
-- Product repair requires all12 physical scenarios fresh: checked-in impact plan
-  has zero carry-forward and no unknown paths. Freeze/revalidate new main first.
-- No physical executor is active. C Windows three-activation/baseline/runtime checks
-  passed, but growth failed with concurrent CI writes on the sampled shared volume.
-  Host-write confounding is demonstrated; no product-growth defect demonstrated.
-- Nitro C campaign stopped after a successful build followed by readiness timeout.
-  Owned builder stopped; three C cores running; later configured HTTP check timed out.
-  Physical readiness remains unresolved, not an additional demonstrated product defect.
-  Receipt: diagnostics/physical-e6a9b74a/nitro-post-p01-safety.json. Do not rerun C.
-- P07/P12 have not started. Owned recording corpora are empty; aged history insufficient.
-  Pending user input: two approved real MTConnect endpoints and a non-protected aged
-  test corpus. Protected Recorder data remains untouched.
+- Windows P01 short-window hourly growth FAIL:135884800 bytes over 3 activations,
+  45294933 bytes/activation; projected2324568721 B/h exceeds1073741824 B/h.
+  Core images, Docker totals, owned raw-file count0 and history32768 bytes stable.
+  Current CI had already finished. Whole-volume attribution remains incomplete:
+  unresolved but non-demonstrated candidate defect; no product repair justified yet.
+- Exactly one passive hour-window follow-up is active. All 4 original samples and
+  FAIL retained; same1GiB/hour ceiling. No Windows activation/fault work until terminal.
+  Final sample not before 2026-09-13T16:41:05.365965Z; PID31872.
+  Status: Windows harness/.acceptance/runtime-control/P01-hour-status.json.
+- Nitro admission dispatched once, PID3010269, started15:45:29Z. Latest read15:57Z:
+  build finished, cores restarted, optional model step running; final result pending.
+  Status: Nitro harness/.acceptance/runtime-control/candidate-admission.json.
+- Fresh P01 failed-build cleanup and remaining physical scenarios are incomplete.
+  Previous focused repair proof cannot substitute for fresh physical acceptance.
+- P07/P12 have NOT STARTED. Owned corpora are empty; aged history insufficient.
+  Pending user input already requested: two approved real MTConnect endpoints and
+  a non-protected aged test corpus. Do not ask again or access protected Recorder data.
 
 ## Active work / next action
-1. Inspect existing actual-main runs on meaningful change:
-   diagnostics/qualify-current-release-main.py --source 1aac6148759d7b2fd488ec26b97e1a786bdafa80
-   Use no dispatch flag; the six missing gates were already accepted.
-2. Retain newly completed native source/artifact proof. Helpers under
-   diagnostics/repair-94567b0d-qualification/ accept --main-source <actual-main-SHA>:
-   retain-current-native.py, fetch-current-artifacts.py, review-completed-artifacts.py.
-   Run final artifact review only when all required actual-main jobs are green.
-3. Then freeze that verified main once, run checked-in revalidation and start fresh
-   physical acceptance P01-P12, CF7 and B01-B09. Tag must equal the accepted main.
-   Let CI finish before Windows disk-growth measurement. Recorder admission pending.
-4. Keep mutable controls/evidence/venv outside runtime build contexts:
+1. Inspect the existing Nitro admission on meaningful change using
+   diagnostics/physical-1aac6148/read-nitro-admission.py. Never redispatch an uncertain
+   activation. If stopped, retain terminal status and inspect its bounded failure.
+2. After Nitro admission completes with launcher0, three C labels and HTTP200,
+   dispatch one fresh Nitro P01 three-activation campaign using run-qualified-p01.py.
+   Retain a durable dispatch receipt; do not overlap physical voter activations.
+3. At/after16:41Z read existing Windows P01-hour terminal packets. Preserve the
+   initial FAIL and every sample, classify the result, then resume required P01 work.
+   Never restart the measurement, filter samples, or relax the unchanged ceiling.
+4. Complete fresh physical P01-P12, CF7 and B01-B09 under the checked-in contract.
+   P07 real1h and P12 real24h require strict single-run evidence. No PASS or public
+   release before all required observations and validation finish; tag must equal C.
+5. Mutable controls/evidence/venv stay outside runtime build contexts:
    C:/wsl/fcp-v1-73c779-nettking-runtime-20260910 and
    /home/martin/fcp-v1-73c779-nitro-20260910/source.
-   Old H=501b528e controls remain in C:/wsl/fcp-v1-p01-filesystem-growth-20260913 and
-   /home/martin/fcp-v1-501b528e-harness-20260913; old evidence is never rewritten.
-5. P07 real1h and P12 real24h with strict single-run evidence. No physical PASS
-   or tag/publication before all required observations and validation finish.
-- One owner is this task; existing30-minute heartbeat targets it. Older task stopped.
-- PR486 merge receipt: diagnostics/repair-94567b0d-qualification/merge-receipt.json.
+   Both new harness controls preserve exact live configuration and existing owned
+   data mounts; staging held the checked-in host mutation lock. Old evidence untouched.
+- One owner is this task; existing 30-minute heartbeat targets it. Older task stopped.
+- Current detailed evidence/scripts: diagnostics/physical-1aac6148/.
 
 ## Immutable safety constraints
 - Never weaken assertions, quorum/authority, deadlines, security or acceptance.

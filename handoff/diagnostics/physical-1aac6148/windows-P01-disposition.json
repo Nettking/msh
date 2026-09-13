@@ -1,0 +1,35 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "three_activations": "PASS",
+  "resource_baseline": "PASS",
+  "runtime_state": "PASS",
+  "hourly_growth": "FAIL",
+  "classification": "unresolved but non-demonstrated candidate defect",
+  "used_bytes_delta": 135884800,
+  "bytes_per_activation": 45294933,
+  "projected_growth_bytes_per_hour": 2324568721,
+  "unchanged_hourly_ceiling": 1073741824,
+  "sample_start": "2026-09-13T15:41:05.365965Z",
+  "sample_end": "2026-09-13T15:44:35.807272Z",
+  "images_stable": true,
+  "docker_totals_stable": true,
+  "owned_recorder_raw_files": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "owned_history_bytes": [
+    32768,
+    32768,
+    32768,
+    32768
+  ],
+  "restart_amplification": [],
+  "current_candidate_ci_finished_before_measurement": true,
+  "host_allocation_attribution_complete": false,
+  "decision": "Retain the failed short interval. Exactly one declared follow-up after the original window reaches one real hour will retain every sample and the 1 GiB/hour ceiling. Do not repeat the three activations or Windows fault work during the window. No product repair is justified by current attribution.",
+  "archive_sha256": "78db44cb98f133bb03bc34c553091a70d2401f3e4a76889008dfc9feb17257b0",
+  "physical_pass": false,
+  "protected_data_accessed": false
+}

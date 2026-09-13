@@ -1,0 +1,37 @@
+{
+  "accepted": false,
+  "checked_at": "2026-09-13T15:23:57.539855Z",
+  "checkout": {
+    "commit_sha": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+    "fresh_checkout_confirmed_by_operator": false,
+    "repository_clean": true
+  },
+  "machine": "school-control",
+  "note": "Preflight readiness is not physical acceptance.",
+  "os_family": "linux",
+  "physical_probe": {
+    "all_peers_reachable": true,
+    "peer_count": 2,
+    "peers": [
+      {
+        "alias": "configured-peer-0",
+        "latency_seconds": 0.029,
+        "reachable": true
+      },
+      {
+        "alias": "configured-peer-2",
+        "latency_seconds": 0.083,
+        "reachable": true
+      }
+    ],
+    "private_targets_persisted": false,
+    "service": "peer-connectivity"
+  },
+  "python_version": "3.12.13",
+  "roles": [
+    "control",
+    "registered-compute",
+    "storage-candidate"
+  ],
+  "schema": "fcp.cf7.physical-readiness.v1"
+}

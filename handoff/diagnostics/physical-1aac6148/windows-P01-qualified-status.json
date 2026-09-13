@@ -1,0 +1,139 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "harness_sha": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "host": "nettking",
+  "status": "COMPLETED",
+  "started_at": "2026-09-13T15:41:03.549350+00:00",
+  "completed_activations": [
+    {
+      "index": 1,
+      "exit_code": 0,
+      "images": [
+        {
+          "service": "flask",
+          "image": "sha256:bda3c9f1e10f966382afd4f63f6d7b0643fb235def339be7333dc3167d54dae1"
+        },
+        {
+          "service": "relay",
+          "image": "sha256:a15d875c3815ce9dbc407ad65821699c0c599c01df98ebbe8b21e39dab7b9036"
+        },
+        {
+          "service": "recorder",
+          "image": "sha256:bb71b4e2b273a2d1f8b625ae2c048299320186e4c6c0f0adcd03f7502ca0435d"
+        }
+      ],
+      "sample": {
+        "evidence": "evidence/v1-physical/observations/P01/20260913T154225410225Z-sample-3676d932.json",
+        "scenario": "P01",
+        "series": [
+          "cpu_ram",
+          "history",
+          "orphan",
+          "publication",
+          "recorder"
+        ]
+      },
+      "log_sha256": "6559c959781976e0d8b531361f399a9e2f7f60c7741532d00b4e6cd4337fb437"
+    },
+    {
+      "index": 2,
+      "exit_code": 0,
+      "images": [
+        {
+          "service": "flask",
+          "image": "sha256:bda3c9f1e10f966382afd4f63f6d7b0643fb235def339be7333dc3167d54dae1"
+        },
+        {
+          "service": "relay",
+          "image": "sha256:a15d875c3815ce9dbc407ad65821699c0c599c01df98ebbe8b21e39dab7b9036"
+        },
+        {
+          "service": "recorder",
+          "image": "sha256:bb71b4e2b273a2d1f8b625ae2c048299320186e4c6c0f0adcd03f7502ca0435d"
+        }
+      ],
+      "sample": {
+        "evidence": "evidence/v1-physical/observations/P01/20260913T154330498541Z-sample-5ac7620f.json",
+        "scenario": "P01",
+        "series": [
+          "cpu_ram",
+          "history",
+          "orphan",
+          "publication",
+          "recorder"
+        ]
+      },
+      "log_sha256": "152306b1861e21bab68eb78753f428ec376dc3e485a31063fa03c86c77b4df86"
+    },
+    {
+      "index": 3,
+      "exit_code": 0,
+      "images": [
+        {
+          "service": "flask",
+          "image": "sha256:bda3c9f1e10f966382afd4f63f6d7b0643fb235def339be7333dc3167d54dae1"
+        },
+        {
+          "service": "relay",
+          "image": "sha256:a15d875c3815ce9dbc407ad65821699c0c599c01df98ebbe8b21e39dab7b9036"
+        },
+        {
+          "service": "recorder",
+          "image": "sha256:bb71b4e2b273a2d1f8b625ae2c048299320186e4c6c0f0adcd03f7502ca0435d"
+        }
+      ],
+      "sample": {
+        "evidence": "evidence/v1-physical/observations/P01/20260913T154440121694Z-sample-2ae6feae.json",
+        "scenario": "P01",
+        "series": [
+          "cpu_ram",
+          "history",
+          "orphan",
+          "publication",
+          "recorder"
+        ]
+      },
+      "log_sha256": "547c483add3c3d06d226787ef5049757b26fa4d9737e7f1da26762b8d4d44922"
+    }
+  ],
+  "physical_campaign_pass": false,
+  "ceilings_changed": false,
+  "prepare_id": "2512fdd9e4044e16a19bbf7f731a8c56",
+  "three_activations": {
+    "assertion": "windows-three-activations",
+    "classification": "operator-fault-injection",
+    "evidence": "evidence/v1-physical/observations/P01/20260913T154442881658Z-assertion-84ad7608.json",
+    "prepare_id": "2512fdd9e4044e16a19bbf7f731a8c56",
+    "probes": [
+      {
+        "probe_id": "activation-growth",
+        "status": "pass",
+        "summary": "per-activation growth stays inside the declared bound"
+      },
+      {
+        "probe_id": "running-commit-identity",
+        "status": "pass",
+        "summary": "every running component carries the candidate build commit"
+      }
+    ],
+    "recorded": true,
+    "scenario": "P01",
+    "verdict": "pass"
+  },
+  "growth": {
+    "assertion": "windows-growth-bounded",
+    "classification": "automated-probe",
+    "evidence": "evidence/v1-physical/observations/P01/20260913T154443632765Z-assertion-0dce546f.json",
+    "probes": [
+      {
+        "probe_id": "growth-analysis",
+        "status": "fail",
+        "summary": "measured growth exceeds the declared per-hour ceiling"
+      }
+    ],
+    "recorded": true,
+    "scenario": "P01",
+    "verdict": "fail"
+  },
+  "finished_at": "2026-09-13T15:44:43.666334+00:00"
+}

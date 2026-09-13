@@ -1,0 +1,30 @@
+{
+  "carry_forward_scenarios": [],
+  "changed_paths": [
+    "catalog/federation/tests/cf7_acceptance/test_v1_physical_growth.py",
+    "catalog/federation/tests/cf7_acceptance/test_v1_physical_runtime_binding.py",
+    "catalog/federation/tests/test_windows_build_quiescence_fail_closed.py",
+    "catalog/federation/tests/test_windows_controlled_build_contract.py",
+    "docs/implementation/v1_physical_campaign_automation.md",
+    "scripts/acceptance/v1_physical_campaign.py",
+    "scripts/acceptance/v1_physical_probes.py",
+    "scripts/windows/fcp_host_build.ps1"
+  ],
+  "impacted_scenarios": [
+    "physical.fresh-windows-checkout",
+    "physical.fresh-linux-checkout",
+    "physical.multi-host-relay-and-network-path",
+    "physical.mtconnect-recorder-source",
+    "physical.ollama-model-and-accelerator",
+    "physical.mobile-and-desktop-browser-review",
+    "physical.recorder-plus-ai-simultaneous-contribution",
+    "physical.separate-ai-compute-storage-contributors",
+    "physical.benchmark-expiry-and-rerun",
+    "physical.contribution-disable-and-reenable",
+    "physical.restart-and-reconciliation",
+    "physical.revocation-and-controlled-rejoin"
+  ],
+  "safe": true,
+  "schema": "fcp.cf7.physical-revalidation-plan.v1",
+  "unknown_paths": []
+}
