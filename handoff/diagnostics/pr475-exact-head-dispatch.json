@@ -1,9 +1,9 @@
 {
-  "recorded_at_utc": "2026-09-13T03:11:38.167880+00:00",
+  "recorded_at_utc": "2026-09-13T03:11:43.614548+00:00",
   "plan_checkpoint": "e70280bc",
   "source_commit": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
   "ref": "codex/fix-d13-windows-refusal-response",
-  "stage": "cfi2-onboarding-composition",
+  "stage": "release-image-metadata",
   "records": [
     {
       "workflow": "cf7-acceptance-harness.yml",
@@ -97,6 +97,14 @@
       "workflow": "cfi2-onboarding-composition.yml",
       "action": "dispatch_requested",
       "requested_at_utc": "2026-09-13T03:11:37.029324+00:00",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "release-image-metadata.yml",
+      "action": "dispatch_requested",
+      "requested_at_utc": "2026-09-13T03:11:41.872426+00:00",
       "response": {
         "http_status": 204
       }
