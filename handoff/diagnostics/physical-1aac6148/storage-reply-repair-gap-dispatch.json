@@ -1,0 +1,47 @@
+{
+  "source": "76ad339f1631e136bba7a8a85973bddb1650d570",
+  "ref": "codex/federation-v1-storage-reply-repair",
+  "started_at": "2026-09-13T19:24:32.637473+00:00",
+  "actions": [
+    {
+      "workflow": "cf7-acceptance-harness.yml",
+      "existing": [],
+      "status": "accepted",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "cf7c-physical-test-readiness.yml",
+      "existing": [],
+      "status": "accepted",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "phase2-federation.yml",
+      "existing": [],
+      "status": "accepted",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "ci-test-sharding.yml",
+      "existing": [],
+      "status": "accepted",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "release-image-metadata.yml",
+      "existing": [],
+      "status": "accepted",
+      "response": {
+        "http_status": 204
+      }
+    }
+  ]
+}

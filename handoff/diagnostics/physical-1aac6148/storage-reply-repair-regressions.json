@@ -1,0 +1,16 @@
+{
+  "repair_commit": "76ad339f1631e136bba7a8a85973bddb1650d570",
+  "pull_request": 487,
+  "archive": "storage-reply-repair-regressions.zip",
+  "sha256": "32c46cee2acc916a139b1b367509de7d7ef709864525fdfc25cb2992a8cf61ef",
+  "junit_tests": 77,
+  "junit_failures": 0,
+  "files": {
+    "repair-result.json": "709c13085a949acceda991cb14f92ef1066121b2d19fbccfe83f23466c66abd9",
+    "related-green.xml": "3f7160076cb3fb14264b8f6b042389f9ea829564fd17790e3c9cadd483af0823",
+    "related-green.log": "12e3916eb115c29a5cb1477e411bf601c3929bcc353bd62516c9f6351e5bdca5",
+    "generation-red.log": "cd0982ff1de4ccb028e42c10887da69a96dfb58d0784c297ea3644590cb64f8a",
+    "focused-green.log": "c7e4112ee00157f6cd73b78553233801e1ebd66836f258ef8f46fb8e60480444"
+  },
+  "note": "Repair-result is the immutable pre-push author receipt; storage-reply-repair-pr.json separately proves subsequent push and PR creation. This is focused software regression evidence, not physical acceptance."
+}

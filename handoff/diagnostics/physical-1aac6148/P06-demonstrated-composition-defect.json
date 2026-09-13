@@ -1,0 +1,57 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "recorded_at": "2026-09-13T19:17:22.667833+00:00",
+  "classification": "product defect",
+  "supersedes_disposition": "P06-startup-disposition.json classified the initial observation as unresolved. The focused exact-source reproduction now demonstrates a materially credible applicable code defect.",
+  "mechanism": "Analysis can retain the original AI relay endpoint while creator storage is subsequently composed behind that same endpoint. Competing consumers can divert an authenticated successful local-provider reply into the analysis lifecycle unrelated-message queue, causing the authority request timeout.",
+  "red": {
+    "composition": "analysis-retained-original-upstream",
+    "timeout_seconds": 15.0,
+    "elapsed_seconds": 15.031,
+    "coordinator_committed": false,
+    "exception": "TimeoutError",
+    "provider_content_present_and_equal": true,
+    "authenticated_storage_reply_diverted_to_lifecycle_other": {
+      "kind": "fcp-storage-v1",
+      "message": "response",
+      "frame_ok": true
+    },
+    "analysis_still_reads_original_ai_endpoint": true
+  },
+  "ordered_control": {
+    "composition": "analysis-behind-storage-view",
+    "timeout_seconds": 15.0,
+    "elapsed_seconds": 0.125,
+    "coordinator_committed": true,
+    "exception": null,
+    "provider_content_present_and_equal": true,
+    "authenticated_storage_reply_diverted_to_lifecycle_other": null,
+    "analysis_still_reads_original_ai_endpoint": false
+  },
+  "evidence_limit": "This isolated exact-source reproducer uses the checked-in loopback transport fixture and actual provider/control/acknowledgement stores. It is regression evidence, not a physical acceptance PASS or proof of which live consumer took each captured frame.",
+  "contract": "docs/implementation/v1_robustness_reconciliation.md P05/P06/P07 require functioning supervised publication, durable progress and no silently dead required worker. Normal creator storage must complete authenticated logical ingest.",
+  "release_effect": "Physical campaign paused; C cannot be released with this demonstrated defect. Produce smallest repaired candidate, exact-source qualification, normal merge, actual-main qualification, new freeze and checked-in revalidation before fresh physical assertions.",
+  "repair_worktree": "C:/wsl/fcp-v1-storage-reply-repair-20260913",
+  "repair_branch": "codex/federation-v1-storage-reply-repair",
+  "additional_pre_pause_checks": [
+    "P05/stale-responder-pid",
+    "P10/emergency-floor",
+    "P11/helper-prestaged"
+  ],
+  "C_progress": {
+    "P01": "10/10 PASS",
+    "P03": "8/8 PASS",
+    "P04": "2/6 PASS",
+    "P05": "9/16 PASS",
+    "P10": "1/6 PASS",
+    "P11": "1/12 PASS"
+  },
+  "timed_prerequisite_correction": "P07/P12 checked-in contracts permit meaningful owned product-generated history and do not require two real CNC endpoints. Separate CF7/CNC readiness requirements still apply. No duration, history threshold or assertion is weakened.",
+  "reproducer_archive_sha256": "dbd4be7cdd3835f9d32da91100ac29a811f7ff1fe32e1f343f7b8ea610d11346",
+  "additional_checks_archive_sha256": "50e13c57db3559e8ca6b4af8353697968a2656f0114877250693ee5471608e08",
+  "P07": "NOT STARTED",
+  "P12": "NOT STARTED",
+  "physical_pass": false,
+  "protected_data_accessed": false,
+  "AQG_requested": false
+}

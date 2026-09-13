@@ -1,0 +1,28 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "harness_sha": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "status": "COMPLETED",
+  "started_at": "2026-09-13T19:11:08.676377+00:00",
+  "results": [
+    {
+      "scenario": "P10",
+      "assertion": "emergency-floor",
+      "exit_code": 0,
+      "verdict": "pass",
+      "probe_output_name": "P10-emergency-floor-probe.json"
+    },
+    {
+      "scenario": "P11",
+      "assertion": "helper-prestaged",
+      "exit_code": 0,
+      "verdict": "pass",
+      "probe_output_name": "P11-helper-prestaged-probe.json"
+    }
+  ],
+  "model_download_performed": false,
+  "runtime_mutation_performed": false,
+  "protected_data_accessed": false,
+  "AQG_requested": false,
+  "physical_campaign_pass": false,
+  "finished_at": "2026-09-13T19:11:10.223441+00:00"
+}

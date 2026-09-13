@@ -1,0 +1,79 @@
+{
+  "candidate_reviewed": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "scope": "Read-only resource, operator configuration and source-network discovery; no physical assertion qualification",
+  "observed_window_utc": "2026-09-13T19:10:52Z/2026-09-13T19:18:36Z",
+  "P07_P12_contract": {
+    "two_real_sources_required_by_these_scenarios": false,
+    "history_requirement": "Non-trivial historical corpus/outbox must exist before the timed scenario; product-generated owned prior history may be seeded.",
+    "default_probe_minimum_files": 100,
+    "default_probe_minimum_bytes": 1048576,
+    "elapsed_seconds_required": {"P07": 3600, "P12": 86400},
+    "references": [
+      "scripts/acceptance/v1_physical_campaign_contract.py:139",
+      "scripts/acceptance/v1_physical_probes.py:1736",
+      "docs/implementation/v1_robustness_reconciliation.md:806",
+      "docs/implementation/v1_robustness_reconciliation.md:867"
+    ],
+    "CF7_distinction": "CF7-C readiness separately names a CNC-recorder profile with two real MTConnect sources; see docs/implementation/federation/acceptance/cf7c_physical_test_readiness.md:14."
+  },
+  "resources": {
+    "windows": {
+      "system_volume_free_bytes": 105594142720,
+      "available_memory_kib": 4083792,
+      "docker_vm_total_bytes": 16614326272,
+      "windows_administrator_token": false,
+      "ubuntu_wsl_root_available": true,
+      "independent_mounted_test_filesystem_found": false
+    },
+    "nitro": {
+      "system_volume_free_bytes": 828703465472,
+      "available_memory_kib": 2082112,
+      "total_memory_kib": 3418608,
+      "swap_free_kib": 2024968,
+      "owned_checkout_data_results_docker_share_system_filesystem": true,
+      "noninteractive_sudo": false,
+      "rootful_docker_available": true,
+      "loop_control_available": true,
+      "mount_losetup_mkfs_ext4_nsenter_available": true
+    },
+    "pressure_plan": [
+      "Use new bounded ext4 filesystem images and unique owned mountpoints; verify resolved backing paths, preserve shared system-disk margin, and change no product thresholds.",
+      "Keep default byte boundaries 16/12/10 GiB and inode boundaries 4096/512/128. Scope external filler files and inode exhaustion to the owned mounted filesystem.",
+      "WSL root is available for isolated mount setup; native Nitro rootful Docker may provide a narrowly scoped setup helper. No mount feasibility has yet been executed or claimed.",
+      "Do not use memory-backed tmpfs to fill through the byte thresholds: neither host has sufficient available RAM for that pressure route.",
+      "A separate data/results/model filesystem cannot prove operational Docker-root pressure. The checkout/Docker assertion needs the actual selected backing resource, potentially an isolated test daemon rooted on a bounded owned filesystem. Leave operational Docker state intact."
+    ]
+  },
+  "CF7_source_configuration": {
+    "source_file": "catalog/standalone_recorder/standalone_recorder.py:50",
+    "same_configuration_in_current_workspace_and_reviewed_candidate": true,
+    "private_reference": "Windows harness/.acceptance/code-source-candidates.private.json",
+    "sources": [
+      {"name": "QuickTurn", "alias": "1be0274b222856ee"},
+      {"name": "IG500", "alias": "cf4a96d3d5fa9027"},
+      {"name": "VTC", "alias": "12d27c8257dd40d2"}
+    ],
+    "read_only_probe_origin": "Recorder network context; no Recorder data files opened",
+    "initial_probe_result": "All three bounded probe calls returned no HTTP result and an outer invocation exception.",
+    "focused_first_source_classification": "Underlying WebException Timeout with a 6-second request/read bound.",
+    "live_sources_proven": false,
+    "new_endpoint_values_needed_now": false
+  },
+  "P11_resources": {
+    "independent_physical_destination": "Nitro physical disk is independent of Windows runtime storage and has available capacity.",
+    "transport_constraint": "Supported backup accepts a filesystem path; current SSH access alone is insufficient. Neither Ubuntu nor Nitro has sshfs, CIFS/NFS mount tools, Samba server, or an existing remote filesystem mount. Provision a scoped transport/mount before backup preflight.",
+    "references": ["catalog/federation/backup_recovery.py:462", "scripts/acceptance/v1_physical_probes.py:2139"],
+    "dpapi": "A second actual Windows security context is reachable on Recorder and its DPAPI API is available. A newly generated owned dummy identity can prove same-user success and different-machine rejection without accessing or writing Recorder data.",
+    "second_security_context_alias": "250547ad709d28cd",
+    "dpapi_product_reference": "catalog/node/identity.py:323"
+  },
+  "safety": {
+    "protected_recorder_data_accessed": false,
+    "runtime_mutated": false,
+    "mounts_created": false,
+    "pressure_injected": false,
+    "host_clock_changed": false,
+    "accounts_or_services_changed": false,
+    "physical_PASS_claimed": false
+  }
+}

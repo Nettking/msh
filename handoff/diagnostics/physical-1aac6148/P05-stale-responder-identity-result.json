@@ -1,0 +1,19 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "status": "COMPLETED",
+  "started_at": "2026-09-13T19:11:30.306741+00:00",
+  "product_changed": false,
+  "protected_data_accessed": false,
+  "physical_pass": false,
+  "prepare_id": "c987abb6684c4d02a9231d1079de12ab",
+  "guard_returned_none": true,
+  "unrelated_process_survived": true,
+  "current_creation_identity_unchanged": true,
+  "prior_creation_identity_from_real_exited_process": true,
+  "stale_record_assembled": true,
+  "actual_kernel_pid_reuse_claimed": false,
+  "elapsed_seconds": 1.0,
+  "verdict": "pass",
+  "finished_at": "2026-09-13T19:11:35.064395+00:00",
+  "owned_fixture_processes_exited": true
+}
