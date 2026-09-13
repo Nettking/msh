@@ -2,6 +2,8 @@
 
 **Current actionable checkpoint: 2026-09-13T04:31:25.652556+00:00. Native5e25/37 required +3/3 companions verified; D17/D18/D19 durable; only controlled D19 retry and D18 error capture active.**
 
+2026-09-13 05:03UTC transition: D18 run34738009371 completed success on Beast-Linux-WSL. API receipt diagnostics/D18-original-beast-current.json. NEXT: retain native candidate/control provenance and sanitized artifact before interpreting success (prior-error retrieval and diagnostic non-reproduction are distinct). No D18 repetition; no F85 poll before05:14UTC.
+
 Source/PR4755e6f184311019b9982e8544a18f3dc02c1b16e98 unchanged. PR473440123f6bc6dc358eef3d233236bc14f91af60e0/mainb719 unchanged at last checked state. 28 successful native logs all verify5e; four failure/cancellation logs and10 digest-verified raw release/ICSE artifacts retained in diagnostics/pr475-exact-head-0414-native-evidence.zip plus retention/review JSONs. Preserve all successes. No new release candidate, merge, full qualification dispatch or physical operation.
 
 D17/#479: Beast Windows initial primary ingest relay response exceeded5s; test line219 / relay_storage.py165, run34734869036/job103664365464. Cause unresolved; same5e Linux full-suite cases pass0.304/0.277s. D18/#480: Beast Linux ICSE authenticated join succeeds; RuntimeError before capability/discovery stage04. Detailed original error not uploaded by success-only workflow artifact step. D19/#481: six cancelled release/F85 jobs explicitly annotated GitHub Actions internal error, infrastructure not product. Exact commands/state invariants/full logs/issues are in diagnostics/D17.md,D18.md,D19.md and blocker table. No source/guard/deadline repair made.
