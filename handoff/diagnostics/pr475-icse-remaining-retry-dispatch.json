@@ -1,0 +1,22 @@
+{
+  "recorded_at_utc": "2026-09-13 05:41:49 UTC",
+  "run_id": 34734857086,
+  "source_sha": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "plan_checkpoint": "c557bb8a",
+  "action": "failed-jobs-only recovery; preserve successful Windows reviewer and Compose jobs",
+  "tool_result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "success": true
+    },
+    "isError": false
+  },
+  "next_ordinary_check_utc": "2026-09-13T06:35:00Z",
+  "physical_runtime_changed": false,
+  "protected_recorder_data": "Not accessed or changed"
+}
