@@ -60,8 +60,8 @@ The markers `paper-defined`, `existing-in-FCP`, `proposed-for-FCP` and
   and freezes legacy/collapsed evidence syntax. Keep it as compatibility
   coverage; do not rename it canonical conformance.
 - `existing-in-FCP`: workflows such as
-  `.github/workflows/phase-f77-ai-runtime-integration.yml:39-99` and
-  `cfi1-federation-overview.yml:37-85` demonstrate Python 3.12 on Ubuntu and
+  `.github/workflows/phase-f7-closeout.yml` (the retained native F7 matrix) and
+  `cfi1-federation-overview.yml:37-85` demonstrate Python 3.12 on Linux and
   Windows, constrained installs, focused pytest, Ruff, compilation and diff
   hygiene.
 - `existing-in-FCP`: no permanent workflow selects operator-strategy/OSL-adjacent

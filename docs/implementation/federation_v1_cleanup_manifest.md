@@ -268,18 +268,10 @@ The repository currently has many phase-specific workflows. They may overlap, bu
 - `.github/workflows/phase-f661-circuit-relay-foundation.yml`;
 - `.github/workflows/phase-f662-session-route-rendezvous.yml`;
 - `.github/workflows/phase-f7-closeout.yml`;
-- `.github/workflows/phase-f71-job-contracts.yml`;
-- `.github/workflows/phase-f72-provider-selection.yml`;
-- `.github/workflows/phase-f73-durable-job-ownership.yml`;
-- `.github/workflows/phase-f74-worker-dispatch.yml`;
-- `.github/workflows/phase-f75-retry-cancellation.yml`;
-- `.github/workflows/phase-f76-artifact-authorization.yml`;
-- `.github/workflows/phase-f77-ai-runtime-integration.yml`;
 - `.github/workflows/phase-f8-closeout.yml`;
 - `.github/workflows/phase-f81-provider-enrollment.yml`;
 - `.github/workflows/phase-f82-provider-health.yml`;
 - `.github/workflows/phase-f83-remote-ai-binding.yml`;
-- `.github/workflows/phase-f84-compute-worker-activation.yml`;
 - `.github/workflows/phase-f85-operator-federation-surface.yml`;
 - `.github/workflows/phase-f86-reconnect-reconciliation.yml`;
 - any additional tracked `.github/workflows/federated-session-phase*.yml` or `.github/workflows/phase-f*.yml` discovered by `git ls-files`.
@@ -290,11 +282,25 @@ The repository currently has many phase-specific workflows. They may overlap, bu
 
 Workflow consolidation must not silently reduce coverage merely to reduce file count.
 
-The [F7 consolidation extension](f7_ci_consolidation.md) preserves the unique
-capability lint, relay lint, transfer tests and Windows AI trigger coverage in the
-existing native F7 matrix. It is under validation: keep all legacy workflow files
-until two green equivalent executions, actual trigger evidence and final reference
-checks are recorded. This entry does not authorize deletion based on overlap alone.
+### Completed replacement review: F7.1–F7.7 and F8.4
+
+The [coverage consolidation](f7_ci_consolidation.md) replaces these eight hosted
+phase gates with the retained native F7/F8 closeouts and release checks. The F7
+extension was merged separately in PR #468 before this retirement batch. Its
+unique capability lint, relay lint, transfer tests and Windows AI path coverage
+have two reviewed green native executions and a real JavaScript-only automatic
+event. F8.4 has two reviewed native F8 executions plus the required release lint
+coverage on both operating systems. Retained workflow definitions are unchanged
+by retirement; this is not a blanket retirement decision for the other rows.
+
+The exact tracked deletion inventory, old-to-new command/OS/path matrix, native
+logs and reference review are preserved on branch
+`codex/federation-v1-diagnostic-sweep-20260911` under
+`handoff/diagnostics/phase-workflow-retirement-preflight.json` and
+`handoff/diagnostics/ci-migration-equivalence-matrix.json`.
+The separate retirement change must pass its own final-source validation before
+merge. These CI records neither replace candidate qualification nor establish
+physical acceptance.
 
 ---
 

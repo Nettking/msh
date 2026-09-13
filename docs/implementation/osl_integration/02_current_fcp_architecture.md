@@ -502,8 +502,8 @@ version kept distinct from storage/codec schema version.
 ### CI
 
 - `existing-in-FCP` workflows such as
-  `.github/workflows/phase-f77-ai-runtime-integration.yml` lines 39--99 and
-  `cfi1-federation-overview.yml` lines 31--85 run Python 3.12 on Ubuntu and
+  `.github/workflows/phase-f7-closeout.yml` (the retained native F7 matrix) and
+  `cfi1-federation-overview.yml` lines 31--85 run Python 3.12 on Linux and
   Windows, install constrained dependencies, compile, run focused/affected
   pytest suites, run Ruff, and check the Git diff.
 - `existing-in-FCP` no workflow path filter or test command selects the current
