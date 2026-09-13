@@ -21,7 +21,7 @@
   "state_changed": "Only test-owned disposable loopback relay/storage fixtures and CI workspace; no deployed runtime changes",
   "protected_recorder_data": "Not accessed or changed",
   "log_sha256": "58a355ca9d847864a642a2d6a43d01ef009583f047c9ef733b592bb6813b7a7c",
-  "github_artifact": "Pending immediate issue publication after this checkpoint",
+  "github_artifact": "https://github.com/Nettking/msh/issues/479",
   "repair": "NONE",
   "next_diagnostic_action": "Read retained native Windows transport-storage JUnit and compare this exact test in existing same5e full-suite/fixed/shard0 artifacts; inspect relay response delivery only if evidence warrants."
 }
