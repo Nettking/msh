@@ -317,6 +317,10 @@ class AnalysisRuntime:
             self.capability_root / "analysis_identity.json",
             resource_admission=self.resource_admission,
         )
+        # A transport can be replaced while this runtime is being constructed.
+        # Keep the generation we began binding, so the next lookup replaces a
+        # stale binding instead of labeling it with the new topology's generation.
+        self.federation_generation = _federation_generation(self.identity)
         self.clock = clock
         self.max_slice_bytes = int(
             max_slice_bytes
@@ -420,7 +424,6 @@ class AnalysisRuntime:
             ),
             session_id=self.identity.session_id,
         )
-        self.federation_generation = _federation_generation(self.identity)
 
     def _local_active_jobs(self) -> int:
         """Count jobs this node's provider currently owns, for honest capacity."""

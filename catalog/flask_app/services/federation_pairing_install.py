@@ -10,6 +10,7 @@ from typing import Any
 
 from flask import Flask, current_app, request
 
+from catalog.federation.errors import FederationOperationError
 from catalog.orchestrator.analysis_federation import DeviceFederationAuthority
 
 from .c03_pairing_onboarding import C03PairingOnboardingService
@@ -31,6 +32,7 @@ from .federation_pairing_service import (
     RemotePairingStore,
 )
 from .federation_storage_authority_install import (
+    _StorageAwareRelayView,
     install_federation_storage_authority,
 )
 from .federation_update_handoff import HostUpdateHandoff
@@ -326,6 +328,7 @@ class SavedFederationReconnectMonitor:
         self._wake = threading.Event()
         self._thread: threading.Thread | None = None
         self._analysis_relay_client: object | None = None
+        self._analysis_message_source: object | None = None
         self._analysis_authority_generation = 0
         self._state: dict[str, object] = {
             "status": "not-started",
@@ -373,10 +376,15 @@ class SavedFederationReconnectMonitor:
         self._wake.set()
 
     def analysis_authority_generation(self) -> int:
-        """Return the generation of the currently observed authenticated relay client."""
+        """Rebind analysis when its relay client or storage stage changes."""
 
-        with self._lock:
-            return self._analysis_authority_generation
+        with self.ai_bridge._endpoint_lock:
+            source = self.ai_bridge._endpoint
+            with self._lock:
+                if source is not self._analysis_message_source:
+                    self._analysis_message_source = source
+                    self._analysis_authority_generation += 1
+                return self._analysis_authority_generation
 
     def _observe_analysis_relay(self, runtime_state: RemotePairingState) -> int:
         """Advance the binding generation exactly when the relay client changes."""
@@ -448,6 +456,26 @@ class SavedFederationReconnectMonitor:
                 runtime,
                 runtime_state,
             )
+            if owner_node_id == node_id and self.app.config.get(
+                "FEDERATION_STORAGE_AUTHORITY_ENABLED", False
+            ):
+                # Storage inserts a reader between remote AI and analysis.
+                # Binding analysis to the original AI queue first leaves two
+                # consumers racing for provider request/reply frames after the
+                # insertion. Only the current creator-owned downstream view is
+                # eligible, including after a storage-authority restart.
+                with self.ai_bridge._endpoint_lock:
+                    storage_ready = (
+                        isinstance(upstream, _StorageAwareRelayView)
+                        and self.ai_bridge._endpoint is upstream
+                        and upstream.relay_client is runtime._connected_client()
+                    )
+                if not storage_ready:
+                    raise FederationOperationError(
+                        "analysis-storage-transport-not-ready",
+                        "analysis is waiting for the creator's shared storage transport",
+                        "connection",
+                    )
             return DeviceFederationAuthority.from_authenticated_relay(
                 capability_root=capability_root,
                 session_id=session_id,
