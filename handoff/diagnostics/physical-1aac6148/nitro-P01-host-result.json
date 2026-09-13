@@ -1,0 +1,34 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "host": "nitro",
+  "native_P01_assertions": "5/5 PASS",
+  "assertions": {
+    "posix-three-activations": "pass",
+    "posix-growth-bounded": "pass",
+    "posix-resource-baseline": "pass",
+    "posix-runtime-state": "pass",
+    "posix-failed-build-cleanup": "pass"
+  },
+  "archive_sha256": "11944e1d8aae49810b0cead3f899595d5d886cc00e3af9bac5137f8035543e0d",
+  "original_failures_retained": true,
+  "scenario_progress": {
+    "scenario": "P01",
+    "title": "Repeated Federation update growth and failure cleanup",
+    "passed": false,
+    "missing_assertions": [
+      "windows-resource-baseline",
+      "windows-three-activations",
+      "windows-failed-build-cleanup",
+      "windows-runtime-state",
+      "windows-growth-bounded"
+    ],
+    "failing_assertions": [],
+    "elapsed_seconds": 0.0,
+    "required_elapsed_seconds": 0,
+    "sample_count": 0,
+    "required_samples": 0,
+    "timed_sessions": []
+  },
+  "physical_pass": false,
+  "protected_data_accessed": false
+}

@@ -1,6 +1,6 @@
 # Federation v1 current release checkpoint
 
-Updated 2026-09-13T16:02Z. Active context: clean handoff + this file + live GitHub.
+Updated 2026-09-13T16:34Z. Active context: clean handoff + this file + live GitHub.
 Historical coordination is evidence only; consult it for a concrete current need.
 
 ## Current source / heads
@@ -29,6 +29,11 @@ Historical coordination is evidence only; consult it for a concrete current need
   3.12.13 Linux; existing venvs reused with unchanged dependency declarations.
 - Windows fresh P01: three activations, resource baseline, runtime state PASS.
   These are partial observations, not complete P01 or physical acceptance.
+- Nitro fresh P01: all 5 POSIX assertions PASS. Three activations completed16:17:35Z;
+  growth decreased43319296 bytes across4 samples, no restart amplification.
+  Native baseline/runtime probes PASS. One real missing-Dockerfile build failed
+  safely16:32:31Z: controller exit1, writer stopped, no success output, cores unchanged.
+  Immutable packets and proof: diagnostics/physical-1aac6148/nitro-P01-host-result.json.
 - Original ICSE trace and bounded PR486 failed-job recovery have valid dispositions;
   no shared or deterministic candidate mechanism demonstrated. Evidence remains in
   prior diagnostics and repair-94567b0d-qualification; do not reopen the broad sweep.
@@ -43,25 +48,26 @@ Historical coordination is evidence only; consult it for a concrete current need
   FAIL retained; same1GiB/hour ceiling. No Windows activation/fault work until terminal.
   Final sample not before 2026-09-13T16:41:05.365965Z; PID31872.
   Status: Windows harness/.acceptance/runtime-control/P01-hour-status.json.
-- Nitro fresh P01 dispatched once16:01:28Z, PID3014025, after verified admission.
-  Its three supported activations and growth checks are active. Status and receipt:
-  Nitro harness/.acceptance/runtime-control/P01-qualified-{status,dispatch}.json.
-- Fresh P01 failed-build cleanup and remaining physical scenarios are incomplete.
+- Nitro P01 activation and build-failure executors are terminal; do not repeat.
+  Initial and post-fault archives retained separately with native candidate/harness C.
+- Fresh Windows P01 failed-build cleanup and remaining physical scenarios are incomplete.
   Previous focused repair proof cannot substitute for fresh physical acceptance.
 - P07/P12 have NOT STARTED. Owned corpora are empty; aged history insufficient.
   Pending user input already requested: two approved real MTConnect endpoints and
   a non-protected aged test corpus. Do not ask again or access protected Recorder data.
 
 ## Active work / next action
-1. Inspect the existing Nitro P01 on meaningful change using
-   diagnostics/physical-1aac6148/read-nitro-p01.py. Never redispatch an uncertain
-   activation. If stopped, retain terminal status and inspect its bounded failure.
-2. After Nitro P01 completes, retain its packets and run the prepared resource
-   baseline/runtime-state probes once via run-p01-readonly.py. No full physical PASS;
-   remaining contract assertions still apply. Do not overlap physical voter activations.
-3. At/after16:41Z read existing Windows P01-hour terminal packets. Preserve the
+1. At/after16:41Z read existing Windows P01-hour terminal packets. Preserve the
    initial FAIL and every sample, classify the result, then resume required P01 work.
    Never restart the measurement, filter samples, or relax the unchanged ceiling.
+2. Once the declared Windows hour is terminal and its disposition permits continuing,
+   run one fresh Windows build-only fault via run-p01-build-failure.py under the native
+   venv. It guards against repeated dispatch and uses the frozen native controller.
+   Retain via retain-p01-build-failure.py windows. No voter activation is requested;
+   no Windows build/fault work is allowed before the existing hour worker completes.
+3. Consolidate exact-source native P01 packets for checked-in scenario validation;
+   retain all originals, including the Windows short-window FAIL. Native Nitro alone
+   does not establish combined P01 or full physical PASS. Do not repeat green probes.
 4. Complete fresh physical P01-P12, CF7 and B01-B09 under the checked-in contract.
    P07 real1h and P12 real24h require strict single-run evidence. No PASS or public
    release before all required observations and validation finish; tag must equal C.

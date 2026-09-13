@@ -1,0 +1,22 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "harness_sha": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "host": "nitro",
+  "status": "COMPLETED",
+  "started_at": "2026-09-13T16:32:00.194482+00:00",
+  "physical_pass": false,
+  "runtime_activation_requested": false,
+  "protected_data_accessed": false,
+  "prepare_id": "0a07c28029654321bec6cc4dc3d004d7",
+  "controller_exit_code": 1,
+  "missing_dockerfile_error_observed": true,
+  "controller_refused_build": true,
+  "success_marker_written": false,
+  "owned_builder": "fcp-build-fb0d1d1756ba33b6368f",
+  "core_containers_unchanged": true,
+  "owned_writer_stopped": true,
+  "log_sha256": "1dbde9cc5b1ef411a3e9ed6d99cdd85e84ee4dc770a807a6a33857d8b85f84ac",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "verdict": "pass",
+  "finished_at": "2026-09-13T16:32:31.379822+00:00"
+}

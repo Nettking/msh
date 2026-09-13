@@ -1,0 +1,33 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "three_activations": "PASS",
+  "hourly_growth": "PASS",
+  "resource_baseline": "PASS",
+  "runtime_state": "PASS",
+  "growth_detail": {
+    "elapsed_hours": 0.2592,
+    "growth_bytes_per_hour": -167156885,
+    "max_growth_bytes_per_hour": 1073741824,
+    "restart_amplification": [],
+    "restart_states": {
+      "flask": {
+        "consecutive_unclean": 0,
+        "state": "stable"
+      },
+      "recorder": {
+        "consecutive_unclean": 0,
+        "state": "stable"
+      },
+      "relay": {
+        "consecutive_unclean": 0,
+        "state": "unknown"
+      }
+    },
+    "run_id_bound": false,
+    "sample_count": 4,
+    "used_bytes_delta": -43319296
+  },
+  "archive_sha256": "6dc2e40126cec10b83fc6b60d290a6fd7d23711bed8bee501b7ec13e75c7b664",
+  "physical_pass": false,
+  "protected_data_accessed": false
+}

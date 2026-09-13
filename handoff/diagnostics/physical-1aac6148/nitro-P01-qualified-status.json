@@ -1,0 +1,139 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "harness_sha": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "host": "nitro",
+  "status": "COMPLETED",
+  "started_at": "2026-09-13T16:01:29.223927+00:00",
+  "completed_activations": [
+    {
+      "index": 1,
+      "exit_code": 0,
+      "images": [
+        {
+          "service": "flask",
+          "image": "sha256:069bd42eb14965efa6cbbde85a57bd3cd65df63b39e2007887ba9c804a31e9c5"
+        },
+        {
+          "service": "relay",
+          "image": "sha256:a0261dfe7528042bed5e42ee5b3a4eb223e1f93525301992331d1109a48e2484"
+        },
+        {
+          "service": "recorder",
+          "image": "sha256:87e41cc42fa284c59c6d885e7146aed71ee1d2671ac225b0e50326f1494ea0a1"
+        }
+      ],
+      "sample": {
+        "evidence": "evidence/v1-physical/observations/P01/20260913T161050615304Z-sample-ce9d81f7.json",
+        "scenario": "P01",
+        "series": [
+          "cpu_ram",
+          "history",
+          "orphan",
+          "publication",
+          "recorder"
+        ]
+      },
+      "log_sha256": "b7e29ebf459acc865b04990760e199d351fe0e23dc0f985d6d5d8eacbcd61db8"
+    },
+    {
+      "index": 2,
+      "exit_code": 0,
+      "images": [
+        {
+          "service": "flask",
+          "image": "sha256:069bd42eb14965efa6cbbde85a57bd3cd65df63b39e2007887ba9c804a31e9c5"
+        },
+        {
+          "service": "relay",
+          "image": "sha256:a0261dfe7528042bed5e42ee5b3a4eb223e1f93525301992331d1109a48e2484"
+        },
+        {
+          "service": "recorder",
+          "image": "sha256:87e41cc42fa284c59c6d885e7146aed71ee1d2671ac225b0e50326f1494ea0a1"
+        }
+      ],
+      "sample": {
+        "evidence": "evidence/v1-physical/observations/P01/20260913T161411084850Z-sample-a40abcae.json",
+        "scenario": "P01",
+        "series": [
+          "cpu_ram",
+          "history",
+          "orphan",
+          "publication",
+          "recorder"
+        ]
+      },
+      "log_sha256": "2958627888d971b71ba9f42339262a1e4ae77e91e3812aaa5eeac558c4444cbc"
+    },
+    {
+      "index": 3,
+      "exit_code": 0,
+      "images": [
+        {
+          "service": "flask",
+          "image": "sha256:069bd42eb14965efa6cbbde85a57bd3cd65df63b39e2007887ba9c804a31e9c5"
+        },
+        {
+          "service": "relay",
+          "image": "sha256:a0261dfe7528042bed5e42ee5b3a4eb223e1f93525301992331d1109a48e2484"
+        },
+        {
+          "service": "recorder",
+          "image": "sha256:87e41cc42fa284c59c6d885e7146aed71ee1d2671ac225b0e50326f1494ea0a1"
+        }
+      ],
+      "sample": {
+        "evidence": "evidence/v1-physical/observations/P01/20260913T161732768283Z-sample-3685be42.json",
+        "scenario": "P01",
+        "series": [
+          "cpu_ram",
+          "history",
+          "orphan",
+          "publication",
+          "recorder"
+        ]
+      },
+      "log_sha256": "a106560c199f041809aabc652d80a2d72acebf29419556b6bd3117477c15f982"
+    }
+  ],
+  "physical_campaign_pass": false,
+  "ceilings_changed": false,
+  "prepare_id": "2b268daf543d4700afc95efdc1b7c4f1",
+  "three_activations": {
+    "assertion": "posix-three-activations",
+    "classification": "operator-fault-injection",
+    "evidence": "evidence/v1-physical/observations/P01/20260913T161734370324Z-assertion-6bbb1e13.json",
+    "prepare_id": "2b268daf543d4700afc95efdc1b7c4f1",
+    "probes": [
+      {
+        "probe_id": "activation-growth",
+        "status": "pass",
+        "summary": "per-activation growth stays inside the declared bound"
+      },
+      {
+        "probe_id": "running-commit-identity",
+        "status": "pass",
+        "summary": "every running component carries the candidate build commit"
+      }
+    ],
+    "recorded": true,
+    "scenario": "P01",
+    "verdict": "pass"
+  },
+  "growth": {
+    "assertion": "posix-growth-bounded",
+    "classification": "automated-probe",
+    "evidence": "evidence/v1-physical/observations/P01/20260913T161734895462Z-assertion-a0029674.json",
+    "probes": [
+      {
+        "probe_id": "growth-analysis",
+        "status": "pass",
+        "summary": "no unexplained growth or restart amplification across the samples"
+      }
+    ],
+    "recorded": true,
+    "scenario": "P01",
+    "verdict": "pass"
+  },
+  "finished_at": "2026-09-13T16:17:35.204026+00:00"
+}
