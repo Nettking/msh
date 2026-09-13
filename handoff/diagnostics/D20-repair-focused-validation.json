@@ -1,0 +1,30 @@
+{
+  "repair_head": "70163ea908741baa1999a9c1084f0805d85dea64",
+  "base_sha": "b7194820d8f1940ae60b8c9639e09b7f61e65c55",
+  "changed_files": [
+    ".github/workflows/icse-tool-demo.yml",
+    "demo/icse/network/run.py",
+    "catalog/federation/tests/test_icse_network_failure_reporting.py"
+  ],
+  "validation": "Existing focused Windows33PASS preserved; three base-red missing-command failures; Ruff and diff hygiene PASS; parsed workflow equivalence PASS",
+  "junit_suites": [
+    {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "33",
+      "time": "1.577",
+      "timestamp": "2026-09-13T08:27:47.156140+02:00",
+      "hostname": "Nettking"
+    }
+  ],
+  "source_file_sha256": {
+    ".github/workflows/icse-tool-demo.yml": "0e3e6e2e45e107c720b51921bdd526979082a66e271217d401e340303d0e77f7",
+    "demo/icse/network/run.py": "b5012716f309b78de6c7e706301f074db47913c0ef2347743fceca632fb2abb1",
+    "catalog/federation/tests/test_icse_network_failure_reporting.py": "bfe9986ff53ec34c3581ae554854b822e79a8dfb616b433f32ffe45238baec1a"
+  },
+  "junit_sha256": "6732f5010447f02bb6b6fb7607dd0a3d778e1a74a8dd67fc9bb3fcb525dd20e3",
+  "scope": "Harness observability only; no D18 runtime repair or full candidate qualification",
+  "protected_recorder_data": "Not accessed/changed"
+}

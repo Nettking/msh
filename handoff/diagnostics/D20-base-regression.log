@@ -1,0 +1,227 @@
+FFF                                                                      [100%]
+================================== FAILURES ===================================
+_ test_failed_campaign_retains_safe_command_cause_and_stops_every_child[TimeoutError-None-TimeoutError-None] _
+
+tmp_path = WindowsPath('C:/Users/Martin/AppData/Local/Temp/pytest-of-Martin/pytest-113/test_failed_campaign_retains_s0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001B43D3CFAA0>
+capsys = <_pytest.capture.CaptureFixture object at 0x000001B43D47E690>
+worker_error = 'TimeoutError', worker_code = None, public_error = 'TimeoutError'
+public_code = None
+
+    @pytest.mark.parametrize(
+        ("worker_error", "worker_code", "public_error", "public_code"),
+        [
+            ("QuorumUnavailable", "federation-quorum-leader-required",
+             "QuorumUnavailable", "federation-quorum-leader-required"),
+            ("TimeoutError", None, "TimeoutError", None),
+            ("secret-enrollment-marker", "secret-invitation-marker",
+             "unclassified", "unclassified"),
+        ],
+    )
+    def test_failed_campaign_retains_safe_command_cause_and_stops_every_child(
+        tmp_path, monkeypatch, capsys, worker_error, worker_code, public_error, public_code,
+    ) -> None:
+        source_sha = "a" * 40
+        children = []
+        original_rpc = run.Child.rpc
+    
+        class FailedBootstrapChild:
+            def __init__(self, label, _config):
+                self.label = label
+                self.sequence = 0
+                self.stopped = False
+                self.process = SimpleNamespace(
+                    pid=len(children) + 1,
+                    stdin=io.StringIO(),
+                    poll=lambda: 0 if self.stopped else None,
+                )
+                self.startup = {"node_id": label, "source_sha": source_sha}
+                children.append(self)
+    
+            def _next(self, timeout):
+                assert timeout == 45  # The existing RPC deadline remains in force.
+                return {"id": self.sequence, "ok": False,
+                        "error_type": worker_error, "error_code": worker_code}
+    
+            def rpc(self, operation, **values):
+                return original_rpc(self, operation, **values)
+    
+            def stop(self):
+                self.stopped = True
+    
+        monkeypatch.setattr(run, "source_identity", lambda _args: {"source_sha": source_sha})
+        monkeypatch.setattr(run, "provision", lambda *_: {
+            label: {} for label in ("voter-a", "voter-b", "voter-c", "reviewer")
+        })
+        monkeypatch.setattr(run, "Child", FailedBootstrapChild)
+        output = tmp_path / "network-output"
+        assert run.campaign(argparse.Namespace(output=output, step_pause=0)) == 1
+    
+        summary = json.loads((output / "public/summary.json").read_text(encoding="utf-8"))
+        assert summary["result"] == "FAIL"
+>       assert summary["failure"]["command"] == {
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            "worker": "voter-a", "operation": "bootstrap",
+            "error_type": public_error, "error_code": public_code,
+        }
+E       KeyError: 'command'
+
+catalog\federation\tests\test_icse_network_failure_reporting.py:65: KeyError
+---------------------------- Captured stdout call -----------------------------
+2026-09-13T07:06:08.990858Z 01 — Four independent local node processes
+NETWORK_DEMO=FAIL SOURCE_SHA=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+---------------------------- Captured stderr call -----------------------------
+Demonstration failed: RuntimeError; details retained in private-state
+_ test_failed_campaign_retains_safe_command_cause_and_stops_every_child[secret-enrollment-marker-secret-invitation-marker-unclassified-unclassified] _
+
+tmp_path = WindowsPath('C:/Users/Martin/AppData/Local/Temp/pytest-of-Martin/pytest-113/test_failed_campaign_retains_s1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001B43D47E630>
+capsys = <_pytest.capture.CaptureFixture object at 0x000001B43D47FC50>
+worker_error = 'secret-enrollment-marker'
+worker_code = 'secret-invitation-marker', public_error = 'unclassified'
+public_code = 'unclassified'
+
+    @pytest.mark.parametrize(
+        ("worker_error", "worker_code", "public_error", "public_code"),
+        [
+            ("QuorumUnavailable", "federation-quorum-leader-required",
+             "QuorumUnavailable", "federation-quorum-leader-required"),
+            ("TimeoutError", None, "TimeoutError", None),
+            ("secret-enrollment-marker", "secret-invitation-marker",
+             "unclassified", "unclassified"),
+        ],
+    )
+    def test_failed_campaign_retains_safe_command_cause_and_stops_every_child(
+        tmp_path, monkeypatch, capsys, worker_error, worker_code, public_error, public_code,
+    ) -> None:
+        source_sha = "a" * 40
+        children = []
+        original_rpc = run.Child.rpc
+    
+        class FailedBootstrapChild:
+            def __init__(self, label, _config):
+                self.label = label
+                self.sequence = 0
+                self.stopped = False
+                self.process = SimpleNamespace(
+                    pid=len(children) + 1,
+                    stdin=io.StringIO(),
+                    poll=lambda: 0 if self.stopped else None,
+                )
+                self.startup = {"node_id": label, "source_sha": source_sha}
+                children.append(self)
+    
+            def _next(self, timeout):
+                assert timeout == 45  # The existing RPC deadline remains in force.
+                return {"id": self.sequence, "ok": False,
+                        "error_type": worker_error, "error_code": worker_code}
+    
+            def rpc(self, operation, **values):
+                return original_rpc(self, operation, **values)
+    
+            def stop(self):
+                self.stopped = True
+    
+        monkeypatch.setattr(run, "source_identity", lambda _args: {"source_sha": source_sha})
+        monkeypatch.setattr(run, "provision", lambda *_: {
+            label: {} for label in ("voter-a", "voter-b", "voter-c", "reviewer")
+        })
+        monkeypatch.setattr(run, "Child", FailedBootstrapChild)
+        output = tmp_path / "network-output"
+        assert run.campaign(argparse.Namespace(output=output, step_pause=0)) == 1
+    
+        summary = json.loads((output / "public/summary.json").read_text(encoding="utf-8"))
+        assert summary["result"] == "FAIL"
+>       assert summary["failure"]["command"] == {
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            "worker": "voter-a", "operation": "bootstrap",
+            "error_type": public_error, "error_code": public_code,
+        }
+E       KeyError: 'command'
+
+catalog\federation\tests\test_icse_network_failure_reporting.py:65: KeyError
+---------------------------- Captured stdout call -----------------------------
+2026-09-13T07:06:09.103027Z 01 — Four independent local node processes
+NETWORK_DEMO=FAIL SOURCE_SHA=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+---------------------------- Captured stderr call -----------------------------
+Demonstration failed: RuntimeError; details retained in private-state
+_ test_failed_campaign_retains_safe_command_cause_and_stops_every_child[QuorumUnavailable-federation-quorum-leader-required-QuorumUnavailable-federation-quorum-leader-required] _
+
+tmp_path = WindowsPath('C:/Users/Martin/AppData/Local/Temp/pytest-of-Martin/pytest-113/test_failed_campaign_retains_s2')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001B43D47FDA0>
+capsys = <_pytest.capture.CaptureFixture object at 0x000001B43D49FE30>
+worker_error = 'QuorumUnavailable'
+worker_code = 'federation-quorum-leader-required'
+public_error = 'QuorumUnavailable'
+public_code = 'federation-quorum-leader-required'
+
+    @pytest.mark.parametrize(
+        ("worker_error", "worker_code", "public_error", "public_code"),
+        [
+            ("QuorumUnavailable", "federation-quorum-leader-required",
+             "QuorumUnavailable", "federation-quorum-leader-required"),
+            ("TimeoutError", None, "TimeoutError", None),
+            ("secret-enrollment-marker", "secret-invitation-marker",
+             "unclassified", "unclassified"),
+        ],
+    )
+    def test_failed_campaign_retains_safe_command_cause_and_stops_every_child(
+        tmp_path, monkeypatch, capsys, worker_error, worker_code, public_error, public_code,
+    ) -> None:
+        source_sha = "a" * 40
+        children = []
+        original_rpc = run.Child.rpc
+    
+        class FailedBootstrapChild:
+            def __init__(self, label, _config):
+                self.label = label
+                self.sequence = 0
+                self.stopped = False
+                self.process = SimpleNamespace(
+                    pid=len(children) + 1,
+                    stdin=io.StringIO(),
+                    poll=lambda: 0 if self.stopped else None,
+                )
+                self.startup = {"node_id": label, "source_sha": source_sha}
+                children.append(self)
+    
+            def _next(self, timeout):
+                assert timeout == 45  # The existing RPC deadline remains in force.
+                return {"id": self.sequence, "ok": False,
+                        "error_type": worker_error, "error_code": worker_code}
+    
+            def rpc(self, operation, **values):
+                return original_rpc(self, operation, **values)
+    
+            def stop(self):
+                self.stopped = True
+    
+        monkeypatch.setattr(run, "source_identity", lambda _args: {"source_sha": source_sha})
+        monkeypatch.setattr(run, "provision", lambda *_: {
+            label: {} for label in ("voter-a", "voter-b", "voter-c", "reviewer")
+        })
+        monkeypatch.setattr(run, "Child", FailedBootstrapChild)
+        output = tmp_path / "network-output"
+        assert run.campaign(argparse.Namespace(output=output, step_pause=0)) == 1
+    
+        summary = json.loads((output / "public/summary.json").read_text(encoding="utf-8"))
+        assert summary["result"] == "FAIL"
+>       assert summary["failure"]["command"] == {
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            "worker": "voter-a", "operation": "bootstrap",
+            "error_type": public_error, "error_code": public_code,
+        }
+E       KeyError: 'command'
+
+catalog\federation\tests\test_icse_network_failure_reporting.py:65: KeyError
+---------------------------- Captured stdout call -----------------------------
+2026-09-13T07:06:09.117074Z 01 — Four independent local node processes
+NETWORK_DEMO=FAIL SOURCE_SHA=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+---------------------------- Captured stderr call -----------------------------
+Demonstration failed: RuntimeError; details retained in private-state
+=========================== short test summary info ===========================
+FAILED catalog/federation/tests/test_icse_network_failure_reporting.py::test_failed_campaign_retains_safe_command_cause_and_stops_every_child[TimeoutError-None-TimeoutError-None]
+FAILED catalog/federation/tests/test_icse_network_failure_reporting.py::test_failed_campaign_retains_safe_command_cause_and_stops_every_child[secret-enrollment-marker-secret-invitation-marker-unclassified-unclassified]
+FAILED catalog/federation/tests/test_icse_network_failure_reporting.py::test_failed_campaign_retains_safe_command_cause_and_stops_every_child[QuorumUnavailable-federation-quorum-leader-required-QuorumUnavailable-federation-quorum-leader-required]
+3 failed in 0.20s
+

@@ -1,0 +1,8 @@
+{
+  "base_sha": "b7194820d8f1940ae60b8c9639e09b7f61e65c55",
+  "procedure": "Load exact base demo.icse.network.run into memory and run three new failure-path tests; working source unchanged",
+  "module_sha256": "56e5140648fd4c8ea0246e9bda4233e31c6923acb3ce3593d07d19616812b477",
+  "result": "3 expected failures: public failure.command missing",
+  "exit_code": 1,
+  "log_sha256": "ea34cfb5521ff683c165c55ff525026cd22ee574a5ffbf0ef8db69170c581148"
+}

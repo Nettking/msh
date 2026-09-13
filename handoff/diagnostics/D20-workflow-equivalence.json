@@ -1,0 +1,5 @@
+{
+  "workflow_diff": "Only step id and public-artifact upload name/condition changed. Original test commands, dependency install commands, OS matrix, triggers, timeouts, other jobs and permissions are identical.",
+  "failure_retention": "Attempted successful or failed demo uploads public output; skipped/cancelled command does not create spurious missing-file error.",
+  "raw_private_upload": false
+}
