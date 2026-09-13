@@ -1,5 +1,8 @@
 # Original AQG host: one bounded diagnostic context run
 
+**CANCELLED BY USER, 2026-09-13.** AQG was intentionally powered off because it is unnecessary. Run34714139932 was cancelled before any runner assignment. This historical plan must not be executed, retargeted or treated as a release dependency. The coordination-only workflow is removed; scripts/evidence remain audit history. See diagnostics/AQG-diagnostic-cancelled-by-user.json.
+
+
 The completed NETTKING seeded contexts (D14 nine cases, D15 two cases) did not
 reproduce either AQG failure. Preserve their raw evidence and do not repeat them
 on NETTKING. Original AQG inspection403/background error remain unexposed.

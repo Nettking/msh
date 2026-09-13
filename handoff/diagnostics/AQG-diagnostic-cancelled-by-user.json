@@ -1,0 +1,29 @@
+{
+  "recorded_at": "2026-09-13T00:29:34.875138+00:00",
+  "user_direction": "AQG intentionally shut down; original-host diagnosis unnecessary. Cancel it and remove AQG as required dependency.",
+  "run_id": 34714139932,
+  "control_sha": "e55b5425972794b6b9b268a0d735635f8e687e5d",
+  "before": {
+    "status": "queued",
+    "conclusion": null,
+    "updated_at": "2026-09-12T19:25:39Z"
+  },
+  "cancellation": {},
+  "verified_at": "2026-09-13T00:30:39.053691+00:00",
+  "after": {
+    "status": "completed",
+    "conclusion": "cancelled",
+    "updated_at": "2026-09-13T00:29:36Z"
+  },
+  "jobs": [
+    {
+      "id": 103608092230,
+      "status": "completed",
+      "conclusion": "cancelled",
+      "runner_id": 0,
+      "runner_name": "",
+      "started_at": "2026-09-12T19:25:39Z",
+      "completed_at": "2026-09-13T00:29:35Z"
+    }
+  ]
+}

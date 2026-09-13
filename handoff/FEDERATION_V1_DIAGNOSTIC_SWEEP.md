@@ -1,5 +1,8 @@
 # Federation v1 diagnostic sweep — recover here first
 
+**2026-09-13 user correction:** AQG shutdown is intentional. The optional original-AQG diagnostic is cancelled before execution, workflow removed, and AQG availability is not a release dependency. Preserve all historical failure/non-reproduction evidence; cancellation does not confer PASS or prove root cause. Current next gate: QUALIFICATION_COORDINATION.md.
+
+
 **Current coordination:** [state-change-driven qualification](QUALIFICATION_COORDINATION.md)
 supersedes historical execution next-actions below. Read it before acting.
 
