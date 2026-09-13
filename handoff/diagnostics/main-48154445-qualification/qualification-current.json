@@ -9,18 +9,18 @@
       "run_attempt": 1,
       "api_head_sha": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
       "event": "workflow_dispatch",
-      "status": "in_progress",
-      "conclusion": null,
+      "status": "completed",
+      "conclusion": "success",
       "jobs": [
         {
           "id": 103806682238,
           "name": "harness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Byp...",
-          "status": "in_progress",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "runner": "Nettking",
-          "steps_executed": 25,
+          "steps_executed": 26,
           "started_at": "2026-09-13T23:14:29Z",
-          "completed_at": null
+          "completed_at": "2026-09-13T23:19:10Z"
         },
         {
           "id": 103806682305,
@@ -295,18 +295,18 @@
       "run_attempt": 2,
       "api_head_sha": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
       "event": "push",
-      "status": "in_progress",
-      "conclusion": null,
+      "status": "completed",
+      "conclusion": "success",
       "jobs": [
         {
           "id": 103810115536,
           "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
-          "status": "in_progress",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "runner": "Beast-Linux-WSL",
-          "steps_executed": 11,
+          "steps_executed": 12,
           "started_at": "2026-09-13T23:15:41Z",
-          "completed_at": null
+          "completed_at": "2026-09-13T23:17:12Z"
         },
         {
           "id": 103810116036,
@@ -327,6 +327,16 @@
           "steps_executed": 7,
           "started_at": "2026-09-13T22:56:26Z",
           "completed_at": "2026-09-13T22:57:17Z"
+        },
+        {
+          "id": 103810320213,
+          "name": "publication-bundle",
+          "status": "completed",
+          "conclusion": "success",
+          "runner": "Beast-Linux-WSL",
+          "steps_executed": 9,
+          "started_at": "2026-09-13T23:17:14Z",
+          "completed_at": "2026-09-13T23:17:29Z"
         }
       ]
     },
@@ -425,5 +435,5 @@
       ]
     }
   ],
-  "recorded_at": "2026-09-13T23:16:10.956360+00:00"
+  "recorded_at": "2026-09-13T23:20:17.622876+00:00"
 }

@@ -1,6 +1,6 @@
 # Federation v1 current release checkpoint
 
-Updated 2026-09-13T23:17Z. Active context: clean handoff + this file + live GitHub.
+Updated 2026-09-13T23:20Z. Active context: clean handoff + this file + live GitHub.
 Historical coordination is evidence only; consult it for a specific current need.
 
 ## Current source / heads
@@ -17,10 +17,10 @@ Historical coordination is evidence only; consult it for a specific current need
 - PR488 synthetic 1bd199b3: release 16/16, ICSE 4/4, current product gates PASS;
   audit verified 29 native source proofs, two aggregates and publication bytes.
   Real C2 warm-activation defect repaired; 43 related tests + live red-to-green.
-- C3 release 34787907931: 9 PASS, 0 FAIL at 23:16, remaining jobs running/queued.
-  CF7-B/C, CF8, software update, branding and registry PASS. CF7-A running.
-- ICSE 34787907928 attempt 2: ONE failed Linux job recovery accepted; Windows
-  and Compose successes retained. Linux recovery running. NEVER dispatch again.
+- C3 release 34787907931: 9 PASS, 0 FAIL at 23:20; rotating order running,
+  Linux shards 1/3 queued. CF7-A/B/C, CF8, update, branding and registry PASS.
+- ICSE 34787907928 attempt 2: 4/4 PASS after ONE failed Linux job recovery;
+  Windows and Compose successes retained. No further ICSE dispatch/recovery.
   Original Linux job 103806642856 timed out during initial reviewer join after
   quorum PASS, before failover. No underlying/shared mechanism demonstrated;
   exact private trace absent. Native/public failure evidence retained.
