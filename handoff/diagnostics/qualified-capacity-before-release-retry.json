@@ -1,0 +1,179 @@
+{
+  "checked_at_utc": "2026-09-13T02:29:24.356834+00:00",
+  "runners": [
+    {
+      "id": 22,
+      "name": "Nettking",
+      "os": "Windows",
+      "status": "offline",
+      "busy": false,
+      "version": "2.337.0",
+      "labels": [
+        {
+          "id": 0,
+          "name": "self-hosted",
+          "type": "read-only"
+        },
+        {
+          "id": 0,
+          "name": "X64",
+          "type": "read-only"
+        },
+        {
+          "id": 0,
+          "name": "Windows",
+          "type": "read-only"
+        },
+        {
+          "id": 0,
+          "name": "nettking",
+          "type": "custom"
+        },
+        {
+          "id": 0,
+          "name": "fcp-windows",
+          "type": "custom"
+        },
+        {
+          "id": 0,
+          "name": "fcp-windows-fast",
+          "type": "custom"
+        },
+        {
+          "id": 0,
+          "name": "fcp-test-windows",
+          "type": "custom"
+        }
+      ]
+    },
+    {
+      "id": 27,
+      "name": "Nettking-Linux",
+      "os": "Linux",
+      "status": "offline",
+      "busy": false,
+      "version": "2.337.0",
+      "labels": [
+        {
+          "id": 0,
+          "name": "self-hosted",
+          "type": "read-only"
+        },
+        {
+          "id": 0,
+          "name": "Linux",
+          "type": "read-only"
+        },
+        {
+          "id": 0,
+          "name": "X64",
+          "type": "read-only"
+        },
+        {
+          "id": 0,
+          "name": "fcp-linux-fast",
+          "type": "custom"
+        },
+        {
+          "id": 0,
+          "name": "nettking-linux",
+          "type": "custom"
+        },
+        {
+          "id": 0,
+          "name": "fcp-test-linux",
+          "type": "custom"
+        },
+        {
+          "id": 0,
+          "name": "fcp-docker-linux",
+          "type": "custom"
+        }
+      ]
+    },
+    {
+      "id": 28,
+      "name": "Beast",
+      "os": "Windows",
+      "status": "offline",
+      "busy": false,
+      "version": "2.337.0",
+      "labels": [
+        {
+          "id": 0,
+          "name": "self-hosted",
+          "type": "read-only"
+        },
+        {
+          "id": 0,
+          "name": "X64",
+          "type": "read-only"
+        },
+        {
+          "id": 0,
+          "name": "Windows",
+          "type": "read-only"
+        },
+        {
+          "id": 0,
+          "name": "fcp-windows",
+          "type": "custom"
+        },
+        {
+          "id": 0,
+          "name": "beast-windows",
+          "type": "custom"
+        },
+        {
+          "id": 0,
+          "name": "fcp-windows-fast",
+          "type": "custom"
+        },
+        {
+          "id": 0,
+          "name": "fcp-test-windows",
+          "type": "custom"
+        }
+      ]
+    },
+    {
+      "id": 29,
+      "name": "Beast-Linux-WSL",
+      "os": "Linux",
+      "status": "offline",
+      "busy": false,
+      "version": "2.337.0",
+      "labels": [
+        {
+          "id": 0,
+          "name": "self-hosted",
+          "type": "read-only"
+        },
+        {
+          "id": 0,
+          "name": "Linux",
+          "type": "read-only"
+        },
+        {
+          "id": 0,
+          "name": "X64",
+          "type": "read-only"
+        },
+        {
+          "id": 0,
+          "name": "beast-linux",
+          "type": "custom"
+        },
+        {
+          "id": 0,
+          "name": "fcp-linux-fast",
+          "type": "custom"
+        }
+      ]
+    }
+  ],
+  "AQG": "Not queried; deliberately off and not a dependency.",
+  "state_changed": false,
+  "protected_recorder_data": "Untouched; no access.",
+  "timestamp_note": "Receipt finalized after the bounded API snapshot; no host procedures executed."
+}
