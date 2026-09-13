@@ -1,0 +1,25 @@
+import json,pathlib,subprocess,os,hashlib
+h=pathlib.Path('/home/martin/fcp-v1-e6a9b74a-nitro-20260913/source')
+r=pathlib.Path('/home/martin/fcp-v1-73c779-nitro-20260910/source')
+sha='e6a9b74a1d555609eed6bf40c800e1258f1c9077';old=h/'.acceptance/runtime-control';new=h/'.acceptance/runtime-control-clean'
+def run(a,env=None):return subprocess.check_output(a,cwd=r,env=env,text=True,timeout=40).strip()
+safe=json.loads((h.parent/'inputs/aborted-build-safety.json').read_text())
+assert safe['activation']['status']=='COMPLETED' and not any(b['running'] for b in safe['owned_builders'])
+assert not new.exists();new.mkdir()
+assert run(['git','rev-parse','HEAD'])=='9b286f931497bf6291e215f6340443c5162826b0' and not run(['git','status','--porcelain'])
+assert not any((r/n).exists() for n in ['.acceptance','evidence','.env','.venv'])
+run(['git','fetch',str(h.parent/'inputs/source.bundle'),'HEAD']);run(['git','checkout','--detach',sha])
+values=json.loads((old/'environment.private.json').read_text());overlay=json.loads((old/'compose.live-candidate.json').read_text())
+for svc in ['flask','relay','recorder']:overlay['services'][svc]['build']['context']=str(r)
+override=new/'compose.live-candidate.json';override.write_text(json.dumps(overlay,indent=2)+'\n')
+files=values['COMPOSE_FILE'].split(':');values['COMPOSE_FILE']=':'.join([str(r/'docker-compose.yml'),*files[1:-1],str(override)])
+(new/'environment.private.json').write_text(json.dumps(values,indent=2)+'\n')
+b=json.loads((old/'runtime-binding.json').read_text());b['runtime']['working_directory']=str(r);b['runtime']['config_files']=values['COMPOSE_FILE'].split(':');(new/'runtime-binding.json').write_text(json.dumps(b,indent=2)+'\n')
+env=os.environ.copy();env.update(values)
+config=json.loads(run(['docker','compose','config','--format','json'],env))
+assert config['name']=='fcp-v1-fba508-nitro'
+assert all(config['services'][svc]['build']['context']==str(r) and config['services'][svc]['build']['args']['FCP_BUILD_COMMIT']==sha for svc in ['flask','relay','recorder'])
+assert not run(['git','status','--porcelain'])
+review={'candidate':sha,'harness_outside_runtime_build_context':True,'owned_data_and_config_preserved':True,'source_clean':True,'reuse_existing_owned_runtime_builder':True,'previous_builder_quiescent':True,'no_floor_or_deadline_change':True,'configuration_sha256':hashlib.sha256(json.dumps(config,sort_keys=True).encode()).hexdigest(),'runtime_changed':False}
+(new/'input-review.json').write_text(json.dumps(review,indent=2)+'\n')
+print(json.dumps(review))

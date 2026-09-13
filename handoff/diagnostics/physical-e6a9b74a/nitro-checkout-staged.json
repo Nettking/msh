@@ -1,0 +1,9 @@
+{
+  "candidate": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+  "source_clean": true,
+  "bundle_sha256": "505ea9196b7a713cc12d12711f0d6e3d00bf8fe046aea8f79cc88d3732d7dca1",
+  "native_python_version": "3.12.13",
+  "dependency_install_pid": 2971109,
+  "runtime_changed": false,
+  "physical_pass": false
+}

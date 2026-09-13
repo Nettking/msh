@@ -1,0 +1,38 @@
+{
+  "observed_at": "2026-09-13T11:32:21.767507+00:00",
+  "candidate": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+  "host": "nettking",
+  "readiness_preflight": {
+    "accepted": false,
+    "checked_at": "2026-09-13T11:32:21.097331Z",
+    "checkout": {
+      "commit_sha": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+      "fresh_checkout_confirmed_by_operator": false,
+      "repository_clean": true
+    },
+    "machine": "local-ai",
+    "note": "Preflight readiness is not physical acceptance.",
+    "os_family": "windows",
+    "physical_probe": {
+      "inventory_count": 5,
+      "latency_seconds": 2.813,
+      "private_endpoint_persisted": false,
+      "reachable": true,
+      "service": "ollama",
+      "target_model": "llama3.2:3b",
+      "target_model_present": true
+    },
+    "python_version": "3.12.10",
+    "roles": [
+      "language-model",
+      "desktop-browser"
+    ],
+    "schema": "fcp.cf7.physical-readiness.v1"
+  },
+  "model_container": "5f7f12dfa699fc22d1c14de0332eb812c37020825e9b6b3dcbc2981aed3c0ddd",
+  "pinned_model_image_unchanged": true,
+  "only_runtime_change": "Owned managed Ollama loopback exposure; core services remain previous candidate",
+  "preparation_recovery": "First requested loopback port was occupied by an existing Ollama instance. Recreated only owned managed Ollama on a verified free loopback port. Existing unrelated Ollama unchanged.",
+  "physical_pass": false,
+  "protected_recorder_data_accessed": false
+}

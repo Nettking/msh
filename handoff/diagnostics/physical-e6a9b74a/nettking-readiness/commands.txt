@@ -1,0 +1,86 @@
+[cf7-acceptance] result=passed
+duration_seconds=62.641
+command=python -m pytest -o addopts= -q catalog/federation/tests/cf7_acceptance
+........................................................................ [ 35%]
+........................................................................ [ 71%]
+.........................................................                [100%]
+============================== warnings summary ===============================
+catalog/federation/tests/cf7_acceptance/test_product_acceptance.py::test_fresh_product_flow_finishes_restarts_and_reruns_expired_evidence
+  <checkout>\catalog\orchestrator\pipeline.py:291: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    return datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+
+-- Docs: <redacted-endpoint>
+201 passed, 1 warning in 60.68s (0:01:00)
+
+[capability-routes] result=passed
+duration_seconds=46.39
+command=python -m pytest -o addopts= -q catalog/flask_app/tests/test_capability_onboarding_route.py catalog/flask_app/tests/test_capability_inspection_route.py catalog/flask_app/tests/test_capability_benchmark_route.py catalog/flask_app/tests/test_capability_contribution_route.py catalog/flask_app/tests/test_capability_startup_transition_route.py catalog/flask_app/tests/test_federation_overview_route.py
+...................................................................      [100%]
+============================== warnings summary ===============================
+catalog/flask_app/tests/test_capability_startup_transition_route.py::test_completed_setup_preserves_workbench_and_retires_legacy_fallback
+  <checkout>\catalog\flask_app\routes.py:264: Pandas4Warning: Timestamp.utcnow is deprecated and will be removed in a future version. Use Timestamp.now('UTC') instead.
+    route_started = pd.Timestamp.utcnow()
+
+catalog/flask_app/tests/test_capability_startup_transition_route.py::test_completed_setup_preserves_workbench_and_retires_legacy_fallback
+  <checkout>\catalog\flask_app\routes.py:265: Pandas4Warning: Timestamp.utcnow is deprecated and will be removed in a future version. Use Timestamp.now('UTC') instead.
+    overview_build_started = pd.Timestamp.utcnow()
+
+catalog/flask_app/tests/test_capability_startup_transition_route.py::test_completed_setup_preserves_workbench_and_retires_legacy_fallback
+  <checkout>\catalog\flask_app\routes.py:267: Pandas4Warning: Timestamp.utcnow is deprecated and will be removed in a future version. Use Timestamp.now('UTC') instead.
+    build_ms = max((pd.Timestamp.utcnow() - overview_build_started).total_seconds() * 1000.0, 0.0)
+
+catalog/flask_app/tests/test_capability_startup_transition_route.py::test_completed_setup_preserves_workbench_and_retires_legacy_fallback
+  <checkout>\catalog\flask_app\routes.py:268: Pandas4Warning: Timestamp.utcnow is deprecated and will be removed in a future version. Use Timestamp.now('UTC') instead.
+    total_ms = max((pd.Timestamp.utcnow() - route_started).total_seconds() * 1000.0, 0.0)
+
+-- Docs: <redacted-endpoint>
+67 passed, 4 warnings in 45.12s
+
+[compose-config] result=passed
+duration_seconds=0.36
+command=docker compose config
+- mode: ingress
+        host_ip: <redacted-address>
+        target: 8875
+        published: "8875"
+        protocol: tcp
+      - mode: ingress
+        host_ip: <redacted-address>
+        target: 8876
+        published: "8876"
+        protocol: tcp
+      - mode: ingress
+        host_ip: <redacted-address>
+        target: 8877
+        published: "8877"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: volume
+        source: relay_state
+        target: /var/lib/fcp-relay
+      - type: bind
+        source: <checkout>\data\auth
+        target: /app/data/auth
+      - type: bind
+        source: <checkout>\data\federation
+        target: /app/data/federation
+        read_only: true
+networks:
+  default:
+    name: fcp-v1-e6a9b74a-main-20260913_default
+volumes:
+  ollama_models:
+    name: fcp_ollama_models
+  relay_state:
+    name: fcp_relay_state
+x-fcp-container-logging:
+  driver: json-file
+  options:
+    max-file: "3"
+    max-size: 10m
+
+[diff-hygiene] result=passed
+duration_seconds=0.047
+command=git diff --check
+<no output>

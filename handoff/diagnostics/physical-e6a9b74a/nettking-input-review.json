@@ -1,0 +1,15 @@
+{
+  "candidate": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+  "host": "nettking",
+  "source_clean": true,
+  "configuration_validated": true,
+  "existing_owned_acceptance_project": true,
+  "owned_data_results_mounts_preserved": true,
+  "persistent_volume_names_preserved": true,
+  "model_mount_readonly": true,
+  "only_additional_exposure": "Ollama loopback socket for native readiness",
+  "protected_recorder_referenced": false,
+  "runtime_changed": false,
+  "physical_pass": false,
+  "configuration_sha256": "12f7dbc6fac4e2605b5f1cb2a67fce8c32c3f156b2d59dabd2875e4f414d39b5"
+}

@@ -1,0 +1,80 @@
+{
+  "observed_at": "2026-09-13T11:23:31.504837+00:00",
+  "candidate": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+  "physical_pass": false,
+  "protected_recorder_data_accessed": false,
+  "nettking": {
+    "fingerprint": "0efb6f56566ac0eb",
+    "runtime_binding_candidate": "9b286f931497bf6291e215f6340443c5162826b0",
+    "services": [
+      {
+        "service": "flask",
+        "container_id": "662cc6f7f58fb2477a2027fd2d667a75eefc49a82e77c1a28d83a35dfeda6bfc",
+        "image": "sha256:e68d212604e6e2793ef8d58968324cb7a01377da2de6b9ae2f900d8ddd24752e",
+        "build_commit": "9b286f931497bf6291e215f6340443c5162826b0",
+        "running": true,
+        "oom_killed": false,
+        "started_at": "2026-09-11T18:24:45.319222668Z"
+      },
+      {
+        "service": "recorder",
+        "container_id": "ec00e9e58aab61ab5aee5ddee4b0005b16038308d2e7cb436dd6808fbb09c581",
+        "image": "sha256:a98250176254366300589b09e6629d9361d3ddc97276269d0c95c7768fd7c465",
+        "build_commit": "9b286f931497bf6291e215f6340443c5162826b0",
+        "running": true,
+        "oom_killed": false,
+        "started_at": "2026-09-11T18:24:44.27031452Z"
+      },
+      {
+        "service": "relay",
+        "container_id": "c81dad4821ba10b46f0bac0c33ed9fb30b8721be0ba9ed7da06cb3c4ab0f9867",
+        "image": "sha256:bd8e5494641634bc70e4e4a1301987eb6ac1ce8c5d321adbca94e4869df25956",
+        "build_commit": "9b286f931497bf6291e215f6340443c5162826b0",
+        "running": true,
+        "oom_killed": false,
+        "started_at": "2026-09-11T18:24:44.275078685Z"
+      },
+      {
+        "service": "ollama",
+        "container_id": "a108c4ed7ef453353191ed9dda1c41b0fd1a281f5a86c960e01a1e6284d65f0d",
+        "image": "sha256:b88c73ace3e115f8ec53dc8761ae1c0aabfa675406e3681786b98757ce050f42",
+        "build_commit": null,
+        "running": true,
+        "oom_killed": false,
+        "started_at": "2026-09-11T18:24:46.119870446Z"
+      }
+    ],
+    "source": "9b286f931497bf6291e215f6340443c5162826b0",
+    "source_clean": true,
+    "gpu": "NVIDIA GeForce RTX 3070 Ti Laptop GPU, 8192 MiB, 0 MiB, 0 %"
+  },
+  "nitro": {
+    "fingerprint": "ad885120af1f11cf",
+    "os": "Linux",
+    "wsl": false,
+    "source": "9b286f931497bf6291e215f6340443c5162826b0",
+    "source_clean": true,
+    "services": [
+      {
+        "service": "flask",
+        "container_id": "8d96382f90c88235483e6297d4fe57f8f37177106fbc2b21bee6615f1811f74f",
+        "image": "sha256:bec1d95ace6f962c446c5e50f9888efad196a72ed0240382fd4a37d1cb3e9f32",
+        "build_commit": "9b286f931497bf6291e215f6340443c5162826b0",
+        "running": true,
+        "oom_killed": false,
+        "started_at": "2026-09-11T18:43:02.985082423Z"
+      },
+      {
+        "service": "relay",
+        "container_id": "1405bdf150efa568cc8ef7d7fac3ee05e45c934a67a5caf5da0d7035e31abeb9",
+        "image": "sha256:be14b918bb02d8f9109fb95ad4f796946d62314379445e7ef67bec6f5b70dd16",
+        "build_commit": "9b286f931497bf6291e215f6340443c5162826b0",
+        "running": true,
+        "oom_killed": false,
+        "started_at": "2026-09-11T18:42:24.185120696Z"
+      }
+    ],
+    "python": "Python 3.14.4",
+    "disk_free_bytes": 830388908032
+  }
+}

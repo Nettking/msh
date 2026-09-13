@@ -1,0 +1,48 @@
+{
+  "observed_at": "2026-09-13T11:39:24.723316+00:00",
+  "candidate": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+  "host": "nettking",
+  "supported_activation_count": 1,
+  "source_clean": true,
+  "services": [
+    {
+      "service": "flask",
+      "container_id": "3cc1d7f4d8ea7b5e88e433586400330d65833411094299324dccb56704d57e47",
+      "image": "sha256:11900dd6b7fb21445ca17e6e89c44198cfd1107e522ba01aa25a97191b00d2bc",
+      "build_commit": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+      "running": true,
+      "started_at": "2026-09-13T11:38:37.276554077Z"
+    },
+    {
+      "service": "recorder",
+      "container_id": "cf2b96362dd3c56b10b08bf0b6d95b8a93209d1ab60a14cccf77bbbbdbbedc86",
+      "image": "sha256:991e748626b718f01cba2d82b51fe98a7538974d79ef5ce5009253c60d0fe9ca",
+      "build_commit": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+      "running": true,
+      "started_at": "2026-09-13T11:38:36.567839254Z"
+    },
+    {
+      "service": "relay",
+      "container_id": "09f8a69a77ccdefc2527b86d3ec43c2c5d37d1f3a1dca19826270143a47f4932",
+      "image": "sha256:1dd78bed8cd71b4f3916421246a83d87afaade10cab65e74107632ada29a6958",
+      "build_commit": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+      "running": true,
+      "started_at": "2026-09-13T11:38:36.575452111Z"
+    },
+    {
+      "service": "ollama",
+      "container_id": "7fddb6dbfdede9b8630b1f585f7bf098632637c31400e5e31f29a77242ea8520",
+      "image": "sha256:b88c73ace3e115f8ec53dc8761ae1c0aabfa675406e3681786b98757ce050f42",
+      "build_commit": null,
+      "running": true,
+      "started_at": "2026-09-13T11:38:37.947046191Z"
+    }
+  ],
+  "startup_exit": 0,
+  "startup_log_sha256": "e6ba870342fc8ed4d62a1bf62191e2feb08982ffb645ef53e008d13b9929414c",
+  "runtime_admitted": true,
+  "physical_pass": false,
+  "P07": "NOT_STARTED",
+  "P12": "NOT_STARTED",
+  "protected_recorder_data_accessed": false
+}

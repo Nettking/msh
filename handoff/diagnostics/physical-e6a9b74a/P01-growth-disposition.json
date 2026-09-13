@@ -1,0 +1,17 @@
+{
+  "at": "2026-09-13T11:58:53.393154+00:00",
+  "candidate": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+  "P01_three_activations": "PASS after three supported normal activations, exact source/image checks and four bound samples",
+  "P01_windows_growth": "FAIL retained; no physical campaign PASS",
+  "observed_conservative_delta_bytes": 2407276544,
+  "observed_hours": 0.1828,
+  "hourly_ceiling_bytes": 1073741824,
+  "demonstrated_setup_defect": "Harness evidence and private acceptance-control inputs reside inside COPY . build context, invalidating that layer on every build. File presence and control-input hashes were checked without printing contents.",
+  "additional_measurement_limitation": "Two bound roots share one Windows filesystem; the current probe sums both filesystem-wide used-byte values. It does not isolate owned-tree growth.",
+  "candidate_disposition": "No demonstrated product regression yet. Do not weaken either ceiling or change product code speculatively.",
+  "recovery": "Move runtime execution to a clean exact-source checkout; keep harness, control and evidence outside its Docker build context. Retain previous attempt and perform one targeted P01 repeat with unchanged contract.",
+  "private_images": "Local acceptance images have not been published or exported for release.",
+  "protected_recorder_data_accessed": false,
+  "P07": "NOT_STARTED",
+  "P12": "NOT_STARTED"
+}

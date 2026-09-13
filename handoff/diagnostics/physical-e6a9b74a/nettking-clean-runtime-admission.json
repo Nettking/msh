@@ -1,0 +1,29 @@
+{
+  "observed_at": "2026-09-13T12:07:00.630321+00:00",
+  "candidate": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+  "clean_runtime_admitted": true,
+  "source_clean": true,
+  "services": [
+    {
+      "service": "flask",
+      "image": "sha256:aff3a4961efe88b9c08aa7223705486540949f3d1a7e6794cb54e75db3c5b1fc",
+      "build_commit": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+      "harness_inputs_absent": true
+    },
+    {
+      "service": "relay",
+      "image": "sha256:692e30bdf3747816a1a1aeb2ce37b1f566807eb8b4883c93de2225123dd2bcf5",
+      "build_commit": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+      "harness_inputs_absent": true
+    },
+    {
+      "service": "recorder",
+      "image": "sha256:324fecfb0f27f801a8c66ba41bc005c7efbd2c7ce4f13724bec09fc672b6365a",
+      "build_commit": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+      "harness_inputs_absent": true
+    }
+  ],
+  "startup_log_sha256": "fcc2690cebf050de0f7f185bef84081a6acd99282dbfeb7c15b15ddeb8c781b9",
+  "physical_pass": false,
+  "previous_local_images_not_published": true
+}

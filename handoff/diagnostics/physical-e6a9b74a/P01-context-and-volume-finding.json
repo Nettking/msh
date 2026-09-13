@@ -1,0 +1,20 @@
+{
+  "local_control_input_baked_into_image": true,
+  "control_digest": "b2a12eaf9d9972b3737374384c920e51a0133242578d29727700282d60ecfd6a",
+  "physical_evidence_directory_baked_into_image": true,
+  "candidate": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+  "local_control_input_digest": "b2a12eaf9d9972b3737374384c920e51a0133242578d29727700282d60ecfd6a",
+  "context_files": [
+    {
+      "directory": ".acceptance",
+      "files": 37,
+      "bytes": 269861
+    },
+    {
+      "directory": "evidence",
+      "files": 25,
+      "bytes": 66188
+    }
+  ],
+  "private_content_output": false
+}
