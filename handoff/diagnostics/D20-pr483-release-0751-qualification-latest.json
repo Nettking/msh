@@ -1,0 +1,1852 @@
+{
+  "source_commit": "83d059fba6d22b7d8f526be1b7e563c9bc3c0a68",
+  "review_head": "70163ea908741baa1999a9c1084f0805d85dea64",
+  "workflows": [
+    {
+      "workflow": "federation-v1-release.yml",
+      "run_id": 34744552431,
+      "jobs": [
+        {
+          "id": 103689932215,
+          "run_id": 34744552431,
+          "workflow_name": "Federation v1 release gate",
+          "head_branch": "codex/fix-d20-icse-failure-evidence",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34744552431",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYJGbNtw",
+          "head_sha": "70163ea908741baa1999a9c1084f0805d85dea64",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103689932215",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34744552431/job/103689932215",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-13T07:10:07Z",
+          "started_at": "2026-09-13T07:12:36Z",
+          "completed_at": "2026-09-13T07:13:23Z",
+          "name": "PostgreSQL storage release check",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-13T07:12:37Z",
+              "completed_at": "2026-09-13T07:12:38Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-13T07:12:38Z",
+              "completed_at": "2026-09-13T07:12:39Z"
+            },
+            {
+              "name": "Start disposable PostgreSQL 16",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-13T07:12:39Z",
+              "completed_at": "2026-09-13T07:12:45Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-13T07:12:45Z",
+              "completed_at": "2026-09-13T07:12:48Z"
+            },
+            {
+              "name": "Install dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-13T07:12:48Z",
+              "completed_at": "2026-09-13T07:13:18Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-13T07:13:18Z",
+              "completed_at": "2026-09-13T07:13:18Z"
+            },
+            {
+              "name": "PostgreSQL storage authority regression",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-13T07:13:18Z",
+              "completed_at": "2026-09-13T07:13:19Z"
+            },
+            {
+              "name": "Remove disposable PostgreSQL 16",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-13T07:13:19Z",
+              "completed_at": "2026-09-13T07:13:20Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 16,
+              "started_at": "2026-09-13T07:13:20Z",
+              "completed_at": "2026-09-13T07:13:20Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-09-13T07:13:20Z",
+              "completed_at": "2026-09-13T07:13:20Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103689932215",
+          "labels": [
+            "self-hosted",
+            "Linux",
+            "X64",
+            "fcp-docker-linux"
+          ],
+          "runner_id": 27,
+          "runner_name": "Nettking-Linux",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103689932291,
+          "run_id": 34744552431,
+          "workflow_name": "Federation v1 release gate",
+          "head_branch": "codex/fix-d20-icse-failure-evidence",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34744552431",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYJGbOAw",
+          "head_sha": "70163ea908741baa1999a9c1084f0805d85dea64",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103689932291",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34744552431/job/103689932291",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-13T07:10:07Z",
+          "started_at": "2026-09-13T07:13:53Z",
+          "completed_at": "2026-09-13T07:15:19Z",
+          "name": "Release checks (Linux)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-13T07:13:54Z",
+              "completed_at": "2026-09-13T07:13:57Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-13T07:13:57Z",
+              "completed_at": "2026-09-13T07:13:58Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-13T07:13:58Z",
+              "completed_at": "2026-09-13T07:14:01Z"
+            },
+            {
+              "name": "Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-13T07:14:01Z",
+              "completed_at": "2026-09-13T07:14:02Z"
+            },
+            {
+              "name": "Install release dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-13T07:14:02Z",
+              "completed_at": "2026-09-13T07:14:32Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-13T07:14:32Z",
+              "completed_at": "2026-09-13T07:14:32Z"
+            },
+            {
+              "name": "Compile maintained product packages",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-13T07:14:32Z",
+              "completed_at": "2026-09-13T07:14:35Z"
+            },
+            {
+              "name": "POSIX readiness redirect regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-13T07:14:35Z",
+              "completed_at": "2026-09-13T07:14:48Z"
+            },
+            {
+              "name": "Validate acceptance manifest shape",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-13T07:14:48Z",
+              "completed_at": "2026-09-13T07:14:48Z"
+            },
+            {
+              "name": "Go direct peer sidecar tests",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-09-13T07:14:48Z",
+              "completed_at": "2026-09-13T07:14:49Z"
+            },
+            {
+              "name": "Ruff maintained release boundaries",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-09-13T07:14:49Z",
+              "completed_at": "2026-09-13T07:14:49Z"
+            },
+            {
+              "name": "Validate Compose configuration",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-09-13T07:14:49Z",
+              "completed_at": "2026-09-13T07:14:49Z"
+            },
+            {
+              "name": "Discovery authority and bounded startup regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-09-13T07:14:49Z",
+              "completed_at": "2026-09-13T07:15:09Z"
+            },
+            {
+              "name": "Lint discovery boundary",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14,
+              "started_at": "2026-09-13T07:15:09Z",
+              "completed_at": "2026-09-13T07:15:09Z"
+            },
+            {
+              "name": "Diff hygiene",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-09-13T07:15:09Z",
+              "completed_at": "2026-09-13T07:15:09Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 29,
+              "started_at": "2026-09-13T07:15:09Z",
+              "completed_at": "2026-09-13T07:15:09Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 30,
+              "started_at": "2026-09-13T07:15:09Z",
+              "completed_at": "2026-09-13T07:15:09Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 31,
+              "started_at": "2026-09-13T07:15:09Z",
+              "completed_at": "2026-09-13T07:15:09Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103689932291",
+          "labels": [
+            "self-hosted",
+            "Linux",
+            "X64",
+            "fcp-test-linux"
+          ],
+          "runner_id": 27,
+          "runner_name": "Nettking-Linux",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103689932323,
+          "run_id": 34744552431,
+          "workflow_name": "Federation v1 release gate",
+          "head_branch": "codex/fix-d20-icse-failure-evidence",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34744552431",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYJGbOIw",
+          "head_sha": "70163ea908741baa1999a9c1084f0805d85dea64",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103689932323",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34744552431/job/103689932323",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-13T07:10:07Z",
+          "started_at": "2026-09-13T07:15:21Z",
+          "completed_at": "2026-09-13T07:19:01Z",
+          "name": "Linux regression shard (0)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-13T07:15:22Z",
+              "completed_at": "2026-09-13T07:15:25Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-13T07:15:25Z",
+              "completed_at": "2026-09-13T07:15:26Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-13T07:15:26Z",
+              "completed_at": "2026-09-13T07:15:28Z"
+            },
+            {
+              "name": "Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-13T07:15:28Z",
+              "completed_at": "2026-09-13T07:15:28Z"
+            },
+            {
+              "name": "Install release dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-13T07:15:28Z",
+              "completed_at": "2026-09-13T07:16:00Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-13T07:16:00Z",
+              "completed_at": "2026-09-13T07:16:00Z"
+            },
+            {
+              "name": "Run one file-preserving regression shard",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-13T07:16:00Z",
+              "completed_at": "2026-09-13T07:18:54Z"
+            },
+            {
+              "name": "Preserve shard coverage and timings",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-13T07:18:54Z",
+              "completed_at": "2026-09-13T07:18:56Z"
+            },
+            {
+              "name": "Repository stays clean after the suite",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-13T07:18:56Z",
+              "completed_at": "2026-09-13T07:18:56Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-09-13T07:18:56Z",
+              "completed_at": "2026-09-13T07:18:56Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 18,
+              "started_at": "2026-09-13T07:18:56Z",
+              "completed_at": "2026-09-13T07:18:57Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 19,
+              "started_at": "2026-09-13T07:18:57Z",
+              "completed_at": "2026-09-13T07:18:57Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103689932323",
+          "labels": [
+            "self-hosted",
+            "Linux",
+            "X64",
+            "fcp-test-linux"
+          ],
+          "runner_id": 27,
+          "runner_name": "Nettking-Linux",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103689932333,
+          "run_id": 34744552431,
+          "workflow_name": "Federation v1 release gate",
+          "head_branch": "codex/fix-d20-icse-failure-evidence",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34744552431",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYJGbOLQ",
+          "head_sha": "70163ea908741baa1999a9c1084f0805d85dea64",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103689932333",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34744552431/job/103689932333",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-13T07:10:07Z",
+          "started_at": "2026-09-13T07:14:46Z",
+          "completed_at": "2026-09-13T07:23:32Z",
+          "name": "Windows regressions (journal-artifacts)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-13T07:14:48Z",
+              "completed_at": "2026-09-13T07:14:52Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-13T07:14:52Z",
+              "completed_at": "2026-09-13T07:14:56Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-13T07:14:56Z",
+              "completed_at": "2026-09-13T07:15:03Z"
+            },
+            {
+              "name": "Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-13T07:15:03Z",
+              "completed_at": "2026-09-13T07:15:04Z"
+            },
+            {
+              "name": "Install release dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-13T07:15:04Z",
+              "completed_at": "2026-09-13T07:17:20Z"
+            },
+            {
+              "name": "Windows capability and product release regressions",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 6,
+              "started_at": "2026-09-13T07:17:20Z",
+              "completed_at": "2026-09-13T07:17:20Z"
+            },
+            {
+              "name": "Windows transport, storage, and failover regressions",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 7,
+              "started_at": "2026-09-13T07:17:20Z",
+              "completed_at": "2026-09-13T07:17:20Z"
+            },
+            {
+              "name": "Windows replicated journal and reviewer artifact regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-13T07:17:20Z",
+              "completed_at": "2026-09-13T07:23:22Z"
+            },
+            {
+              "name": "Preserve Windows regression timings",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-13T07:23:22Z",
+              "completed_at": "2026-09-13T07:23:24Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-09-13T07:23:24Z",
+              "completed_at": "2026-09-13T07:23:25Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 18,
+              "started_at": "2026-09-13T07:23:25Z",
+              "completed_at": "2026-09-13T07:23:27Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 19,
+              "started_at": "2026-09-13T07:23:27Z",
+              "completed_at": "2026-09-13T07:23:27Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103689932333",
+          "labels": [
+            "self-hosted",
+            "Windows",
+            "X64",
+            "fcp-test-windows"
+          ],
+          "runner_id": 22,
+          "runner_name": "Nettking",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103689932339,
+          "run_id": 34744552431,
+          "workflow_name": "Federation v1 release gate",
+          "head_branch": "codex/fix-d20-icse-failure-evidence",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34744552431",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYJGbOMw",
+          "head_sha": "70163ea908741baa1999a9c1084f0805d85dea64",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103689932339",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34744552431/job/103689932339",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-13T07:10:07Z",
+          "started_at": "2026-09-13T07:22:17Z",
+          "completed_at": "2026-09-13T07:25:40Z",
+          "name": "Linux regression shard (1)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-13T07:22:18Z",
+              "completed_at": "2026-09-13T07:22:22Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-13T07:22:22Z",
+              "completed_at": "2026-09-13T07:22:23Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-13T07:22:23Z",
+              "completed_at": "2026-09-13T07:22:26Z"
+            },
+            {
+              "name": "Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-13T07:22:26Z",
+              "completed_at": "2026-09-13T07:22:26Z"
+            },
+            {
+              "name": "Install release dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-13T07:22:26Z",
+              "completed_at": "2026-09-13T07:22:57Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-13T07:22:57Z",
+              "completed_at": "2026-09-13T07:22:57Z"
+            },
+            {
+              "name": "Run one file-preserving regression shard",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-13T07:22:57Z",
+              "completed_at": "2026-09-13T07:25:33Z"
+            },
+            {
+              "name": "Preserve shard coverage and timings",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-13T07:25:33Z",
+              "completed_at": "2026-09-13T07:25:35Z"
+            },
+            {
+              "name": "Repository stays clean after the suite",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-13T07:25:35Z",
+              "completed_at": "2026-09-13T07:25:35Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-09-13T07:25:35Z",
+              "completed_at": "2026-09-13T07:25:35Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 18,
+              "started_at": "2026-09-13T07:25:35Z",
+              "completed_at": "2026-09-13T07:25:36Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 19,
+              "started_at": "2026-09-13T07:25:36Z",
+              "completed_at": "2026-09-13T07:25:36Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103689932339",
+          "labels": [
+            "self-hosted",
+            "Linux",
+            "X64",
+            "fcp-test-linux"
+          ],
+          "runner_id": 27,
+          "runner_name": "Nettking-Linux",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103689932343,
+          "run_id": 34744552431,
+          "workflow_name": "Federation v1 release gate",
+          "head_branch": "codex/fix-d20-icse-failure-evidence",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34744552431",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYJGbONw",
+          "head_sha": "70163ea908741baa1999a9c1084f0805d85dea64",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103689932343",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34744552431/job/103689932343",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-13T07:10:07Z",
+          "started_at": "2026-09-13T07:19:02Z",
+          "completed_at": "2026-09-13T07:22:15Z",
+          "name": "Linux regression shard (2)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-13T07:19:03Z",
+              "completed_at": "2026-09-13T07:19:06Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-13T07:19:06Z",
+              "completed_at": "2026-09-13T07:19:07Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-13T07:19:07Z",
+              "completed_at": "2026-09-13T07:19:10Z"
+            },
+            {
+              "name": "Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-13T07:19:10Z",
+              "completed_at": "2026-09-13T07:19:10Z"
+            },
+            {
+              "name": "Install release dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-13T07:19:10Z",
+              "completed_at": "2026-09-13T07:19:40Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-13T07:19:40Z",
+              "completed_at": "2026-09-13T07:19:40Z"
+            },
+            {
+              "name": "Run one file-preserving regression shard",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-13T07:19:40Z",
+              "completed_at": "2026-09-13T07:22:09Z"
+            },
+            {
+              "name": "Preserve shard coverage and timings",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-13T07:22:09Z",
+              "completed_at": "2026-09-13T07:22:11Z"
+            },
+            {
+              "name": "Repository stays clean after the suite",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-13T07:22:11Z",
+              "completed_at": "2026-09-13T07:22:11Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-09-13T07:22:11Z",
+              "completed_at": "2026-09-13T07:22:11Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 18,
+              "started_at": "2026-09-13T07:22:11Z",
+              "completed_at": "2026-09-13T07:22:11Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 19,
+              "started_at": "2026-09-13T07:22:11Z",
+              "completed_at": "2026-09-13T07:22:11Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103689932343",
+          "labels": [
+            "self-hosted",
+            "Linux",
+            "X64",
+            "fcp-test-linux"
+          ],
+          "runner_id": 27,
+          "runner_name": "Nettking-Linux",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103689932357,
+          "run_id": 34744552431,
+          "workflow_name": "Federation v1 release gate",
+          "head_branch": "codex/fix-d20-icse-failure-evidence",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34744552431",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYJGbORQ",
+          "head_sha": "70163ea908741baa1999a9c1084f0805d85dea64",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103689932357",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34744552431/job/103689932357",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-13T07:10:07Z",
+          "started_at": "2026-09-13T07:25:42Z",
+          "completed_at": "2026-09-13T07:35:24Z",
+          "name": "Full-suite order (rotating)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-13T07:25:43Z",
+              "completed_at": "2026-09-13T07:25:45Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-13T07:25:45Z",
+              "completed_at": "2026-09-13T07:25:46Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-13T07:25:46Z",
+              "completed_at": "2026-09-13T07:25:50Z"
+            },
+            {
+              "name": "Install release dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-13T07:25:50Z",
+              "completed_at": "2026-09-13T07:26:22Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-13T07:26:22Z",
+              "completed_at": "2026-09-13T07:26:22Z"
+            },
+            {
+              "name": "Entire suite in the selected shuffled order",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-13T07:26:22Z",
+              "completed_at": "2026-09-13T07:35:15Z"
+            },
+            {
+              "name": "Repository stays clean after the suite",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-13T07:35:15Z",
+              "completed_at": "2026-09-13T07:35:15Z"
+            },
+            {
+              "name": "Preserve full-suite order timings",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-13T07:35:15Z",
+              "completed_at": "2026-09-13T07:35:17Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 16,
+              "started_at": "2026-09-13T07:35:17Z",
+              "completed_at": "2026-09-13T07:35:18Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-09-13T07:35:18Z",
+              "completed_at": "2026-09-13T07:35:18Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103689932357",
+          "labels": [
+            "self-hosted",
+            "Linux",
+            "X64",
+            "fcp-test-linux"
+          ],
+          "runner_id": 27,
+          "runner_name": "Nettking-Linux",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103689932363,
+          "run_id": 34744552431,
+          "workflow_name": "Federation v1 release gate",
+          "head_branch": "codex/fix-d20-icse-failure-evidence",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34744552431",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYJGbOSw",
+          "head_sha": "70163ea908741baa1999a9c1084f0805d85dea64",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103689932363",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34744552431/job/103689932363",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-13T07:10:07Z",
+          "started_at": "2026-09-13T07:22:17Z",
+          "completed_at": "2026-09-13T07:28:17Z",
+          "name": "Windows regressions (capability-product)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-13T07:22:18Z",
+              "completed_at": "2026-09-13T07:22:24Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-13T07:22:24Z",
+              "completed_at": "2026-09-13T07:22:28Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-13T07:22:28Z",
+              "completed_at": "2026-09-13T07:22:34Z"
+            },
+            {
+              "name": "Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-13T07:22:34Z",
+              "completed_at": "2026-09-13T07:22:34Z"
+            },
+            {
+              "name": "Install release dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-13T07:22:34Z",
+              "completed_at": "2026-09-13T07:24:01Z"
+            },
+            {
+              "name": "Windows capability and product release regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-13T07:24:01Z",
+              "completed_at": "2026-09-13T07:28:10Z"
+            },
+            {
+              "name": "Windows transport, storage, and failover regressions",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 7,
+              "started_at": "2026-09-13T07:28:10Z",
+              "completed_at": "2026-09-13T07:28:10Z"
+            },
+            {
+              "name": "Windows replicated journal and reviewer artifact regressions",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 8,
+              "started_at": "2026-09-13T07:28:10Z",
+              "completed_at": "2026-09-13T07:28:10Z"
+            },
+            {
+              "name": "Preserve Windows regression timings",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-13T07:28:10Z",
+              "completed_at": "2026-09-13T07:28:12Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-09-13T07:28:12Z",
+              "completed_at": "2026-09-13T07:28:12Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 18,
+              "started_at": "2026-09-13T07:28:12Z",
+              "completed_at": "2026-09-13T07:28:14Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 19,
+              "started_at": "2026-09-13T07:28:14Z",
+              "completed_at": "2026-09-13T07:28:14Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103689932363",
+          "labels": [
+            "self-hosted",
+            "Windows",
+            "X64",
+            "fcp-test-windows"
+          ],
+          "runner_id": 28,
+          "runner_name": "Beast",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103689932368,
+          "run_id": 34744552431,
+          "workflow_name": "Federation v1 release gate",
+          "head_branch": "codex/fix-d20-icse-failure-evidence",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34744552431",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYJGbOUA",
+          "head_sha": "70163ea908741baa1999a9c1084f0805d85dea64",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103689932368",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34744552431/job/103689932368",
+          "status": "completed",
+          "conclusion": "failure",
+          "created_at": "2026-09-13T07:10:07Z",
+          "started_at": "2026-09-13T07:28:19Z",
+          "completed_at": "2026-09-13T07:31:01Z",
+          "name": "Release checks (Windows)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-13T07:28:20Z",
+              "completed_at": "2026-09-13T07:28:23Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-13T07:28:23Z",
+              "completed_at": "2026-09-13T07:28:27Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-13T07:28:27Z",
+              "completed_at": "2026-09-13T07:28:33Z"
+            },
+            {
+              "name": "Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-13T07:28:33Z",
+              "completed_at": "2026-09-13T07:28:34Z"
+            },
+            {
+              "name": "Install release dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-13T07:28:34Z",
+              "completed_at": "2026-09-13T07:29:51Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 6,
+              "started_at": "2026-09-13T07:29:51Z",
+              "completed_at": "2026-09-13T07:29:51Z"
+            },
+            {
+              "name": "Compile maintained product packages",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-13T07:29:51Z",
+              "completed_at": "2026-09-13T07:29:54Z"
+            },
+            {
+              "name": "POSIX readiness redirect regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-13T07:29:54Z",
+              "completed_at": "2026-09-13T07:30:20Z"
+            },
+            {
+              "name": "Validate acceptance manifest shape",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-13T07:30:20Z",
+              "completed_at": "2026-09-13T07:30:20Z"
+            },
+            {
+              "name": "Go direct peer sidecar tests",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-09-13T07:30:20Z",
+              "completed_at": "2026-09-13T07:30:22Z"
+            },
+            {
+              "name": "Ruff maintained release boundaries",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-09-13T07:30:22Z",
+              "completed_at": "2026-09-13T07:30:23Z"
+            },
+            {
+              "name": "Validate Compose configuration",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-09-13T07:30:23Z",
+              "completed_at": "2026-09-13T07:30:23Z"
+            },
+            {
+              "name": "Discovery authority and bounded startup regressions",
+              "status": "completed",
+              "conclusion": "failure",
+              "number": 13,
+              "started_at": "2026-09-13T07:30:23Z",
+              "completed_at": "2026-09-13T07:30:55Z"
+            },
+            {
+              "name": "Lint discovery boundary",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 14,
+              "started_at": "2026-09-13T07:30:55Z",
+              "completed_at": "2026-09-13T07:30:55Z"
+            },
+            {
+              "name": "Diff hygiene",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 15,
+              "started_at": "2026-09-13T07:30:55Z",
+              "completed_at": "2026-09-13T07:30:55Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 29,
+              "started_at": "2026-09-13T07:30:55Z",
+              "completed_at": "2026-09-13T07:30:55Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 30,
+              "started_at": "2026-09-13T07:30:55Z",
+              "completed_at": "2026-09-13T07:30:57Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 31,
+              "started_at": "2026-09-13T07:30:57Z",
+              "completed_at": "2026-09-13T07:30:57Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103689932368",
+          "labels": [
+            "self-hosted",
+            "Windows",
+            "X64",
+            "fcp-test-windows"
+          ],
+          "runner_id": 28,
+          "runner_name": "Beast",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103689932371,
+          "run_id": 34744552431,
+          "workflow_name": "Federation v1 release gate",
+          "head_branch": "codex/fix-d20-icse-failure-evidence",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34744552431",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYJGbOUw",
+          "head_sha": "70163ea908741baa1999a9c1084f0805d85dea64",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103689932371",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34744552431/job/103689932371",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-13T07:10:07Z",
+          "started_at": "2026-09-13T07:18:09Z",
+          "completed_at": "2026-09-13T07:22:15Z",
+          "name": "Windows regressions (transport-storage)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-13T07:18:10Z",
+              "completed_at": "2026-09-13T07:18:12Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-13T07:18:12Z",
+              "completed_at": "2026-09-13T07:18:16Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-13T07:18:16Z",
+              "completed_at": "2026-09-13T07:18:23Z"
+            },
+            {
+              "name": "Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-13T07:18:23Z",
+              "completed_at": "2026-09-13T07:18:23Z"
+            },
+            {
+              "name": "Install release dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-13T07:18:23Z",
+              "completed_at": "2026-09-13T07:20:12Z"
+            },
+            {
+              "name": "Windows capability and product release regressions",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 6,
+              "started_at": "2026-09-13T07:20:12Z",
+              "completed_at": "2026-09-13T07:20:12Z"
+            },
+            {
+              "name": "Windows transport, storage, and failover regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-13T07:20:12Z",
+              "completed_at": "2026-09-13T07:21:54Z"
+            },
+            {
+              "name": "Windows replicated journal and reviewer artifact regressions",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 8,
+              "started_at": "2026-09-13T07:21:54Z",
+              "completed_at": "2026-09-13T07:21:54Z"
+            },
+            {
+              "name": "Preserve Windows regression timings",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-13T07:21:54Z",
+              "completed_at": "2026-09-13T07:21:56Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-09-13T07:21:56Z",
+              "completed_at": "2026-09-13T07:21:56Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 18,
+              "started_at": "2026-09-13T07:21:56Z",
+              "completed_at": "2026-09-13T07:21:58Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 19,
+              "started_at": "2026-09-13T07:21:58Z",
+              "completed_at": "2026-09-13T07:21:58Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103689932371",
+          "labels": [
+            "self-hosted",
+            "Windows",
+            "X64",
+            "fcp-test-windows"
+          ],
+          "runner_id": 28,
+          "runner_name": "Beast",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103689932384,
+          "run_id": 34744552431,
+          "workflow_name": "Federation v1 release gate",
+          "head_branch": "codex/fix-d20-icse-failure-evidence",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34744552431",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYJGbOYA",
+          "head_sha": "70163ea908741baa1999a9c1084f0805d85dea64",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103689932384",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34744552431/job/103689932384",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-13T07:10:07Z",
+          "started_at": "2026-09-13T07:35:26Z",
+          "completed_at": "2026-09-13T07:44:45Z",
+          "name": "Full-suite order (fixed)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-13T07:35:27Z",
+              "completed_at": "2026-09-13T07:35:29Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-13T07:35:29Z",
+              "completed_at": "2026-09-13T07:35:30Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-13T07:35:30Z",
+              "completed_at": "2026-09-13T07:35:32Z"
+            },
+            {
+              "name": "Install release dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-13T07:35:32Z",
+              "completed_at": "2026-09-13T07:36:02Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-13T07:36:02Z",
+              "completed_at": "2026-09-13T07:36:02Z"
+            },
+            {
+              "name": "Entire suite in the selected shuffled order",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-13T07:36:02Z",
+              "completed_at": "2026-09-13T07:44:38Z"
+            },
+            {
+              "name": "Repository stays clean after the suite",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-13T07:44:38Z",
+              "completed_at": "2026-09-13T07:44:38Z"
+            },
+            {
+              "name": "Preserve full-suite order timings",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-13T07:44:38Z",
+              "completed_at": "2026-09-13T07:44:40Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 16,
+              "started_at": "2026-09-13T07:44:40Z",
+              "completed_at": "2026-09-13T07:44:41Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-09-13T07:44:41Z",
+              "completed_at": "2026-09-13T07:44:41Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103689932384",
+          "labels": [
+            "self-hosted",
+            "Linux",
+            "X64",
+            "fcp-test-linux"
+          ],
+          "runner_id": 27,
+          "runner_name": "Nettking-Linux",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103689932389,
+          "run_id": 34744552431,
+          "workflow_name": "Federation v1 release gate",
+          "head_branch": "codex/fix-d20-icse-failure-evidence",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34744552431",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYJGbOZQ",
+          "head_sha": "70163ea908741baa1999a9c1084f0805d85dea64",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103689932389",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34744552431/job/103689932389",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-13T07:10:07Z",
+          "started_at": "2026-09-13T07:44:47Z",
+          "completed_at": "2026-09-13T07:47:11Z",
+          "name": "Linux regression shard (3)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-13T07:44:48Z",
+              "completed_at": "2026-09-13T07:44:51Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-13T07:44:51Z",
+              "completed_at": "2026-09-13T07:44:53Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-13T07:44:53Z",
+              "completed_at": "2026-09-13T07:44:56Z"
+            },
+            {
+              "name": "Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-13T07:44:56Z",
+              "completed_at": "2026-09-13T07:44:56Z"
+            },
+            {
+              "name": "Install release dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-13T07:44:56Z",
+              "completed_at": "2026-09-13T07:45:25Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-13T07:45:25Z",
+              "completed_at": "2026-09-13T07:45:25Z"
+            },
+            {
+              "name": "Run one file-preserving regression shard",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-13T07:45:25Z",
+              "completed_at": "2026-09-13T07:47:05Z"
+            },
+            {
+              "name": "Preserve shard coverage and timings",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-13T07:47:05Z",
+              "completed_at": "2026-09-13T07:47:07Z"
+            },
+            {
+              "name": "Repository stays clean after the suite",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-13T07:47:07Z",
+              "completed_at": "2026-09-13T07:47:07Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-09-13T07:47:07Z",
+              "completed_at": "2026-09-13T07:47:07Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 18,
+              "started_at": "2026-09-13T07:47:07Z",
+              "completed_at": "2026-09-13T07:47:07Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 19,
+              "started_at": "2026-09-13T07:47:07Z",
+              "completed_at": "2026-09-13T07:47:08Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103689932389",
+          "labels": [
+            "self-hosted",
+            "Linux",
+            "X64",
+            "fcp-test-linux"
+          ],
+          "runner_id": 27,
+          "runner_name": "Nettking-Linux",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103693902946,
+          "run_id": 34744552431,
+          "workflow_name": "Federation v1 release gate",
+          "head_branch": "codex/fix-d20-icse-failure-evidence",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34744552431",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYJKNkYg",
+          "head_sha": "70163ea908741baa1999a9c1084f0805d85dea64",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103693902946",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34744552431/job/103693902946",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-13T07:44:46Z",
+          "started_at": "2026-09-13T07:47:13Z",
+          "completed_at": "2026-09-13T07:47:18Z",
+          "name": "Clean-checkout suite order independence",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-13T07:47:14Z",
+              "completed_at": "2026-09-13T07:47:14Z"
+            },
+            {
+              "name": "Require both complete-suite order checks",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-13T07:47:14Z",
+              "completed_at": "2026-09-13T07:47:14Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-13T07:47:14Z",
+              "completed_at": "2026-09-13T07:47:15Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103693902946",
+          "labels": [
+            "self-hosted",
+            "Linux",
+            "X64",
+            "fcp-test-linux"
+          ],
+          "runner_id": 27,
+          "runner_name": "Nettking-Linux",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103694159322,
+          "run_id": 34744552431,
+          "workflow_name": "Federation v1 release gate",
+          "head_branch": "codex/fix-d20-icse-failure-evidence",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34744552431",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYJKdN2g",
+          "head_sha": "70163ea908741baa1999a9c1084f0805d85dea64",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103694159322",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34744552431/job/103694159322",
+          "status": "completed",
+          "conclusion": "failure",
+          "created_at": "2026-09-13T07:47:12Z",
+          "started_at": "2026-09-13T07:47:19Z",
+          "completed_at": "2026-09-13T07:47:26Z",
+          "name": "Release matrix (Linux)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-13T07:47:20Z",
+              "completed_at": "2026-09-13T07:47:22Z"
+            },
+            {
+              "name": "Require release checks and every regression shard",
+              "status": "completed",
+              "conclusion": "failure",
+              "number": 2,
+              "started_at": "2026-09-13T07:47:22Z",
+              "completed_at": "2026-09-13T07:47:22Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 3,
+              "started_at": "2026-09-13T07:47:22Z",
+              "completed_at": "2026-09-13T07:47:22Z"
+            },
+            {
+              "name": "Run actions/download-artifact@v4",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 4,
+              "started_at": "2026-09-13T07:47:22Z",
+              "completed_at": "2026-09-13T07:47:22Z"
+            },
+            {
+              "name": "Require exact complete Linux test coverage",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 5,
+              "started_at": "2026-09-13T07:47:22Z",
+              "completed_at": "2026-09-13T07:47:22Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-13T07:47:22Z",
+              "completed_at": "2026-09-13T07:47:22Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103694159322",
+          "labels": [
+            "self-hosted",
+            "Linux",
+            "X64",
+            "fcp-test-linux"
+          ],
+          "runner_id": 27,
+          "runner_name": "Nettking-Linux",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103694159352,
+          "run_id": 34744552431,
+          "workflow_name": "Federation v1 release gate",
+          "head_branch": "codex/fix-d20-icse-failure-evidence",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34744552431",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYJKdN-A",
+          "head_sha": "70163ea908741baa1999a9c1084f0805d85dea64",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103694159352",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34744552431/job/103694159352",
+          "status": "completed",
+          "conclusion": "failure",
+          "created_at": "2026-09-13T07:47:12Z",
+          "started_at": "2026-09-13T07:47:28Z",
+          "completed_at": "2026-09-13T07:47:35Z",
+          "name": "Release matrix (Windows)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-13T07:47:29Z",
+              "completed_at": "2026-09-13T07:47:31Z"
+            },
+            {
+              "name": "Require release checks and every regression shard",
+              "status": "completed",
+              "conclusion": "failure",
+              "number": 2,
+              "started_at": "2026-09-13T07:47:31Z",
+              "completed_at": "2026-09-13T07:47:31Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 3,
+              "started_at": "2026-09-13T07:47:31Z",
+              "completed_at": "2026-09-13T07:47:31Z"
+            },
+            {
+              "name": "Run actions/download-artifact@v4",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 4,
+              "started_at": "2026-09-13T07:47:31Z",
+              "completed_at": "2026-09-13T07:47:31Z"
+            },
+            {
+              "name": "Require exact complete Linux test coverage",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 5,
+              "started_at": "2026-09-13T07:47:31Z",
+              "completed_at": "2026-09-13T07:47:31Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-13T07:47:31Z",
+              "completed_at": "2026-09-13T07:47:31Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103694159352",
+          "labels": [
+            "self-hosted",
+            "Linux",
+            "X64",
+            "fcp-test-linux"
+          ],
+          "runner_id": 27,
+          "runner_name": "Nettking-Linux",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103694197967,
+          "run_id": 34744552431,
+          "workflow_name": "Federation v1 release gate",
+          "head_branch": "codex/fix-d20-icse-failure-evidence",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34744552431",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYJKfkzw",
+          "head_sha": "70163ea908741baa1999a9c1084f0805d85dea64",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103694197967",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34744552431/job/103694197967",
+          "status": "completed",
+          "conclusion": "failure",
+          "created_at": "2026-09-13T07:47:35Z",
+          "started_at": "2026-09-13T07:47:37Z",
+          "completed_at": "2026-09-13T07:47:41Z",
+          "name": "Federation v1 automated release verdict",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-13T07:47:38Z",
+              "completed_at": "2026-09-13T07:47:38Z"
+            },
+            {
+              "name": "Require every automated release job",
+              "status": "completed",
+              "conclusion": "failure",
+              "number": 2,
+              "started_at": "2026-09-13T07:47:38Z",
+              "completed_at": "2026-09-13T07:47:38Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-13T07:47:38Z",
+              "completed_at": "2026-09-13T07:47:38Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103694197967",
+          "labels": [
+            "self-hosted",
+            "Linux",
+            "X64",
+            "fcp-test-linux"
+          ],
+          "runner_id": 27,
+          "runner_name": "Nettking-Linux",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        }
+      ]
+    }
+  ]
+}

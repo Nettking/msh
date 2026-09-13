@@ -1,0 +1,222 @@
+{
+  "recorded_at": "2026-09-13T07:55:27.751893+00:00",
+  "finding": "D13 recurrence; no new independent defect",
+  "source": "83d059fba6d22b7d8f526be1b7e563c9bc3c0a68",
+  "review_head": "70163ea908741baa1999a9c1084f0805d85dea64",
+  "run": 34744552431,
+  "job": 103689932368,
+  "host": "Beast native Windows Python3.12.10",
+  "stage": "Release checks Windows / Discovery authority and bounded startup regressions",
+  "test": "catalog/federation/tests/test_tailnet_join_responder.py::test_unknown_paths_are_refused",
+  "procedure": "Checked-in discovery regression selection; POST /anything-else, expecting HTTP404 without grant invocation",
+  "observed": "ConnectionAbortedError WinError10053 reading status; server logged404;1failed149passed7skipped30.44s",
+  "expected": "Client receives404; no pairing-authority invocation",
+  "classification": "Pre-existing product defect D13/#474, repair PR475 absent from PR483 base. Not a new D20 regression.",
+  "source_blob_proof": {
+    "catalog/federation/tailnet_join_responder.py": {
+      "b7194820d8f1940ae60b8c9639e09b7f61e65c55": "f3476eb4c40b30251206102893aa7aa326d6211b",
+      "83d059fba6d22b7d8f526be1b7e563c9bc3c0a68": "f3476eb4c40b30251206102893aa7aa326d6211b",
+      "5e6f184311019b9982e8544a18f3dc02c1b16e98": "3154531b2193cd1f2e09522fa13f385377c64589"
+    },
+    "catalog/federation/tests/test_tailnet_join_responder.py": {
+      "b7194820d8f1940ae60b8c9639e09b7f61e65c55": "6cb0e1ce6d3b4edd189be80fb8ee8e26f5c2d9d2",
+      "83d059fba6d22b7d8f526be1b7e563c9bc3c0a68": "6cb0e1ce6d3b4edd189be80fb8ee8e26f5c2d9d2",
+      "5e6f184311019b9982e8544a18f3dc02c1b16e98": "e250c8b058de39c3f218d8f1fbd832fe06da815b"
+    }
+  },
+  "D13_fix_ancestor": false,
+  "dependent_red_jobs": [
+    103694159322,
+    103694159352,
+    103694197967
+  ],
+  "dependency_evidence": "Both matrices expose CHECKS=failure, LINUX=success, WINDOWS=success; verdict depends on failed matrices",
+  "successful_jobs_preserved": 12,
+  "artifact_review": [
+    {
+      "artifact": "windows-regression-capability-product",
+      "file": "windows-capability-product.xml",
+      "suites": [
+        {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "0",
+          "skipped": "5",
+          "tests": "895",
+          "time": "240.863",
+          "timestamp": "2026-09-13T09:24:02.855737+02:00",
+          "hostname": "Beast"
+        }
+      ],
+      "new_D20_cases_pass": 0
+    },
+    {
+      "artifact": "full-suite-order-fixed",
+      "file": "order-fixed.xml",
+      "suites": [
+        {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "0",
+          "skipped": "40",
+          "tests": "4489",
+          "time": "512.792",
+          "timestamp": "2026-09-13T09:36:03.123034+02:00",
+          "hostname": "Nettking"
+        }
+      ],
+      "new_D20_cases_pass": 3
+    },
+    {
+      "artifact": "full-suite-order-rotating",
+      "file": "order-rotating.xml",
+      "suites": [
+        {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "0",
+          "skipped": "40",
+          "tests": "4489",
+          "time": "528.829",
+          "timestamp": "2026-09-13T09:26:22.907970+02:00",
+          "hostname": "Nettking"
+        }
+      ],
+      "new_D20_cases_pass": 3
+    },
+    {
+      "artifact": "linux-regression-shard-2",
+      "file": "shard-2.json",
+      "source": "83d059fba6d22b7d8f526be1b7e563c9bc3c0a68",
+      "selected": 1122,
+      "executed": 1122
+    },
+    {
+      "artifact": "linux-regression-shard-2",
+      "file": "junit-2.xml",
+      "suites": [
+        {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "0",
+          "skipped": "21",
+          "tests": "1122",
+          "time": "147.325",
+          "timestamp": "2026-09-13T09:19:40.427433+02:00",
+          "hostname": "Nettking"
+        }
+      ],
+      "new_D20_cases_pass": 0
+    },
+    {
+      "artifact": "linux-regression-shard-0",
+      "file": "shard-0.json",
+      "source": "83d059fba6d22b7d8f526be1b7e563c9bc3c0a68",
+      "selected": 1123,
+      "executed": 1123
+    },
+    {
+      "artifact": "linux-regression-shard-0",
+      "file": "junit-0.xml",
+      "suites": [
+        {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "0",
+          "skipped": "0",
+          "tests": "1123",
+          "time": "172.477",
+          "timestamp": "2026-09-13T09:16:00.621581+02:00",
+          "hostname": "Nettking"
+        }
+      ],
+      "new_D20_cases_pass": 0
+    },
+    {
+      "artifact": "windows-regression-transport-storage",
+      "file": "windows-transport-storage.xml",
+      "suites": [
+        {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "0",
+          "skipped": "1",
+          "tests": "371",
+          "time": "99.598",
+          "timestamp": "2026-09-13T09:20:14.179739+02:00",
+          "hostname": "Beast"
+        }
+      ],
+      "new_D20_cases_pass": 0
+    },
+    {
+      "artifact": "windows-regression-journal-artifacts",
+      "file": "windows-journal-artifacts.xml",
+      "suites": [
+        {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "0",
+          "skipped": "1",
+          "tests": "298",
+          "time": "359.955",
+          "timestamp": "2026-09-13T09:17:21.498666+02:00",
+          "hostname": "Nettking"
+        }
+      ],
+      "new_D20_cases_pass": 0
+    },
+    {
+      "artifact": "linux-regression-shard-3",
+      "file": "shard-3.json",
+      "source": "83d059fba6d22b7d8f526be1b7e563c9bc3c0a68",
+      "selected": 1122,
+      "executed": 1122
+    },
+    {
+      "artifact": "linux-regression-shard-3",
+      "file": "junit-3.xml",
+      "suites": [
+        {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "0",
+          "skipped": "2",
+          "tests": "1122",
+          "time": "98.115",
+          "timestamp": "2026-09-13T09:45:26.248845+02:00",
+          "hostname": "Nettking"
+        }
+      ],
+      "new_D20_cases_pass": 3
+    },
+    {
+      "artifact": "linux-regression-shard-1",
+      "file": "shard-1.json",
+      "source": "83d059fba6d22b7d8f526be1b7e563c9bc3c0a68",
+      "selected": 1122,
+      "executed": 1122
+    },
+    {
+      "artifact": "linux-regression-shard-1",
+      "file": "junit-1.xml",
+      "suites": [
+        {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "0",
+          "skipped": "17",
+          "tests": "1122",
+          "time": "154.894",
+          "timestamp": "2026-09-13T09:22:57.468344+02:00",
+          "hostname": "Nettking"
+        }
+      ],
+      "new_D20_cases_pass": 0
+    }
+  ],
+  "next_action": "Stack the single D20 repair commit onto unchanged PR4755e, retarget PR483 base to that branch, prove only D20 delta, and retain all original source evidence. No retry of known-bad old source. Existing automatic CI validates changed combination; no full manual qualification.",
+  "state_changed": "CI-owned temporary dependencies and synthetic tests only; repository evidence retention",
+  "protected_recorder_data": "Not accessed/changed",
+  "physical_pass": false
+}
