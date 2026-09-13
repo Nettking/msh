@@ -1,9 +1,9 @@
 {
-  "recorded_at_utc": "2026-09-13T03:11:06.644130+00:00",
+  "recorded_at_utc": "2026-09-13T03:11:11.651834+00:00",
   "plan_checkpoint": "e70280bc",
   "source_commit": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
   "ref": "codex/fix-d13-windows-refusal-response",
-  "stage": "cf7c-physical-test-readiness",
+  "stage": "icse-tool-demo",
   "records": [
     {
       "workflow": "cf7-acceptance-harness.yml",
@@ -49,6 +49,14 @@
       "workflow": "cf7c-physical-test-readiness.yml",
       "action": "dispatch_requested",
       "requested_at_utc": "2026-09-13T03:11:05.114336+00:00",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "icse-tool-demo.yml",
+      "action": "dispatch_requested",
+      "requested_at_utc": "2026-09-13T03:11:10.524038+00:00",
       "response": {
         "http_status": 204
       }
