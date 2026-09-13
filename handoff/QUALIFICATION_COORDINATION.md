@@ -1,6 +1,6 @@
 # Federation v1 current release checkpoint
 
-Updated 2026-09-13T10:30Z. Active context: clean handoff + this file + live GitHub.
+Updated 2026-09-13T11:09Z. Active context: clean handoff + this file + live GitHub.
 Historical plans are evidence only; use handoff/archive only for a current requirement.
 
 ## Current source / heads
@@ -9,10 +9,15 @@ Historical plans are evidence only; use handoff/archive only for a current requi
 - Actual main tree cc9b29515d47d754f24199bf403213e7ff111315 matches the reviewed
   offline combination; all three reviewed PR heads are ancestors. No deployment.
 - Clean detached checkout:C:/wsl/fcp-v1-e6a9b74a-main-20260913.
-- Main qualification is active:all13 workflows submitted; no missing scope.
+- Main qualification:24/24 non-release jobs PASS with native/artifact review.
+- Broad release34751832493 is the only remaining gate to inspect about11:15Z.
 - AUTHORITATIVE_SHA is not frozen yet.
 
 ## Green gates / retained evidence
+- Actual main e6a9b74a:all12 non-release workflows/24 jobs PASS; source proved in
+  every native checkout. ICSE Linux/Windows10/10, bundle source/export/privacy,
+  CF8 JUnit and registry verified. diagnostics/main-e6a9b74a-qualification/
+  short-qualification.json, artifact-review.json and native archives retain proof.
 - Prior combined f104038a native37/37 required plus3/3 companions PASS.
 - ICSE Windows/Linux10/10, retained Compose and exact-source publication verified.
 - Evidence:diagnostics/f104-final-qualification/qualification.json and archives.
@@ -34,7 +39,7 @@ Historical plans are evidence only; use handoff/archive only for a current requi
    diagnostics/main-e6a9b74a-qualification-dispatch.json. Inspect existing receipt
    and live runs before any repeated request, especially after uncertain responses.
    All13 run IDs:diagnostics/main-e6a9b74a-qualification-startup.json.
-   Next short-gate check about10:50Z; broad release about11:15Z unless a terminal
+   Short gates are complete and retained. Broad release about11:15Z unless a terminal
    event arrives. Do not keep polling unchanged long jobs or completed greens.
 2. Retain completed native checks/artifacts on actual main; classify new failures
    before action. Never qualify intermediate main or repeat valid green results.

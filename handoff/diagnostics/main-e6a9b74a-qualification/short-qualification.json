@@ -1,0 +1,87 @@
+{
+  "at": "2026-09-13T11:07:30.100539+00:00",
+  "source": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+  "status": "COMPLETED_NON_RELEASE_SCOPE_QUALIFIED",
+  "passed_jobs": 24,
+  "native_checkout_proofs": 24,
+  "workflows": [
+    {
+      "id": 34751832430,
+      "path": ".github/workflows/federation-software-update.yml",
+      "expected_jobs": 2,
+      "conclusion": "success"
+    },
+    {
+      "id": 34751832432,
+      "path": ".github/workflows/product-branding.yml",
+      "expected_jobs": 1,
+      "conclusion": "success"
+    },
+    {
+      "id": 34751930317,
+      "path": ".github/workflows/cf7-acceptance-harness.yml",
+      "expected_jobs": 2,
+      "conclusion": "success"
+    },
+    {
+      "id": 34751931473,
+      "path": ".github/workflows/phase2-federation.yml",
+      "expected_jobs": 2,
+      "conclusion": "success"
+    },
+    {
+      "id": 34751932385,
+      "path": ".github/workflows/cf7b-product-physical-acceptance.yml",
+      "expected_jobs": 2,
+      "conclusion": "success"
+    },
+    {
+      "id": 34751933879,
+      "path": ".github/workflows/cf7c-physical-test-readiness.yml",
+      "expected_jobs": 2,
+      "conclusion": "success"
+    },
+    {
+      "id": 34751934925,
+      "path": ".github/workflows/icse-tool-demo.yml",
+      "expected_jobs": 4,
+      "conclusion": "success"
+    },
+    {
+      "id": 34751935929,
+      "path": ".github/workflows/cf8-role-retirement.yml",
+      "expected_jobs": 2,
+      "conclusion": "success"
+    },
+    {
+      "id": 34751936806,
+      "path": ".github/workflows/phase-f85-operator-federation-surface.yml",
+      "expected_jobs": 2,
+      "conclusion": "success"
+    },
+    {
+      "id": 34751938039,
+      "path": ".github/workflows/ci-test-sharding.yml",
+      "expected_jobs": 2,
+      "conclusion": "success"
+    },
+    {
+      "id": 34751939219,
+      "path": ".github/workflows/cfi2-onboarding-composition.yml",
+      "expected_jobs": 2,
+      "conclusion": "success"
+    },
+    {
+      "id": 34751940355,
+      "path": ".github/workflows/release-image-metadata.yml",
+      "expected_jobs": 1,
+      "conclusion": "success"
+    }
+  ],
+  "artifact_review": "artifact-review.json",
+  "native_logs": "native-job-logs.zip",
+  "broad_release_workflow": 34751832493,
+  "broad_release_status": "Not inspected this cycle before11:15UTC; no PASS claimed",
+  "physical_acceptance": "NOT_EVALUATED",
+  "protected_recorder_data": "NOT_ACCESSED_OR_CHANGED"
+}

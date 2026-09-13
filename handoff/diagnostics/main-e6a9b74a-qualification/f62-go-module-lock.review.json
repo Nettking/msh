@@ -1,0 +1,19 @@
+{
+  "artifact_id": 10315677730,
+  "artifact_sha256": "5dcd7964ba0376a72b3826c1a0a76af25f6a7da7204f24cdaacf2490632fe263",
+  "files": {
+    "go.mod": {
+      "sha256": "d0c12d48e8c10d472bc2337ac9a0f24b60e6cdff9d96637d3292016ac0a9248b",
+      "matches_native_output": true,
+      "tracked_in_source": true,
+      "equals_tracked_source": true
+    },
+    "go.sum": {
+      "sha256": "883d23a0f1508aea026c7a2fe82a6c60eff5ad53c924aa6112d5e038edc77a91",
+      "matches_native_output": true,
+      "tracked_in_source": false,
+      "equals_tracked_source": null
+    }
+  },
+  "contract": "Unchanged phase2 workflow runs go mod tidy and retains its generated module lock. Generated go.sum is not a tracked candidate file; no source identity claim is made for it."
+}
