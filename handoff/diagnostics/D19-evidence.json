@@ -1,0 +1,126 @@
+{
+  "recorded_at_utc": "2026-09-13T04:20:15.125214+00:00",
+  "source_sha": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "finding": "D19",
+  "status": "CONFIRMED",
+  "classification": "infrastructure/GitHub Actions internal error",
+  "cancelled_jobs": [
+    {
+      "run_id": 34734869036,
+      "job_id": 103664365450,
+      "name": "Linux regression shard (2)",
+      "annotations": [
+        {
+          "path": ".github",
+          "blob_href": "https://github.com/Nettking/msh/blob/5e6f184311019b9982e8544a18f3dc02c1b16e98/.github",
+          "start_line": 1,
+          "start_column": null,
+          "end_line": 1,
+          "end_column": null,
+          "annotation_level": "failure",
+          "title": "",
+          "message": "GitHub Actions has encountered an internal error when running your job.",
+          "raw_details": ""
+        }
+      ]
+    },
+    {
+      "run_id": 34734869036,
+      "job_id": 103664365456,
+      "name": "Release checks (Linux)",
+      "annotations": [
+        {
+          "path": ".github",
+          "blob_href": "https://github.com/Nettking/msh/blob/5e6f184311019b9982e8544a18f3dc02c1b16e98/.github",
+          "start_line": 1,
+          "start_column": null,
+          "end_line": 1,
+          "end_column": null,
+          "annotation_level": "failure",
+          "title": "",
+          "message": "GitHub Actions has encountered an internal error when running your job.",
+          "raw_details": ""
+        }
+      ]
+    },
+    {
+      "run_id": 34734869036,
+      "job_id": 103664365475,
+      "name": "Linux regression shard (1)",
+      "annotations": [
+        {
+          "path": ".github",
+          "blob_href": "https://github.com/Nettking/msh/blob/5e6f184311019b9982e8544a18f3dc02c1b16e98/.github",
+          "start_line": 1,
+          "start_column": null,
+          "end_line": 1,
+          "end_column": null,
+          "annotation_level": "failure",
+          "title": "",
+          "message": "GitHub Actions has encountered an internal error when running your job.",
+          "raw_details": ""
+        }
+      ]
+    },
+    {
+      "run_id": 34734869036,
+      "job_id": 103664365491,
+      "name": "Linux regression shard (3)",
+      "annotations": [
+        {
+          "path": ".github",
+          "blob_href": "https://github.com/Nettking/msh/blob/5e6f184311019b9982e8544a18f3dc02c1b16e98/.github",
+          "start_line": 1,
+          "start_column": null,
+          "end_line": 1,
+          "end_column": null,
+          "annotation_level": "failure",
+          "title": "",
+          "message": "GitHub Actions has encountered an internal error when running your job.",
+          "raw_details": ""
+        }
+      ]
+    },
+    {
+      "run_id": 34734869036,
+      "job_id": 103667724273,
+      "name": "Clean-checkout suite order independence",
+      "annotations": [
+        {
+          "path": ".github",
+          "blob_href": "https://github.com/Nettking/msh/blob/5e6f184311019b9982e8544a18f3dc02c1b16e98/.github",
+          "start_line": 1,
+          "start_column": null,
+          "end_line": 1,
+          "end_column": null,
+          "annotation_level": "failure",
+          "title": "",
+          "message": "GitHub Actions has encountered an internal error when running your job.",
+          "raw_details": ""
+        }
+      ]
+    },
+    {
+      "run_id": 34734864966,
+      "job_id": 103664353333,
+      "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+      "annotations": [
+        {
+          "path": ".github",
+          "blob_href": "https://github.com/Nettking/msh/blob/5e6f184311019b9982e8544a18f3dc02c1b16e98/.github",
+          "start_line": 1,
+          "start_column": null,
+          "end_line": 1,
+          "end_column": null,
+          "annotation_level": "failure",
+          "title": "",
+          "message": "GitHub Actions has encountered an internal error when running your job.",
+          "raw_details": ""
+        }
+      ]
+    }
+  ],
+  "github_artifact": "Pending immediate publication",
+  "protected_recorder_data": "Not accessed or changed",
+  "runtime_changed": false
+}
