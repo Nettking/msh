@@ -1,0 +1,79 @@
+{
+  "recorded_at": "2026-09-13T08:37:56.297161+00:00",
+  "finding": "D18 new explicit failure profiles; independent root causes not established",
+  "review_head": "06b956787ae63215982d5afd7198dead366e05ea",
+  "actual_source": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+  "run": 34746641262,
+  "command": "python -B -m demo.icse.network.run --source-sha \"$GITHUB_SHA\" --output \"$RUNNER_TEMP/fcp-icse-network-RUN-ATTEMPT-OS\" (exact expanded commands in retained native logs)",
+  "profiles": [
+    {
+      "artifact": {
+        "run_id": 34746641262,
+        "id": 10314277364,
+        "name": "icse-network-summary-Windows",
+        "digest": "sha256:1441151b082862b13544e3c3dbc888641111bf541a3a582b9859c60e4ec49451",
+        "bytes": 2381,
+        "created_at": "2026-09-13T08:16:55Z",
+        "api_workflow_head": "06b956787ae63215982d5afd7198dead366e05ea"
+      },
+      "failure": {
+        "command": {
+          "error_code": null,
+          "error_type": "QuorumUnavailable",
+          "operation": "bootstrap",
+          "worker": "voter-a"
+        },
+        "type": "WorkerCommandFailure"
+      },
+      "checks_before_failure": {
+        "independent_processes": "PASS"
+      },
+      "source_sha": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+      "clean": true,
+      "owned_processes_stopped": true,
+      "result": "FAIL",
+      "physical_acceptance": "NOT_EVALUATED"
+    },
+    {
+      "artifact": {
+        "run_id": 34746641262,
+        "id": 10313918499,
+        "name": "icse-network-summary-Linux",
+        "digest": "sha256:54d70fe5454e8475010e359111c5eff26d24f8fcad0204ea5ca6e0f12a4fab41",
+        "bytes": 7293,
+        "created_at": "2026-09-13T08:03:48Z",
+        "api_workflow_head": "06b956787ae63215982d5afd7198dead366e05ea"
+      },
+      "failure": {
+        "command": {
+          "error_code": null,
+          "error_type": "TimeoutError",
+          "operation": "connect",
+          "worker": "voter-b"
+        },
+        "type": "WorkerCommandFailure"
+      },
+      "checks_before_failure": {
+        "authenticated_enrollment_and_join": "PASS",
+        "authenticated_payload_delivery": "PASS",
+        "authenticated_quorum_bootstrap": "PASS",
+        "automatic_quorum_failover_and_continuity": "PASS",
+        "discovery_and_owner_authorization": "PASS",
+        "independent_processes": "PASS"
+      },
+      "source_sha": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+      "clean": true,
+      "owned_processes_stopped": true,
+      "result": "FAIL",
+      "physical_acceptance": "NOT_EVALUATED"
+    }
+  ],
+  "expected": "Bootstrap authenticates quorum; survivor reconnects to successor within existing deadlines; complete all10network checks",
+  "classification": "Unresolved runtime/harness/host: Windows voter-a bootstrap QuorumUnavailable, Linux voter-b successor connect TimeoutError. Fail-closed behavior preserved; no proven product regression or shared root cause.",
+  "acceptance_impact": "ICSE both OS and dependent bundle blocked; no physical acceptance evidence",
+  "D20_native_failed_upload_proof": "PASS for harness function only: both failed commands stayed exit1 and uploaded only bounded public outputs with structured command context; all owned children stopped",
+  "safe_continuation": "YES: focused read-only source/report inspection; release remains untouched and not due until08:50UTC. No source mutation or retry.",
+  "state_changed": "Existing CI-owned synthetic processes and outputs only; agent retention and checkpoint files",
+  "protected_recorder_data": "Not accessed/changed",
+  "next_action": "Inspect bootstrap and successor connect call paths plus available public events to identify the immediate mechanism; preserve distinct profiles without inventing independent root causes or retroactively assigning old5e errors."
+}
