@@ -1,0 +1,22 @@
+{
+  "candidate_sha": "e91e521813aff67c44bae51d00dfae212b56ef7e",
+  "tree": "c61eb8e838e8c3d44628af8909da4ed8ed347acf",
+  "frozen_at": "2026-09-13T21:38:17.053120+00:00",
+  "state": "AUTHORITATIVE_FROZEN_CANDIDATE",
+  "actual_main_verified": true,
+  "required_jobs_passed": 36,
+  "companion_jobs_passed": 3,
+  "required_release_gate_jobs_passed": 16,
+  "all_release_contracts_satisfied": true,
+  "standalone_phase2": "FAIL_RETAINED_WITH_CURRENT_SOURCE_DISPOSITION",
+  "native_checkout_proofs": 38,
+  "qualification_sha256": "ebb52ff0d8c9882ff8f61c2314d91162024ca06d4a1d06c781f577d62b76ae45",
+  "qualification": "main-e91e5218-qualification/qualification.json",
+  "supersedes_blocked_candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "reason": "Storage reply ownership repair PR487; actual resulting main qualified once.",
+  "physical_acceptance": "NOT_PASSED",
+  "P07": "NOT_STARTED",
+  "P12": "NOT_STARTED",
+  "protected_recorder_data": "UNTOUCHED",
+  "tag_or_publication_created": false
+}

@@ -1,0 +1,73 @@
+{
+  "status": "EXECUTABLES_PREPARED_WAITING_ROOT_ACTIVATION_AUTHORIZATION",
+  "recorded_at": "2026-09-13T21:48:23.165929+00:00",
+  "candidate_sha": "e91e521813aff67c44bae51d00dfae212b56ef7e",
+  "syntax_valid": true,
+  "json_templates_valid": true,
+  "physical_verdict_created": false,
+  "runtime_started": false,
+  "backup_performed": false,
+  "dummy_keys_created": false,
+  "SMB_transport": "positive-and-negative-ready",
+  "Recorder_portable_runtime": "807-files-hash-verified-isolated-imports-ready",
+  "checkouts": [
+    {
+      "kind": "original",
+      "exact_clean_source": true
+    },
+    {
+      "kind": "restore",
+      "exact_clean_source": true
+    }
+  ],
+  "files": [
+    {
+      "name": "backup_copy_gate.py",
+      "sha256": "ef55a65e44772c4893404cc41c017976bf551be01a7f53094e8890b8f546a21c"
+    },
+    {
+      "name": "continuity_probe.py",
+      "sha256": "3280c85671d482107f720ea6bc27e25210565dacf7aace39632e037c7b186861"
+    },
+    {
+      "name": "dpapi_cross_context.py",
+      "sha256": "0428c15a52f44a7707e3ff88b3963821fe56c793fc4a4b4e9281e51b5ed7a8e0"
+    },
+    {
+      "name": "dpapi_dummy_probe.py",
+      "sha256": "5513047f5d04d5eb180fe36928374e0b6279bd4603b237c5d8c10c1594520861"
+    },
+    {
+      "name": "dpapi_sftp_transport.py",
+      "sha256": "1eb6d1c51397be3b49a72095b4202729279e6bce08e57d609661ecd91e866677"
+    },
+    {
+      "name": "p11_common.py",
+      "sha256": "0a0c1f8f4c0becaf4caafd8d9d2a53cf36aa036a0ef155d213768fcddafc3f5d"
+    },
+    {
+      "name": "p11_driver.py",
+      "sha256": "0231629c45e63f58e72f9cecebbeb95219227b21889c5d42753ca94b87dacb49"
+    },
+    {
+      "name": "replacement_member.py",
+      "sha256": "9bbfb0a34a1983211efa42b5979ef52c35143af86570bfc07e09b51dbc099f2f"
+    },
+    {
+      "name": "stopped_inventory.py",
+      "sha256": "b59b01a904132ce674393f39d9f9ef5057602747250e7a8e34168448d664eb5e"
+    },
+    {
+      "name": "dedicated_fixture.py",
+      "sha256": "9958315066bc291ed85c985a23dd9a9525eee5f86c43f592138e590c6f6f36d2"
+    },
+    {
+      "name": "controlled_mtconnect.py",
+      "sha256": "928a088cc83f71aa9ad1e55ef7f274334195e9b9abea09a37a3da4ec52af77f4"
+    },
+    {
+      "name": "recorder_direct_control.py",
+      "sha256": "6840109578d393d32aba660866602308c1987d6e9db5378bbd1d59ba99574288"
+    }
+  ]
+}

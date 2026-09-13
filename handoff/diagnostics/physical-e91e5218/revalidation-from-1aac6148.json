@@ -1,0 +1,34 @@
+{
+  "baseline": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "candidate": "e91e521813aff67c44bae51d00dfae212b56ef7e",
+  "exit_code": 2,
+  "decision": "ALL_SCENARIOS_FRESH_NO_CARRY_FORWARD",
+  "report": {
+    "carry_forward_scenarios": [],
+    "changed_paths": [
+      "catalog/flask_app/services/federation_pairing_install.py",
+      "catalog/flask_app/tests/test_storage_analysis_reader_composition.py",
+      "catalog/orchestrator/analysis_runtime.py",
+      "catalog/orchestrator/tests/test_analysis_runtime_integration.py"
+    ],
+    "impacted_scenarios": [
+      "physical.fresh-windows-checkout",
+      "physical.fresh-linux-checkout",
+      "physical.multi-host-relay-and-network-path",
+      "physical.mtconnect-recorder-source",
+      "physical.ollama-model-and-accelerator",
+      "physical.mobile-and-desktop-browser-review",
+      "physical.recorder-plus-ai-simultaneous-contribution",
+      "physical.separate-ai-compute-storage-contributors",
+      "physical.benchmark-expiry-and-rerun",
+      "physical.contribution-disable-and-reenable",
+      "physical.restart-and-reconciliation",
+      "physical.revocation-and-controlled-rejoin"
+    ],
+    "safe": false,
+    "schema": "fcp.cf7.physical-revalidation-plan.v1",
+    "unknown_paths": [
+      "catalog/orchestrator/analysis_runtime.py"
+    ]
+  }
+}

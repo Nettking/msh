@@ -1,0 +1,41 @@
+{
+  "reviewed_at": "2026-09-13T21:36:28.727990+00:00",
+  "source": "e91e521813aff67c44bae51d00dfae212b56ef7e",
+  "tree": "c61eb8e838e8c3d44628af8909da4ed8ed347acf",
+  "live_main": "e91e521813aff67c44bae51d00dfae212b56ef7e",
+  "status": "ACTUAL_MAIN_AUTOMATED_QUALIFIED",
+  "required_jobs_passed": 36,
+  "required_release_gate_jobs_passed": 16,
+  "all_release_contracts_satisfied": true,
+  "legacy_inventory_label_note": "required_jobs_passed retains the historical 37-job inventory count; checked-in mandatory release verdict is the complete 16-job release gate.",
+  "standalone_phase2": "FAIL_RETAINED_WITH_CURRENT_SOURCE_DISPOSITION",
+  "companion_jobs_passed": 3,
+  "native_checkout_proofs": 38,
+  "aggregate_jobs_without_checkout": 2,
+  "disjoint_complete_linux_test_coverage": 4535,
+  "full_order_test_identities_equal_shard_union": true,
+  "cf8_junit": [
+    {
+      "artifact_id": 10324447787,
+      "tests": 12,
+      "skipped": 0
+    },
+    {
+      "artifact_id": 10325226773,
+      "tests": 12,
+      "skipped": 0
+    }
+  ],
+  "release_artifact_review_sha256": "4e5dffc96560da403c16bb047f36f0e2aa022e58a5b057482bf5658d9d5efcd2",
+  "native_logs_redacted_archive_sha256": "77681098dc79986ce254755425ee520c3246779047db89f7755b757ebd21ade6",
+  "publication_artifact": 10324648930,
+  "publication_digest": "sha256:b6f4a321b4b707eaf68a34bfdc2b6d34e14f3fea8a2eac8284b7fd2a5a36e386",
+  "publication_source_matches_git_archive": true,
+  "network_checks": {
+    "Linux": "10/10 PASS",
+    "Windows": "10/10 PASS"
+  },
+  "component_checks": "4/4 PASS Linux, Windows, Compose",
+  "physical_acceptance": "NOT_PASSED",
+  "protected_recorder_data": "UNTOUCHED"
+}

@@ -1,0 +1,55 @@
+{
+  "source": "e91e521813aff67c44bae51d00dfae212b56ef7e",
+  "run_id": 34780593619,
+  "job_id": 103786775814,
+  "workflow_result": "FAIL_RETAINED",
+  "native_log_sha256": "bf3a00f0ab06ac621c586e46dc553781dfb81a09dcc2af52ac757145aa5ec09d",
+  "classification": "unresolved timing observation; no demonstrated candidate defect",
+  "failure_path": "test_live_storage_reinstatement:258 -> _wait_for_promotion -> LiveFailoverCoordinator._resume:1296 -> RelayFailoverChannel.publish:714 -> unchanged 5s test channel timeout",
+  "failed_job_other_tests": {
+    "passed": 380,
+    "skipped": 1
+  },
+  "actual_main_passing_counterevidence": [
+    {
+      "artifact_id": 10325812482,
+      "name": "windows-regression-transport-storage",
+      "digest": "sha256:4781d248e85536865dc431b238321f1c7cb87b730dda922dd08775e34b15dad4",
+      "test": [
+        "catalog.node.tests.test_live_storage_reinstatement",
+        "test_live_reinstatement_restores_replica_and_acknowledgement_policy"
+      ],
+      "result": "PASS",
+      "seconds": "7.395",
+      "skipped": false
+    },
+    {
+      "artifact_id": 10325408016,
+      "name": "full-suite-order-fixed",
+      "digest": "sha256:ea3562fb1907e557b785be2e54a770b90f8ebfc5e77e37a349164b3d005aba81",
+      "test": [
+        "catalog.node.tests.test_live_storage_reinstatement",
+        "test_live_reinstatement_restores_replica_and_acknowledgement_policy"
+      ],
+      "result": "PASS",
+      "seconds": "2.102",
+      "skipped": false
+    },
+    {
+      "artifact_id": 10325478462,
+      "name": "full-suite-order-rotating",
+      "digest": "sha256:cda6ed754057366be3e5cab46c9798a40a32aaef328b82bf143dd7e4fd8919ac",
+      "test": [
+        "catalog.node.tests.test_live_storage_reinstatement",
+        "test_live_reinstatement_restores_replica_and_acknowledgement_policy"
+      ],
+      "result": "PASS",
+      "seconds": "2.299",
+      "skipped": false
+    }
+  ],
+  "contract_basis": "docs/release_process.md:35-37 requires every release-gate job PASS; federation-v1-release.yml release-verdict depends on release-matrix, postgres-storage and suite-order-independence. Standalone Phase2 is not a verdict dependency. Current handoff requires a demonstrated candidate correctness violation to block v1.",
+  "decision": "No extra diagnostic or job rerun. Preserve failure; required exact-main release gate and independent same-test proofs satisfy the release decision.",
+  "product_or_assertion_changes": false,
+  "physical_acceptance": "NOT_EVALUATED"
+}
