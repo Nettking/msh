@@ -1,36 +1,16 @@
 # Federation v1 qualification coordination
 
-**Current actionable checkpoint: 2026-09-13 04:14UTC. All13 native5e qualification runs terminal; failures/cancellations require evidence triage.**
+**Current actionable checkpoint: 2026-09-13T04:27:26.305235+00:00. Native5e qualification25/37 required +3/3 companion PASS verified; D17/D18 failures and D19 infrastructure cancellations durable.**
 
-New independent failed path D17 confirmed: Beast native5e Windows transport-storage initial primary ingest response timed out at5.0s; run34734869036/job103664365464. Classification unresolved, not automatically product regression. Evidence diagnostics/D17.md/json/native-log.zip. NEXT: publish its issue immediately, then continue other failed/cancelled evidence triage; no new retry, repair or merge.
+28 successful native logs all prove exact5e6f184311019b9982e8544a18f3dc02c1b16e98. Four assigned failed/cancelled logs and10 digest-verified raw release/ICSE artifacts also retained: diagnostics/pr475-exact-head-0414-native-evidence.zip and associated retention/review JSONs. Do not rerun these successes. Current mainb719/PR4755e/PR473440 remain unchanged; no merge/new candidate/physical PASS.
 
-NEXT (supersedes prior wait/startup): preserve new completed native logs, first inspect release Windows transport/storage failure and ICSE Linux failure plus release/F85 cancellations. No retry, source change or merge before classification. API snapshot diagnostics/pr475-exact-head-state-20260913T0414.json; heads5e/440 and baseb719 unchanged. Passing results remain valid. No physical state change.
+D17/#479: Beast Windows primary ingest waits5s for relay reply, TimeoutError; job103664365464, run34734869036. Product/harness/host cause unresolved. Same5e Linux full-suite cases pass0.304/0.277s; do not infer a Windows repair. D18/#480: Beast Linux ICSE demo joins successfully then fails before capability/discovery stage04; original detailed RuntimeError omitted from uploaded evidence. D19/#481: six cancelled release/F85 jobs explicitly annotated GitHub Actions internal error, infrastructure not product. Original logs, exact commands, state invariants and issue links are in diagnostics/D17.md,D18.md,D19.md and blocker table.
 
-All13 unchanged workflows were manually dispatched once at5e6f184311019b9982e8544a18f3dc02c1b16e98 between03:10:38 and03:11:41UTC. Each accepted dispatch was committed/pushed individually. Receipt diagnostics/pr475-exact-head-dispatch.json; plan [PR475_EXACT_HEAD_QUALIFICATION_RECONCILIATION.md](PR475_EXACT_HEAD_QUALIFICATION_RECONCILIATION.md). Four initial jobs running: CF7 harness on Beast Windows/Nettking Linux and Phase2 on Nettking Windows/Beast Linux, with setup/tests progressing. Other jobs queued normally; no failure at startup. Full API snapshot diagnostics/pr475-exact-head-startup.json. Native checkout logs await completion; do not claim exact-head PASS from API metadata alone.
+D19 controlled F85-only failed-job retry now run34734864966 attempt2; new Windows103671816139 started04:20:43UTC on Nettking, successful Linux job reused with original03:24:41-03:26:47 timestamps. Receipt diagnostics/D19-f85-retry-startup.json. NO ordinary F85 poll before2026-09-13T05:14:00UTC unless actual terminal event arrives. Release retry held pending D17/D18 triage, preserving seven successful release jobs and classified cancellations. No blanket rerun.
 
-NEXT HIGHEST VALUE ACTION: no ordinary qualification polling before2026-09-13T04:01:37UTC, unless a real terminal event/user completion message arrives sooner. At the intervening30-minute heartbeat, return minimal quiet no-action status from this checkpoint without job/runner/log queries. At due time inspect only these13 run IDs, retain newly completed native5e logs/artifacts and classify failures before any mutation. Never redispatch existing runs or rerun passing jobs. Existing script dispatch_pr475_exact_head_gaps.py guards duplicate dispatches; it is not the polling command.
+NEXT HIGHEST VALUE ACTION: execute one bounded D18 original-host error capture under [D18_BOUNDED_NETWORK_DIAGNOSTIC_PLAN.md](D18_BOUNDED_NETWORK_DIAGNOSTIC_PLAN.md). Retain original error classification if still available; otherwise run unchanged same5e network demo once with safe external failure retention. Do not count this as qualification or repeat a non-reproduction. Then update issue480/coordination before further work. No optional D14-D16 repetitions, no new sweep, no AQG diagnosis.
 
-| Workflow | Native exact-head run | Startup |
-|---|---:|---|
-|cf7-acceptance-harness.yml|34734837531|in_progress|
-|phase2-federation.yml|34734841137|in_progress|
-|cf7b-product-physical-acceptance.yml|34734843741|queued|
-|product-branding.yml|34734846378|queued|
-|federation-software-update.yml|34734849699|queued|
-|cf7c-physical-test-readiness.yml|34734853505|queued|
-|icse-tool-demo.yml|34734857086|queued|
-|cf8-role-retirement.yml|34734861054|queued|
-|phase-f85-operator-federation-surface.yml|34734864966|queued|
-|federation-v1-release.yml|34734869036|queued|
-|ci-test-sharding.yml|34734873183|queued|
-|cfi2-onboarding-composition.yml|34734876309|queued|
-|release-image-metadata.yml|34734879810|queued|
-
-Previous automatic source qualification is preserved: all27 checks green, release34707260030 attempt2 16/16 green. Actual automatic native checkouta5e743fee24e27bfd8d6d4f57c8efd589c6c3a42 has identical tree1c671f446fa215c99a6a58a155806de394aa569a to PRhead5e; results remain attributed to a5e. Linux4460PASS40skips and Windows297PASS1skip. Ten original passing release jobs retained. Six new native logs/two digest-verified raw JUnit ZIPs in diagnostics/pr475-release-attempt2-native-evidence.zip. Exact-head dispatch reason is source/absent gate coverage in the standing product-fix37+3 scope, not timer cadence, red-check cleanup or repeated optional diagnosis.
-
-PR475/PR473 remain draft/unchanged5e6f1843 and440123f6bc6dc358eef3d233236bc14f91af60e0; mainb7194820d8f1940ae60b8c9639e09b7f61e65c55. No merge/intermediate main qualification/candidate freeze. Last fully qualified17ab3a05(37+3) and PR468/473 native replacement proofs untouched. Qualify final actual merged main once after intended fix/cleanup set completes.
-
-D13 exact two-file repair review found no new actionable correctness issue; external reviews empty. D11/D14/D15/D16 original failures and later native passes remain recorded without root-cause closure; issues476/477/478 and PR475 updated. Branch-policy read403 is unavailable evidence, not permission to bypass requirements. AQG deliberately off/not queried/not a dependency; its optional diagnosis stays cancelled. No new sweep or short-context repetitions. Existing runner accounts/labels/pools unchanged. Runtime9b286f93 and protected Recorder data untouched; no physical PASS/P07/P12. Coordination-only workflows/scripts never enter candidate branches. Existing automation ACTIVE every30minutes, minimal when unchanged.
+Preserve automatic a5e-source27/27 and release16/16, last fully qualified17ab3a05(37+3), and PR468/473 native replacement proofs. D11/D14/D15/D16 historical mechanisms remain recorded. No merge/freeze without exact-source qualification/relevant correctness disposition; no branch-rule bypass after policy API403. Physical runtime9b286f93, protected Recorder data and P07/P12 untouched. Existing runner labels/accounts/pools unchanged. Coordination-only files never enter candidates. Automation ACTIVE every30minutes, minimal when unchanged.
 
 Current user direction, September 11 2026: execute on state changes, using this
 checkpoint and the completed diagnostic sweep report; do not repeat the sweep.

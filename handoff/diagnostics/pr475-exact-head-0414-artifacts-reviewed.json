@@ -1,0 +1,139 @@
+{
+  "recorded_at_utc": "2026-09-13T04:23:42.417396+00:00",
+  "source_commit": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "native_passes_verified": 28,
+  "required_passes": 25,
+  "companions": 3,
+  "review": [
+    {
+      "artifact_id": 10311310313,
+      "artifact_name": "windows-regression-capability-product",
+      "xml": "windows-capability-product.xml",
+      "suites": [
+        {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "0",
+          "skipped": "5",
+          "tests": "895",
+          "time": "213.650",
+          "timestamp": "2026-09-13T05:33:02.384581+02:00",
+          "hostname": "Nettking"
+        }
+      ],
+      "D17": []
+    },
+    {
+      "artifact_id": 10311201452,
+      "artifact_name": "linux-regression-shard-0",
+      "xml": "junit-0.xml",
+      "suites": [
+        {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "0",
+          "skipped": "19",
+          "tests": "1125",
+          "time": "165.411",
+          "timestamp": "2026-09-13T05:27:27.182240+02:00",
+          "hostname": "Nettking"
+        }
+      ],
+      "D17": []
+    },
+    {
+      "artifact_id": 10311122504,
+      "artifact_name": "full-suite-order-rotating",
+      "xml": "order-rotating.xml",
+      "suites": [
+        {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "0",
+          "skipped": "40",
+          "tests": "4500",
+          "time": "547.881",
+          "timestamp": "2026-09-13T05:32:16.595901+02:00",
+          "hostname": "Nettking"
+        }
+      ],
+      "D17": [
+        {
+          "name": "test_storage_node_serves_primary_ingest_over_relay_and_restarts",
+          "class": "catalog.node.tests.test_storage_agent",
+          "seconds": "0.277",
+          "outcome": "passed"
+        }
+      ]
+    },
+    {
+      "artifact_id": 10311061602,
+      "artifact_name": "full-suite-order-fixed",
+      "xml": "order-fixed.xml",
+      "suites": [
+        {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "0",
+          "skipped": "40",
+          "tests": "4500",
+          "time": "540.545",
+          "timestamp": "2026-09-13T05:15:28.508519+02:00",
+          "hostname": "Nettking"
+        }
+      ],
+      "D17": [
+        {
+          "name": "test_storage_node_serves_primary_ingest_over_relay_and_restarts",
+          "class": "catalog.node.tests.test_storage_agent",
+          "seconds": "0.304",
+          "outcome": "passed"
+        }
+      ]
+    },
+    {
+      "artifact_id": 10310852667,
+      "artifact_name": "windows-regression-transport-storage",
+      "xml": "windows-transport-storage.xml",
+      "suites": [
+        {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "1",
+          "skipped": "1",
+          "tests": "371",
+          "time": "116.020",
+          "timestamp": "2026-09-13T05:32:54.289349+02:00",
+          "hostname": "Beast"
+        }
+      ],
+      "D17": [
+        {
+          "name": "test_storage_node_serves_primary_ingest_over_relay_and_restarts",
+          "class": "catalog.node.tests.test_storage_agent",
+          "seconds": "22.525",
+          "outcome": "failure"
+        }
+      ]
+    },
+    {
+      "artifact_id": 10310448877,
+      "artifact_name": "windows-regression-journal-artifacts",
+      "xml": "windows-journal-artifacts.xml",
+      "suites": [
+        {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "0",
+          "skipped": "1",
+          "tests": "298",
+          "time": "358.531",
+          "timestamp": "2026-09-13T05:18:06.683845+02:00",
+          "hostname": "Nettking"
+        }
+      ],
+      "D17": []
+    }
+  ],
+  "physical_acceptance": "No evidence or PASS"
+}
