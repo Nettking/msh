@@ -1,0 +1,19 @@
+{
+  "source_commit": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+  "retained_at": "2026-09-13T08:04:02.807900+00:00",
+  "records": [
+    {
+      "job_id": 103695663272,
+      "run_id": 34746641274,
+      "name": "product-branding",
+      "runner_name": "Beast-Linux-WSL",
+      "conclusion": "success",
+      "bytes": 11865,
+      "sha256": "2e3790bfdeb9a54afeaa827fe8705993a4e9f630791964a443546bc107be1b2e",
+      "checkout_commits": [
+        "f104038a2b77705adaa547cdd1df7d895bf80a41"
+      ],
+      "checkout_matches": true
+    }
+  ]
+}
