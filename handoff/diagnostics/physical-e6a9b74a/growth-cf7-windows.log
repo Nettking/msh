@@ -1,0 +1,11 @@
+........................................................................ [ 32%]
+........................................................................ [ 64%]
+........................................................................ [ 96%]
+........                                                                 [100%]
+============================== warnings summary ===============================
+catalog/federation/tests/cf7_acceptance/test_product_acceptance.py::test_fresh_product_flow_finishes_restarts_and_reruns_expired_evidence
+  <acceptance-harness>\catalog\orchestrator\pipeline.py:291: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    return datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+224 passed, 1 warning in 59.82s

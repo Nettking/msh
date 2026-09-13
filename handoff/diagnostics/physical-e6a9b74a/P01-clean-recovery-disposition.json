@@ -1,0 +1,89 @@
+{
+  "candidate": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+  "classification": "deterministic harness defect",
+  "recovery_completed": true,
+  "completed_activations": 3,
+  "three_activations_verdict": "pass",
+  "growth_verdict": "fail",
+  "same_native_backing_resource_verified": true,
+  "actual_unique_volume_delta_bytes": 41558016,
+  "incorrect_summed_delta_bytes": 83116032,
+  "elapsed_seconds": 215.61801,
+  "unique_volume_growth_bytes_per_hour": 693860673,
+  "unchanged_ceiling_bytes_per_hour": 1073741824,
+  "images_stable_across_all_activations": true,
+  "docker_totals_stable": true,
+  "physical_pass": false,
+  "old_packets_rewritten": false,
+  "disposition": "Repair identity-based sampling and growth aggregation in independently pinned acceptance harness; preserve product freeze and old failures. Require fresh measurements, not a retroactive PASS.",
+  "packets": [
+    {
+      "name": "20260913T120841522458Z-sample-caf1df90.json",
+      "sha256": "c56e1a09e3a7cb16d9a833010e800a48500185bd2f63ea331c667bbf5731c0c4",
+      "recorded_at": "2026-09-13T12:08:34.302316Z",
+      "resources": {
+        "data": {
+          "free_bytes": 99540811776,
+          "total_bytes": 2047048937472,
+          "used_bytes": 1947508125696
+        },
+        "results": {
+          "free_bytes": 99540811776,
+          "total_bytes": 2047048937472,
+          "used_bytes": 1947508125696
+        }
+      }
+    },
+    {
+      "name": "20260913T120957543102Z-sample-627cdaa8.json",
+      "sha256": "0a27995c7e60d6d16326a0887c712a48f984f96d1d883950b30911982a0e7f8a",
+      "recorded_at": "2026-09-13T12:09:52.035323Z",
+      "resources": {
+        "data": {
+          "free_bytes": 99541565440,
+          "total_bytes": 2047048937472,
+          "used_bytes": 1947507372032
+        },
+        "results": {
+          "free_bytes": 99541565440,
+          "total_bytes": 2047048937472,
+          "used_bytes": 1947507372032
+        }
+      }
+    },
+    {
+      "name": "20260913T121107753069Z-sample-4449600e.json",
+      "sha256": "420ed035d5200f85a166a3d63d150105854c0cf8021494439f8f3d2e7b4bbafd",
+      "recorded_at": "2026-09-13T12:11:00.688618Z",
+      "resources": {
+        "data": {
+          "free_bytes": 99505278976,
+          "total_bytes": 2047048937472,
+          "used_bytes": 1947543658496
+        },
+        "results": {
+          "free_bytes": 99505278976,
+          "total_bytes": 2047048937472,
+          "used_bytes": 1947543658496
+        }
+      }
+    },
+    {
+      "name": "20260913T121216137510Z-sample-d07e492c.json",
+      "sha256": "516215e8fd2d62c6c49a77efd96365668e90312af426a376d3df916aade51e01",
+      "recorded_at": "2026-09-13T12:12:09.920326Z",
+      "resources": {
+        "data": {
+          "free_bytes": 99499253760,
+          "total_bytes": 2047048937472,
+          "used_bytes": 1947549683712
+        },
+        "results": {
+          "free_bytes": 99499253760,
+          "total_bytes": 2047048937472,
+          "used_bytes": 1947549683712
+        }
+      }
+    }
+  ]
+}

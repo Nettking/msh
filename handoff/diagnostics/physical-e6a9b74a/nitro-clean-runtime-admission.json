@@ -1,0 +1,42 @@
+{
+  "activation": {
+    "candidate": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+    "status": "COMPLETED",
+    "started_at": "2026-09-13T12:11:56.505260+00:00",
+    "purpose": "One clean runtime admission recovery with existing owned builder",
+    "physical_pass": false,
+    "exit_code": 0,
+    "finished_at": "2026-09-13T12:15:35.456562+00:00"
+  },
+  "startup.private.log": {
+    "sha256": "39bae8c238bd00862f5f1295236c32efaef5767fa35a8c38a47b4d3066895076",
+    "bytes": 7787
+  },
+  "wrapper.private.log": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "services": [
+    {
+      "service": "flask",
+      "running": true,
+      "commit": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+      "image": "sha256:a8383bc143cf480853f7d25c3a53c377889185384503f79c2653408a24d0c8df",
+      "harness_inputs_absent": true
+    },
+    {
+      "service": "relay",
+      "running": true,
+      "commit": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+      "image": "sha256:e66a5c817e369fbbaf6bed28db1bc9208846e80448e147625a575f030ae3994f",
+      "harness_inputs_absent": true
+    },
+    {
+      "service": "recorder",
+      "running": true,
+      "commit": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+      "image": "sha256:8d2f340195768179fddd915d24436581fe3971e93d9feab474aae98ba0178cc0",
+      "harness_inputs_absent": true
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "acceptance_harness_sha": "501b528e9476878e6a6fe5cde8240b2d54b1d263",
+  "product_candidate_sha": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+  "pre_repair": {
+    "source": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+    "initial_focused_cases": 22,
+    "failed": 22,
+    "evidence": "Native pytest output in release task; no physical packets altered"
+  },
+  "post_repair": {
+    "windows_cf7": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "224",
+      "time": "59.662",
+      "timestamp": "2026-09-13T14:22:11.706272+02:00",
+      "hostname": "Nettking"
+    },
+    "linux_focused": {
+      "acceptance_harness_sha": "501b528e9476878e6a6fe5cde8240b2d54b1d263",
+      "native_python": "Python 3.12.13",
+      "exit_code": 0,
+      "log_sha256": "b3566aa6ad1221e6bbb908cd2a4c66821a17095053a77c2d75f1eb67df0a7321",
+      "summary": "23 passed in 0.43s",
+      "physical_pass": false
+    },
+    "ruff": "PASS",
+    "diff_hygiene": "PASS"
+  },
+  "physical_pass": false,
+  "ceilings_changed": false,
+  "old_packets_rewritten": false,
+  "frozen_product_changed": false
+}
