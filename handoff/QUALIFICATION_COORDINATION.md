@@ -1,50 +1,43 @@
 # Federation v1 current release checkpoint
 
-Updated 2026-09-13T10:23Z. Active context: clean handoff + this file + live GitHub.
-Historical coordination/plans are evidence only; see handoff/archive when needed.
+Updated 2026-09-13T10:28Z. Active context: clean handoff + this file + live GitHub.
+Historical plans are evidence only; use handoff/archive only for a current requirement.
 
 ## Current source / heads
-- Qualified combined source: f104038a2b77705adaa547cdd1df7d895bf80a41.
-- PR483 head06b956787ae63215982d5afd7198dead366e05ea, stacked on PR475.
-- PR475 head5e6f184311019b9982e8544a18f3dc02c1b16e98, targets main.
-- PR473 head440123f6bc6dc358eef3d233236bc14f91af60e0, CI retirement.
-- Main b7194820d8f1940ae60b8c9639e09b7f61e65c55. No release merge/deployment yet.
-- f104 and PR483 head share tree ff5af295717f6dc9dc90cea399e2d5901c38935d.
-  Results retain actual f104 identity; no native06/5e/final-main relabelling.
+- Actual resulting main:e6a9b74a1d555609eed6bf40c800e1258f1c9077.
+- Merged in order:PR475 -> a039061e; PR483 ->02a90d3b; PR473 ->e6a9b74a.
+- Actual main tree cc9b29515d47d754f24199bf403213e7ff111315 matches the reviewed
+  offline combination; all three reviewed PR heads are ancestors. No deployment.
+- Clean detached checkout:C:/wsl/fcp-v1-e6a9b74a-main-20260913.
+- Main qualification is next. AUTHORITATIVE_SHA is not frozen yet.
 
-## Green gates
-- f104 native required qualification COMPLETE:37/37 plus3/3 companions.
-- Release16/16; Phase2, CF7-A/B/C, update, branding, CF8, F8.5, sharding,
-  CFI2 and registry PASS. ICSE native4/4 including retained original Compose.
-- ICSE Windows/Linux network10/10 each; exact-source publication bundle verified.
-- Evidence: diagnostics/f104-final-qualification/qualification.json,
-  artifact-review.json, native-review.json and retained native archives.
-- Preserve every valid green result; no further f104 execution is needed.
+## Green gates / retained evidence
+- Prior combined f104038a native37/37 required plus3/3 companions PASS.
+- ICSE Windows/Linux10/10, retained Compose and exact-source publication verified.
+- Evidence:diagnostics/f104-final-qualification/qualification.json and archives.
+- Those results retain f104 identity and are not final-main qualification.
+- Source release notes are finalized; no source edit needed merely for publication.
 
 ## Actual blockers / disposition
-- No demonstrated remaining candidate defect. Original Windows bootstrap and Linux
-  reconnect observations remain unresolved but non-demonstrated candidate defects.
-  No common mechanism proven; no speculative product repair or new diagnostic.
-- ICSE run34746641262 API metadata is inconsistent: attempt2 says queued/no jobs;
-  latest native jobs are attempt3 and all pass. Run aggregate still says failure.
-  Native logs/source/publication prove recovery completed09:55UTC. Do not poll the
-  empty attempt2 endpoint or retry green jobs to change metadata. Receipt retains
-  the discrepancy; normal merge API must enforce repository policy without bypass.
-- Branch-rule reads403 mean unknown policy, not absence of rules. No external
-  review approval is claimed. Await an actual server rejection before inferring
-  a merge permission/check blocker.
+- No demonstrated remaining candidate defect. Original Windows bootstrap/Linux
+  reconnect observations remain unresolved but non-demonstrated candidate defects;
+  both native recoveries passed unchanged. No common mechanism proven.
+- Prior ICSE run34746641262 metadata disagreed with completed native attempt3 jobs.
+  Native proof is retained; do not revisit empty attempt2 or retry passing work.
+- Normal expected-head GitHub APIs accepted all merges; no policy bypass used.
 
 ## Active work / next action
-1. Persist final f104 proof, update PR validation, then guarded merges:475 before483;
-   retarget483 to main after475. Merge separate473 after applicable review.
-2. Prepared expected combined tree cc9b29515d47d754f24199bf403213e7ff111315;
-   offline merge-tree was clean. This is not an authoritative commit.
-3. Qualify actual resulting main once, reusing automatic runs on that exact SHA
-   and dispatching only absent gates; never qualify intermediate main.
-4. Freeze one authoritative SHA, checked-in revalidation, fresh physical P01-P12.
-   Preparation: diagnostics/next_release_merge_sequence.md; no physical action yet.
-- One active owner is this fresh task. Existing30-minute heartbeat targets it;
-  older task stopped. Keep the checkpoint compact and evidence separate.
+1. Qualify actual main e6a9b74a once. Reuse automatic exact-source release34751832493,
+   update34751832430, branding34751832432. Dispatch only ten absent workflows.
+   Dispatcher/receipts:diagnostics/dispatch_actual_main_e6a9b74a.py and
+   diagnostics/main-e6a9b74a-qualification-dispatch.json. Inspect existing receipt
+   and live runs before any repeated request, especially after uncertain responses.
+2. Retain completed native checks/artifacts on actual main; classify new failures
+   before action. Never qualify intermediate main or repeat valid green results.
+3. After required main qualification, freeze one authoritative SHA, run checked-in
+   revalidation and scenario side-effect review, then fresh physical P01-P12.
+- One active owner is this fresh task; existing30-minute heartbeat targets it.
+- Merge receipts:diagnostics/release-merge-475.json,-483.json,-473.json.
 
 ## Immutable safety constraints
 - Never weaken assertions, quorum/authority, deadlines, security or acceptance.
