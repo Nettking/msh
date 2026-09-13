@@ -1,0 +1,47 @@
+{
+  "status": "PRESSURE_ENVIRONMENT_PREPARED_EMPTY",
+  "updated_at": "2026-09-13T19:54:53.104968+00:00",
+  "candidate_binding": "PREPARATION_ONLY_AWAIT_NEW_ROOT_FREEZE",
+  "physical_assertions_run": false,
+  "candidate_images_loaded": false,
+  "protected_recorder_data_accessed": false,
+  "reserved_backing_bytes": 47244640256,
+  "outer_free_bytes": 56517603328,
+  "minimum_outer_free_bytes": 42949672960,
+  "owned_daemons": {
+    "processes": {
+      "supervisor_pid": 1380301,
+      "containerd_pid": 1380312,
+      "dockerd_pid": 1380362
+    },
+    "private_net_namespace": "net:[4026534202]",
+    "docker_root": "/mnt/fcp-v1-pressure-20260913/engine/docker",
+    "containerd_root": "/mnt/fcp-v1-pressure-20260913/engine/owned-containerd/root",
+    "containerd_state": "/mnt/fcp-v1-pressure-20260913/engine/owned-containerd/state",
+    "daemon_socket": "/mnt/fcp-v1-pressure-20260913/engine/docker.sock",
+    "containerd_socket": "/mnt/fcp-v1-pressure-20260913/engine/owned-containerd/state/containerd.sock",
+    "temp_environment": {
+      "containerd_pid": {
+        "TMPDIR": "/mnt/fcp-v1-pressure-20260913/engine/owned-containerd/tmp",
+        "DOCKER_TMPDIR": null
+      },
+      "dockerd_pid": {
+        "TMPDIR": "/mnt/fcp-v1-pressure-20260913/engine/docker-tmp",
+        "DOCKER_TMPDIR": "/mnt/fcp-v1-pressure-20260913/engine/docker-tmp"
+      }
+    },
+    "image_count": 0,
+    "container_count": 0
+  },
+  "operational_proof": {
+    "windows_backend_pids_unchanged": true,
+    "owned_windows_core_containers_without_start_or_restart_during_preparation": true,
+    "owned_windows_core_count": 6,
+    "wsl_original_daemon_container_inventory_unchanged": true
+  },
+  "setup_refusals_retained": [
+    "Automatic selection of global containerd detected; empty new dockerd stopped and explicit owned containerd configured.",
+    "Ubuntu retains its default empty import glob; effective owned roots and zero matching global imports verified before startup."
+  ],
+  "private_status_sha256": "8b2289fad0a7da7b65d20fbc373430a73155fcf29944b16544d967db33f543b0"
+}

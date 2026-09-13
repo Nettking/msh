@@ -1,0 +1,58 @@
+{
+  "validated_at": "2026-09-13T19:50:35.720274+00:00",
+  "source": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+  "branch": "76ad339f1631e136bba7a8a85973bddb1650d570",
+  "tree": "c61eb8e838e8c3d44628af8909da4ed8ed347acf",
+  "classification": "deterministic CI artifact-selection defect, not a product defect",
+  "cause": "Pinned download-artifact d3f86a106a0bac45b974a628896c90dbdf5c8093 filterLatest sorts descending numeric artifact ID. Earlier failed Linux artifact10324271911 has a larger ID than later passing10323944077, so the publication job selects the failed first attempt.",
+  "first_failed_artifact": {
+    "id": 10324271911,
+    "created_at": "2026-09-13T19:21:54Z",
+    "sha256": "de8a06ddce3ffc49fe6f8a1fc75d0fbc6d2d107c8b883d4659c194ac03cb4d62"
+  },
+  "pinned_action_dist_sha256": "02c2cf24c5b60ae4b3f8d71d3cc85e2e6433dbdf106a38fee7ec3f1c96e2d18e",
+  "failed_publication_job": 103780468967,
+  "failed_publication_log_sha256": "f632595807a91bd93b29bf149549818a4a5b7647e06b93a4c25885181ba86dc9",
+  "artifact_inputs": [
+    {
+      "id": 10323708214,
+      "name": "icse-summary-Linux",
+      "sha256": "7b34ccdad66f9a55b9a9ac081b3de69b74847984415a6564c4aca568187fac02",
+      "created_at": "2026-09-13T19:37:57Z"
+    },
+    {
+      "id": 10323249153,
+      "name": "icse-summary-Windows",
+      "sha256": "3b9d5cb3fbf61155aa7da1f504ed7011a3fcd0d26d4c534fade5f2f31d40c268",
+      "created_at": "2026-09-13T19:30:47Z"
+    },
+    {
+      "id": 10324203251,
+      "name": "icse-summary-compose",
+      "sha256": "5dffd940bbed9cf8b1136050927543277604128f24a6a48dd2812508b4791017",
+      "created_at": "2026-09-13T19:36:24Z"
+    },
+    {
+      "id": 10323944077,
+      "name": "icse-network-summary-Linux",
+      "sha256": "d2851454a5efab2347f497775ca853e03424ebdc5d9546ac9d4426794af60de0",
+      "created_at": "2026-09-13T19:38:22Z"
+    },
+    {
+      "id": 10324068207,
+      "name": "icse-network-summary-Windows",
+      "sha256": "059cdd15604e133776101ca9b9d84bddf42586990cd4287d9940b410784cdd37",
+      "created_at": "2026-09-13T19:31:32Z"
+    }
+  ],
+  "unmodified_bundler_exit": 0,
+  "all_source_files_equal_exact_git_archive": true,
+  "source_file_count": 1411,
+  "local_bundle_sha256": "daa4722e90f333a5b1a29c68918864f66091d6221ce6fb41039c49384320b9a9",
+  "local_bundle_bytes": 4511171,
+  "ci_publication_verdict": "FAIL_RETAINED",
+  "physical_acceptance": "NOT_EVALUATED",
+  "canonical_publication_archive": false,
+  "remote_artifacts_deleted_or_changed": false,
+  "scope": "Exact-source local packaging proof only. Tag-triggered canonical paper artifact still requires its own successful CI publication per demo/icse/RELEASE.md. No new demonstration or CI cleanup source change."
+}

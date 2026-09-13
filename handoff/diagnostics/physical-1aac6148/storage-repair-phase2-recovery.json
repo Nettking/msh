@@ -1,0 +1,13 @@
+{
+  "source": "76ad339f1631e136bba7a8a85973bddb1650d570",
+  "run_id": 34777608170,
+  "original_attempt": 1,
+  "requested_at": "2026-09-13T19:48:05.983695+00:00",
+  "classification": "infrastructure/host/transient timing issue; no demonstrated candidate defect",
+  "observation": "Initial recorder enrollment/auth receive exceeds unchanged 3-second test deadline before scan publication. Same test passed in two independent equal-tree release executions in 0.090 and 0.344 seconds.",
+  "first_failure_log_sha256": "73b3fff98482725fa77a3c46305b92d97843f2280b604e8bc22bb043c75a031b",
+  "cross_proof": "storage-reply-repair-pr487-audit.json",
+  "scope": "Failed Linux job only; retain successful Windows, no source/deadline/runner change.",
+  "status": "accepted",
+  "response": {}
+}

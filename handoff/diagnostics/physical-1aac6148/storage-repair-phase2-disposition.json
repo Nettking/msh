@@ -1,0 +1,77 @@
+{
+  "reviewed_at": "2026-09-13T19:56:39.839459+00:00",
+  "branch_source": "76ad339f1631e136bba7a8a85973bddb1650d570",
+  "passing_native_source": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+  "equal_tree": "c61eb8e838e8c3d44628af8909da4ed8ed347acf",
+  "run_id": 34777608170,
+  "recovery_count": 1,
+  "github_workflow_verdict": "FAIL_RETAINED",
+  "classification": "unresolved timing observations; no demonstrated candidate defect",
+  "first": {
+    "job_id": 103778479160,
+    "test": "test_a_bounded_scan_report_publishes_over_a_real_relay",
+    "stage": "Initial recorder enrollment/auth reply, before scan publication",
+    "timeout_seconds": 3
+  },
+  "recovery": {
+    "job_id": 103781857426,
+    "test": "test_f2_010_run_forever_reconnects_and_replays_without_duplicates",
+    "stage": "Initial owner.append_event fixture setup at test line403 before disconnect, replay, or relay failover",
+    "timeout_seconds": 3,
+    "log_sha256": "b815e14a6dfae971dbd5852cd54b3eb1eb58e82735f496d6105ba1dd4f1bac2b"
+  },
+  "common_evidence": {
+    "each_failed_invocation_other_tests_passed": 281,
+    "phase0_phase1_passed": 65,
+    "phase_d_e_passed": 253,
+    "windows": "PASS_RETAINED",
+    "changed_product_path_demonstrated": false
+  },
+  "same_current_tree_passing_proofs": [
+    {
+      "archive": "full-suite-order-fixed.zip",
+      "archive_sha256": "952512edea461ff7d109443b6a39527b6f5504027ff90b651561f5951a5e3fd3",
+      "member": "order-fixed.xml",
+      "testcase": {
+        "classname": "catalog.relay.tests.test_recorder_control_payload_filter",
+        "name": "test_a_bounded_scan_report_publishes_over_a_real_relay",
+        "time": "0.090"
+      },
+      "result": "PASS"
+    },
+    {
+      "archive": "full-suite-order-fixed.zip",
+      "archive_sha256": "952512edea461ff7d109443b6a39527b6f5504027ff90b651561f5951a5e3fd3",
+      "member": "order-fixed.xml",
+      "testcase": {
+        "classname": "catalog.relay.tests.test_phase2_integration",
+        "name": "test_f2_010_run_forever_reconnects_and_replays_without_duplicates",
+        "time": "1.281"
+      },
+      "result": "PASS"
+    },
+    {
+      "archive": "linux-regression-shard-2.zip",
+      "archive_sha256": "a1bedb401328a90c4284dc812db1b1fbfe8f31af2f3d543d63afe447670118c5",
+      "member": "junit-2.xml",
+      "testcase": {
+        "classname": "catalog.relay.tests.test_phase2_integration",
+        "name": "test_f2_010_run_forever_reconnects_and_replays_without_duplicates",
+        "time": "2.402"
+      },
+      "result": "PASS"
+    },
+    {
+      "archive": "linux-regression-shard-2.zip",
+      "archive_sha256": "a1bedb401328a90c4284dc812db1b1fbfe8f31af2f3d543d63afe447670118c5",
+      "member": "junit-2.xml",
+      "testcase": {
+        "classname": "catalog.relay.tests.test_recorder_control_payload_filter",
+        "name": "test_a_bounded_scan_report_publishes_over_a_real_relay",
+        "time": "0.344"
+      },
+      "result": "PASS"
+    }
+  ],
+  "next_action": "No third workflow attempt. Review current required release contract and reuse valid exact-source proof where permitted; no assertions, deadlines, runner labels, or product code changed."
+}

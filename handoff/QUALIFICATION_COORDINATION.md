@@ -1,6 +1,6 @@
 # Federation v1 current release checkpoint
 
-Updated 2026-09-13T19:38Z. Active context: clean handoff + this file + live GitHub.
+Updated 2026-09-13T20:01Z. Active context: clean handoff + this file + live GitHub.
 Historical coordination is evidence only; consult it for a concrete current need.
 
 ## Current source / heads
@@ -44,10 +44,15 @@ Historical coordination is evidence only; consult it for a concrete current need
   ec0bbd1d5ce45a97ddc10058bad38eea90f044b6. Equal treec61eb8e838e8c3d44628af8909da4ed8ed347acf.
   Storage-stage identity/generation repair: two production files,77 tests PASS.
   All13 qualification workflows present; automatic PR sourceec0, manual source76.
-  ICSE34777368640: Windows PASS; Linux announce timeout unresolved/non-demonstrated,
-  Compose missing parent snapshot is infrastructure. One failed-job recovery accepted;
-  receipt physical-1aac6148/storage-repair-icse-recovery.json. No blanket retry.
-  Phase2 Linux34777608170 failed; bounded log/source review active.
+  ICSE reviewer recovery PASS; Windows retained. Publication selected prior failed
+  Linux artifact by descending numeric ID (pinned third-party action defect).
+  Unmodified bundler PASS with explicit verified current-source passing IDs; all1411
+  source files match exact git archive. CI publication FAIL retained; no artifact
+  deletion/source change. See storage-repair-icse-publication-disposition.json.
+  Phase2 bounded recovery failed at a different initial setup operation; both tests
+  PASS twice in exact-source release jobs. No third attempt; contract review active.
+  Release13 jobs PASS; only rotating suite interrupted by confirmed AQG offline.
+  Cancel/recover only that job and dependent verdicts; unchanged pool, no AQG wait.
 - All required physical scenarios, CF7 and B01-B09 remain incomplete as a campaign.
   C evidence stays immutable. Checked-in P01-P12 schema has no cross-SHA carry mechanism;
   repaired main needs new freeze/revalidation and fresh physical observations.
@@ -73,9 +78,10 @@ Historical coordination is evidence only; consult it for a concrete current need
    cached model storage read-only, private test owner. Pairing now advertises its
    existing58796 tailnet relay binding; only Flask operator environment was activated.
    Candidate image/credentials/mounts/authority preserved; original runtimes separate.
-4. Guarded44GiB isolated WSL backing/daemon and Nitro SSHFS preparation authorized;
-   retain >=40GiB outer free. P06/P09 executors prepared only. Start P07 real1h/P12
-   real24h only on qualified C2 with strict
+4. Isolated44GiB backing and private daemon/containerd READY, no images/containers;
+   52.6GiB outer free (40GiB floor). SSHFS Windows SQLite preflight failed; scoped Nitro SMB helper
+   approved for transport preflight only. No backup quiescence or physical claim.
+   P06/P09/timed executors prepared only. Start P07 real1h/P12 real24h on C2 with strict
    single-run evidence. Final tag must equal the newly frozen accepted candidate.
 5. Windows harness/evidence/v1-physical is combined coordinator; original native roots
    retained. Mutable inputs/evidence/venvs remain outside runtime build contexts.

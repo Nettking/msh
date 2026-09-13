@@ -1,0 +1,130 @@
+{
+  "artifact": "FCP ICSE Tool Demonstration",
+  "artifact_version": "candidate",
+  "citation_file": "CITATION.cff",
+  "evidence": [
+    {
+      "execution": "compose",
+      "file": "evidence/compose.json",
+      "scenarios": [
+        "E1-selective-contribution",
+        "E2-authority-boundary",
+        "E3-runtime-eligibility",
+        "E4-ownership-boundary"
+      ],
+      "sha256": "0bc8c4c780da9a23a8c189cfbda6ac905978afd118300478d5819ba3934aa824",
+      "summary_schema": "fcp.icse-demo-summary.v1"
+    },
+    {
+      "execution": "Linux",
+      "file": "evidence/Linux.json",
+      "scenarios": [
+        "E1-selective-contribution",
+        "E2-authority-boundary",
+        "E3-runtime-eligibility",
+        "E4-ownership-boundary"
+      ],
+      "sha256": "0bc8c4c780da9a23a8c189cfbda6ac905978afd118300478d5819ba3934aa824",
+      "summary_schema": "fcp.icse-demo-summary.v1"
+    },
+    {
+      "execution": "Windows",
+      "file": "evidence/Windows.json",
+      "scenarios": [
+        "E1-selective-contribution",
+        "E2-authority-boundary",
+        "E3-runtime-eligibility",
+        "E4-ownership-boundary"
+      ],
+      "sha256": "e5bee8177187b3cb3fb1f5d927e05a42b432988391f831c76bab78ae0138ce02",
+      "summary_schema": "fcp.icse-demo-summary.v1"
+    }
+  ],
+  "license": {
+    "files": [
+      "LICENSE"
+    ],
+    "status": "declared"
+  },
+  "network_evidence": [
+    {
+      "checks": [
+        "independent_processes",
+        "authenticated_quorum_bootstrap",
+        "authenticated_enrollment_and_join",
+        "discovery_and_owner_authorization",
+        "authenticated_payload_delivery",
+        "automatic_quorum_failover_and_continuity",
+        "successor_reconnect_and_delivery",
+        "returning_leader_fenced",
+        "minority_mutation_refused",
+        "source_identity_unchanged"
+      ],
+      "execution": "Linux",
+      "files": [
+        {
+          "file": "network-evidence/Linux/summary.json",
+          "sha256": "98ee553ec0e84e08d4373be13fc8a867046c1ebbd2096adbfa3a13e89965f3c2"
+        },
+        {
+          "file": "network-evidence/Linux/events.jsonl",
+          "sha256": "5ffa9512289655421d5fef92ed271ec81e3086aa74dbeb3bef010b4c0d34178e"
+        },
+        {
+          "file": "network-evidence/Linux/operator-report.html",
+          "sha256": "820dad700365e785da21050f7b1094d62ca307dff42af8cb3f6afecfb3970c17"
+        }
+      ],
+      "source_revision": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "summary_schema": "fcp.icse-network-demo.v1"
+    },
+    {
+      "checks": [
+        "independent_processes",
+        "authenticated_quorum_bootstrap",
+        "authenticated_enrollment_and_join",
+        "discovery_and_owner_authorization",
+        "authenticated_payload_delivery",
+        "automatic_quorum_failover_and_continuity",
+        "successor_reconnect_and_delivery",
+        "returning_leader_fenced",
+        "minority_mutation_refused",
+        "source_identity_unchanged"
+      ],
+      "execution": "Windows",
+      "files": [
+        {
+          "file": "network-evidence/Windows/summary.json",
+          "sha256": "9ea06087bd678e73e2ce810d19f78d9a118817d3bfdd8db0ab4d4f75ccd0427b"
+        },
+        {
+          "file": "network-evidence/Windows/events.jsonl",
+          "sha256": "41e2e6ba99c52dbc3e29cfddd69b322420c52b7a28ae7ed0bf2bac4e40111b92"
+        },
+        {
+          "file": "network-evidence/Windows/operator-report.html",
+          "sha256": "cfdcf61db06c0aad13fdefb375d7a17a4cc08db557d3bee5036a3bc5b13e5e47"
+        }
+      ],
+      "source_revision": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "summary_schema": "fcp.icse-network-demo.v1"
+    }
+  ],
+  "publication_archive": {
+    "artifact_prefix": "fcp-icse-tool-demo-candidate/artifact/",
+    "file": "fcp-icse-tool-demo-candidate.zip",
+    "sha256_sidecar": "ZENODO_SHA256",
+    "source_prefix": "fcp-icse-tool-demo-candidate/source/"
+  },
+  "scenarios": [
+    "E1-selective-contribution",
+    "E2-authority-boundary",
+    "E3-runtime-eligibility",
+    "E4-ownership-boundary"
+  ],
+  "schema": "fcp.icse-artifact-manifest.v1",
+  "source_ref": "refs/pull/487/merge",
+  "source_revision": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+  "summary_schema": "fcp.icse-demo-summary.v1",
+  "workflow_run": "34777368640"
+}

@@ -1,0 +1,491 @@
+{
+  "reviewed_at": "2026-09-13T19:54:19.780985+00:00",
+  "source": "76ad339f1631e136bba7a8a85973bddb1650d570",
+  "merge_source": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+  "records": [
+    {
+      "workflow": "product-branding.yml",
+      "job_id": 103777829796,
+      "name": "product-branding",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "native_checkout_values": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "expected_present": true,
+      "log_sha256": "abccdf65725d0edbbb3c03d9c24b3c2e4f63a60f907c4b03eb985ef513946c3c",
+      "bytes": 11730
+    },
+    {
+      "workflow": "cf7b-product-physical-acceptance.yml",
+      "job_id": 103777830020,
+      "name": "acceptance (Linux, fcp-linux-fast, bash)",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "native_checkout_values": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "expected_present": true,
+      "log_sha256": "5887d67018d519935a387eb9734be2fdf11e303b1f04841dffb57b2e3db29415",
+      "bytes": 69071
+    },
+    {
+      "workflow": "cf7b-product-physical-acceptance.yml",
+      "job_id": 103777830168,
+      "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "native_checkout_values": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "expected_present": true,
+      "log_sha256": "1bdeaccd7b1e09797dd2c4c0b2369a3425a221dbbc9d19a3081ee810bf554ba8",
+      "bytes": 70327
+    },
+    {
+      "workflow": "phase-f85-operator-federation-surface.yml",
+      "job_id": 103777830027,
+      "name": "operator-surface (Linux, fcp-linux-fast, bash)",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "native_checkout_values": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "expected_present": true,
+      "log_sha256": "309a5e43744025eaffee8a2ba4634268d568b94c86de796363158dbcc0edecd0",
+      "bytes": 102723
+    },
+    {
+      "workflow": "phase-f85-operator-federation-surface.yml",
+      "job_id": 103777830170,
+      "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "native_checkout_values": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "expected_present": true,
+      "log_sha256": "5968702171a82aae7978ab4e1d07a601ce7e22b00652c9b006524fee1b71854e",
+      "bytes": 107023
+    },
+    {
+      "workflow": "cf8-role-retirement.yml",
+      "job_id": 103777829891,
+      "name": "role-retirement (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "native_checkout_values": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "expected_present": true,
+      "log_sha256": "f7c249333cfc4672e8911816ecddd2f9bb15a5eb4e0f9e399688fe52c54a14c3",
+      "bytes": 50092
+    },
+    {
+      "workflow": "cf8-role-retirement.yml",
+      "job_id": 103777829972,
+      "name": "role-retirement (Linux, fcp-linux-fast, bash)",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "native_checkout_values": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "expected_present": true,
+      "log_sha256": "b588cec7c0de72eb880de36bc511cd4bbc87644fc723b871c3375cf759159e5b",
+      "bytes": 48289
+    },
+    {
+      "workflow": "federation-v1-release.yml",
+      "job_id": 103777830556,
+      "name": "Full-suite order (fixed)",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "native_checkout_values": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "expected_present": true,
+      "log_sha256": "e5eeb6cd2d7c93a7279100042267a2235dfaa69e74530c831067300a789481b7",
+      "bytes": 67914
+    },
+    {
+      "workflow": "federation-v1-release.yml",
+      "job_id": 103777830570,
+      "name": "Windows regressions (transport-storage)",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "native_checkout_values": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "expected_present": true,
+      "log_sha256": "c59ea765d5e75f6f0198cbd37d1c821745e4663a2611d9ea0da69df6545a4e0f",
+      "bytes": 53343
+    },
+    {
+      "workflow": "federation-v1-release.yml",
+      "job_id": 103777830579,
+      "name": "PostgreSQL storage release check",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "native_checkout_values": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "expected_present": true,
+      "log_sha256": "73c6936a5cdeede1b331f8e79a6af811e318aca131243cfec32f4b8a87f44105",
+      "bytes": 45055
+    },
+    {
+      "workflow": "federation-v1-release.yml",
+      "job_id": 103777830628,
+      "name": "Windows regressions (journal-artifacts)",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "native_checkout_values": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "expected_present": true,
+      "log_sha256": "381824999ecb8c2edeeb479a96d0dafc41ffb93822d1b52e923ba174f8b9cc4b",
+      "bytes": 51638
+    },
+    {
+      "workflow": "federation-v1-release.yml",
+      "job_id": 103777830640,
+      "name": "Release checks (Windows)",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "native_checkout_values": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "expected_present": true,
+      "log_sha256": "663b236713f729a3bfb38ba0c1c886e0996a1070853a54fd50ee757ac9a85169",
+      "bytes": 55583
+    },
+    {
+      "workflow": "federation-v1-release.yml",
+      "job_id": 103777830641,
+      "name": "Linux regression shard (2)",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "native_checkout_values": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "expected_present": true,
+      "log_sha256": "1a3ff068f191742cf94e74f5da3815870bd67bc4eddb3440f0870c9542ef22f9",
+      "bytes": 57831
+    },
+    {
+      "workflow": "federation-v1-release.yml",
+      "job_id": 103777830645,
+      "name": "Release checks (Linux)",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "native_checkout_values": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "expected_present": true,
+      "log_sha256": "82f36f16de95de67a1cbc6d58fd4ccf7236beec75811461c5b0b6aa3b9fa3015",
+      "bytes": 56417
+    },
+    {
+      "workflow": "federation-v1-release.yml",
+      "job_id": 103777830664,
+      "name": "Linux regression shard (1)",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "native_checkout_values": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "expected_present": true,
+      "log_sha256": "ab0d94b6b3d7fdab242d1083849255a815cf14915d52dc8b94c0065b94b05b3b",
+      "bytes": 54222
+    },
+    {
+      "workflow": "federation-v1-release.yml",
+      "job_id": 103777830675,
+      "name": "Linux regression shard (0)",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "native_checkout_values": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "expected_present": true,
+      "log_sha256": "e80f727f9e3800f75709cbca255418b4e9c4aa2cee4a9e4e3520ea8558526fb3",
+      "bytes": 57318
+    },
+    {
+      "workflow": "federation-v1-release.yml",
+      "job_id": 103777830680,
+      "name": "Linux regression shard (3)",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "native_checkout_values": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "expected_present": true,
+      "log_sha256": "b65a5d7452b0a25dff676dcbad726d354847551df247134623d456d37b752b09",
+      "bytes": 66105
+    },
+    {
+      "workflow": "federation-v1-release.yml",
+      "job_id": 103777830701,
+      "name": "Windows regressions (capability-product)",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "native_checkout_values": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "expected_present": true,
+      "log_sha256": "ee9fa2a098daeea9756d23c6ecdbc85d0ce2b606debfe14ce81a6446b4ce88ce",
+      "bytes": 62503
+    },
+    {
+      "workflow": "federation-v1-release.yml",
+      "job_id": 103782555692,
+      "name": "Release matrix (Windows)",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "native_checkout_values": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "expected_present": true,
+      "log_sha256": "8192cab9cea949109748e830c5aca369efc2c10418bd4633ec409127b94fa8cc",
+      "bytes": 18869
+    },
+    {
+      "workflow": "federation-v1-release.yml",
+      "job_id": 103782555699,
+      "name": "Release matrix (Linux)",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "native_checkout_values": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "expected_present": true,
+      "log_sha256": "3c444941fe85286ef294b655a4baf56dec07483407189866dc4b60960190d43c",
+      "bytes": 15014
+    },
+    {
+      "workflow": "icse-tool-demo.yml",
+      "job_id": 103779921010,
+      "name": "reviewer-compose",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "native_checkout_values": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "expected_present": true,
+      "log_sha256": "3840941f530ee83ee66919d3e22a2de75bd6fc52ad7fe035c0271b007b04e00b",
+      "bytes": 27889
+    },
+    {
+      "workflow": "icse-tool-demo.yml",
+      "job_id": 103779921221,
+      "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "native_checkout_values": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "expected_present": true,
+      "log_sha256": "81903a077b214254965b47b7119101f7ae96b841c4d7d490ef68dfcdf6dfd803",
+      "bytes": 49194
+    },
+    {
+      "workflow": "icse-tool-demo.yml",
+      "job_id": 103779921740,
+      "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "native_checkout_values": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "expected_present": true,
+      "log_sha256": "9d5423d74b089bd6fd478aa5b0dd49a072fbc1ea6cb9846b4d024cfc252a5709",
+      "bytes": 53672
+    },
+    {
+      "workflow": "icse-tool-demo.yml",
+      "job_id": 103780468967,
+      "name": "publication-bundle",
+      "conclusion": "failure",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "native_checkout_values": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "expected_present": true,
+      "log_sha256": "f632595807a91bd93b29bf149549818a4a5b7647e06b93a4c25885181ba86dc9",
+      "bytes": 23241
+    },
+    {
+      "workflow": "federation-software-update.yml",
+      "job_id": 103777829886,
+      "name": "update-contracts (Linux, fcp-linux-fast, bash)",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "native_checkout_values": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "expected_present": true,
+      "log_sha256": "09576e2ba466c46201aca8cb077f31ad454bff8f989850ed930db6955e82cefc",
+      "bytes": 52139
+    },
+    {
+      "workflow": "federation-software-update.yml",
+      "job_id": 103777830021,
+      "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "native_checkout_values": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "expected_present": true,
+      "log_sha256": "de1a9b1940911057bdbf2ee892948066c523527e5a21d1f18ee6d472e99b5d32",
+      "bytes": 64881
+    },
+    {
+      "workflow": "cfi2-onboarding-composition.yml",
+      "job_id": 103777830057,
+      "name": "onboarding (Linux, fcp-test-linux, bash, 3.12.13)",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "native_checkout_values": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "expected_present": true,
+      "log_sha256": "62bd8e4917ea53ed66528f2a685d4185fd3242860c95dff0d1c2ec360d6cf1fe",
+      "bytes": 56709
+    },
+    {
+      "workflow": "cfi2-onboarding-composition.yml",
+      "job_id": 103777830235,
+      "name": "onboarding (Windows, fcp-test-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "native_checkout_values": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "expected_present": true,
+      "log_sha256": "0a06617f8e8a9cc2737d91e553ff54c492291c8ce1b74421ea51d6fcfafd1b34",
+      "bytes": 56635
+    },
+    {
+      "workflow": "cf7-acceptance-harness.yml",
+      "job_id": 103778466345,
+      "name": "harness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Byp...",
+      "conclusion": "success",
+      "expected_checkout": "76ad339f1631e136bba7a8a85973bddb1650d570",
+      "native_checkout_values": [
+        "76ad339f1631e136bba7a8a85973bddb1650d570"
+      ],
+      "expected_present": true,
+      "log_sha256": "ac5e3df812285dfa6bf04326b76f360f5f93ec33c64d84ca6c6a021aae1d283c",
+      "bytes": 62953
+    },
+    {
+      "workflow": "cf7-acceptance-harness.yml",
+      "job_id": 103778466494,
+      "name": "harness (Linux, fcp-linux-fast, bash)",
+      "conclusion": "success",
+      "expected_checkout": "76ad339f1631e136bba7a8a85973bddb1650d570",
+      "native_checkout_values": [
+        "76ad339f1631e136bba7a8a85973bddb1650d570"
+      ],
+      "expected_present": true,
+      "log_sha256": "4c7ef9daea77f7f925b173428d2a083f4bac11a568b4075d361405a82ebaa6d5",
+      "bytes": 62294
+    },
+    {
+      "workflow": "cf7c-physical-test-readiness.yml",
+      "job_id": 103778473147,
+      "name": "readiness (Linux, fcp-linux-fast, bash)",
+      "conclusion": "success",
+      "expected_checkout": "76ad339f1631e136bba7a8a85973bddb1650d570",
+      "native_checkout_values": [
+        "76ad339f1631e136bba7a8a85973bddb1650d570"
+      ],
+      "expected_present": true,
+      "log_sha256": "ab3fd6e66fd6e0be3b48dffe0c1d3843d1c43d132841095fb2d7c861dea9d8e2",
+      "bytes": 45259
+    },
+    {
+      "workflow": "cf7c-physical-test-readiness.yml",
+      "job_id": 103778473242,
+      "name": "readiness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy B...",
+      "conclusion": "success",
+      "expected_checkout": "76ad339f1631e136bba7a8a85973bddb1650d570",
+      "native_checkout_values": [
+        "76ad339f1631e136bba7a8a85973bddb1650d570"
+      ],
+      "expected_present": true,
+      "log_sha256": "f4fb2d72d1cf76bb03d7099894ba9d6946008a15516b57533a29cbe6c7bf46cf",
+      "bytes": 48972
+    },
+    {
+      "workflow": "phase2-federation.yml",
+      "job_id": 103781857426,
+      "name": "linux",
+      "conclusion": "failure",
+      "expected_checkout": "76ad339f1631e136bba7a8a85973bddb1650d570",
+      "native_checkout_values": [
+        "76ad339f1631e136bba7a8a85973bddb1650d570"
+      ],
+      "expected_present": true,
+      "log_sha256": "b815e14a6dfae971dbd5852cd54b3eb1eb58e82735f496d6105ba1dd4f1bac2b",
+      "bytes": 209212
+    },
+    {
+      "workflow": "phase2-federation.yml",
+      "job_id": 103781858036,
+      "name": "windows",
+      "conclusion": "success",
+      "expected_checkout": "76ad339f1631e136bba7a8a85973bddb1650d570",
+      "native_checkout_values": [
+        "76ad339f1631e136bba7a8a85973bddb1650d570"
+      ],
+      "expected_present": true,
+      "log_sha256": "76519b1696e79e9e3d1b9b6fba81c3729a67770f07a6ffe0708d2c1280b95175",
+      "bytes": 47519
+    },
+    {
+      "workflow": "ci-test-sharding.yml",
+      "job_id": 103778485229,
+      "name": "Shard contract (Linux, shared-pool)",
+      "conclusion": "success",
+      "expected_checkout": "76ad339f1631e136bba7a8a85973bddb1650d570",
+      "native_checkout_values": [
+        "76ad339f1631e136bba7a8a85973bddb1650d570"
+      ],
+      "expected_present": true,
+      "log_sha256": "17c502a4096210e6cd50eb772ffd819a0183559c7efe07f470a6bff13f7a2daf",
+      "bytes": 31696
+    },
+    {
+      "workflow": "ci-test-sharding.yml",
+      "job_id": 103778485419,
+      "name": "Shard contract (Windows, shared-pool)",
+      "conclusion": "success",
+      "expected_checkout": "76ad339f1631e136bba7a8a85973bddb1650d570",
+      "native_checkout_values": [
+        "76ad339f1631e136bba7a8a85973bddb1650d570"
+      ],
+      "expected_present": true,
+      "log_sha256": "d76321ccb4fac914296e534e6ae8ce89393937c14ee929d0feadd9d8cd9eab7a",
+      "bytes": 26216
+    },
+    {
+      "workflow": "release-image-metadata.yml",
+      "job_id": 103778491378,
+      "name": "Verify immutable release image metadata",
+      "conclusion": "success",
+      "expected_checkout": "76ad339f1631e136bba7a8a85973bddb1650d570",
+      "native_checkout_values": [
+        "76ad339f1631e136bba7a8a85973bddb1650d570"
+      ],
+      "expected_present": true,
+      "log_sha256": "b5882eacefaa20943621189d564742c354a1e04b424f96df1a15104d2f16cdde",
+      "bytes": 10742
+    }
+  ],
+  "native_proofs": 37,
+  "without_native_checkout": [],
+  "qualification_complete": false
+}

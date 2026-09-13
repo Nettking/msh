@@ -1,0 +1,1022 @@
+{
+  "schema": "fcp.pr-qualification-readonly-audit.v1",
+  "reviewed_at": "2026-09-13T19:42:54.152030+00:00",
+  "snapshot_at_approximately": "2026-09-13T19:38:30Z",
+  "pr": 487,
+  "branch_sha": "76ad339f1631e136bba7a8a85973bddb1650d570",
+  "merge_sha": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+  "equal_tree": "c61eb8e838e8c3d44628af8909da4ed8ed347acf",
+  "qualification_complete": false,
+  "scope": "Bounded completed-job native checkout and artifact audit; this snapshot does not authorize merge or physical PASS.",
+  "raw_directory_local_only": "C:/wsl/fcp-v1-1aac6148-main-20260913/.acceptance/pr487-qualification",
+  "phase2_first_failure": {
+    "job_id": 103778479160,
+    "run_id": 34777608170,
+    "nodeid": "catalog/relay/tests/test_recorder_control_payload_filter.py::test_a_bounded_scan_report_publishes_over_a_real_relay",
+    "failed_path": "_drive_scan_report line454 recorder.connect -> catalog/node/client.py line254 websocket.recv during initial enrollment/auth reply, before session creation or scan report publication",
+    "timeout_seconds": 3,
+    "outcome": "1 failed, 281 passed",
+    "classification": "unresolved but non-demonstrated candidate defect",
+    "same_tree_counterevidence": [
+      {
+        "artifact": "full-suite-order-fixed",
+        "case_result": "PASS",
+        "seconds": 0.09
+      },
+      {
+        "artifact": "linux-regression-shard-2",
+        "case_result": "PASS",
+        "seconds": 0.344
+      }
+    ],
+    "recommended_next_action": "One failed-job-only Phase2 recovery after workflow terminal; root owns disposition/dispatch. No deadline/assertion change."
+  },
+  "icse_retained_windows": {
+    "original_job": 103777830095,
+    "attempt2_record_job": 103779921740,
+    "decoded_logs_byte_identical": true,
+    "characters": 54268,
+    "native_started_at": "2026-09-13T19:28:06.4999597Z",
+    "native_finished_at": "2026-09-13T19:31:41.3244817Z",
+    "assessment": "API record copied into failed-job recovery; original successful Windows execution retained, not rerun."
+  },
+  "jobs": [
+    {
+      "job_id": 103777829796,
+      "workflow": "product-branding.yml",
+      "name": "product-branding",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "checkout_shas": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "checkout_verified": true,
+      "private_log": "job-103777829796.private.log",
+      "test_totals": [],
+      "log_sha256": "abccdf65725d0edbbb3c03d9c24b3c2e4f63a60f907c4b03eb985ef513946c3c"
+    },
+    {
+      "job_id": 103777830168,
+      "workflow": "cf7b-product-physical-acceptance.yml",
+      "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "checkout_shas": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "checkout_verified": true,
+      "private_log": "job-103777830168.private.log",
+      "test_totals": [
+        "2 passed, 1 warning in 29.84s",
+        "31 passed in 2.75s",
+        "8 passed in 1.20s",
+        "67 passed, 4 warnings in 44.72s",
+        "65 passed, 16 warnings in 7.33s",
+        "69 passed in 2.25s",
+        "93 passed in 3.53s"
+      ],
+      "log_sha256": "1bdeaccd7b1e09797dd2c4c0b2369a3425a221dbbc9d19a3081ee810bf554ba8"
+    },
+    {
+      "job_id": 103777830027,
+      "workflow": "phase-f85-operator-federation-surface.yml",
+      "name": "operator-surface (Linux, fcp-linux-fast, bash)",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "checkout_shas": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "checkout_verified": true,
+      "private_log": "job-103777830027.private.log",
+      "test_totals": [
+        "732 passed, 18 skipped, 44 warnings in 292.54s (0:04:52)"
+      ],
+      "log_sha256": "309a5e43744025eaffee8a2ba4634268d568b94c86de796363158dbcc0edecd0"
+    },
+    {
+      "job_id": 103777830170,
+      "workflow": "phase-f85-operator-federation-surface.yml",
+      "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "checkout_shas": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "checkout_verified": true,
+      "private_log": "job-103777830170.private.log",
+      "test_totals": [
+        "742 passed, 5 skipped, 44 warnings in 290.69s (0:04:50)",
+        "3 passed in 2.15s"
+      ],
+      "log_sha256": "5968702171a82aae7978ab4e1d07a601ce7e22b00652c9b006524fee1b71854e"
+    },
+    {
+      "job_id": 103777829891,
+      "workflow": "cf8-role-retirement.yml",
+      "name": "role-retirement (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "checkout_shas": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "checkout_verified": true,
+      "private_log": "job-103777829891.private.log",
+      "test_totals": [
+        "12 passed, 1 warning in 9.57s",
+        "50 passed, 4 warnings in 13.45s"
+      ],
+      "log_sha256": "f7c249333cfc4672e8911816ecddd2f9bb15a5eb4e0f9e399688fe52c54a14c3"
+    },
+    {
+      "job_id": 103777829972,
+      "workflow": "cf8-role-retirement.yml",
+      "name": "role-retirement (Linux, fcp-linux-fast, bash)",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "checkout_shas": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "checkout_verified": true,
+      "private_log": "job-103777829972.private.log",
+      "test_totals": [
+        "12 passed, 1 warning in 3.83s",
+        "50 passed, 4 warnings in 6.90s"
+      ],
+      "log_sha256": "b588cec7c0de72eb880de36bc511cd4bbc87644fc723b871c3375cf759159e5b"
+    },
+    {
+      "job_id": 103777830556,
+      "workflow": "federation-v1-release.yml",
+      "name": "Full-suite order (fixed)",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "checkout_shas": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "checkout_verified": true,
+      "private_log": "job-103777830556.private.log",
+      "test_totals": [
+        "4493 passed, 42 skipped, 453 warnings in 555.18s (0:09:15)"
+      ],
+      "log_sha256": "e5eeb6cd2d7c93a7279100042267a2235dfaa69e74530c831067300a789481b7"
+    },
+    {
+      "job_id": 103777830579,
+      "workflow": "federation-v1-release.yml",
+      "name": "PostgreSQL storage release check",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "checkout_shas": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "checkout_verified": true,
+      "private_log": "job-103777830579.private.log",
+      "test_totals": [
+        "11 passed in 0.86s"
+      ],
+      "log_sha256": "73c6936a5cdeede1b331f8e79a6af811e318aca131243cfec32f4b8a87f44105"
+    },
+    {
+      "job_id": 103777830641,
+      "workflow": "federation-v1-release.yml",
+      "name": "Linux regression shard (2)",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "checkout_shas": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "checkout_verified": true,
+      "private_log": "job-103777830641.private.log",
+      "test_totals": [
+        "1128 passed, 6 skipped, 3401 deselected, 263 warnings in 382.50s (0:06:22)"
+      ],
+      "log_sha256": "1a3ff068f191742cf94e74f5da3815870bd67bc4eddb3440f0870c9542ef22f9"
+    },
+    {
+      "job_id": 103777830095,
+      "workflow": "icse-tool-demo.yml",
+      "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "checkout_shas": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "checkout_verified": true,
+      "private_log": "job-103777830095.private.log",
+      "test_totals": [],
+      "log_sha256": "9d5423d74b089bd6fd478aa5b0dd49a072fbc1ea6cb9846b4d024cfc252a5709"
+    },
+    {
+      "job_id": 103777829886,
+      "workflow": "federation-software-update.yml",
+      "name": "update-contracts (Linux, fcp-linux-fast, bash)",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "checkout_shas": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "checkout_verified": true,
+      "private_log": "job-103777829886.private.log",
+      "test_totals": [
+        "312 passed, 4 skipped, 1 warning in 22.36s"
+      ],
+      "log_sha256": "09576e2ba466c46201aca8cb077f31ad454bff8f989850ed930db6955e82cefc"
+    },
+    {
+      "job_id": 103777830057,
+      "workflow": "cfi2-onboarding-composition.yml",
+      "name": "onboarding (Linux, fcp-test-linux, bash, 3.12.13)",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "checkout_shas": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "checkout_verified": true,
+      "private_log": "job-103777830057.private.log",
+      "test_totals": [
+        "123 passed, 1 warning in 36.30s"
+      ],
+      "log_sha256": "62bd8e4917ea53ed66528f2a685d4185fd3242860c95dff0d1c2ec360d6cf1fe"
+    },
+    {
+      "job_id": 103777830235,
+      "workflow": "cfi2-onboarding-composition.yml",
+      "name": "onboarding (Windows, fcp-test-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "checkout_shas": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "checkout_verified": true,
+      "private_log": "job-103777830235.private.log",
+      "test_totals": [
+        "123 passed, 1 warning in 43.47s"
+      ],
+      "log_sha256": "0a06617f8e8a9cc2737d91e553ff54c492291c8ce1b74421ea51d6fcfafd1b34"
+    },
+    {
+      "job_id": 103778473147,
+      "workflow": "cf7c-physical-test-readiness.yml",
+      "name": "readiness (Linux, fcp-linux-fast, bash)",
+      "conclusion": "success",
+      "expected_checkout": "76ad339f1631e136bba7a8a85973bddb1650d570",
+      "checkout_shas": [
+        "76ad339f1631e136bba7a8a85973bddb1650d570"
+      ],
+      "checkout_verified": true,
+      "private_log": "job-103778473147.private.log",
+      "test_totals": [
+        "29 passed in 0.16s",
+        "36 passed, 7 skipped, 2 warnings in 3.28s"
+      ],
+      "log_sha256": "ab3fd6e66fd6e0be3b48dffe0c1d3843d1c43d132841095fb2d7c861dea9d8e2"
+    },
+    {
+      "job_id": 103778485229,
+      "workflow": "ci-test-sharding.yml",
+      "name": "Shard contract (Linux, shared-pool)",
+      "conclusion": "success",
+      "expected_checkout": "76ad339f1631e136bba7a8a85973bddb1650d570",
+      "checkout_shas": [
+        "76ad339f1631e136bba7a8a85973bddb1650d570"
+      ],
+      "checkout_verified": true,
+      "private_log": "job-103778485229.private.log",
+      "test_totals": [
+        "10 passed in 2.18s"
+      ],
+      "log_sha256": "17c502a4096210e6cd50eb772ffd819a0183559c7efe07f470a6bff13f7a2daf"
+    },
+    {
+      "job_id": 103777830645,
+      "workflow": "federation-v1-release.yml",
+      "name": "Release checks (Linux)",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "checkout_shas": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "checkout_verified": true,
+      "log_first_timestamp": "2026-09-13T19:33:18.4634291Z",
+      "log_last_timestamp": "2026-09-13T19:34:58.9455370Z",
+      "private_log": "job-103777830645.private.log",
+      "test_totals": [
+        "18 passed in 12.11s",
+        "168 passed, 3 skipped in 20.12s"
+      ],
+      "log_sha256": "82f36f16de95de67a1cbc6d58fd4ccf7236beec75811461c5b0b6aa3b9fa3015"
+    },
+    {
+      "job_id": 103779921010,
+      "workflow": "icse-tool-demo.yml",
+      "name": "reviewer-compose",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "checkout_shas": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "checkout_verified": true,
+      "log_first_timestamp": "2026-09-13T19:35:50.1438987Z",
+      "log_last_timestamp": "2026-09-13T19:36:25.0998555Z",
+      "private_log": "job-103779921010.private.log",
+      "test_totals": [],
+      "log_sha256": "3840941f530ee83ee66919d3e22a2de75bd6fc52ad7fe035c0271b007b04e00b"
+    },
+    {
+      "job_id": 103779921221,
+      "workflow": "icse-tool-demo.yml",
+      "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "checkout_shas": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "checkout_verified": true,
+      "log_first_timestamp": "2026-09-13T19:36:47.7126567Z",
+      "log_last_timestamp": "2026-09-13T19:38:22.3793344Z",
+      "private_log": "job-103779921221.private.log",
+      "test_totals": [],
+      "log_sha256": "81903a077b214254965b47b7119101f7ae96b841c4d7d490ef68dfcdf6dfd803"
+    },
+    {
+      "job_id": 103779921740,
+      "workflow": "icse-tool-demo.yml",
+      "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "checkout_shas": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "checkout_verified": true,
+      "log_first_timestamp": "2026-09-13T19:28:06.4999597Z",
+      "log_last_timestamp": "2026-09-13T19:31:41.3244817Z",
+      "private_log": "job-103779921740.private.log",
+      "test_totals": [],
+      "log_sha256": "9d5423d74b089bd6fd478aa5b0dd49a072fbc1ea6cb9846b4d024cfc252a5709"
+    },
+    {
+      "job_id": 103777830021,
+      "workflow": "federation-software-update.yml",
+      "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "checkout_shas": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "checkout_verified": true,
+      "log_first_timestamp": "2026-09-13T19:20:51.3863508Z",
+      "log_last_timestamp": "2026-09-13T19:37:12.1812500Z",
+      "private_log": "job-103777830021.private.log",
+      "test_totals": [
+        "311 passed, 5 skipped, 1 warning in 543.93s (0:09:03)"
+      ],
+      "log_sha256": "de1a9b1940911057bdbf2ee892948066c523527e5a21d1f18ee6d472e99b5d32"
+    },
+    {
+      "job_id": 103778466345,
+      "workflow": "cf7-acceptance-harness.yml",
+      "name": "harness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Byp...",
+      "conclusion": "success",
+      "expected_checkout": "76ad339f1631e136bba7a8a85973bddb1650d570",
+      "checkout_shas": [
+        "76ad339f1631e136bba7a8a85973bddb1650d570"
+      ],
+      "checkout_verified": true,
+      "log_first_timestamp": "2026-09-13T19:31:57.6372672Z",
+      "log_last_timestamp": "2026-09-13T19:37:04.4463125Z",
+      "private_log": "job-103778466345.private.log",
+      "test_totals": [
+        "9 passed in 3.88s",
+        "10 passed in 1.17s",
+        "21 passed in 4.24s",
+        "8 passed in 2.08s",
+        "7 passed in 3.21s",
+        "17 passed in 27.05s",
+        "10 passed in 8.46s",
+        "11 passed in 5.83s",
+        "9 passed in 16.80s",
+        "13 passed, 4 warnings in 7.65s",
+        "10 passed in 0.26s",
+        "28 passed in 10.52s"
+      ],
+      "log_sha256": "ac5e3df812285dfa6bf04326b76f360f5f93ec33c64d84ca6c6a021aae1d283c"
+    },
+    {
+      "job_id": 103778466494,
+      "workflow": "cf7-acceptance-harness.yml",
+      "name": "harness (Linux, fcp-linux-fast, bash)",
+      "conclusion": "success",
+      "expected_checkout": "76ad339f1631e136bba7a8a85973bddb1650d570",
+      "checkout_shas": [
+        "76ad339f1631e136bba7a8a85973bddb1650d570"
+      ],
+      "checkout_verified": true,
+      "log_first_timestamp": "2026-09-13T19:33:01.1922483Z",
+      "log_last_timestamp": "2026-09-13T19:35:43.9312412Z",
+      "private_log": "job-103778466494.private.log",
+      "test_totals": [
+        "9 passed in 1.07s",
+        "10 passed in 3.20s",
+        "21 passed in 9.38s",
+        "8 passed in 1.21s",
+        "7 passed in 2.51s",
+        "17 passed in 30.37s",
+        "10 passed in 7.75s",
+        "11 passed in 5.15s",
+        "9 passed in 3.53s",
+        "13 passed, 4 warnings in 1.63s",
+        "10 passed in 0.14s",
+        "28 passed in 5.60s"
+      ],
+      "log_sha256": "4c7ef9daea77f7f925b173428d2a083f4bac11a568b4075d361405a82ebaa6d5"
+    },
+    {
+      "job_id": 103778485419,
+      "workflow": "ci-test-sharding.yml",
+      "name": "Shard contract (Windows, shared-pool)",
+      "conclusion": "success",
+      "expected_checkout": "76ad339f1631e136bba7a8a85973bddb1650d570",
+      "checkout_shas": [
+        "76ad339f1631e136bba7a8a85973bddb1650d570"
+      ],
+      "checkout_verified": true,
+      "log_first_timestamp": "2026-09-13T19:37:21.4694984Z",
+      "log_last_timestamp": "2026-09-13T19:38:06.5112970Z",
+      "private_log": "job-103778485419.private.log",
+      "test_totals": [
+        "10 passed in 7.03s"
+      ],
+      "log_sha256": "d76321ccb4fac914296e534e6ae8ce89393937c14ee929d0feadd9d8cd9eab7a"
+    },
+    {
+      "job_id": 103778491378,
+      "workflow": "release-image-metadata.yml",
+      "name": "Verify immutable release image metadata",
+      "conclusion": "success",
+      "expected_checkout": "76ad339f1631e136bba7a8a85973bddb1650d570",
+      "checkout_shas": [
+        "76ad339f1631e136bba7a8a85973bddb1650d570"
+      ],
+      "checkout_verified": true,
+      "log_first_timestamp": "2026-09-13T19:36:31.7754976Z",
+      "log_last_timestamp": "2026-09-13T19:36:41.1305946Z",
+      "private_log": "job-103778491378.private.log",
+      "test_totals": [],
+      "log_sha256": "b5882eacefaa20943621189d564742c354a1e04b424f96df1a15104d2f16cdde"
+    },
+    {
+      "job_id": 103778479160,
+      "workflow": "phase2-federation.yml",
+      "name": "linux",
+      "conclusion": "failure",
+      "expected_checkout": "76ad339f1631e136bba7a8a85973bddb1650d570",
+      "checkout_shas": [
+        "76ad339f1631e136bba7a8a85973bddb1650d570"
+      ],
+      "checkout_verified": true,
+      "private_log": "phase2-linux-first-103778479160.private.log",
+      "log_sha256": "73b3fff98482725fa77a3c46305b92d97843f2280b604e8bc22bb043c75a031b"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": 10323858753,
+      "name": "full-suite-order-fixed",
+      "sha256": "952512edea461ff7d109443b6a39527b6f5504027ff90b651561f5951a5e3fd3",
+      "created_at": "2026-09-13T19:32:21Z",
+      "download_sha256": "952512edea461ff7d109443b6a39527b6f5504027ff90b651561f5951a5e3fd3",
+      "digest_verified": true,
+      "proofs": [
+        {
+          "member": "order-fixed.xml",
+          "cases": 4535,
+          "passed": 4493,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 42
+        }
+      ]
+    },
+    {
+      "id": 10323548434,
+      "name": "linux-regression-shard-2",
+      "sha256": "a1bedb401328a90c4284dc812db1b1fbfe8f31af2f3d543d63afe447670118c5",
+      "created_at": "2026-09-13T19:33:06Z",
+      "download_sha256": "a1bedb401328a90c4284dc812db1b1fbfe8f31af2f3d543d63afe447670118c5",
+      "digest_verified": true,
+      "proofs": [
+        {
+          "member": "shard-2.json",
+          "source_sha": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+          "source_identity_before": {
+            "sha": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+            "tree": "c61eb8e838e8c3d44628af8909da4ed8ed347acf"
+          },
+          "source_identity_after": {
+            "sha": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+            "tree": "c61eb8e838e8c3d44628af8909da4ed8ed347acf"
+          },
+          "source_error": null,
+          "collection_complete": true,
+          "exit_code": 0,
+          "collected": 4535,
+          "selected": 1134,
+          "executed": 1134,
+          "selected_equals_executed": true
+        },
+        {
+          "member": "junit-2.xml",
+          "cases": 1134,
+          "passed": 1128,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 6
+        }
+      ]
+    },
+    {
+      "id": 10323864371,
+      "name": "windows-regression-transport-storage",
+      "sha256": "e5f2f071fcbdb1f6fb7c7f4a2cf7ebb3ceb71875bc223f61c534021204c39db7",
+      "created_at": "2026-09-13T19:39:43Z",
+      "download_sha256": "e5f2f071fcbdb1f6fb7c7f4a2cf7ebb3ceb71875bc223f61c534021204c39db7",
+      "digest_verified": true,
+      "proofs": [
+        {
+          "member": "windows-transport-storage.xml",
+          "cases": 371,
+          "passed": 370,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 1
+        }
+      ]
+    },
+    {
+      "id": 10324002950,
+      "name": "cf8-acceptance-Windows",
+      "sha256": "b6fa908e3667f4f1dc276e8e0cadbe50cf2729826a1b1cec43155db1c46cd10b",
+      "created_at": "2026-09-13T19:23:17Z",
+      "download_sha256": "b6fa908e3667f4f1dc276e8e0cadbe50cf2729826a1b1cec43155db1c46cd10b",
+      "digest_verified": true,
+      "proofs": [
+        {
+          "member": "cf8-acceptance.xml",
+          "cases": 12,
+          "passed": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ]
+    },
+    {
+      "id": 10323492859,
+      "name": "cf8-acceptance-Linux",
+      "sha256": "fcdb6087ff71f9595cb1c01ca62e2951f4c7669807b1399bfb4e84e946f6159b",
+      "created_at": "2026-09-13T19:20:55Z",
+      "download_sha256": "fcdb6087ff71f9595cb1c01ca62e2951f4c7669807b1399bfb4e84e946f6159b",
+      "digest_verified": true,
+      "proofs": [
+        {
+          "member": "cf8-acceptance.xml",
+          "cases": 12,
+          "passed": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ]
+    },
+    {
+      "id": 10323944077,
+      "name": "icse-network-summary-Linux",
+      "sha256": "d2851454a5efab2347f497775ca853e03424ebdc5d9546ac9d4426794af60de0",
+      "created_at": "2026-09-13T19:38:22Z",
+      "download_sha256": "d2851454a5efab2347f497775ca853e03424ebdc5d9546ac9d4426794af60de0",
+      "digest_verified": true,
+      "proofs": [
+        {
+          "member": "summary.json",
+          "source_sha": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+          "result": "PASS",
+          "checks": {
+            "authenticated_enrollment_and_join": "PASS",
+            "authenticated_payload_delivery": "PASS",
+            "authenticated_quorum_bootstrap": "PASS",
+            "automatic_quorum_failover_and_continuity": "PASS",
+            "discovery_and_owner_authorization": "PASS",
+            "independent_processes": "PASS",
+            "minority_mutation_refused": "PASS",
+            "returning_leader_fenced": "PASS",
+            "source_identity_unchanged": "PASS",
+            "successor_reconnect_and_delivery": "PASS"
+          },
+          "working_tree_clean": true,
+          "all_owned_processes_stopped": true,
+          "physical_acceptance": "NOT_EVALUATED"
+        }
+      ]
+    },
+    {
+      "id": 10324203251,
+      "name": "icse-summary-compose",
+      "sha256": "5dffd940bbed9cf8b1136050927543277604128f24a6a48dd2812508b4791017",
+      "created_at": "2026-09-13T19:36:24Z",
+      "download_sha256": "5dffd940bbed9cf8b1136050927543277604128f24a6a48dd2812508b4791017",
+      "digest_verified": true,
+      "proofs": [
+        {
+          "member": "icse-summary.json",
+          "implementation_commit": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+          "passed": 4,
+          "total": 4
+        }
+      ]
+    },
+    {
+      "id": 10324068207,
+      "name": "icse-network-summary-Windows",
+      "sha256": "059cdd15604e133776101ca9b9d84bddf42586990cd4287d9940b410784cdd37",
+      "created_at": "2026-09-13T19:31:32Z",
+      "download_sha256": "059cdd15604e133776101ca9b9d84bddf42586990cd4287d9940b410784cdd37",
+      "digest_verified": true,
+      "proofs": [
+        {
+          "member": "summary.json",
+          "source_sha": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+          "result": "PASS",
+          "checks": {
+            "authenticated_enrollment_and_join": "PASS",
+            "authenticated_payload_delivery": "PASS",
+            "authenticated_quorum_bootstrap": "PASS",
+            "automatic_quorum_failover_and_continuity": "PASS",
+            "discovery_and_owner_authorization": "PASS",
+            "independent_processes": "PASS",
+            "minority_mutation_refused": "PASS",
+            "returning_leader_fenced": "PASS",
+            "source_identity_unchanged": "PASS",
+            "successor_reconnect_and_delivery": "PASS"
+          },
+          "working_tree_clean": true,
+          "all_owned_processes_stopped": true,
+          "physical_acceptance": "NOT_EVALUATED"
+        }
+      ]
+    },
+    {
+      "id": 10323708214,
+      "name": "icse-summary-Linux",
+      "sha256": "7b34ccdad66f9a55b9a9ac081b3de69b74847984415a6564c4aca568187fac02",
+      "created_at": "2026-09-13T19:37:57Z",
+      "download_sha256": "7b34ccdad66f9a55b9a9ac081b3de69b74847984415a6564c4aca568187fac02",
+      "digest_verified": true,
+      "proofs": [
+        {
+          "member": "icse-summary.json",
+          "implementation_commit": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+          "passed": 4,
+          "total": 4
+        }
+      ]
+    },
+    {
+      "id": 10323249153,
+      "name": "icse-summary-Windows",
+      "sha256": "3b9d5cb3fbf61155aa7da1f504ed7011a3fcd0d26d4c534fade5f2f31d40c268",
+      "created_at": "2026-09-13T19:30:47Z",
+      "download_sha256": "3b9d5cb3fbf61155aa7da1f504ed7011a3fcd0d26d4c534fade5f2f31d40c268",
+      "digest_verified": true,
+      "proofs": [
+        {
+          "member": "icse-summary.json",
+          "implementation_commit": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+          "passed": 4,
+          "total": 4
+        }
+      ]
+    }
+  ],
+  "workflows": [
+    {
+      "workflow": "product-branding.yml",
+      "id": 34777368598,
+      "expected": 1,
+      "event": "pull_request",
+      "jobs": [
+        {
+          "id": 103777829796,
+          "name": "product-branding",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "workflow": "cf7b-product-physical-acceptance.yml",
+      "id": 34777368605,
+      "expected": 2,
+      "event": "pull_request",
+      "jobs": [
+        {
+          "id": 103777830020,
+          "name": "acceptance (Linux, fcp-linux-fast, bash)",
+          "status": "in_progress",
+          "conclusion": null
+        },
+        {
+          "id": 103777830168,
+          "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "workflow": "phase-f85-operator-federation-surface.yml",
+      "id": 34777368606,
+      "expected": 2,
+      "event": "pull_request",
+      "jobs": [
+        {
+          "id": 103777830027,
+          "name": "operator-surface (Linux, fcp-linux-fast, bash)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 103777830170,
+          "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "workflow": "cf8-role-retirement.yml",
+      "id": 34777368615,
+      "expected": 2,
+      "event": "pull_request",
+      "jobs": [
+        {
+          "id": 103777829891,
+          "name": "role-retirement (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 103777829972,
+          "name": "role-retirement (Linux, fcp-linux-fast, bash)",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "workflow": "federation-v1-release.yml",
+      "id": 34777368620,
+      "expected": 16,
+      "event": "pull_request",
+      "jobs": [
+        {
+          "id": 103777830545,
+          "name": "Full-suite order (rotating)",
+          "status": "queued",
+          "conclusion": null
+        },
+        {
+          "id": 103777830556,
+          "name": "Full-suite order (fixed)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 103777830570,
+          "name": "Windows regressions (transport-storage)",
+          "status": "in_progress",
+          "conclusion": null
+        },
+        {
+          "id": 103777830579,
+          "name": "PostgreSQL storage release check",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 103777830628,
+          "name": "Windows regressions (journal-artifacts)",
+          "status": "queued",
+          "conclusion": null
+        },
+        {
+          "id": 103777830640,
+          "name": "Release checks (Windows)",
+          "status": "queued",
+          "conclusion": null
+        },
+        {
+          "id": 103777830641,
+          "name": "Linux regression shard (2)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 103777830645,
+          "name": "Release checks (Linux)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 103777830664,
+          "name": "Linux regression shard (1)",
+          "status": "queued",
+          "conclusion": null
+        },
+        {
+          "id": 103777830675,
+          "name": "Linux regression shard (0)",
+          "status": "in_progress",
+          "conclusion": null
+        },
+        {
+          "id": 103777830680,
+          "name": "Linux regression shard (3)",
+          "status": "in_progress",
+          "conclusion": null
+        },
+        {
+          "id": 103777830701,
+          "name": "Windows regressions (capability-product)",
+          "status": "queued",
+          "conclusion": null
+        }
+      ]
+    },
+    {
+      "workflow": "icse-tool-demo.yml",
+      "id": 34777368640,
+      "expected": 4,
+      "event": "pull_request",
+      "jobs": [
+        {
+          "id": 103779921010,
+          "name": "reviewer-compose",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 103779921221,
+          "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 103779921740,
+          "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 103780468967,
+          "name": "publication-bundle",
+          "status": "queued",
+          "conclusion": null
+        }
+      ]
+    },
+    {
+      "workflow": "federation-software-update.yml",
+      "id": 34777368658,
+      "expected": 2,
+      "event": "pull_request",
+      "jobs": [
+        {
+          "id": 103777829886,
+          "name": "update-contracts (Linux, fcp-linux-fast, bash)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 103777830021,
+          "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "workflow": "cfi2-onboarding-composition.yml",
+      "id": 34777368687,
+      "expected": 2,
+      "event": "pull_request",
+      "jobs": [
+        {
+          "id": 103777830057,
+          "name": "onboarding (Linux, fcp-test-linux, bash, 3.12.13)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 103777830235,
+          "name": "onboarding (Windows, fcp-test-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "workflow": "cf7-acceptance-harness.yml",
+      "id": 34777603763,
+      "expected": 2,
+      "event": "workflow_dispatch",
+      "jobs": [
+        {
+          "id": 103778466345,
+          "name": "harness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Byp...",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 103778466494,
+          "name": "harness (Linux, fcp-linux-fast, bash)",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "workflow": "cf7c-physical-test-readiness.yml",
+      "id": 34777605997,
+      "expected": 2,
+      "event": "workflow_dispatch",
+      "jobs": [
+        {
+          "id": 103778473147,
+          "name": "readiness (Linux, fcp-linux-fast, bash)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 103778473242,
+          "name": "readiness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy B...",
+          "status": "in_progress",
+          "conclusion": null
+        }
+      ]
+    },
+    {
+      "workflow": "phase2-federation.yml",
+      "id": 34777608170,
+      "expected": 2,
+      "event": "workflow_dispatch",
+      "jobs": [
+        {
+          "id": 103778479160,
+          "name": "linux",
+          "status": "completed",
+          "conclusion": "failure"
+        },
+        {
+          "id": 103778479276,
+          "name": "windows",
+          "status": "in_progress",
+          "conclusion": null
+        }
+      ]
+    },
+    {
+      "workflow": "ci-test-sharding.yml",
+      "id": 34777610296,
+      "expected": 2,
+      "event": "workflow_dispatch",
+      "jobs": [
+        {
+          "id": 103778485229,
+          "name": "Shard contract (Linux, shared-pool)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 103778485419,
+          "name": "Shard contract (Windows, shared-pool)",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "workflow": "release-image-metadata.yml",
+      "id": 34777612527,
+      "expected": 1,
+      "event": "workflow_dispatch",
+      "jobs": [
+        {
+          "id": 103778491378,
+          "name": "Verify immutable release image metadata",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    }
+  ]
+}

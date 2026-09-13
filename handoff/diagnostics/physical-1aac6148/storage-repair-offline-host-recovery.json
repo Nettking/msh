@@ -1,0 +1,29 @@
+{
+  "source": "76ad339f1631e136bba7a8a85973bddb1650d570",
+  "native_source": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+  "run_id": 34777368620,
+  "interrupted_job_id": 103777830545,
+  "requested_at": "2026-09-13T19:58:40.501181+00:00",
+  "authorization": "User reports AQG shutdown, instructs continued progress without waiting for it.",
+  "classification": "confirmed host offline interruption",
+  "completed_green_job_ids_retained": [
+    103777830556,
+    103777830570,
+    103777830579,
+    103777830628,
+    103777830640,
+    103777830641,
+    103777830645,
+    103777830664,
+    103777830675,
+    103777830680,
+    103777830701,
+    103782555692,
+    103782555699
+  ],
+  "scope": "Only active job is on offline AQG. Cancel pending execution, rerun that job and dependent verdicts using unchanged workflow/source/seed/runner pool. No successful test rerun.",
+  "status": "cancel_accepted",
+  "cancel_response": {},
+  "force_cancel_requested_at": "2026-09-13T20:00:08.909061+00:00",
+  "force_cancel_response": {}
+}
