@@ -1,0 +1,105 @@
+{
+  "at": "2026-09-13T11:21:16.014263+00:00",
+  "source": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+  "tree": "cc9b29515d47d754f24199bf403213e7ff111315",
+  "live_main": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+  "status": "ACTUAL_MAIN_AUTOMATED_QUALIFIED",
+  "required_jobs_passed": 37,
+  "companion_jobs_passed": 3,
+  "native_checkout_proofs": 38,
+  "aggregate_jobs_without_checkout": 2,
+  "source_checkout_clean": true,
+  "workflows": [
+    {
+      "id": 34751832430,
+      "path": ".github/workflows/federation-software-update.yml",
+      "jobs_passed": 2,
+      "url": "https://github.com/Nettking/msh/actions/runs/34751832430"
+    },
+    {
+      "id": 34751832432,
+      "path": ".github/workflows/product-branding.yml",
+      "jobs_passed": 1,
+      "url": "https://github.com/Nettking/msh/actions/runs/34751832432"
+    },
+    {
+      "id": 34751832493,
+      "path": ".github/workflows/federation-v1-release.yml",
+      "jobs_passed": 16,
+      "url": "https://github.com/Nettking/msh/actions/runs/34751832493"
+    },
+    {
+      "id": 34751930317,
+      "path": ".github/workflows/cf7-acceptance-harness.yml",
+      "jobs_passed": 2,
+      "url": "https://github.com/Nettking/msh/actions/runs/34751930317"
+    },
+    {
+      "id": 34751931473,
+      "path": ".github/workflows/phase2-federation.yml",
+      "jobs_passed": 2,
+      "url": "https://github.com/Nettking/msh/actions/runs/34751931473"
+    },
+    {
+      "id": 34751932385,
+      "path": ".github/workflows/cf7b-product-physical-acceptance.yml",
+      "jobs_passed": 2,
+      "url": "https://github.com/Nettking/msh/actions/runs/34751932385"
+    },
+    {
+      "id": 34751933879,
+      "path": ".github/workflows/cf7c-physical-test-readiness.yml",
+      "jobs_passed": 2,
+      "url": "https://github.com/Nettking/msh/actions/runs/34751933879"
+    },
+    {
+      "id": 34751934925,
+      "path": ".github/workflows/icse-tool-demo.yml",
+      "jobs_passed": 4,
+      "url": "https://github.com/Nettking/msh/actions/runs/34751934925"
+    },
+    {
+      "id": 34751935929,
+      "path": ".github/workflows/cf8-role-retirement.yml",
+      "jobs_passed": 2,
+      "url": "https://github.com/Nettking/msh/actions/runs/34751935929"
+    },
+    {
+      "id": 34751936806,
+      "path": ".github/workflows/phase-f85-operator-federation-surface.yml",
+      "jobs_passed": 2,
+      "url": "https://github.com/Nettking/msh/actions/runs/34751936806"
+    },
+    {
+      "id": 34751938039,
+      "path": ".github/workflows/ci-test-sharding.yml",
+      "jobs_passed": 2,
+      "url": "https://github.com/Nettking/msh/actions/runs/34751938039"
+    },
+    {
+      "id": 34751939219,
+      "path": ".github/workflows/cfi2-onboarding-composition.yml",
+      "jobs_passed": 2,
+      "url": "https://github.com/Nettking/msh/actions/runs/34751939219"
+    },
+    {
+      "id": 34751940355,
+      "path": ".github/workflows/release-image-metadata.yml",
+      "jobs_passed": 1,
+      "url": "https://github.com/Nettking/msh/actions/runs/34751940355"
+    }
+  ],
+  "evidence": [
+    "short-qualification.json",
+    "native-review.json",
+    "native-job-logs.zip",
+    "artifact-review.json",
+    "release/native-review.json",
+    "release/native-job-logs.zip",
+    "release/artifact-review.json"
+  ],
+  "physical_acceptance": "NOT_PASSED",
+  "P07": "NOT_STARTED",
+  "P12": "NOT_STARTED",
+  "protected_recorder_data": "UNTOUCHED"
+}

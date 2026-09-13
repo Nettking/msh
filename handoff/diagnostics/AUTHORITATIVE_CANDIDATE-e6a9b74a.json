@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-13T11:21:16.014263+00:00",
+  "AUTHORITATIVE_SHA": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+  "tree": "cc9b29515d47d754f24199bf403213e7ff111315",
+  "status": "FROZEN_FOR_FRESH_PHYSICAL_ACCEPTANCE",
+  "qualification": "main-e6a9b74a-qualification/qualification.json",
+  "main_verified_at_freeze": true,
+  "physical_pass": false,
+  "P07": "NOT_STARTED",
+  "P12": "NOT_STARTED",
+  "release_tag_created": false,
+  "deployment_performed": false
+}

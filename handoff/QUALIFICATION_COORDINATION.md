@@ -1,57 +1,47 @@
 # Federation v1 current release checkpoint
 
-Updated 2026-09-13T11:09Z. Active context: clean handoff + this file + live GitHub.
+Updated 2026-09-13T11:21Z. Active context: clean handoff + this file + live GitHub.
 Historical plans are evidence only; use handoff/archive only for a current requirement.
 
 ## Current source / heads
-- Actual resulting main:e6a9b74a1d555609eed6bf40c800e1258f1c9077.
-- Merged in order:PR475 -> a039061e; PR483 ->02a90d3b; PR473 ->e6a9b74a.
-- Actual main tree cc9b29515d47d754f24199bf403213e7ff111315 matches the reviewed
-  offline combination; all three reviewed PR heads are ancestors. No deployment.
-- Clean detached checkout:C:/wsl/fcp-v1-e6a9b74a-main-20260913.
-- Main qualification:24/24 non-release jobs PASS with native/artifact review.
-- Broad release34751832493 is the only remaining gate to inspect about11:15Z.
-- AUTHORITATIVE_SHA is not frozen yet.
+- AUTHORITATIVE_SHA=e6a9b74a1d555609eed6bf40c800e1258f1c9077 (frozen).
+- Actual main verified at freeze; tree cc9b29515d47d754f24199bf403213e7ff111315.
+- Merged in order: PR475 -> a039061e; PR483 -> 02a90d3b; PR473 -> e6a9b74a.
+- Clean detached checkout: C:/wsl/fcp-v1-e6a9b74a-main-20260913.
+- Freeze receipt: diagnostics/AUTHORITATIVE_CANDIDATE-e6a9b74a.json.
+- No release tag or deployment. Coordination stays outside product source.
 
-## Green gates / retained evidence
-- Actual main e6a9b74a:all12 non-release workflows/24 jobs PASS; source proved in
-  every native checkout. ICSE Linux/Windows10/10, bundle source/export/privacy,
-  CF8 JUnit and registry verified. diagnostics/main-e6a9b74a-qualification/
-  short-qualification.json, artifact-review.json and native archives retain proof.
-- Prior combined f104038a native37/37 required plus3/3 companions PASS.
-- ICSE Windows/Linux10/10, retained Compose and exact-source publication verified.
-- Evidence:diagnostics/f104-final-qualification/qualification.json and archives.
-- Those results retain f104 identity and are not final-main qualification.
-- Source release notes are finalized; no source edit needed merely for publication.
+## Current green gates
+- Actual resulting main qualified once: 37/37 required + 3/3 companions PASS.
+- Release 34751832493: 16/16; all other 12 workflows: 24/24.
+- Phase 2, CF7 A/B/C, update, branding, CF8, F85, sharding, CFI2, registry PASS.
+- ICSE 34751934925: Windows and Linux 10/10; Compose 4/4; publication verified.
+- Native logs prove 38 exact checkouts; two aggregate jobs consume green results.
+- All native artifacts/digests retained and reviewed, including complete 4503-test
+  shard coverage, both full-suite orders and exact-source public ICSE bundle.
+- Authoritative proof: diagnostics/main-e6a9b74a-qualification/qualification.json.
+- Do not repeat qualification or inspect already completed greens again.
 
 ## Actual blockers / disposition
 - No demonstrated remaining candidate defect. Original Windows bootstrap/Linux
-  reconnect observations remain unresolved but non-demonstrated candidate defects;
-  both native recoveries passed unchanged. No common mechanism proven.
-- Prior ICSE run34746641262 metadata disagreed with completed native attempt3 jobs.
-  Native proof is retained; do not revisit empty attempt2 or retry passing work.
-- Normal expected-head GitHub APIs accepted all merges; no policy bypass used.
+  reconnect observations remain unresolved but non-demonstrated candidate defects.
+  Recovery and fresh actual-main ICSE passed; no common mechanism proven.
+- Physical acceptance remains outstanding. No physical PASS; P07/P12 not started.
 
 ## Active work / next action
-1. Qualify actual main e6a9b74a once. Reuse automatic exact-source release34751832493,
-   update34751832430, branding34751832432; ten missing workflows accepted once.
-   Dispatcher/receipts:diagnostics/dispatch_actual_main_e6a9b74a.py and
-   diagnostics/main-e6a9b74a-qualification-dispatch.json. Inspect existing receipt
-   and live runs before any repeated request, especially after uncertain responses.
-   All13 run IDs:diagnostics/main-e6a9b74a-qualification-startup.json.
-   Short gates are complete and retained. Broad release about11:15Z unless a terminal
-   event arrives. Do not keep polling unchanged long jobs or completed greens.
-2. Retain completed native checks/artifacts on actual main; classify new failures
-   before action. Never qualify intermediate main or repeat valid green results.
-3. After required main qualification, freeze one authoritative SHA, run checked-in
-   revalidation and scenario side-effect review, then fresh physical P01-P12.
-- One active owner is this fresh task; existing30-minute heartbeat targets it.
-- Merge receipts:diagnostics/release-merge-475.json,-483.json,-473.json.
+1. Complete checked-in revalidation. There are no valid prior physical PASS records
+   to carry forward; missing observations require fresh candidate evidence.
+2. Review physical scenario side effects and exact host/runtime bindings, then run
+   fresh init/preflight/gate on required physical hosts and supported startup.
+3. Execute fresh P01-P12; P07 real 1h and P12 real 24h with strict run-bound evidence.
+4. Tag/publish only after complete checked-in physical acceptance on frozen SHA.
+- One active owner is this fresh task; existing 30-minute heartbeat targets it.
+- Merge receipts: diagnostics/release-merge-475.json, -483.json, -473.json.
 
 ## Immutable safety constraints
 - Never weaken assertions, quorum/authority, deadlines, security or acceptance.
 - No broad diagnostic sweep, blanket retry, unnecessary runner/account/label change.
 - Only credible current-candidate contract violations block v1; archive timing noise.
 - AQG deliberately off and never a dependency. Protected Recorder data untouched.
-- No physical PASS. P07/P12 not started; require real1h/24h and strict run-bound evidence.
-- Coordination artifacts stay out of candidates. No reset/prune or protected-data actions.
+- No physical PASS before real observations and strict validation complete.
+- No reset/prune, volume deletion, Arrowhead restart, or protected-data actions.

@@ -1,0 +1,223 @@
+[
+  {
+    "id": 103710753076,
+    "name": "Full-suite order (fixed)",
+    "aggregate_without_checkout": false,
+    "source": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+    "source_log": [
+      "2026-09-13T10:39:17.2583508Z [command]/usr/bin/git log -1 --format=%H",
+      "2026-09-13T10:39:17.2632824Z e6a9b74a1d555609eed6bf40c800e1258f1c9077"
+    ],
+    "pytest_summaries": [
+      "2026-09-13T10:48:55.9786641Z 4463 passed, 40 skipped, 453 warnings in 544.68s (0:09:04)"
+    ],
+    "verdict_lines": []
+  },
+  {
+    "id": 103710753207,
+    "name": "Release checks (Windows)",
+    "aggregate_without_checkout": false,
+    "source": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+    "source_log": [
+      "2026-09-13T10:57:26.3469697Z [command]\"C:\\Program Files\\Git\\cmd\\git.exe\" log -1 --format=%H\r",
+      "2026-09-13T10:57:26.3742666Z e6a9b74a1d555609eed6bf40c800e1258f1c9077\r"
+    ],
+    "pytest_summaries": [
+      "2026-09-13T10:59:30.8759901Z 18 passed in 18.63s\r",
+      "2026-09-13T11:00:18.7209832Z 164 passed, 7 skipped in 33.23s\r"
+    ],
+    "verdict_lines": []
+  },
+  {
+    "id": 103710753211,
+    "name": "Linux regression shard (3)",
+    "aggregate_without_checkout": false,
+    "source": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+    "source_log": [
+      "2026-09-13T10:57:47.8720568Z [command]/usr/bin/git log -1 --format=%H",
+      "2026-09-13T10:57:47.8746270Z e6a9b74a1d555609eed6bf40c800e1258f1c9077"
+    ],
+    "pytest_summaries": [
+      "2026-09-13T11:00:52.6062529Z 1111 passed, 14 skipped, 3378 deselected, 234 warnings in 147.77s (0:02:27)"
+    ],
+    "verdict_lines": []
+  },
+  {
+    "id": 103710753216,
+    "name": "PostgreSQL storage release check",
+    "aggregate_without_checkout": false,
+    "source": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+    "source_log": [
+      "2026-09-13T10:38:25.2164094Z [command]/usr/bin/git log -1 --format=%H",
+      "2026-09-13T10:38:25.2215297Z e6a9b74a1d555609eed6bf40c800e1258f1c9077"
+    ],
+    "pytest_summaries": [
+      "2026-09-13T10:39:06.0136360Z 11 passed in 0.60s"
+    ],
+    "verdict_lines": []
+  },
+  {
+    "id": 103710753229,
+    "name": "Linux regression shard (0)",
+    "aggregate_without_checkout": false,
+    "source": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+    "source_log": [
+      "2026-09-13T10:49:15.6776705Z [command]/usr/bin/git log -1 --format=%H",
+      "2026-09-13T10:49:15.6862880Z e6a9b74a1d555609eed6bf40c800e1258f1c9077"
+    ],
+    "pytest_summaries": [
+      "2026-09-13T10:52:46.4252809Z 1105 passed, 21 skipped, 3377 deselected, 18 warnings in 173.44s (0:02:53)"
+    ],
+    "verdict_lines": []
+  },
+  {
+    "id": 103710753231,
+    "name": "Linux regression shard (2)",
+    "aggregate_without_checkout": false,
+    "source": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+    "source_log": [
+      "2026-09-13T10:53:02.0431858Z [command]/usr/bin/git log -1 --format=%H",
+      "2026-09-13T10:53:02.0457214Z e6a9b74a1d555609eed6bf40c800e1258f1c9077"
+    ],
+    "pytest_summaries": [
+      "2026-09-13T10:56:09.2601621Z 1126 passed, 3377 deselected, 38 warnings in 152.13s (0:02:32)"
+    ],
+    "verdict_lines": []
+  },
+  {
+    "id": 103710753234,
+    "name": "Full-suite order (rotating)",
+    "aggregate_without_checkout": false,
+    "source": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+    "source_log": [
+      "2026-09-13T11:01:05.5525632Z [command]/usr/bin/git log -1 --format=%H",
+      "2026-09-13T11:01:05.5552753Z e6a9b74a1d555609eed6bf40c800e1258f1c9077"
+    ],
+    "pytest_summaries": [
+      "2026-09-13T11:10:35.9906119Z 4463 passed, 40 skipped, 453 warnings in 532.95s (0:08:52)"
+    ],
+    "verdict_lines": []
+  },
+  {
+    "id": 103710753236,
+    "name": "Windows regressions (journal-artifacts)",
+    "aggregate_without_checkout": false,
+    "source": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+    "source_log": [
+      "2026-09-13T10:38:51.6124088Z [command]\"C:\\Program Files\\Git\\cmd\\git.exe\" log -1 --format=%H\r",
+      "2026-09-13T10:38:51.6432098Z e6a9b74a1d555609eed6bf40c800e1258f1c9077\r"
+    ],
+    "pytest_summaries": [
+      "2026-09-13T10:47:07.0896888Z 297 passed, 1 skipped, 1 warning in 367.16s (0:06:07)\r"
+    ],
+    "verdict_lines": []
+  },
+  {
+    "id": 103710753242,
+    "name": "Release checks (Linux)",
+    "aggregate_without_checkout": false,
+    "source": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+    "source_log": [
+      "2026-09-13T10:56:23.9911755Z [command]/usr/bin/git log -1 --format=%H",
+      "2026-09-13T10:56:23.9936665Z e6a9b74a1d555609eed6bf40c800e1258f1c9077"
+    ],
+    "pytest_summaries": [
+      "2026-09-13T10:57:14.1151311Z 18 passed in 12.45s",
+      "2026-09-13T10:57:36.2594460Z 168 passed, 3 skipped in 20.22s"
+    ],
+    "verdict_lines": []
+  },
+  {
+    "id": 103710753249,
+    "name": "Windows regressions (transport-storage)",
+    "aggregate_without_checkout": false,
+    "source": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+    "source_log": [
+      "2026-09-13T10:44:32.4596960Z [command]\"C:\\Program Files\\Git\\bin\\git.exe\" log -1 --format=%H\r",
+      "2026-09-13T10:44:32.4958328Z e6a9b74a1d555609eed6bf40c800e1258f1c9077\r"
+    ],
+    "pytest_summaries": [
+      "2026-09-13T10:48:12.1674769Z 370 passed, 1 skipped in 91.88s (0:01:31)\r"
+    ],
+    "verdict_lines": []
+  },
+  {
+    "id": 103710753299,
+    "name": "Windows regressions (capability-product)",
+    "aggregate_without_checkout": false,
+    "source": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+    "source_log": [
+      "2026-09-13T10:59:16.8473174Z [command]\"C:\\Program Files\\Git\\bin\\git.exe\" log -1 --format=%H\r",
+      "2026-09-13T10:59:16.8724837Z e6a9b74a1d555609eed6bf40c800e1258f1c9077\r"
+    ],
+    "pytest_summaries": [
+      "2026-09-13T11:05:23.6630948Z 890 passed, 5 skipped, 44 warnings in 216.60s (0:03:36)\r"
+    ],
+    "verdict_lines": []
+  },
+  {
+    "id": 103710753307,
+    "name": "Linux regression shard (1)",
+    "aggregate_without_checkout": false,
+    "source": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+    "source_log": [
+      "2026-09-13T11:10:54.4452607Z [command]/usr/bin/git log -1 --format=%H",
+      "2026-09-13T11:10:54.4478002Z e6a9b74a1d555609eed6bf40c800e1258f1c9077"
+    ],
+    "pytest_summaries": [
+      "2026-09-13T11:13:00.3744648Z 1121 passed, 5 skipped, 3377 deselected, 166 warnings in 94.27s (0:01:34)"
+    ],
+    "verdict_lines": []
+  },
+  {
+    "id": 103714547306,
+    "name": "Clean-checkout suite order independence",
+    "aggregate_without_checkout": true,
+    "source": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+    "source_log": [],
+    "pytest_summaries": [],
+    "verdict_lines": [
+      "2026-09-13T11:13:10.4491047Z ##[group]Run test \"$RESULT\" = success",
+      "2026-09-13T11:13:10.4491539Z \u001b[36;1mtest \"$RESULT\" = success\u001b[0m",
+      "2026-09-13T11:13:10.4509449Z   RESULT: success"
+    ]
+  },
+  {
+    "id": 103714816085,
+    "name": "Release matrix (Windows)",
+    "aggregate_without_checkout": false,
+    "source": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+    "source_log": [
+      "2026-09-13T11:13:30.8708834Z [command]/usr/bin/git log -1 --format=%H",
+      "2026-09-13T11:13:30.8756808Z e6a9b74a1d555609eed6bf40c800e1258f1c9077"
+    ],
+    "pytest_summaries": [],
+    "verdict_lines": []
+  },
+  {
+    "id": 103714816159,
+    "name": "Release matrix (Linux)",
+    "aggregate_without_checkout": false,
+    "source": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+    "source_log": [
+      "2026-09-13T11:13:19.5072925Z [command]/usr/bin/git log -1 --format=%H",
+      "2026-09-13T11:13:19.5095173Z e6a9b74a1d555609eed6bf40c800e1258f1c9077"
+    ],
+    "pytest_summaries": [],
+    "verdict_lines": []
+  },
+  {
+    "id": 103714869983,
+    "name": "Federation v1 automated release verdict",
+    "aggregate_without_checkout": true,
+    "source": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+    "source_log": [],
+    "pytest_summaries": [],
+    "verdict_lines": [
+      "2026-09-13T11:13:39.4503471Z ##[group]Run test \"success\" = \"success\"",
+      "2026-09-13T11:13:39.4504191Z \u001b[36;1mtest \"success\" = \"success\"\u001b[0m",
+      "2026-09-13T11:13:39.4504640Z \u001b[36;1mtest \"success\" = \"success\"\u001b[0m",
+      "2026-09-13T11:13:39.4505076Z \u001b[36;1mtest \"success\" = \"success\"\u001b[0m"
+    ]
+  }
+]
