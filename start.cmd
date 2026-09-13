@@ -381,9 +381,9 @@ exit /b 0
 set "FCP_RUNTIME_FILE=%TEMP%\fcp-runtime-%RANDOM%-%RANDOM%.txt"
 if exist "%FCP_RUNTIME_FILE%" del /q "%FCP_RUNTIME_FILE%" >nul 2>&1
 if "%FCP_WEB_PORT_EXPLICIT%"=="1" (
-    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\resolve_fcp_web_port.ps1" -BindAddress "%FCP_WEB_BIND%" -PreferredPort %FCP_WEB_PORT% -OutputFile "%FCP_RUNTIME_FILE%"
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\resolve_fcp_web_port.ps1" -BindAddress "%FCP_WEB_BIND%" -PreferredPort %FCP_WEB_PORT% -CurrentProjectName "%COMPOSE_PROJECT_NAME%" -OutputFile "%FCP_RUNTIME_FILE%"
 ) else (
-    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\resolve_fcp_web_port.ps1" -BindAddress "%FCP_WEB_BIND%" -PreferredPort %FCP_WEB_PORT% -OutputFile "%FCP_RUNTIME_FILE%" -AllowFallback
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\resolve_fcp_web_port.ps1" -BindAddress "%FCP_WEB_BIND%" -PreferredPort %FCP_WEB_PORT% -CurrentProjectName "%COMPOSE_PROJECT_NAME%" -OutputFile "%FCP_RUNTIME_FILE%" -AllowFallback
 )
 set "FCP_RUNTIME_EXIT=%ERRORLEVEL%"
 if not "%FCP_RUNTIME_EXIT%"=="0" (

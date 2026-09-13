@@ -97,6 +97,37 @@ function Test-FcpFlaskContainer {
     return @($hasFcpEnvironment).Count -gt 0 -or $null -ne $hasFcpDataMount
 }
 
+function Test-PublishedWebBinding {
+    param([Parameter(Mandatory = $true)]$Inspection)
+
+    $requestedAddress = [System.Net.IPAddress]::Parse($BindAddress)
+    if ($requestedAddress.IsIPv4MappedToIPv6) {
+        $requestedAddress = $requestedAddress.MapToIPv4()
+    }
+    foreach ($binding in @($Inspection.NetworkSettings.Ports.'5000/tcp')) {
+        if ($null -eq $binding -or [string]$binding.HostPort -ne [string]$PreferredPort) {
+            continue
+        }
+        $publishedAddress = [System.Net.IPAddress]::Parse([string]$binding.HostIp)
+        if ($publishedAddress.IsIPv4MappedToIPv6) {
+            $publishedAddress = $publishedAddress.MapToIPv4()
+        }
+        if ($publishedAddress.AddressFamily -ne $requestedAddress.AddressFamily) {
+            continue
+        }
+        if (
+            $publishedAddress.Equals($requestedAddress) -or
+            $publishedAddress.Equals([System.Net.IPAddress]::Any) -or
+            $publishedAddress.Equals([System.Net.IPAddress]::IPv6Any) -or
+            $requestedAddress.Equals([System.Net.IPAddress]::Any) -or
+            $requestedAddress.Equals([System.Net.IPAddress]::IPv6Any)
+        ) {
+            return $true
+        }
+    }
+    return $false
+}
+
 function Get-VolumeInspection {
     param([Parameter(Mandatory = $true)][string]$VolumeName)
 
@@ -305,15 +336,32 @@ try {
     $ownerDataDirectory = ""
     $ownerResultsDirectory = ""
 
-    $publishedOwners = @(
-        & docker ps --filter "publish=$PreferredPort" --format "{{.ID}}" 2>$null
+    # Docker's publish filter selects the container port. Resolve ownership from
+    # the actual host address/port bindings before retaining or replacing state.
+    $flaskContainers = @(
+        & docker ps --filter "label=com.docker.compose.service=flask" --format "{{.ID}}" 2>$null
     ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    if ($LASTEXITCODE -ne 0) {
+        throw "Could not inspect running Flask containers safely. No state was changed."
+    }
 
-    foreach ($containerId in $publishedOwners) {
+    $publishedOwners = @(
+    foreach ($containerId in $flaskContainers) {
         $inspection = Get-ContainerInspection -ContainerId $containerId
-        if ($null -eq $inspection -or -not (Test-FcpFlaskContainer -Inspection $inspection)) {
+        if (
+            $null -eq $inspection -or
+            -not (Test-FcpFlaskContainer -Inspection $inspection) -or
+            -not (Test-PublishedWebBinding -Inspection $inspection)
+        ) {
             continue
         }
+        $inspection
+    }
+    )
+    if ($publishedOwners.Count -gt 1) {
+        throw "Multiple FCP containers overlap the selected web binding. No state was changed."
+    }
+    foreach ($inspection in $publishedOwners) {
         $ownerProject = Get-ComposeProjectName -Inspection $inspection
         $relayMount = Get-Mount -Inspection $inspection -Destination "/var/lib/fcp-relay"
         $dataMount = Get-Mount -Inspection $inspection -Destination "/app/data"
