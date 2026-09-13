@@ -1,0 +1,33 @@
+{
+  "captured_at": "2026-09-13T21:12:56.125803+00:00",
+  "source": "e91e521813aff67c44bae51d00dfae212b56ef7e",
+  "job_id": 103786726556,
+  "classification": "infrastructure/host-capacity interference caused by preparatory fixture allocation",
+  "candidate_defect_demonstrated": false,
+  "failed_tests": 6,
+  "setup_errors": 14,
+  "passed": 350,
+  "skipped": 1,
+  "all20_share_initial_ingest_allocation_floor_refusal": true,
+  "actual_ci_temp": "C:/fcp-qtmp",
+  "measured_total_bytes": 2047048937472,
+  "measured_free_bytes": 54593343488,
+  "actual_product_derived_floor_bytes": 68719476736,
+  "floor_formula": "min(max(10GiB,5% of volume total),64GiB)",
+  "preparatory_fully_allocated_bytes": 47244640256,
+  "preparation_guard_bytes": 42949672960,
+  "preparation_guard_disposition": "Insufficient for simultaneous native storage CI on this volume; root requires64GiB+8GiB live margin.",
+  "source_floor_blob_sha256": "d15a71163b80db3a98f5337563e52d4396038caea6aafb832cb52c51710f492a",
+  "failed_native_log_sha256": "b4f8c2d499f79d26db667792381922dc24995544b97824d34d7c25d41130f360",
+  "code_path": [
+    "StorageNodeAgent.__init__ storage_agent.py:275-280 supplies default StorageAllocation",
+    "FilesystemBatchStorageProvider._claim local_storage.py:254-259",
+    "StorageAllocation.claim storage_allocation.py:375-383 refuses free-minus-positive-write below floor",
+    "PhaseDLogicalStorageClient.ingest phase_d_client.py:235 surfaces allocation-exhausted"
+  ],
+  "preflight": "Windows transport-storage job has no capacity preflight step; ci_release_disk_preflight.py checks generic12GiB host threshold, not derived allocation floor.",
+  "repair": "Restore host capacity by verified migration of owned unused fixture only, then one targeted failed-job recovery with unchanged exact source/assertions/floors.",
+  "product_or_workflow_modified": false,
+  "physical_assertions_run": false,
+  "protected_data_accessed": false
+}

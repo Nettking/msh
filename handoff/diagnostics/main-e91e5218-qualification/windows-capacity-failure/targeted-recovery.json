@@ -1,0 +1,16 @@
+{
+  "source": "e91e521813aff67c44bae51d00dfae212b56ef7e",
+  "run_id": 34780575628,
+  "original_job_id": 103786726556,
+  "status": "ONE_FAILED_JOB_AND_DEPENDENTS_REQUESTED",
+  "requested_at": "2026-09-13T21:27:29.862001+00:00",
+  "outer_free_bytes": 100153167872,
+  "minimum_recovery_headroom_bytes": 77309411328,
+  "capacity_receipt_sha256": "3f4307c24b9d7ceecefbac519d347542b40a4179a27a0a0eacaa649c6076e3c6",
+  "preserved_successful_jobs": 12,
+  "product_or_assertion_changes": false,
+  "runner_pool_or_account_changes": false,
+  "physical_acceptance": "NOT_STARTED",
+  "confirmed_by_live_attempt": 2,
+  "local_receipt_note": "POST returned successfully; helper expected an empty HTTP201 response but API returned another success shape. No request repeated. Live attempt2 independently confirms dispatch."
+}
