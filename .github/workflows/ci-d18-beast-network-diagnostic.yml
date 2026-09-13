@@ -1,0 +1,64 @@
+name: D18 bounded original-Beast network error capture
+
+# Coordination-only diagnosis. Never merge into a release candidate.
+on:
+  push:
+    branches: [codex/federation-v1-diagnostic-sweep-20260911]
+    paths: [".github/workflows/ci-d18-beast-network-diagnostic.yml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: d18-original-beast-network-diagnostic
+  cancel-in-progress: false
+
+jobs:
+  original-beast:
+    runs-on: [self-hosted, Linux, X64, beast-linux, fcp-linux-fast]
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Verify existing original CI context
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = "Nettking/msh"
+          test "$GITHUB_REF" = "refs/heads/codex/federation-v1-diagnostic-sweep-20260911"
+          test "$RUNNER_NAME" = "Beast-Linux-WSL"
+          test "$GITHUB_WORKSPACE" = "/opt/actions-runner/_work/msh/msh"
+          test "$(realpath "$GITHUB_WORKSPACE")" = "$GITHUB_WORKSPACE"
+          evidence="$RUNNER_TEMP/d18-evidence-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          mkdir "$evidence"
+          echo "D18_EVIDENCE=$evidence" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: 5e6f184311019b9982e8544a18f3dc02c1b16e98
+
+      - uses: ./.github/actions/self-hosted-python
+        with:
+          python-version: 3.12.13
+
+      - name: Install unchanged constrained reviewer dependencies
+        run: |
+          python -m pip install --upgrade pip==26.2.1
+          python -m pip install -r requirements.txt -c constraints-release.txt
+
+      - name: Extract external diagnostic driver from exact coordination commit
+        run: |
+          git fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          python -B -c 'import os,pathlib,subprocess; target=pathlib.Path(os.environ["D18_EVIDENCE"])/"run_d18_network_diagnostic.py"; target.write_bytes(subprocess.check_output(["git","show",os.environ["GITHUB_SHA"]+":handoff/diagnostics/run_d18_network_diagnostic.py"],timeout=30))'
+
+      - name: Retain prior error or run unchanged network demonstration once
+        run: python -B "$D18_EVIDENCE/run_d18_network_diagnostic.py"
+
+      - name: Preserve only sanitized diagnostic and checked-in public output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: d18-original-beast-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.D18_EVIDENCE }}
+          if-no-files-found: error
+          retention-days: 30
