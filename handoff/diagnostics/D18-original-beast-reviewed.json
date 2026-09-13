@@ -1,7 +1,7 @@
 {
   "recorded_at_utc": "2026-09-13T05:06:41.367872+00:00",
   "finding": "D18",
-  "status": "CONFIRMED_ORIGINAL_FAILURE_NOT_REPRODUCED_ONCE",
+  "status": "DIAGNOSTIC_PASS_ON_SAME_SOURCE_BUT_DIFFERENT_DEPENDENCIES",
   "run_id": 34738009371,
   "job_id": 103672744624,
   "control_sha": "f906b249fb63714aa9b6de70ac119a6e1031c88f",
@@ -51,5 +51,11 @@
   "interpretation": "One unchanged same-host network command completed. Original detailed failure reason not recovered; no root-cause closure, product/environment attribution, qualification substitution or physical evidence. No further D18 diagnostic repetition.",
   "next_action": "Keep original ICSE Linux failure pending exact required-gate disposition; retain this non-reproduction and process separately active F85 infrastructure retry only when due.",
   "protected_recorder_data": "Not accessed or changed",
-  "physical_runtime_changed": false
+  "physical_runtime_changed": false,
+  "dependency_context_correction": {
+    "original_workflow": "constraints-phase2.txt, unpinned pip/ruff",
+    "diagnostic_control": "constraints-release.txt and pinned pip26.2.1; no ruff install",
+    "actual_version_differences": "D18-dependency-context-comparison.json",
+    "interpretation": "Not a matched-environment non-reproduction. Same host/source and command, but dependency setup and actual versions differed. No qualification or root-cause evidence may be inferred."
+  }
 }

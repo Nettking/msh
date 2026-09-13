@@ -2,6 +2,8 @@
 
 **Current actionable checkpoint: 2026-09-13T05:44:39.724494+00:00. Native5e26/37 required +3/3 companion PASS; only remaining release/ICSE recovery attempts active.**
 
+MANDATORY CORRECTION: D18 coordination diagnostic used constraints-release.txt/pinned pip, while actual ICSE uses constraints-phase2.txt/floating pip+ruff. Native logs show14 differing/missing package versions (diagnostics/D18-dependency-context-comparison.json). Its same-source10-check success is NOT a matched-environment non-reproduction and cannot support original-cause attribution. No qualification/physical evidence was counted from it. D20 harness repair must preserve existing ICSE dependency commands. No repeat diagnostic or dependency switch to force green.
+
 New confirmed D20 harness persistence defect: failed ICSE network public artifact is skipped and detailed worker cause remains private/unavailable. Evidence diagnostics/D20.md/json; independent of unresolved D18 runtime cause. NEXT: publish issue immediately, then isolated minimal harness repair/draftPR from mainb719; do not move PR4755e or disturb active release. Release remains due06:35UTC.
 
 2026-09-13 06:15UTC actionable transition: ICSE34734857086 attempt2 failed again, Linux103680410677 on Beast-Linux-WSL completed05:43:21UTC; publication bundle skipped. Original Windows/Compose successes retained. NEXT: retain native failure evidence and classify recurrence against D18 before further investigation. No third retry or repeated passing diagnostic. Release was not queried early; still due06:35UTC. Receipt diagnostics/pr475-icse-attempt2-completed.json.
