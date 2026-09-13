@@ -1,9 +1,9 @@
 {
-  "recorded_at_utc": "2026-09-13T03:11:17.152718+00:00",
+  "recorded_at_utc": "2026-09-13T03:11:22.267108+00:00",
   "plan_checkpoint": "e70280bc",
   "source_commit": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
   "ref": "codex/fix-d13-windows-refusal-response",
-  "stage": "cf8-role-retirement",
+  "stage": "phase-f85-operator-federation-surface",
   "records": [
     {
       "workflow": "cf7-acceptance-harness.yml",
@@ -65,6 +65,14 @@
       "workflow": "cf8-role-retirement.yml",
       "action": "dispatch_requested",
       "requested_at_utc": "2026-09-13T03:11:15.985636+00:00",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "phase-f85-operator-federation-surface.yml",
+      "action": "dispatch_requested",
+      "requested_at_utc": "2026-09-13T03:11:21.113927+00:00",
       "response": {
         "http_status": 204
       }
