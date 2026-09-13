@@ -9,7 +9,7 @@
   ],
   "workflow_file": ".github/workflows/icse-tool-demo.yml",
   "driver_file": "demo/icse/network/run.py",
-  "github_artifact": "Pending immediate publication",
+  "github_artifact": "https://github.com/Nettking/msh/issues/482",
   "repair_base": "b7194820d8f1940ae60b8c9639e09b7f61e65c55",
   "repair_branch": "codex/fix-d20-icse-failure-evidence",
   "protected_recorder_data": "Not accessed or changed",
