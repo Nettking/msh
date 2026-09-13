@@ -1,0 +1,41 @@
+922: 2026-09-13T22:55:33.9856792Z =================================== FAILURES ===================================
+923: 2026-09-13T22:55:33.9857216Z ___ test_a_store_failure_while_reading_pending_work_does_not_kill_the_driver ___
+924: 2026-09-13T22:55:33.9857484Z
+925: 2026-09-13T22:55:33.9858191Z tmp_path = PosixPath('<runner-temp>')
+926: 2026-09-13T22:55:33.9858592Z
+927: 2026-09-13T22:55:33.9858765Z     def test_a_store_failure_while_reading_pending_work_does_not_kill_the_driver(
+928: 2026-09-13T22:55:33.9859080Z         tmp_path,
+929: 2026-09-13T22:55:33.9859273Z     ) -> None:
+930: 2026-09-13T22:55:33.9860341Z         """``pending_job_ids`` is part of the pass, not unguarded loop scaffolding."""
+931: 2026-09-13T22:55:33.9861088Z
+932: 2026-09-13T22:55:33.9861300Z         stack = build_stack(tmp_path)
+933: 2026-09-13T22:55:33.9861551Z         stack.service.scheduler_poll_seconds = 0.05
+934: 2026-09-13T22:55:33.9861802Z         outcome = stack.submit()
+935: 2026-09-13T22:55:33.9862190Z
+936: 2026-09-13T22:55:33.9862381Z         real_pending = stack.service.pending_job_ids
+937: 2026-09-13T22:55:33.9862625Z         raised: list[int] = []
+938: 2026-09-13T22:55:33.9862805Z
+939: 2026-09-13T22:55:33.9862964Z         def pending_job_ids():
+940: 2026-09-13T22:55:33.9863166Z             if not raised:
+941: 2026-09-13T22:55:33.9863682Z                 raised.append(1)
+942: 2026-09-13T22:55:33.9863976Z                 raise sqlite3.OperationalError("database is locked")
+943: 2026-09-13T22:55:33.9864250Z             return real_pending()
+944: 2026-09-13T22:55:33.9864435Z
+945: 2026-09-13T22:55:33.9864781Z         stack.service.pending_job_ids = pending_job_ids
+946: 2026-09-13T22:55:33.9865473Z         try:
+947: 2026-09-13T22:55:33.9865705Z             assert stack.service.request_scheduling_pass() is True
+948: 2026-09-13T22:55:33.9865974Z >           assert _wait_until(
+949: 2026-09-13T22:55:33.9866230Z                 lambda: stack.store.snapshot(outcome.job_id).job.terminal
+950: 2026-09-13T22:55:33.9866561Z             ), "a store failure reading pending work killed the driver"
+951: 2026-09-13T22:55:33.9866924Z E           AssertionError: a store failure reading pending work killed the driver
+952: 2026-09-13T22:55:33.9867227Z E           assert False
+953: 2026-09-13T22:55:33.9867706Z E            +  where False = _wait_until(<function test_a_store_failure_while_reading_pending_work_does_not_kill_the_driver.<locals>.<lambda> at <memory-address>>)
+954: 2026-09-13T22:55:33.9868492Z
+955: 2026-09-13T22:55:33.9868697Z catalog/capabilities/tests/test_analysis_driver_supervision.py:203: AssertionError
+998: 2026-09-13T22:55:33.9904177Z -- Docs: <redacted-endpoint>
+999: 2026-09-13T22:55:33.9904613Z =========================== short test summary info ============================
+1000: 2026-09-13T22:55:33.9905369Z FAILED catalog/capabilities/tests/test_analysis_driver_supervision.py::test_a_store_failure_while_reading_pending_work_does_not_kill_the_driver - AssertionError: a store failure reading pending work killed the driver
+1001: 2026-09-13T22:55:33.9906050Z assert False
+1002: 2026-09-13T22:55:33.9906482Z  +  where False = _wait_until(<function test_a_store_failure_while_reading_pending_work_does_not_kill_the_driver.<locals>.<lambda> at <memory-address>>)
+1003: 2026-09-13T22:55:33.9907030Z 1 failed, 731 passed, 18 skipped, 44 warnings in 238.67s (0:03:58)
+1004: 2026-09-13T22:55:34.3030667Z ##[error]Process completed with exit code 1.

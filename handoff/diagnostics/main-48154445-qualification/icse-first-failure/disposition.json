@@ -1,0 +1,90 @@
+{
+  "all_owned_processes_stopped": true,
+  "artifact_id": 10326763815,
+  "artifact_members": [
+    {
+      "bytes": 4537,
+      "path": "events.jsonl"
+    },
+    {
+      "bytes": 7766,
+      "path": "operator-report.html"
+    },
+    {
+      "bytes": 7307,
+      "path": "summary.json"
+    }
+  ],
+  "artifact_sha256": "9b1e573b3db41d46b099888ca0c8b9951e78cdd84780f581d7a9d4b8eb1264a7",
+  "checks_before_failure": {
+    "authenticated_quorum_bootstrap": "PASS",
+    "independent_processes": "PASS"
+  },
+  "classification": "UNRESOLVED_NON_DEMONSTRATED_CANDIDATE_DEFECT",
+  "distinct_from_previous_symptom": "Initial reviewer join; no failover or successor reconnect occurred in this failed run.",
+  "execution_path": [
+    "demo/icse/network/run.py:400 reviewer.rpc(join) after voter connections, reviewer enrollment/connect, and invitation creation returned",
+    "demo/icse/network/worker.py:121 RelayNodeClient.join_session(invitation)",
+    "catalog/node/client.py:578 session.join request, then :586 request_replay; either may time out",
+    "catalog/node/client.py:540 request awaits response future with unchanged default 15-second timeout",
+    "demo/icse/network/worker.py:177 catches exception and returns type; run.py:262 raises WorkerCommandFailure"
+  ],
+  "failed_step": "Run independent-node network demonstration",
+  "failure": {
+    "command": {
+      "error_code": null,
+      "error_type": "TimeoutError",
+      "operation": "join",
+      "worker": "reviewer"
+    },
+    "type": "WorkerCommandFailure"
+  },
+  "job_id": 103806642856,
+  "native_checkout_proven": true,
+  "native_log_sha256": "a25d84af1ff4f4f27654758162959f53103ee7618281868b4fcddfe162e5b35f",
+  "next_action": "Root may select one failed-job-only recovery after the run is terminal, retaining successful jobs and this original evidence. No broader CI rerun, new trace run, deadline change, or source repair is supported by current evidence.",
+  "os": "Linux",
+  "physical_acceptance": "NOT_EVALUATED",
+  "product_mutations": false,
+  "protected_data_accessed": false,
+  "reason": "One initial-join timeout on exact main; current equal-tree Linux proof passed the same operation and all network checks. The retained failure does not identify a harness error, host cause, authority violation, or reproducible product mechanism.",
+  "recorded_at": "2026-09-13T23:12:35.226201+00:00",
+  "release_relevance": "Actual-main ICSE workflow failed; its publication cannot complete from this attempt. This is a qualification observation, not demonstrated grounds for a product repair or a new defect identifier. Physical join/reconnect acceptance remains independently required.",
+  "run_attempt": 1,
+  "run_id": 34787907928,
+  "same_tree_current_pr_crossproof": {
+    "all_ten_checks": "PASS",
+    "artifact_id": 10326138878,
+    "artifact_sha256": "6b1532a9f967696c77778e37064ebeed5ad0f25fa8460002d263736c300480be",
+    "job_id": 103802146427,
+    "join_event_at": "2026-09-13T22:03:51.389579Z",
+    "native_checkout_proven": true,
+    "network_result": "PASS",
+    "run_id": 34785372265,
+    "source": "1bd199b317eef613c3ba289ef39a20ae48f089e5",
+    "tree": "4f45748e55e7d976ef9936b8f77933eae8a5aa29"
+  },
+  "source": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "trace_coverage": {
+    "artifact_contains_private_trace": false,
+    "exact_existing_access_read": true,
+    "files": [
+      {
+        "errno": 2,
+        "error_type": "FileNotFoundError",
+        "relative_path": "reviewer/worker.stderr.log",
+        "status": "UNAVAILABLE"
+      },
+      {
+        "errno": 2,
+        "error_type": "FileNotFoundError",
+        "relative_path": "driver-failure.log",
+        "status": "UNAVAILABLE"
+      }
+    ],
+    "status": "UNAVAILABLE",
+    "underlying_join_stage_or_cause_proven": false
+  },
+  "tree": "4f45748e55e7d976ef9936b8f77933eae8a5aa29",
+  "workflow_mutations": false
+}

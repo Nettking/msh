@@ -1,0 +1,5 @@
+510: 2026-09-13T22:58:22.0516206Z 2026-09-13T22:58:22.050990Z 01 — Four independent local node processes
+511: 2026-09-13T22:58:23.0490865Z 2026-09-13T22:58:23.048146Z 02 — One Federation committed by the voter quorum
+512: 2026-09-13T22:58:42.2445495Z Demonstration failed: WorkerCommandFailure; details retained in private-state
+513: 2026-09-13T22:58:55.4451073Z NETWORK_DEMO=FAIL SOURCE_SHA=48154445d380980047bb5cbc39ae5b4c1a6889c0
+514: 2026-09-13T22:58:55.4778958Z ##[error]Process completed with exit code 1.

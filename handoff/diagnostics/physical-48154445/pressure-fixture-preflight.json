@@ -1,0 +1,23 @@
+{
+  "status": "FIXTURE_OBSERVATION_ONLY_NOT_PHYSICAL_PASS",
+  "candidate_sha": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "candidate_activation": "NOT_ACTIVATED_REQUIRES_QUALIFICATION_AND_FREEZE",
+  "observed_at": "2026-09-13T23:01:24Z",
+  "live_attempts": 1,
+  "read_only": true,
+  "helper_daemon_containment": "PASS",
+  "retained_ancestor_memory_bytes": 2415919104,
+  "retained_ancestor_swap_bytes": 0,
+  "host_memory_gate": "REFUSED",
+  "host_memory_reason": "Available host memory did not cover remaining retained helper allowance plus unchanged 512MiB margin.",
+  "classification": "CURRENT_FIXTURE_CAPACITY_PREREQUISITE_NOT_DEMONSTRATED_CANDIDATE_DEFECT",
+  "next_action": "Wait for meaningful host/load change; require passing unchanged memory gate and actual core PID/start/cgroup proof after normal startup before initialization or upload.",
+  "actual_core_containment": "NOT_YET_RUN",
+  "capped_observer_coverage": "Complete admission proof refuses at unchanged 10000-event cap; overflow and coverage errors retained.",
+  "local_harness_check_cases": 32,
+  "product_executions": 0,
+  "physical_assertions": 0,
+  "resource_limits_changed": false,
+  "private_observation_sha256": "245085cc1f177daf2503963cf6cfdc8c474538203e1becb46a4f53a656aff220",
+  "prepared_driver_manifest_sha256": "9f2d1d0aec2e31f3075cb2d83ea0a2acd4fe5e3e7e4bf62017e66c801e40c5af"
+}

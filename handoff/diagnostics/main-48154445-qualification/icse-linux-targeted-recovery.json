@@ -1,0 +1,22 @@
+{
+  "run_id": 34787907928,
+  "failed_job_id": 103806642856,
+  "source": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "head": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "status": "RECOVERY_REQUEST_ACCEPTED",
+  "requested_at": "2026-09-13T23:15:37.576038+00:00",
+  "preserved_successful_job_ids": [
+    103806642733,
+    103806642853
+  ],
+  "original_failure_log_sha256": "a25d84af1ff4f4f27654758162959f53103ee7618281868b4fcddfe162e5b35f",
+  "original_network_artifact_sha256": "9b1e573b3db41d46b099888ca0c8b9951e78cdd84780f581d7a9d4b8eb1264a7",
+  "disposition_sha256": "219b698814de8c2161be3067f9733a8f001ba3aa976d937b5d33875751a25536",
+  "whole_workflow_rerun": false,
+  "product_changes": false,
+  "runner_pool_changes": false,
+  "deadline_or_assertion_changes": false,
+  "new_trace_run": false,
+  "reason": "One initial reviewer join timeout after successful quorum. No underlying cause or candidate defect demonstrated; same-tree PR network passed. Preserve original evidence and successful jobs; recover only this failed exact-main job.",
+  "response": {}
+}

@@ -1,0 +1,127 @@
+{
+  "classification": "UNRESOLVED_NON_DEMONSTRATED_CANDIDATE_DEFECT",
+  "candidate_sha": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "tree": "4f45748e55e7d976ef9936b8f77933eae8a5aa29",
+  "run_id": 34787908014,
+  "run_attempt": 1,
+  "job_id": 103806642710,
+  "job_os": "Linux",
+  "job_url": "https://github.com/Nettking/msh/actions/runs/34787908014/job/103806642710",
+  "native_checkout_verified": true,
+  "native_log_sha256": "8b72ce3762fa4955fa9f583107526a02d824ce796bda436e3d8efa93f2401933",
+  "native_excerpt_sha256": "cde032d40a0acc1369b1ea9ce27ec95341e329a08aadd6c809f6b14eb04dd7bd",
+  "failed_node": "catalog/capabilities/tests/test_analysis_driver_supervision.py::test_a_store_failure_while_reading_pending_work_does_not_kill_the_driver",
+  "assertion_line": 203,
+  "deadline_seconds": 20.0,
+  "error": "terminal-state _wait_until returned false after one deliberately injected sqlite3.OperationalError(database is locked)",
+  "suite_counts": {
+    "failed": 1,
+    "passed": 731,
+    "skipped": 18
+  },
+  "what_is_not_demonstrated": [
+    "thread death",
+    "driver health at deadline",
+    "reason work remained nonterminal",
+    "host resource fault",
+    "deterministic harness defect"
+  ],
+  "current_code_path": {
+    "path": "catalog/capabilities/analysis/service.py",
+    "retry_error_line": 61,
+    "guarded_pending_read_line": 474,
+    "retry_catch_line": 475,
+    "explanation": "sqlite3.Error is inside the retry set; pending work reads are guarded and failed passes retry unless a successful read proves no backlog."
+  },
+  "same_tree_pr_required_suite_crossproof": {
+    "source": "1bd199b317eef613c3ba289ef39a20ae48f089e5",
+    "tree": "4f45748e55e7d976ef9936b8f77933eae8a5aa29",
+    "node": "catalog/capabilities/tests/test_analysis_driver_supervision.py::test_a_store_failure_while_reading_pending_work_does_not_kill_the_driver",
+    "passes": [
+      {
+        "artifact_id": 10326213970,
+        "entry": "junit-2.xml",
+        "classname": "catalog.capabilities.tests.test_analysis_driver_supervision",
+        "name": "test_a_store_failure_while_reading_pending_work_does_not_kill_the_driver",
+        "time_seconds": "0.274",
+        "verdict": "pass",
+        "artifact_sha256": "sha256:91c9df1e54f479e91f186be04a068dd8e029e26e6f578b6beda7c14e11a7c79a"
+      },
+      {
+        "artifact_id": 10326632389,
+        "entry": "order-fixed.xml",
+        "classname": "catalog.capabilities.tests.test_analysis_driver_supervision",
+        "name": "test_a_store_failure_while_reading_pending_work_does_not_kill_the_driver",
+        "time_seconds": "0.420",
+        "verdict": "pass",
+        "artifact_sha256": "sha256:ba5c4f2fd6f506155c68b6eb7f7f10c49949ec6f0ecc705a92b7a386e92b224e"
+      },
+      {
+        "artifact_id": 10326667159,
+        "entry": "windows-capability-product.xml",
+        "classname": "catalog.capabilities.tests.test_analysis_driver_supervision",
+        "name": "test_a_store_failure_while_reading_pending_work_does_not_kill_the_driver",
+        "time_seconds": "0.640",
+        "verdict": "pass",
+        "artifact_sha256": "sha256:c9711a49387a69e3050b8f59019458593827ecce96f7971c0cace598671da95e"
+      },
+      {
+        "artifact_id": 10326997382,
+        "entry": "order-rotating.xml",
+        "classname": "catalog.capabilities.tests.test_analysis_driver_supervision",
+        "name": "test_a_store_failure_while_reading_pending_work_does_not_kill_the_driver",
+        "time_seconds": "0.248",
+        "verdict": "pass",
+        "artifact_sha256": "sha256:992bb091718eaf6e0759a15e9cda3cadbc4974c577f5708b953720e026074494"
+      }
+    ],
+    "shards": [
+      {
+        "artifact_id": 10326213970,
+        "entry": "shard-2.json",
+        "index": 2,
+        "selected_and_executed": true,
+        "source_identity": {
+          "sha": "1bd199b317eef613c3ba289ef39a20ae48f089e5",
+          "tree": "4f45748e55e7d976ef9936b8f77933eae8a5aa29"
+        }
+      }
+    ]
+  },
+  "exact_main_required_coverage": {
+    "run_id": 34787907931,
+    "snapshot_recorded_at": "2026-09-13T22:57:14.439892+00:00",
+    "jobs": [
+      {
+        "id": 103806642833,
+        "name": "Windows regressions (capability-product)",
+        "status": "in_progress",
+        "conclusion": null
+      },
+      {
+        "id": 103806642834,
+        "name": "Linux regression shard (2)",
+        "status": "queued",
+        "conclusion": null
+      },
+      {
+        "id": 103806642839,
+        "name": "Full-suite order (rotating)",
+        "status": "queued",
+        "conclusion": null
+      },
+      {
+        "id": 103806642841,
+        "name": "Full-suite order (fixed)",
+        "status": "queued",
+        "conclusion": null
+      }
+    ]
+  },
+  "checked_release_contract": "docs/release_process.md:30-38 requires all complete release-gate jobs and immutable registry metadata; helper all-companion-green policy does not create an extra product contract.",
+  "next_action": "Use already-running exact-main Linux shard2/fixed/rotating and Windows capability-product node evidence. If mandatory exact-main evidence is green and no code-specific contrary evidence arises, retain this as non-demonstrated observation and continue under checked acceptance contract. Root alone decides whether one failed-job recovery is useful; no retry or change made.",
+  "product_changed": false,
+  "workflow_mutated": false,
+  "new_finding_number_created": false,
+  "physical_pass": false
+}
