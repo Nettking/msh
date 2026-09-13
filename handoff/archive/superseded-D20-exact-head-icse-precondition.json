@@ -1,0 +1,68 @@
+{
+  "recorded_at": "2026-09-13T09:47:16.236869+00:00",
+  "review_head": "06b956787ae63215982d5afd7198dead366e05ea",
+  "base_head": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "pull_reviews": {
+    "/pulls/483/reviews?per_page=100": [],
+    "/pulls/483/comments?per_page=100": [],
+    "/pulls/475/reviews?per_page=100": [],
+    "/pulls/475/comments?per_page=100": []
+  },
+  "runs": [
+    {
+      "id": 34746641274,
+      "path": ".github/workflows/product-branding.yml",
+      "status": "completed",
+      "conclusion": "success",
+      "event": "pull_request",
+      "head_sha": "06b956787ae63215982d5afd7198dead366e05ea",
+      "run_attempt": 1
+    },
+    {
+      "id": 34746641366,
+      "path": ".github/workflows/cf7b-product-physical-acceptance.yml",
+      "status": "completed",
+      "conclusion": "success",
+      "event": "pull_request",
+      "head_sha": "06b956787ae63215982d5afd7198dead366e05ea",
+      "run_attempt": 1
+    },
+    {
+      "id": 34746641262,
+      "path": ".github/workflows/icse-tool-demo.yml",
+      "status": "completed",
+      "conclusion": "failure",
+      "event": "pull_request",
+      "head_sha": "06b956787ae63215982d5afd7198dead366e05ea",
+      "run_attempt": 1
+    },
+    {
+      "id": 34746641323,
+      "path": ".github/workflows/phase2-federation.yml",
+      "status": "completed",
+      "conclusion": "success",
+      "event": "pull_request",
+      "head_sha": "06b956787ae63215982d5afd7198dead366e05ea",
+      "run_attempt": 1
+    },
+    {
+      "id": 34746641390,
+      "path": ".github/workflows/federation-software-update.yml",
+      "status": "completed",
+      "conclusion": "success",
+      "event": "pull_request",
+      "head_sha": "06b956787ae63215982d5afd7198dead366e05ea",
+      "run_attempt": 1
+    },
+    {
+      "id": 34746641263,
+      "path": ".github/workflows/federation-v1-release.yml",
+      "status": "completed",
+      "conclusion": "success",
+      "event": "pull_request",
+      "head_sha": "06b956787ae63215982d5afd7198dead366e05ea",
+      "run_attempt": 1
+    }
+  ],
+  "existing_exact_head_manual_icse": []
+}

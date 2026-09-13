@@ -1,0 +1,118 @@
+﻿2026-09-13T09:56:00.8588975Z Current runner version: '2.337.0'
+2026-09-13T09:56:00.8594631Z Runner name: 'Beast-Linux-WSL'
+2026-09-13T09:56:00.8595292Z Runner group name: 'Default'
+2026-09-13T09:56:00.8596092Z Machine name: 'Beast'
+2026-09-13T09:56:00.8598188Z ##[group]GITHUB_TOKEN Permissions
+2026-09-13T09:56:00.8600140Z Contents: read
+2026-09-13T09:56:00.8600700Z Metadata: read
+2026-09-13T09:56:00.8601159Z ##[endgroup]
+2026-09-13T09:56:00.8603097Z Secret source: Actions
+2026-09-13T09:56:00.8603909Z Cache mode: write
+2026-09-13T09:56:00.8604518Z Prepare workflow directory
+2026-09-13T09:56:00.9052392Z Prepare all required actions
+2026-09-13T09:56:00.9092181Z Getting action download info
+2026-09-13T09:56:01.3650816Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-09-13T09:56:01.8750380Z Complete job name: Verify immutable release image metadata
+2026-09-13T09:56:01.9335939Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-09-13T09:56:01.9343430Z ##[group]Run actions/checkout@v4
+2026-09-13T09:56:01.9344194Z with:
+2026-09-13T09:56:01.9344578Z   repository: Nettking/msh
+2026-09-13T09:56:01.9347846Z   token: ***
+2026-09-13T09:56:01.9348243Z   ssh-strict: true
+2026-09-13T09:56:01.9348632Z   ssh-user: git
+2026-09-13T09:56:01.9349018Z   persist-credentials: true
+2026-09-13T09:56:01.9349431Z   clean: true
+2026-09-13T09:56:01.9349820Z   sparse-checkout-cone-mode: true
+2026-09-13T09:56:01.9350263Z   fetch-depth: 1
+2026-09-13T09:56:01.9350642Z   fetch-tags: false
+2026-09-13T09:56:01.9351024Z   show-progress: true
+2026-09-13T09:56:01.9351412Z   lfs: false
+2026-09-13T09:56:01.9351811Z   submodules: false
+2026-09-13T09:56:01.9352202Z   set-safe-directory: true
+2026-09-13T09:56:01.9352634Z   allow-unsafe-pr-checkout: false
+2026-09-13T09:56:01.9353347Z ##[endgroup]
+2026-09-13T09:56:02.0155999Z Syncing repository: Nettking/msh
+2026-09-13T09:56:02.0157445Z ##[group]Getting Git version info
+2026-09-13T09:56:02.0158203Z Working directory is '/opt/actions-runner/_work/msh/msh'
+2026-09-13T09:56:02.0713102Z [command]/usr/bin/git version
+2026-09-13T09:56:02.0743429Z git version 2.53.0
+2026-09-13T09:56:02.0761874Z ##[endgroup]
+2026-09-13T09:56:02.0774662Z Temporarily overriding HOME='/opt/actions-runner/_work/_temp/90593767-d28f-433d-ad26-80c3ce5d016c' before making global git config changes
+2026-09-13T09:56:02.0776066Z Adding repository directory to the temporary git global config as a safe directory
+2026-09-13T09:56:02.0778704Z [command]/usr/bin/git config --global --add safe.directory /opt/actions-runner/_work/msh/msh
+2026-09-13T09:56:02.0805604Z [command]/usr/bin/git config --local --get remote.origin.url
+2026-09-13T09:56:02.0821552Z https://github.com/Nettking/msh
+2026-09-13T09:56:02.0833002Z ##[group]Removing previously created refs, to avoid conflicts
+2026-09-13T09:56:02.0836522Z [command]/usr/bin/git rev-parse --symbolic-full-name --verify --quiet HEAD
+2026-09-13T09:56:02.0851071Z HEAD
+2026-09-13T09:56:02.0902260Z ##[endgroup]
+2026-09-13T09:56:02.0905161Z [command]/usr/bin/git submodule status
+2026-09-13T09:56:02.1114711Z ##[group]Cleaning the repository
+2026-09-13T09:56:02.1117186Z [command]/usr/bin/git clean -ffdx
+2026-09-13T09:56:02.1157794Z Removing demo/icse/__pycache__/
+2026-09-13T09:56:02.1158475Z Removing downloaded-evidence/
+2026-09-13T09:56:02.1159106Z Removing downloaded-network-evidence/
+2026-09-13T09:56:02.1160023Z Removing publication-bundle/
+2026-09-13T09:56:02.1164343Z [command]/usr/bin/git reset --hard HEAD
+2026-09-13T09:56:02.1221354Z HEAD is now at f104038a Merge 06b956787ae63215982d5afd7198dead366e05ea into 5e6f184311019b9982e8544a18f3dc02c1b16e98
+2026-09-13T09:56:02.1226541Z ##[endgroup]
+2026-09-13T09:56:02.1229113Z ##[group]Disabling automatic garbage collection
+2026-09-13T09:56:02.1233109Z [command]/usr/bin/git config --local gc.auto 0
+2026-09-13T09:56:02.1255237Z ##[endgroup]
+2026-09-13T09:56:02.1256054Z ##[group]Setting up auth
+2026-09-13T09:56:02.1259887Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-09-13T09:56:02.1281438Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-09-13T09:56:02.1491682Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-09-13T09:56:02.1515064Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-09-13T09:56:02.1721113Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-09-13T09:56:02.1746011Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-09-13T09:56:02.1952012Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-09-13T09:56:02.1983890Z ##[endgroup]
+2026-09-13T09:56:02.1984890Z ##[group]Fetching the repository
+2026-09-13T09:56:02.1991394Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +f104038a2b77705adaa547cdd1df7d895bf80a41:refs/remotes/origin/codex/federation-v1-qualify-f104038a
+2026-09-13T09:56:02.7003184Z ##[endgroup]
+2026-09-13T09:56:02.7029763Z ##[group]Determining the checkout info
+2026-09-13T09:56:02.7031081Z ##[endgroup]
+2026-09-13T09:56:02.7031721Z [command]/usr/bin/git sparse-checkout disable
+2026-09-13T09:56:02.7064487Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-09-13T09:56:02.7088289Z ##[group]Checking out the ref
+2026-09-13T09:56:02.7092853Z [command]/usr/bin/git checkout --progress --force -B codex/federation-v1-qualify-f104038a refs/remotes/origin/codex/federation-v1-qualify-f104038a
+2026-09-13T09:56:02.7158589Z Switched to a new branch 'codex/federation-v1-qualify-f104038a'
+2026-09-13T09:56:02.7160375Z branch 'codex/federation-v1-qualify-f104038a' set up to track 'origin/codex/federation-v1-qualify-f104038a'.
+2026-09-13T09:56:02.7163062Z ##[endgroup]
+2026-09-13T09:56:02.7198330Z [command]/usr/bin/git log -1 --format=%H
+2026-09-13T09:56:02.7217684Z f104038a2b77705adaa547cdd1df7d895bf80a41
+2026-09-13T09:56:02.7403327Z ##[group]Run image="python:3.12.13-slim@sha256:57cd7c3a7a273101a6485ba99423ee568157882804b1124b4dd04266317710de"
+2026-09-13T09:56:02.7405577Z [36;1mimage="python:3.12.13-slim@sha256:57cd7c3a7a273101a6485ba99423ee568157882804b1124b4dd04266317710de"[0m
+2026-09-13T09:56:02.7407120Z [36;1mtest "$(head -n 1 Dockerfile)" = "FROM ${image}"[0m
+2026-09-13T09:56:02.7408104Z [36;1mtest "$(head -n 1 Dockerfile.cli)" = "FROM ${image}"[0m
+2026-09-13T09:56:02.7409287Z [36;1mdocker buildx imagetools inspect "${image}" >/tmp/python-image.txt[0m
+2026-09-13T09:56:02.7410426Z [36;1mgrep -q "linux/amd64" /tmp/python-image.txt[0m
+2026-09-13T09:56:02.7411294Z [36;1mgrep -q "linux/arm64" /tmp/python-image.txt[0m
+2026-09-13T09:56:02.7422266Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-09-13T09:56:02.7423106Z ##[endgroup]
+2026-09-13T09:56:03.9380548Z ##[group]Run image="ollama/ollama:0.32.6@sha256:b88c73ace3e115f8ec53dc8761ae1c0aabfa675406e3681786b98757ce050f42"
+2026-09-13T09:56:03.9382033Z [36;1mimage="ollama/ollama:0.32.6@sha256:b88c73ace3e115f8ec53dc8761ae1c0aabfa675406e3681786b98757ce050f42"[0m
+2026-09-13T09:56:03.9383275Z [36;1mtest "$(grep -Fc "image: ${image}" docker-compose.yml)" -eq 4[0m
+2026-09-13T09:56:03.9385512Z [36;1mdocker buildx imagetools inspect "${image}" >/tmp/ollama-image.txt[0m
+2026-09-13T09:56:03.9386603Z [36;1mgrep -q "linux/amd64" /tmp/ollama-image.txt[0m
+2026-09-13T09:56:03.9387552Z [36;1mgrep -q "linux/arm64" /tmp/ollama-image.txt[0m
+2026-09-13T09:56:03.9395789Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-09-13T09:56:03.9396815Z ##[endgroup]
+2026-09-13T09:56:05.0288195Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-09-13T09:56:05.0289956Z Post job cleanup.
+2026-09-13T09:56:05.1580335Z [command]/usr/bin/git version
+2026-09-13T09:56:05.1611749Z git version 2.53.0
+2026-09-13T09:56:05.1648824Z Temporarily overriding HOME='/opt/actions-runner/_work/_temp/04390be6-d7db-4846-9775-638a58f351b1' before making global git config changes
+2026-09-13T09:56:05.1649539Z Adding repository directory to the temporary git global config as a safe directory
+2026-09-13T09:56:05.1653466Z [command]/usr/bin/git config --global --add safe.directory /opt/actions-runner/_work/msh/msh
+2026-09-13T09:56:05.1686298Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-09-13T09:56:05.1716415Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-09-13T09:56:05.1925118Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-09-13T09:56:05.1943469Z http.https://github.com/.extraheader
+2026-09-13T09:56:05.1951952Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-09-13T09:56:05.1979280Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-09-13T09:56:05.2187492Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-09-13T09:56:05.2211053Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-09-13T09:56:05.2525671Z Cleaning up orphan processes
+2026-09-13T09:56:05.2599796Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

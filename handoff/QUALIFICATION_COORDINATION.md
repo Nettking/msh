@@ -1,6 +1,6 @@
 # Federation v1 current release checkpoint
 
-Updated 2026-09-13. Active context: clean release handoff + this checkpoint + live GitHub.
+Updated 2026-09-13T09:58Z. Active context: clean release handoff + this checkpoint + live GitHub.
 Historical coordination is archived in archive/QUALIFICATION_COORDINATION-c25045b9.md.
 
 ## Current source / heads
@@ -16,6 +16,7 @@ Historical coordination is archived in archive/QUALIFICATION_COORDINATION-c25045
 - f104 release 34746641263: 16/16 PASS; native source/artifact review retained.
 - f104 Phase 2 34746641323, CF7-B 34746641366, software update 34746641390: PASS.
 - f104 branding 34746641274: PASS. ICSE compose: PASS on attempt 1.
+- f104 registry metadata34750527921: PASS, native checkout and digest checks reviewed.
 - Prior #475/#473 valid qualification remains source-bound evidence; consult only
   the specific receipt needed to fill a current qualification/merge requirement.
 
@@ -36,8 +37,12 @@ Historical coordination is archived in archive/QUALIFICATION_COORDINATION-c25045
 ## Active work / next action
 1. ICSE 34746641262 targeted failed-job recovery accepted: attempt 2 queued.
    Retain original failures and successful compose; do not repeat the trace capture.
-2. Fill only seven absent exact-source workflows per diagnostics/f104-remaining-qualification.md.
-   Review recovery native source/public artifacts; retain all valid green evidence.
+2. Seven absent workflows submitted on codex/federation-v1-qualify-f104038a; registry PASS.
+   Six other gates queued/running; run IDs in diagnostics/f104-active-qualification.json.
+   Review new terminal results/native source/public artifacts; retain all green evidence.
+   Next bounded state check around10:15Z or a completion event; no duplicate dispatches.
+   Existing30-minute heartbeat now targets this fresh task; old task stopped all actions.
+   Current merge review: diagnostics/release-merge-review-current.json.
 3. Review and merge required release changes in dependency order (#475 before #483;
    separate #473 after its applicable qualification/review), without bypassing checks.
 4. Qualify actual resulting main once, freeze one authoritative SHA, run checked-in

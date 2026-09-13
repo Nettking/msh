@@ -1,0 +1,87 @@
+{
+  "at": "2026-09-13T09:52:38.538794+00:00",
+  "source": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+  "ref": "codex/federation-v1-qualify-f104038a",
+  "actions": [
+    {
+      "workflow": "cf7-acceptance-harness.yml",
+      "action": "workflow_dispatch",
+      "status": "accepted",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "cf7c-physical-test-readiness.yml",
+      "action": "workflow_dispatch",
+      "status": "accepted",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "cf8-role-retirement.yml",
+      "action": "workflow_dispatch",
+      "status": "accepted",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "phase-f85-operator-federation-surface.yml",
+      "action": "workflow_dispatch",
+      "status": "accepted",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "ci-test-sharding.yml",
+      "action": "workflow_dispatch",
+      "status": "accepted",
+      "reconciled_at": "2026-09-13T09:54:41.200117+00:00",
+      "existing_run_ids": [],
+      "previous_submission": "HTTP502; absent in subsequent repository branch listing and this workflow-specific exact-source listing",
+      "bounded_resubmission": true,
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "cfi2-onboarding-composition.yml",
+      "action": "workflow_dispatch",
+      "reconciled_at": "2026-09-13T09:54:44.536139+00:00",
+      "existing_run_ids": [],
+      "status": "accepted",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "release-image-metadata.yml",
+      "action": "workflow_dispatch",
+      "reconciled_at": "2026-09-13T09:54:46.562904+00:00",
+      "existing_run_ids": [],
+      "status": "accepted",
+      "response": {
+        "http_status": 204
+      }
+    }
+  ],
+  "preserve_green_gates": true,
+  "guarded_heads": {
+    "475": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+    "483": "06b956787ae63215982d5afd7198dead366e05ea",
+    "473": "440123f6bc6dc358eef3d233236bc14f91af60e0"
+  },
+  "existing_exact_source_runs": {
+    "cf7-acceptance-harness.yml": [],
+    "cf7c-physical-test-readiness.yml": [],
+    "cf8-role-retirement.yml": [],
+    "phase-f85-operator-federation-surface.yml": [],
+    "ci-test-sharding.yml": [],
+    "cfi2-onboarding-composition.yml": [],
+    "release-image-metadata.yml": []
+  },
+  "branch": "created at exact source"
+}

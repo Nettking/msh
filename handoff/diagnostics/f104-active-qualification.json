@@ -1,0 +1,67 @@
+{
+  "at": "2026-09-13T09:56:30.287237+00:00",
+  "recovery": {
+    "id": 34746641262,
+    "status": "queued",
+    "conclusion": null,
+    "run_attempt": 2
+  },
+  "qualification": [
+    {
+      "id": 34750527921,
+      "path": ".github/workflows/release-image-metadata.yml",
+      "head_sha": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+      "status": "completed",
+      "conclusion": "success",
+      "event": "workflow_dispatch"
+    },
+    {
+      "id": 34750525417,
+      "path": ".github/workflows/cfi2-onboarding-composition.yml",
+      "head_sha": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+      "status": "queued",
+      "conclusion": null,
+      "event": "workflow_dispatch"
+    },
+    {
+      "id": 34750523615,
+      "path": ".github/workflows/ci-test-sharding.yml",
+      "head_sha": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+      "status": "queued",
+      "conclusion": null,
+      "event": "workflow_dispatch"
+    },
+    {
+      "id": 34750448614,
+      "path": ".github/workflows/phase-f85-operator-federation-surface.yml",
+      "head_sha": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+      "status": "queued",
+      "conclusion": null,
+      "event": "workflow_dispatch"
+    },
+    {
+      "id": 34750447222,
+      "path": ".github/workflows/cf8-role-retirement.yml",
+      "head_sha": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+      "status": "queued",
+      "conclusion": null,
+      "event": "workflow_dispatch"
+    },
+    {
+      "id": 34750445380,
+      "path": ".github/workflows/cf7c-physical-test-readiness.yml",
+      "head_sha": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+      "status": "in_progress",
+      "conclusion": null,
+      "event": "workflow_dispatch"
+    },
+    {
+      "id": 34750443711,
+      "path": ".github/workflows/cf7-acceptance-harness.yml",
+      "head_sha": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+      "status": "in_progress",
+      "conclusion": null,
+      "event": "workflow_dispatch"
+    }
+  ]
+}

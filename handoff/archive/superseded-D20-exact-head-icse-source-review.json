@@ -1,0 +1,15 @@
+{
+  "recorded_at": "2026-09-13T09:48:17.150275+00:00",
+  "head": "06b956787ae63215982d5afd7198dead366e05ea",
+  "parent": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "retained_automatic_source": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+  "trees_identical": true,
+  "tree": "ff5af295717f6dc9dc90cea399e2d5901c38935d",
+  "D20_changed_files": [
+    ".github/workflows/icse-tool-demo.yml",
+    "catalog/federation/tests/test_icse_network_failure_reporting.py",
+    "demo/icse/network/run.py"
+  ],
+  "workflow_blob": "3bc185bc628f0ec8e3ca9cbe5403688271ef539b",
+  "qualification_identity": "Distinct commit IDs; preserve automatic evidence under its actual source, no relabeling"
+}

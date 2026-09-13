@@ -1,0 +1,27 @@
+{
+  "473": {
+    "scope": "Eight redundant workflow deletions and four documentation edits. Runtime/tests/remaining workflows unchanged relative to b719; prior exact440 scoped F7 native2/2 proof34701516368 retained.",
+    "failed_release_run": 34701429430,
+    "failed_release_job": 103583206021,
+    "underlying_error": "test_tailnet_join_responder.py::test_unknown_paths_are_refused: WinError10053. The two affected responder/test blobs at440 equal unfixed b719. Already repaired by #475 and covered in combined f104 release16/16.",
+    "dependent_aggregate_failures": 3,
+    "docs_jobs": [
+      103573774480,
+      103573774550
+    ],
+    "docs_classification": "Infrastructure admission: GitHub annotations explicitly say jobs were not started because account payments failed or spending limit needs increase. No candidate execution or demonstrated documentation defect."
+  },
+  "475": "Current two-file diff reviewed: immediate404 plus declared-body drain <=4096 bytes and one absolute10s cleanup budget; no authority/identity access on refusal. Existing native46PASS each OS and base-red focused proof retained.",
+  "483": "Current three-file diff reviewed: allowlisted command failure context and public upload after attempted failure; original commands/dependencies/deadlines/assertions, fail-closed exit1 and private-state exclusion preserved. Existing focused and both-OS failed-upload proof retained.",
+  "source": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+  "reviewed_heads": {
+    "473": "440123f6bc6dc358eef3d233236bc14f91af60e0",
+    "475": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+    "483": "06b956787ae63215982d5afd7198dead366e05ea"
+  },
+  "decision": "No additional candidate defect found by current small-diff review. Preserve source-bound evidence; finish current f104 required qualification before release merges, then actual resulting main qualification once. GitHub policy checks must not be bypassed.",
+  "external_review_claim": false,
+  "merged": false,
+  "physical_acceptance": "NOT_EVALUATED",
+  "protected_recorder_data": "NOT_ACCESSED_OR_CHANGED"
+}

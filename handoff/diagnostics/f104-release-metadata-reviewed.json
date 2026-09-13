@@ -1,0 +1,47 @@
+{
+  "source": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+  "run_id": 34750527921,
+  "job_id": 103706166785,
+  "result": "PASS",
+  "native_checkout": "git log -1 --format=%H emits exact f104038a2b77705adaa547cdd1df7d895bf80a41",
+  "runner": "Beast-Linux-WSL",
+  "steps": [
+    {
+      "name": "Set up job",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 1
+    },
+    {
+      "name": "Run actions/checkout@v4",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 2
+    },
+    {
+      "name": "Verify Python runtime image digest",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 3
+    },
+    {
+      "name": "Verify Ollama runtime image digest",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 4
+    },
+    {
+      "name": "Post Run actions/checkout@v4",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 8
+    },
+    {
+      "name": "Complete job",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 9
+    }
+  ],
+  "scope": "Read/verification of unchanged pinned Python and Ollama registry image digests and amd64/arm64 manifests; no image publication or deployment"
+}
