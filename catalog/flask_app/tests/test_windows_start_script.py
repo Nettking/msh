@@ -104,7 +104,8 @@ def test_start_cmd_recovers_runtime_state_before_host_build() -> None:
     assert '[string]$OutputFile = ""' in resolver
     assert "System.Text.UTF8Encoding($false)" in resolver
     assert "WriteAllLines" in resolver
-    assert 'docker ps --filter "publish=$PreferredPort"' in resolver
+    assert 'docker ps --filter "label=com.docker.compose.service=flask"' in resolver
+    assert "Test-PublishedWebBinding" in resolver
     assert "Test-FcpFlaskContainer" in resolver
     assert "Get-IdentityNodeId" in resolver
     assert "Get-RelayVolumeProbe" in resolver
