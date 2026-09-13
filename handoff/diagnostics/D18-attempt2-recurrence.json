@@ -1,0 +1,28 @@
+{
+  "recorded_at_utc": "2026-09-13T06:19:22.379162+00:00",
+  "finding": "D18",
+  "source_sha": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "run_id": 34734857086,
+  "attempt": 2,
+  "job_id": 103680410677,
+  "runner": "Beast-Linux-WSL",
+  "native_proof": {
+    "job_id": 103680410677,
+    "run_id": 34734857086,
+    "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
+    "runner_name": "Beast-Linux-WSL",
+    "conclusion": "failure",
+    "bytes": 45517,
+    "sha256": "b472f385e2c7bc1f7dfeb1deac9dcf762cca951a4ccad1278b43d8caa43ceef2",
+    "checkout_commits": [
+      "5e6f184311019b9982e8544a18f3dc02c1b16e98"
+    ],
+    "checkout_matches": true
+  },
+  "observed": "After01 independent processes and02 quorum bootstrap, RuntimeError before03 enrollment/join; NETWORK_DEMO=FAIL exit1. Original attempt1 failed after03 and before04. Detailed reason again only in private-state.",
+  "classification": "Unresolved original network/demo failure; different last stage does not establish a separate product root cause",
+  "command": "python -B -m demo.icse.network.run --source-sha 5e6f184311019b9982e8544a18f3dc02c1b16e98 --output /opt/actions-runner/_work/_temp/fcp-icse-network-34734857086-2-Linux",
+  "state_changed": "Ephemeral CI-owned node processes/state only; no product source or physical runtime change",
+  "protected_recorder_data": "Not accessed or changed",
+  "next_action": "No third automatic retry. Address independently established failure-evidence retention gap through isolated harness repair before further runtime diagnosis."
+}
