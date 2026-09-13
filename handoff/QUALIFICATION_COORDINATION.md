@@ -1,7 +1,7 @@
 # Federation v1 current release checkpoint
 
 Updated 2026-09-13. Active context: clean release handoff + this checkpoint + live GitHub.
-Historical coordination is archived in archive/QUALIFICATION_COORDINATION-7ae84e22.md.
+Historical coordination is archived in archive/QUALIFICATION_COORDINATION-c25045b9.md.
 
 ## Current source / heads
 - Combined native qualification source: f104038a2b77705adaa547cdd1df7d895bf80a41.
@@ -34,10 +34,10 @@ Historical coordination is archived in archive/QUALIFICATION_COORDINATION-7ae84e
 - Evidence: diagnostics/icse-trace-34749055328/review.json and native-artifact.zip.
 
 ## Active work / next action
-1. Perform one targeted failed-job recovery of ICSE 34746641262 on unchanged f104.
+1. ICSE 34746641262 targeted failed-job recovery accepted: attempt 2 queued.
    Retain original failures and successful compose; do not repeat the trace capture.
-2. Review recovery native source/public artifacts. Then fill only required exact-source
-   qualification gaps under checked-in contracts; retain all valid green evidence.
+2. Fill only seven absent exact-source workflows per diagnostics/f104-remaining-qualification.md.
+   Review recovery native source/public artifacts; retain all valid green evidence.
 3. Review and merge required release changes in dependency order (#475 before #483;
    separate #473 after its applicable qualification/review), without bypassing checks.
 4. Qualify actual resulting main once, freeze one authoritative SHA, run checked-in
