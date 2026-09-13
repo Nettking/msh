@@ -1,0 +1,26 @@
+{
+  "source": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+  "classification": "unresolved but non-demonstrated candidate defect",
+  "shared_mechanism": "Not established. Initial storage-ingest and reviewer-join request timeouts were different paths; quorum bootstrap passed.",
+  "bounded_recovery": {
+    "release": {
+      "run_id": 34760641401,
+      "job_id": 103738827421,
+      "runner_assigned_by_unchanged_pool": "Nettking",
+      "result": "370 passed, 1 skipped"
+    },
+    "icse": {
+      "run_id": 34760641469,
+      "job_id": 103738827228,
+      "runner_assigned_by_unchanged_pool": "Beast",
+      "result": "10/10 PASS; publication PASS"
+    }
+  },
+  "source_or_assertions_changed": false,
+  "runner_labels_accounts_or_pools_changed": false,
+  "all_required_and_companion_jobs_pass": true,
+  "native_checkout_and_artifact_source_verified": true,
+  "release_decision": "Current exact-source gates satisfied. Preserve the initial observations without promoting them to a demonstrated candidate defect; merge the repair and qualify actual resulting main once.",
+  "physical_pass": false,
+  "protected_recorder_data": "UNTOUCHED"
+}

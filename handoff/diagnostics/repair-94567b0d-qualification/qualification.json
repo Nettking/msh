@@ -1,0 +1,168 @@
+{
+  "reviewed_at": "2026-09-13T14:37:10.650658+00:00",
+  "source": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+  "tree": "8fd60c5e2886dfedb0248959fda6cbfc60413d2f",
+  "status": "EXACT_SOURCE_AUTOMATED_QUALIFIED",
+  "required_jobs_passed": 37,
+  "companion_jobs_passed": 3,
+  "native_checkout_proofs": 38,
+  "aggregate_jobs_without_checkout": 2,
+  "disjoint_complete_linux_test_coverage": 4528,
+  "release_artifacts": [
+    {
+      "id": 10319940596,
+      "name": "linux-regression-shard-3",
+      "digest": "sha256:6831cc584bce74e3648daa2bdc1d590bbf595a80f2429e16fe7158457cbe606c",
+      "files": [
+        {
+          "name": "shard-3.json",
+          "sha256": "98439c8e6eca02a1ba1a2445fe049b56486470deacf4a20698ea241a60036276"
+        },
+        {
+          "name": "junit-3.xml",
+          "sha256": "cf1e55dbb64505f02d25026e647f5148a12ad255a645709f956388c3e158b16d",
+          "tests": 1132,
+          "skipped": 10
+        }
+      ]
+    },
+    {
+      "id": 10319641156,
+      "name": "full-suite-order-rotating",
+      "digest": "sha256:dc33c4d3319eac580d4b334392ca01a41ef4e35074a3a438ad341d7b3e959939",
+      "files": [
+        {
+          "name": "order-rotating.xml",
+          "sha256": "8d16bea713c47144dae674a160274ad64278b3dc7e51587ce63f22a42211f3f4",
+          "tests": 4528,
+          "skipped": 42
+        }
+      ]
+    },
+    {
+      "id": 10319615473,
+      "name": "linux-regression-shard-2",
+      "digest": "sha256:3ec53fe03e93825b2c22579ced8995f08e0090e24a956df6a2bfa68f8b154170",
+      "files": [
+        {
+          "name": "shard-2.json",
+          "sha256": "4734ba3a9abd9d6d59faaec064989d5d4aca8e7da54196602b7d99530d052990"
+        },
+        {
+          "name": "junit-2.xml",
+          "sha256": "906d384124c0591d3415826292a08d91488e465acfab8dffd64f21ea2b4d3da0",
+          "tests": 1132,
+          "skipped": 7
+        }
+      ]
+    },
+    {
+      "id": 10319580673,
+      "name": "windows-regression-capability-product",
+      "digest": "sha256:35544052cac2c102b60ab806f47460706736f099c23a7f288358b8c0e091d658",
+      "files": [
+        {
+          "name": "windows-capability-product.xml",
+          "sha256": "5295a2030fb0e119a4097c347d1fae7847d451fcd2aa2e756b0a8e2ffd8a6ec0",
+          "tests": 895,
+          "skipped": 5
+        }
+      ]
+    },
+    {
+      "id": 10319565068,
+      "name": "linux-regression-shard-1",
+      "digest": "sha256:d1ae022fa3ec894eaceb74f88c6fc2e9908364c58be97be17d499efb84057f11",
+      "files": [
+        {
+          "name": "shard-1.json",
+          "sha256": "ca78a0dce7a3725589178685797e9aa95b662b789b5e8af8d640482c37f53403"
+        },
+        {
+          "name": "junit-1.xml",
+          "sha256": "90b4a278ca09a5a2f5064906c56ac4f1ec42f924533007aa0f4df1091f6b8c84",
+          "tests": 1132,
+          "skipped": 16
+        }
+      ]
+    },
+    {
+      "id": 10319337185,
+      "name": "windows-regression-journal-artifacts",
+      "digest": "sha256:8d0caefacf6ac7c064b51dc6d7d97c55efaeb74bf9bd4ac896987b404d8e78bd",
+      "files": [
+        {
+          "name": "windows-journal-artifacts.xml",
+          "sha256": "9ee241c8fbbb9373ad60b26b8c539cf5725658ade2762e4564b7f6d2173182b9",
+          "tests": 298,
+          "skipped": 1
+        }
+      ]
+    },
+    {
+      "id": 10319327624,
+      "name": "linux-regression-shard-0",
+      "digest": "sha256:29224a86f45ebe950f807049a282a63c81b4d0452ade68e73618530ad5d94cc5",
+      "files": [
+        {
+          "name": "shard-0.json",
+          "sha256": "e464c034bfaf3e96b52d3ba422250b6e28a2ae6bf163165b01c14369b9a21881"
+        },
+        {
+          "name": "junit-0.xml",
+          "sha256": "b1f7d942170eb22a5ff9bcc6ea7861cd13755d74d0e901f2910028670a94e428",
+          "tests": 1132,
+          "skipped": 9
+        }
+      ]
+    },
+    {
+      "id": 10319093481,
+      "name": "windows-regression-transport-storage",
+      "digest": "sha256:885765804d543e306af365176cf96917bbc5a36865e42c2d4d5833e9cfbf5d2f",
+      "files": [
+        {
+          "name": "windows-transport-storage.xml",
+          "sha256": "13c190a2c74730ae9a5f151057c9ade648d47e990c52c2cbfb2b7080a15d985a",
+          "tests": 371,
+          "skipped": 1
+        }
+      ]
+    },
+    {
+      "id": 10318837046,
+      "name": "full-suite-order-fixed",
+      "digest": "sha256:b679b1d281a432a7076fcd15c3f5c51b0c2b53c8c3eea2fb6a751ac7ef843b4d",
+      "files": [
+        {
+          "name": "order-fixed.xml",
+          "sha256": "40f4784f731239a0c4fb89248c914d5ce983b98a72427454b01c8368753e9882",
+          "tests": 4528,
+          "skipped": 42
+        }
+      ]
+    }
+  ],
+  "cf8_junit": [
+    {
+      "artifact_id": 10319870529,
+      "tests": 12,
+      "skipped": 0
+    },
+    {
+      "artifact_id": 10319156503,
+      "tests": 12,
+      "skipped": 0
+    }
+  ],
+  "publication_artifact": 10319767103,
+  "publication_digest": "sha256:2b73c8605ef725171e9ebc80b049ac9ade4a13faa8b90e94409783dfc66cd1a8",
+  "publication_source_matches_git_archive": true,
+  "network_checks": {
+    "Linux": "10/10 PASS",
+    "Windows": "10/10 PASS"
+  },
+  "component_checks": "4/4 PASS Linux, Windows, Compose",
+  "physical_acceptance": "NOT_PASSED",
+  "protected_recorder_data": "UNTOUCHED"
+}

@@ -1,0 +1,21 @@
+{
+  "reviewed_at": "2026-09-13T14:37:55.832828+00:00",
+  "pr": 486,
+  "title": "Preserve Windows build process exit status",
+  "head": "fe21bdc59bc1414fd7c4cdcf1aa4f6d6aa9048fe",
+  "base": "1492d925d791b9a0ebc7bcee39ce9b3b7477254b",
+  "qualified_merge_source": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+  "qualified_tree": "8fd60c5e2886dfedb0248959fda6cbfc60413d2f",
+  "mergeable": true,
+  "mergeable_state": "clean",
+  "draft": false,
+  "changed_files": [
+    "catalog/federation/tests/test_windows_build_quiescence_fail_closed.py",
+    "catalog/federation/tests/test_windows_controlled_build_contract.py",
+    "scripts/windows/fcp_host_build.ps1"
+  ],
+  "required_jobs_passed": 37,
+  "companion_jobs_passed": 3,
+  "physical_pass": false,
+  "review": "Small Windows process-handle and exit-status repair; native 20-test proof and real Docker failure proof retained. No weakened assertions, quorum, security, deadlines, or runner changes. One bounded failed-job recovery passed; initial timeout causes remain non-demonstrated candidate defects."
+}

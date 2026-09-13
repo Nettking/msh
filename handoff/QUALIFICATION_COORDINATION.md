@@ -1,91 +1,80 @@
 # Federation v1 current release checkpoint
 
-Updated 2026-09-13T13:56Z. Active context: clean handoff + this file + live GitHub.
-Historical coordination is evidence only; use it for a concrete current need.
+Updated 2026-09-13T14:40Z. Active context: clean handoff + this file + live GitHub.
+Historical coordination is evidence only; consult it for a concrete current need.
 
 ## Current source / heads
-- Previous frozen C=e6a9b74a1d555609eed6bf40c800e1258f1c9077 is BLOCKED and not
-  releasable: a real Windows build failure is reported as success. No replacement freeze.
-- Actual main=1492d925d791b9a0ebc7bcee39ce9b3b7477254b includes merged tooling PR485.
-- Product repair PR486 head=fe21bdc59bc1414fd7c4cdcf1aa4f6d6aa9048fe.
-- Combined qualification source=94567b0d9ac916eec9e4f094d2f6754562b966aa, pinned at
-  codex/federation-v1-qualify-94567b0d. Its tree8fd60c5e2886dfedb0248959fda6cbfc60413d2f
-  equals PR486 head tree; base main1492d925. No repair merge or new deployment yet.
-- Repair worktree: C:/wsl/fcp-v1-windows-build-exit-status-20260913,
-  branch codex/windows-build-exit-status-20260913, clean and pushed.
-- H=501b528e9476878e6a6fe5cde8240b2d54b1d263 is the independently pinned P01 harness.
-- Nettking and Nitro owned runtimes still run C; Recorder owned voter remains fba50818.
-- No release tag or complete physical PASS. Coordination remains outside product source.
+- Actual main=1aac6148759d7b2fd488ec26b97e1a786bdafa80 after normal PR486 merge.
+- Tree=8fd60c5e2886dfedb0248959fda6cbfc60413d2f equals the qualified repair tree.
+- Main worktree: C:/wsl/fcp-v1-1aac6148-main-20260913, clean, detached at actual main.
+- PR486 head=fe21bdc59bc1414fd7c4cdcf1aa4f6d6aa9048fe; qualified merge source
+  94567b0d9ac916eec9e4f094d2f6754562b966aa. PR485 tooling merged beforehand.
+- Previous frozen C=e6a9b74a1d555609eed6bf40c800e1258f1c9077 remains BLOCKED;
+  it can falsely report a failed Windows build as successful. No replacement freeze.
+- Nettking/Nitro owned runtimes still run C; Recorder owned voter remains fba50818.
+  No new runtime activation, release tag, publication, or complete physical PASS.
 
 ## Current green evidence
-- Prior C qualified once: 37/37 required +3/3 companions PASS, including release
-  34751832493 16/16 and ICSE34751934925 Windows/Linux10/10, Compose4/4, publication.
-  Retain diagnostics/main-e6a9b74a-qualification/qualification.json; do not rerun C.
-- Original ICSE bootstrap/reconnect findings were non-demonstrated candidate defects.
-  Their bounded capture/recovery is complete; no new ICSE diagnostic sweep.
-- H shared-volume accounting repair PR485: all8 applicable workflows/31 jobs PASS,
-  release34756997295 16/16. Four native logs prove merge990cb8f2 tree=H=main1492d925.
-  Proof: diagnostics/physical-e6a9b74a/growth-native-proof.json and ZIP.
-- PR486 focused native Windows tests20/20 PASS. Exit0 succeeds, exit7 refuses,
-  stdout/stderr preserved; existing cache cleanup tested. Ruff/diff PASS.
-- Real Docker red-to-green: C returns0 and writes success for a missing Dockerfile;
-  repaired controller returns1/core_image_build_failed:1, writes no success marker,
-  and leaves running core containers unchanged. Tested controller Git blob21b611f8.
-  Proof: diagnostics/physical-e6a9b74a/windows-build-exit-defect.json and red/green logs.
-- C's prior native readiness gates remain evidence, not qualification of the repair.
+- PR486 combined source945 qualified: 37/37 required +3/3 companions PASS.
+  Release34760641401 16/16; ICSE34760641469 Windows/Linux10/10, Compose4/4.
+  Native source proof:38 exact checkouts +2 aggregates;4528 disjoint Linux test IDs.
+  Publication source equals exact Git archive; all digests and native artifacts checked.
+  Proof: diagnostics/repair-94567b0d-qualification/qualification.json and archives.
+- Windows repair: native20/20 tests PASS; real missing-Dockerfile red-to-green
+  refuses the failure and writes no success marker, leaving core containers unchanged.
+  Proof: diagnostics/physical-e6a9b74a/windows-build-exit-defect.json.
+- One bounded PR486 failed-job recovery completed: Windows transport370 passed,
+  1 skipped; ICSE10/10 and publication PASS. No source, assertion, or runner-label change.
+  Original failures were storage-ingest timeout and reviewer-join timeout after quorum
+  bootstrap PASS. No shared mechanism or deterministic candidate defect demonstrated.
+  Retained originals/disposition: diagnostics/repair-94567b0d-qualification/.
+- PR485 shared-volume accounting tooling qualified and merged normally.
+  Earlier C gates and original ICSE capture are retained evidence; never rerun C
+  or reopen that completed diagnostic sweep.
 
 ## Actual blockers / disposition
-- Windows product defect is demonstrated on clean C and also present on main1492d925.
-  Start-Process can expose null ExitCode; casting to int turns failure into zero,
-  then old same-commit images satisfy identity. PR486 retains the process handle,
-  waits for completion and refuses unavailable/nonzero status through existing cleanup.
-  No bounds, assertions, authority or security changes.
-- Repair qualification is incomplete. At13:56 all13 expected workflows exist;
-  three workflows PASS, others queued/running, no failure. Await all required proof.
-- Physical C work stopped. Checked-in impact plan for PR486 requires all12 CF7
-  physical scenarios fresh, zero carry-forward, no unknown paths. After merge,
-  qualify actual resulting main once, freeze it, revalidate, then restart acceptance.
-- C Windows P01 had three activations/baseline/runtime PASS. Its hourly growth FAIL
-  was confounded by CI started by the tooling merge:790,487,040 shared-volume bytes,
-  with451,089,550 surviving new CI-temp bytes. Images/Docker totals stable.
-  No product-growth defect demonstrated. Preserve failed packets; no limit change.
-- Nitro C P01 stopped after one activation; the next build succeeded but readiness
-  timed out. Its owned builder is stopped, all three C cores still run, and a later
-  configured HTTP check also timed out. Physical readiness remains unresolved;
-  no additional defect demonstrated. Receipt: physical-e6a9b74a/nitro-post-p01-safety.json.
-- P07/P12 have not started. Owned recorder corpora are empty and aged history
-  insufficient. Pending user input: two approved real MTConnect endpoints and a
-  non-protected aged test corpus. Protected Recorder data remains untouched.
+- Actual-main qualification is incomplete. At14:40 all13 workflows exist, queued
+  or running, no reported failure. Seven auto-started; six gaps dispatched once.
+  Receipt/state: diagnostics/main-1aac6148-qualification/{gap-dispatch,
+  qualification-current}.json. Never dispatch duplicate workflows.
+- Product repair requires all12 physical scenarios fresh: checked-in impact plan
+  has zero carry-forward and no unknown paths. Freeze/revalidate new main first.
+- No physical executor is active. C Windows three-activation/baseline/runtime checks
+  passed, but growth failed with concurrent CI writes on the sampled shared volume.
+  Host-write confounding is demonstrated; no product-growth defect demonstrated.
+- Nitro C campaign stopped after a successful build followed by readiness timeout.
+  Owned builder stopped; three C cores running; later configured HTTP check timed out.
+  Physical readiness remains unresolved, not an additional demonstrated product defect.
+  Receipt: diagnostics/physical-e6a9b74a/nitro-post-p01-safety.json. Do not rerun C.
+- P07/P12 have not started. Owned recording corpora are empty; aged history insufficient.
+  Pending user input: two approved real MTConnect endpoints and a non-protected aged
+  test corpus. Protected Recorder data remains untouched.
 
 ## Active work / next action
-1. Inspect PR486 and its existing exact-source runs only on meaningful change.
-   Seven workflows started automatically; the six missing gates were dispatched
-   once at source94567b0d. No existing job rerun. Durable receipt:
-   diagnostics/physical-e6a9b74a/windows-repair-gap-dispatch.json.
-   Current status: windows-repair-qualification-current.json in that directory.
-   Review helper: review-windows-repair-qualification.py. Do not dispatch duplicates.
-2. Retain native source/artifact proof as these runs complete, review/merge PR486
-   with expected-head guard, then qualify resulting main once and freeze replacement.
-   The source tree must be finalized before acceptance; tag must equal accepted main.
-3. No physical executor remains active. H control records are under each harness
-   .acceptance/runtime-control; campaign evidence remains evidence/v1-physical.
-   Windows H: C:/wsl/fcp-v1-p01-filesystem-growth-20260913.
-   Nitro H: /home/martin/fcp-v1-501b528e-harness-20260913.
-4. Keep runtime contexts clean: C:/wsl/fcp-v1-73c779-nettking-runtime-20260910 and
-   /home/martin/fcp-v1-73c779-nitro-20260910/source. Harness/control/evidence/venv
-   files stay outside them. Both runtimes remain C until replacement qualification.
-5. Resolve remaining physical prerequisites and required P01-P12, CF7/B01-B09.
-   Let CI finish before Windows growth measurement. Never rewrite old observations
-   or silently replace campaign identities. Recorder candidate admission is pending.
-6. P07 real1h, P12 real24h with strict single-run evidence. No tag/publication or
-   physical PASS before all required observations and validation actually complete.
+1. Inspect existing actual-main runs on meaningful change:
+   diagnostics/qualify-current-release-main.py --source 1aac6148759d7b2fd488ec26b97e1a786bdafa80
+   Use no dispatch flag; the six missing gates were already accepted.
+2. Retain newly completed native source/artifact proof. Helpers under
+   diagnostics/repair-94567b0d-qualification/ accept --main-source <actual-main-SHA>:
+   retain-current-native.py, fetch-current-artifacts.py, review-completed-artifacts.py.
+   Run final artifact review only when all required actual-main jobs are green.
+3. Then freeze that verified main once, run checked-in revalidation and start fresh
+   physical acceptance P01-P12, CF7 and B01-B09. Tag must equal the accepted main.
+   Let CI finish before Windows disk-growth measurement. Recorder admission pending.
+4. Keep mutable controls/evidence/venv outside runtime build contexts:
+   C:/wsl/fcp-v1-73c779-nettking-runtime-20260910 and
+   /home/martin/fcp-v1-73c779-nitro-20260910/source.
+   Old H=501b528e controls remain in C:/wsl/fcp-v1-p01-filesystem-growth-20260913 and
+   /home/martin/fcp-v1-501b528e-harness-20260913; old evidence is never rewritten.
+5. P07 real1h and P12 real24h with strict single-run evidence. No physical PASS
+   or tag/publication before all required observations and validation finish.
 - One owner is this task; existing30-minute heartbeat targets it. Older task stopped.
-- PR485 merge receipt: diagnostics/physical-e6a9b74a/growth-repair-merge.json.
+- PR486 merge receipt: diagnostics/repair-94567b0d-qualification/merge-receipt.json.
 
 ## Immutable safety constraints
 - Never weaken assertions, quorum/authority, deadlines, security or acceptance.
 - Only credible current-candidate contract violations block v1; preserve host noise.
-- No broad sweep, blanket retry, unnecessary runner/account/label change.
+- No broad sweep, blanket retry, unnecessary runner/account/label changes.
 - AQG deliberately off and never a dependency. Protected Recorder data untouched.
 - No reset, operational Docker prune, volume deletion, Arrowhead restart or protected
   data action. Supported lifecycle may bound only its own regenerable builder cache.

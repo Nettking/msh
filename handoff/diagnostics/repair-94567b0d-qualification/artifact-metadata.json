@@ -1,0 +1,405 @@
+{
+  "source": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+  "read_at": "2026-09-13T14:36:13.751877+00:00",
+  "artifacts": [
+    {
+      "id": 10319940596,
+      "node_id": "MDg6QXJ0aWZhY3QxMDMxOTk0MDU5Ng==",
+      "name": "linux-regression-shard-3",
+      "size_in_bytes": 163219,
+      "url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10319940596",
+      "archive_download_url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10319940596/zip",
+      "expired": false,
+      "digest": "sha256:6831cc584bce74e3648daa2bdc1d590bbf595a80f2429e16fe7158457cbe606c",
+      "created_at": "2026-09-13T14:19:34Z",
+      "updated_at": "2026-09-13T14:19:34Z",
+      "expires_at": "2026-09-20T14:19:33Z",
+      "workflow_run": {
+        "id": 34760641401,
+        "repository_id": 1033058161,
+        "head_repository_id": 1033058161,
+        "head_branch": "codex/windows-build-exit-status-20260913",
+        "head_sha": "fe21bdc59bc1414fd7c4cdcf1aa4f6d6aa9048fe"
+      },
+      "qualification_workflow": "federation-v1-release.yml"
+    },
+    {
+      "id": 10319641156,
+      "node_id": "MDg6QXJ0aWZhY3QxMDMxOTY0MTE1Ng==",
+      "name": "full-suite-order-rotating",
+      "size_in_bytes": 108291,
+      "url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10319641156",
+      "archive_download_url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10319641156/zip",
+      "expired": false,
+      "digest": "sha256:dc33c4d3319eac580d4b334392ca01a41ef4e35074a3a438ad341d7b3e959939",
+      "created_at": "2026-09-13T14:16:52Z",
+      "updated_at": "2026-09-13T14:16:52Z",
+      "expires_at": "2026-09-20T14:16:51Z",
+      "workflow_run": {
+        "id": 34760641401,
+        "repository_id": 1033058161,
+        "head_repository_id": 1033058161,
+        "head_branch": "codex/windows-build-exit-status-20260913",
+        "head_sha": "fe21bdc59bc1414fd7c4cdcf1aa4f6d6aa9048fe"
+      },
+      "qualification_workflow": "federation-v1-release.yml"
+    },
+    {
+      "id": 10319615473,
+      "node_id": "MDg6QXJ0aWZhY3QxMDMxOTYxNTQ3Mw==",
+      "name": "linux-regression-shard-2",
+      "size_in_bytes": 160989,
+      "url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10319615473",
+      "archive_download_url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10319615473/zip",
+      "expired": false,
+      "digest": "sha256:3ec53fe03e93825b2c22579ced8995f08e0090e24a956df6a2bfa68f8b154170",
+      "created_at": "2026-09-13T14:07:03Z",
+      "updated_at": "2026-09-13T14:07:03Z",
+      "expires_at": "2026-09-20T14:07:02Z",
+      "workflow_run": {
+        "id": 34760641401,
+        "repository_id": 1033058161,
+        "head_repository_id": 1033058161,
+        "head_branch": "codex/windows-build-exit-status-20260913",
+        "head_sha": "fe21bdc59bc1414fd7c4cdcf1aa4f6d6aa9048fe"
+      },
+      "qualification_workflow": "federation-v1-release.yml"
+    },
+    {
+      "id": 10319580673,
+      "node_id": "MDg6QXJ0aWZhY3QxMDMxOTU4MDY3Mw==",
+      "name": "windows-regression-capability-product",
+      "size_in_bytes": 21419,
+      "url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10319580673",
+      "archive_download_url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10319580673/zip",
+      "expired": false,
+      "digest": "sha256:35544052cac2c102b60ab806f47460706736f099c23a7f288358b8c0e091d658",
+      "created_at": "2026-09-13T14:07:36Z",
+      "updated_at": "2026-09-13T14:07:36Z",
+      "expires_at": "2026-09-20T14:07:35Z",
+      "workflow_run": {
+        "id": 34760641401,
+        "repository_id": 1033058161,
+        "head_repository_id": 1033058161,
+        "head_branch": "codex/windows-build-exit-status-20260913",
+        "head_sha": "fe21bdc59bc1414fd7c4cdcf1aa4f6d6aa9048fe"
+      },
+      "qualification_workflow": "federation-v1-release.yml"
+    },
+    {
+      "id": 10319565068,
+      "node_id": "MDg6QXJ0aWZhY3QxMDMxOTU2NTA2OA==",
+      "name": "linux-regression-shard-1",
+      "size_in_bytes": 163105,
+      "url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10319565068",
+      "archive_download_url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10319565068/zip",
+      "expired": false,
+      "digest": "sha256:d1ae022fa3ec894eaceb74f88c6fc2e9908364c58be97be17d499efb84057f11",
+      "created_at": "2026-09-13T13:58:00Z",
+      "updated_at": "2026-09-13T13:58:00Z",
+      "expires_at": "2026-09-20T13:57:58Z",
+      "workflow_run": {
+        "id": 34760641401,
+        "repository_id": 1033058161,
+        "head_repository_id": 1033058161,
+        "head_branch": "codex/windows-build-exit-status-20260913",
+        "head_sha": "fe21bdc59bc1414fd7c4cdcf1aa4f6d6aa9048fe"
+      },
+      "qualification_workflow": "federation-v1-release.yml"
+    },
+    {
+      "id": 10319337185,
+      "node_id": "MDg6QXJ0aWZhY3QxMDMxOTMzNzE4NQ==",
+      "name": "windows-regression-journal-artifacts",
+      "size_in_bytes": 6855,
+      "url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10319337185",
+      "archive_download_url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10319337185/zip",
+      "expired": false,
+      "digest": "sha256:8d0caefacf6ac7c064b51dc6d7d97c55efaeb74bf9bd4ac896987b404d8e78bd",
+      "created_at": "2026-09-13T14:16:31Z",
+      "updated_at": "2026-09-13T14:16:31Z",
+      "expires_at": "2026-09-20T14:16:30Z",
+      "workflow_run": {
+        "id": 34760641401,
+        "repository_id": 1033058161,
+        "head_repository_id": 1033058161,
+        "head_branch": "codex/windows-build-exit-status-20260913",
+        "head_sha": "fe21bdc59bc1414fd7c4cdcf1aa4f6d6aa9048fe"
+      },
+      "qualification_workflow": "federation-v1-release.yml"
+    },
+    {
+      "id": 10319327624,
+      "node_id": "MDg6QXJ0aWZhY3QxMDMxOTMyNzYyNA==",
+      "name": "linux-regression-shard-0",
+      "size_in_bytes": 158651,
+      "url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10319327624",
+      "archive_download_url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10319327624/zip",
+      "expired": false,
+      "digest": "sha256:29224a86f45ebe950f807049a282a63c81b4d0452ade68e73618530ad5d94cc5",
+      "created_at": "2026-09-13T14:22:57Z",
+      "updated_at": "2026-09-13T14:22:57Z",
+      "expires_at": "2026-09-20T14:22:55Z",
+      "workflow_run": {
+        "id": 34760641401,
+        "repository_id": 1033058161,
+        "head_repository_id": 1033058161,
+        "head_branch": "codex/windows-build-exit-status-20260913",
+        "head_sha": "fe21bdc59bc1414fd7c4cdcf1aa4f6d6aa9048fe"
+      },
+      "qualification_workflow": "federation-v1-release.yml"
+    },
+    {
+      "id": 10319093481,
+      "node_id": "MDg6QXJ0aWZhY3QxMDMxOTA5MzQ4MQ==",
+      "name": "windows-regression-transport-storage",
+      "size_in_bytes": 8765,
+      "url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10319093481",
+      "archive_download_url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10319093481/zip",
+      "expired": false,
+      "digest": "sha256:885765804d543e306af365176cf96917bbc5a36865e42c2d4d5833e9cfbf5d2f",
+      "created_at": "2026-09-13T14:36:02Z",
+      "updated_at": "2026-09-13T14:36:02Z",
+      "expires_at": "2026-09-20T14:36:00Z",
+      "workflow_run": {
+        "id": 34760641401,
+        "repository_id": 1033058161,
+        "head_repository_id": 1033058161,
+        "head_branch": "codex/windows-build-exit-status-20260913",
+        "head_sha": "fe21bdc59bc1414fd7c4cdcf1aa4f6d6aa9048fe"
+      },
+      "qualification_workflow": "federation-v1-release.yml"
+    },
+    {
+      "id": 10318837046,
+      "node_id": "MDg6QXJ0aWZhY3QxMDMxODgzNzA0Ng==",
+      "name": "full-suite-order-fixed",
+      "size_in_bytes": 108388,
+      "url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10318837046",
+      "archive_download_url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10318837046/zip",
+      "expired": false,
+      "digest": "sha256:b679b1d281a432a7076fcd15c3f5c51b0c2b53c8c3eea2fb6a751ac7ef843b4d",
+      "created_at": "2026-09-13T13:54:28Z",
+      "updated_at": "2026-09-13T13:54:28Z",
+      "expires_at": "2026-09-20T13:54:27Z",
+      "workflow_run": {
+        "id": 34760641401,
+        "repository_id": 1033058161,
+        "head_repository_id": 1033058161,
+        "head_branch": "codex/windows-build-exit-status-20260913",
+        "head_sha": "fe21bdc59bc1414fd7c4cdcf1aa4f6d6aa9048fe"
+      },
+      "qualification_workflow": "federation-v1-release.yml"
+    },
+    {
+      "id": 10319767103,
+      "node_id": "MDg6QXJ0aWZhY3QxMDMxOTc2NzEwMw==",
+      "name": "fcp-icse-tool-demo-bundle-94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "size_in_bytes": 4226645,
+      "url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10319767103",
+      "archive_download_url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10319767103/zip",
+      "expired": false,
+      "digest": "sha256:2b73c8605ef725171e9ebc80b049ac9ade4a13faa8b90e94409783dfc66cd1a8",
+      "created_at": "2026-09-13T14:34:58Z",
+      "updated_at": "2026-09-13T14:34:58Z",
+      "expires_at": "2026-12-12T14:32:04Z",
+      "workflow_run": {
+        "id": 34760641469,
+        "repository_id": 1033058161,
+        "head_repository_id": 1033058161,
+        "head_branch": "codex/windows-build-exit-status-20260913",
+        "head_sha": "fe21bdc59bc1414fd7c4cdcf1aa4f6d6aa9048fe"
+      },
+      "qualification_workflow": "icse-tool-demo.yml"
+    },
+    {
+      "id": 10319722123,
+      "node_id": "MDg6QXJ0aWZhY3QxMDMxOTcyMjEyMw==",
+      "name": "icse-summary-Windows",
+      "size_in_bytes": 1046,
+      "url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10319722123",
+      "archive_download_url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10319722123/zip",
+      "expired": false,
+      "digest": "sha256:321a171cedbd758332be9b86a8ffdf17fd4c594bb15911c0c338d9f29ce169dd",
+      "created_at": "2026-09-13T14:33:57Z",
+      "updated_at": "2026-09-13T14:33:57Z",
+      "expires_at": "2026-12-12T14:32:04Z",
+      "workflow_run": {
+        "id": 34760641469,
+        "repository_id": 1033058161,
+        "head_repository_id": 1033058161,
+        "head_branch": "codex/windows-build-exit-status-20260913",
+        "head_sha": "fe21bdc59bc1414fd7c4cdcf1aa4f6d6aa9048fe"
+      },
+      "qualification_workflow": "icse-tool-demo.yml"
+    },
+    {
+      "id": 10319627332,
+      "node_id": "MDg6QXJ0aWZhY3QxMDMxOTYyNzMzMg==",
+      "name": "icse-network-summary-Windows",
+      "size_in_bytes": 8289,
+      "url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10319627332",
+      "archive_download_url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10319627332/zip",
+      "expired": false,
+      "digest": "sha256:88625c4d95992449e75dcc55e4f41d015185f990f7d2d198441a7fe6fbd69f8e",
+      "created_at": "2026-09-13T14:34:38Z",
+      "updated_at": "2026-09-13T14:34:38Z",
+      "expires_at": "2026-12-12T14:32:04Z",
+      "workflow_run": {
+        "id": 34760641469,
+        "repository_id": 1033058161,
+        "head_repository_id": 1033058161,
+        "head_branch": "codex/windows-build-exit-status-20260913",
+        "head_sha": "fe21bdc59bc1414fd7c4cdcf1aa4f6d6aa9048fe"
+      },
+      "qualification_workflow": "icse-tool-demo.yml"
+    },
+    {
+      "id": 10319600585,
+      "node_id": "MDg6QXJ0aWZhY3QxMDMxOTYwMDU4NQ==",
+      "name": "icse-summary-Windows",
+      "size_in_bytes": 1046,
+      "url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10319600585",
+      "archive_download_url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10319600585/zip",
+      "expired": false,
+      "digest": "sha256:db9ee28d76dbf9e09dc7812b5fd711ed00fc1edcabd1adeea224074d646b41c1",
+      "created_at": "2026-09-13T14:08:01Z",
+      "updated_at": "2026-09-13T14:08:01Z",
+      "expires_at": "2026-12-12T13:43:39Z",
+      "workflow_run": {
+        "id": 34760641469,
+        "repository_id": 1033058161,
+        "head_repository_id": 1033058161,
+        "head_branch": "codex/windows-build-exit-status-20260913",
+        "head_sha": "fe21bdc59bc1414fd7c4cdcf1aa4f6d6aa9048fe"
+      },
+      "qualification_workflow": "icse-tool-demo.yml"
+    },
+    {
+      "id": 10319311126,
+      "node_id": "MDg6QXJ0aWZhY3QxMDMxOTMxMTEyNg==",
+      "name": "icse-summary-compose",
+      "size_in_bytes": 1038,
+      "url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10319311126",
+      "archive_download_url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10319311126/zip",
+      "expired": false,
+      "digest": "sha256:c19863379d2491dd1944fd4ed246d0d8ca421bb55617b3c9c921a0472f63baf4",
+      "created_at": "2026-09-13T13:58:32Z",
+      "updated_at": "2026-09-13T13:58:32Z",
+      "expires_at": "2026-12-12T13:43:39Z",
+      "workflow_run": {
+        "id": 34760641469,
+        "repository_id": 1033058161,
+        "head_repository_id": 1033058161,
+        "head_branch": "codex/windows-build-exit-status-20260913",
+        "head_sha": "fe21bdc59bc1414fd7c4cdcf1aa4f6d6aa9048fe"
+      },
+      "qualification_workflow": "icse-tool-demo.yml"
+    },
+    {
+      "id": 10319091841,
+      "node_id": "MDg6QXJ0aWZhY3QxMDMxOTA5MTg0MQ==",
+      "name": "icse-network-summary-Linux",
+      "size_in_bytes": 8221,
+      "url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10319091841",
+      "archive_download_url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10319091841/zip",
+      "expired": false,
+      "digest": "sha256:5f88f8f533e6ea92531aca65a3a71122d1dfec336ca41eae2e5f3524d494990e",
+      "created_at": "2026-09-13T14:03:57Z",
+      "updated_at": "2026-09-13T14:03:57Z",
+      "expires_at": "2026-12-12T13:43:39Z",
+      "workflow_run": {
+        "id": 34760641469,
+        "repository_id": 1033058161,
+        "head_repository_id": 1033058161,
+        "head_branch": "codex/windows-build-exit-status-20260913",
+        "head_sha": "fe21bdc59bc1414fd7c4cdcf1aa4f6d6aa9048fe"
+      },
+      "qualification_workflow": "icse-tool-demo.yml"
+    },
+    {
+      "id": 10318857798,
+      "node_id": "MDg6QXJ0aWZhY3QxMDMxODg1Nzc5OA==",
+      "name": "icse-network-summary-Windows",
+      "size_in_bytes": 3910,
+      "url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10318857798",
+      "archive_download_url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10318857798/zip",
+      "expired": false,
+      "digest": "sha256:dda282c5a7206d18d1f747be2f4351bd7cab43443fb9e07ad8c6f9a6d9120944",
+      "created_at": "2026-09-13T14:08:36Z",
+      "updated_at": "2026-09-13T14:08:36Z",
+      "expires_at": "2026-12-12T13:43:39Z",
+      "workflow_run": {
+        "id": 34760641469,
+        "repository_id": 1033058161,
+        "head_repository_id": 1033058161,
+        "head_branch": "codex/windows-build-exit-status-20260913",
+        "head_sha": "fe21bdc59bc1414fd7c4cdcf1aa4f6d6aa9048fe"
+      },
+      "qualification_workflow": "icse-tool-demo.yml"
+    },
+    {
+      "id": 10318782815,
+      "node_id": "MDg6QXJ0aWZhY3QxMDMxODc4MjgxNQ==",
+      "name": "icse-summary-Linux",
+      "size_in_bytes": 1038,
+      "url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10318782815",
+      "archive_download_url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10318782815/zip",
+      "expired": false,
+      "digest": "sha256:c771bfd8d5a52853839e226d78070d1a45adbbf93a6640a6b3638f4f984b05fd",
+      "created_at": "2026-09-13T14:03:35Z",
+      "updated_at": "2026-09-13T14:03:35Z",
+      "expires_at": "2026-12-12T13:43:39Z",
+      "workflow_run": {
+        "id": 34760641469,
+        "repository_id": 1033058161,
+        "head_repository_id": 1033058161,
+        "head_branch": "codex/windows-build-exit-status-20260913",
+        "head_sha": "fe21bdc59bc1414fd7c4cdcf1aa4f6d6aa9048fe"
+      },
+      "qualification_workflow": "icse-tool-demo.yml"
+    },
+    {
+      "id": 10319870529,
+      "node_id": "MDg6QXJ0aWZhY3QxMDMxOTg3MDUyOQ==",
+      "name": "cf8-acceptance-Windows",
+      "size_in_bytes": 711,
+      "url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10319870529",
+      "archive_download_url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10319870529/zip",
+      "expired": false,
+      "digest": "sha256:6fe151d2b3144c9cbd8c188b8ae5816153c93e9ffcc202e64a07cc020794a59e",
+      "created_at": "2026-09-13T14:14:52Z",
+      "updated_at": "2026-09-13T14:14:52Z",
+      "expires_at": "2026-12-12T13:46:21Z",
+      "workflow_run": {
+        "id": 34760769024,
+        "repository_id": 1033058161,
+        "head_repository_id": 1033058161,
+        "head_branch": "codex/federation-v1-qualify-94567b0d",
+        "head_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa"
+      },
+      "qualification_workflow": "cf8-role-retirement.yml"
+    },
+    {
+      "id": 10319156503,
+      "node_id": "MDg6QXJ0aWZhY3QxMDMxOTE1NjUwMw==",
+      "name": "cf8-acceptance-Linux",
+      "size_in_bytes": 699,
+      "url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10319156503",
+      "archive_download_url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10319156503/zip",
+      "expired": false,
+      "digest": "sha256:8e36516c6b865bc537ac52f6f433d23cdb89edcf0bd8d30bce54d80406774c31",
+      "created_at": "2026-09-13T13:59:43Z",
+      "updated_at": "2026-09-13T13:59:43Z",
+      "expires_at": "2026-12-12T13:46:21Z",
+      "workflow_run": {
+        "id": 34760769024,
+        "repository_id": 1033058161,
+        "head_repository_id": 1033058161,
+        "head_branch": "codex/federation-v1-qualify-94567b0d",
+        "head_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa"
+      },
+      "qualification_workflow": "cf8-role-retirement.yml"
+    }
+  ]
+}

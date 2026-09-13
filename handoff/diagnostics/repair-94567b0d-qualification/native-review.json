@@ -1,0 +1,602 @@
+{
+  "source": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+  "reviewed_at": "2026-09-13T14:37:09.733187+00:00",
+  "current_completed_jobs": 40,
+  "source_verified_jobs": 38,
+  "archive_sha256": "52850d5406739ac2ab1baeec87afaeca93c9d7590fba2bc735abeb792d50097d",
+  "jobs": [
+    {
+      "job_id": 103732755375,
+      "run_id": 34760641390,
+      "name": "product-branding",
+      "conclusion": "success",
+      "runner": "Beast-Linux-WSL",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "8429276de8d085bcf2a9db2db5a05214ad63122c7e3f080a27ce11e0f6dcc8e3",
+      "pytest_summaries": [],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103738827421,
+      "run_id": 34760641401,
+      "name": "Windows regressions (transport-storage)",
+      "conclusion": "success",
+      "runner": "Nettking",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "91eee980dab69687bc7008f91ef508d47594f4eaf5238f2c28c12789818db991",
+      "pytest_summaries": [
+        "2026-09-13T14:35:59.1947778Z 370 passed, 1 skipped in 89.47s (0:01:29)"
+      ],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103738827935,
+      "run_id": 34760641401,
+      "name": "Linux regression shard (1)",
+      "conclusion": "success",
+      "runner": "Nettking-Linux",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "e6e1b8073799f79b6780d9a9fb01cc6d6f0879136215ad3144e2cf5e2a642283",
+      "pytest_summaries": [
+        "2026-09-13T13:57:56.8361404Z 1116 passed, 16 skipped, 3396 deselected, 57 warnings in 155.36s (0:02:35)"
+      ],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103738828054,
+      "run_id": 34760641401,
+      "name": "Full-suite order (fixed)",
+      "conclusion": "success",
+      "runner": "Nettking-Linux",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "448746ce769fd98108dd0f9eab2a0c5076781bd325b91bb2e29f901d9c085003",
+      "pytest_summaries": [
+        "2026-09-13T13:54:24.0764736Z 4486 passed, 42 skipped, 453 warnings in 561.11s (0:09:21)"
+      ],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103738828194,
+      "run_id": 34760641401,
+      "name": "Linux regression shard (2)",
+      "conclusion": "success",
+      "runner": "Nettking-Linux",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "3b9c863439504561d7122dff78fa900aba0473f181c2d4b5e03c3bb1c1b5b6fd",
+      "pytest_summaries": [
+        "2026-09-13T14:07:00.8064744Z 1125 passed, 7 skipped, 3396 deselected, 244 warnings in 133.15s (0:02:13)"
+      ],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103738828366,
+      "run_id": 34760641401,
+      "name": "Clean-checkout suite order independence",
+      "conclusion": "success",
+      "runner": "Nettking-Linux",
+      "checkout_sha": null,
+      "log_sha256": "ec119a503f423aac3c52235ecf0b408745aa905099347e2dfb6ce42e59cfe3fe",
+      "pytest_summaries": [],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103738839092,
+      "run_id": 34760641401,
+      "name": "Full-suite order (rotating)",
+      "conclusion": "success",
+      "runner": "Nettking-Linux",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "41f818679e44ea0c17919daee93b670a9dbbf070b92bffe0452a6dce45ff9635",
+      "pytest_summaries": [
+        "2026-09-13T14:16:48.1916043Z 4486 passed, 42 skipped, 453 warnings in 536.72s (0:08:56)"
+      ],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103738839261,
+      "run_id": 34760641401,
+      "name": "Windows regressions (journal-artifacts)",
+      "conclusion": "success",
+      "runner": "Beast",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "bd4eceaa5dd6b416f17c797499facca1892f68da9b3b7bdfedb8f7baea849c56",
+      "pytest_summaries": [
+        "2026-09-13T14:16:29.0731845Z 297 passed, 1 skipped, 1 warning in 369.35s (0:06:09)"
+      ],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103738840828,
+      "run_id": 34760641401,
+      "name": "Release checks (Linux)",
+      "conclusion": "success",
+      "runner": "Nettking-Linux",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "a62addd12ec20f6ccd2064bb47f2602950775045a3ca3b65722ad87f46c1e708",
+      "pytest_summaries": [
+        "2026-09-13T14:01:26.9823918Z 18 passed in 11.74s",
+        "2026-09-13T14:01:49.1026860Z 168 passed, 3 skipped in 19.82s"
+      ],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103738841982,
+      "run_id": 34760641401,
+      "name": "Release checks (Windows)",
+      "conclusion": "success",
+      "runner": "Beast",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "5c137a15724a5edc335faafaa88765b73456b7ab0c7a462aa1a6f15dd44daac8",
+      "pytest_summaries": [
+        "2026-09-13T13:47:06.7264699Z 18 passed in 27.91s",
+        "2026-09-13T13:47:50.1876694Z 164 passed, 7 skipped in 38.15s"
+      ],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103738845482,
+      "run_id": 34760641401,
+      "name": "Windows regressions (capability-product)",
+      "conclusion": "success",
+      "runner": "Nettking",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "23fd149c6abc4fc86d3c8b599f75ddfd2e8ae92ae17cf885bc1e6d09a794286a",
+      "pytest_summaries": [
+        "2026-09-13T14:07:33.2791906Z 890 passed, 5 skipped, 44 warnings in 218.19s (0:03:38)"
+      ],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103738846208,
+      "run_id": 34760641401,
+      "name": "Linux regression shard (3)",
+      "conclusion": "success",
+      "runner": "Nettking-Linux",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "ef9f3bef87480ad65b52d4ebfcee0eb169082ee13ec13e14cf71d280310aaef3",
+      "pytest_summaries": [
+        "2026-09-13T14:19:31.9672932Z 1122 passed, 10 skipped, 3396 deselected, 150 warnings in 113.56s (0:01:53)"
+      ],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103738846396,
+      "run_id": 34760641401,
+      "name": "Linux regression shard (0)",
+      "conclusion": "success",
+      "runner": "Nettking-Linux",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "579267a8620bbafc3e9f788e769267543874ccf7ccd656fe561776357f78fc40",
+      "pytest_summaries": [
+        "2026-09-13T14:22:54.5655573Z 1123 passed, 9 skipped, 3396 deselected, 5 warnings in 155.33s (0:02:35)"
+      ],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103738847587,
+      "run_id": 34760641401,
+      "name": "PostgreSQL storage release check",
+      "conclusion": "success",
+      "runner": "Nettking-Linux",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "3e7b502e01db8bd4bf77535bfce13dd3490bcf952fbd0c5385cbf4e304c4f40d",
+      "pytest_summaries": [
+        "2026-09-13T14:02:39.0199954Z 11 passed in 0.74s"
+      ],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103739330095,
+      "run_id": 34760641401,
+      "name": "Release matrix (Linux)",
+      "conclusion": "success",
+      "runner": "Nettking-Linux",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "ddd85e631f588830953679de1c3e93249dc8a4ed01ad723460775f86c156504e",
+      "pytest_summaries": [],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103739330127,
+      "run_id": 34760641401,
+      "name": "Release matrix (Windows)",
+      "conclusion": "success",
+      "runner": "Nettking-Linux",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "a2dc596623bb71dfb3e9bc62b7ee505bb79999e61ac8d2ffbf15fb2e5c66caa6",
+      "pytest_summaries": [],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103739378771,
+      "run_id": 34760641401,
+      "name": "Federation v1 automated release verdict",
+      "conclusion": "success",
+      "runner": "Nettking-Linux",
+      "checkout_sha": null,
+      "log_sha256": "b8743e92286e49f00463212f551780ee120640642fce3080ee5a128331c87ae1",
+      "pytest_summaries": [],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103732755451,
+      "run_id": 34760641413,
+      "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+      "conclusion": "success",
+      "runner": "Nettking",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "1f14e3057e46dcc6de1d512d93e6b1ba2e5d9e9e684737a6e660fa61b96f5a80",
+      "pytest_summaries": [
+        "2026-09-13T13:49:42.1684451Z 311 passed, 5 skipped, 1 warning in 212.80s (0:03:32)"
+      ],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103732755547,
+      "run_id": 34760641413,
+      "name": "update-contracts (Linux, fcp-linux-fast, bash)",
+      "conclusion": "success",
+      "runner": "Beast-Linux-WSL",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "feebc2ae615d60f778b8beb1b12067ce5e5ea799d7527c756d14dbe11553b172",
+      "pytest_summaries": [
+        "2026-09-13T13:45:18.9007421Z 312 passed, 4 skipped, 1 warning in 23.39s"
+      ],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103732755646,
+      "run_id": 34760641414,
+      "name": "windows",
+      "conclusion": "success",
+      "runner": "Nettking",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "f61c6fd1c32e106cb09dced37b8c78033cbd224c577498a468099328224c2022",
+      "pytest_summaries": [
+        "2026-09-13T13:54:14.3275256Z 381 passed, 1 skipped in 79.63s (0:01:19)"
+      ],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103732755818,
+      "run_id": 34760641414,
+      "name": "linux",
+      "conclusion": "success",
+      "runner": "Beast-Linux-WSL",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "db104262785705d562964d5e359870f4827dd9e622f43df89408f85c310b0c09",
+      "pytest_summaries": [
+        "2026-09-13T13:53:03.3706769Z 65 passed in 2.02s",
+        "2026-09-13T13:54:39.2700561Z 253 passed in 95.33s (0:01:35)",
+        "2026-09-13T13:56:37.7697110Z 282 passed in 118.02s (0:01:58)"
+      ],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103732755640,
+      "run_id": 34760641442,
+      "name": "operator-surface (Linux, fcp-linux-fast, bash)",
+      "conclusion": "success",
+      "runner": "Beast-Linux-WSL",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "87601158a0dfb50ff8d8306dd56f205f039bb3847a79b5d787a99f297df64659",
+      "pytest_summaries": [
+        "2026-09-13T13:51:33.7030780Z 732 passed, 18 skipped, 44 warnings in 297.53s (0:04:57)"
+      ],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103732755730,
+      "run_id": 34760641442,
+      "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+      "conclusion": "success",
+      "runner": "Beast",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "1cc63d2de9a62e910cd1fe9637db26f4bae03d6e6693cbb600eb2b31cf8d12c5",
+      "pytest_summaries": [
+        "2026-09-13T13:55:27.5202899Z 742 passed, 5 skipped, 44 warnings in 296.60s (0:04:56)",
+        "2026-09-13T13:55:40.3808180Z 3 passed in 11.92s"
+      ],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103732755729,
+      "run_id": 34760641453,
+      "name": "acceptance (Linux, fcp-linux-fast, bash)",
+      "conclusion": "success",
+      "runner": "Beast-Linux-WSL",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "9e1ae779df2b513bf04c0af015126e9de9c5dbbdd2ac56f4468873d64ee1794c",
+      "pytest_summaries": [
+        "2026-09-13T14:01:40.8292921Z 2 passed, 1 warning in 24.29s",
+        "2026-09-13T14:01:42.7853807Z 31 passed in 1.30s",
+        "2026-09-13T14:01:46.4193491Z 8 passed in 3.15s",
+        "2026-09-13T14:02:47.1106514Z 67 passed, 4 warnings in 61.88s (0:01:01)",
+        "2026-09-13T14:02:50.8083877Z 56 passed, 9 skipped, 16 warnings in 2.99s",
+        "2026-09-13T14:02:58.7233997Z 69 passed in 8.00s",
+        "2026-09-13T14:03:09.6928325Z 93 passed in 10.50s"
+      ],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103732755936,
+      "run_id": 34760641453,
+      "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
+      "conclusion": "success",
+      "runner": "Beast",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "39d96c72d89cbae1a96f35901dae1a381d4f22ddad6504baa2f8a95742d6eaae",
+      "pytest_summaries": [
+        "2026-09-13T13:58:41.8589910Z 2 passed, 1 warning in 26.39s",
+        "2026-09-13T13:58:50.4249302Z 31 passed in 7.25s",
+        "2026-09-13T13:58:54.3487966Z 8 passed in 2.80s",
+        "2026-09-13T13:59:49.9379445Z 67 passed, 4 warnings in 54.75s",
+        "2026-09-13T13:59:56.3877678Z 65 passed, 16 warnings in 5.14s",
+        "2026-09-13T14:00:02.3568102Z 69 passed in 4.76s",
+        "2026-09-13T14:00:38.2617195Z 93 passed in 34.86s"
+      ],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103738827228,
+      "run_id": 34760641469,
+      "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
+      "conclusion": "success",
+      "runner": "Beast",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "508f9529c9cb6f3371e0225d83ec34715606deaa6fea4d23fdf16cb590eeb532",
+      "pytest_summaries": [],
+      "network_results": [
+        "2026-09-13T14:34:37.0628022Z NETWORK_DEMO=PASS SOURCE_SHA=94567b0d9ac916eec9e4f094d2f6754562b966aa"
+      ],
+      "registry_results": []
+    },
+    {
+      "job_id": 103738827847,
+      "run_id": 34760641469,
+      "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
+      "conclusion": "success",
+      "runner": "Nettking-Linux",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "0dcd38c473f49323da5fbc378355482f86315dee556547192ede36abe905a0f2",
+      "pytest_summaries": [],
+      "network_results": [
+        "2026-09-13T14:03:55.3807707Z NETWORK_DEMO=PASS SOURCE_SHA=94567b0d9ac916eec9e4f094d2f6754562b966aa"
+      ],
+      "registry_results": []
+    },
+    {
+      "job_id": 103738843592,
+      "run_id": 34760641469,
+      "name": "reviewer-compose",
+      "conclusion": "success",
+      "runner": "Beast-Linux-WSL",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "3b9c237cf39d98291b768793bc71928460b39ba30a18cea771b206975164e6ba",
+      "pytest_summaries": [],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103739154436,
+      "run_id": 34760641469,
+      "name": "publication-bundle",
+      "conclusion": "success",
+      "runner": "Beast-Linux-WSL",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "0c2b6b3186bc6ef96277485a5e35fc6a410a2f05a2620724fb4bb9861655af15",
+      "pytest_summaries": [],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103733081089,
+      "run_id": 34760765480,
+      "name": "harness (Linux, fcp-linux-fast, bash)",
+      "conclusion": "success",
+      "runner": "Beast-Linux-WSL",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "f0b488f1ebc138f5d04c495d94722e732b6e2c84509328fb3a2401dae0ff6a49",
+      "pytest_summaries": [
+        "2026-09-13T14:05:11.6663664Z 224 passed, 1 warning in 45.22s",
+        "2026-09-13T14:05:12.3977090Z 26 passed in 0.11s",
+        "2026-09-13T14:05:14.6842002Z 11 passed, 492 deselected in 2.03s",
+        "2026-09-13T14:05:15.7603824Z 9 passed in 0.80s",
+        "2026-09-13T14:05:17.6487496Z 10 passed in 1.46s",
+        "2026-09-13T14:05:25.9999483Z 21 passed in 8.15s",
+        "2026-09-13T14:05:27.5181050Z 8 passed in 1.25s",
+        "2026-09-13T14:05:30.2981424Z 7 passed in 2.35s",
+        "2026-09-13T14:05:56.0291368Z 17 passed in 25.27s",
+        "2026-09-13T14:06:00.4527701Z 10 passed in 3.71s",
+        "2026-09-13T14:06:05.8152679Z 11 passed in 4.90s",
+        "2026-09-13T14:06:09.8995536Z 9 passed in 3.59s",
+        "2026-09-13T14:06:12.0436901Z 13 passed, 4 warnings in 1.63s",
+        "2026-09-13T14:06:12.7724480Z 10 passed in 0.13s",
+        "2026-09-13T14:06:39.8146262Z 28 passed in 26.64s"
+      ],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103733081183,
+      "run_id": 34760765480,
+      "name": "harness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Byp...",
+      "conclusion": "success",
+      "runner": "Nettking",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "e1c69c839ee55e0317163b9c7af1b9232680eea5609ddd86cd598ca3bc1d40b1",
+      "pytest_summaries": [
+        "2026-09-13T14:10:49.4797729Z 224 passed, 1 warning in 40.39s",
+        "2026-09-13T14:10:51.4033093Z 26 passed in 0.23s",
+        "2026-09-13T14:10:59.4104789Z 11 passed, 492 deselected in 7.21s",
+        "2026-09-13T14:11:02.1368898Z 9 passed in 1.49s",
+        "2026-09-13T14:11:03.8487054Z 10 passed in 0.66s",
+        "2026-09-13T14:11:06.6927357Z 21 passed in 2.08s",
+        "2026-09-13T14:11:10.0390332Z 8 passed in 2.62s",
+        "2026-09-13T14:11:13.5553250Z 7 passed in 2.58s",
+        "2026-09-13T14:11:41.8147181Z 17 passed in 27.11s",
+        "2026-09-13T14:11:48.8035301Z 10 passed in 5.70s",
+        "2026-09-13T14:11:55.2973666Z 11 passed in 5.55s",
+        "2026-09-13T14:12:00.7114205Z 9 passed in 4.57s",
+        "2026-09-13T14:12:04.4167040Z 13 passed, 4 warnings in 2.80s",
+        "2026-09-13T14:12:06.7013431Z 10 passed in 0.26s",
+        "2026-09-13T14:12:12.4180986Z 28 passed in 3.83s"
+      ],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103733084873,
+      "run_id": 34760767150,
+      "name": "readiness (Linux, fcp-linux-fast, bash)",
+      "conclusion": "success",
+      "runner": "Beast-Linux-WSL",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "165c0eb5706ec4a76da9eccedb733af30ee111149b62c7703b9a836063dd82fc",
+      "pytest_summaries": [
+        "2026-09-13T13:57:38.1689121Z 29 passed in 0.13s",
+        "2026-09-13T13:57:41.5328148Z 36 passed, 7 skipped, 2 warnings in 3.07s"
+      ],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103733084960,
+      "run_id": 34760767150,
+      "name": "readiness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy B...",
+      "conclusion": "success",
+      "runner": "Nettking",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "f7b27d44dab30c178f4be7e48883913b27e4e1e748e359c3b73008e0276e6ed2",
+      "pytest_summaries": [
+        "2026-09-13T14:01:01.5178365Z 29 passed in 1.02s",
+        "2026-09-13T14:01:12.0633687Z 43 passed, 2 warnings in 9.45s"
+      ],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103733090039,
+      "run_id": 34760769024,
+      "name": "role-retirement (Linux, fcp-linux-fast, bash)",
+      "conclusion": "success",
+      "runner": "Beast-Linux-WSL",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "5cb2abffc4a768f0325d498dbf514208a48edcf734ed0a91f5c046b9957774ff",
+      "pytest_summaries": [
+        "2026-09-13T13:59:41.9554087Z 12 passed, 1 warning in 2.58s",
+        "2026-09-13T13:59:50.7920167Z 50 passed, 4 warnings in 6.65s"
+      ],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103733090159,
+      "run_id": 34760769024,
+      "name": "role-retirement (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+      "conclusion": "success",
+      "runner": "Nettking",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "e859e3385249151bb461860696757fdb2e74ea8c72c92ec0db4b2e153f4e34c6",
+      "pytest_summaries": [
+        "2026-09-13T14:14:50.2471407Z 12 passed, 1 warning in 6.05s",
+        "2026-09-13T14:15:04.9853708Z 50 passed, 4 warnings in 11.65s"
+      ],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103733095007,
+      "run_id": 34760770584,
+      "name": "Shard contract (Linux, shared-pool)",
+      "conclusion": "success",
+      "runner": "Nettking-Linux",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "28d039e92f3bc25114b57c46a66f219ee6786dbe013427403f78b57ed11154cf",
+      "pytest_summaries": [
+        "2026-09-13T14:23:17.5535335Z 10 passed in 2.30s"
+      ],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103733095058,
+      "run_id": 34760770584,
+      "name": "Shard contract (Windows, shared-pool)",
+      "conclusion": "success",
+      "runner": "Nettking",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "c098ae535ea29e116e073c06f0389274e4563b1d7f8fa88442c943248abe4b9f",
+      "pytest_summaries": [
+        "2026-09-13T13:58:27.5060639Z 10 passed in 14.53s"
+      ],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103733099296,
+      "run_id": 34760772078,
+      "name": "onboarding (Linux, fcp-test-linux, bash, 3.12.13)",
+      "conclusion": "success",
+      "runner": "Nettking-Linux",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "8884317a35c7a9423103c674703139d89fdb8e1f129a0a769b257f06b2b9f8f4",
+      "pytest_summaries": [
+        "2026-09-13T14:24:43.7832417Z 123 passed, 1 warning in 31.61s"
+      ],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103733099393,
+      "run_id": 34760772078,
+      "name": "onboarding (Windows, fcp-test-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+      "conclusion": "success",
+      "runner": "Nettking",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "c98495b93988b27fcff5231079e048797dee98a9dcfb45fadc25e846da3bab94",
+      "pytest_summaries": [
+        "2026-09-13T13:57:33.2313260Z 123 passed, 1 warning in 36.38s"
+      ],
+      "network_results": [],
+      "registry_results": []
+    },
+    {
+      "job_id": 103733103439,
+      "run_id": 34760773510,
+      "name": "Verify immutable release image metadata",
+      "conclusion": "success",
+      "runner": "Beast-Linux-WSL",
+      "checkout_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "log_sha256": "69a58d8a75b2ed3df4e46eefe3cf37d0b9e25b6c366b370306ec31a1bda5c79e",
+      "pytest_summaries": [],
+      "network_results": [],
+      "registry_results": []
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "source": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+  "head": "fe21bdc59bc1414fd7c4cdcf1aa4f6d6aa9048fe",
+  "base": "1492d925d791b9a0ebc7bcee39ce9b3b7477254b",
+  "pr": 486,
+  "started_at": "2026-09-13T14:32:02.657679+00:00",
+  "scope": "failed jobs and dependent summaries only; preserve every valid green job",
+  "classification": "unresolved but non-demonstrated candidate defect",
+  "observations": [
+    {
+      "run_id": 34760641401,
+      "job_id": 103732755647,
+      "runner": "Beast",
+      "path": "test_three_machine_deployment.py:318 -> phase_d_client.py:202 -> relay_storage.py:165",
+      "failure": "TimeoutError during initial storage ingest before restart; 369 passed, 1 skipped"
+    },
+    {
+      "run_id": 34760641469,
+      "job_id": 103732755738,
+      "runner": "Beast",
+      "path": "demo/icse/network/run.py:400 reviewer join",
+      "failure": "WorkerCommandFailure wrapping TimeoutError; independent processes and quorum bootstrap PASS; all owned children stopped"
+    }
+  ],
+  "mechanism": "Different request paths. Shared host/timing is possible but not demonstrated; no shared mechanism or deterministic harness defect established. Current Linux equivalents passed. The changed Windows build launcher is not exercised by either failing path.",
+  "source_changes": false,
+  "runner_changes": false,
+  "assertion_changes": false,
+  "actions": [
+    {
+      "run_id": 34760641401,
+      "status": "accepted",
+      "response": {}
+    },
+    {
+      "run_id": 34760641469,
+      "status": "accepted",
+      "response": {}
+    }
+  ]
+}
