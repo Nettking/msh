@@ -1,0 +1,138 @@
+{
+  "status": "SMB_TRANSPORT_PREFLIGHT_PASS",
+  "started_at": "2026-09-13T20:04:46.628697+00:00",
+  "formal_backup_started": false,
+  "physical_assertions_run": false,
+  "protected_data_accessed": false,
+  "checks": {
+    "owned_nonpersistent_mapping": true,
+    "smb3_encrypted_signed": true,
+    "native_write_fsync_atomic_replace": true,
+    "native_copy2_metadata": true,
+    "ordinary_win32_closed_copy_quick_check": true,
+    "two_process_lock_conflict_refused_without_commit": true,
+    "lock_release_recovery_exact_once": true,
+    "windows_docker_cp_unc": true,
+    "owned_copy_source_pid_restart_unchanged": true,
+    "direct_nitro_file_digest_equality": true,
+    "direct_nitro_quick_check": true,
+    "windows_reopen_after_nitro_check": true,
+    "actual_two_host_capacity_measured": true
+  },
+  "stage": "direct_nitro_digest_integrity_and_capacity",
+  "updated_at": "2026-09-13T20:05:27.813068+00:00",
+  "wnet_return_code": 0,
+  "dialect": "SMB3_11",
+  "negotiated_security": {
+    "exact_peer_user_share_matched": true,
+    "session_dialect": "SMB3_11",
+    "session_encryption": {
+      "cipher": "AES-128-GCM",
+      "degree": "full"
+    },
+    "session_signing": {
+      "cipher": "AES-128-GMAC",
+      "degree": "full"
+    },
+    "share_encryption": {
+      "cipher": "AES-128-GCM",
+      "degree": "full"
+    },
+    "share_signing": {
+      "cipher": "-",
+      "degree": "none"
+    }
+  },
+  "files": {
+    "atomic.bin": {
+      "bytes": 8192,
+      "sha256": "45c000235a380ddc065220577445111aecba159e327852a3853cea90b2137131"
+    },
+    "closed-copy.sqlite3": {
+      "bytes": 12288,
+      "sha256": "89cdc6232d245cfb60bf8eb3185b4dd566b88c2a6721f9cee02e10325ccfec68"
+    },
+    "copy2.bin": {
+      "bytes": 8192,
+      "sha256": "45c000235a380ddc065220577445111aecba159e327852a3853cea90b2137131"
+    },
+    "docker-copy.bin": {
+      "bytes": 13,
+      "sha256": "51ed877b543b8536a5ba74166e9dcf3fa741c22864ffbcd1bc3d2b0d92af828d"
+    }
+  },
+  "nitro_capacity": {
+    "device": 2050,
+    "total_bytes": 983347249152,
+    "actual_available_bytes": 828452061184,
+    "available_inodes": 60244091
+  },
+  "windows_available_bytes": 828452057088,
+  "capacity_scope": "Transport preparation only; root must recompute exact future candidate backup source estimate and margin before product quiescence.",
+  "helper_image_id": "sha256:2fcb56517a564601652902bc24709e4ff399226f558f4d13e20989f0db80d50a",
+  "config_sha256": "e4113a780dcf4de9b1eb986d778ff59993cadec1d891480a2356381693e6a9aa",
+  "scope": "Source-independent backup transport preparation, not physical acceptance or backup completion",
+  "helper": {
+    "status": "SMB_TRANSPORT_READY",
+    "base_image": "sha256:3cd9086bdb30f7c9bc08a3fa621d9842e0d3f6f9291aeb4677e0547817c10b12",
+    "helper_image_id": "sha256:2fcb56517a564601652902bc24709e4ff399226f558f4d13e20989f0db80d50a",
+    "config_sha256": "e4113a780dcf4de9b1eb986d778ff59993cadec1d891480a2356381693e6a9aa",
+    "listener_boundary_verified": true,
+    "listener_boundary_after_transport": true,
+    "container_pid": 3050300,
+    "restart_count": 0
+  },
+  "retained_failures": [
+    {
+      "stage": "SSHFS closed SQLite read",
+      "classification": "Transport locking incompatible with native Windows SQLite",
+      "receipt": "old-C .acceptance/backup-transport-preflight-status.json",
+      "preserved": true
+    },
+    {
+      "stage": "Samba config validator",
+      "classification": "Validator UID did not own private config directory; fixed using owner UID1000 without added privileges",
+      "private_receipt_sha256": "ce99dbc6fb6458f8543f12e18d5a3cd062d6796f074996722a1e0c26a9326ef7"
+    },
+    {
+      "stage": "Samba interface selector",
+      "classification": "Samba rejects non-broadcast TUN /32 selector; approved same-literal-IP /10 metadata keeps exact socket bind and Windows /32 ACL",
+      "private_receipt_sha256": "a9a1ccf3fa4d2fc628ee6acede319e0316b0c3c7509a55519b111c60ffd64045"
+    },
+    {
+      "stage": "Windows connection security observation",
+      "classification": "CIM read denied to current user; actual negotiated security instead verified server-side in owned helper",
+      "receipt_sha256": "7cfbc03ccb354f291d5759635544706b147d678d824109f2e8e50d0da198cfd7"
+    }
+  ],
+  "private_evidence_sha256": {
+    "status.json": "39ddc91e293d4336db693dab5f0c51a3ee377a680b8e73cf99101ce78348262a",
+    "build.private.log": "2f674dc7c0de25b26427a9206c3d3d04403e73e17ed080c260b50b812d289e3d",
+    "package-versions.txt": "1daa8a3842b69189e6116a441d92f985254248f88cb7fffe911d00be65abe235",
+    "start-first-failure.json": "ce99dbc6fb6458f8543f12e18d5a3cd062d6796f074996722a1e0c26a9326ef7",
+    "start-first-failure.private.log": "86206729f418acb8d5edc84a0878fbc0dbf6a00d2e4744952e10fdf28298730b",
+    "testparm-first-failure.private.log": "a7abb99ead8859afa9f16f99e26da682d0cb71672d7b356ca360abea7a0d1e69",
+    "start-daemon-first-failure.json": "a9a1ccf3fa4d2fc628ee6acede319e0316b0c3c7509a55519b111c60ffd64045",
+    "start-daemon-first-failure.private.log": "7f5cfaea1405e09556527df762e3cf877ad8c894c53df922f7a1c9a2d1b62fa4",
+    "smb-daemon-first-failure.private.log": "5bcc00de7c4b85674286f22959778b939c4e4502bd1e5366ccd4ea2d2135d9ab",
+    "smb-first-interface.private.conf": "74f30e3b6962f456a2730c500e5ad471bc9764112af7c0c3024d2904c2931395",
+    "testparm.private.log": "77eaa6765f942eb098290c685503f4c8c787763773ce1d3756c5241796feca00",
+    "container-inspect.private.json": "4dfbad2039c2115be71c45ea54d4df80101afb814262a265f0f322b20f9e9cd5",
+    "listeners.private.json": "18a356e6ee1155b06357370d5d3363cfa41682043cdaf06f7663cf52a9a536f3",
+    "negotiated-security.private.json": "1bc738fed9f0e19153202b7f00af159798b9bfab6751018c58ad6a6fed46bb35",
+    "smb-current.private.log": "2aaefd8622e51ed832aa55b686c59ba6daecb7c1dd583bf227e83e9d083806b4",
+    "windows-transport-receipt.json": "6f53074a55647af04b689004cec7597ce412aba4129887037aa3eafb2d7e4501"
+  },
+  "safety": {
+    "protected_recorder_accessed": false,
+    "product_quiesced": false,
+    "physical_assertion_executed": false,
+    "host_accounts_changed": false,
+    "host_packages_installed": false,
+    "host_firewall_changed": false,
+    "host_services_changed": false,
+    "capabilities_or_resource_limits_broadened": false,
+    "nonowned_mapping_disconnected": false
+  },
+  "ready_for_root": "Use private Windows binding-serverproof and DPAPI credential; owned temporary mapping/helper remain available. Revalidate exact candidate and compute fresh product backup estimate/margins before actual backup."
+}

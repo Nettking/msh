@@ -1,5 +1,5 @@
 {
-  "reviewed_at": "2026-09-13T19:54:19.780985+00:00",
+  "reviewed_at": "2026-09-13T20:14:42.753143+00:00",
   "pr": 487,
   "source": "76ad339f1631e136bba7a8a85973bddb1650d570",
   "merge_ref": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
@@ -120,78 +120,24 @@
     {
       "workflow": "federation-v1-release.yml",
       "id": 34777368620,
-      "status": "in_progress",
-      "conclusion": null,
+      "status": "completed",
+      "conclusion": "success",
       "event": "pull_request",
       "head_sha": "76ad339f1631e136bba7a8a85973bddb1650d570",
-      "attempt": 1,
+      "attempt": 2,
       "expected": 16,
       "jobs": [
         {
-          "id": 103777830545,
+          "id": 103784122477,
           "name": "Full-suite order (rotating)",
-          "status": "in_progress",
-          "conclusion": null,
-          "started_at": "2026-09-13T19:40:28Z",
-          "completed_at": null,
-          "runner_name": "AQG7NCC-Linux"
-        },
-        {
-          "id": 103777830556,
-          "name": "Full-suite order (fixed)",
           "status": "completed",
           "conclusion": "success",
-          "started_at": "2026-09-13T19:22:20Z",
-          "completed_at": "2026-09-13T19:32:27Z",
+          "started_at": "2026-09-13T20:04:38Z",
+          "completed_at": "2026-09-13T20:14:03Z",
           "runner_name": "Nettking-Linux"
         },
         {
-          "id": 103777830570,
-          "name": "Windows regressions (transport-storage)",
-          "status": "completed",
-          "conclusion": "success",
-          "started_at": "2026-09-13T19:31:27Z",
-          "completed_at": "2026-09-13T19:40:12Z",
-          "runner_name": "Nettking"
-        },
-        {
-          "id": 103777830579,
-          "name": "PostgreSQL storage release check",
-          "status": "completed",
-          "conclusion": "success",
-          "started_at": "2026-09-13T19:20:32Z",
-          "completed_at": "2026-09-13T19:22:05Z",
-          "runner_name": "AQG7NCC-Linux"
-        },
-        {
-          "id": 103777830628,
-          "name": "Windows regressions (journal-artifacts)",
-          "status": "completed",
-          "conclusion": "success",
-          "started_at": "2026-09-13T19:40:13Z",
-          "completed_at": "2026-09-13T19:51:04Z",
-          "runner_name": "Nettking"
-        },
-        {
-          "id": 103777830640,
-          "name": "Release checks (Windows)",
-          "status": "completed",
-          "conclusion": "success",
-          "started_at": "2026-09-13T19:42:46Z",
-          "completed_at": "2026-09-13T19:45:59Z",
-          "runner_name": "Beast"
-        },
-        {
-          "id": 103777830641,
-          "name": "Linux regression shard (2)",
-          "status": "completed",
-          "conclusion": "success",
-          "started_at": "2026-09-13T19:25:39Z",
-          "completed_at": "2026-09-13T19:33:13Z",
-          "runner_name": "AQG7NCC-Linux"
-        },
-        {
-          "id": 103777830645,
+          "id": 103784122910,
           "name": "Release checks (Linux)",
           "status": "completed",
           "conclusion": "success",
@@ -200,25 +146,34 @@
           "runner_name": "AQG7NCC-Linux"
         },
         {
-          "id": 103777830664,
-          "name": "Linux regression shard (1)",
+          "id": 103784123299,
+          "name": "Windows regressions (transport-storage)",
           "status": "completed",
           "conclusion": "success",
-          "started_at": "2026-09-13T19:43:07Z",
-          "completed_at": "2026-09-13T19:46:47Z",
-          "runner_name": "Nettking-Linux"
+          "started_at": "2026-09-13T19:31:27Z",
+          "completed_at": "2026-09-13T19:40:12Z",
+          "runner_name": "Nettking"
         },
         {
-          "id": 103777830675,
-          "name": "Linux regression shard (0)",
+          "id": 103784123318,
+          "name": "Linux regression shard (2)",
           "status": "completed",
           "conclusion": "success",
-          "started_at": "2026-09-13T19:33:22Z",
-          "completed_at": "2026-09-13T19:43:05Z",
-          "runner_name": "Nettking-Linux"
+          "started_at": "2026-09-13T19:25:39Z",
+          "completed_at": "2026-09-13T19:33:13Z",
+          "runner_name": "AQG7NCC-Linux"
         },
         {
-          "id": 103777830680,
+          "id": 103784123326,
+          "name": "Release checks (Windows)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-13T19:42:46Z",
+          "completed_at": "2026-09-13T19:45:59Z",
+          "runner_name": "Beast"
+        },
+        {
+          "id": 103784123408,
           "name": "Linux regression shard (3)",
           "status": "completed",
           "conclusion": "success",
@@ -227,16 +182,16 @@
           "runner_name": "AQG7NCC-Linux"
         },
         {
-          "id": 103777830701,
-          "name": "Windows regressions (capability-product)",
+          "id": 103784123410,
+          "name": "Windows regressions (journal-artifacts)",
           "status": "completed",
           "conclusion": "success",
-          "started_at": "2026-09-13T19:46:01Z",
-          "completed_at": "2026-09-13T19:53:17Z",
-          "runner_name": "Beast"
+          "started_at": "2026-09-13T19:40:13Z",
+          "completed_at": "2026-09-13T19:51:04Z",
+          "runner_name": "Nettking"
         },
         {
-          "id": 103782555692,
+          "id": 103784123529,
           "name": "Release matrix (Windows)",
           "status": "completed",
           "conclusion": "success",
@@ -245,12 +200,75 @@
           "runner_name": "Nettking-Linux"
         },
         {
-          "id": 103782555699,
+          "id": 103784123826,
           "name": "Release matrix (Linux)",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-09-13T19:53:31Z",
           "completed_at": "2026-09-13T19:53:40Z",
+          "runner_name": "Nettking-Linux"
+        },
+        {
+          "id": 103784140449,
+          "name": "PostgreSQL storage release check",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-13T19:20:32Z",
+          "completed_at": "2026-09-13T19:22:05Z",
+          "runner_name": "AQG7NCC-Linux"
+        },
+        {
+          "id": 103784145903,
+          "name": "Linux regression shard (0)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-13T19:33:22Z",
+          "completed_at": "2026-09-13T19:43:05Z",
+          "runner_name": "Nettking-Linux"
+        },
+        {
+          "id": 103784146024,
+          "name": "Linux regression shard (1)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-13T19:43:07Z",
+          "completed_at": "2026-09-13T19:46:47Z",
+          "runner_name": "Nettking-Linux"
+        },
+        {
+          "id": 103784146361,
+          "name": "Windows regressions (capability-product)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-13T19:46:01Z",
+          "completed_at": "2026-09-13T19:53:17Z",
+          "runner_name": "Beast"
+        },
+        {
+          "id": 103784146974,
+          "name": "Full-suite order (fixed)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-13T19:22:20Z",
+          "completed_at": "2026-09-13T19:32:27Z",
+          "runner_name": "Nettking-Linux"
+        },
+        {
+          "id": 103785492108,
+          "name": "Clean-checkout suite order independence",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-13T20:14:05Z",
+          "completed_at": "2026-09-13T20:14:11Z",
+          "runner_name": "Nettking-Linux"
+        },
+        {
+          "id": 103785508850,
+          "name": "Federation v1 automated release verdict",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-13T20:14:13Z",
+          "completed_at": "2026-09-13T20:14:18Z",
           "runner_name": "Nettking-Linux"
         }
       ]
@@ -259,23 +277,23 @@
       "workflow": "icse-tool-demo.yml",
       "id": 34777368640,
       "status": "completed",
-      "conclusion": "failure",
+      "conclusion": "success",
       "event": "pull_request",
       "head_sha": "76ad339f1631e136bba7a8a85973bddb1650d570",
-      "attempt": 2,
+      "attempt": 3,
       "expected": 4,
       "jobs": [
         {
-          "id": 103779921010,
-          "name": "reviewer-compose",
+          "id": 103784000136,
+          "name": "publication-bundle",
           "status": "completed",
           "conclusion": "success",
-          "started_at": "2026-09-13T19:35:49Z",
-          "completed_at": "2026-09-13T19:36:28Z",
-          "runner_name": "Beast-Linux-WSL"
+          "started_at": "2026-09-13T20:03:48Z",
+          "completed_at": "2026-09-13T20:04:05Z",
+          "runner_name": "Nettking-Linux"
         },
         {
-          "id": 103779921221,
+          "id": 103784000221,
           "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
           "status": "completed",
           "conclusion": "success",
@@ -284,7 +302,7 @@
           "runner_name": "Beast-Linux-WSL"
         },
         {
-          "id": 103779921740,
+          "id": 103784000528,
           "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
           "status": "completed",
           "conclusion": "success",
@@ -293,12 +311,12 @@
           "runner_name": "Beast"
         },
         {
-          "id": 103780468967,
-          "name": "publication-bundle",
+          "id": 103784013004,
+          "name": "reviewer-compose",
           "status": "completed",
-          "conclusion": "failure",
-          "started_at": "2026-09-13T19:41:36Z",
-          "completed_at": "2026-09-13T19:41:48Z",
+          "conclusion": "success",
+          "started_at": "2026-09-13T19:35:49Z",
+          "completed_at": "2026-09-13T19:36:28Z",
           "runner_name": "Beast-Linux-WSL"
         }
       ]

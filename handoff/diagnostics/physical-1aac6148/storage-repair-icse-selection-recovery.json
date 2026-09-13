@@ -1,0 +1,15 @@
+{
+  "requested_at": "2026-09-13T20:03:42.718914+00:00",
+  "source": "76ad339f1631e136bba7a8a85973bddb1650d570",
+  "native_source": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+  "run_id": 34777368640,
+  "original_artifact_id": 10324271911,
+  "original_artifact_sha256": "de8a06ddce3ffc49fe6f8a1fc75d0fbc6d2d107c8b883d4659c194ac03cb4d62",
+  "immutable_archive_commit": "89911820c33963c47973acafd86049ee9f380bc6",
+  "immutable_archive": "https://github.com/Nettking/msh/blob/89911820c33963c47973acafd86049ee9f380bc6/handoff/diagnostics/physical-1aac6148/icse-artifact-10324271911-original-failure.zip",
+  "passing_artifact_id": 10323944077,
+  "scope": "Remove only superseded CI artifact copy after exact bytes are committed and pushed. Original failed logs/verdict and immutable archived artifact retained. Rerun publication only; no demonstrations or source changes.",
+  "status": "publication_recovery_accepted",
+  "delete_http_status": 204,
+  "recovery_response": {}
+}

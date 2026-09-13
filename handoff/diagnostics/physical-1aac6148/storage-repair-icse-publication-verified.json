@@ -1,0 +1,22 @@
+{
+  "verified_at": "2026-09-13T20:10:09.618713+00:00",
+  "source": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+  "artifact_id": 10324446083,
+  "api_artifact_sha256": "d4ef051cf0e627141a96377655d6ffeac9cf6c61c139b12bae2431bd0d5cbbb0",
+  "publication_archive_sha256": "2f2308e2eab8f2b9cbc7f42089310c823514a2c74a8704e22b923adc0a4d84e5",
+  "source_files": 1411,
+  "source_equals_exact_git_archive": true,
+  "archive_conversion": "core.autocrlf=false, core.eol=lf (scoped to verification command)",
+  "all_manifest_digests_valid": true,
+  "component_executions_passed": [
+    "Linux",
+    "Windows",
+    "compose"
+  ],
+  "network_executions_10_of_10_passed": [
+    "Linux",
+    "Windows"
+  ],
+  "physical_acceptance": "NOT_EVALUATED",
+  "release_tag_artifact": false
+}

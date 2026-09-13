@@ -1,0 +1,11 @@
+{
+  "prepared_at": "2026-09-13T20:13:57.828118+00:00",
+  "runtime_checkout": "C:\\wsl\\fcp-v1-native-main-runtime-20260913",
+  "current_source": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "branch": "main",
+  "origin": "https://github.com/Nettking/msh.git",
+  "repair_trial_remote_ref": "76ad339f1631e136bba7a8a85973bddb1650d570",
+  "data_or_membership_copied": false,
+  "runtime_started": false,
+  "next_action": "After actual main C2 is qualified/frozen, fast-forward this clean permanent main checkout and bind existing owned native data in place."
+}

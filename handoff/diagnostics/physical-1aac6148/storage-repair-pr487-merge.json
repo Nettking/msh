@@ -1,0 +1,25 @@
+{
+  "reviewed_at": "2026-09-13T20:22:39.301295+00:00",
+  "pr": 487,
+  "base": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "head": "76ad339f1631e136bba7a8a85973bddb1650d570",
+  "reviewed_merge_ref": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+  "tree": "c61eb8e838e8c3d44628af8909da4ed8ed347acf",
+  "release_gate": "16/16 PASS",
+  "icse": "4/4 PASS",
+  "native_checkout_proofs": 38,
+  "passing_jobs": 39,
+  "phase2": "FAIL retained: two different initial setup timeouts; each test passes twice in exact-source release jobs. No demonstrated candidate defect.",
+  "phase2_disposition_sha256": "2afa4465cfd4fe3f8fce1dcadb81762310871c84f5523d9c8d397000a500cf70",
+  "contract_decision": "docs/release_process.md requires every actual-main release job PASS; standalone Phase2 is not a dependency of that verdict. ICSE PR workflow PASS and exact source bundle verified. Proceed with ordinary server-enforced merge; qualify resulting main before freeze.",
+  "method": "merge",
+  "admin_or_bypass": false,
+  "status": "MERGED",
+  "response": {
+    "sha": "e91e521813aff67c44bae51d00dfae212b56ef7e",
+    "merged": true,
+    "message": "Pull Request successfully merged"
+  },
+  "actual_main": "e91e521813aff67c44bae51d00dfae212b56ef7e",
+  "actual_main_verified_at": "2026-09-13T20:22:43.339452+00:00"
+}

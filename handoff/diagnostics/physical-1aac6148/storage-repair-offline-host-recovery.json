@@ -22,8 +22,11 @@
     103782555699
   ],
   "scope": "Only active job is on offline AQG. Cancel pending execution, rerun that job and dependent verdicts using unchanged workflow/source/seed/runner pool. No successful test rerun.",
-  "status": "cancel_accepted",
+  "status": "job_recovery_accepted",
   "cancel_response": {},
   "force_cancel_requested_at": "2026-09-13T20:00:08.909061+00:00",
-  "force_cancel_response": {}
+  "force_cancel_response": {},
+  "cancelled_conclusion": "cancelled",
+  "job_recovery_requested_at": "2026-09-13T20:04:34.399911+00:00",
+  "job_recovery_response": {}
 }

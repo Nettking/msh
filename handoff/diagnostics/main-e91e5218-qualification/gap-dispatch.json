@@ -1,0 +1,51 @@
+{
+  "source": "e91e521813aff67c44bae51d00dfae212b56ef7e",
+  "started_at": "2026-09-13T20:23:00.991645+00:00",
+  "existing_runs": {
+    "phase-f85-operator-federation-surface.yml": 34780575533,
+    "product-branding.yml": 34780575548,
+    "cf7b-product-physical-acceptance.yml": 34780575554,
+    "cf8-role-retirement.yml": 34780575568,
+    "federation-software-update.yml": 34780575575,
+    "cfi2-onboarding-composition.yml": 34780575586,
+    "federation-v1-release.yml": 34780575628,
+    "icse-tool-demo.yml": 34780575682
+  },
+  "actions": [
+    {
+      "workflow": "cf7-acceptance-harness.yml",
+      "status": "accepted",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "phase2-federation.yml",
+      "status": "accepted",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "cf7c-physical-test-readiness.yml",
+      "status": "accepted",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "ci-test-sharding.yml",
+      "status": "accepted",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "release-image-metadata.yml",
+      "status": "accepted",
+      "response": {
+        "http_status": 204
+      }
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 {
-  "reviewed_at": "2026-09-13T19:54:19.780985+00:00",
+  "reviewed_at": "2026-09-13T20:14:42.753143+00:00",
   "source": "76ad339f1631e136bba7a8a85973bddb1650d570",
   "merge_source": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
   "records": [
@@ -96,20 +96,33 @@
     },
     {
       "workflow": "federation-v1-release.yml",
-      "job_id": 103777830556,
-      "name": "Full-suite order (fixed)",
+      "job_id": 103784122477,
+      "name": "Full-suite order (rotating)",
       "conclusion": "success",
       "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
       "native_checkout_values": [
         "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
       ],
       "expected_present": true,
-      "log_sha256": "e5eeb6cd2d7c93a7279100042267a2235dfaa69e74530c831067300a789481b7",
-      "bytes": 67914
+      "log_sha256": "83537a7ec79674a84e9eecd78775cc6f13b0aca8d322e56f9499644f69916b8b",
+      "bytes": 65823
     },
     {
       "workflow": "federation-v1-release.yml",
-      "job_id": 103777830570,
+      "job_id": 103784122910,
+      "name": "Release checks (Linux)",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "native_checkout_values": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "expected_present": true,
+      "log_sha256": "20207eeff826a57979fcf1d3538fc537318aed7e6fd77645c5f4758ee8525aef",
+      "bytes": 56416
+    },
+    {
+      "workflow": "federation-v1-release.yml",
+      "job_id": 103784123299,
       "name": "Windows regressions (transport-storage)",
       "conclusion": "success",
       "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
@@ -122,33 +135,20 @@
     },
     {
       "workflow": "federation-v1-release.yml",
-      "job_id": 103777830579,
-      "name": "PostgreSQL storage release check",
+      "job_id": 103784123318,
+      "name": "Linux regression shard (2)",
       "conclusion": "success",
       "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
       "native_checkout_values": [
         "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
       ],
       "expected_present": true,
-      "log_sha256": "73c6936a5cdeede1b331f8e79a6af811e318aca131243cfec32f4b8a87f44105",
-      "bytes": 45055
+      "log_sha256": "0d9eb4ffd368b6103a1f9d40b950bf5f49dd6b2d7120de67c3533bf5b3efdbb9",
+      "bytes": 57830
     },
     {
       "workflow": "federation-v1-release.yml",
-      "job_id": 103777830628,
-      "name": "Windows regressions (journal-artifacts)",
-      "conclusion": "success",
-      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
-      "native_checkout_values": [
-        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
-      ],
-      "expected_present": true,
-      "log_sha256": "381824999ecb8c2edeeb479a96d0dafc41ffb93822d1b52e923ba174f8b9cc4b",
-      "bytes": 51638
-    },
-    {
-      "workflow": "federation-v1-release.yml",
-      "job_id": 103777830640,
+      "job_id": 103784123326,
       "name": "Release checks (Windows)",
       "conclusion": "success",
       "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
@@ -161,59 +161,7 @@
     },
     {
       "workflow": "federation-v1-release.yml",
-      "job_id": 103777830641,
-      "name": "Linux regression shard (2)",
-      "conclusion": "success",
-      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
-      "native_checkout_values": [
-        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
-      ],
-      "expected_present": true,
-      "log_sha256": "1a3ff068f191742cf94e74f5da3815870bd67bc4eddb3440f0870c9542ef22f9",
-      "bytes": 57831
-    },
-    {
-      "workflow": "federation-v1-release.yml",
-      "job_id": 103777830645,
-      "name": "Release checks (Linux)",
-      "conclusion": "success",
-      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
-      "native_checkout_values": [
-        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
-      ],
-      "expected_present": true,
-      "log_sha256": "82f36f16de95de67a1cbc6d58fd4ccf7236beec75811461c5b0b6aa3b9fa3015",
-      "bytes": 56417
-    },
-    {
-      "workflow": "federation-v1-release.yml",
-      "job_id": 103777830664,
-      "name": "Linux regression shard (1)",
-      "conclusion": "success",
-      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
-      "native_checkout_values": [
-        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
-      ],
-      "expected_present": true,
-      "log_sha256": "ab0d94b6b3d7fdab242d1083849255a815cf14915d52dc8b94c0065b94b05b3b",
-      "bytes": 54222
-    },
-    {
-      "workflow": "federation-v1-release.yml",
-      "job_id": 103777830675,
-      "name": "Linux regression shard (0)",
-      "conclusion": "success",
-      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
-      "native_checkout_values": [
-        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
-      ],
-      "expected_present": true,
-      "log_sha256": "e80f727f9e3800f75709cbca255418b4e9c4aa2cee4a9e4e3520ea8558526fb3",
-      "bytes": 57318
-    },
-    {
-      "workflow": "federation-v1-release.yml",
-      "job_id": 103777830680,
+      "job_id": 103784123408,
       "name": "Linux regression shard (3)",
       "conclusion": "success",
       "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
@@ -226,20 +174,20 @@
     },
     {
       "workflow": "federation-v1-release.yml",
-      "job_id": 103777830701,
-      "name": "Windows regressions (capability-product)",
+      "job_id": 103784123410,
+      "name": "Windows regressions (journal-artifacts)",
       "conclusion": "success",
       "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
       "native_checkout_values": [
         "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
       ],
       "expected_present": true,
-      "log_sha256": "ee9fa2a098daeea9756d23c6ecdbc85d0ce2b606debfe14ce81a6446b4ce88ce",
-      "bytes": 62503
+      "log_sha256": "381824999ecb8c2edeeb479a96d0dafc41ffb93822d1b52e923ba174f8b9cc4b",
+      "bytes": 51638
     },
     {
       "workflow": "federation-v1-release.yml",
-      "job_id": 103782555692,
+      "job_id": 103784123529,
       "name": "Release matrix (Windows)",
       "conclusion": "success",
       "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
@@ -252,7 +200,7 @@
     },
     {
       "workflow": "federation-v1-release.yml",
-      "job_id": 103782555699,
+      "job_id": 103784123826,
       "name": "Release matrix (Linux)",
       "conclusion": "success",
       "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
@@ -264,21 +212,108 @@
       "bytes": 15014
     },
     {
-      "workflow": "icse-tool-demo.yml",
-      "job_id": 103779921010,
-      "name": "reviewer-compose",
+      "workflow": "federation-v1-release.yml",
+      "job_id": 103784140449,
+      "name": "PostgreSQL storage release check",
       "conclusion": "success",
       "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
       "native_checkout_values": [
         "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
       ],
       "expected_present": true,
-      "log_sha256": "3840941f530ee83ee66919d3e22a2de75bd6fc52ad7fe035c0271b007b04e00b",
-      "bytes": 27889
+      "log_sha256": "1901881592ffad744bec988f5fcba53dab69b954d8fb23da717600e6bc7872de",
+      "bytes": 45054
+    },
+    {
+      "workflow": "federation-v1-release.yml",
+      "job_id": 103784145903,
+      "name": "Linux regression shard (0)",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "native_checkout_values": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "expected_present": true,
+      "log_sha256": "e80f727f9e3800f75709cbca255418b4e9c4aa2cee4a9e4e3520ea8558526fb3",
+      "bytes": 57318
+    },
+    {
+      "workflow": "federation-v1-release.yml",
+      "job_id": 103784146024,
+      "name": "Linux regression shard (1)",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "native_checkout_values": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "expected_present": true,
+      "log_sha256": "ab0d94b6b3d7fdab242d1083849255a815cf14915d52dc8b94c0065b94b05b3b",
+      "bytes": 54222
+    },
+    {
+      "workflow": "federation-v1-release.yml",
+      "job_id": 103784146361,
+      "name": "Windows regressions (capability-product)",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "native_checkout_values": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "expected_present": true,
+      "log_sha256": "ee9fa2a098daeea9756d23c6ecdbc85d0ce2b606debfe14ce81a6446b4ce88ce",
+      "bytes": 62503
+    },
+    {
+      "workflow": "federation-v1-release.yml",
+      "job_id": 103784146974,
+      "name": "Full-suite order (fixed)",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "native_checkout_values": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "expected_present": true,
+      "log_sha256": "6d6f7791dd109d47aa00130b1706c957c3873db208964927ad28245e70eb78a6",
+      "bytes": 67913
+    },
+    {
+      "workflow": "federation-v1-release.yml",
+      "job_id": 103785492108,
+      "name": "Clean-checkout suite order independence",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "native_checkout_values": [],
+      "expected_present": false,
+      "log_sha256": "92feda490f11aeef3e8f5a7c42c4c206141dd5908926d8ed2a23b3e6226ddd5f",
+      "bytes": 1101
+    },
+    {
+      "workflow": "federation-v1-release.yml",
+      "job_id": 103785508850,
+      "name": "Federation v1 automated release verdict",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "native_checkout_values": [],
+      "expected_present": false,
+      "log_sha256": "f9b0dcf61011799fbac0deec438e078d70e79a1330c716947cf1b9fa546e5be4",
+      "bytes": 1189
     },
     {
       "workflow": "icse-tool-demo.yml",
-      "job_id": 103779921221,
+      "job_id": 103784000136,
+      "name": "publication-bundle",
+      "conclusion": "success",
+      "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
+      "native_checkout_values": [
+        "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
+      ],
+      "expected_present": true,
+      "log_sha256": "900fe366c5bc37f25c2eea248fcac35c7f451bcdeb0cefbc4d428b371aa6ff68",
+      "bytes": 21990
+    },
+    {
+      "workflow": "icse-tool-demo.yml",
+      "job_id": 103784000221,
       "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
       "conclusion": "success",
       "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
@@ -286,12 +321,12 @@
         "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
       ],
       "expected_present": true,
-      "log_sha256": "81903a077b214254965b47b7119101f7ae96b841c4d7d490ef68dfcdf6dfd803",
-      "bytes": 49194
+      "log_sha256": "9332d6c2702f7a973a2b9dc8ce93d793e4ba66d851321de56bafb81a26e2e5f7",
+      "bytes": 49193
     },
     {
       "workflow": "icse-tool-demo.yml",
-      "job_id": 103779921740,
+      "job_id": 103784000528,
       "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
       "conclusion": "success",
       "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
@@ -299,21 +334,21 @@
         "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
       ],
       "expected_present": true,
-      "log_sha256": "9d5423d74b089bd6fd478aa5b0dd49a072fbc1ea6cb9846b4d024cfc252a5709",
-      "bytes": 53672
+      "log_sha256": "671f06436fc6757c493a2143e43df2c2581603b94ad3707089d3ad6d8162b894",
+      "bytes": 54290
     },
     {
       "workflow": "icse-tool-demo.yml",
-      "job_id": 103780468967,
-      "name": "publication-bundle",
-      "conclusion": "failure",
+      "job_id": 103784013004,
+      "name": "reviewer-compose",
+      "conclusion": "success",
       "expected_checkout": "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6",
       "native_checkout_values": [
         "ec0bbd1d5ce45a97ddc10058bad38eea90f044b6"
       ],
       "expected_present": true,
-      "log_sha256": "f632595807a91bd93b29bf149549818a4a5b7647e06b93a4c25885181ba86dc9",
-      "bytes": 23241
+      "log_sha256": "31441ff7fd12f67ef064b79499df9084d8ec25c17388ab5e8e7c75408b4814e7",
+      "bytes": 27888
     },
     {
       "workflow": "federation-software-update.yml",
@@ -485,7 +520,18 @@
       "bytes": 10742
     }
   ],
-  "native_proofs": 37,
-  "without_native_checkout": [],
+  "native_proofs": 38,
+  "without_native_checkout": [
+    {
+      "job_id": 103785492108,
+      "name": "Clean-checkout suite order independence",
+      "native_checkout_values": []
+    },
+    {
+      "job_id": 103785508850,
+      "name": "Federation v1 automated release verdict",
+      "native_checkout_values": []
+    }
+  ],
   "qualification_complete": false
 }
