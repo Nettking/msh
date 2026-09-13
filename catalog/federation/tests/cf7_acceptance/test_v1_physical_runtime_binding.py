@@ -606,6 +606,8 @@ def test_a_bound_sample_measures_the_runtime_roots_and_not_the_harness_checkout(
     packet = json.loads(written.read_text(encoding="utf-8"))
     assert packet["resource_roots_bound"] is True
     assert sorted(packet["resources"]) == ["data", "results"]
+    assert packet["resources"]["data"] == packet["resources"]["results"]
+    assert len(packet["resources"]["data"]["resource_alias"]) == 64
     assert "checkout" not in packet["resources"]
     assert set(seen) == {data, results}
     assert checkout / "data" not in seen

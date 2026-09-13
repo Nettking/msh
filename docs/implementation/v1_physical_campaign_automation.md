@@ -216,6 +216,14 @@ resource snapshot as the base harness plus the recorder, publication, history,
 orphan and CPU/RAM series the P12 series assertions require. The series
 assertions then check the recorded samples rather than trusting a claim.
 
+Growth probes count each backing filesystem once. Samples retain each measured
+root and an opaque filesystem alias, so `data` and `results` on one volume share
+one measurement while distinct volumes remain additive. Missing identities,
+contradictory aliases, or changes to the measured roots, volumes or capacities
+make growth evidence unavailable. Older samples without identities cannot prove
+growth; retain them and collect fresh evidence with the pinned harness revision.
+The hourly and per-activation ceilings are unchanged.
+
 ## Step 6 — human-observation assertions
 
 Three assertions have no probe. Record them through the base harness after the
