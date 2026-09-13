@@ -2,6 +2,8 @@
 
 **Current actionable checkpoint: 2026-09-13 04:14UTC. All13 native5e qualification runs terminal; failures/cancellations require evidence triage.**
 
+New independent failed path D17 confirmed: Beast native5e Windows transport-storage initial primary ingest response timed out at5.0s; run34734869036/job103664365464. Classification unresolved, not automatically product regression. Evidence diagnostics/D17.md/json/native-log.zip. NEXT: publish its issue immediately, then continue other failed/cancelled evidence triage; no new retry, repair or merge.
+
 NEXT (supersedes prior wait/startup): preserve new completed native logs, first inspect release Windows transport/storage failure and ICSE Linux failure plus release/F85 cancellations. No retry, source change or merge before classification. API snapshot diagnostics/pr475-exact-head-state-20260913T0414.json; heads5e/440 and baseb719 unchanged. Passing results remain valid. No physical state change.
 
 All13 unchanged workflows were manually dispatched once at5e6f184311019b9982e8544a18f3dc02c1b16e98 between03:10:38 and03:11:41UTC. Each accepted dispatch was committed/pushed individually. Receipt diagnostics/pr475-exact-head-dispatch.json; plan [PR475_EXACT_HEAD_QUALIFICATION_RECONCILIATION.md](PR475_EXACT_HEAD_QUALIFICATION_RECONCILIATION.md). Four initial jobs running: CF7 harness on Beast Windows/Nettking Linux and Phase2 on Nettking Windows/Beast Linux, with setup/tests progressing. Other jobs queued normally; no failure at startup. Full API snapshot diagnostics/pr475-exact-head-startup.json. Native checkout logs await completion; do not claim exact-head PASS from API metadata alone.
