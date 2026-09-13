@@ -1,0 +1,34 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "host": "nitro",
+  "status": "COMPLETED",
+  "started_at": "2026-09-13T15:45:29.505855+00:00",
+  "operation": "one supported activation of the owned acceptance installation",
+  "runtime_source_clean": true,
+  "physical_pass": false,
+  "protected_data_accessed": false,
+  "launcher_exit_code": 0,
+  "log_sha256": "bae3264401e1c8fd10a9a7cf8a25992636273bd740529923e429284e126002dc",
+  "core_images": [
+    {
+      "service": "flask",
+      "container": "32ff54a316679bddca4f50ae15fd0f812e5aec2ad2e5ea733c54bb32de5cfc5f",
+      "image": "sha256:069bd42eb14965efa6cbbde85a57bd3cd65df63b39e2007887ba9c804a31e9c5",
+      "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80"
+    },
+    {
+      "service": "relay",
+      "container": "ce8ce356defb02d541e353462434799e0b438eb3c0be218a15b3c85379558d48",
+      "image": "sha256:a0261dfe7528042bed5e42ee5b3a4eb223e1f93525301992331d1109a48e2484",
+      "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80"
+    },
+    {
+      "service": "recorder",
+      "container": "06e4e1730f305d3bc6b07d8d1bc2f62df05314a4b45d8da0573267c716500bf4",
+      "image": "sha256:87e41cc42fa284c59c6d885e7146aed71ee1d2671ac225b0e50326f1494ea0a1",
+      "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80"
+    }
+  ],
+  "configured_http_status": 200,
+  "finished_at": "2026-09-13T15:58:06.710610+00:00"
+}

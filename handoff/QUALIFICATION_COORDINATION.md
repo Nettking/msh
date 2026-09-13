@@ -1,6 +1,6 @@
 # Federation v1 current release checkpoint
 
-Updated 2026-09-13T16:00Z. Active context: clean handoff + this file + live GitHub.
+Updated 2026-09-13T16:02Z. Active context: clean handoff + this file + live GitHub.
 Historical coordination is evidence only; consult it for a concrete current need.
 
 ## Current source / heads
@@ -9,9 +9,9 @@ Historical coordination is evidence only; consult it for a concrete current need
   merged normally. Freeze: diagnostics/AUTHORITATIVE_CANDIDATE-1aac6148.json.
 - Windows harness: C:/wsl/fcp-v1-1aac6148-main-20260913, clean detached C.
 - Nitro harness: /home/martin/fcp-v1-1aac6148-main-20260913/source, clean detached C.
-- Both owned runtime source checkouts are C. Windows installed C, verified three
-  core image labels and configured HTTP200. Nitro activation is still RUNNING;
-  its final image/HTTP verification is pending. Recorder owned voter remains fba50818.
+- Both owned runtimes installed C: launcher0, three core image labels and configured
+  HTTP200 verified on each. Nitro admission completed15:58:06Z; the slower first
+  build succeeded within existing limits. Recorder owned voter remains fba50818.
 - No tag, public release, or complete physical PASS. Old e6a9b74a freeze is blocked
   and superseded; never repeat qualification or physical acceptance on that source.
 
@@ -43,9 +43,9 @@ Historical coordination is evidence only; consult it for a concrete current need
   FAIL retained; same1GiB/hour ceiling. No Windows activation/fault work until terminal.
   Final sample not before 2026-09-13T16:41:05.365965Z; PID31872.
   Status: Windows harness/.acceptance/runtime-control/P01-hour-status.json.
-- Nitro admission dispatched once, PID3010269, started15:45:29Z. Latest read15:57Z:
-  build finished, cores restarted, optional model step running; final result pending.
-  Status: Nitro harness/.acceptance/runtime-control/candidate-admission.json.
+- Nitro fresh P01 dispatched once16:01:28Z, PID3014025, after verified admission.
+  Its three supported activations and growth checks are active. Status and receipt:
+  Nitro harness/.acceptance/runtime-control/P01-qualified-{status,dispatch}.json.
 - Fresh P01 failed-build cleanup and remaining physical scenarios are incomplete.
   Previous focused repair proof cannot substitute for fresh physical acceptance.
 - P07/P12 have NOT STARTED. Owned corpora are empty; aged history insufficient.
@@ -53,12 +53,12 @@ Historical coordination is evidence only; consult it for a concrete current need
   a non-protected aged test corpus. Do not ask again or access protected Recorder data.
 
 ## Active work / next action
-1. Inspect the existing Nitro admission on meaningful change using
-   diagnostics/physical-1aac6148/read-nitro-admission.py. Never redispatch an uncertain
+1. Inspect the existing Nitro P01 on meaningful change using
+   diagnostics/physical-1aac6148/read-nitro-p01.py. Never redispatch an uncertain
    activation. If stopped, retain terminal status and inspect its bounded failure.
-2. After Nitro admission completes with launcher0, three C labels and HTTP200,
-   dispatch one fresh Nitro P01 three-activation campaign using run-qualified-p01.py.
-   Retain a durable dispatch receipt; do not overlap physical voter activations.
+2. After Nitro P01 completes, retain its packets and run the prepared resource
+   baseline/runtime-state probes once via run-p01-readonly.py. No full physical PASS;
+   remaining contract assertions still apply. Do not overlap physical voter activations.
 3. At/after16:41Z read existing Windows P01-hour terminal packets. Preserve the
    initial FAIL and every sample, classify the result, then resume required P01 work.
    Never restart the measurement, filter samples, or relax the unchanged ceiling.
