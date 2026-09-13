@@ -29,6 +29,43 @@ CAPABILITIES = {
     "voter-b": ("icse-synthetic-readings", "demo.synthetic-readings"),
     "voter-c": ("icse-reading-viewer", "demo.reading-viewer"),
 }
+_PUBLIC_WORKERS = frozenset({"voter-a", "voter-b", "voter-c", "reviewer"})
+_PUBLIC_OPERATIONS = frozenset({
+    "status", "bootstrap", "enrollment_token", "connect", "invite", "join",
+    "discover", "announce", "send", "receive",
+})
+_PUBLIC_ERROR_TYPES = frozenset({
+    "RuntimeError", "TimeoutError", "RelayRemoteError", "AuthorizationError",
+    "QuorumUnavailable", "FederationValidationError", "ValueError", "OSError",
+    "ConnectionError",
+})
+_PUBLIC_ERROR_CODES = frozenset({
+    "federation-quorum-leader-required", "quorum-unavailable",
+    "capability-node-mismatch", "ownership-lease-expired", "session-mismatch",
+    "request-timeout", "node-revoked", "enrollment-required",
+})
+
+
+def _public_choice(value: object, allowed: frozenset[str]) -> str:
+    return value if isinstance(value, str) and value in allowed else "unclassified"
+
+
+class WorkerCommandFailure(RuntimeError):
+    """Keep full errors private while exposing only fixed diagnostic vocabulary."""
+
+    def __init__(self, worker: str, operation: str, response: dict) -> None:
+        super().__init__(
+            f"{worker} {operation} failed: {response.get('error_type')}/{response.get('error_code')}"
+        )
+        self.public_context = {
+            "worker": _public_choice(worker, _PUBLIC_WORKERS),
+            "operation": _public_choice(operation, _PUBLIC_OPERATIONS),
+            "error_type": _public_choice(response.get("error_type"), _PUBLIC_ERROR_TYPES),
+            "error_code": (
+                None if response.get("error_code") is None
+                else _public_choice(response["error_code"], _PUBLIC_ERROR_CODES)
+            ),
+        }
 
 
 def utc() -> str:
@@ -221,7 +258,8 @@ class Child:
         if expect_error:
             require(response.get("ok") is False, f"{operation} unexpectedly succeeded")
             return response
-        require(response.get("ok") is True, f"{self.label} {operation} failed: {response.get('error_type')}/{response.get('error_code')}")
+        if response.get("ok") is not True:
+            raise WorkerCommandFailure(self.label, operation, response)
         return response["result"]
 
     def stop(self, *, force: bool = False) -> None:
@@ -506,6 +544,8 @@ def campaign(args: argparse.Namespace) -> int:
     except Exception as error:  # noqa: BLE001 - retain failure evidence, fail closed, and stop every child
         summary["result"] = "FAIL"
         summary["failure"] = {"type": type(error).__name__}
+        if isinstance(error, WorkerCommandFailure):
+            summary["failure"]["command"] = error.public_context
         with (state / "driver-failure.log").open("a", encoding="utf-8") as stream:
             traceback.print_exc(file=stream)
         print(f"Demonstration failed: {type(error).__name__}; details retained in private-state", file=sys.stderr)
