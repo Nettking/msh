@@ -1,0 +1,291 @@
+{
+  "reviewed_at": "2026-09-13T09:05:46.277489+00:00",
+  "pr_head": "06b956787ae63215982d5afd7198dead366e05ea",
+  "actual_native_source": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+  "run": 34746641263,
+  "attempt": 1,
+  "release_pass": 16,
+  "checkout_proofs": 14,
+  "two_aggregate_jobs": "Order-independence and release-verdict use verified dependency results; no checkout claimed",
+  "artifact_digests_verified": 9,
+  "artifact_reviews": [
+    {
+      "artifact": "linux-regression-shard-2",
+      "file": "shard-2.json",
+      "source": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+      "selected": 1126,
+      "executed": 1126
+    },
+    {
+      "artifact": "linux-regression-shard-2",
+      "file": "junit-2.xml",
+      "suites": [
+        {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "0",
+          "skipped": "0",
+          "tests": "1126",
+          "time": "158.664",
+          "timestamp": "2026-09-13T10:22:39.547036+02:00",
+          "hostname": "Nettking"
+        }
+      ],
+      "relevant_passes": []
+    },
+    {
+      "artifact": "full-suite-order-rotating",
+      "file": "order-rotating.xml",
+      "suites": [
+        {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "0",
+          "skipped": "40",
+          "tests": "4503",
+          "time": "537.688",
+          "timestamp": "2026-09-13T10:12:42.987560+02:00",
+          "hostname": "Nettking"
+        }
+      ],
+      "relevant_passes": [
+        {
+          "classname": "catalog.federation.tests.test_icse_network_failure_reporting",
+          "name": "test_failed_campaign_retains_safe_command_cause_and_stops_every_child[secret-enrollment-marker-secret-invitation-marker-unclassified-unclassified]",
+          "time": "0.005"
+        },
+        {
+          "classname": "catalog.federation.tests.test_icse_network_failure_reporting",
+          "name": "test_failed_campaign_retains_safe_command_cause_and_stops_every_child[TimeoutError-None-TimeoutError-None]",
+          "time": "0.004"
+        },
+        {
+          "classname": "catalog.federation.tests.test_icse_network_failure_reporting",
+          "name": "test_failed_campaign_retains_safe_command_cause_and_stops_every_child[QuorumUnavailable-federation-quorum-leader-required-QuorumUnavailable-federation-quorum-leader-required]",
+          "time": "0.004"
+        },
+        {
+          "classname": "catalog.node.tests.test_live_storage_replication",
+          "name": "test_two_live_storage_nodes_replicate_and_replica_restarts",
+          "time": "1.724"
+        },
+        {
+          "classname": "catalog.federation.tests.test_tailnet_join_responder",
+          "name": "test_unknown_paths_are_refused",
+          "time": "0.505"
+        }
+      ]
+    },
+    {
+      "artifact": "windows-regression-journal-artifacts",
+      "file": "windows-journal-artifacts.xml",
+      "suites": [
+        {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "0",
+          "skipped": "1",
+          "tests": "298",
+          "time": "368.742",
+          "timestamp": "2026-09-13T10:11:45.230218+02:00",
+          "hostname": "Nettking"
+        }
+      ],
+      "relevant_passes": []
+    },
+    {
+      "artifact": "full-suite-order-fixed",
+      "file": "order-fixed.xml",
+      "suites": [
+        {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "0",
+          "skipped": "40",
+          "tests": "4503",
+          "time": "505.784",
+          "timestamp": "2026-09-13T10:26:03.867279+02:00",
+          "hostname": "Nettking"
+        }
+      ],
+      "relevant_passes": [
+        {
+          "classname": "catalog.federation.tests.test_tailnet_join_responder",
+          "name": "test_unknown_paths_are_refused",
+          "time": "0.506"
+        },
+        {
+          "classname": "catalog.node.tests.test_live_storage_replication",
+          "name": "test_two_live_storage_nodes_replicate_and_replica_restarts",
+          "time": "0.634"
+        },
+        {
+          "classname": "catalog.federation.tests.test_icse_network_failure_reporting",
+          "name": "test_failed_campaign_retains_safe_command_cause_and_stops_every_child[TimeoutError-None-TimeoutError-None]",
+          "time": "0.008"
+        },
+        {
+          "classname": "catalog.federation.tests.test_icse_network_failure_reporting",
+          "name": "test_failed_campaign_retains_safe_command_cause_and_stops_every_child[secret-enrollment-marker-secret-invitation-marker-unclassified-unclassified]",
+          "time": "0.006"
+        },
+        {
+          "classname": "catalog.federation.tests.test_icse_network_failure_reporting",
+          "name": "test_failed_campaign_retains_safe_command_cause_and_stops_every_child[QuorumUnavailable-federation-quorum-leader-required-QuorumUnavailable-federation-quorum-leader-required]",
+          "time": "0.005"
+        }
+      ]
+    },
+    {
+      "artifact": "windows-regression-capability-product",
+      "file": "windows-capability-product.xml",
+      "suites": [
+        {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "0",
+          "skipped": "5",
+          "tests": "895",
+          "time": "362.397",
+          "timestamp": "2026-09-13T10:04:05.685005+02:00",
+          "hostname": "Beast"
+        }
+      ],
+      "relevant_passes": []
+    },
+    {
+      "artifact": "linux-regression-shard-3",
+      "file": "shard-3.json",
+      "source": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+      "selected": 1125,
+      "executed": 1125
+    },
+    {
+      "artifact": "linux-regression-shard-3",
+      "file": "junit-3.xml",
+      "suites": [
+        {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "0",
+          "skipped": "14",
+          "tests": "1125",
+          "time": "132.971",
+          "timestamp": "2026-09-13T10:35:19.812799+02:00",
+          "hostname": "Nettking"
+        }
+      ],
+      "relevant_passes": [
+        {
+          "classname": "catalog.federation.tests.test_tailnet_join_responder",
+          "name": "test_unknown_paths_are_refused",
+          "time": "0.505"
+        }
+      ]
+    },
+    {
+      "artifact": "windows-regression-transport-storage",
+      "file": "windows-transport-storage.xml",
+      "suites": [
+        {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "0",
+          "skipped": "1",
+          "tests": "371",
+          "time": "105.344",
+          "timestamp": "2026-09-13T10:03:56.366385+02:00",
+          "hostname": "Nettking"
+        }
+      ],
+      "relevant_passes": [
+        {
+          "classname": "catalog.node.tests.test_live_storage_replication",
+          "name": "test_two_live_storage_nodes_replicate_and_replica_restarts",
+          "time": "2.207"
+        }
+      ]
+    },
+    {
+      "artifact": "linux-regression-shard-1",
+      "file": "shard-1.json",
+      "source": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+      "selected": 1126,
+      "executed": 1126
+    },
+    {
+      "artifact": "linux-regression-shard-1",
+      "file": "junit-1.xml",
+      "suites": [
+        {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "0",
+          "skipped": "5",
+          "tests": "1126",
+          "time": "107.108",
+          "timestamp": "2026-09-13T10:02:03.959352+02:00",
+          "hostname": "Nettking"
+        }
+      ],
+      "relevant_passes": [
+        {
+          "classname": "catalog.federation.tests.test_icse_network_failure_reporting",
+          "name": "test_failed_campaign_retains_safe_command_cause_and_stops_every_child[QuorumUnavailable-federation-quorum-leader-required-QuorumUnavailable-federation-quorum-leader-required]",
+          "time": "0.005"
+        },
+        {
+          "classname": "catalog.federation.tests.test_icse_network_failure_reporting",
+          "name": "test_failed_campaign_retains_safe_command_cause_and_stops_every_child[TimeoutError-None-TimeoutError-None]",
+          "time": "0.004"
+        },
+        {
+          "classname": "catalog.federation.tests.test_icse_network_failure_reporting",
+          "name": "test_failed_campaign_retains_safe_command_cause_and_stops_every_child[secret-enrollment-marker-secret-invitation-marker-unclassified-unclassified]",
+          "time": "0.004"
+        }
+      ]
+    },
+    {
+      "artifact": "linux-regression-shard-0",
+      "file": "shard-0.json",
+      "source": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+      "selected": 1126,
+      "executed": 1126
+    },
+    {
+      "artifact": "linux-regression-shard-0",
+      "file": "junit-0.xml",
+      "suites": [
+        {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "0",
+          "skipped": "21",
+          "tests": "1126",
+          "time": "175.247",
+          "timestamp": "2026-09-13T10:04:42.931618+02:00",
+          "hostname": "Nettking"
+        }
+      ],
+      "relevant_passes": [
+        {
+          "classname": "catalog.node.tests.test_live_storage_replication",
+          "name": "test_two_live_storage_nodes_replicate_and_replica_restarts",
+          "time": "0.632"
+        }
+      ]
+    }
+  ],
+  "stacked_automatic_total": {
+    "passed": 24,
+    "failed": 2,
+    "skipped": 1,
+    "scope": 27,
+    "remaining": "ICSE Linux/Windows failed; publication bundle skipped"
+  },
+  "pr475_exact_qualification_unchanged": "35/37 required +3/3 companions on5e",
+  "physical_acceptance": "NOT_EVALUATED",
+  "protected_recorder_data": "Not accessed/changed",
+  "next_action": "Guard unchanged PR heads and activate prepared one-shot out-of-tree worker frame capture; no qualification rerun or product edits."
+}

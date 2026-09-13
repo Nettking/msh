@@ -1,0 +1,210 @@
+{
+  "source_commit": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+  "retained_at": "2026-09-13T09:04:33.065921+00:00",
+  "records": [
+    {
+      "job_id": 103695663235,
+      "run_id": 34746641263,
+      "name": "PostgreSQL storage release check",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 44652,
+      "sha256": "3841602d8568ebc762fdc78fd44b5ae8c03d45741d6c7f34d6ce16a680bf1398",
+      "checkout_commits": [
+        "f104038a2b77705adaa547cdd1df7d895bf80a41"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103695663280,
+      "run_id": 34746641263,
+      "name": "Linux regression shard (1)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 60643,
+      "sha256": "cf6e63f56768378a99ceeb6afdc462d7dd4bb8603d3b24e97b377c3a54fccb67",
+      "checkout_commits": [
+        "f104038a2b77705adaa547cdd1df7d895bf80a41"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103695663283,
+      "run_id": 34746641263,
+      "name": "Release checks (Linux)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 54567,
+      "sha256": "fef80ff24b034106ca7960a9decc343517c60d22022831eb317be1d145e5887f",
+      "checkout_commits": [
+        "f104038a2b77705adaa547cdd1df7d895bf80a41"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103695663288,
+      "run_id": 34746641263,
+      "name": "Windows regressions (capability-product)",
+      "runner_name": "Beast",
+      "conclusion": "success",
+      "bytes": 63702,
+      "sha256": "97a72c15ee2fc43e5ca6a37d0f16502b0709e9ef4c11f31db5cad0573b534a36",
+      "checkout_commits": [
+        "f104038a2b77705adaa547cdd1df7d895bf80a41"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103695663289,
+      "run_id": 34746641263,
+      "name": "Linux regression shard (0)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 59909,
+      "sha256": "da6506735e7eb4d16bb649f064c76d033681f11659729bf9af529a044c5d88fb",
+      "checkout_commits": [
+        "f104038a2b77705adaa547cdd1df7d895bf80a41"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103695663293,
+      "run_id": 34746641263,
+      "name": "Full-suite order (rotating)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 70027,
+      "sha256": "c50f98283d139e1a70ae081e50469bdc0d36fa8d0bcef4e57e44abd7afa01d29",
+      "checkout_commits": [
+        "f104038a2b77705adaa547cdd1df7d895bf80a41"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103695663309,
+      "run_id": 34746641263,
+      "name": "Windows regressions (transport-storage)",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 54036,
+      "sha256": "b2ca91bd0c9a1ad6d737b3327d76e5239197b14f294d633ec7e198e223fbcea9",
+      "checkout_commits": [
+        "f104038a2b77705adaa547cdd1df7d895bf80a41"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103695663318,
+      "run_id": 34746641263,
+      "name": "Full-suite order (fixed)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 69605,
+      "sha256": "0b7fc4e5307847f03f2d990218bd452f87e20b25dc3c1c1f91bbe30f1d8d2770",
+      "checkout_commits": [
+        "f104038a2b77705adaa547cdd1df7d895bf80a41"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103695663327,
+      "run_id": 34746641263,
+      "name": "Linux regression shard (2)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 59202,
+      "sha256": "bf9c60c2eb417ebb284ff69a6fdcdb4e04943f69da37d02215cbb5a70a648028",
+      "checkout_commits": [
+        "f104038a2b77705adaa547cdd1df7d895bf80a41"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103695663334,
+      "run_id": 34746641263,
+      "name": "Release checks (Windows)",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 55121,
+      "sha256": "0e53fcc7572f1a2a026c9ca4b501ed8dc8b3ec8314e4b304afea572f848b9318",
+      "checkout_commits": [
+        "f104038a2b77705adaa547cdd1df7d895bf80a41"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103695663341,
+      "run_id": 34746641263,
+      "name": "Linux regression shard (3)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 62425,
+      "sha256": "e00f8e02bce46cc95b593a5d012a484e56e736f5b599740a15446e25f60cbafb",
+      "checkout_commits": [
+        "f104038a2b77705adaa547cdd1df7d895bf80a41"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103695663401,
+      "run_id": 34746641263,
+      "name": "Windows regressions (journal-artifacts)",
+      "runner_name": "Nettking",
+      "conclusion": "success",
+      "bytes": 54899,
+      "sha256": "542c4c0530cd08e28e47f941b64d85177acdcce9062d784d942dd32b9451f50b",
+      "checkout_commits": [
+        "f104038a2b77705adaa547cdd1df7d895bf80a41"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103699437843,
+      "run_id": 34746641263,
+      "name": "Clean-checkout suite order independence",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 1101,
+      "sha256": "98112b6521555f080edbd64f8213c40a7f7e7ae4b0421590c026e69f61fc7cfc",
+      "checkout_commits": [],
+      "checkout_matches": null
+    },
+    {
+      "job_id": 103699777269,
+      "run_id": 34746641263,
+      "name": "Release matrix (Windows)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 18865,
+      "sha256": "9f89aad993ef0eca39bc511590b5c52f734a7c8b6414454832a24449e2c13eeb",
+      "checkout_commits": [
+        "f104038a2b77705adaa547cdd1df7d895bf80a41"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103699777318,
+      "run_id": 34746641263,
+      "name": "Release matrix (Linux)",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 15016,
+      "sha256": "6b3e7f6be8fa47e128eff5f8844a813f4b7b152978a7c38746d21f8c639ae9b1",
+      "checkout_commits": [
+        "f104038a2b77705adaa547cdd1df7d895bf80a41"
+      ],
+      "checkout_matches": true
+    },
+    {
+      "job_id": 103699833624,
+      "run_id": 34746641263,
+      "name": "Federation v1 automated release verdict",
+      "runner_name": "Nettking-Linux",
+      "conclusion": "success",
+      "bytes": 1189,
+      "sha256": "9952bf893f79582a7eab52fdbed2ad60ba400640216fc2ca9130730b9eef6e2b",
+      "checkout_commits": [],
+      "checkout_matches": null
+    }
+  ]
+}
