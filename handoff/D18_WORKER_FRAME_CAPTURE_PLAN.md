@@ -42,7 +42,4 @@ This new one-shot captures worker frames missing from the newly demonstrated
 failure, uses the actual ICSE dependency commands, and does not seek a green
 qualification result. No AQG dependency or protected Recorder access.
 
-Preparation only: no executable workflow/dispatch has been added yet. After the
-release gate is processed, use the verified private-worker path and five passing offline redaction/bounds checks
-(D18-worker-frame-preflight.json), then publish the narrow coordination workflow
-and its execution receipt. Keep every existing PR head fixed during this capture.
+Activation authorized after release34746641263 completed and all native evidence was retained. The workflow is now copied byte-for-byte from the reviewed template on the coordination branch. D18-worker-frame-activation-guard.json records unchanged PR/source/main guards; the next checkpoint must record the exact activation commit and resulting run ID. Five offline safety cases remain PASS. One execution only, then evidence review; all PR heads stay fixed.

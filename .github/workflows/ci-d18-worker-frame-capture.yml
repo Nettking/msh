@@ -1,0 +1,67 @@
+name: D18 single unchanged worker-frame capture
+
+# Coordination-only template. Activate only after current release evidence is retained.
+on:
+  push:
+    branches: [codex/federation-v1-diagnostic-sweep-20260911]
+    paths: [".github/workflows/ci-d18-worker-frame-capture.yml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: d18-single-worker-frame-capture
+  cancel-in-progress: false
+
+jobs:
+  worker-frames:
+    runs-on: [self-hosted, Linux, X64, beast-linux, fcp-linux-fast]
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Verify original host and allocate owned evidence
+        id: evidence
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = "Nettking/msh"
+          test "$GITHUB_REF" = "refs/heads/codex/federation-v1-diagnostic-sweep-20260911"
+          test "$GITHUB_RUN_ATTEMPT" = 1
+          test "$RUNNER_NAME" = "Beast-Linux-WSL"
+          test "$GITHUB_WORKSPACE" = "/opt/actions-runner/_work/msh/msh"
+          test "$(realpath "$GITHUB_WORKSPACE")" = "$GITHUB_WORKSPACE"
+          evidence="$RUNNER_TEMP/d18-frames-evidence-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          mkdir "$evidence"
+          echo "D18_FRAME_EVIDENCE=$evidence" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: f104038a2b77705adaa547cdd1df7d895bf80a41
+
+      - uses: ./.github/actions/self-hosted-python
+        with:
+          python-version: "3.12"
+
+      - name: Preserve original ICSE dependency commands
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install ruff
+
+      - name: Extract external collector without modifying candidate source
+        run: |
+          git fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          python -B -c 'import os,pathlib,subprocess; target=pathlib.Path(os.environ["D18_FRAME_EVIDENCE"])/"capture_d18_worker_frames.py"; target.write_bytes(subprocess.check_output(["git","show",os.environ["GITHUB_SHA"]+":handoff/diagnostics/capture_d18_worker_frames.py"],timeout=30))'
+
+      - name: Execute unchanged network command exactly once and capture safe frames
+        run: python -B "$D18_FRAME_EVIDENCE/capture_d18_worker_frames.py"
+
+      - name: Preserve only sanitized receipt and existing public outputs
+        if: ${{ always() && steps.evidence.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: d18-worker-frames-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.D18_FRAME_EVIDENCE }}
+          if-no-files-found: error
+          retention-days: 30

@@ -1,0 +1,36 @@
+{
+  "recorded_at": "2026-09-13T09:09:59.497144+00:00",
+  "coordination_prior": "bc0adef55a488bb63eefe42c611611559b5d0140",
+  "guard": "PASS",
+  "prs": [
+    {
+      "number": 473,
+      "head": "440123f6bc6dc358eef3d233236bc14f91af60e0",
+      "base": "b7194820d8f1940ae60b8c9639e09b7f61e65c55",
+      "base_ref": "main",
+      "draft": true
+    },
+    {
+      "number": 475,
+      "head": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+      "base": "b7194820d8f1940ae60b8c9639e09b7f61e65c55",
+      "base_ref": "main",
+      "draft": true
+    },
+    {
+      "number": 483,
+      "head": "06b956787ae63215982d5afd7198dead366e05ea",
+      "base": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+      "base_ref": "codex/fix-d13-windows-refusal-response",
+      "draft": true
+    }
+  ],
+  "main": "b7194820d8f1940ae60b8c9639e09b7f61e65c55",
+  "diagnostic_source": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+  "mode": "DIAGNOSTIC_ONLY_NOT_QUALIFICATION",
+  "release_prerequisite": "D20-stacked-release-0903-reviewed.json: SUCCESS16/16 native evidence retained",
+  "state_change": "Activate one coordination-only worker-frame capture; PR heads and physical hosts unchanged",
+  "protected_recorder_data": "UNTOUCHED",
+  "physical_acceptance": "NOT_EVALUATED",
+  "retry_policy": "No retry; preserve result and decide from evidence"
+}
