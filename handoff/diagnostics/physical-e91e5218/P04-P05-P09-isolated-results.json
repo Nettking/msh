@@ -1,0 +1,96 @@
+{
+  "candidate": "e91e521813aff67c44bae51d00dfae212b56ef7e",
+  "scope": "isolated C2 native physical cases only",
+  "P09": [
+    {
+      "assertion": "raw-publication",
+      "verdict": "pass",
+      "windows": 2,
+      "primary_summary_sha256": "702bf150a406b0dad87487b2c0b6a454cbc7337b423696734cf0f64cd56ccd19"
+    },
+    {
+      "assertion": "raw-manifest",
+      "verdict": "pass",
+      "windows": 2,
+      "primary_summary_sha256": "9d89e75f8696266c9f73c8e6281ff951b8a54d12d2d90f3bf28a15f3c915904e"
+    },
+    {
+      "assertion": "observation-archive",
+      "verdict": "pass",
+      "windows": 2,
+      "primary_summary_sha256": "2bfcdb92e0e135de520033744d71e2e73a62730aa3ceca8e02d945a74c1bf7c9"
+    },
+    {
+      "assertion": "compat-jsonl",
+      "verdict": "pass",
+      "windows": 2,
+      "primary_summary_sha256": "65be6d65562461c5d52b329149c5eb662d0db6b8673eea6257af1e6b889c0633"
+    },
+    {
+      "assertion": "checkpoint-status",
+      "verdict": "pass",
+      "windows": 4,
+      "primary_summary_sha256": "de73da5961ff298ea887c3e20363ccec72b4b3d04871afbf3cae4a5c36762c77"
+    }
+  ],
+  "P04_P05": [
+    {
+      "scenario": "P04",
+      "assertion": "maximum-ingress",
+      "verdict": "pass",
+      "prepare_id": "5445027bddd541cfac1d46d29ce25d69",
+      "primary_sha256": "be53275a62091eee27f9e3100695ed11f60c6074e14de6e70779fc66a8c4198c"
+    },
+    {
+      "scenario": "P04",
+      "assertion": "concurrent-sources",
+      "verdict": "pass",
+      "prepare_id": "964a247cb5574e678fdedd32b6d68bd3",
+      "primary_sha256": "64db654581b973c017eafe02c319c79e76655412631233d4a8cb704cca752ba3"
+    },
+    {
+      "scenario": "P05",
+      "assertion": "slow-trickle-response",
+      "verdict": "pass",
+      "prepare_id": "2a4c9dad6a1b4d6ab20d6ca0b08a037c",
+      "primary_sha256": "d489737970cda8461c2234c54cf3fec2bce665f2e8eac61ff49358e9330d7055"
+    },
+    {
+      "scenario": "P05",
+      "assertion": "oversized-ingress",
+      "verdict": "pass",
+      "prepare_id": "dfee5ea6748b435697b6e5dfd7469008",
+      "primary_sha256": "4c1e43c7bfe6146e58d9cf64ef7073c59cebddb5b556d1efb8f1b50439e1fe01"
+    },
+    {
+      "scenario": "P05",
+      "assertion": "huge-sequence-gap",
+      "verdict": "pass",
+      "prepare_id": "5dcb4639e9ba48fc89b0447686fdb3bb",
+      "primary_sha256": "df1b75327e6536d25abc111b1139ed108136334321408335dd6cb8d2d3924a4b"
+    },
+    {
+      "scenario": "P05",
+      "assertion": "event-storm",
+      "verdict": "pass",
+      "prepare_id": "adde41867e5e404aac70f459f043a270",
+      "primary_sha256": "5e8011f3d8d7725c09c0d655e8b50dbce1d56653354a9e73d55b17275c872022"
+    }
+  ],
+  "actual_os_kill_windows": 12,
+  "wholly_new_fixture_data": true,
+  "operator_stop_exit_code": 0,
+  "protected_data_accessed": false,
+  "shared_creator_or_native_faults_executed": false,
+  "P07_P12_started": false,
+  "physical_campaign_pass": false,
+  "p09_initial_failure": "deterministic harness: global tracing resolved every called source path before filtering writer name; retained original attempt; name-first targeted recovery passed",
+  "archive": "P04-P05-P09-isolated-primary-evidence.zip",
+  "archive_sha256": "b2fb3c009fad6360983a275a0056f4abd85ea927a403905377679f20d2fd4cce",
+  "retained_primary_file_count": 27,
+  "source_evidence_roots": [
+    "C:\\wsl\\fcp-v1-e91e5218-main-20260913\\.acceptance\\p09\\native-first-five-e91e5218-namefirst-20260913",
+    "C:\\wsl\\fcp-v1-diagnostic-sweep-20260911\\.acceptance\\p04-p05-e91e5218-fresh-20260913"
+  ],
+  "strict_evidence_root": "C:\\wsl\\fcp-v1-e91e5218-main-20260913\\evidence\\v1-physical"
+}

@@ -1,0 +1,25 @@
+{
+  "candidate": "e91e521813aff67c44bae51d00dfae212b56ef7e",
+  "reviewed_at": "2026-09-13T21:56:26.719879+00:00",
+  "status": "READ_ONLY_RED_TO_GREEN_PASS",
+  "all_containers_unchanged": true,
+  "owned_containers_unchanged": true,
+  "owned_current_port_and_coordinator_preserved": true,
+  "physical_activation_pass": false,
+  "protected_data_accessed": false,
+  "comparison_note": "Docker inspect returns Mounts in unstable array order; same retained before/after snapshots compare equal after sorting by destination/type/source. No replay performed for this receipt. Original comparison refusals retained.",
+  "results": [
+    {
+      "label": "red",
+      "exit_code": 2,
+      "script_sha256": "487e1fda1800f15fe32660553c3b0df65cab1deffa8f57983cfe1758270fb362",
+      "log_sha256": "2cfb3810b16d9a70c04032e51f5557bbae91fa27d868e46752bfaf3d375cd32b"
+    },
+    {
+      "label": "green",
+      "exit_code": 0,
+      "script_sha256": "8c92df64fdc099cf8f7206e1270ee6074e630b64c48516dfacbcf384a7121478",
+      "log_sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    }
+  ]
+}

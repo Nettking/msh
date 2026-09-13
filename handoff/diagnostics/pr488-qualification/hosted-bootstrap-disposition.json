@@ -1,0 +1,13 @@
+{
+  "pr": 488,
+  "head": "1345244efb6f3c081e077471e587f8d2b63f258d",
+  "run_id": 34785372293,
+  "job_id": 103799764716,
+  "classification": "INFRASTRUCTURE_ACCOUNT_JOB_NOT_STARTED",
+  "annotation": "The job was not started because recent account payments have failed or your spending limit needs to be increased.",
+  "runner_assigned": false,
+  "steps_executed": 0,
+  "candidate_code_executed": false,
+  "mandatory_release_gate_job": false,
+  "action": "Retain observation; no retry, billing/account change or runner-pool change."
+}

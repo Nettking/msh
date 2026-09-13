@@ -1,13 +1,15 @@
 # Federation v1 current release checkpoint
 
-Updated 2026-09-13T21:54Z. Active context: clean handoff + this file + live GitHub.
+Updated 2026-09-13T22:09Z. Active context: clean handoff + this file + live GitHub.
 Historical coordination is evidence only; consult it for a specific current need.
 
 ## Current source / heads
 - Main=e91e521813aff67c44bae51d00dfae212b56ef7e, PR487 merged normally.
   Tree=c61eb8e838e8c3d44628af8909da4ed8ed347acf. No override/bypass.
 - Clean detached harness: C:/wsl/fcp-v1-e91e5218-main-20260913.
-  C2 is FROZEN; physical acceptance incomplete. No tag/public release created.
+  C2 frozen but BLOCKED by demonstrated Windows activation defect. No release.
+- Repair PR488 head1345244efb6f3c081e077471e587f8d2b63f258d;
+  synthetic source1bd199b317eef613c3ba289ef39a20ae48f089e5. Qualification running.
 - Old C=1aac6148759d7b2fd488ec26b97e1a786bdafa80 is immutable evidence only.
   PR487 repairs its demonstrated storage-reply ownership race. No cross-SHA PASS.
 - Native main checkout prepared at C:/wsl/fcp-v1-native-main-runtime-20260913,
@@ -52,19 +54,22 @@ Historical coordination is evidence only; consult it for a specific current need
   QuickTurn/IG500/VTC timed out; user asked once, answer pending. Timers independent.
 
 ## Active work / next action
-1. Root controls: coord/.acceptance/c2-release-preparation. Creator source nowC2;
-   supported start safely refused: configured host port missed by Docker publish
-   filter. Existing owned stack intact. Assess current contract before recovery.
-2. Nitro workbench staging stopped before source mutation: system Python lacks
-   psycopg. Agent resumes reviewed partial with qualified Python, then admission.
-   Agent executing separate fresh P09/P04/P05; P09 observer cost being repaired.
+1. Root controls: coord/.acceptance/c2-release-preparation. PR488 fixes P01/P03
+   supported warm activation: use actual host TCP binding, pass current project.
+   Two production files;43 related tests PASS, focused red-to-green and actual
+   owned resolver red-to-green PASS. No container state changed. Review complete.
+2. PR488 mandatory release/ICSE/other automatic jobs queued/running. Hosted-only
+   Windows bootstrap never started (account billing),0steps; no candidate defect,
+   retry, account/pool change. Not a mandatory16-job release dependency.
+   Nitro qualified-Python staging and supported C2 admission PASS,21:49-22:01.
+   Exact3core C2 images verified; original system-Python refusal retained.
 3. Reuse native data/membership/checkpoints IN PLACE at old harness
    .acceptance/native-faults/data. No supervisor/source Agent active. P06 basic ->
    crash fence -> real branch trial/main restore, chaining latest Agent state.
    Finish shared creator clock/outbox faults before reserving it for P07/P12.
 4. Existing owned creator source C:/wsl/fcp-v1-1aac6148-onboarding-runtime-20260913;
    preserve its data/coordinator volume/credentials/readonly model mounts.
-   Other owned Win/Nitro workbenches remain separate, admissions pending.
+   Creator runtime stilloldC/sourceC2. Next admission separates these baselines.
 5. NEW Nitro44GiB isolated pressure fixture ready;679GiB outer free. First3s
    daemon readiness timeout retained; read-only adoption PASS, empty private
    daemon. No product/filler. Old sparse archives/partial copies retained.
@@ -73,8 +78,12 @@ Historical coordination is evidence only; consult it for a specific current need
    at C:/wsl/fcp-v1-p11-e91e5218-20260913, no activation/volumes/backup yet.
    Recorder isolated portable Python3.12 manifest/imports verified; no physical
    DPAPI/key assertion. P11 baseline awaits creator activation disposition.
-7. P06/P09/outbox/poison/timed/P11 executors prepared in coord/.acceptance;
-   root owns shared faults and release mutations. Existing
+7. C2 eleven isolated assertions strict PASS: P09first5/12actualcrashwindows,
+   P04maximum+eight-source, P05slow/oversized/gap/eventstorm. Fixtures stopped.
+   Launcher map globally invalidates all prior physical evidence; use fresh
+   next-SHA runs, no relabeling. Agents prepare new controls/source observer hashes.
+   Root qualifies PR488 -> normal merge -> actual main gate -> freeze -> fresh
+   admission/early faults -> actual P07/P12. Existing
    30-minute heartbeat targets this thread. Keep details outside this checkpoint.
 
 ## Immutable safety constraints

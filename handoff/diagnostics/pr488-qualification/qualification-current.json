@@ -1,0 +1,288 @@
+{
+  "recorded_at": "2026-09-13T22:09:04.149550+00:00",
+  "pr": 488,
+  "head": "1345244efb6f3c081e077471e587f8d2b63f258d",
+  "source": "1bd199b317eef613c3ba289ef39a20ae48f089e5",
+  "base": "e91e521813aff67c44bae51d00dfae212b56ef7e",
+  "mergeable": true,
+  "state": "open",
+  "workflows": [
+    {
+      "workflow": "windows-first-federation-start.yml",
+      "run_id": 34785372293,
+      "status": "completed",
+      "conclusion": "failure",
+      "run_attempt": 1,
+      "jobs": [
+        {
+          "id": 103799764716,
+          "name": "Real Windows batch bootstrap boundary",
+          "status": "completed",
+          "conclusion": "failure",
+          "runner": ""
+        }
+      ]
+    },
+    {
+      "workflow": "cf8-role-retirement.yml",
+      "run_id": 34785372258,
+      "status": "queued",
+      "conclusion": null,
+      "run_attempt": 1,
+      "jobs": [
+        {
+          "id": 103799764680,
+          "name": "role-retirement (Linux, fcp-linux-fast, bash)",
+          "status": "completed",
+          "conclusion": "success",
+          "runner": "Nettking-Linux"
+        },
+        {
+          "id": 103799764799,
+          "name": "role-retirement (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+          "status": "queued",
+          "conclusion": null,
+          "runner": ""
+        }
+      ]
+    },
+    {
+      "workflow": "federation-v1-release.yml",
+      "run_id": 34785372268,
+      "status": "queued",
+      "conclusion": null,
+      "run_attempt": 1,
+      "jobs": [
+        {
+          "id": 103799764935,
+          "name": "Release checks (Linux)",
+          "status": "completed",
+          "conclusion": "success",
+          "runner": "Nettking-Linux"
+        },
+        {
+          "id": 103799765082,
+          "name": "Release checks (Windows)",
+          "status": "queued",
+          "conclusion": null,
+          "runner": ""
+        },
+        {
+          "id": 103799765094,
+          "name": "Linux regression shard (2)",
+          "status": "completed",
+          "conclusion": "success",
+          "runner": "Nettking-Linux"
+        },
+        {
+          "id": 103799765108,
+          "name": "PostgreSQL storage release check",
+          "status": "completed",
+          "conclusion": "success",
+          "runner": "Nettking-Linux"
+        },
+        {
+          "id": 103799765109,
+          "name": "Linux regression shard (0)",
+          "status": "queued",
+          "conclusion": null,
+          "runner": ""
+        },
+        {
+          "id": 103799765111,
+          "name": "Windows regressions (journal-artifacts)",
+          "status": "in_progress",
+          "conclusion": null,
+          "runner": "Beast"
+        },
+        {
+          "id": 103799765127,
+          "name": "Windows regressions (capability-product)",
+          "status": "queued",
+          "conclusion": null,
+          "runner": ""
+        },
+        {
+          "id": 103799765138,
+          "name": "Linux regression shard (3)",
+          "status": "queued",
+          "conclusion": null,
+          "runner": ""
+        },
+        {
+          "id": 103799765147,
+          "name": "Linux regression shard (1)",
+          "status": "in_progress",
+          "conclusion": null,
+          "runner": "Nettking-Linux"
+        },
+        {
+          "id": 103799765148,
+          "name": "Full-suite order (fixed)",
+          "status": "queued",
+          "conclusion": null,
+          "runner": ""
+        },
+        {
+          "id": 103799765160,
+          "name": "Windows regressions (transport-storage)",
+          "status": "queued",
+          "conclusion": null,
+          "runner": ""
+        },
+        {
+          "id": 103799765215,
+          "name": "Full-suite order (rotating)",
+          "status": "queued",
+          "conclusion": null,
+          "runner": ""
+        }
+      ]
+    },
+    {
+      "workflow": "federation-software-update.yml",
+      "run_id": 34785372269,
+      "status": "queued",
+      "conclusion": null,
+      "run_attempt": 1,
+      "jobs": [
+        {
+          "id": 103799764856,
+          "name": "update-contracts (Linux, fcp-linux-fast, bash)",
+          "status": "completed",
+          "conclusion": "success",
+          "runner": "Nettking-Linux"
+        },
+        {
+          "id": 103799765009,
+          "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+          "status": "queued",
+          "conclusion": null,
+          "runner": ""
+        }
+      ]
+    },
+    {
+      "workflow": "product-branding.yml",
+      "run_id": 34785372244,
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "jobs": [
+        {
+          "id": 103799764521,
+          "name": "product-branding",
+          "status": "completed",
+          "conclusion": "success",
+          "runner": "Nettking-Linux"
+        }
+      ]
+    },
+    {
+      "workflow": "cf7c-physical-test-readiness.yml",
+      "run_id": 34785372277,
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "jobs": [
+        {
+          "id": 103799764673,
+          "name": "readiness (Linux, fcp-linux-fast, bash)",
+          "status": "completed",
+          "conclusion": "success",
+          "runner": "Nettking-Linux"
+        },
+        {
+          "id": 103799764763,
+          "name": "readiness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy B...",
+          "status": "completed",
+          "conclusion": "success",
+          "runner": "Nettking"
+        }
+      ]
+    },
+    {
+      "workflow": "cf7b-product-physical-acceptance.yml",
+      "run_id": 34785372259,
+      "status": "in_progress",
+      "conclusion": null,
+      "run_attempt": 1,
+      "jobs": [
+        {
+          "id": 103799764631,
+          "name": "acceptance (Linux, fcp-linux-fast, bash)",
+          "status": "completed",
+          "conclusion": "success",
+          "runner": "Beast-Linux-WSL"
+        },
+        {
+          "id": 103799764744,
+          "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
+          "status": "in_progress",
+          "conclusion": null,
+          "runner": "Nettking"
+        }
+      ]
+    },
+    {
+      "workflow": "icse-tool-demo.yml",
+      "run_id": 34785372265,
+      "status": "completed",
+      "conclusion": "failure",
+      "run_attempt": 1,
+      "jobs": [
+        {
+          "id": 103799764777,
+          "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
+          "status": "completed",
+          "conclusion": "failure",
+          "runner": "Nettking"
+        },
+        {
+          "id": 103799764819,
+          "name": "reviewer-compose",
+          "status": "completed",
+          "conclusion": "success",
+          "runner": "Nettking-Linux"
+        },
+        {
+          "id": 103799764823,
+          "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
+          "status": "completed",
+          "conclusion": "success",
+          "runner": "Nettking-Linux"
+        },
+        {
+          "id": 103800647924,
+          "name": "publication-bundle",
+          "status": "completed",
+          "conclusion": "skipped",
+          "runner": null
+        }
+      ]
+    },
+    {
+      "workflow": "phase-f85-operator-federation-surface.yml",
+      "run_id": 34785372266,
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "jobs": [
+        {
+          "id": 103799764775,
+          "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+          "status": "completed",
+          "conclusion": "success",
+          "runner": "Beast"
+        },
+        {
+          "id": 103799764908,
+          "name": "operator-surface (Linux, fcp-linux-fast, bash)",
+          "status": "completed",
+          "conclusion": "success",
+          "runner": "Beast-Linux-WSL"
+        }
+      ]
+    }
+  ]
+}

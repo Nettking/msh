@@ -1,0 +1,35 @@
+{
+  "candidate": "e91e521813aff67c44bae51d00dfae212b56ef7e",
+  "classification": "DEMONSTRATED_PRODUCT_DEFECT",
+  "contract": [
+    "P01/windows-three-activations",
+    "P01/runtime-state",
+    "P03/start-cmd"
+  ],
+  "trigger": "Supported warm activation with an explicitly configured host web port mapped to Flask container5000 and selected Compose project.",
+  "mechanism": "Docker publish filter targets container port, so resolver misses actual host port owner. start.cmd also omitted CurrentProjectName in both resolver branches.",
+  "actual_activation_exit_code": 1,
+  "resolver_exit_code": 2,
+  "runtime_mutated_by_failed_activation": false,
+  "source_already_staged": true,
+  "repair_pr": 488,
+  "repair_head": "1345244efb6f3c081e077471e587f8d2b63f258d",
+  "repair_production_files": [
+    "start.cmd",
+    "scripts/windows/resolve_fcp_web_port.ps1"
+  ],
+  "validation": {
+    "original_focused_failures": 3,
+    "original_focused_passes": 2,
+    "repaired_related_tests_passed": 43,
+    "ruff": "PASS",
+    "diff_check": "PASS",
+    "independent_production_review": "NO_BLOCKING_FINDING",
+    "actual_owned_readonly_resolver": "RED_TO_GREEN_PASS"
+  },
+  "physical_campaign_pass": false,
+  "P07": "NOT_STARTED",
+  "P12": "NOT_STARTED",
+  "protected_data_accessed": false,
+  "revalidation": "Launcher paths globally invalidate prior physical evidence; fresh campaign required after repaired candidate qualification."
+}
