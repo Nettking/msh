@@ -1,0 +1,19 @@
+{
+  "old_head": "70163ea908741baa1999a9c1084f0805d85dea64",
+  "old_base": "b7194820d8f1940ae60b8c9639e09b7f61e65c55",
+  "new_head": "06b956787ae63215982d5afd7198dead366e05ea",
+  "new_base": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "new_base_ref": "codex/fix-d13-windows-refusal-response",
+  "D20_patch_byte_identical": true,
+  "D20_patch_sha256": "d0a782df4c0fd41799058a14dba6608e93364d46b50487dd656e99db2cc2964b",
+  "D20_files": [
+    ".github/workflows/icse-tool-demo.yml",
+    "catalog/federation/tests/test_icse_network_failure_reporting.py",
+    "demo/icse/network/run.py"
+  ],
+  "D13_runtime_and_tests_unchanged_from_475": true,
+  "old_source_bundle_sha256": "374df0c5c20e45c4c27b588c4b6fae9b307c62ae94360a53d9dac79948236807",
+  "all_original_runs_terminal": true,
+  "manual_qualification_dispatch": false,
+  "next_action": "Retarget PR483 base to unchanged PR475 branch, then guarded force-with-lease push old701->new head; persist immediately. Do not move PR475, merge or deploy."
+}

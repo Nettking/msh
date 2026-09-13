@@ -1,0 +1,51 @@
+{
+  "source": "83d059fba6d22b7d8f526be1b7e563c9bc3c0a68",
+  "existing_junit": [
+    {
+      "artifact_id": 10314336503,
+      "artifact": "full-suite-order-fixed",
+      "file": "order-fixed.xml",
+      "case": {
+        "classname": "catalog.node.tests.test_live_storage_replication",
+        "name": "test_two_live_storage_nodes_replicate_and_replica_restarts",
+        "time": "0.639"
+      },
+      "outcome": "PASS"
+    },
+    {
+      "artifact_id": 10313991497,
+      "artifact": "full-suite-order-rotating",
+      "file": "order-rotating.xml",
+      "case": {
+        "classname": "catalog.node.tests.test_live_storage_replication",
+        "name": "test_two_live_storage_nodes_replicate_and_replica_restarts",
+        "time": "0.855"
+      },
+      "outcome": "PASS"
+    },
+    {
+      "artifact_id": 10313900921,
+      "artifact": "linux-regression-shard-2",
+      "file": "junit-2.xml",
+      "case": {
+        "classname": "catalog.node.tests.test_live_storage_replication",
+        "name": "test_two_live_storage_nodes_replicate_and_replica_restarts",
+        "time": "0.740"
+      },
+      "outcome": "PASS"
+    },
+    {
+      "artifact_id": 10313771251,
+      "artifact": "windows-regression-transport-storage",
+      "file": "windows-transport-storage.xml",
+      "case": {
+        "classname": "catalog.node.tests.test_live_storage_replication",
+        "name": "test_two_live_storage_nodes_replicate_and_replica_restarts",
+        "time": "2.595"
+      },
+      "outcome": "PASS"
+    }
+  ],
+  "new_execution": false,
+  "root_cause": "Unresolved; different workflows may use different dependency/runtime contexts"
+}
