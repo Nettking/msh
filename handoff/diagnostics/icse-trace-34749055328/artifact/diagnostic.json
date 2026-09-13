@@ -1,0 +1,328 @@
+{
+  "at": "2026-09-13T09:11:08.217296+00:00",
+  "mode": "DIAGNOSTIC_ONLY_NOT_QUALIFICATION",
+  "source_sha": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+  "control_sha": "4f253ae6d626f5d51c9c8888b1de3347ee8c36db",
+  "runner": "Beast-Linux-WSL",
+  "host": "Beast",
+  "python": "3.12.13",
+  "command": [
+    "/opt/actions-runner/_work/_temp/fcp-python.weNakV/bin/python",
+    "-B",
+    "-m",
+    "demo.icse.network.run",
+    "--source-sha",
+    "f104038a2b77705adaa547cdd1df7d895bf80a41",
+    "--output",
+    "/opt/actions-runner/_work/_temp/d18-frames-network-34749055328-1"
+  ],
+  "packages": [
+    {
+      "name": "argon2-cffi",
+      "version": "25.1.0"
+    },
+    {
+      "name": "argon2-cffi-bindings",
+      "version": "26.1.0"
+    },
+    {
+      "name": "blinker",
+      "version": "1.9.0"
+    },
+    {
+      "name": "certifi",
+      "version": "2026.7.22"
+    },
+    {
+      "name": "cffi",
+      "version": "2.1.1"
+    },
+    {
+      "name": "charset-normalizer",
+      "version": "3.5.1"
+    },
+    {
+      "name": "click",
+      "version": "8.5.0"
+    },
+    {
+      "name": "cloudpickle",
+      "version": "3.1.2"
+    },
+    {
+      "name": "contourpy",
+      "version": "1.4.0"
+    },
+    {
+      "name": "cryptography",
+      "version": "43.0.3"
+    },
+    {
+      "name": "cycler",
+      "version": "0.12.1"
+    },
+    {
+      "name": "dnspython",
+      "version": "2.8.0"
+    },
+    {
+      "name": "duckdb",
+      "version": "1.5.5"
+    },
+    {
+      "name": "email-validator",
+      "version": "2.3.0"
+    },
+    {
+      "name": "Flask",
+      "version": "3.1.3"
+    },
+    {
+      "name": "Flask-Login",
+      "version": "0.6.3"
+    },
+    {
+      "name": "Flask-Principal",
+      "version": "0.4.0"
+    },
+    {
+      "name": "Flask-Security-Too",
+      "version": "5.8.2"
+    },
+    {
+      "name": "Flask-SQLAlchemy",
+      "version": "3.1.1"
+    },
+    {
+      "name": "Flask-WTF",
+      "version": "1.3.0"
+    },
+    {
+      "name": "fonttools",
+      "version": "4.65.0"
+    },
+    {
+      "name": "greenlet",
+      "version": "3.5.5"
+    },
+    {
+      "name": "idna",
+      "version": "3.19"
+    },
+    {
+      "name": "itsdangerous",
+      "version": "2.2.0"
+    },
+    {
+      "name": "Jinja2",
+      "version": "3.1.6"
+    },
+    {
+      "name": "joblib",
+      "version": "1.6.0"
+    },
+    {
+      "name": "kiwisolver",
+      "version": "1.5.1"
+    },
+    {
+      "name": "libpass",
+      "version": "1.9.3"
+    },
+    {
+      "name": "Markdown",
+      "version": "3.10.3"
+    },
+    {
+      "name": "MarkupSafe",
+      "version": "3.0.3"
+    },
+    {
+      "name": "matplotlib",
+      "version": "3.11.2"
+    },
+    {
+      "name": "narwhals",
+      "version": "2.26.0"
+    },
+    {
+      "name": "numpy",
+      "version": "2.5.3"
+    },
+    {
+      "name": "packaging",
+      "version": "26.3"
+    },
+    {
+      "name": "pandas",
+      "version": "3.0.5"
+    },
+    {
+      "name": "pillow",
+      "version": "12.3.0"
+    },
+    {
+      "name": "pip",
+      "version": "26.2.1"
+    },
+    {
+      "name": "psycopg",
+      "version": "3.2.9"
+    },
+    {
+      "name": "psycopg-binary",
+      "version": "3.2.9"
+    },
+    {
+      "name": "pyarrow",
+      "version": "25.0.1"
+    },
+    {
+      "name": "pycparser",
+      "version": "3.0"
+    },
+    {
+      "name": "pyparsing",
+      "version": "3.3.2"
+    },
+    {
+      "name": "python-dateutil",
+      "version": "2.9.0.post0"
+    },
+    {
+      "name": "requests",
+      "version": "2.34.2"
+    },
+    {
+      "name": "ruff",
+      "version": "0.16.7"
+    },
+    {
+      "name": "scikit-learn",
+      "version": "1.9.1"
+    },
+    {
+      "name": "scipy",
+      "version": "1.18.1"
+    },
+    {
+      "name": "six",
+      "version": "1.17.0"
+    },
+    {
+      "name": "SQLAlchemy",
+      "version": "2.0.52"
+    },
+    {
+      "name": "threadpoolctl",
+      "version": "3.6.0"
+    },
+    {
+      "name": "typing_extensions",
+      "version": "4.16.0"
+    },
+    {
+      "name": "urllib3",
+      "version": "2.7.0"
+    },
+    {
+      "name": "websockets",
+      "version": "15.0.1"
+    },
+    {
+      "name": "Werkzeug",
+      "version": "3.1.8"
+    },
+    {
+      "name": "WTForms",
+      "version": "3.2.2"
+    }
+  ],
+  "protected_recorder_data": "NOT_ACCESSED_OR_CHANGED",
+  "physical_acceptance": "NOT_EVALUATED",
+  "exit_code": 0,
+  "workers": {
+    "voter-a": {
+      "exists": true,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "frames": [],
+      "error_types": []
+    },
+    "voter-b": {
+      "exists": true,
+      "bytes": 1381,
+      "sha256": "b344979e755c53f579f744955076e7ed881d6e1cc2bab3f97ba04346cd54b3ba",
+      "frames": [
+        {
+          "file": "demo/icse/network/worker.py",
+          "line": 175
+        },
+        {
+          "file": "demo/icse/network/worker.py",
+          "line": 102
+        },
+        {
+          "file": "catalog/federation/control_plane_facade.py",
+          "line": 27
+        },
+        {
+          "file": "catalog/federation/control_plane_facade.py",
+          "line": 80
+        },
+        {
+          "file": "catalog/federation/control_plane_product.py",
+          "line": 669
+        },
+        {
+          "file": "catalog/federation/control_plane_product.py",
+          "line": 319
+        }
+      ],
+      "error_types": [
+        "QuorumUnavailable"
+      ]
+    },
+    "voter-c": {
+      "exists": true,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "frames": [],
+      "error_types": []
+    },
+    "reviewer": {
+      "exists": true,
+      "bytes": 981,
+      "sha256": "de88cfa1f0318f611a16af1844d4fd5c9e51181134a0f5ba87486f45232dcced",
+      "frames": [
+        {
+          "file": "demo/icse/network/worker.py",
+          "line": 175
+        },
+        {
+          "file": "demo/icse/network/worker.py",
+          "line": 136
+        },
+        {
+          "file": "catalog/node/client.py",
+          "line": 592
+        },
+        {
+          "file": "catalog/node/client.py",
+          "line": 540
+        },
+        {
+          "file": "external/asyncio",
+          "line": 520
+        }
+      ],
+      "error_types": [
+        "RelayRemoteError"
+      ]
+    }
+  },
+  "driver": {
+    "exists": false
+  },
+  "source_still_clean": true
+}

@@ -1,0 +1,485 @@
+<!doctype html><html lang='en'><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'><title>Federation local network demonstration</title><style>body{font:16px system-ui;margin:2rem auto;max-width:72rem;padding:0 1rem;background:#f4f7fa;color:#142536}article{background:white;padding:1.2rem;margin:1rem 0;border:1px solid #cad5df;border-radius:.5rem}pre{overflow:auto;font-size:13px;line-height:1.4}h1{font-size:2rem}</style><h1>Federation membership survives one voter loss</h1><p>Offline demonstration report generated from observed process output. This is not the product interface or physical acceptance evidence.</p><p>Result: <strong>PASS</strong><br>Source: <code>f104038a2b77705adaa547cdd1df7d895bf80a41</code></p><article><h2>01 — Four independent local node processes</h2><p>2026-09-13T09:11:12.192707Z</p><pre>{
+  &quot;reviewer&quot;: {
+    &quot;kind&quot;: &quot;member&quot;,
+    &quot;node_id&quot;: &quot;node-abumevp-0mGycfT_kHGhnwyzMGXeyI04PUOj8kA8M-M&quot;,
+    &quot;pid&quot;: 78709
+  },
+  &quot;voter-a&quot;: {
+    &quot;kind&quot;: &quot;voter and relay&quot;,
+    &quot;node_id&quot;: &quot;node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY&quot;,
+    &quot;pid&quot;: 78676
+  },
+  &quot;voter-b&quot;: {
+    &quot;kind&quot;: &quot;voter and relay&quot;,
+    &quot;node_id&quot;: &quot;node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY&quot;,
+    &quot;pid&quot;: 78687
+  },
+  &quot;voter-c&quot;: {
+    &quot;kind&quot;: &quot;voter and relay&quot;,
+    &quot;node_id&quot;: &quot;node-fp-n1K0250BUVOTrPKDKiU7rNLOw37rUg51JuBxOttM&quot;,
+    &quot;pid&quot;: 78698
+  }
+}</pre></article><article><h2>02 — One Federation committed by the voter quorum</h2><p>2026-09-13T09:11:13.123059Z</p><pre>{
+  &quot;voter-a&quot;: {
+    &quot;capabilities&quot;: {
+      &quot;icse-session-0018bc8a03c44b21b54c36dc5bea227f&quot;: {
+        &quot;fcp.control-plane.bootstrap-complete&quot;: {
+          &quot;capability_id&quot;: &quot;fcp.control-plane.bootstrap-complete&quot;,
+          &quot;capability_type&quot;: &quot;fcp-control-plane-bootstrap-seal&quot;,
+          &quot;owner_node_id&quot;: &quot;node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY&quot;
+        }
+      }
+    },
+    &quot;control_plane&quot;: {
+      &quot;cluster_id&quot;: &quot;icse-cluster-fb18b2530caf48f9add0b7eb43c31a63&quot;,
+      &quot;commit_index&quot;: 3,
+      &quot;consensus_leader_id&quot;: &quot;node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY&quot;,
+      &quot;consensus_term&quot;: 1,
+      &quot;federation_id&quot;: &quot;icse-federation-41855e479d5240bea6ef628da5509cb3&quot;,
+      &quot;fencing_epoch&quot;: 1,
+      &quot;last_applied&quot;: 3,
+      &quot;ready&quot;: true,
+      &quot;role&quot;: &quot;LEADER&quot;,
+      &quot;schema&quot;: &quot;fcp.control-plane.status.v1&quot;,
+      &quot;sessions&quot;: [
+        {
+          &quot;creator_node_id&quot;: &quot;node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY&quot;,
+          &quot;leader_node_id&quot;: &quot;node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY&quot;,
+          &quot;leadership_term&quot;: 1,
+          &quot;session_id&quot;: &quot;icse-session-0018bc8a03c44b21b54c36dc5bea227f&quot;
+        }
+      ],
+      &quot;voter_id&quot;: &quot;node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY&quot;,
+      &quot;voter_only&quot;: false
+    },
+    &quot;lifecycle_error&quot;: null,
+    &quot;memberships&quot;: {
+      &quot;icse-session-0018bc8a03c44b21b54c36dc5bea227f&quot;: {
+        &quot;node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY&quot;: true,
+        &quot;node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY&quot;: true,
+        &quot;node-fp-n1K0250BUVOTrPKDKiU7rNLOw37rUg51JuBxOttM&quot;: true
+      }
+    }
+  },
+  &quot;voter-b&quot;: {
+    &quot;capabilities&quot;: {
+      &quot;icse-session-0018bc8a03c44b21b54c36dc5bea227f&quot;: {
+        &quot;fcp.control-plane.bootstrap-complete&quot;: {
+          &quot;capability_id&quot;: &quot;fcp.control-plane.bootstrap-complete&quot;,
+          &quot;capability_type&quot;: &quot;fcp-control-plane-bootstrap-seal&quot;,
+          &quot;owner_node_id&quot;: &quot;node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY&quot;
+        }
+      }
+    },
+    &quot;control_plane&quot;: {
+      &quot;cluster_id&quot;: &quot;icse-cluster-fb18b2530caf48f9add0b7eb43c31a63&quot;,
+      &quot;commit_index&quot;: 3,
+      &quot;consensus_leader_id&quot;: &quot;node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY&quot;,
+      &quot;consensus_term&quot;: 1,
+      &quot;federation_id&quot;: &quot;icse-federation-41855e479d5240bea6ef628da5509cb3&quot;,
+      &quot;fencing_epoch&quot;: 0,
+      &quot;last_applied&quot;: 3,
+      &quot;ready&quot;: true,
+      &quot;role&quot;: &quot;FOLLOWER&quot;,
+      &quot;schema&quot;: &quot;fcp.control-plane.status.v1&quot;,
+      &quot;sessions&quot;: [
+        {
+          &quot;creator_node_id&quot;: &quot;node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY&quot;,
+          &quot;leader_node_id&quot;: &quot;node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY&quot;,
+          &quot;leadership_term&quot;: 1,
+          &quot;session_id&quot;: &quot;icse-session-0018bc8a03c44b21b54c36dc5bea227f&quot;
+        }
+      ],
+      &quot;voter_id&quot;: &quot;node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY&quot;,
+      &quot;voter_only&quot;: false
+    },
+    &quot;lifecycle_error&quot;: null,
+    &quot;memberships&quot;: {
+      &quot;icse-session-0018bc8a03c44b21b54c36dc5bea227f&quot;: {
+        &quot;node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY&quot;: true,
+        &quot;node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY&quot;: true,
+        &quot;node-fp-n1K0250BUVOTrPKDKiU7rNLOw37rUg51JuBxOttM&quot;: true
+      }
+    }
+  },
+  &quot;voter-c&quot;: {
+    &quot;capabilities&quot;: {
+      &quot;icse-session-0018bc8a03c44b21b54c36dc5bea227f&quot;: {
+        &quot;fcp.control-plane.bootstrap-complete&quot;: {
+          &quot;capability_id&quot;: &quot;fcp.control-plane.bootstrap-complete&quot;,
+          &quot;capability_type&quot;: &quot;fcp-control-plane-bootstrap-seal&quot;,
+          &quot;owner_node_id&quot;: &quot;node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY&quot;
+        }
+      }
+    },
+    &quot;control_plane&quot;: {
+      &quot;cluster_id&quot;: &quot;icse-cluster-fb18b2530caf48f9add0b7eb43c31a63&quot;,
+      &quot;commit_index&quot;: 3,
+      &quot;consensus_leader_id&quot;: &quot;node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY&quot;,
+      &quot;consensus_term&quot;: 1,
+      &quot;federation_id&quot;: &quot;icse-federation-41855e479d5240bea6ef628da5509cb3&quot;,
+      &quot;fencing_epoch&quot;: 0,
+      &quot;last_applied&quot;: 3,
+      &quot;ready&quot;: true,
+      &quot;role&quot;: &quot;FOLLOWER&quot;,
+      &quot;schema&quot;: &quot;fcp.control-plane.status.v1&quot;,
+      &quot;sessions&quot;: [
+        {
+          &quot;creator_node_id&quot;: &quot;node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY&quot;,
+          &quot;leader_node_id&quot;: &quot;node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY&quot;,
+          &quot;leadership_term&quot;: 1,
+          &quot;session_id&quot;: &quot;icse-session-0018bc8a03c44b21b54c36dc5bea227f&quot;
+        }
+      ],
+      &quot;voter_id&quot;: &quot;node-fp-n1K0250BUVOTrPKDKiU7rNLOw37rUg51JuBxOttM&quot;,
+      &quot;voter_only&quot;: false
+    },
+    &quot;lifecycle_error&quot;: null,
+    &quot;memberships&quot;: {
+      &quot;icse-session-0018bc8a03c44b21b54c36dc5bea227f&quot;: {
+        &quot;node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY&quot;: true,
+        &quot;node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY&quot;: true,
+        &quot;node-fp-n1K0250BUVOTrPKDKiU7rNLOw37rUg51JuBxOttM&quot;: true
+      }
+    }
+  }
+}</pre></article><article><h2>03 — Reviewer enrolls and joins using one-use credentials</h2><p>2026-09-13T09:11:15.402719Z</p><pre>{
+  &quot;credential_values&quot;: &quot;omitted&quot;,
+  &quot;reviewer_node_id&quot;: &quot;node-abumevp-0mGycfT_kHGhnwyzMGXeyI04PUOj8kA8M-M&quot;,
+  &quot;session_id&quot;: &quot;icse-session-0018bc8a03c44b21b54c36dc5bea227f&quot;
+}</pre></article><article><h2>04 — Distinct capability owners are discoverable; forgery is rejected</h2><p>2026-09-13T09:11:16.440439Z</p><pre>{
+  &quot;authorized_status&quot;: {
+    &quot;capabilities&quot;: [
+      {
+        &quot;capability_id&quot;: &quot;icse-reading-viewer&quot;,
+        &quot;last_heartbeat&quot;: &quot;2026-09-13T09:11:16.006721+00:00&quot;,
+        &quot;node_id&quot;: &quot;node-fp-n1K0250BUVOTrPKDKiU7rNLOw37rUg51JuBxOttM&quot;,
+        &quot;properties&quot;: {
+          &quot;purpose&quot;: &quot;synthetic reviewer dataset exchange&quot;
+        },
+        &quot;protocol&quot;: &quot;icse-illustrative-payload&quot;,
+        &quot;protocol_version&quot;: &quot;1&quot;,
+        &quot;session_id&quot;: &quot;icse-session-0018bc8a03c44b21b54c36dc5bea227f&quot;,
+        &quot;status&quot;: &quot;ready&quot;,
+        &quot;type&quot;: &quot;demo.reading-viewer&quot;
+      },
+      {
+        &quot;capability_id&quot;: &quot;icse-synthetic-readings&quot;,
+        &quot;last_heartbeat&quot;: &quot;2026-09-13T09:11:15.496070+00:00&quot;,
+        &quot;node_id&quot;: &quot;node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY&quot;,
+        &quot;properties&quot;: {
+          &quot;purpose&quot;: &quot;synthetic reviewer dataset exchange&quot;
+        },
+        &quot;protocol&quot;: &quot;icse-illustrative-payload&quot;,
+        &quot;protocol_version&quot;: &quot;1&quot;,
+        &quot;session_id&quot;: &quot;icse-session-0018bc8a03c44b21b54c36dc5bea227f&quot;,
+        &quot;status&quot;: &quot;ready&quot;,
+        &quot;type&quot;: &quot;demo.synthetic-readings&quot;
+      }
+    ],
+    &quot;coordinator_id&quot;: &quot;fcp-replicated-coordinator-v1&quot;,
+    &quot;nodes&quot;: [
+      {
+        &quot;connection_state&quot;: &quot;connected&quot;,
+        &quot;display_name&quot;: &quot;voter-b&quot;,
+        &quot;last_heartbeat&quot;: &quot;2026-09-13T09:11:13.386733+00:00&quot;,
+        &quot;node_id&quot;: &quot;node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY&quot;,
+        &quot;revoked&quot;: false
+      },
+      {
+        &quot;connection_state&quot;: &quot;connected&quot;,
+        &quot;display_name&quot;: &quot;voter-a&quot;,
+        &quot;last_heartbeat&quot;: &quot;2026-09-13T09:11:13.178071+00:00&quot;,
+        &quot;node_id&quot;: &quot;node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY&quot;,
+        &quot;revoked&quot;: false
+      },
+      {
+        &quot;connection_state&quot;: &quot;connected&quot;,
+        &quot;display_name&quot;: &quot;reviewer&quot;,
+        &quot;last_heartbeat&quot;: &quot;2026-09-13T09:11:14.339090+00:00&quot;,
+        &quot;node_id&quot;: &quot;node-abumevp-0mGycfT_kHGhnwyzMGXeyI04PUOj8kA8M-M&quot;,
+        &quot;revoked&quot;: false
+      },
+      {
+        &quot;connection_state&quot;: &quot;connected&quot;,
+        &quot;display_name&quot;: &quot;voter-c&quot;,
+        &quot;last_heartbeat&quot;: &quot;2026-09-13T09:11:13.474025+00:00&quot;,
+        &quot;node_id&quot;: &quot;node-fp-n1K0250BUVOTrPKDKiU7rNLOw37rUg51JuBxOttM&quot;,
+        &quot;revoked&quot;: false
+      }
+    ],
+    &quot;schema&quot;: &quot;fcp.coordinator_status.v1&quot;,
+    &quot;sessions&quot;: [
+      {
+        &quot;created_by_node_id&quot;: &quot;node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY&quot;,
+        &quot;display_name&quot;: &quot;ICSE local network demonstration&quot;,
+        &quot;revision&quot;: 7,
+        &quot;session_id&quot;: &quot;icse-session-0018bc8a03c44b21b54c36dc5bea227f&quot;,
+        &quot;state&quot;: &quot;active&quot;
+      }
+    ]
+  },
+  &quot;provider_activation&quot;: &quot;NOT_DEMONSTRATED; declarations do not approve execution&quot;,
+  &quot;rejection_code&quot;: &quot;capability-node-mismatch&quot;
+}</pre></article><article><h2>05 — Synthetic readings cross the authenticated relay</h2><p>2026-09-13T09:11:16.773880Z</p><pre>{
+  &quot;dataset&quot;: {
+    &quot;dataset_id&quot;: &quot;synthetic-mill-01&quot;,
+    &quot;observations&quot;: [
+      {
+        &quot;feed_mm_per_min&quot;: 100,
+        &quot;sequence&quot;: 1,
+        &quot;spindle_rpm&quot;: 1200
+      },
+      {
+        &quot;feed_mm_per_min&quot;: 105,
+        &quot;sequence&quot;: 2,
+        &quot;spindle_rpm&quot;: 1250
+      },
+      {
+        &quot;feed_mm_per_min&quot;: 110,
+        &quot;sequence&quot;: 3,
+        &quot;spindle_rpm&quot;: 1300
+      }
+    ],
+    &quot;origin&quot;: &quot;invented demonstration data; no physical measurement&quot;,
+    &quot;schema&quot;: &quot;fcp.icse-synthetic-readings.v1&quot;
+  },
+  &quot;dataset_sha256&quot;: &quot;2f20ff480d35398db268c8f8132272930662ba9a01859bd579bc04ae0f8ec06d&quot;,
+  &quot;delivery_confirmed&quot;: true,
+  &quot;recipient&quot;: &quot;node-fp-n1K0250BUVOTrPKDKiU7rNLOw37rUg51JuBxOttM&quot;,
+  &quot;sender&quot;: &quot;node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY&quot;
+}</pre></article><article><h2>06 — The original leader process has actually exited</h2><p>2026-09-13T09:11:16.785411Z</p><pre>{
+  &quot;exit_code&quot;: -15,
+  &quot;fault_scope&quot;: &quot;only this demonstration child process&quot;,
+  &quot;stopped_pid&quot;: 78676
+}</pre></article><article><h2>07 — Surviving voters retain the Federation and advance authority</h2><p>2026-09-13T09:11:25.958495Z</p><pre>{
+  &quot;voter-b&quot;: {
+    &quot;capabilities&quot;: {
+      &quot;icse-session-0018bc8a03c44b21b54c36dc5bea227f&quot;: {
+        &quot;fcp.control-plane.bootstrap-complete&quot;: {
+          &quot;capability_id&quot;: &quot;fcp.control-plane.bootstrap-complete&quot;,
+          &quot;capability_type&quot;: &quot;fcp-control-plane-bootstrap-seal&quot;,
+          &quot;owner_node_id&quot;: &quot;node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY&quot;
+        },
+        &quot;icse-reading-viewer&quot;: {
+          &quot;capability_id&quot;: &quot;icse-reading-viewer&quot;,
+          &quot;capability_type&quot;: &quot;demo.reading-viewer&quot;,
+          &quot;owner_node_id&quot;: &quot;node-fp-n1K0250BUVOTrPKDKiU7rNLOw37rUg51JuBxOttM&quot;
+        },
+        &quot;icse-synthetic-readings&quot;: {
+          &quot;capability_id&quot;: &quot;icse-synthetic-readings&quot;,
+          &quot;capability_type&quot;: &quot;demo.synthetic-readings&quot;,
+          &quot;owner_node_id&quot;: &quot;node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY&quot;
+        }
+      }
+    },
+    &quot;control_plane&quot;: {
+      &quot;cluster_id&quot;: &quot;icse-cluster-fb18b2530caf48f9add0b7eb43c31a63&quot;,
+      &quot;commit_index&quot;: 11,
+      &quot;consensus_leader_id&quot;: &quot;node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY&quot;,
+      &quot;consensus_term&quot;: 2,
+      &quot;federation_id&quot;: &quot;icse-federation-41855e479d5240bea6ef628da5509cb3&quot;,
+      &quot;fencing_epoch&quot;: 1,
+      &quot;last_applied&quot;: 11,
+      &quot;ready&quot;: true,
+      &quot;role&quot;: &quot;LEADER&quot;,
+      &quot;schema&quot;: &quot;fcp.control-plane.status.v1&quot;,
+      &quot;sessions&quot;: [
+        {
+          &quot;creator_node_id&quot;: &quot;node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY&quot;,
+          &quot;leader_node_id&quot;: &quot;node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY&quot;,
+          &quot;leadership_term&quot;: 2,
+          &quot;session_id&quot;: &quot;icse-session-0018bc8a03c44b21b54c36dc5bea227f&quot;
+        }
+      ],
+      &quot;voter_id&quot;: &quot;node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY&quot;,
+      &quot;voter_only&quot;: false
+    },
+    &quot;lifecycle_error&quot;: null,
+    &quot;memberships&quot;: {
+      &quot;icse-session-0018bc8a03c44b21b54c36dc5bea227f&quot;: {
+        &quot;node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY&quot;: true,
+        &quot;node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY&quot;: true,
+        &quot;node-abumevp-0mGycfT_kHGhnwyzMGXeyI04PUOj8kA8M-M&quot;: true,
+        &quot;node-fp-n1K0250BUVOTrPKDKiU7rNLOw37rUg51JuBxOttM&quot;: true
+      }
+    }
+  },
+  &quot;voter-c&quot;: {
+    &quot;capabilities&quot;: {
+      &quot;icse-session-0018bc8a03c44b21b54c36dc5bea227f&quot;: {
+        &quot;fcp.control-plane.bootstrap-complete&quot;: {
+          &quot;capability_id&quot;: &quot;fcp.control-plane.bootstrap-complete&quot;,
+          &quot;capability_type&quot;: &quot;fcp-control-plane-bootstrap-seal&quot;,
+          &quot;owner_node_id&quot;: &quot;node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY&quot;
+        },
+        &quot;icse-reading-viewer&quot;: {
+          &quot;capability_id&quot;: &quot;icse-reading-viewer&quot;,
+          &quot;capability_type&quot;: &quot;demo.reading-viewer&quot;,
+          &quot;owner_node_id&quot;: &quot;node-fp-n1K0250BUVOTrPKDKiU7rNLOw37rUg51JuBxOttM&quot;
+        },
+        &quot;icse-synthetic-readings&quot;: {
+          &quot;capability_id&quot;: &quot;icse-synthetic-readings&quot;,
+          &quot;capability_type&quot;: &quot;demo.synthetic-readings&quot;,
+          &quot;owner_node_id&quot;: &quot;node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY&quot;
+        }
+      }
+    },
+    &quot;control_plane&quot;: {
+      &quot;cluster_id&quot;: &quot;icse-cluster-fb18b2530caf48f9add0b7eb43c31a63&quot;,
+      &quot;commit_index&quot;: 10,
+      &quot;consensus_leader_id&quot;: &quot;node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY&quot;,
+      &quot;consensus_term&quot;: 2,
+      &quot;federation_id&quot;: &quot;icse-federation-41855e479d5240bea6ef628da5509cb3&quot;,
+      &quot;fencing_epoch&quot;: 0,
+      &quot;last_applied&quot;: 10,
+      &quot;ready&quot;: true,
+      &quot;role&quot;: &quot;FOLLOWER&quot;,
+      &quot;schema&quot;: &quot;fcp.control-plane.status.v1&quot;,
+      &quot;sessions&quot;: [
+        {
+          &quot;creator_node_id&quot;: &quot;node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY&quot;,
+          &quot;leader_node_id&quot;: &quot;node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY&quot;,
+          &quot;leadership_term&quot;: 1,
+          &quot;session_id&quot;: &quot;icse-session-0018bc8a03c44b21b54c36dc5bea227f&quot;
+        }
+      ],
+      &quot;voter_id&quot;: &quot;node-fp-n1K0250BUVOTrPKDKiU7rNLOw37rUg51JuBxOttM&quot;,
+      &quot;voter_only&quot;: false
+    },
+    &quot;lifecycle_error&quot;: null,
+    &quot;memberships&quot;: {
+      &quot;icse-session-0018bc8a03c44b21b54c36dc5bea227f&quot;: {
+        &quot;node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY&quot;: true,
+        &quot;node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY&quot;: true,
+        &quot;node-abumevp-0mGycfT_kHGhnwyzMGXeyI04PUOj8kA8M-M&quot;: true,
+        &quot;node-fp-n1K0250BUVOTrPKDKiU7rNLOw37rUg51JuBxOttM&quot;: true
+      }
+    }
+  }
+}</pre></article><article><h2>08 — Explicit reconnect restores the same authenticated exchange</h2><p>2026-09-13T09:11:26.926149Z</p><pre>{
+  &quot;dataset&quot;: {
+    &quot;dataset_id&quot;: &quot;synthetic-mill-01&quot;,
+    &quot;observations&quot;: [
+      {
+        &quot;feed_mm_per_min&quot;: 100,
+        &quot;sequence&quot;: 1,
+        &quot;spindle_rpm&quot;: 1200
+      },
+      {
+        &quot;feed_mm_per_min&quot;: 105,
+        &quot;sequence&quot;: 2,
+        &quot;spindle_rpm&quot;: 1250
+      },
+      {
+        &quot;feed_mm_per_min&quot;: 110,
+        &quot;sequence&quot;: 3,
+        &quot;spindle_rpm&quot;: 1300
+      }
+    ],
+    &quot;origin&quot;: &quot;invented demonstration data; no physical measurement&quot;,
+    &quot;schema&quot;: &quot;fcp.icse-synthetic-readings.v1&quot;
+  },
+  &quot;dataset_sha256&quot;: &quot;2f20ff480d35398db268c8f8132272930662ba9a01859bd579bc04ae0f8ec06d&quot;,
+  &quot;delivery_confirmed&quot;: true,
+  &quot;recipient&quot;: &quot;node-fp-n1K0250BUVOTrPKDKiU7rNLOw37rUg51JuBxOttM&quot;,
+  &quot;sender&quot;: &quot;node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY&quot;
+}</pre></article><article><h2>09 — Returning former leader catches up as a follower</h2><p>2026-09-13T09:11:28.573083Z</p><pre>{
+  &quot;capabilities&quot;: {
+    &quot;icse-session-0018bc8a03c44b21b54c36dc5bea227f&quot;: {
+      &quot;fcp.control-plane.bootstrap-complete&quot;: {
+        &quot;capability_id&quot;: &quot;fcp.control-plane.bootstrap-complete&quot;,
+        &quot;capability_type&quot;: &quot;fcp-control-plane-bootstrap-seal&quot;,
+        &quot;owner_node_id&quot;: &quot;node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY&quot;
+      },
+      &quot;icse-reading-viewer&quot;: {
+        &quot;capability_id&quot;: &quot;icse-reading-viewer&quot;,
+        &quot;capability_type&quot;: &quot;demo.reading-viewer&quot;,
+        &quot;owner_node_id&quot;: &quot;node-fp-n1K0250BUVOTrPKDKiU7rNLOw37rUg51JuBxOttM&quot;
+      },
+      &quot;icse-synthetic-readings&quot;: {
+        &quot;capability_id&quot;: &quot;icse-synthetic-readings&quot;,
+        &quot;capability_type&quot;: &quot;demo.synthetic-readings&quot;,
+        &quot;owner_node_id&quot;: &quot;node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY&quot;
+      }
+    }
+  },
+  &quot;control_plane&quot;: {
+    &quot;cluster_id&quot;: &quot;icse-cluster-fb18b2530caf48f9add0b7eb43c31a63&quot;,
+    &quot;commit_index&quot;: 14,
+    &quot;consensus_leader_id&quot;: &quot;node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY&quot;,
+    &quot;consensus_term&quot;: 2,
+    &quot;federation_id&quot;: &quot;icse-federation-41855e479d5240bea6ef628da5509cb3&quot;,
+    &quot;fencing_epoch&quot;: 1,
+    &quot;last_applied&quot;: 14,
+    &quot;ready&quot;: true,
+    &quot;role&quot;: &quot;FOLLOWER&quot;,
+    &quot;schema&quot;: &quot;fcp.control-plane.status.v1&quot;,
+    &quot;sessions&quot;: [
+      {
+        &quot;creator_node_id&quot;: &quot;node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY&quot;,
+        &quot;leader_node_id&quot;: &quot;node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY&quot;,
+        &quot;leadership_term&quot;: 2,
+        &quot;session_id&quot;: &quot;icse-session-0018bc8a03c44b21b54c36dc5bea227f&quot;
+      }
+    ],
+    &quot;voter_id&quot;: &quot;node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY&quot;,
+    &quot;voter_only&quot;: false
+  },
+  &quot;lifecycle_error&quot;: null,
+  &quot;memberships&quot;: {
+    &quot;icse-session-0018bc8a03c44b21b54c36dc5bea227f&quot;: {
+      &quot;node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY&quot;: true,
+      &quot;node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY&quot;: true,
+      &quot;node-abumevp-0mGycfT_kHGhnwyzMGXeyI04PUOj8kA8M-M&quot;: true,
+      &quot;node-fp-n1K0250BUVOTrPKDKiU7rNLOw37rUg51JuBxOttM&quot;: true
+    }
+  }
+}</pre></article><article><h2>10 — A single remaining voter cannot authorize enrollment</h2><p>2026-09-13T09:11:28.627697Z</p><pre>{
+  &quot;after&quot;: {
+    &quot;cluster_id&quot;: &quot;icse-cluster-fb18b2530caf48f9add0b7eb43c31a63&quot;,
+    &quot;commit_index&quot;: 14,
+    &quot;consensus_leader_id&quot;: &quot;node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY&quot;,
+    &quot;consensus_term&quot;: 2,
+    &quot;federation_id&quot;: &quot;icse-federation-41855e479d5240bea6ef628da5509cb3&quot;,
+    &quot;fencing_epoch&quot;: 1,
+    &quot;last_applied&quot;: 14,
+    &quot;ready&quot;: true,
+    &quot;role&quot;: &quot;LEADER&quot;,
+    &quot;schema&quot;: &quot;fcp.control-plane.status.v1&quot;,
+    &quot;sessions&quot;: [
+      {
+        &quot;creator_node_id&quot;: &quot;node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY&quot;,
+        &quot;leader_node_id&quot;: &quot;node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY&quot;,
+        &quot;leadership_term&quot;: 2,
+        &quot;session_id&quot;: &quot;icse-session-0018bc8a03c44b21b54c36dc5bea227f&quot;
+      }
+    ],
+    &quot;voter_id&quot;: &quot;node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY&quot;,
+    &quot;voter_only&quot;: false
+  },
+  &quot;before&quot;: {
+    &quot;cluster_id&quot;: &quot;icse-cluster-fb18b2530caf48f9add0b7eb43c31a63&quot;,
+    &quot;commit_index&quot;: 14,
+    &quot;consensus_leader_id&quot;: &quot;node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY&quot;,
+    &quot;consensus_term&quot;: 2,
+    &quot;federation_id&quot;: &quot;icse-federation-41855e479d5240bea6ef628da5509cb3&quot;,
+    &quot;fencing_epoch&quot;: 1,
+    &quot;last_applied&quot;: 14,
+    &quot;ready&quot;: true,
+    &quot;role&quot;: &quot;LEADER&quot;,
+    &quot;schema&quot;: &quot;fcp.control-plane.status.v1&quot;,
+    &quot;sessions&quot;: [
+      {
+        &quot;creator_node_id&quot;: &quot;node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY&quot;,
+        &quot;leader_node_id&quot;: &quot;node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY&quot;,
+        &quot;leadership_term&quot;: 2,
+        &quot;session_id&quot;: &quot;icse-session-0018bc8a03c44b21b54c36dc5bea227f&quot;
+      }
+    ],
+    &quot;voter_id&quot;: &quot;node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY&quot;,
+    &quot;voter_only&quot;: false
+  },
+  &quot;error_code&quot;: null,
+  &quot;error_type&quot;: &quot;QuorumUnavailable&quot;
+}</pre></article></html>

@@ -1,0 +1,564 @@
+{
+  "all_owned_processes_stopped": true,
+  "checks": {
+    "authenticated_enrollment_and_join": "PASS",
+    "authenticated_payload_delivery": "PASS",
+    "authenticated_quorum_bootstrap": "PASS",
+    "automatic_quorum_failover_and_continuity": "PASS",
+    "discovery_and_owner_authorization": "PASS",
+    "independent_processes": "PASS",
+    "minority_mutation_refused": "PASS",
+    "returning_leader_fenced": "PASS",
+    "source_identity_unchanged": "PASS",
+    "successor_reconnect_and_delivery": "PASS"
+  },
+  "events": [
+    {
+      "at": "2026-09-13T09:11:12.192707Z",
+      "observation": {
+        "reviewer": {
+          "kind": "member",
+          "node_id": "node-abumevp-0mGycfT_kHGhnwyzMGXeyI04PUOj8kA8M-M",
+          "pid": 78709
+        },
+        "voter-a": {
+          "kind": "voter and relay",
+          "node_id": "node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY",
+          "pid": 78676
+        },
+        "voter-b": {
+          "kind": "voter and relay",
+          "node_id": "node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY",
+          "pid": 78687
+        },
+        "voter-c": {
+          "kind": "voter and relay",
+          "node_id": "node-fp-n1K0250BUVOTrPKDKiU7rNLOw37rUg51JuBxOttM",
+          "pid": 78698
+        }
+      },
+      "step": "01 \u2014 Four independent local node processes"
+    },
+    {
+      "at": "2026-09-13T09:11:13.123059Z",
+      "observation": {
+        "voter-a": {
+          "capabilities": {
+            "icse-session-0018bc8a03c44b21b54c36dc5bea227f": {
+              "fcp.control-plane.bootstrap-complete": {
+                "capability_id": "fcp.control-plane.bootstrap-complete",
+                "capability_type": "fcp-control-plane-bootstrap-seal",
+                "owner_node_id": "node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY"
+              }
+            }
+          },
+          "control_plane": {
+            "cluster_id": "icse-cluster-fb18b2530caf48f9add0b7eb43c31a63",
+            "commit_index": 3,
+            "consensus_leader_id": "node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY",
+            "consensus_term": 1,
+            "federation_id": "icse-federation-41855e479d5240bea6ef628da5509cb3",
+            "fencing_epoch": 1,
+            "last_applied": 3,
+            "ready": true,
+            "role": "LEADER",
+            "schema": "fcp.control-plane.status.v1",
+            "sessions": [
+              {
+                "creator_node_id": "node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY",
+                "leader_node_id": "node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY",
+                "leadership_term": 1,
+                "session_id": "icse-session-0018bc8a03c44b21b54c36dc5bea227f"
+              }
+            ],
+            "voter_id": "node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY",
+            "voter_only": false
+          },
+          "lifecycle_error": null,
+          "memberships": {
+            "icse-session-0018bc8a03c44b21b54c36dc5bea227f": {
+              "node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY": true,
+              "node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY": true,
+              "node-fp-n1K0250BUVOTrPKDKiU7rNLOw37rUg51JuBxOttM": true
+            }
+          }
+        },
+        "voter-b": {
+          "capabilities": {
+            "icse-session-0018bc8a03c44b21b54c36dc5bea227f": {
+              "fcp.control-plane.bootstrap-complete": {
+                "capability_id": "fcp.control-plane.bootstrap-complete",
+                "capability_type": "fcp-control-plane-bootstrap-seal",
+                "owner_node_id": "node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY"
+              }
+            }
+          },
+          "control_plane": {
+            "cluster_id": "icse-cluster-fb18b2530caf48f9add0b7eb43c31a63",
+            "commit_index": 3,
+            "consensus_leader_id": "node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY",
+            "consensus_term": 1,
+            "federation_id": "icse-federation-41855e479d5240bea6ef628da5509cb3",
+            "fencing_epoch": 0,
+            "last_applied": 3,
+            "ready": true,
+            "role": "FOLLOWER",
+            "schema": "fcp.control-plane.status.v1",
+            "sessions": [
+              {
+                "creator_node_id": "node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY",
+                "leader_node_id": "node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY",
+                "leadership_term": 1,
+                "session_id": "icse-session-0018bc8a03c44b21b54c36dc5bea227f"
+              }
+            ],
+            "voter_id": "node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY",
+            "voter_only": false
+          },
+          "lifecycle_error": null,
+          "memberships": {
+            "icse-session-0018bc8a03c44b21b54c36dc5bea227f": {
+              "node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY": true,
+              "node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY": true,
+              "node-fp-n1K0250BUVOTrPKDKiU7rNLOw37rUg51JuBxOttM": true
+            }
+          }
+        },
+        "voter-c": {
+          "capabilities": {
+            "icse-session-0018bc8a03c44b21b54c36dc5bea227f": {
+              "fcp.control-plane.bootstrap-complete": {
+                "capability_id": "fcp.control-plane.bootstrap-complete",
+                "capability_type": "fcp-control-plane-bootstrap-seal",
+                "owner_node_id": "node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY"
+              }
+            }
+          },
+          "control_plane": {
+            "cluster_id": "icse-cluster-fb18b2530caf48f9add0b7eb43c31a63",
+            "commit_index": 3,
+            "consensus_leader_id": "node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY",
+            "consensus_term": 1,
+            "federation_id": "icse-federation-41855e479d5240bea6ef628da5509cb3",
+            "fencing_epoch": 0,
+            "last_applied": 3,
+            "ready": true,
+            "role": "FOLLOWER",
+            "schema": "fcp.control-plane.status.v1",
+            "sessions": [
+              {
+                "creator_node_id": "node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY",
+                "leader_node_id": "node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY",
+                "leadership_term": 1,
+                "session_id": "icse-session-0018bc8a03c44b21b54c36dc5bea227f"
+              }
+            ],
+            "voter_id": "node-fp-n1K0250BUVOTrPKDKiU7rNLOw37rUg51JuBxOttM",
+            "voter_only": false
+          },
+          "lifecycle_error": null,
+          "memberships": {
+            "icse-session-0018bc8a03c44b21b54c36dc5bea227f": {
+              "node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY": true,
+              "node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY": true,
+              "node-fp-n1K0250BUVOTrPKDKiU7rNLOw37rUg51JuBxOttM": true
+            }
+          }
+        }
+      },
+      "step": "02 \u2014 One Federation committed by the voter quorum"
+    },
+    {
+      "at": "2026-09-13T09:11:15.402719Z",
+      "observation": {
+        "credential_values": "omitted",
+        "reviewer_node_id": "node-abumevp-0mGycfT_kHGhnwyzMGXeyI04PUOj8kA8M-M",
+        "session_id": "icse-session-0018bc8a03c44b21b54c36dc5bea227f"
+      },
+      "step": "03 \u2014 Reviewer enrolls and joins using one-use credentials"
+    },
+    {
+      "at": "2026-09-13T09:11:16.440439Z",
+      "observation": {
+        "authorized_status": {
+          "capabilities": [
+            {
+              "capability_id": "icse-reading-viewer",
+              "last_heartbeat": "2026-09-13T09:11:16.006721+00:00",
+              "node_id": "node-fp-n1K0250BUVOTrPKDKiU7rNLOw37rUg51JuBxOttM",
+              "properties": {
+                "purpose": "synthetic reviewer dataset exchange"
+              },
+              "protocol": "icse-illustrative-payload",
+              "protocol_version": "1",
+              "session_id": "icse-session-0018bc8a03c44b21b54c36dc5bea227f",
+              "status": "ready",
+              "type": "demo.reading-viewer"
+            },
+            {
+              "capability_id": "icse-synthetic-readings",
+              "last_heartbeat": "2026-09-13T09:11:15.496070+00:00",
+              "node_id": "node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY",
+              "properties": {
+                "purpose": "synthetic reviewer dataset exchange"
+              },
+              "protocol": "icse-illustrative-payload",
+              "protocol_version": "1",
+              "session_id": "icse-session-0018bc8a03c44b21b54c36dc5bea227f",
+              "status": "ready",
+              "type": "demo.synthetic-readings"
+            }
+          ],
+          "coordinator_id": "fcp-replicated-coordinator-v1",
+          "nodes": [
+            {
+              "connection_state": "connected",
+              "display_name": "voter-b",
+              "last_heartbeat": "2026-09-13T09:11:13.386733+00:00",
+              "node_id": "node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY",
+              "revoked": false
+            },
+            {
+              "connection_state": "connected",
+              "display_name": "voter-a",
+              "last_heartbeat": "2026-09-13T09:11:13.178071+00:00",
+              "node_id": "node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY",
+              "revoked": false
+            },
+            {
+              "connection_state": "connected",
+              "display_name": "reviewer",
+              "last_heartbeat": "2026-09-13T09:11:14.339090+00:00",
+              "node_id": "node-abumevp-0mGycfT_kHGhnwyzMGXeyI04PUOj8kA8M-M",
+              "revoked": false
+            },
+            {
+              "connection_state": "connected",
+              "display_name": "voter-c",
+              "last_heartbeat": "2026-09-13T09:11:13.474025+00:00",
+              "node_id": "node-fp-n1K0250BUVOTrPKDKiU7rNLOw37rUg51JuBxOttM",
+              "revoked": false
+            }
+          ],
+          "schema": "fcp.coordinator_status.v1",
+          "sessions": [
+            {
+              "created_by_node_id": "node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY",
+              "display_name": "ICSE local network demonstration",
+              "revision": 7,
+              "session_id": "icse-session-0018bc8a03c44b21b54c36dc5bea227f",
+              "state": "active"
+            }
+          ]
+        },
+        "provider_activation": "NOT_DEMONSTRATED; declarations do not approve execution",
+        "rejection_code": "capability-node-mismatch"
+      },
+      "step": "04 \u2014 Distinct capability owners are discoverable; forgery is rejected"
+    },
+    {
+      "at": "2026-09-13T09:11:16.773880Z",
+      "observation": {
+        "dataset": {
+          "dataset_id": "synthetic-mill-01",
+          "observations": [
+            {
+              "feed_mm_per_min": 100,
+              "sequence": 1,
+              "spindle_rpm": 1200
+            },
+            {
+              "feed_mm_per_min": 105,
+              "sequence": 2,
+              "spindle_rpm": 1250
+            },
+            {
+              "feed_mm_per_min": 110,
+              "sequence": 3,
+              "spindle_rpm": 1300
+            }
+          ],
+          "origin": "invented demonstration data; no physical measurement",
+          "schema": "fcp.icse-synthetic-readings.v1"
+        },
+        "dataset_sha256": "2f20ff480d35398db268c8f8132272930662ba9a01859bd579bc04ae0f8ec06d",
+        "delivery_confirmed": true,
+        "recipient": "node-fp-n1K0250BUVOTrPKDKiU7rNLOw37rUg51JuBxOttM",
+        "sender": "node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY"
+      },
+      "step": "05 \u2014 Synthetic readings cross the authenticated relay"
+    },
+    {
+      "at": "2026-09-13T09:11:16.785411Z",
+      "observation": {
+        "exit_code": -15,
+        "fault_scope": "only this demonstration child process",
+        "stopped_pid": 78676
+      },
+      "step": "06 \u2014 The original leader process has actually exited"
+    },
+    {
+      "at": "2026-09-13T09:11:25.958495Z",
+      "observation": {
+        "voter-b": {
+          "capabilities": {
+            "icse-session-0018bc8a03c44b21b54c36dc5bea227f": {
+              "fcp.control-plane.bootstrap-complete": {
+                "capability_id": "fcp.control-plane.bootstrap-complete",
+                "capability_type": "fcp-control-plane-bootstrap-seal",
+                "owner_node_id": "node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY"
+              },
+              "icse-reading-viewer": {
+                "capability_id": "icse-reading-viewer",
+                "capability_type": "demo.reading-viewer",
+                "owner_node_id": "node-fp-n1K0250BUVOTrPKDKiU7rNLOw37rUg51JuBxOttM"
+              },
+              "icse-synthetic-readings": {
+                "capability_id": "icse-synthetic-readings",
+                "capability_type": "demo.synthetic-readings",
+                "owner_node_id": "node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY"
+              }
+            }
+          },
+          "control_plane": {
+            "cluster_id": "icse-cluster-fb18b2530caf48f9add0b7eb43c31a63",
+            "commit_index": 11,
+            "consensus_leader_id": "node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY",
+            "consensus_term": 2,
+            "federation_id": "icse-federation-41855e479d5240bea6ef628da5509cb3",
+            "fencing_epoch": 1,
+            "last_applied": 11,
+            "ready": true,
+            "role": "LEADER",
+            "schema": "fcp.control-plane.status.v1",
+            "sessions": [
+              {
+                "creator_node_id": "node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY",
+                "leader_node_id": "node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY",
+                "leadership_term": 2,
+                "session_id": "icse-session-0018bc8a03c44b21b54c36dc5bea227f"
+              }
+            ],
+            "voter_id": "node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY",
+            "voter_only": false
+          },
+          "lifecycle_error": null,
+          "memberships": {
+            "icse-session-0018bc8a03c44b21b54c36dc5bea227f": {
+              "node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY": true,
+              "node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY": true,
+              "node-abumevp-0mGycfT_kHGhnwyzMGXeyI04PUOj8kA8M-M": true,
+              "node-fp-n1K0250BUVOTrPKDKiU7rNLOw37rUg51JuBxOttM": true
+            }
+          }
+        },
+        "voter-c": {
+          "capabilities": {
+            "icse-session-0018bc8a03c44b21b54c36dc5bea227f": {
+              "fcp.control-plane.bootstrap-complete": {
+                "capability_id": "fcp.control-plane.bootstrap-complete",
+                "capability_type": "fcp-control-plane-bootstrap-seal",
+                "owner_node_id": "node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY"
+              },
+              "icse-reading-viewer": {
+                "capability_id": "icse-reading-viewer",
+                "capability_type": "demo.reading-viewer",
+                "owner_node_id": "node-fp-n1K0250BUVOTrPKDKiU7rNLOw37rUg51JuBxOttM"
+              },
+              "icse-synthetic-readings": {
+                "capability_id": "icse-synthetic-readings",
+                "capability_type": "demo.synthetic-readings",
+                "owner_node_id": "node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY"
+              }
+            }
+          },
+          "control_plane": {
+            "cluster_id": "icse-cluster-fb18b2530caf48f9add0b7eb43c31a63",
+            "commit_index": 10,
+            "consensus_leader_id": "node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY",
+            "consensus_term": 2,
+            "federation_id": "icse-federation-41855e479d5240bea6ef628da5509cb3",
+            "fencing_epoch": 0,
+            "last_applied": 10,
+            "ready": true,
+            "role": "FOLLOWER",
+            "schema": "fcp.control-plane.status.v1",
+            "sessions": [
+              {
+                "creator_node_id": "node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY",
+                "leader_node_id": "node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY",
+                "leadership_term": 1,
+                "session_id": "icse-session-0018bc8a03c44b21b54c36dc5bea227f"
+              }
+            ],
+            "voter_id": "node-fp-n1K0250BUVOTrPKDKiU7rNLOw37rUg51JuBxOttM",
+            "voter_only": false
+          },
+          "lifecycle_error": null,
+          "memberships": {
+            "icse-session-0018bc8a03c44b21b54c36dc5bea227f": {
+              "node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY": true,
+              "node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY": true,
+              "node-abumevp-0mGycfT_kHGhnwyzMGXeyI04PUOj8kA8M-M": true,
+              "node-fp-n1K0250BUVOTrPKDKiU7rNLOw37rUg51JuBxOttM": true
+            }
+          }
+        }
+      },
+      "step": "07 \u2014 Surviving voters retain the Federation and advance authority"
+    },
+    {
+      "at": "2026-09-13T09:11:26.926149Z",
+      "observation": {
+        "dataset": {
+          "dataset_id": "synthetic-mill-01",
+          "observations": [
+            {
+              "feed_mm_per_min": 100,
+              "sequence": 1,
+              "spindle_rpm": 1200
+            },
+            {
+              "feed_mm_per_min": 105,
+              "sequence": 2,
+              "spindle_rpm": 1250
+            },
+            {
+              "feed_mm_per_min": 110,
+              "sequence": 3,
+              "spindle_rpm": 1300
+            }
+          ],
+          "origin": "invented demonstration data; no physical measurement",
+          "schema": "fcp.icse-synthetic-readings.v1"
+        },
+        "dataset_sha256": "2f20ff480d35398db268c8f8132272930662ba9a01859bd579bc04ae0f8ec06d",
+        "delivery_confirmed": true,
+        "recipient": "node-fp-n1K0250BUVOTrPKDKiU7rNLOw37rUg51JuBxOttM",
+        "sender": "node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY"
+      },
+      "step": "08 \u2014 Explicit reconnect restores the same authenticated exchange"
+    },
+    {
+      "at": "2026-09-13T09:11:28.573083Z",
+      "observation": {
+        "capabilities": {
+          "icse-session-0018bc8a03c44b21b54c36dc5bea227f": {
+            "fcp.control-plane.bootstrap-complete": {
+              "capability_id": "fcp.control-plane.bootstrap-complete",
+              "capability_type": "fcp-control-plane-bootstrap-seal",
+              "owner_node_id": "node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY"
+            },
+            "icse-reading-viewer": {
+              "capability_id": "icse-reading-viewer",
+              "capability_type": "demo.reading-viewer",
+              "owner_node_id": "node-fp-n1K0250BUVOTrPKDKiU7rNLOw37rUg51JuBxOttM"
+            },
+            "icse-synthetic-readings": {
+              "capability_id": "icse-synthetic-readings",
+              "capability_type": "demo.synthetic-readings",
+              "owner_node_id": "node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY"
+            }
+          }
+        },
+        "control_plane": {
+          "cluster_id": "icse-cluster-fb18b2530caf48f9add0b7eb43c31a63",
+          "commit_index": 14,
+          "consensus_leader_id": "node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY",
+          "consensus_term": 2,
+          "federation_id": "icse-federation-41855e479d5240bea6ef628da5509cb3",
+          "fencing_epoch": 1,
+          "last_applied": 14,
+          "ready": true,
+          "role": "FOLLOWER",
+          "schema": "fcp.control-plane.status.v1",
+          "sessions": [
+            {
+              "creator_node_id": "node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY",
+              "leader_node_id": "node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY",
+              "leadership_term": 2,
+              "session_id": "icse-session-0018bc8a03c44b21b54c36dc5bea227f"
+            }
+          ],
+          "voter_id": "node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY",
+          "voter_only": false
+        },
+        "lifecycle_error": null,
+        "memberships": {
+          "icse-session-0018bc8a03c44b21b54c36dc5bea227f": {
+            "node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY": true,
+            "node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY": true,
+            "node-abumevp-0mGycfT_kHGhnwyzMGXeyI04PUOj8kA8M-M": true,
+            "node-fp-n1K0250BUVOTrPKDKiU7rNLOw37rUg51JuBxOttM": true
+          }
+        }
+      },
+      "step": "09 \u2014 Returning former leader catches up as a follower"
+    },
+    {
+      "at": "2026-09-13T09:11:28.627697Z",
+      "observation": {
+        "after": {
+          "cluster_id": "icse-cluster-fb18b2530caf48f9add0b7eb43c31a63",
+          "commit_index": 14,
+          "consensus_leader_id": "node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY",
+          "consensus_term": 2,
+          "federation_id": "icse-federation-41855e479d5240bea6ef628da5509cb3",
+          "fencing_epoch": 1,
+          "last_applied": 14,
+          "ready": true,
+          "role": "LEADER",
+          "schema": "fcp.control-plane.status.v1",
+          "sessions": [
+            {
+              "creator_node_id": "node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY",
+              "leader_node_id": "node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY",
+              "leadership_term": 2,
+              "session_id": "icse-session-0018bc8a03c44b21b54c36dc5bea227f"
+            }
+          ],
+          "voter_id": "node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY",
+          "voter_only": false
+        },
+        "before": {
+          "cluster_id": "icse-cluster-fb18b2530caf48f9add0b7eb43c31a63",
+          "commit_index": 14,
+          "consensus_leader_id": "node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY",
+          "consensus_term": 2,
+          "federation_id": "icse-federation-41855e479d5240bea6ef628da5509cb3",
+          "fencing_epoch": 1,
+          "last_applied": 14,
+          "ready": true,
+          "role": "LEADER",
+          "schema": "fcp.control-plane.status.v1",
+          "sessions": [
+            {
+              "creator_node_id": "node-RlNopxG0YHmPiPZUbTUDTtOyx7-lu-eEktOsHn0u9tY",
+              "leader_node_id": "node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY",
+              "leadership_term": 2,
+              "session_id": "icse-session-0018bc8a03c44b21b54c36dc5bea227f"
+            }
+          ],
+          "voter_id": "node-0Q62O7oUAMwzMeOHbgQh09uMwGIgVRaWMFIdaAmI7tY",
+          "voter_only": false
+        },
+        "error_code": null,
+        "error_type": "QuorumUnavailable"
+      },
+      "step": "10 \u2014 A single remaining voter cannot authorize enrollment"
+    }
+  ],
+  "finished_at": "2026-09-13T09:11:29.818347Z",
+  "physical_acceptance": "NOT_EVALUATED",
+  "python_version": "3.12.13",
+  "release_tag": null,
+  "release_tag_checked": false,
+  "result": "PASS",
+  "run_id": "icse-network-3aaeb1ae3c82435db10bcb14b3296052",
+  "schema": "fcp.icse-network-demo.v1",
+  "scope": "same-host independent processes; production authority and relay; illustrative payload",
+  "source_mode": "git",
+  "source_sha": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+  "started_at": "2026-09-13T09:11:08.727786Z",
+  "working_tree_clean": true
+}

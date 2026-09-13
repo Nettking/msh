@@ -1,0 +1,126 @@
+{
+  "source_sha": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+  "run_id": 34749055328,
+  "job_id": 103702121271,
+  "artifact_id": 10315421432,
+  "artifact_sha256": "b90089876397479a938b5821206cc8f744f9ee2e4b76d7bfe16a700043782a49",
+  "mode": "DIAGNOSTIC_ONLY_NOT_QUALIFICATION",
+  "command_exit_code": 0,
+  "network_checks": {
+    "authenticated_enrollment_and_join": "PASS",
+    "authenticated_payload_delivery": "PASS",
+    "authenticated_quorum_bootstrap": "PASS",
+    "automatic_quorum_failover_and_continuity": "PASS",
+    "discovery_and_owner_authorization": "PASS",
+    "independent_processes": "PASS",
+    "minority_mutation_refused": "PASS",
+    "returning_leader_fenced": "PASS",
+    "source_identity_unchanged": "PASS",
+    "successor_reconnect_and_delivery": "PASS"
+  },
+  "source_still_clean": true,
+  "all_owned_processes_stopped": true,
+  "original_linux_job": 103695663389,
+  "original_packages_recovered": 55,
+  "captured_packages": 55,
+  "package_differences": {},
+  "dependency_scope": "Original ICSE install commands, same Python and runner; package comparison uses original native installation log, not old differently constrained diagnostic.",
+  "captured_frames": {
+    "voter-a": {
+      "exists": true,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "frames": [],
+      "error_types": []
+    },
+    "voter-b": {
+      "exists": true,
+      "bytes": 1381,
+      "sha256": "b344979e755c53f579f744955076e7ed881d6e1cc2bab3f97ba04346cd54b3ba",
+      "frames": [
+        {
+          "file": "demo/icse/network/worker.py",
+          "line": 175
+        },
+        {
+          "file": "demo/icse/network/worker.py",
+          "line": 102
+        },
+        {
+          "file": "catalog/federation/control_plane_facade.py",
+          "line": 27
+        },
+        {
+          "file": "catalog/federation/control_plane_facade.py",
+          "line": 80
+        },
+        {
+          "file": "catalog/federation/control_plane_product.py",
+          "line": 669
+        },
+        {
+          "file": "catalog/federation/control_plane_product.py",
+          "line": 319
+        }
+      ],
+      "error_types": [
+        "QuorumUnavailable"
+      ]
+    },
+    "voter-c": {
+      "exists": true,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "frames": [],
+      "error_types": []
+    },
+    "reviewer": {
+      "exists": true,
+      "bytes": 981,
+      "sha256": "de88cfa1f0318f611a16af1844d4fd5c9e51181134a0f5ba87486f45232dcced",
+      "frames": [
+        {
+          "file": "demo/icse/network/worker.py",
+          "line": 175
+        },
+        {
+          "file": "demo/icse/network/worker.py",
+          "line": 136
+        },
+        {
+          "file": "catalog/node/client.py",
+          "line": 592
+        },
+        {
+          "file": "catalog/node/client.py",
+          "line": 540
+        },
+        {
+          "file": "external/asyncio",
+          "line": 520
+        }
+      ],
+      "error_types": [
+        "RelayRemoteError"
+      ]
+    }
+  },
+  "frame_interpretation": {
+    "voter-b": "worker.py:102 enrollment_token -> control_plane_product.py:669 -> require_quorum_leader:319. Expected final minority-enrollment refusal; bootstrap and successor connect passed.",
+    "reviewer": "worker.py:136 announce -> client.py:592 -> request:540. Expected rejected forged capability ownership; discovery/owner-authorization check passed."
+  },
+  "windows": {
+    "classification": "unresolved but non-demonstrated candidate defect",
+    "known_path": "voter-a bootstrap -> worker.py:90 bootstrap_new_federation; QuorumUnavailable. Original public evidence lacks the raising frame. This Linux-only capture cannot reproduce or exclude a Windows-specific cause.",
+    "release_decision": "No demonstrated violated authority/correctness contract; preserve the failure. Windows ICSE qualification remains required, with unchanged assertions and deadlines."
+  },
+  "linux": {
+    "classification": "unresolved but non-demonstrated candidate defect",
+    "known_path": "voter-b successor connect -> worker.py:118 RelayNodeClient.connect, following disconnect. Original TimeoutError lacks raising frame; handshake/auth/status/replay boundary cannot be selected from its type. Ready successor term2/index11 was observed before the failure.",
+    "release_decision": "Same-source same-runner single capture passes reconnect/delivery. No product defect or deterministic harness mechanism demonstrated; infrastructure/transient cause remains a hypothesis, not an established classification."
+  },
+  "relationship": "Distinct operations and phases. Neither a shared mechanism nor independent root causes are established. The successful capture supplies no failure stack for either original symptom.",
+  "next_action": "One targeted failed-job recovery of original ICSE run34746641262 on unchanged f104; retain successful compose and all other green gates. Do not rerun this diagnostic or patch product code speculatively.",
+  "physical_acceptance": "NOT_EVALUATED; P07/P12 not started",
+  "protected_recorder_data": "NOT_ACCESSED_OR_CHANGED"
+}
