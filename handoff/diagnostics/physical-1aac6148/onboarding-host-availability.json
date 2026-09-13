@@ -1,0 +1,17 @@
+{
+  "observed_at": "2026-09-13T17:44:13.676254+00:00",
+  "observations": [
+    {
+      "installation": "original-owned",
+      "http_status": null,
+      "error_type": "TimeoutError"
+    },
+    {
+      "installation": "isolated-onboarding",
+      "http_status": null,
+      "error_type": "TimeoutError"
+    }
+  ],
+  "mutations_performed": false,
+  "physical_pass": false
+}

@@ -1,0 +1,29 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "harness_sha": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "host": "nettking",
+  "status": "STOPPED",
+  "phase": "VERIFY",
+  "started_at": "2026-09-13T17:34:30.411561+00:00",
+  "physical_pass": false,
+  "reset_requested": false,
+  "existing_installations_changed": false,
+  "protected_data_accessed": false,
+  "AQG_requested": false,
+  "baseline-start-recovery": {
+    "exit_code": 0,
+    "log_sha256": "1df95a51e16880447505bb3ac2b37919bcbedb0024d6cca176f98a61e95369d5"
+  },
+  "before-initialize_exit_code": 0,
+  "initialize-owner_exit_code": 0,
+  "after-initialize_exit_code": 0,
+  "product_federation_state": "connected",
+  "prepare_id": "a27f5e55b6d94846a5624136268429bf",
+  "tailnet-start": {
+    "exit_code": 0,
+    "log_sha256": "2c3cee175aaf49affeda56d768cec2b32c93bad910be75a5db57b33b21c3eb6c"
+  },
+  "error_type": "AssertionError",
+  "error": "tailnet-verify refused; retain original evidence",
+  "finished_at": "2026-09-13T17:39:17.059919+00:00"
+}

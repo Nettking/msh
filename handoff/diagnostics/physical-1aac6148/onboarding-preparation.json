@@ -1,0 +1,19 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "harness_sha": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "status": "PREPARED",
+  "runtime_checkout": "C:\\wsl\\fcp-v1-1aac6148-onboarding-runtime-20260913",
+  "new_empty_data_and_results": true,
+  "separate_compose_project": "fcp-v1-1aac6148-onboarding-nettking",
+  "existing_models_read_only": true,
+  "existing_installations_changed": false,
+  "existing_authority_or_data_copied": false,
+  "reset_requested": false,
+  "protected_data_accessed": false,
+  "AQG_requested": false,
+  "web_port": 55040,
+  "relay_port": 58796,
+  "join_port": 55041,
+  "runtime_activated": false,
+  "physical_pass": false
+}

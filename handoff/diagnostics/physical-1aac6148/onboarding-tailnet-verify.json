@@ -1,0 +1,21 @@
+{
+  "assertion": "start-tailscale-cmd",
+  "classification": "operator-fault-injection",
+  "evidence": "evidence/v1-physical/observations/P03/20260913T173917020525Z-assertion-f6467d31.json",
+  "prepare_id": "a27f5e55b6d94846a5624136268429bf",
+  "probes": [
+    {
+      "probe_id": "running-commit-identity",
+      "status": "fail",
+      "summary": "a running component does not carry the candidate build commit"
+    },
+    {
+      "probe_id": "service-health",
+      "status": "pass",
+      "summary": "every observable core worker is alive and its health is visible"
+    }
+  ],
+  "recorded": true,
+  "scenario": "P03",
+  "verdict": "fail"
+}

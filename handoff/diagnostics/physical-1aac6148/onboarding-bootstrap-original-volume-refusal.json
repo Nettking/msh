@@ -1,0 +1,20 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "harness_sha": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "host": "nettking",
+  "status": "STOPPED",
+  "phase": "BASELINE_START",
+  "started_at": "2026-09-13T17:31:19.848574+00:00",
+  "physical_pass": false,
+  "reset_requested": false,
+  "existing_installations_changed": false,
+  "protected_data_accessed": false,
+  "AQG_requested": false,
+  "baseline-start": {
+    "exit_code": 1,
+    "log_sha256": "4ce33744c7fa04aba5e52958f755c1513be1d9fc77967547a20e4ab8928c0b4c"
+  },
+  "error_type": "AssertionError",
+  "error": "baseline-start refused; inspect one retained attempt",
+  "finished_at": "2026-09-13T17:31:26.357431+00:00"
+}

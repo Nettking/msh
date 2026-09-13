@@ -1,0 +1,79 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "recorded_at": "2026-09-13T17:45:52.863201+00:00",
+  "P03_assertions": "7/8 PASS; tailnet verification FAIL retained",
+  "P05_assertions_pass": [
+    "ollama-absence",
+    "malformed-timestamp-path"
+  ],
+  "progress": {
+    "P03": {
+      "scenario": "P03",
+      "title": "All supported start/update entry points and concurrency",
+      "passed": false,
+      "missing_assertions": [],
+      "failing_assertions": [
+        "start-tailscale-cmd"
+      ],
+      "elapsed_seconds": 0.0,
+      "required_elapsed_seconds": 0,
+      "sample_count": 0,
+      "required_samples": 0,
+      "timed_sessions": []
+    },
+    "P05": {
+      "scenario": "P05",
+      "title": "Service and failure injection",
+      "passed": false,
+      "missing_assertions": [
+        "flask-crash",
+        "relay-crash",
+        "relay-stale-db-failure",
+        "managed-recorder-crash",
+        "native-recorder-crash",
+        "publication-db-failure",
+        "analysis-db-failure",
+        "poison-recorder-archive",
+        "slow-trickle-response",
+        "oversized-ingress",
+        "huge-sequence-gap",
+        "event-storm",
+        "stale-responder-pid",
+        "global-invariant"
+      ],
+      "failing_assertions": [],
+      "elapsed_seconds": 0.0,
+      "required_elapsed_seconds": 0,
+      "sample_count": 0,
+      "required_samples": 0,
+      "timed_sessions": []
+    }
+  },
+  "archive_sha256": "a2fc2647fa87a8b184f58ef673b2cd0cf2943dcc4ec628dfc6ec6b60d6b99eed",
+  "onboarding": {
+    "scope": "separate new empty owned workbench",
+    "initial_refusal": "Product safely refused ambiguous coordinator volumes before activation. Explicit project-scoped selection corrected the fixture; original refusal retained.",
+    "owner_initialization_exit_code": 0,
+    "product_federation_state": "connected",
+    "unmodified_tailnet_launcher_exit_code": 0,
+    "supplemental_evidence": "Execution reached and recorded the operator action only after checking three exact candidate images and actual tailnet HTTP200 from Windows and native Nitro.",
+    "verifier_failure": "All Compose rows were excluded as unbound before their build labels were compared. Expected working-directory metadata requires comparison with the actual container labels.",
+    "classification": "Unresolved acceptance binding discrepancy; no demonstrated candidate defect. Do not promote the launcher assertion to PASS.",
+    "recovery": "No repeated launcher, account initialization, build, reset, or verifier recovery."
+  },
+  "windows_host_observation": {
+    "docker_read_only_queries": "Docker Desktop returned HTTP500 for container list and inspect; bounded metadata read unavailable.",
+    "http_read_only_queries": "Both the original owned workbench and isolated workbench timed out with the unchanged10s deadline after the successful launcher proof.",
+    "classification": "Current host/runtime unavailability; candidate causation unresolved and not demonstrated.",
+    "host_free_bytes": 106952519680,
+    "host_free_memory_kib": 4773096,
+    "daemon_restarted": false,
+    "next_action": "When Docker responds, compare the exact project/working-directory labels with the binding. Correct only a demonstrated fixture metadata error, then verify the existing action once without relaunching."
+  },
+  "active_executor": null,
+  "physical_pass": false,
+  "P07": "NOT STARTED; approved real agents and aged non-protected corpus pending",
+  "P12": "NOT STARTED; approved real agents and aged non-protected corpus pending",
+  "protected_data_accessed": false,
+  "AQG_requested": false
+}

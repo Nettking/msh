@@ -1,0 +1,17 @@
+{
+  "assertion": "start-tailscale-cmd",
+  "evidence": "evidence/v1-physical/observations/P03/20260913T173733901780Z-prepare-20837447.json",
+  "harness_performs_this_action": false,
+  "next_command": "python -m scripts.acceptance.v1_physical_runner action --commit 1aac6148759d7b2fd488ec26b97e1a786bdafa80 --host nettking --scenario P03 --assertion start-tailscale-cmd --prepare-id a27f5e55b6d94846a5624136268429bf --note \"<what you actually did>\"",
+  "operator_action": "Run start-tailscale.cmd on this Windows host over the tailnet path and let it complete.",
+  "prepare_id": "a27f5e55b6d94846a5624136268429bf",
+  "prepare_probes": [
+    {
+      "probe_id": "docker-state",
+      "status": "pass",
+      "summary": "Docker state and its backing host resource are both observable"
+    }
+  ],
+  "reviewed_helper": "",
+  "scenario": "P03"
+}

@@ -1,0 +1,7 @@
+{
+  "assertion": "start-tailscale-cmd",
+  "evidence": "evidence/v1-physical/observations/P03/20260913T173914326891Z-operator-action-8a968a29.json",
+  "next_command": "python -m scripts.acceptance.v1_physical_runner verify --commit 1aac6148759d7b2fd488ec26b97e1a786bdafa80 --host nettking --scenario P03 --assertion start-tailscale-cmd --prepare-id a27f5e55b6d94846a5624136268429bf",
+  "prepare_id": "a27f5e55b6d94846a5624136268429bf",
+  "scenario": "P03"
+}
