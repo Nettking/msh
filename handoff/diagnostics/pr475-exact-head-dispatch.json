@@ -1,14 +1,22 @@
 {
-  "recorded_at_utc": "2026-09-13T03:10:39.855996+00:00",
+  "recorded_at_utc": "2026-09-13T03:10:45.511419+00:00",
   "plan_checkpoint": "e70280bc",
   "source_commit": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
   "ref": "codex/fix-d13-windows-refusal-response",
-  "stage": "cf7-acceptance-harness",
+  "stage": "phase2-federation",
   "records": [
     {
       "workflow": "cf7-acceptance-harness.yml",
       "action": "dispatch_requested",
       "requested_at_utc": "2026-09-13T03:10:38.321598+00:00",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "phase2-federation.yml",
+      "action": "dispatch_requested",
+      "requested_at_utc": "2026-09-13T03:10:43.979449+00:00",
       "response": {
         "http_status": 204
       }
