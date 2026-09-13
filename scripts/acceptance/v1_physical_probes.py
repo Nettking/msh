@@ -1955,17 +1955,40 @@ def _probe_campaign_series(context: ProbeContext) -> ProbeOutcome:
     )
 
 
-def _used_bytes(packet: Mapping[str, object]) -> int:
-    resources = packet.get("resources")
-    if not isinstance(resources, Mapping):
-        return 0
-    total = 0
-    for value in resources.values():
-        if isinstance(value, Mapping):
-            used = value.get("used_bytes")
-            if isinstance(used, int):
-                total += used
-    return total
+def _growth_delta(samples: Sequence[Mapping[str, object]]) -> int:
+    """Difference unique volumes only when every sample proves the same surface."""
+
+    expected_surface = None
+    totals: list[int] = []
+    for packet in samples:
+        resources = packet.get("resources")
+        if not isinstance(resources, Mapping) or not resources:
+            raise ProbeError("resource samples are missing backing filesystem evidence")
+        surface: dict[str, tuple[str, int]] = {}
+        volumes: dict[str, tuple[int, int]] = {}
+        for name, value in resources.items():
+            if not isinstance(name, str) or not isinstance(value, Mapping):
+                raise ProbeError("resource sample has an invalid filesystem observation")
+            alias, used, capacity = (
+                value.get("resource_alias"), value.get("used_bytes"),
+                value.get("total_bytes"),
+            )
+            if (
+                not isinstance(alias, str)
+                or re.fullmatch(r"[0-9a-f]{64}", alias) is None
+                or type(used) is not int or type(capacity) is not int
+                or not 0 <= used <= capacity or capacity <= 0
+            ):
+                raise ProbeError("resource sample lacks valid filesystem identity or bytes")
+            observation = (capacity, used)
+            if volumes.setdefault(alias, observation) != observation:
+                raise ProbeError("aliases of one filesystem have contradictory measurements")
+            surface[name] = (alias, capacity)
+        if expected_surface is not None and surface != expected_surface:
+            raise ProbeError("measured roots, backing filesystems or capacities changed")
+        expected_surface = surface
+        totals.append(sum(used for _, used in volumes.values()))
+    return totals[-1] - totals[0]
 
 
 def _probe_growth_analysis(context: ProbeContext) -> ProbeOutcome:
@@ -1989,7 +2012,10 @@ def _probe_growth_analysis(context: ProbeContext) -> ProbeOutcome:
     started = campaign.parse_time(str(first["recorded_at"]))
     ended = campaign.parse_time(str(last["recorded_at"]))
     elapsed_hours = max((ended - started).total_seconds() / 3600.0, 0.0)
-    delta = _used_bytes(last) - _used_bytes(first)
+    try:
+        delta = _growth_delta(samples)
+    except ProbeError as exc:
+        return _outcome("growth-analysis", UNAVAILABLE, str(exc), detail)
     detail["elapsed_hours"] = round(elapsed_hours, 4)
     detail["used_bytes_delta"] = delta
     if elapsed_hours <= 0:
@@ -2054,7 +2080,10 @@ def _probe_activation_growth(context: ProbeContext) -> ProbeOutcome:
             "there is no baseline plus per-activation sample for each activation",
             detail,
         )
-    delta = _used_bytes(samples[-1]) - _used_bytes(samples[0])
+    try:
+        delta = _growth_delta(samples)
+    except ProbeError as exc:
+        return _outcome("activation-growth", UNAVAILABLE, str(exc), detail)
     per_activation = delta / activations
     detail["used_bytes_delta"] = delta
     detail["bytes_per_activation"] = int(per_activation)

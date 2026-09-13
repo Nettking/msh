@@ -850,8 +850,16 @@ def run_command(
 
 
 def _disk_snapshot(path: Path) -> dict[str, object]:
+    from catalog.federation.host_resources import measure_filesystem
+
+    measurement = measure_filesystem(path)
+    if not measurement.available:
+        raise CampaignError("backing filesystem identity is unavailable")
     usage = shutil.disk_usage(path)
     result: dict[str, object] = {
+        "resource_alias": hashlib.sha256(
+            measurement.resource_id.encode("utf-8")
+        ).hexdigest(),
         "total_bytes": usage.total,
         "used_bytes": usage.used,
         "free_bytes": usage.free,
@@ -1000,14 +1008,14 @@ def sample_resources(
     )
     if run_id:
         packet["run_id"] = run_id
-    # P12 growth is measured by differencing the used_bytes of every entry in
-    # ``resources`` across two samples.  When the harness runs from its own
+    # Growth counts each backing filesystem once, even if several roots share
+    # it. When the harness runs from its own
     # checkout on another filesystem, folding that checkout in would let
     # harness-side churn masquerade as product growth, and reading
     # ``checkout/data`` would measure a directory the deployment never writes.
     # So an explicitly bound root replaces the checkout-relative surface
     # outright rather than supplementing it.
-    resources: dict[str, object] = {}
+    resources: dict[str, dict[str, object]] = {}
     bound_roots = {
         name: value
         for name, value in (("data", data_root), ("results", results_root))
@@ -1027,6 +1035,15 @@ def sample_resources(
             path = checkout / name
             if path.exists():
                 resources[name] = _disk_snapshot(path)
+    # Aliases of one volume share one byte/inode observation. Writes between
+    # path measurements must not produce contradictory copies of that volume.
+    by_volume: dict[str, dict[str, object]] = {}
+    for name, snapshot in resources.items():
+        alias = str(snapshot["resource_alias"])
+        previous = by_volume.setdefault(alias, snapshot)
+        if previous["total_bytes"] != snapshot["total_bytes"]:
+            raise CampaignError("backing filesystem capacity changed during sampling")
+        resources[name] = dict(previous)
     docker: dict[str, object] = {
         "available": shutil.which("docker") is not None
     }
@@ -1060,8 +1077,8 @@ def sample_resources(
             "label": redact_text(label, cwd=checkout),
             "resources": resources,
             # Which surface was measured, without naming it.  The roots
-            # themselves stay local: only this boolean and the byte/inode
-            # counts reach portable evidence.
+            # themselves stay local: only an opaque volume alias, this boolean
+            # and the byte/inode counts reach portable evidence.
             "resource_roots_bound": bool(bound_roots),
             "resource_roots_measured": sorted(resources),
             "docker": docker,
