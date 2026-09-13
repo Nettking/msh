@@ -1,0 +1,127 @@
+{
+  "at": "2026-09-13T10:28:12.830297+00:00",
+  "source": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+  "ref": "main",
+  "expected_tree": "cc9b29515d47d754f24199bf403213e7ff111315",
+  "merges": {
+    "475": "a039061e797dfde76d452f90c8888a7704e0c5b3",
+    "483": "02a90d3b9e26134a9d36a1ccb8bd660f54eed388",
+    "473": "e6a9b74a1d555609eed6bf40c800e1258f1c9077"
+  },
+  "scope": "37 required jobs plus3 companions on actual resulting main",
+  "actions": [
+    {
+      "workflow": "cf7-acceptance-harness.yml",
+      "expected_jobs": 2,
+      "action": "workflow_dispatch",
+      "status": "accepted",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "phase2-federation.yml",
+      "expected_jobs": 2,
+      "action": "workflow_dispatch",
+      "status": "accepted",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "cf7b-product-physical-acceptance.yml",
+      "expected_jobs": 2,
+      "action": "workflow_dispatch",
+      "status": "accepted",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "product-branding.yml",
+      "expected_jobs": 1,
+      "action": "reuse existing exact-source run",
+      "run_id": 34751832432,
+      "status": "queued"
+    },
+    {
+      "workflow": "federation-software-update.yml",
+      "expected_jobs": 2,
+      "action": "reuse existing exact-source run",
+      "run_id": 34751832430,
+      "status": "queued"
+    },
+    {
+      "workflow": "cf7c-physical-test-readiness.yml",
+      "expected_jobs": 2,
+      "action": "workflow_dispatch",
+      "status": "accepted",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "icse-tool-demo.yml",
+      "expected_jobs": 4,
+      "action": "workflow_dispatch",
+      "status": "accepted",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "cf8-role-retirement.yml",
+      "expected_jobs": 2,
+      "action": "workflow_dispatch",
+      "status": "accepted",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "phase-f85-operator-federation-surface.yml",
+      "expected_jobs": 2,
+      "action": "workflow_dispatch",
+      "status": "accepted",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "federation-v1-release.yml",
+      "expected_jobs": 16,
+      "action": "reuse existing exact-source run",
+      "run_id": 34751832493,
+      "status": "pending"
+    },
+    {
+      "workflow": "ci-test-sharding.yml",
+      "expected_jobs": 2,
+      "action": "workflow_dispatch",
+      "status": "accepted",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "cfi2-onboarding-composition.yml",
+      "expected_jobs": 2,
+      "action": "workflow_dispatch",
+      "status": "accepted",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "release-image-metadata.yml",
+      "expected_jobs": 1,
+      "action": "workflow_dispatch",
+      "status": "accepted",
+      "response": {
+        "http_status": 204
+      }
+    }
+  ],
+  "physical_acceptance": "NOT_EVALUATED",
+  "deployed": false
+}
