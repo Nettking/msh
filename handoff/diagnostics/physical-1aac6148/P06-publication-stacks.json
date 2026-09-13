@@ -1,0 +1,702 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "started_at": "2026-09-13T18:45:50.370349+00:00",
+  "samples": [
+    {
+      "elapsed_seconds": 0.0,
+      "snapshot": {
+        "status": "connected",
+        "storage_state": "discovering",
+        "jsonl_state": "discovering",
+        "pending_batches": 0,
+        "last_committed_count": 0,
+        "last_error_code": null
+      },
+      "threads": [
+        [
+          {
+            "file": "windows_events.py",
+            "function": "recv",
+            "line": 487
+          },
+          {
+            "file": "proactor_events.py",
+            "function": "_loop_self_reading",
+            "line": 804
+          },
+          {
+            "file": "events.py",
+            "function": "_run",
+            "line": 88
+          },
+          {
+            "file": "base_events.py",
+            "function": "_run_once",
+            "line": 1999
+          },
+          {
+            "file": "base_events.py",
+            "function": "run_forever",
+            "line": 645
+          },
+          {
+            "file": "windows_events.py",
+            "function": "run_forever",
+            "line": 322
+          },
+          {
+            "file": "catalog/flask_app/services/federation_pairing_service.py",
+            "function": "run",
+            "line": 595
+          },
+          {
+            "file": "threading.py",
+            "function": "run",
+            "line": 1012
+          },
+          {
+            "file": "threading.py",
+            "function": "_bootstrap_inner",
+            "line": 1075
+          },
+          {
+            "file": "threading.py",
+            "function": "_bootstrap",
+            "line": 1032
+          }
+        ],
+        [
+          {
+            "file": "capture-native-publication-stacks.py",
+            "function": "<module>",
+            "line": 64
+          }
+        ]
+      ],
+      "tasks": [
+        {
+          "done": false,
+          "await_chain": [
+            {
+              "file": "catalog/mtconnect_recorder/federation_node.py",
+              "function": "_publication_loop",
+              "line": 910,
+              "stage": "announce"
+            },
+            {
+              "file": "catalog/mtconnect_recorder/federation_node.py",
+              "function": "_announce_connected",
+              "line": 828
+            },
+            {
+              "file": "catalog/mtconnect_recorder/federation_node.py",
+              "function": "_announce_now",
+              "line": 778
+            },
+            {
+              "file": "catalog/mtconnect_recorder/federation_node.py",
+              "function": "_resolve_capability_identity",
+              "line": 708
+            },
+            {
+              "file": "catalog/mtconnect_recorder/federation_node.py",
+              "function": "_session_capability_rows",
+              "line": 664
+            },
+            {
+              "file": "scripts/start_tailscale_recorder.py",
+              "function": "coordinator_status",
+              "line": 122
+            },
+            {
+              "file": "catalog/node/client.py",
+              "function": "coordinator_status",
+              "line": 888
+            },
+            {
+              "file": "catalog/node/client.py",
+              "function": "_coordinator_status_snapshot",
+              "line": 908
+            },
+            {
+              "file": "catalog/node/client.py",
+              "function": "request",
+              "line": 540
+            },
+            {
+              "file": "tasks.py",
+              "function": "wait_for",
+              "line": 520
+            }
+          ]
+        },
+        {
+          "done": false,
+          "await_chain": [
+            {
+              "file": "catalog/node/client.py",
+              "function": "_heartbeat_loop",
+              "line": 1228
+            },
+            {
+              "file": "tasks.py",
+              "function": "sleep",
+              "line": 665
+            }
+          ]
+        },
+        {
+          "done": false,
+          "await_chain": [
+            {
+              "file": "connection.py",
+              "function": "keepalive",
+              "line": 815
+            },
+            {
+              "file": "tasks.py",
+              "function": "sleep",
+              "line": 665
+            }
+          ]
+        },
+        {
+          "done": false,
+          "await_chain": [
+            {
+              "file": "catalog/node/client.py",
+              "function": "_receiver_loop",
+              "line": 1077
+            }
+          ]
+        }
+      ],
+      "loop_callback_observed": true
+    },
+    {
+      "elapsed_seconds": 5.0,
+      "snapshot": {
+        "status": "connected",
+        "storage_state": "discovering",
+        "jsonl_state": "discovering",
+        "pending_batches": 0,
+        "last_committed_count": 0,
+        "last_error_code": null
+      },
+      "threads": [
+        [
+          {
+            "file": "thread.py",
+            "function": "_worker",
+            "line": 90
+          },
+          {
+            "file": "threading.py",
+            "function": "run",
+            "line": 1012
+          },
+          {
+            "file": "threading.py",
+            "function": "_bootstrap_inner",
+            "line": 1075
+          },
+          {
+            "file": "threading.py",
+            "function": "_bootstrap",
+            "line": 1032
+          }
+        ],
+        [
+          {
+            "file": "windows_events.py",
+            "function": "_poll",
+            "line": 774
+          },
+          {
+            "file": "windows_events.py",
+            "function": "select",
+            "line": 445
+          },
+          {
+            "file": "base_events.py",
+            "function": "_run_once",
+            "line": 1961
+          },
+          {
+            "file": "base_events.py",
+            "function": "run_forever",
+            "line": 645
+          },
+          {
+            "file": "windows_events.py",
+            "function": "run_forever",
+            "line": 322
+          },
+          {
+            "file": "catalog/flask_app/services/federation_pairing_service.py",
+            "function": "run",
+            "line": 595
+          },
+          {
+            "file": "threading.py",
+            "function": "run",
+            "line": 1012
+          },
+          {
+            "file": "threading.py",
+            "function": "_bootstrap_inner",
+            "line": 1075
+          },
+          {
+            "file": "threading.py",
+            "function": "_bootstrap",
+            "line": 1032
+          }
+        ],
+        [
+          {
+            "file": "capture-native-publication-stacks.py",
+            "function": "<module>",
+            "line": 64
+          }
+        ]
+      ],
+      "tasks": [
+        {
+          "done": false,
+          "await_chain": [
+            {
+              "file": "catalog/mtconnect_recorder/federation_node.py",
+              "function": "_publication_loop",
+              "line": 998,
+              "stage": "delivery"
+            },
+            {
+              "file": "catalog/federation/recorder_publication.py",
+              "function": "run_cycle",
+              "line": 1041
+            },
+            {
+              "file": "catalog/federation/recorder_delivery.py",
+              "function": "run_once",
+              "line": 389
+            },
+            {
+              "file": "catalog/federation/recorder_storage_relay.py",
+              "function": "ingest_batch",
+              "line": 821
+            },
+            {
+              "file": "catalog/federation/recorder_storage_relay.py",
+              "function": "_request_response",
+              "line": 1006
+            },
+            {
+              "file": "catalog/node/client.py",
+              "function": "request_message_response",
+              "line": 704
+            },
+            {
+              "file": "tasks.py",
+              "function": "wait_for",
+              "line": 520
+            }
+          ]
+        },
+        {
+          "done": false,
+          "await_chain": [
+            {
+              "file": "catalog/node/client.py",
+              "function": "_heartbeat_loop",
+              "line": 1228
+            },
+            {
+              "file": "tasks.py",
+              "function": "sleep",
+              "line": 665
+            }
+          ]
+        },
+        {
+          "done": false,
+          "await_chain": [
+            {
+              "file": "connection.py",
+              "function": "keepalive",
+              "line": 815
+            },
+            {
+              "file": "tasks.py",
+              "function": "sleep",
+              "line": 665
+            }
+          ]
+        },
+        {
+          "done": false,
+          "await_chain": [
+            {
+              "file": "catalog/node/client.py",
+              "function": "_receiver_loop",
+              "line": 1077
+            }
+          ]
+        }
+      ],
+      "loop_callback_observed": true
+    },
+    {
+      "elapsed_seconds": 20.0,
+      "snapshot": {
+        "status": "connected",
+        "storage_state": "discovering",
+        "jsonl_state": "discovering",
+        "pending_batches": 0,
+        "last_committed_count": 0,
+        "last_error_code": null
+      },
+      "threads": [
+        [
+          {
+            "file": "thread.py",
+            "function": "_worker",
+            "line": 90
+          },
+          {
+            "file": "threading.py",
+            "function": "run",
+            "line": 1012
+          },
+          {
+            "file": "threading.py",
+            "function": "_bootstrap_inner",
+            "line": 1075
+          },
+          {
+            "file": "threading.py",
+            "function": "_bootstrap",
+            "line": 1032
+          }
+        ],
+        [
+          {
+            "file": "windows_events.py",
+            "function": "_poll",
+            "line": 774
+          },
+          {
+            "file": "windows_events.py",
+            "function": "select",
+            "line": 445
+          },
+          {
+            "file": "base_events.py",
+            "function": "_run_once",
+            "line": 1961
+          },
+          {
+            "file": "base_events.py",
+            "function": "run_forever",
+            "line": 645
+          },
+          {
+            "file": "windows_events.py",
+            "function": "run_forever",
+            "line": 322
+          },
+          {
+            "file": "catalog/flask_app/services/federation_pairing_service.py",
+            "function": "run",
+            "line": 595
+          },
+          {
+            "file": "threading.py",
+            "function": "run",
+            "line": 1012
+          },
+          {
+            "file": "threading.py",
+            "function": "_bootstrap_inner",
+            "line": 1075
+          },
+          {
+            "file": "threading.py",
+            "function": "_bootstrap",
+            "line": 1032
+          }
+        ],
+        [
+          {
+            "file": "capture-native-publication-stacks.py",
+            "function": "<module>",
+            "line": 64
+          }
+        ]
+      ],
+      "tasks": [
+        {
+          "done": false,
+          "await_chain": [
+            {
+              "file": "catalog/mtconnect_recorder/federation_node.py",
+              "function": "_publication_loop",
+              "line": 998,
+              "stage": "delivery"
+            },
+            {
+              "file": "catalog/federation/recorder_publication.py",
+              "function": "run_cycle",
+              "line": 1041
+            },
+            {
+              "file": "catalog/federation/recorder_delivery.py",
+              "function": "run_once",
+              "line": 389
+            },
+            {
+              "file": "catalog/federation/recorder_storage_relay.py",
+              "function": "ingest_batch",
+              "line": 821
+            },
+            {
+              "file": "catalog/federation/recorder_storage_relay.py",
+              "function": "_request_response",
+              "line": 1006
+            },
+            {
+              "file": "catalog/node/client.py",
+              "function": "request_message_response",
+              "line": 704
+            },
+            {
+              "file": "tasks.py",
+              "function": "wait_for",
+              "line": 520
+            }
+          ]
+        },
+        {
+          "done": false,
+          "await_chain": [
+            {
+              "file": "catalog/node/client.py",
+              "function": "_heartbeat_loop",
+              "line": 1228
+            },
+            {
+              "file": "tasks.py",
+              "function": "sleep",
+              "line": 665
+            }
+          ]
+        },
+        {
+          "done": false,
+          "await_chain": [
+            {
+              "file": "connection.py",
+              "function": "keepalive",
+              "line": 815
+            },
+            {
+              "file": "tasks.py",
+              "function": "sleep",
+              "line": 665
+            }
+          ]
+        },
+        {
+          "done": false,
+          "await_chain": [
+            {
+              "file": "catalog/node/client.py",
+              "function": "_receiver_loop",
+              "line": 1077
+            }
+          ]
+        }
+      ],
+      "loop_callback_observed": true
+    },
+    {
+      "elapsed_seconds": 40.0,
+      "snapshot": {
+        "status": "connected",
+        "storage_state": "discovering",
+        "jsonl_state": "discovering",
+        "pending_batches": 0,
+        "last_committed_count": 0,
+        "last_error_code": null
+      },
+      "threads": [
+        [
+          {
+            "file": "thread.py",
+            "function": "_worker",
+            "line": 90
+          },
+          {
+            "file": "threading.py",
+            "function": "run",
+            "line": 1012
+          },
+          {
+            "file": "threading.py",
+            "function": "_bootstrap_inner",
+            "line": 1075
+          },
+          {
+            "file": "threading.py",
+            "function": "_bootstrap",
+            "line": 1032
+          }
+        ],
+        [
+          {
+            "file": "windows_events.py",
+            "function": "_poll",
+            "line": 774
+          },
+          {
+            "file": "windows_events.py",
+            "function": "select",
+            "line": 445
+          },
+          {
+            "file": "base_events.py",
+            "function": "_run_once",
+            "line": 1961
+          },
+          {
+            "file": "base_events.py",
+            "function": "run_forever",
+            "line": 645
+          },
+          {
+            "file": "windows_events.py",
+            "function": "run_forever",
+            "line": 322
+          },
+          {
+            "file": "catalog/flask_app/services/federation_pairing_service.py",
+            "function": "run",
+            "line": 595
+          },
+          {
+            "file": "threading.py",
+            "function": "run",
+            "line": 1012
+          },
+          {
+            "file": "threading.py",
+            "function": "_bootstrap_inner",
+            "line": 1075
+          },
+          {
+            "file": "threading.py",
+            "function": "_bootstrap",
+            "line": 1032
+          }
+        ],
+        [
+          {
+            "file": "capture-native-publication-stacks.py",
+            "function": "<module>",
+            "line": 64
+          }
+        ]
+      ],
+      "tasks": [
+        {
+          "done": false,
+          "await_chain": [
+            {
+              "file": "catalog/mtconnect_recorder/federation_node.py",
+              "function": "_publication_loop",
+              "line": 998,
+              "stage": "delivery"
+            },
+            {
+              "file": "catalog/federation/recorder_publication.py",
+              "function": "run_cycle",
+              "line": 1041
+            },
+            {
+              "file": "catalog/federation/recorder_delivery.py",
+              "function": "run_once",
+              "line": 389
+            },
+            {
+              "file": "catalog/federation/recorder_storage_relay.py",
+              "function": "ingest_batch",
+              "line": 821
+            },
+            {
+              "file": "catalog/federation/recorder_storage_relay.py",
+              "function": "_request_response",
+              "line": 1006
+            },
+            {
+              "file": "catalog/node/client.py",
+              "function": "request_message_response",
+              "line": 704
+            },
+            {
+              "file": "tasks.py",
+              "function": "wait_for",
+              "line": 520
+            }
+          ]
+        },
+        {
+          "done": false,
+          "await_chain": [
+            {
+              "file": "catalog/node/client.py",
+              "function": "_heartbeat_loop",
+              "line": 1228
+            },
+            {
+              "file": "tasks.py",
+              "function": "sleep",
+              "line": 665
+            }
+          ]
+        },
+        {
+          "done": false,
+          "await_chain": [
+            {
+              "file": "connection.py",
+              "function": "keepalive",
+              "line": 815
+            },
+            {
+              "file": "tasks.py",
+              "function": "sleep",
+              "line": 665
+            }
+          ]
+        },
+        {
+          "done": false,
+          "await_chain": [
+            {
+              "file": "catalog/node/client.py",
+              "function": "_receiver_loop",
+              "line": 1077
+            }
+          ]
+        }
+      ],
+      "loop_callback_observed": true
+    }
+  ],
+  "new_grant_requested": false,
+  "product_changed": false,
+  "physical_pass": false,
+  "protected_data_accessed": false,
+  "status": "CAPTURED",
+  "finished_at": "2026-09-13T18:46:33.518890+00:00"
+}

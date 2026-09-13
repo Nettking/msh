@@ -1,0 +1,29 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "harness_sha": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "status": "STOPPED",
+  "phase": "SUPPORTED_SUPERVISOR_START",
+  "started_at": "2026-09-13T18:36:18.517268+00:00",
+  "results": [],
+  "supervisor_defaults": {
+    "started_runtime_seconds": 10,
+    "healthy_runtime_seconds": 120,
+    "restart_backoff_seconds": [
+      5,
+      15,
+      45,
+      120
+    ],
+    "max_rapid_restarts": 5
+  },
+  "policy_overrides": false,
+  "new_grant_requested": false,
+  "physical_pass": false,
+  "protected_data_accessed": false,
+  "AQG_requested": false,
+  "supervisor_pid": 36720,
+  "error_type": "RuntimeError",
+  "error": "Bounded observation unavailable: native supported startup",
+  "finished_at": "2026-09-13T18:37:58.653590+00:00",
+  "operator_stop_exit_code": 0
+}

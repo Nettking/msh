@@ -1,0 +1,166 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "recorded_at": "2026-09-13T18:21:19.955337+00:00",
+  "P04_assertions": "2/6 PASS",
+  "P05_assertions": "6/16 PASS",
+  "new_assertions": [
+    "concurrent-sources",
+    "maximum-ingress",
+    "slow-trickle-response",
+    "oversized-ingress",
+    "huge-sequence-gap",
+    "event-storm"
+  ],
+  "progress": {
+    "P04": {
+      "scenario": "P04",
+      "title": "Recorder finite transaction and disk pressure",
+      "passed": false,
+      "missing_assertions": [
+        "aggregate-admission",
+        "pressure-state-ladder",
+        "safe-pause",
+        "recovery-continuity"
+      ],
+      "failing_assertions": [],
+      "elapsed_seconds": 0.0,
+      "required_elapsed_seconds": 0,
+      "sample_count": 0,
+      "required_samples": 0,
+      "timed_sessions": []
+    },
+    "P05": {
+      "scenario": "P05",
+      "title": "Service and failure injection",
+      "passed": false,
+      "missing_assertions": [
+        "flask-crash",
+        "relay-crash",
+        "relay-stale-db-failure",
+        "managed-recorder-crash",
+        "native-recorder-crash",
+        "publication-db-failure",
+        "analysis-db-failure",
+        "poison-recorder-archive",
+        "stale-responder-pid",
+        "global-invariant"
+      ],
+      "failing_assertions": [],
+      "elapsed_seconds": 0.0,
+      "required_elapsed_seconds": 0,
+      "sample_count": 0,
+      "required_samples": 0,
+      "timed_sessions": []
+    }
+  },
+  "maximum_archives": [
+    {
+      "kind": "raw",
+      "archive_bytes": 71831,
+      "uncompressed_bytes": 16777216,
+      "sha256": "9043617fcba690c4375fe2b1fc7cd31b88ef8bc5c5f3f5648cc6b1dbe9754ef2"
+    },
+    {
+      "kind": "probe",
+      "archive_bytes": 16577,
+      "uncompressed_bytes": 16777216,
+      "sha256": "82f7fea75bb73de205cbd1cf350077c3ce3edb8f749b43322c7bec74ca2a6d57"
+    }
+  ],
+  "discontinuity_events": [
+    {
+      "bytes": 686,
+      "sha256": "fc2b39a0c9eb65e98fdda143b76a80c8a64a00afff764d6b92995eb8c2cab86e",
+      "event": {
+        "coalesced_occurrence_count": 5,
+        "event_type": "agent_instance_changed_during_fetch",
+        "first_payload": {
+          "agent_instance_id": 8,
+          "previous_instance_id": 7
+        },
+        "first_seen_at": "2026-09-13T18:17:25.608Z",
+        "hour_bucket": "2026-09-13T18",
+        "last_seen_at": "2026-09-13T18:17:49.660Z",
+        "latest_payload": {
+          "agent_instance_id": 8,
+          "previous_instance_id": 7
+        },
+        "latest_payload_sha256": "02ccdf589113e43859265a47db5deaef5686676e0d0b81278d5654c6aadda945",
+        "occurrence_count": 6,
+        "payload_change_count": 0,
+        "schema": "fcp.mtconnect.recorder_event.v2",
+        "source": "mtconnect_recorder",
+        "source_name": "s07",
+        "timestamp": "2026-09-13T18:17:49.660Z"
+      }
+    },
+    {
+      "bytes": 686,
+      "sha256": "21987ffb935be2e8fa8da8395c7f82d36f89622851f50efac730ae23ed08a62a",
+      "event": {
+        "coalesced_occurrence_count": 0,
+        "event_type": "agent_instance_changed_during_fetch",
+        "first_payload": {
+          "agent_instance_id": 8,
+          "previous_instance_id": 7
+        },
+        "first_seen_at": "2026-09-13T18:15:03.241Z",
+        "hour_bucket": "2026-09-13T18",
+        "last_seen_at": "2026-09-13T18:15:03.241Z",
+        "latest_payload": {
+          "agent_instance_id": 8,
+          "previous_instance_id": 7
+        },
+        "latest_payload_sha256": "02ccdf589113e43859265a47db5deaef5686676e0d0b81278d5654c6aadda945",
+        "occurrence_count": 1,
+        "payload_change_count": 0,
+        "schema": "fcp.mtconnect.recorder_event.v2",
+        "source": "mtconnect_recorder",
+        "source_name": "s08",
+        "timestamp": "2026-09-13T18:15:03.241Z"
+      }
+    }
+  ],
+  "actual_recorder_refusals": [
+    "MtconnectProtocolError: MTConnect /current exceeded its total request deadline.; retrying in 1.0s",
+    "MtconnectProtocolError: MTConnect /current response exceeds maximum 8388608 bytes (declared 8388609).; retrying in 1.0s",
+    "MtconnectProtocolError: MTConnect /current response exceeds maximum 8388608 bytes.; retrying in 1.0s",
+    "MtconnectProtocolError: MTConnect response contained more than 10000 observations.; retrying in 1.0s",
+    "MtconnectProtocolError: MTConnect Agent instance changed while a batch was being fetched.; retrying in 1.0s",
+    "MtconnectProtocolError: MTConnect Agent instance changed while a batch was being fetched.; retrying in 2.0s",
+    "MtconnectProtocolError: MTConnect Agent instance changed while a batch was being fetched.; retrying in 4.0s",
+    "MtconnectProtocolError: MTConnect Agent instance changed while a batch was being fetched.; retrying in 8.0s",
+    "PermissionError: [WinError 5] Ingen tilgang: 'C:\\\\wsl\\\\fcp-v1-1aac6148-main-20260913\\\\.acceptance\\\\native-faults\\\\data\\\\source_state\\\\.mtconnect_recorder_state.json.1900.24916.tmp' -> 'C:\\\\wsl\\\\fcp-v1-1aac6148-main-20260913\\\\.acceptance\\\\native-faults\\\\data\\\\source_state\\\\mtconnect_recorder_state.json'; retrying in 1.0s",
+    "PermissionError: [WinError 5] Ingen tilgang: 'C:\\\\wsl\\\\fcp-v1-1aac6148-main-20260913\\\\.acceptance\\\\native-faults\\\\data\\\\source_state\\\\.mtconnect_recorder_state.json.1900.28716.tmp' -> 'C:\\\\wsl\\\\fcp-v1-1aac6148-main-20260913\\\\.acceptance\\\\native-faults\\\\data\\\\source_state\\\\mtconnect_recorder_state.json'; retrying in 1.0s"
+  ],
+  "private_log_digests": [
+    {
+      "name": "recorder-maximum-continuation.private.log",
+      "bytes": 127423,
+      "sha256": "be45d3d8ae86f0a29c072332220fdc5b8bb7ea944b224c324d179e1936bd52f3"
+    },
+    {
+      "name": "recorder-recovery.private.log",
+      "bytes": 21036,
+      "sha256": "3da27f84ae84d6f157c36c6b80fbf9810d2d3a0cc9ca6299567f724322d308f0"
+    },
+    {
+      "name": "recorder.private.log",
+      "bytes": 83709,
+      "sha256": "5c0f9e5f9926e0c4c4a46950ef3fda3d174dd8eb49aee7c17a53207a3c0b2047"
+    }
+  ],
+  "archive_sha256": "5176117c5edefe751d30744af6c6cf0325623f8a54fbccb3fb4c6799f629196c",
+  "setup_disposition": "Native PID observer corrected for Windows venv child; transient checkpoint sharing reads remain unavailable within the same observation bound. Maximum-input fixture armed before startup after a live switch missed the current/probe boundaries. Original attempts retained; no repeated green concurrency test.",
+  "product_changed": false,
+  "default_deadlines_and_limits_preserved": true,
+  "native_recorder_stopped_cleanly": true,
+  "loopback_agent_stopped": true,
+  "active_executor": null,
+  "physical_pass": false,
+  "protected_data_accessed": false,
+  "AQG_requested": false,
+  "P06": "NOT STARTED; real supervised native enrollment prerequisite remains",
+  "P07": "NOT STARTED",
+  "P12": "NOT STARTED"
+}

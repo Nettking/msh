@@ -1,0 +1,521 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "recorded_at": "2026-09-13T18:48:13.912290+00:00",
+  "creator": {
+    "intent_states": [
+      [
+        "prepared",
+        4
+      ]
+    ],
+    "committed_items": 0,
+    "ack_modes": [
+      "primary"
+    ],
+    "events": [
+      {
+        "event": "storage.group.created",
+        "at": "2026-09-13T17:39:05.516789+00:00",
+        "shape_and_state": {
+          "group_id": "<value omitted>"
+        }
+      },
+      {
+        "event": "storage.provider.registered",
+        "at": "2026-09-13T17:39:05.527952+00:00",
+        "shape_and_state": {
+          "authorized": "<value omitted>",
+          "node_id": "<value omitted>",
+          "protocol": "<value omitted>",
+          "protocol_version": "<value omitted>",
+          "provider_id": "<value omitted>",
+          "status": "ready"
+        }
+      },
+      {
+        "event": "storage.assignment.changed",
+        "at": "2026-09-13T17:39:05.531695+00:00",
+        "shape_and_state": {
+          "group_id": "<value omitted>",
+          "primary_provider_id": "<value omitted>",
+          "replica_provider_ids": []
+        }
+      },
+      {
+        "event": "storage.leader.granted",
+        "at": "2026-09-13T17:39:18.848543+00:00",
+        "shape_and_state": {
+          "fencing_token": 1,
+          "grant_id": "<value omitted>",
+          "group_id": "<value omitted>",
+          "lease_expires_at": "2026-09-13T17:44:18.848543+00:00",
+          "provider_id": "<value omitted>",
+          "scopes": [
+            "<value omitted>"
+          ],
+          "term": 1
+        }
+      },
+      {
+        "event": "storage.assignment.changed",
+        "at": "2026-09-13T17:44:23.388949+00:00",
+        "shape_and_state": {
+          "group_id": "<value omitted>",
+          "primary_provider_id": "<value omitted>",
+          "replica_provider_ids": []
+        }
+      },
+      {
+        "event": "storage.provider.registered",
+        "at": "2026-09-13T17:44:23.405171+00:00",
+        "shape_and_state": {
+          "authorized": "<value omitted>",
+          "node_id": "<value omitted>",
+          "protocol": "<value omitted>",
+          "protocol_version": "<value omitted>",
+          "provider_id": "<value omitted>",
+          "status": "unavailable"
+        }
+      },
+      {
+        "event": "storage.provider.registered",
+        "at": "2026-09-13T17:44:23.993488+00:00",
+        "shape_and_state": {
+          "authorized": "<value omitted>",
+          "node_id": "<value omitted>",
+          "protocol": "<value omitted>",
+          "protocol_version": "<value omitted>",
+          "provider_id": "<value omitted>",
+          "status": "ready"
+        }
+      },
+      {
+        "event": "storage.assignment.changed",
+        "at": "2026-09-13T17:44:24.003485+00:00",
+        "shape_and_state": {
+          "group_id": "<value omitted>",
+          "primary_provider_id": "<value omitted>",
+          "replica_provider_ids": []
+        }
+      },
+      {
+        "event": "storage.leader.granted",
+        "at": "2026-09-13T17:44:24.018154+00:00",
+        "shape_and_state": {
+          "fencing_token": 2,
+          "grant_id": "<value omitted>",
+          "group_id": "<value omitted>",
+          "lease_expires_at": "2026-09-13T17:49:24.018154+00:00",
+          "provider_id": "<value omitted>",
+          "scopes": [
+            "<value omitted>"
+          ],
+          "term": 2
+        }
+      },
+      {
+        "event": "storage.leader.granted",
+        "at": "2026-09-13T17:48:25.290791+00:00",
+        "shape_and_state": {
+          "fencing_token": 3,
+          "grant_id": "<value omitted>",
+          "group_id": "<value omitted>",
+          "lease_expires_at": "2026-09-13T17:53:25.290791+00:00",
+          "provider_id": "<value omitted>",
+          "scopes": [
+            "<value omitted>"
+          ],
+          "term": 3
+        }
+      },
+      {
+        "event": "storage.leader.granted",
+        "at": "2026-09-13T17:52:25.836653+00:00",
+        "shape_and_state": {
+          "fencing_token": 4,
+          "grant_id": "<value omitted>",
+          "group_id": "<value omitted>",
+          "lease_expires_at": "2026-09-13T17:57:25.836653+00:00",
+          "provider_id": "<value omitted>",
+          "scopes": [
+            "<value omitted>"
+          ],
+          "term": 4
+        }
+      },
+      {
+        "event": "storage.leader.granted",
+        "at": "2026-09-13T17:56:26.391688+00:00",
+        "shape_and_state": {
+          "fencing_token": 5,
+          "grant_id": "<value omitted>",
+          "group_id": "<value omitted>",
+          "lease_expires_at": "2026-09-13T18:01:26.391688+00:00",
+          "provider_id": "<value omitted>",
+          "scopes": [
+            "<value omitted>"
+          ],
+          "term": 5
+        }
+      },
+      {
+        "event": "storage.leader.granted",
+        "at": "2026-09-13T18:00:27.126852+00:00",
+        "shape_and_state": {
+          "fencing_token": 6,
+          "grant_id": "<value omitted>",
+          "group_id": "<value omitted>",
+          "lease_expires_at": "2026-09-13T18:05:27.126852+00:00",
+          "provider_id": "<value omitted>",
+          "scopes": [
+            "<value omitted>"
+          ],
+          "term": 6
+        }
+      },
+      {
+        "event": "storage.leader.granted",
+        "at": "2026-09-13T18:04:28.993365+00:00",
+        "shape_and_state": {
+          "fencing_token": 7,
+          "grant_id": "<value omitted>",
+          "group_id": "<value omitted>",
+          "lease_expires_at": "2026-09-13T18:09:28.993365+00:00",
+          "provider_id": "<value omitted>",
+          "scopes": [
+            "<value omitted>"
+          ],
+          "term": 7
+        }
+      },
+      {
+        "event": "storage.leader.granted",
+        "at": "2026-09-13T18:08:30.931371+00:00",
+        "shape_and_state": {
+          "fencing_token": 8,
+          "grant_id": "<value omitted>",
+          "group_id": "<value omitted>",
+          "lease_expires_at": "2026-09-13T18:13:30.931371+00:00",
+          "provider_id": "<value omitted>",
+          "scopes": [
+            "<value omitted>"
+          ],
+          "term": 8
+        }
+      },
+      {
+        "event": "storage.leader.granted",
+        "at": "2026-09-13T18:12:32.152865+00:00",
+        "shape_and_state": {
+          "fencing_token": 9,
+          "grant_id": "<value omitted>",
+          "group_id": "<value omitted>",
+          "lease_expires_at": "2026-09-13T18:17:32.152865+00:00",
+          "provider_id": "<value omitted>",
+          "scopes": [
+            "<value omitted>"
+          ],
+          "term": 9
+        }
+      },
+      {
+        "event": "storage.leader.granted",
+        "at": "2026-09-13T18:16:33.931611+00:00",
+        "shape_and_state": {
+          "fencing_token": 10,
+          "grant_id": "<value omitted>",
+          "group_id": "<value omitted>",
+          "lease_expires_at": "2026-09-13T18:21:33.931611+00:00",
+          "provider_id": "<value omitted>",
+          "scopes": [
+            "<value omitted>"
+          ],
+          "term": 10
+        }
+      },
+      {
+        "event": "storage.leader.granted",
+        "at": "2026-09-13T18:20:34.059383+00:00",
+        "shape_and_state": {
+          "fencing_token": 11,
+          "grant_id": "<value omitted>",
+          "group_id": "<value omitted>",
+          "lease_expires_at": "2026-09-13T18:25:34.059383+00:00",
+          "provider_id": "<value omitted>",
+          "scopes": [
+            "<value omitted>"
+          ],
+          "term": 11
+        }
+      },
+      {
+        "event": "storage.assignment.changed",
+        "at": "2026-09-13T18:23:49.720481+00:00",
+        "shape_and_state": {
+          "group_id": "<value omitted>",
+          "primary_provider_id": "<value omitted>",
+          "replica_provider_ids": []
+        }
+      },
+      {
+        "event": "storage.provider.registered",
+        "at": "2026-09-13T18:23:49.723677+00:00",
+        "shape_and_state": {
+          "authorized": "<value omitted>",
+          "node_id": "<value omitted>",
+          "protocol": "<value omitted>",
+          "protocol_version": "<value omitted>",
+          "provider_id": "<value omitted>",
+          "status": "unavailable"
+        }
+      },
+      {
+        "event": "storage.provider.registered",
+        "at": "2026-09-13T18:23:49.976056+00:00",
+        "shape_and_state": {
+          "authorized": "<value omitted>",
+          "node_id": "<value omitted>",
+          "protocol": "<value omitted>",
+          "protocol_version": "<value omitted>",
+          "provider_id": "<value omitted>",
+          "status": "ready"
+        }
+      },
+      {
+        "event": "storage.assignment.changed",
+        "at": "2026-09-13T18:23:49.981159+00:00",
+        "shape_and_state": {
+          "group_id": "<value omitted>",
+          "primary_provider_id": "<value omitted>",
+          "replica_provider_ids": []
+        }
+      },
+      {
+        "event": "storage.leader.granted",
+        "at": "2026-09-13T18:23:49.987204+00:00",
+        "shape_and_state": {
+          "fencing_token": 12,
+          "grant_id": "<value omitted>",
+          "group_id": "<value omitted>",
+          "lease_expires_at": "2026-09-13T18:28:49.987204+00:00",
+          "provider_id": "<value omitted>",
+          "scopes": [
+            "<value omitted>"
+          ],
+          "term": 12
+        }
+      },
+      {
+        "event": "storage.assignment.changed",
+        "at": "2026-09-13T18:24:05.663546+00:00",
+        "shape_and_state": {
+          "group_id": "<value omitted>",
+          "primary_provider_id": "<value omitted>",
+          "replica_provider_ids": []
+        }
+      },
+      {
+        "event": "storage.provider.registered",
+        "at": "2026-09-13T18:24:05.666755+00:00",
+        "shape_and_state": {
+          "authorized": "<value omitted>",
+          "node_id": "<value omitted>",
+          "protocol": "<value omitted>",
+          "protocol_version": "<value omitted>",
+          "provider_id": "<value omitted>",
+          "status": "unavailable"
+        }
+      },
+      {
+        "event": "storage.provider.registered",
+        "at": "2026-09-13T18:24:05.823451+00:00",
+        "shape_and_state": {
+          "authorized": "<value omitted>",
+          "node_id": "<value omitted>",
+          "protocol": "<value omitted>",
+          "protocol_version": "<value omitted>",
+          "provider_id": "<value omitted>",
+          "status": "ready"
+        }
+      },
+      {
+        "event": "storage.assignment.changed",
+        "at": "2026-09-13T18:24:05.826848+00:00",
+        "shape_and_state": {
+          "group_id": "<value omitted>",
+          "primary_provider_id": "<value omitted>",
+          "replica_provider_ids": []
+        }
+      },
+      {
+        "event": "storage.leader.granted",
+        "at": "2026-09-13T18:24:05.830774+00:00",
+        "shape_and_state": {
+          "fencing_token": 13,
+          "grant_id": "<value omitted>",
+          "group_id": "<value omitted>",
+          "lease_expires_at": "2026-09-13T18:29:05.830774+00:00",
+          "provider_id": "<value omitted>",
+          "scopes": [
+            "<value omitted>"
+          ],
+          "term": 13
+        }
+      },
+      {
+        "event": "storage.assignment.changed",
+        "at": "2026-09-13T18:27:38.199911+00:00",
+        "shape_and_state": {
+          "group_id": "<value omitted>",
+          "primary_provider_id": "<value omitted>",
+          "replica_provider_ids": []
+        }
+      },
+      {
+        "event": "storage.provider.registered",
+        "at": "2026-09-13T18:27:38.203759+00:00",
+        "shape_and_state": {
+          "authorized": "<value omitted>",
+          "node_id": "<value omitted>",
+          "protocol": "<value omitted>",
+          "protocol_version": "<value omitted>",
+          "provider_id": "<value omitted>",
+          "status": "unavailable"
+        }
+      },
+      {
+        "event": "storage.provider.registered",
+        "at": "2026-09-13T18:27:38.477442+00:00",
+        "shape_and_state": {
+          "authorized": "<value omitted>",
+          "node_id": "<value omitted>",
+          "protocol": "<value omitted>",
+          "protocol_version": "<value omitted>",
+          "provider_id": "<value omitted>",
+          "status": "ready"
+        }
+      },
+      {
+        "event": "storage.assignment.changed",
+        "at": "2026-09-13T18:27:38.481473+00:00",
+        "shape_and_state": {
+          "group_id": "<value omitted>",
+          "primary_provider_id": "<value omitted>",
+          "replica_provider_ids": []
+        }
+      },
+      {
+        "event": "storage.leader.granted",
+        "at": "2026-09-13T18:27:38.486477+00:00",
+        "shape_and_state": {
+          "fencing_token": 14,
+          "grant_id": "<value omitted>",
+          "group_id": "<value omitted>",
+          "lease_expires_at": "2026-09-13T18:32:38.486477+00:00",
+          "provider_id": "<value omitted>",
+          "scopes": [
+            "<value omitted>"
+          ],
+          "term": 14
+        }
+      },
+      {
+        "event": "storage.leader.granted",
+        "at": "2026-09-13T18:31:40.181658+00:00",
+        "shape_and_state": {
+          "fencing_token": 15,
+          "grant_id": "<value omitted>",
+          "group_id": "<value omitted>",
+          "lease_expires_at": "2026-09-13T18:36:40.181658+00:00",
+          "provider_id": "<value omitted>",
+          "scopes": [
+            "<value omitted>"
+          ],
+          "term": 15
+        }
+      },
+      {
+        "event": "storage.leader.granted",
+        "at": "2026-09-13T18:35:41.480274+00:00",
+        "shape_and_state": {
+          "fencing_token": 16,
+          "grant_id": "<value omitted>",
+          "group_id": "<value omitted>",
+          "lease_expires_at": "2026-09-13T18:40:41.480274+00:00",
+          "provider_id": "<value omitted>",
+          "scopes": [
+            "<value omitted>"
+          ],
+          "term": 16
+        }
+      },
+      {
+        "event": "storage.leader.granted",
+        "at": "2026-09-13T18:39:42.937321+00:00",
+        "shape_and_state": {
+          "fencing_token": 17,
+          "grant_id": "<value omitted>",
+          "group_id": "<value omitted>",
+          "lease_expires_at": "2026-09-13T18:44:42.937321+00:00",
+          "provider_id": "<value omitted>",
+          "scopes": [
+            "<value omitted>"
+          ],
+          "term": 17
+        }
+      },
+      {
+        "event": "storage.leader.granted",
+        "at": "2026-09-13T18:43:43.749158+00:00",
+        "shape_and_state": {
+          "fencing_token": 18,
+          "grant_id": "<value omitted>",
+          "group_id": "<value omitted>",
+          "lease_expires_at": "2026-09-13T18:48:43.749158+00:00",
+          "provider_id": "<value omitted>",
+          "scopes": [
+            "<value omitted>"
+          ],
+          "term": 18
+        }
+      },
+      {
+        "event": "storage.leader.granted",
+        "at": "2026-09-13T18:47:43.870480+00:00",
+        "shape_and_state": {
+          "fencing_token": 19,
+          "grant_id": "<value omitted>",
+          "group_id": "<value omitted>",
+          "lease_expires_at": "2026-09-13T18:52:43.870480+00:00",
+          "provider_id": "<value omitted>",
+          "scopes": [
+            "<value omitted>"
+          ],
+          "term": 19
+        }
+      }
+    ]
+  },
+  "protected_data_accessed": false,
+  "read_only": true,
+  "outbox": {
+    "states": [
+      [
+        "pending",
+        928,
+        0,
+        4
+      ]
+    ],
+    "errors": [
+      {
+        "error": "",
+        "rows": 925
+      },
+      {
+        "error": "",
+        "rows": 3
+      }
+    ]
+  }
+}

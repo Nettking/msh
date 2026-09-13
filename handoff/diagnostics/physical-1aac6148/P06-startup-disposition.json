@@ -1,0 +1,129 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "recorded_at": "2026-09-13T18:51:22.548395+00:00",
+  "classification": "unresolved but non-demonstrated candidate defect",
+  "observed_failure": "The supported Windows native supervisor could not establish required sharing readiness before the unchanged 45-second child startup deadline. No planned child-crash assertion began.",
+  "demonstrated_path": [
+    "Signed enrollment succeeded and saved membership was reused without another grant.",
+    "Publication coroutine ran on a responsive relay loop and advanced through announcement and authority selection.",
+    "At 5, 20 and 40 seconds it awaited RecorderFederationDeliveryWorker.run_cycle -> DurableRecorderDeliveryQueue.run_once -> RelayRecorderStorageClient.ingest_batch -> RelayNodeClient.request_message_response.",
+    "The creator log identifies a nested TimeoutError from PhaseDLogicalStorageClient.ingest -> RelayStorageEndpoint.request while awaiting the assigned local provider response.",
+    "Read-only receipts show acknowledgement policy primary, no assigned replicas, four prepared intents, zero committed items and 928 pending native outbox rows. No replica quorum was required or weakened."
+  ],
+  "limits": "The captures establish the current failure path, not the cause of the missing provider response. They do not demonstrate a deterministic product defect or justify a product patch, deadline change, data reset or another generic startup retry.",
+  "release_effect": "P06 remains incomplete; this disposition does not waive physical acceptance. Existing exact-source qualification and completed physical assertions remain evidence for C.",
+  "next_action": "Inspect the exact-source shared local-provider request/reply composition or obtain one focused reproducer tied to these stack frames before any further startup attempt. Resolve isolated storage and real-source/aged-corpus prerequisites independently.",
+  "core_crash_archive_sha256": "7f91026ef7df4b68a4a5a996115a9fce92b5464248771362b3f5d62612d8dd0b",
+  "progress": {
+    "P01": {
+      "scenario": "P01",
+      "title": "Repeated Federation update growth and failure cleanup",
+      "passed": true,
+      "missing_assertions": [],
+      "failing_assertions": [],
+      "elapsed_seconds": 0.0,
+      "required_elapsed_seconds": 0,
+      "sample_count": 0,
+      "required_samples": 0,
+      "timed_sessions": []
+    },
+    "P03": {
+      "scenario": "P03",
+      "title": "All supported start/update entry points and concurrency",
+      "passed": true,
+      "missing_assertions": [],
+      "failing_assertions": [],
+      "elapsed_seconds": 0.0,
+      "required_elapsed_seconds": 0,
+      "sample_count": 0,
+      "required_samples": 0,
+      "timed_sessions": []
+    },
+    "P04": {
+      "scenario": "P04",
+      "title": "Recorder finite transaction and disk pressure",
+      "passed": false,
+      "missing_assertions": [
+        "aggregate-admission",
+        "pressure-state-ladder",
+        "safe-pause",
+        "recovery-continuity"
+      ],
+      "failing_assertions": [],
+      "elapsed_seconds": 0.0,
+      "required_elapsed_seconds": 0,
+      "sample_count": 0,
+      "required_samples": 0,
+      "timed_sessions": []
+    },
+    "P05": {
+      "scenario": "P05",
+      "title": "Service and failure injection",
+      "passed": false,
+      "missing_assertions": [
+        "relay-stale-db-failure",
+        "managed-recorder-crash",
+        "native-recorder-crash",
+        "publication-db-failure",
+        "analysis-db-failure",
+        "poison-recorder-archive",
+        "stale-responder-pid",
+        "global-invariant"
+      ],
+      "failing_assertions": [],
+      "elapsed_seconds": 0.0,
+      "required_elapsed_seconds": 0,
+      "sample_count": 0,
+      "required_samples": 0,
+      "timed_sessions": []
+    },
+    "P06": {
+      "scenario": "P06",
+      "title": "Native recorder supervision contract",
+      "passed": false,
+      "missing_assertions": [
+        "unexpected-child-restart",
+        "crash-loop-fence",
+        "operator-stop",
+        "update-trial-semantics",
+        "checkpoint-continuity",
+        "service-manager-boundary"
+      ],
+      "failing_assertions": [],
+      "elapsed_seconds": 0.0,
+      "required_elapsed_seconds": 0,
+      "sample_count": 0,
+      "required_samples": 0,
+      "timed_sessions": []
+    }
+  },
+  "private_log_digests": [
+    {
+      "name": "P06-enrollment.private.error",
+      "bytes": 822,
+      "sha256": "c8eaf552e2d7ede062b3a5af34e4dc255324464618ea91b90b0337b571e5b079"
+    },
+    {
+      "name": "P06-supervisor.private.log",
+      "bytes": 545,
+      "sha256": "b1d5f7a163e958037356e5c0cfb601d18d032002acd05aed5830c17cf62dd760"
+    },
+    {
+      "name": "P06-authority-reply-path.private.log",
+      "bytes": 13707,
+      "sha256": "5a3f3f9740197e8363a989960d8cdfd2b21239169e37dcfed796ac7a063885e7"
+    }
+  ],
+  "P04_assertions": "2/6 PASS",
+  "P05_assertions": "8/16 PASS",
+  "P06_pass_assertions_added": 0,
+  "active_executor": null,
+  "native_supervisor_and_child_absent": true,
+  "product_changed": false,
+  "policy_overrides": false,
+  "protected_data_accessed": false,
+  "AQG_requested": false,
+  "P07": "NOT STARTED",
+  "P12": "NOT STARTED",
+  "physical_pass": false
+}

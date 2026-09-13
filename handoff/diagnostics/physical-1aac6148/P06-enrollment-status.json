@@ -1,0 +1,27 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "harness_sha": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "status": "STOPPED",
+  "phase": "SIGNED_NATIVE_ENROLLMENT",
+  "started_at": "2026-09-13T18:27:33.098428+00:00",
+  "change": "Owned creator advertises its already-bound tailnet relay port/address. Only Flask operator environment is changed; source/image, credentials, mounts, coordinator authority and data remain unchanged.",
+  "source_changed": false,
+  "physical_pass": false,
+  "protected_data_accessed": false,
+  "AQG_requested": false,
+  "native_supervision_started": false,
+  "configuration_activation_exit_code": 0,
+  "creator_http_status": 200,
+  "relay_port": 58796,
+  "creator_core_images": {
+    "flask": "sha256:22eda560bd95bf2f4084f3c940283ab2a211eed98547890a426ba6a86141c16f",
+    "relay": "sha256:52b97ab4d6b5e659df93dcad584f9d95e796ddf71edb49dadd213384e73ee9a8",
+    "recorder": "sha256:1138c0fcb97366abf2d0205d2c70e21a8705bfa879b5454931f60690741bcb25"
+  },
+  "other_cores_unchanged": true,
+  "native_federation_status": "connected",
+  "membership_saved": true,
+  "error_type": "FederationOperationError",
+  "error_code": "recorder-sharing-not-ready",
+  "finished_at": "2026-09-13T18:28:40.160525+00:00"
+}

@@ -1,0 +1,12 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "source_checkout": "C:\\wsl\\fcp-v1-1aac6148-native-faults-20260913",
+  "data_directory": "C:\\wsl\\fcp-v1-1aac6148-main-20260913\\.acceptance\\native-faults\\data",
+  "sources": 8,
+  "local_only": true,
+  "default_poll_seconds": 0.2,
+  "default_timeout_seconds": 10,
+  "default_batch_size": 1000,
+  "no_auto_scan": true,
+  "fresh_or_reset": false
+}

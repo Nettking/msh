@@ -1,0 +1,53 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "harness_sha": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "status": "STOPPED",
+  "phase": "P04/maximum-ingress",
+  "started_at": "2026-09-13T18:14:57.357255+00:00",
+  "results": [
+    {
+      "assertion": "concurrent-sources",
+      "verdict": "pass",
+      "prepare_id": "cb37c57b2d42442bb7be6a8d7ea4fd17",
+      "detail": {
+        "peak_active_requests": 8,
+        "before": {
+          "s01": 553,
+          "s02": 553,
+          "s03": 525,
+          "s04": 509,
+          "s05": 549,
+          "s06": 541,
+          "s07": 497,
+          "s08": 481
+        },
+        "after": {
+          "s01": 557,
+          "s02": 557,
+          "s03": 529,
+          "s04": 513,
+          "s05": 553,
+          "s06": 545,
+          "s07": 501,
+          "s08": 485
+        }
+      }
+    }
+  ],
+  "physical_pass": false,
+  "protected_data_accessed": false,
+  "AQG_requested": false,
+  "request_deadline_seconds": 10,
+  "recorder_limit_overrides": false,
+  "P07_started": false,
+  "P12_started": false,
+  "observer_correction": "Treat Windows transient sharing refusal as unavailable within the original observation bound; verify native child ancestry through the OS rather than equating the venv launcher PID with its Python child. Preserve prior corpus/checkpoints/receipts.",
+  "recorder_pid": 52856,
+  "native_child_pid": 34740,
+  "native_process_parent_pid": 52856,
+  "active_prepare_id": "9123fd86d3974ad48507b82cf448996e",
+  "error_type": "AssertionError",
+  "error": "",
+  "finished_at": "2026-09-13T18:15:06.811508+00:00",
+  "operator_stop_exit_code": 0
+}

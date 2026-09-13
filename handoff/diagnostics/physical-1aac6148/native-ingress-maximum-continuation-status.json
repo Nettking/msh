@@ -1,0 +1,117 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "harness_sha": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "status": "COMPLETED",
+  "phase": "COMPLETE",
+  "started_at": "2026-09-13T18:16:49.947407+00:00",
+  "results": [
+    {
+      "assertion": "concurrent-sources",
+      "verdict": "pass",
+      "prepare_id": "cb37c57b2d42442bb7be6a8d7ea4fd17",
+      "detail": {
+        "peak_active_requests": 8,
+        "before": {
+          "s01": 553,
+          "s02": 553,
+          "s03": 525,
+          "s04": 509,
+          "s05": 549,
+          "s06": 541,
+          "s07": 497,
+          "s08": 481
+        },
+        "after": {
+          "s01": 557,
+          "s02": 557,
+          "s03": 529,
+          "s04": 513,
+          "s05": 553,
+          "s06": 545,
+          "s07": 501,
+          "s08": 485
+        }
+      }
+    },
+    {
+      "assertion": "maximum-ingress",
+      "verdict": "pass",
+      "prepare_id": "9123fd86d3974ad48507b82cf448996e",
+      "detail": {
+        "maximum_response_bytes": {
+          "current": 8388608,
+          "probe": 16777216,
+          "sample": 16777216
+        },
+        "observations": 10000,
+        "checkpoint_after": 20533
+      }
+    },
+    {
+      "assertion": "slow-trickle-response",
+      "verdict": "pass",
+      "prepare_id": "14b5480c187d4ef9949db3cefaeeec45",
+      "detail": {
+        "observed_deadline_error": true,
+        "observation_elapsed_seconds": 10.875,
+        "unchanged_deadline_seconds": 10,
+        "other_source_advanced": true
+      }
+    },
+    {
+      "assertion": "oversized-ingress",
+      "verdict": "pass",
+      "prepare_id": "7cc12f4ddded49b69e09a400446f85ca",
+      "detail": {
+        "cases": [
+          {
+            "input": "oversized-declared",
+            "refusal_observed": true
+          },
+          {
+            "input": "oversized-stream",
+            "refusal_observed": true
+          },
+          {
+            "input": "oversized-observations",
+            "refusal_observed": true
+          }
+        ]
+      }
+    },
+    {
+      "assertion": "huge-sequence-gap",
+      "verdict": "pass",
+      "prepare_id": "a158a746d36640d681d1b2ea7155371f",
+      "detail": {
+        "before": 1029,
+        "after": 1000000000021,
+        "gap_order": 1000000000000,
+        "elapsed_seconds": 0.6099999999860302
+      }
+    },
+    {
+      "assertion": "event-storm",
+      "verdict": "pass",
+      "prepare_id": "d44af5e06e064962a2ca9bb924e5ac14",
+      "detail": {
+        "occurrence_count": 6,
+        "coalesced_occurrence_count": 5
+      }
+    }
+  ],
+  "physical_pass": false,
+  "protected_data_accessed": false,
+  "AQG_requested": false,
+  "request_deadline_seconds": 10,
+  "recorder_limit_overrides": false,
+  "P07_started": false,
+  "P12_started": false,
+  "observer_correction": "Treat Windows transient sharing refusal as unavailable within the original observation bound; verify native child ancestry through the OS rather than equating the venv launcher PID with its Python child. Preserve prior corpus/checkpoints/receipts.",
+  "maximum_fixture_correction": "The previous live mode switch reached an already-in-flight sample before the maximum current/probe responses were served. Arm the full maximum-input sequence before native startup, reuse the prior preparation and preserve the incomplete input trace. No concurrent-sources rerun.",
+  "recorder_pid": 56936,
+  "native_child_pid": 1900,
+  "native_process_parent_pid": 56936,
+  "operator_stop_exit_code": 0,
+  "finished_at": "2026-09-13T18:18:01.236738+00:00"
+}
