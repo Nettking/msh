@@ -2,6 +2,8 @@
 
 **Current actionable checkpoint: 2026-09-13T05:44:39.724494+00:00. Native5e26/37 required +3/3 companion PASS; only remaining release/ICSE recovery attempts active.**
 
+New confirmed D20 harness persistence defect: failed ICSE network public artifact is skipped and detailed worker cause remains private/unavailable. Evidence diagnostics/D20.md/json; independent of unresolved D18 runtime cause. NEXT: publish issue immediately, then isolated minimal harness repair/draftPR from mainb719; do not move PR4755e or disturb active release. Release remains due06:35UTC.
+
 2026-09-13 06:15UTC actionable transition: ICSE34734857086 attempt2 failed again, Linux103680410677 on Beast-Linux-WSL completed05:43:21UTC; publication bundle skipped. Original Windows/Compose successes retained. NEXT: retain native failure evidence and classify recurrence against D18 before further investigation. No third retry or repeated passing diagnostic. Release was not queried early; still due06:35UTC. Receipt diagnostics/pr475-icse-attempt2-completed.json.
 
 Source/PR4755e6f184311019b9982e8544a18f3dc02c1b16e98, PR473440123f6bc6dc358eef3d233236bc14f91af60e0, base/mainb7194820d8f1940ae60b8c9639e09b7f61e65c55 verified unchanged before dispatch. F85 run34734864966 attempt2 completed native PASS both OS; new Windows103671816139 exact5e proof retained, original Linux timings/steps identical. diagnostics/D19-f85-retry-reviewed.json and native-evidence.zip. Never poll/rerun completed F85 again without new evidence.

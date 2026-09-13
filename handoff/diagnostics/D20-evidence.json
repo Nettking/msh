@@ -1,0 +1,17 @@
+{
+  "recorded_at_utc": "2026-09-13T06:21:51.508279+00:00",
+  "finding": "D20",
+  "candidate_sha": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "classification": "test/harness evidence-retention defect",
+  "evidence_jobs": [
+    103664331488,
+    103680410677
+  ],
+  "workflow_file": ".github/workflows/icse-tool-demo.yml",
+  "driver_file": "demo/icse/network/run.py",
+  "github_artifact": "Pending immediate publication",
+  "repair_base": "b7194820d8f1940ae60b8c9639e09b7f61e65c55",
+  "repair_branch": "codex/fix-d20-icse-failure-evidence",
+  "protected_recorder_data": "Not accessed or changed",
+  "runtime_changed": false
+}
