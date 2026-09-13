@@ -88,7 +88,7 @@ def test_windows_preflight_reproves_quiescence_at_all_pressure_levels() -> None:
 def test_windows_failed_build_attempt_still_bounds_its_fcp_cache() -> None:
     text = _read("scripts/windows/fcp_host_build.ps1")
     build = text[text.index("function Invoke-ControlledCoreBuild") : text.index("function Assert-CoreImageCommits")]
-    failed = build[build.index("if ($exit -ne 0)") : build.index("if (-not (Invoke-BuildCachePrune))")]
+    failed = build[build.index("if ($null -eq $exit -or $exit -ne 0)") : build.index("if (-not (Invoke-BuildCachePrune))")]
 
     assert "$cleanupOk = Invoke-BuildCachePrune" in failed
     assert "Stop-FcpBuildWriter $name" in failed
