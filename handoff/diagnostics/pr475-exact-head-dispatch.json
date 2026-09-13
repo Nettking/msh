@@ -1,9 +1,9 @@
 {
-  "recorded_at_utc": "2026-09-13T03:11:27.438400+00:00",
+  "recorded_at_utc": "2026-09-13T03:11:33.349507+00:00",
   "plan_checkpoint": "e70280bc",
   "source_commit": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
   "ref": "codex/fix-d13-windows-refusal-response",
-  "stage": "federation-v1-release",
+  "stage": "ci-test-sharding",
   "records": [
     {
       "workflow": "cf7-acceptance-harness.yml",
@@ -81,6 +81,14 @@
       "workflow": "federation-v1-release.yml",
       "action": "dispatch_requested",
       "requested_at_utc": "2026-09-13T03:11:26.182828+00:00",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "ci-test-sharding.yml",
+      "action": "dispatch_requested",
+      "requested_at_utc": "2026-09-13T03:11:31.882762+00:00",
       "response": {
         "http_status": 204
       }
