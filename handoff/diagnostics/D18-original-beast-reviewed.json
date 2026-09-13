@@ -1,0 +1,55 @@
+{
+  "recorded_at_utc": "2026-09-13T05:06:41.367872+00:00",
+  "finding": "D18",
+  "status": "CONFIRMED_ORIGINAL_FAILURE_NOT_REPRODUCED_ONCE",
+  "run_id": 34738009371,
+  "job_id": 103672744624,
+  "control_sha": "f906b249fb63714aa9b6de70ac119a6e1031c88f",
+  "source_sha": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "runner": "Beast-Linux-WSL",
+  "host": "Beast",
+  "python": "3.12.13",
+  "prior_private_error_available": false,
+  "action": "one_unchanged_original_host_execution",
+  "exit_code": 0,
+  "checks": {
+    "authenticated_enrollment_and_join": "PASS",
+    "authenticated_payload_delivery": "PASS",
+    "authenticated_quorum_bootstrap": "PASS",
+    "automatic_quorum_failover_and_continuity": "PASS",
+    "discovery_and_owner_authorization": "PASS",
+    "independent_processes": "PASS",
+    "minority_mutation_refused": "PASS",
+    "returning_leader_fenced": "PASS",
+    "source_identity_unchanged": "PASS",
+    "successor_reconnect_and_delivery": "PASS"
+  },
+  "all_owned_processes_stopped": true,
+  "source_still_clean": true,
+  "artifact": {
+    "run_id": 34738009371,
+    "id": 10312320429,
+    "name": "d18-original-beast-34738009371-1",
+    "digest": "sha256:e8c16ddc53154dcdaaf1e53238477bdcd0d9d9838430361370759a6c95a87f9e",
+    "bytes": 8884,
+    "created_at": "2026-09-13T04:36:03Z",
+    "api_workflow_head": "f906b249fb63714aa9b6de70ac119a6e1031c88f"
+  },
+  "native_log": {
+    "job_id": 103672744624,
+    "run_id": 34738009371,
+    "name": "original-beast",
+    "runner_name": "Beast-Linux-WSL",
+    "conclusion": "success",
+    "bytes": 41472,
+    "sha256": "5ca74a50942b77f965f6a3f14dd0924acfbeb982af488ee9ee070a6f21f1a35a",
+    "checkout_commits": [
+      "5e6f184311019b9982e8544a18f3dc02c1b16e98"
+    ],
+    "checkout_matches": true
+  },
+  "interpretation": "One unchanged same-host network command completed. Original detailed failure reason not recovered; no root-cause closure, product/environment attribution, qualification substitution or physical evidence. No further D18 diagnostic repetition.",
+  "next_action": "Keep original ICSE Linux failure pending exact required-gate disposition; retain this non-reproduction and process separately active F85 infrastructure retry only when due.",
+  "protected_recorder_data": "Not accessed or changed",
+  "physical_runtime_changed": false
+}
