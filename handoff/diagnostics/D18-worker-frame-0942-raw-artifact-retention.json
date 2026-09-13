@@ -1,0 +1,14 @@
+{
+  "recorded_at": "2026-09-13T09:42:41.776871+00:00",
+  "records": [
+    {
+      "run_id": 34749055328,
+      "id": 10315421432,
+      "name": "d18-worker-frames-34749055328-1",
+      "digest": "sha256:b90089876397479a938b5821206cc8f744f9ee2e4b76d7bfe16a700043782a49",
+      "bytes": 11974,
+      "created_at": "2026-09-13T09:11:31Z",
+      "api_workflow_head": "4f253ae6d626f5d51c9c8888b1de3347ee8c36db"
+    }
+  ]
+}

@@ -1,0 +1,121 @@
+{
+  "recorded_at": "2026-09-13T09:44:48.598448+00:00",
+  "run_id": 34749055328,
+  "job_id": 103702121271,
+  "attempt": 1,
+  "native_source": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+  "control_sha": "4f253ae6d626f5d51c9c8888b1de3347ee8c36db",
+  "runner": "Beast-Linux-WSL",
+  "python": "3.12.13",
+  "mode": "DIAGNOSTIC_ONLY_NOT_QUALIFICATION",
+  "exit_code": 0,
+  "network_checks": {
+    "authenticated_enrollment_and_join": "PASS",
+    "authenticated_payload_delivery": "PASS",
+    "authenticated_quorum_bootstrap": "PASS",
+    "automatic_quorum_failover_and_continuity": "PASS",
+    "discovery_and_owner_authorization": "PASS",
+    "independent_processes": "PASS",
+    "minority_mutation_refused": "PASS",
+    "returning_leader_fenced": "PASS",
+    "source_identity_unchanged": "PASS",
+    "successor_reconnect_and_delivery": "PASS"
+  },
+  "source_clean_before_after": true,
+  "owned_processes_stopped": true,
+  "dependency_comparison": {
+    "original_run": 34746641262,
+    "original_job": 103695663389,
+    "original_log_sha256": "6f4398c564ff0dd8d60294acb52ded864641af54f9699a294b2bcb28f4fe9f86",
+    "packages_compared": 55,
+    "differences": {},
+    "matched": "Same observed Python/package versions, same original install commands and network command; not entire job/workload equivalence: preceding compile/lint/E1-E4 and concurrent host load not reproduced"
+  },
+  "safe_frames": {
+    "voter-a": {
+      "exists": true,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "frames": [],
+      "error_types": []
+    },
+    "voter-b": {
+      "exists": true,
+      "bytes": 1381,
+      "sha256": "b344979e755c53f579f744955076e7ed881d6e1cc2bab3f97ba04346cd54b3ba",
+      "frames": [
+        {
+          "file": "demo/icse/network/worker.py",
+          "line": 175
+        },
+        {
+          "file": "demo/icse/network/worker.py",
+          "line": 102
+        },
+        {
+          "file": "catalog/federation/control_plane_facade.py",
+          "line": 27
+        },
+        {
+          "file": "catalog/federation/control_plane_facade.py",
+          "line": 80
+        },
+        {
+          "file": "catalog/federation/control_plane_product.py",
+          "line": 669
+        },
+        {
+          "file": "catalog/federation/control_plane_product.py",
+          "line": 319
+        }
+      ],
+      "error_types": [
+        "QuorumUnavailable"
+      ]
+    },
+    "voter-c": {
+      "exists": true,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "frames": [],
+      "error_types": []
+    },
+    "reviewer": {
+      "exists": true,
+      "bytes": 981,
+      "sha256": "de88cfa1f0318f611a16af1844d4fd5c9e51181134a0f5ba87486f45232dcced",
+      "frames": [
+        {
+          "file": "demo/icse/network/worker.py",
+          "line": 175
+        },
+        {
+          "file": "demo/icse/network/worker.py",
+          "line": 136
+        },
+        {
+          "file": "catalog/node/client.py",
+          "line": 592
+        },
+        {
+          "file": "catalog/node/client.py",
+          "line": 540
+        },
+        {
+          "file": "external/asyncio",
+          "line": 520
+        }
+      ],
+      "error_types": [
+        "RelayRemoteError"
+      ]
+    }
+  },
+  "interpretation": "One diagnostic non-reproduction on the recorded environment only. Expected negative-test exceptions are retained (minority enrollment QuorumUnavailable; forged capability RelayRemoteError), not new blockers. No driver failure frame. Does not locate or close previous Windows bootstrap/Linux successor timeout or qualify any PR head.",
+  "artifact_id": 10315421432,
+  "artifact_digest": "b90089876397479a938b5821206cc8f744f9ee2e4b76d7bfe16a700043782a49",
+  "state_changed": "This run only: CI-owned synthetic processes/state; all children stopped. Coordination evidence retention only.",
+  "protected_recorder_data": "NOT_ACCESSED_OR_CHANGED",
+  "physical_acceptance": "NOT_EVALUATED",
+  "next_action": "No capture retry. Reconcile required exact-head qualification and source correctness against checked-in contracts; preserve all failed and passed observations. No speculative runtime repair."
+}

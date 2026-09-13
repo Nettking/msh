@@ -1,0 +1,124 @@
+{
+  "source_commit": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+  "review_head": "06b956787ae63215982d5afd7198dead366e05ea",
+  "workflows": [
+    {
+      "workflow": "ci-d18-worker-frame-capture.yml",
+      "run_id": 34749055328,
+      "jobs": [
+        {
+          "id": 103702121271,
+          "run_id": 34749055328,
+          "workflow_name": "D18 single unchanged worker-frame capture",
+          "head_branch": "codex/federation-v1-diagnostic-sweep-20260911",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34749055328",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYJSDLNw",
+          "head_sha": "4f253ae6d626f5d51c9c8888b1de3347ee8c36db",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103702121271",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34749055328/job/103702121271",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-13T09:10:19Z",
+          "started_at": "2026-09-13T09:10:21Z",
+          "completed_at": "2026-09-13T09:11:35Z",
+          "name": "worker-frames",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-13T09:10:22Z",
+              "completed_at": "2026-09-13T09:10:24Z"
+            },
+            {
+              "name": "Verify original host and allocate owned evidence",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-13T09:10:24Z",
+              "completed_at": "2026-09-13T09:10:24Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-13T09:10:24Z",
+              "completed_at": "2026-09-13T09:10:26Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-13T09:10:26Z",
+              "completed_at": "2026-09-13T09:10:28Z"
+            },
+            {
+              "name": "Preserve original ICSE dependency commands",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-13T09:10:28Z",
+              "completed_at": "2026-09-13T09:11:07Z"
+            },
+            {
+              "name": "Extract external collector without modifying candidate source",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-13T09:11:07Z",
+              "completed_at": "2026-09-13T09:11:08Z"
+            },
+            {
+              "name": "Execute unchanged network command exactly once and capture safe frames",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-13T09:11:08Z",
+              "completed_at": "2026-09-13T09:11:29Z"
+            },
+            {
+              "name": "Preserve only sanitized receipt and existing public outputs",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-13T09:11:29Z",
+              "completed_at": "2026-09-13T09:11:31Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 16,
+              "started_at": "2026-09-13T09:11:31Z",
+              "completed_at": "2026-09-13T09:11:31Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-09-13T09:11:31Z",
+              "completed_at": "2026-09-13T09:11:31Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103702121271",
+          "labels": [
+            "self-hosted",
+            "Linux",
+            "X64",
+            "beast-linux",
+            "fcp-linux-fast"
+          ],
+          "runner_id": 29,
+          "runner_name": "Beast-Linux-WSL",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        }
+      ]
+    }
+  ]
+}

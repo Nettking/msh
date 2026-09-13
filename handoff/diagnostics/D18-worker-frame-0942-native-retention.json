@@ -1,0 +1,19 @@
+{
+  "source_commit": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+  "retained_at": "2026-09-13T09:42:40.401365+00:00",
+  "records": [
+    {
+      "job_id": 103702121271,
+      "run_id": 34749055328,
+      "name": "worker-frames",
+      "runner_name": "Beast-Linux-WSL",
+      "conclusion": "success",
+      "bytes": 40749,
+      "sha256": "0dec16f4f021567a9890dad236e85c2f5f89852332eb3ef73318fb2f38df15ab",
+      "checkout_commits": [
+        "f104038a2b77705adaa547cdd1df7d895bf80a41"
+      ],
+      "checkout_matches": true
+    }
+  ]
+}
