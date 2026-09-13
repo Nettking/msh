@@ -1,0 +1,44 @@
+{
+  "source": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+  "pr483_head": "06b956787ae63215982d5afd7198dead366e05ea",
+  "source_and_head_tree": "ff5af295717f6dc9dc90cea399e2d5901c38935d",
+  "status": "NATIVE_REQUIRED_SOURCE_QUALIFIED",
+  "required_jobs_passed": 37,
+  "companion_jobs_passed": 3,
+  "total_native_job_results_passed": 40,
+  "source_identity_policy": "Every result retains its actual f104 native checkout. No claim of native06, native475-head or final-main qualification.",
+  "workflows": [
+    {"workflow": "federation-v1-release.yml", "run": 34746641263, "passed": 16, "evidence": "../D20-stacked-release-0903-reviewed.json"},
+    {"workflow": "phase2-federation.yml", "run": 34746641323, "passed": 2, "evidence": "../D20-stacked-short-0835-qualification-latest.json"},
+    {"workflow": "cf7b-product-physical-acceptance.yml", "run": 34746641366, "passed": 2, "evidence": "../D20-stacked-short-0835-qualification-latest.json"},
+    {"workflow": "federation-software-update.yml", "run": 34746641390, "passed": 2, "evidence": "../D20-stacked-short-0835-qualification-latest.json"},
+    {"workflow": "product-branding.yml", "run": 34746641274, "passed": 1, "evidence": "../D20-stacked-short-0835-qualification-latest.json"},
+    {"workflow": "icse-tool-demo.yml", "run": 34746641262, "passed": 4, "evidence": "artifact-review.json", "job_ids": [103705686394, 103705686454, 103705686974, 103706043571]},
+    {"workflow": "cf7-acceptance-harness.yml", "run": 34750443711, "passed": 2},
+    {"workflow": "cf7c-physical-test-readiness.yml", "run": 34750445380, "passed": 2},
+    {"workflow": "cf8-role-retirement.yml", "run": 34750447222, "passed": 2},
+    {"workflow": "phase-f85-operator-federation-surface.yml", "run": 34750448614, "passed": 2},
+    {"workflow": "ci-test-sharding.yml", "run": 34750523615, "passed": 2},
+    {"workflow": "cfi2-onboarding-composition.yml", "run": 34750525417, "passed": 2, "companion": true},
+    {"workflow": "release-image-metadata.yml", "run": 34750527921, "passed": 1, "companion": true, "evidence": "../f104-release-metadata-reviewed.json"}
+  ],
+  "native_new_gate_evidence": ["native-review.json", "native-job-logs.zip", "artifact-review.json", "../f104-active-gates-latest.json"],
+  "icse_metadata_discrepancy": {
+    "logical_recovery_requests_submitted_by_fresh_task": 1,
+    "tool_response": "ReadTimeout; no repeated logical ICSE dispatch was submitted",
+    "attempt2_endpoint": "queued with zero jobs",
+    "latest_run_metadata": "attempt3, completed/failure, updated09:48:54Z",
+    "latest_native_jobs": "attempt3, four successful job results; Windows/Linux executed09:50-09:53, publication09:55",
+    "compose_reuse": "New job-result ID103705686974 preserves original08:03:54-08:04:22 execution and original artifact10314267711; no new Compose execution claimed",
+    "proof": "Both native network commands emit PASS SOURCE_SHA=f104; checksum-verified native publication archive contains E1-E4 Linux/Windows/compose and10/10 network checks on each OS, exact Git source export and stopped children",
+    "disposition": "GitHub metadata discrepancy, not an observed candidate execution failure. Preserve it; no diagnostic loop or successful-job retry. Normal merge API still enforces repository policy."
+  },
+  "original_icse_profiles": {
+    "windows": "unresolved but non-demonstrated candidate defect; native qualification recovery now passes without a product change",
+    "linux": "unresolved but non-demonstrated candidate defect; diagnostic and native qualification recovery pass without a product change",
+    "relationship": "No shared mechanism or independent root causes proven; original failures retained. No correctness-preserving repair was indicated by current evidence."
+  },
+  "next": "Guarded release merges in dependency order, actual resulting main qualification once, authoritative freeze, checked-in revalidation, fresh physical acceptance.",
+  "physical_acceptance": "NOT_EVALUATED; P07/P12 not started",
+  "protected_recorder_data": "NOT_ACCESSED_OR_CHANGED"
+}

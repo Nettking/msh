@@ -1,0 +1,213 @@
+[
+  {
+    "job_id": 103705919603,
+    "native_source": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+    "checkout_log_lines": [
+      "2026-09-13T09:52:52.6939978Z [command]/usr/bin/git log -1 --format=%H",
+      "2026-09-13T09:52:52.6966591Z f104038a2b77705adaa547cdd1df7d895bf80a41"
+    ],
+    "pytest_summaries": [
+      "2026-09-13T09:54:27.6931582Z 201 passed, 1 warning in 43.80s",
+      "2026-09-13T09:54:28.4407984Z 26 passed in 0.11s",
+      "2026-09-13T09:54:30.6299712Z 11 passed, 492 deselected in 1.93s",
+      "2026-09-13T09:54:31.5834132Z 9 passed in 0.68s",
+      "2026-09-13T09:54:33.1974856Z 10 passed in 1.20s",
+      "2026-09-13T09:54:40.8805908Z 21 passed in 7.47s",
+      "2026-09-13T09:54:42.4123355Z 8 passed in 1.27s",
+      "2026-09-13T09:54:45.1019321Z 7 passed in 2.25s",
+      "2026-09-13T09:55:10.2740213Z 17 passed in 24.71s",
+      "2026-09-13T09:55:15.0071797Z 10 passed in 4.25s",
+      "2026-09-13T09:55:21.3333777Z 11 passed in 5.89s",
+      "2026-09-13T09:55:26.2243470Z 9 passed in 4.39s",
+      "2026-09-13T09:55:28.3562692Z 13 passed, 4 warnings in 1.63s",
+      "2026-09-13T09:55:29.0750014Z 10 passed in 0.13s",
+      "2026-09-13T09:55:38.1563754Z 28 passed in 8.67s"
+    ],
+    "network_result": []
+  },
+  {
+    "job_id": 103705919721,
+    "native_source": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+    "checkout_log_lines": [
+      "2026-09-13T09:52:57.3705690Z [command]\"C:\\Program Files\\Git\\cmd\\git.exe\" log -1 --format=%H\r",
+      "2026-09-13T09:52:57.3984019Z f104038a2b77705adaa547cdd1df7d895bf80a41\r"
+    ],
+    "pytest_summaries": [
+      "2026-09-13T09:56:28.5752397Z 201 passed, 1 warning in 58.48s\r",
+      "2026-09-13T09:56:30.4130016Z 26 passed in 0.41s\r",
+      "2026-09-13T09:56:36.7126844Z 11 passed, 492 deselected in 5.54s\r",
+      "2026-09-13T09:56:39.4319225Z 9 passed in 2.05s\r",
+      "2026-09-13T09:56:41.5584239Z 10 passed in 1.14s\r",
+      "2026-09-13T09:56:45.8401625Z 21 passed in 3.69s\r",
+      "2026-09-13T09:56:48.4843746Z 8 passed in 1.99s\r",
+      "2026-09-13T09:56:52.3713374Z 7 passed in 3.09s\r",
+      "2026-09-13T09:57:18.7751388Z 17 passed in 25.56s\r",
+      "2026-09-13T09:57:25.1437998Z 10 passed in 5.47s\r",
+      "2026-09-13T09:57:31.7020464Z 11 passed in 5.69s\r",
+      "2026-09-13T09:57:37.7183305Z 9 passed in 5.08s\r",
+      "2026-09-13T09:57:41.0048904Z 13 passed, 4 warnings in 2.41s\r",
+      "2026-09-13T09:57:42.3833808Z 10 passed in 0.23s\r",
+      "2026-09-13T09:57:48.0180950Z 28 passed in 4.65s\r"
+    ],
+    "network_result": []
+  },
+  {
+    "job_id": 103705924633,
+    "native_source": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+    "checkout_log_lines": [
+      "2026-09-13T09:53:55.7954341Z [command]\"C:\\Program Files\\Git\\bin\\git.exe\" log -1 --format=%H\r",
+      "2026-09-13T09:53:55.8259062Z f104038a2b77705adaa547cdd1df7d895bf80a41\r"
+    ],
+    "pytest_summaries": [
+      "2026-09-13T09:56:21.2159854Z 29 passed in 0.56s\r",
+      "2026-09-13T09:56:33.8624547Z 43 passed, 2 warnings in 11.86s\r"
+    ],
+    "network_result": []
+  },
+  {
+    "job_id": 103705924803,
+    "native_source": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+    "checkout_log_lines": [
+      "2026-09-13T09:52:55.2458699Z [command]/usr/bin/git log -1 --format=%H",
+      "2026-09-13T09:52:55.2497116Z f104038a2b77705adaa547cdd1df7d895bf80a41"
+    ],
+    "pytest_summaries": [
+      "2026-09-13T09:53:30.9354223Z 29 passed in 0.15s",
+      "2026-09-13T09:53:35.0707239Z 36 passed, 7 skipped, 2 warnings in 3.80s"
+    ],
+    "network_result": []
+  },
+  {
+    "job_id": 103705934251,
+    "native_source": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+    "checkout_log_lines": [
+      "2026-09-13T09:57:49.5720287Z [command]\"C:\\Program Files\\Git\\bin\\git.exe\" log -1 --format=%H\r",
+      "2026-09-13T09:57:49.5987898Z f104038a2b77705adaa547cdd1df7d895bf80a41\r"
+    ],
+    "pytest_summaries": [
+      "2026-09-13T10:00:04.5992354Z 12 passed, 1 warning in 8.18s\r",
+      "2026-09-13T10:00:16.7771886Z 50 passed, 4 warnings in 9.30s\r"
+    ],
+    "network_result": []
+  },
+  {
+    "job_id": 103705934564,
+    "native_source": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+    "checkout_log_lines": [
+      "2026-09-13T09:53:46.5095638Z [command]/usr/bin/git log -1 --format=%H",
+      "2026-09-13T09:53:46.5120083Z f104038a2b77705adaa547cdd1df7d895bf80a41"
+    ],
+    "pytest_summaries": [
+      "2026-09-13T09:54:23.0391801Z 12 passed, 1 warning in 2.46s",
+      "2026-09-13T09:54:32.7885708Z 50 passed, 4 warnings in 7.51s"
+    ],
+    "network_result": []
+  },
+  {
+    "job_id": 103705935519,
+    "native_source": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+    "checkout_log_lines": [
+      "2026-09-13T09:54:42.3963501Z [command]/usr/bin/git log -1 --format=%H",
+      "2026-09-13T09:54:42.3987627Z f104038a2b77705adaa547cdd1df7d895bf80a41"
+    ],
+    "pytest_summaries": [
+      "2026-09-13T09:56:37.1876784Z 732 passed, 18 skipped, 44 warnings in 77.77s (0:01:17)"
+    ],
+    "network_result": []
+  },
+  {
+    "job_id": 103705936123,
+    "native_source": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+    "checkout_log_lines": [
+      "2026-09-13T09:58:01.4478704Z [command]\"C:\\Program Files\\Git\\cmd\\git.exe\" log -1 --format=%H\r",
+      "2026-09-13T09:58:01.4752979Z f104038a2b77705adaa547cdd1df7d895bf80a41\r"
+    ],
+    "pytest_summaries": [
+      "2026-09-13T10:02:58.8279219Z 742 passed, 5 skipped, 44 warnings in 187.28s (0:03:07)\r",
+      "2026-09-13T10:03:01.7824227Z 3 passed in 2.02s\r"
+    ],
+    "network_result": []
+  },
+  {
+    "job_id": 103706153332,
+    "native_source": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+    "checkout_log_lines": [
+      "2026-09-13T09:57:00.6098479Z [command]\"C:\\Program Files\\Git\\bin\\git.exe\" log -1 --format=%H\r",
+      "2026-09-13T09:57:00.6568097Z f104038a2b77705adaa547cdd1df7d895bf80a41\r"
+    ],
+    "pytest_summaries": [
+      "2026-09-13T09:57:32.3469331Z 10 passed in 14.40s\r"
+    ],
+    "network_result": []
+  },
+  {
+    "job_id": 103706153420,
+    "native_source": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+    "checkout_log_lines": [
+      "2026-09-13T09:56:54.3233533Z [command]/usr/bin/git log -1 --format=%H",
+      "2026-09-13T09:56:54.3284737Z f104038a2b77705adaa547cdd1df7d895bf80a41"
+    ],
+    "pytest_summaries": [
+      "2026-09-13T09:57:04.3030791Z 10 passed in 2.54s"
+    ],
+    "network_result": []
+  },
+  {
+    "job_id": 103706159173,
+    "native_source": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+    "checkout_log_lines": [
+      "2026-09-13T09:57:29.3391756Z [command]/usr/bin/git log -1 --format=%H",
+      "2026-09-13T09:57:29.3435885Z f104038a2b77705adaa547cdd1df7d895bf80a41"
+    ],
+    "pytest_summaries": [
+      "2026-09-13T09:58:32.2913823Z 123 passed, 1 warning in 30.45s"
+    ],
+    "network_result": []
+  },
+  {
+    "job_id": 103706159349,
+    "native_source": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+    "checkout_log_lines": [
+      "2026-09-13T10:00:33.8901991Z [command]\"C:\\Program Files\\Git\\bin\\git.exe\" log -1 --format=%H\r",
+      "2026-09-13T10:00:33.9480079Z f104038a2b77705adaa547cdd1df7d895bf80a41\r"
+    ],
+    "pytest_summaries": [
+      "2026-09-13T10:03:18.1420280Z 123 passed, 1 warning in 37.92s\r"
+    ],
+    "network_result": []
+  },
+  {
+    "job_id": 103705686394,
+    "native_source": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+    "checkout_log_lines": [
+      "2026-09-13T09:50:35.5481406Z [command]\"C:\\Program Files\\Git\\bin\\git.exe\" log -1 --format=%H\r",
+      "2026-09-13T09:50:35.5785434Z f104038a2b77705adaa547cdd1df7d895bf80a41\r"
+    ],
+    "pytest_summaries": [],
+    "network_result": [
+      "2026-09-13T09:53:39.7289305Z NETWORK_DEMO=PASS SOURCE_SHA=f104038a2b77705adaa547cdd1df7d895bf80a41\r"
+    ]
+  },
+  {
+    "job_id": 103705686454,
+    "native_source": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+    "checkout_log_lines": [
+      "2026-09-13T09:50:33.1374220Z [command]/usr/bin/git log -1 --format=%H",
+      "2026-09-13T09:50:33.1395628Z f104038a2b77705adaa547cdd1df7d895bf80a41"
+    ],
+    "pytest_summaries": [],
+    "network_result": [
+      "2026-09-13T09:51:34.4760508Z NETWORK_DEMO=PASS SOURCE_SHA=f104038a2b77705adaa547cdd1df7d895bf80a41"
+    ]
+  },
+  {
+    "job_id": 103706043571,
+    "native_source": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+    "checkout_log_lines": [
+      "2026-09-13T09:55:48.0661648Z [command]/usr/bin/git log -1 --format=%H",
+      "2026-09-13T09:55:48.0684601Z f104038a2b77705adaa547cdd1df7d895bf80a41"
+    ],
+    "pytest_summaries": [],
+    "network_result": []
+  }
+]

@@ -1,0 +1,39 @@
+{
+  "at": "2026-09-13T10:20:09.645469+00:00",
+  "source": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+  "publication_artifact": 10315473711,
+  "publication_archive_sha256": "46a22abb11f4cb71b961dde0adf742f2bac2445d93681dfea39a3d8bc62c3e34",
+  "export_matches_exact_git_source": true,
+  "exported_source_files": 1417,
+  "component_checks": {
+    "Linux": "4/4 PASS",
+    "Windows": "4/4 PASS",
+    "compose": "4/4 PASS retained from attempt1"
+  },
+  "network_checks": {
+    "Linux": "10/10 PASS",
+    "Windows": "10/10 PASS"
+  },
+  "owned_teardown": "PASS both OS",
+  "public_privacy": "PASS",
+  "cf8_junit": [
+    {
+      "artifact_id": 10315499057,
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "sha256": "465621d6e0856d4f2d85cdd5382f43109b11660ff4cb21d8bb40951ceffe1b4a"
+    },
+    {
+      "artifact_id": 10314899213,
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "sha256": "d419750a6aef54f2f8932017545087e4a474bb9a18affec7070b020e2cfb9421"
+    }
+  ],
+  "new_native_checkout_proofs": 15,
+  "native_logs_sha256": "f45954927748079f9bee703284b74c8819d35deb584ec2215d84e0c25cce2f53",
+  "physical_acceptance": "NOT_EVALUATED",
+  "protected_recorder_data": "NOT_ACCESSED_OR_CHANGED"
+}

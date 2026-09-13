@@ -1,0 +1,1866 @@
+{
+  "at": "2026-09-13T10:15:25.802354+00:00",
+  "source": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+  "runs": [
+    {
+      "id": 34746641262,
+      "name": "ICSE tool demonstration",
+      "path": ".github/workflows/icse-tool-demo.yml",
+      "head_sha": "06b956787ae63215982d5afd7198dead366e05ea",
+      "head_branch": "codex/fix-d20-icse-failure-evidence",
+      "event": "pull_request",
+      "status": "queued",
+      "conclusion": null,
+      "run_attempt": 2,
+      "created_at": "2026-09-13T09:48:54Z",
+      "updated_at": "2026-09-13T09:48:54Z",
+      "jobs": []
+    },
+    {
+      "id": 34750443711,
+      "name": "CF7-A acceptance harness",
+      "path": ".github/workflows/cf7-acceptance-harness.yml",
+      "head_sha": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+      "head_branch": "codex/federation-v1-qualify-f104038a",
+      "event": "workflow_dispatch",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "created_at": "2026-09-13T09:52:46Z",
+      "updated_at": "2026-09-13T09:57:54Z",
+      "jobs": [
+        {
+          "id": 103705919603,
+          "name": "harness (Linux, fcp-linux-fast, bash)",
+          "status": "completed",
+          "conclusion": "success",
+          "run_attempt": 1,
+          "runner_name": "Beast-Linux-WSL",
+          "runner_id": 29,
+          "started_at": "2026-09-13T09:52:49Z",
+          "completed_at": "2026-09-13T09:55:42Z",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-13T09:52:50Z",
+              "completed_at": "2026-09-13T09:52:51Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-13T09:52:51Z",
+              "completed_at": "2026-09-13T09:52:52Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-13T09:52:52Z",
+              "completed_at": "2026-09-13T09:52:54Z"
+            },
+            {
+              "name": "Install test dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-13T09:52:54Z",
+              "completed_at": "2026-09-13T09:53:42Z"
+            },
+            {
+              "name": "Compile CF7-A through CFI-6 harness files",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-13T09:53:42Z",
+              "completed_at": "2026-09-13T09:53:43Z"
+            },
+            {
+              "name": "Parse scenario manifest",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-13T09:53:43Z",
+              "completed_at": "2026-09-13T09:53:43Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-13T09:53:43Z",
+              "completed_at": "2026-09-13T09:53:43Z"
+            },
+            {
+              "name": "Run CF7-A harness scenarios",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-13T09:53:43Z",
+              "completed_at": "2026-09-13T09:54:27Z"
+            },
+            {
+              "name": "Run CF1 contract regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-13T09:54:27Z",
+              "completed_at": "2026-09-13T09:54:28Z"
+            },
+            {
+              "name": "Run CF2-A isolated benchmark-engine regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-09-13T09:54:28Z",
+              "completed_at": "2026-09-13T09:54:30Z"
+            },
+            {
+              "name": "Run CF2-B isolated concrete-adapter regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-09-13T09:54:30Z",
+              "completed_at": "2026-09-13T09:54:31Z"
+            },
+            {
+              "name": "Run CF3 discovery and join regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-09-13T09:54:31Z",
+              "completed_at": "2026-09-13T09:54:33Z"
+            },
+            {
+              "name": "Run CF4 contribution service regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-09-13T09:54:33Z",
+              "completed_at": "2026-09-13T09:54:40Z"
+            },
+            {
+              "name": "Run CF5 UI shell regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14,
+              "started_at": "2026-09-13T09:54:40Z",
+              "completed_at": "2026-09-13T09:54:42Z"
+            },
+            {
+              "name": "Run CFI-1 read-only Federation overview regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-09-13T09:54:42Z",
+              "completed_at": "2026-09-13T09:54:45Z"
+            },
+            {
+              "name": "Run CFI-2 onboarding composition regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 16,
+              "started_at": "2026-09-13T09:54:45Z",
+              "completed_at": "2026-09-13T09:55:10Z"
+            },
+            {
+              "name": "Run CFI-3 device inspection composition regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-09-13T09:55:10Z",
+              "completed_at": "2026-09-13T09:55:15Z"
+            },
+            {
+              "name": "Run CFI-4 benchmark composition regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 18,
+              "started_at": "2026-09-13T09:55:15Z",
+              "completed_at": "2026-09-13T09:55:21Z"
+            },
+            {
+              "name": "Run CFI-5 contribution composition regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 19,
+              "started_at": "2026-09-13T09:55:21Z",
+              "completed_at": "2026-09-13T09:55:26Z"
+            },
+            {
+              "name": "Run CFI-6 startup transition regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 20,
+              "started_at": "2026-09-13T09:55:26Z",
+              "completed_at": "2026-09-13T09:55:28Z"
+            },
+            {
+              "name": "Run CF6 projection regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 21,
+              "started_at": "2026-09-13T09:55:28Z",
+              "completed_at": "2026-09-13T09:55:29Z"
+            },
+            {
+              "name": "Run focused Federation authority regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 22,
+              "started_at": "2026-09-13T09:55:29Z",
+              "completed_at": "2026-09-13T09:55:38Z"
+            },
+            {
+              "name": "Ruff CF7-A through CFI-6 files",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 23,
+              "started_at": "2026-09-13T09:55:38Z",
+              "completed_at": "2026-09-13T09:55:38Z"
+            },
+            {
+              "name": "Diff hygiene",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 24,
+              "started_at": "2026-09-13T09:55:38Z",
+              "completed_at": "2026-09-13T09:55:38Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 48,
+              "started_at": "2026-09-13T09:55:38Z",
+              "completed_at": "2026-09-13T09:55:38Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 49,
+              "started_at": "2026-09-13T09:55:38Z",
+              "completed_at": "2026-09-13T09:55:38Z"
+            }
+          ]
+        },
+        {
+          "id": 103705919721,
+          "name": "harness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Byp...",
+          "status": "completed",
+          "conclusion": "success",
+          "run_attempt": 1,
+          "runner_name": "Beast",
+          "runner_id": 28,
+          "started_at": "2026-09-13T09:52:49Z",
+          "completed_at": "2026-09-13T09:57:53Z",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-13T09:52:50Z",
+              "completed_at": "2026-09-13T09:52:52Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-13T09:52:52Z",
+              "completed_at": "2026-09-13T09:52:57Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-13T09:52:57Z",
+              "completed_at": "2026-09-13T09:53:05Z"
+            },
+            {
+              "name": "Install test dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-13T09:53:05Z",
+              "completed_at": "2026-09-13T09:55:26Z"
+            },
+            {
+              "name": "Compile CF7-A through CFI-6 harness files",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-13T09:55:26Z",
+              "completed_at": "2026-09-13T09:55:27Z"
+            },
+            {
+              "name": "Parse scenario manifest",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-13T09:55:27Z",
+              "completed_at": "2026-09-13T09:55:27Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 7,
+              "started_at": "2026-09-13T09:55:27Z",
+              "completed_at": "2026-09-13T09:55:27Z"
+            },
+            {
+              "name": "Run CF7-A harness scenarios",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-13T09:55:27Z",
+              "completed_at": "2026-09-13T09:56:29Z"
+            },
+            {
+              "name": "Run CF1 contract regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-13T09:56:29Z",
+              "completed_at": "2026-09-13T09:56:30Z"
+            },
+            {
+              "name": "Run CF2-A isolated benchmark-engine regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-09-13T09:56:30Z",
+              "completed_at": "2026-09-13T09:56:36Z"
+            },
+            {
+              "name": "Run CF2-B isolated concrete-adapter regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-09-13T09:56:36Z",
+              "completed_at": "2026-09-13T09:56:39Z"
+            },
+            {
+              "name": "Run CF3 discovery and join regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-09-13T09:56:39Z",
+              "completed_at": "2026-09-13T09:56:41Z"
+            },
+            {
+              "name": "Run CF4 contribution service regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-09-13T09:56:41Z",
+              "completed_at": "2026-09-13T09:56:45Z"
+            },
+            {
+              "name": "Run CF5 UI shell regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14,
+              "started_at": "2026-09-13T09:56:45Z",
+              "completed_at": "2026-09-13T09:56:48Z"
+            },
+            {
+              "name": "Run CFI-1 read-only Federation overview regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-09-13T09:56:48Z",
+              "completed_at": "2026-09-13T09:56:52Z"
+            },
+            {
+              "name": "Run CFI-2 onboarding composition regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 16,
+              "started_at": "2026-09-13T09:56:52Z",
+              "completed_at": "2026-09-13T09:57:19Z"
+            },
+            {
+              "name": "Run CFI-3 device inspection composition regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-09-13T09:57:19Z",
+              "completed_at": "2026-09-13T09:57:25Z"
+            },
+            {
+              "name": "Run CFI-4 benchmark composition regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 18,
+              "started_at": "2026-09-13T09:57:25Z",
+              "completed_at": "2026-09-13T09:57:32Z"
+            },
+            {
+              "name": "Run CFI-5 contribution composition regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 19,
+              "started_at": "2026-09-13T09:57:32Z",
+              "completed_at": "2026-09-13T09:57:38Z"
+            },
+            {
+              "name": "Run CFI-6 startup transition regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 20,
+              "started_at": "2026-09-13T09:57:38Z",
+              "completed_at": "2026-09-13T09:57:41Z"
+            },
+            {
+              "name": "Run CF6 projection regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 21,
+              "started_at": "2026-09-13T09:57:41Z",
+              "completed_at": "2026-09-13T09:57:42Z"
+            },
+            {
+              "name": "Run focused Federation authority regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 22,
+              "started_at": "2026-09-13T09:57:42Z",
+              "completed_at": "2026-09-13T09:57:48Z"
+            },
+            {
+              "name": "Ruff CF7-A through CFI-6 files",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 23,
+              "started_at": "2026-09-13T09:57:48Z",
+              "completed_at": "2026-09-13T09:57:48Z"
+            },
+            {
+              "name": "Diff hygiene",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 24,
+              "started_at": "2026-09-13T09:57:48Z",
+              "completed_at": "2026-09-13T09:57:48Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 48,
+              "started_at": "2026-09-13T09:57:48Z",
+              "completed_at": "2026-09-13T09:57:50Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 49,
+              "started_at": "2026-09-13T09:57:50Z",
+              "completed_at": "2026-09-13T09:57:50Z"
+            }
+          ]
+        }
+      ],
+      "artifacts": []
+    },
+    {
+      "id": 34750445380,
+      "name": "CF7-C physical test readiness",
+      "path": ".github/workflows/cf7c-physical-test-readiness.yml",
+      "head_sha": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+      "head_branch": "codex/federation-v1-qualify-f104038a",
+      "event": "workflow_dispatch",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "created_at": "2026-09-13T09:52:47Z",
+      "updated_at": "2026-09-13T09:57:07Z",
+      "jobs": [
+        {
+          "id": 103705924633,
+          "name": "readiness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy B...",
+          "status": "completed",
+          "conclusion": "success",
+          "run_attempt": 1,
+          "runner_name": "Nettking",
+          "runner_id": 22,
+          "started_at": "2026-09-13T09:53:48Z",
+          "completed_at": "2026-09-13T09:56:48Z",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-13T09:53:49Z",
+              "completed_at": "2026-09-13T09:53:50Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-13T09:53:50Z",
+              "completed_at": "2026-09-13T09:53:55Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-13T09:53:55Z",
+              "completed_at": "2026-09-13T09:54:05Z"
+            },
+            {
+              "name": "Install dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-13T09:54:05Z",
+              "completed_at": "2026-09-13T09:56:16Z"
+            },
+            {
+              "name": "Compile readiness tooling",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-13T09:56:16Z",
+              "completed_at": "2026-09-13T09:56:17Z"
+            },
+            {
+              "name": "Validate topology template",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-13T09:56:17Z",
+              "completed_at": "2026-09-13T09:56:18Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 7,
+              "started_at": "2026-09-13T09:56:18Z",
+              "completed_at": "2026-09-13T09:56:18Z"
+            },
+            {
+              "name": "Run readiness and evidence tests",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-13T09:56:18Z",
+              "completed_at": "2026-09-13T09:56:21Z"
+            },
+            {
+              "name": "Run factory-reset and admin-first lifecycle tests",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-13T09:56:21Z",
+              "completed_at": "2026-09-13T09:56:34Z"
+            },
+            {
+              "name": "Validate Linux wrapper syntax",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 10,
+              "started_at": "2026-09-13T09:56:34Z",
+              "completed_at": "2026-09-13T09:56:34Z"
+            },
+            {
+              "name": "Validate Windows wrapper and fresh-shutdown helper",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-09-13T09:56:34Z",
+              "completed_at": "2026-09-13T09:56:41Z"
+            },
+            {
+              "name": "Ruff readiness tooling",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-09-13T09:56:41Z",
+              "completed_at": "2026-09-13T09:56:42Z"
+            },
+            {
+              "name": "Diff hygiene",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-09-13T09:56:42Z",
+              "completed_at": "2026-09-13T09:56:42Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 26,
+              "started_at": "2026-09-13T09:56:42Z",
+              "completed_at": "2026-09-13T09:56:44Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 27,
+              "started_at": "2026-09-13T09:56:44Z",
+              "completed_at": "2026-09-13T09:56:44Z"
+            }
+          ]
+        },
+        {
+          "id": 103705924803,
+          "name": "readiness (Linux, fcp-linux-fast, bash)",
+          "status": "completed",
+          "conclusion": "success",
+          "run_attempt": 1,
+          "runner_name": "Nettking-Linux",
+          "runner_id": 27,
+          "started_at": "2026-09-13T09:52:51Z",
+          "completed_at": "2026-09-13T09:53:40Z",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-13T09:52:52Z",
+              "completed_at": "2026-09-13T09:52:54Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-13T09:52:54Z",
+              "completed_at": "2026-09-13T09:52:55Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-13T09:52:55Z",
+              "completed_at": "2026-09-13T09:52:58Z"
+            },
+            {
+              "name": "Install dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-13T09:52:58Z",
+              "completed_at": "2026-09-13T09:53:29Z"
+            },
+            {
+              "name": "Compile readiness tooling",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-13T09:53:29Z",
+              "completed_at": "2026-09-13T09:53:29Z"
+            },
+            {
+              "name": "Validate topology template",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-13T09:53:29Z",
+              "completed_at": "2026-09-13T09:53:30Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-13T09:53:30Z",
+              "completed_at": "2026-09-13T09:53:30Z"
+            },
+            {
+              "name": "Run readiness and evidence tests",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-13T09:53:30Z",
+              "completed_at": "2026-09-13T09:53:31Z"
+            },
+            {
+              "name": "Run factory-reset and admin-first lifecycle tests",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-13T09:53:31Z",
+              "completed_at": "2026-09-13T09:53:35Z"
+            },
+            {
+              "name": "Validate Linux wrapper syntax",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-09-13T09:53:35Z",
+              "completed_at": "2026-09-13T09:53:35Z"
+            },
+            {
+              "name": "Validate Windows wrapper and fresh-shutdown helper",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 11,
+              "started_at": "2026-09-13T09:53:35Z",
+              "completed_at": "2026-09-13T09:53:35Z"
+            },
+            {
+              "name": "Ruff readiness tooling",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-09-13T09:53:35Z",
+              "completed_at": "2026-09-13T09:53:35Z"
+            },
+            {
+              "name": "Diff hygiene",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-09-13T09:53:35Z",
+              "completed_at": "2026-09-13T09:53:35Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 26,
+              "started_at": "2026-09-13T09:53:35Z",
+              "completed_at": "2026-09-13T09:53:35Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 27,
+              "started_at": "2026-09-13T09:53:35Z",
+              "completed_at": "2026-09-13T09:53:35Z"
+            }
+          ]
+        }
+      ],
+      "artifacts": []
+    },
+    {
+      "id": 34750447222,
+      "name": "CF8 role retirement",
+      "path": ".github/workflows/cf8-role-retirement.yml",
+      "head_sha": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+      "head_branch": "codex/federation-v1-qualify-f104038a",
+      "event": "workflow_dispatch",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "created_at": "2026-09-13T09:52:49Z",
+      "updated_at": "2026-09-13T10:00:24Z",
+      "jobs": [
+        {
+          "id": 103705934251,
+          "name": "role-retirement (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+          "status": "completed",
+          "conclusion": "success",
+          "run_attempt": 1,
+          "runner_name": "Nettking",
+          "runner_id": 22,
+          "started_at": "2026-09-13T09:57:40Z",
+          "completed_at": "2026-09-13T10:00:23Z",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-13T09:57:41Z",
+              "completed_at": "2026-09-13T09:57:44Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-13T09:57:44Z",
+              "completed_at": "2026-09-13T09:57:49Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-13T09:57:49Z",
+              "completed_at": "2026-09-13T09:57:55Z"
+            },
+            {
+              "name": "Install dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-13T09:57:55Z",
+              "completed_at": "2026-09-13T09:59:55Z"
+            },
+            {
+              "name": "Compile CF8 runtime and migration boundary",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-13T09:59:55Z",
+              "completed_at": "2026-09-13T09:59:55Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 6,
+              "started_at": "2026-09-13T09:59:55Z",
+              "completed_at": "2026-09-13T09:59:55Z"
+            },
+            {
+              "name": "Run CF8 anti-regression acceptance",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-13T09:59:55Z",
+              "completed_at": "2026-09-13T10:00:04Z"
+            },
+            {
+              "name": "Upload CF8 acceptance diagnostics",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-13T10:00:04Z",
+              "completed_at": "2026-09-13T10:00:06Z"
+            },
+            {
+              "name": "Enforce CF8 acceptance",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 9,
+              "started_at": "2026-09-13T10:00:06Z",
+              "completed_at": "2026-09-13T10:00:06Z"
+            },
+            {
+              "name": "Run affected capability-first tests",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-09-13T10:00:06Z",
+              "completed_at": "2026-09-13T10:00:17Z"
+            },
+            {
+              "name": "Ruff CF8 boundary",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-09-13T10:00:17Z",
+              "completed_at": "2026-09-13T10:00:18Z"
+            },
+            {
+              "name": "Diff hygiene",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-09-13T10:00:18Z",
+              "completed_at": "2026-09-13T10:00:18Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 24,
+              "started_at": "2026-09-13T10:00:18Z",
+              "completed_at": "2026-09-13T10:00:20Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 25,
+              "started_at": "2026-09-13T10:00:20Z",
+              "completed_at": "2026-09-13T10:00:20Z"
+            }
+          ]
+        },
+        {
+          "id": 103705934564,
+          "name": "role-retirement (Linux, fcp-linux-fast, bash)",
+          "status": "completed",
+          "conclusion": "success",
+          "run_attempt": 1,
+          "runner_name": "Nettking-Linux",
+          "runner_id": 27,
+          "started_at": "2026-09-13T09:53:41Z",
+          "completed_at": "2026-09-13T09:54:37Z",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-13T09:53:42Z",
+              "completed_at": "2026-09-13T09:53:44Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-13T09:53:44Z",
+              "completed_at": "2026-09-13T09:53:46Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-13T09:53:46Z",
+              "completed_at": "2026-09-13T09:53:48Z"
+            },
+            {
+              "name": "Install dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-13T09:53:48Z",
+              "completed_at": "2026-09-13T09:54:20Z"
+            },
+            {
+              "name": "Compile CF8 runtime and migration boundary",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-13T09:54:20Z",
+              "completed_at": "2026-09-13T09:54:20Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-13T09:54:20Z",
+              "completed_at": "2026-09-13T09:54:20Z"
+            },
+            {
+              "name": "Run CF8 anti-regression acceptance",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-13T09:54:20Z",
+              "completed_at": "2026-09-13T09:54:23Z"
+            },
+            {
+              "name": "Upload CF8 acceptance diagnostics",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-13T09:54:23Z",
+              "completed_at": "2026-09-13T09:54:24Z"
+            },
+            {
+              "name": "Enforce CF8 acceptance",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 9,
+              "started_at": "2026-09-13T09:54:24Z",
+              "completed_at": "2026-09-13T09:54:24Z"
+            },
+            {
+              "name": "Run affected capability-first tests",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-09-13T09:54:24Z",
+              "completed_at": "2026-09-13T09:54:33Z"
+            },
+            {
+              "name": "Ruff CF8 boundary",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-09-13T09:54:33Z",
+              "completed_at": "2026-09-13T09:54:33Z"
+            },
+            {
+              "name": "Diff hygiene",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-09-13T09:54:33Z",
+              "completed_at": "2026-09-13T09:54:33Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 24,
+              "started_at": "2026-09-13T09:54:33Z",
+              "completed_at": "2026-09-13T09:54:33Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 25,
+              "started_at": "2026-09-13T09:54:33Z",
+              "completed_at": "2026-09-13T09:54:33Z"
+            }
+          ]
+        }
+      ],
+      "artifacts": [
+        {
+          "id": 10315499057,
+          "node_id": "MDg6QXJ0aWZhY3QxMDMxNTQ5OTA1Nw==",
+          "name": "cf8-acceptance-Windows",
+          "size_in_bytes": 712,
+          "url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10315499057",
+          "archive_download_url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10315499057/zip",
+          "expired": false,
+          "digest": "sha256:465621d6e0856d4f2d85cdd5382f43109b11660ff4cb21d8bb40951ceffe1b4a",
+          "created_at": "2026-09-13T10:00:06Z",
+          "updated_at": "2026-09-13T10:00:06Z",
+          "expires_at": "2026-12-12T09:52:50Z",
+          "workflow_run": {
+            "id": 34750447222,
+            "repository_id": 1033058161,
+            "head_repository_id": 1033058161,
+            "head_branch": "codex/federation-v1-qualify-f104038a",
+            "head_sha": "f104038a2b77705adaa547cdd1df7d895bf80a41"
+          }
+        },
+        {
+          "id": 10314899213,
+          "node_id": "MDg6QXJ0aWZhY3QxMDMxNDg5OTIxMw==",
+          "name": "cf8-acceptance-Linux",
+          "size_in_bytes": 703,
+          "url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10314899213",
+          "archive_download_url": "https://api.github.com/repos/Nettking/msh/actions/artifacts/10314899213/zip",
+          "expired": false,
+          "digest": "sha256:d419750a6aef54f2f8932017545087e4a474bb9a18affec7070b020e2cfb9421",
+          "created_at": "2026-09-13T09:54:24Z",
+          "updated_at": "2026-09-13T09:54:24Z",
+          "expires_at": "2026-12-12T09:52:50Z",
+          "workflow_run": {
+            "id": 34750447222,
+            "repository_id": 1033058161,
+            "head_repository_id": 1033058161,
+            "head_branch": "codex/federation-v1-qualify-f104038a",
+            "head_sha": "f104038a2b77705adaa547cdd1df7d895bf80a41"
+          }
+        }
+      ]
+    },
+    {
+      "id": 34750448614,
+      "name": "Phase F8.5 operator federation surface",
+      "path": ".github/workflows/phase-f85-operator-federation-surface.yml",
+      "head_sha": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+      "head_branch": "codex/federation-v1-qualify-f104038a",
+      "event": "workflow_dispatch",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "created_at": "2026-09-13T09:52:51Z",
+      "updated_at": "2026-09-13T10:03:10Z",
+      "jobs": [
+        {
+          "id": 103705935519,
+          "name": "operator-surface (Linux, fcp-linux-fast, bash)",
+          "status": "completed",
+          "conclusion": "success",
+          "run_attempt": 1,
+          "runner_name": "Nettking-Linux",
+          "runner_id": 27,
+          "started_at": "2026-09-13T09:54:38Z",
+          "completed_at": "2026-09-13T09:56:42Z",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-13T09:54:40Z",
+              "completed_at": "2026-09-13T09:54:41Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-13T09:54:41Z",
+              "completed_at": "2026-09-13T09:54:42Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-13T09:54:42Z",
+              "completed_at": "2026-09-13T09:54:45Z"
+            },
+            {
+              "name": "Install dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-13T09:54:45Z",
+              "completed_at": "2026-09-13T09:55:16Z"
+            },
+            {
+              "name": "Compile F8.5 boundaries",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-13T09:55:16Z",
+              "completed_at": "2026-09-13T09:55:18Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-13T09:55:18Z",
+              "completed_at": "2026-09-13T09:55:18Z"
+            },
+            {
+              "name": "F8.5 and affected regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-13T09:55:18Z",
+              "completed_at": "2026-09-13T09:56:37Z"
+            },
+            {
+              "name": "Windows F8.5 regressions with long artifact paths",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 8,
+              "started_at": "2026-09-13T09:56:37Z",
+              "completed_at": "2026-09-13T09:56:37Z"
+            },
+            {
+              "name": "Windows F8.5 read-only SQLite regressions",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 9,
+              "started_at": "2026-09-13T09:56:37Z",
+              "completed_at": "2026-09-13T09:56:37Z"
+            },
+            {
+              "name": "Ruff F8.5 boundaries",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-09-13T09:56:37Z",
+              "completed_at": "2026-09-13T09:56:37Z"
+            },
+            {
+              "name": "Compose validation",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-09-13T09:56:37Z",
+              "completed_at": "2026-09-13T09:56:37Z"
+            },
+            {
+              "name": "Diff hygiene",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-09-13T09:56:37Z",
+              "completed_at": "2026-09-13T09:56:37Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 24,
+              "started_at": "2026-09-13T09:56:37Z",
+              "completed_at": "2026-09-13T09:56:37Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 25,
+              "started_at": "2026-09-13T09:56:37Z",
+              "completed_at": "2026-09-13T09:56:37Z"
+            }
+          ]
+        },
+        {
+          "id": 103705936123,
+          "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+          "status": "completed",
+          "conclusion": "success",
+          "run_attempt": 1,
+          "runner_name": "Beast",
+          "runner_id": 28,
+          "started_at": "2026-09-13T09:57:55Z",
+          "completed_at": "2026-09-13T10:03:09Z",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-13T09:57:56Z",
+              "completed_at": "2026-09-13T09:57:57Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-13T09:57:57Z",
+              "completed_at": "2026-09-13T09:58:01Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-13T09:58:01Z",
+              "completed_at": "2026-09-13T09:58:07Z"
+            },
+            {
+              "name": "Install dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-13T09:58:07Z",
+              "completed_at": "2026-09-13T09:59:47Z"
+            },
+            {
+              "name": "Compile F8.5 boundaries",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-13T09:59:47Z",
+              "completed_at": "2026-09-13T09:59:50Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 6,
+              "started_at": "2026-09-13T09:59:50Z",
+              "completed_at": "2026-09-13T09:59:50Z"
+            },
+            {
+              "name": "F8.5 and affected regressions",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 7,
+              "started_at": "2026-09-13T09:59:50Z",
+              "completed_at": "2026-09-13T09:59:50Z"
+            },
+            {
+              "name": "Windows F8.5 regressions with long artifact paths",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-13T09:59:50Z",
+              "completed_at": "2026-09-13T10:02:59Z"
+            },
+            {
+              "name": "Windows F8.5 read-only SQLite regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-13T10:02:59Z",
+              "completed_at": "2026-09-13T10:03:01Z"
+            },
+            {
+              "name": "Ruff F8.5 boundaries",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-09-13T10:03:01Z",
+              "completed_at": "2026-09-13T10:03:02Z"
+            },
+            {
+              "name": "Compose validation",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-09-13T10:03:02Z",
+              "completed_at": "2026-09-13T10:03:03Z"
+            },
+            {
+              "name": "Diff hygiene",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-09-13T10:03:03Z",
+              "completed_at": "2026-09-13T10:03:03Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 24,
+              "started_at": "2026-09-13T10:03:03Z",
+              "completed_at": "2026-09-13T10:03:05Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 25,
+              "started_at": "2026-09-13T10:03:05Z",
+              "completed_at": "2026-09-13T10:03:05Z"
+            }
+          ]
+        }
+      ],
+      "artifacts": []
+    },
+    {
+      "id": 34750523615,
+      "name": "CI test sharding",
+      "path": ".github/workflows/ci-test-sharding.yml",
+      "head_sha": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+      "head_branch": "codex/federation-v1-qualify-f104038a",
+      "event": "workflow_dispatch",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "created_at": "2026-09-13T09:54:43Z",
+      "updated_at": "2026-09-13T09:57:44Z",
+      "jobs": [
+        {
+          "id": 103706153332,
+          "name": "Shard contract (Windows, shared-pool)",
+          "status": "completed",
+          "conclusion": "success",
+          "run_attempt": 1,
+          "runner_name": "Nettking",
+          "runner_id": 22,
+          "started_at": "2026-09-13T09:56:50Z",
+          "completed_at": "2026-09-13T09:57:39Z",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-13T09:56:52Z",
+              "completed_at": "2026-09-13T09:56:54Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-13T09:56:54Z",
+              "completed_at": "2026-09-13T09:57:00Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-13T09:57:00Z",
+              "completed_at": "2026-09-13T09:57:09Z"
+            },
+            {
+              "name": "Install CI tooling only",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-13T09:57:09Z",
+              "completed_at": "2026-09-13T09:57:16Z"
+            },
+            {
+              "name": "Check shard tooling",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-13T09:57:16Z",
+              "completed_at": "2026-09-13T09:57:17Z"
+            },
+            {
+              "name": "Verify complete coverage, stable allocation and failure propagation",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-13T09:57:17Z",
+              "completed_at": "2026-09-13T09:57:32Z"
+            },
+            {
+              "name": "Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-13T09:57:32Z",
+              "completed_at": "2026-09-13T09:57:33Z"
+            },
+            {
+              "name": "Verify Go and Compose prerequisites",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-13T09:57:33Z",
+              "completed_at": "2026-09-13T09:57:33Z"
+            },
+            {
+              "name": "Linux storage precondition",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 9,
+              "started_at": "2026-09-13T09:57:33Z",
+              "completed_at": "2026-09-13T09:57:33Z"
+            },
+            {
+              "name": "Linux Buildx prerequisite",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 10,
+              "started_at": "2026-09-13T09:57:33Z",
+              "completed_at": "2026-09-13T09:57:33Z"
+            },
+            {
+              "name": "Admit Linux Docker with an isolated disposable database",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 11,
+              "started_at": "2026-09-13T09:57:33Z",
+              "completed_at": "2026-09-13T09:57:33Z"
+            },
+            {
+              "name": "Verify the disposable database",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 12,
+              "started_at": "2026-09-13T09:57:33Z",
+              "completed_at": "2026-09-13T09:57:33Z"
+            },
+            {
+              "name": "Remove only this job's database",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 13,
+              "started_at": "2026-09-13T09:57:33Z",
+              "completed_at": "2026-09-13T09:57:33Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 25,
+              "started_at": "2026-09-13T09:57:33Z",
+              "completed_at": "2026-09-13T09:57:34Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 26,
+              "started_at": "2026-09-13T09:57:34Z",
+              "completed_at": "2026-09-13T09:57:36Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 27,
+              "started_at": "2026-09-13T09:57:36Z",
+              "completed_at": "2026-09-13T09:57:36Z"
+            }
+          ]
+        },
+        {
+          "id": 103706153420,
+          "name": "Shard contract (Linux, shared-pool)",
+          "status": "completed",
+          "conclusion": "success",
+          "run_attempt": 1,
+          "runner_name": "Nettking-Linux",
+          "runner_id": 27,
+          "started_at": "2026-09-13T09:56:49Z",
+          "completed_at": "2026-09-13T09:57:15Z",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-13T09:56:50Z",
+              "completed_at": "2026-09-13T09:56:53Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-13T09:56:53Z",
+              "completed_at": "2026-09-13T09:56:54Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-13T09:56:54Z",
+              "completed_at": "2026-09-13T09:56:58Z"
+            },
+            {
+              "name": "Install CI tooling only",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-13T09:56:58Z",
+              "completed_at": "2026-09-13T09:57:01Z"
+            },
+            {
+              "name": "Check shard tooling",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-13T09:57:01Z",
+              "completed_at": "2026-09-13T09:57:01Z"
+            },
+            {
+              "name": "Verify complete coverage, stable allocation and failure propagation",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-13T09:57:01Z",
+              "completed_at": "2026-09-13T09:57:04Z"
+            },
+            {
+              "name": "Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-13T09:57:04Z",
+              "completed_at": "2026-09-13T09:57:04Z"
+            },
+            {
+              "name": "Verify Go and Compose prerequisites",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-13T09:57:04Z",
+              "completed_at": "2026-09-13T09:57:04Z"
+            },
+            {
+              "name": "Linux storage precondition",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-13T09:57:04Z",
+              "completed_at": "2026-09-13T09:57:04Z"
+            },
+            {
+              "name": "Linux Buildx prerequisite",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-09-13T09:57:04Z",
+              "completed_at": "2026-09-13T09:57:04Z"
+            },
+            {
+              "name": "Admit Linux Docker with an isolated disposable database",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-09-13T09:57:04Z",
+              "completed_at": "2026-09-13T09:57:10Z"
+            },
+            {
+              "name": "Verify the disposable database",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-09-13T09:57:10Z",
+              "completed_at": "2026-09-13T09:57:10Z"
+            },
+            {
+              "name": "Remove only this job's database",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-09-13T09:57:10Z",
+              "completed_at": "2026-09-13T09:57:10Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@v5",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 25,
+              "started_at": "2026-09-13T09:57:10Z",
+              "completed_at": "2026-09-13T09:57:10Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 26,
+              "started_at": "2026-09-13T09:57:10Z",
+              "completed_at": "2026-09-13T09:57:10Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 27,
+              "started_at": "2026-09-13T09:57:10Z",
+              "completed_at": "2026-09-13T09:57:10Z"
+            }
+          ]
+        }
+      ],
+      "artifacts": []
+    },
+    {
+      "id": 34750525417,
+      "name": "CFI-2 capability onboarding composition",
+      "path": ".github/workflows/cfi2-onboarding-composition.yml",
+      "head_sha": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+      "head_branch": "codex/federation-v1-qualify-f104038a",
+      "event": "workflow_dispatch",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "created_at": "2026-09-13T09:54:45Z",
+      "updated_at": "2026-09-13T10:03:27Z",
+      "jobs": [
+        {
+          "id": 103706159173,
+          "name": "onboarding (Linux, fcp-test-linux, bash, 3.12.13)",
+          "status": "completed",
+          "conclusion": "success",
+          "run_attempt": 1,
+          "runner_name": "Nettking-Linux",
+          "runner_id": 27,
+          "started_at": "2026-09-13T09:57:24Z",
+          "completed_at": "2026-09-13T09:58:37Z",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-13T09:57:25Z",
+              "completed_at": "2026-09-13T09:57:26Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-13T09:57:26Z",
+              "completed_at": "2026-09-13T09:57:29Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-13T09:57:29Z",
+              "completed_at": "2026-09-13T09:57:32Z"
+            },
+            {
+              "name": "Install dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-13T09:57:32Z",
+              "completed_at": "2026-09-13T09:58:00Z"
+            },
+            {
+              "name": "Compile CFI-2 composition",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-13T09:58:00Z",
+              "completed_at": "2026-09-13T09:58:00Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-13T09:58:00Z",
+              "completed_at": "2026-09-13T09:58:00Z"
+            },
+            {
+              "name": "Run CFI-2 and affected regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-13T09:58:00Z",
+              "completed_at": "2026-09-13T09:58:32Z"
+            },
+            {
+              "name": "Validate Compose configuration",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-13T09:58:32Z",
+              "completed_at": "2026-09-13T09:58:32Z"
+            },
+            {
+              "name": "Ruff CFI-2 composition",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-13T09:58:32Z",
+              "completed_at": "2026-09-13T09:58:32Z"
+            },
+            {
+              "name": "Diff hygiene",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-09-13T09:58:32Z",
+              "completed_at": "2026-09-13T09:58:33Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 20,
+              "started_at": "2026-09-13T09:58:33Z",
+              "completed_at": "2026-09-13T09:58:33Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 21,
+              "started_at": "2026-09-13T09:58:33Z",
+              "completed_at": "2026-09-13T09:58:33Z"
+            }
+          ]
+        },
+        {
+          "id": 103706159349,
+          "name": "onboarding (Windows, fcp-test-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+          "status": "completed",
+          "conclusion": "success",
+          "run_attempt": 1,
+          "runner_name": "Nettking",
+          "runner_id": 22,
+          "started_at": "2026-09-13T10:00:25Z",
+          "completed_at": "2026-09-13T10:03:26Z",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-13T10:00:26Z",
+              "completed_at": "2026-09-13T10:00:28Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-13T10:00:28Z",
+              "completed_at": "2026-09-13T10:00:33Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-13T10:00:33Z",
+              "completed_at": "2026-09-13T10:00:42Z"
+            },
+            {
+              "name": "Install dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-13T10:00:42Z",
+              "completed_at": "2026-09-13T10:02:38Z"
+            },
+            {
+              "name": "Compile CFI-2 composition",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-13T10:02:38Z",
+              "completed_at": "2026-09-13T10:02:38Z"
+            },
+            {
+              "name": "Ubuntu storage precondition",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 6,
+              "started_at": "2026-09-13T10:02:38Z",
+              "completed_at": "2026-09-13T10:02:38Z"
+            },
+            {
+              "name": "Run CFI-2 and affected regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-13T10:02:38Z",
+              "completed_at": "2026-09-13T10:03:18Z"
+            },
+            {
+              "name": "Validate Compose configuration",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-13T10:03:18Z",
+              "completed_at": "2026-09-13T10:03:18Z"
+            },
+            {
+              "name": "Ruff CFI-2 composition",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-13T10:03:18Z",
+              "completed_at": "2026-09-13T10:03:20Z"
+            },
+            {
+              "name": "Diff hygiene",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-09-13T10:03:20Z",
+              "completed_at": "2026-09-13T10:03:20Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 20,
+              "started_at": "2026-09-13T10:03:20Z",
+              "completed_at": "2026-09-13T10:03:22Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 21,
+              "started_at": "2026-09-13T10:03:22Z",
+              "completed_at": "2026-09-13T10:03:22Z"
+            }
+          ]
+        }
+      ],
+      "artifacts": []
+    }
+  ],
+  "previous_terminal_runs_not_polled": []
+}

@@ -1,59 +1,55 @@
 # Federation v1 current release checkpoint
 
-Updated 2026-09-13T09:58Z. Active context: clean release handoff + this checkpoint + live GitHub.
-Historical coordination is archived in archive/QUALIFICATION_COORDINATION-c25045b9.md.
+Updated 2026-09-13T10:23Z. Active context: clean handoff + this file + live GitHub.
+Historical coordination/plans are evidence only; see handoff/archive when needed.
 
 ## Current source / heads
-- Combined native qualification source: f104038a2b77705adaa547cdd1df7d895bf80a41.
-- PR #483: 06b956787ae63215982d5afd7198dead366e05ea, draft/open, stacked on #475.
-- PR #475: 5e6f184311019b9982e8544a18f3dc02c1b16e98, draft/open, targets main.
-- PR #473: 440123f6bc6dc358eef3d233236bc14f91af60e0, draft/open, CI retirement.
-- Main: b7194820d8f1940ae60b8c9639e09b7f61e65c55; no merge/deployment this handoff.
-- f104 and #483 head have identical tree ff5af295717f6dc9dc90cea399e2d5901c38935d.
-  Native evidence retains f104 identity; it is never relabelled as native 06b95678.
+- Qualified combined source: f104038a2b77705adaa547cdd1df7d895bf80a41.
+- PR483 head06b956787ae63215982d5afd7198dead366e05ea, stacked on PR475.
+- PR475 head5e6f184311019b9982e8544a18f3dc02c1b16e98, targets main.
+- PR473 head440123f6bc6dc358eef3d233236bc14f91af60e0, CI retirement.
+- Main b7194820d8f1940ae60b8c9639e09b7f61e65c55. No release merge/deployment yet.
+- f104 and PR483 head share tree ff5af295717f6dc9dc90cea399e2d5901c38935d.
+  Results retain actual f104 identity; no native06/5e/final-main relabelling.
 
-## Green gates (retain, never repeat without a source/contract reason)
-- f104 release 34746641263: 16/16 PASS; native source/artifact review retained.
-- f104 Phase 2 34746641323, CF7-B 34746641366, software update 34746641390: PASS.
-- f104 branding 34746641274: PASS. ICSE compose: PASS on attempt 1.
-- f104 registry metadata34750527921: PASS, native checkout and digest checks reviewed.
-- Prior #475/#473 valid qualification remains source-bound evidence; consult only
-  the specific receipt needed to fill a current qualification/merge requirement.
+## Green gates
+- f104 native required qualification COMPLETE:37/37 plus3/3 companions.
+- Release16/16; Phase2, CF7-A/B/C, update, branding, CF8, F8.5, sharding,
+  CFI2 and registry PASS. ICSE native4/4 including retained original Compose.
+- ICSE Windows/Linux network10/10 each; exact-source publication bundle verified.
+- Evidence: diagnostics/f104-final-qualification/qualification.json,
+  artifact-review.json, native-review.json and retained native archives.
+- Preserve every valid green result; no further f104 execution is needed.
 
 ## Actual blockers / disposition
-- ICSE run 34746641262 attempt 1: Windows bootstrap QuorumUnavailable;
-  Linux successor reconnect TimeoutError; dependent publication skipped.
-- Both classified unresolved but non-demonstrated candidate defect. Distinct paths;
-  neither a shared mechanism nor independent root causes are established.
-- One bounded Linux capture 34749055328/job103702121271 completed: unchanged f104,
-  original Beast Linux runner/Python, all 55 package versions match original,
-  network 10/10 PASS, exit 0, owned children stopped, clean source.
-- Captured frames are expected forgery and minority-refusal checks. They do not
-  identify either original failing frame. Windows-specific cause remains untested.
-- No product or deterministic harness defect demonstrated; no speculative repair.
-  Diagnostic PASS is not qualification or physical acceptance.
-- Evidence: diagnostics/icse-trace-34749055328/review.json and native-artifact.zip.
+- No demonstrated remaining candidate defect. Original Windows bootstrap and Linux
+  reconnect observations remain unresolved but non-demonstrated candidate defects.
+  No common mechanism proven; no speculative product repair or new diagnostic.
+- ICSE run34746641262 API metadata is inconsistent: attempt2 says queued/no jobs;
+  latest native jobs are attempt3 and all pass. Run aggregate still says failure.
+  Native logs/source/publication prove recovery completed09:55UTC. Do not poll the
+  empty attempt2 endpoint or retry green jobs to change metadata. Receipt retains
+  the discrepancy; normal merge API must enforce repository policy without bypass.
+- Branch-rule reads403 mean unknown policy, not absence of rules. No external
+  review approval is claimed. Await an actual server rejection before inferring
+  a merge permission/check blocker.
 
 ## Active work / next action
-1. ICSE 34746641262 targeted failed-job recovery accepted: attempt 2 queued.
-   Retain original failures and successful compose; do not repeat the trace capture.
-2. Seven absent workflows submitted on codex/federation-v1-qualify-f104038a; registry PASS.
-   Six other gates queued/running; run IDs in diagnostics/f104-active-qualification.json.
-   Review new terminal results/native source/public artifacts; retain all green evidence.
-   Next bounded state check around10:15Z or a completion event; no duplicate dispatches.
-   Existing30-minute heartbeat now targets this fresh task; old task stopped all actions.
-   Current merge review: diagnostics/release-merge-review-current.json.
-3. Review and merge required release changes in dependency order (#475 before #483;
-   separate #473 after its applicable qualification/review), without bypassing checks.
-4. Qualify actual resulting main once, freeze one authoritative SHA, run checked-in
-   revalidation, then fresh physical acceptance P01-P12.
+1. Persist final f104 proof, update PR validation, then guarded merges:475 before483;
+   retarget483 to main after475. Merge separate473 after applicable review.
+2. Prepared expected combined tree cc9b29515d47d754f24199bf403213e7ff111315;
+   offline merge-tree was clean. This is not an authoritative commit.
+3. Qualify actual resulting main once, reusing automatic runs on that exact SHA
+   and dispatching only absent gates; never qualify intermediate main.
+4. Freeze one authoritative SHA, checked-in revalidation, fresh physical P01-P12.
+   Preparation: diagnostics/next_release_merge_sequence.md; no physical action yet.
+- One active owner is this fresh task. Existing30-minute heartbeat targets it;
+  older task stopped. Keep the checkpoint compact and evidence separate.
 
 ## Immutable safety constraints
-- No weakened assertions, quorum/authority rules, deadlines, security or acceptance.
-- No broad diagnostic sweep, blanket CI retry or unnecessary runner/account/label change.
-- Historical timing/CI observations block only with credible current-source evidence
-  of a checked-in v1 contract violation. No new D-number for a changed symptom alone.
-- AQG deliberately off; never a release dependency or requested recovery.
-- Protected Recorder data untouched and out of scope. No physical PASS exists.
-- P07/P12 have not started and must complete real durations before any PASS.
-- Coordination/diagnostic artifacts stay out of candidate code and release merges.
+- Never weaken assertions, quorum/authority, deadlines, security or acceptance.
+- No broad diagnostic sweep, blanket retry, unnecessary runner/account/label change.
+- Only credible current-candidate contract violations block v1; archive timing noise.
+- AQG deliberately off and never a dependency. Protected Recorder data untouched.
+- No physical PASS. P07/P12 not started; require real1h/24h and strict run-bound evidence.
+- Coordination artifacts stay out of candidates. No reset/prune or protected-data actions.
