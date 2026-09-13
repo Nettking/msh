@@ -1,0 +1,11 @@
+{
+  "at": "2026-09-13T08:45:52.749094+00:00",
+  "source": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+  "windows": "WorkerCommandFailure wraps QuorumUnavailable from bootstrap_new_federation; election, bootstrap proposal, seal/journal commit paths may raise it. No worker source line available in public output.",
+  "linux": "Last public snapshot at08:03:19.504590 voter-b ready LEADER term2/index11; voter-c ready FOLLOWER same index, no lifecycle error, membership/capabilities retained. Timeout reported08:03:45.460212 after first survivor reconnect. connect command includes disconnect plus new connection/auth/status/replay; type alone cannot locate exact15s boundary.",
+  "known_limits": "No original private stderr was uploaded. D20 exposes bounded operation/type, not frames. No actual new failing call stack yet; no proof of product/harness root cause or shared cause.",
+  "next_action": "After existing release gate is terminal and retained, activate one new coordination-only frame-capture job using prepared .yml.in template. Exact unchangedf104/originalICSE install commands; no retry, no candidate edits.",
+  "source_change": false,
+  "network_execution": false,
+  "protected_recorder_data": "Not accessed/changed"
+}

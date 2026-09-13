@@ -1,0 +1,15 @@
+{
+  "collector_sha256": "6ab145f16ff9c67515ff55ebdd88d5967ed5befc9bf0f428dcfa775fff790c3f",
+  "offline_cases_pass": 5,
+  "cases": [
+    "missing file",
+    "safe frame identity and no raw messages/functions/paths",
+    "bounded64frames",
+    "oversize omission",
+    "foreign path refusal"
+  ],
+  "original_ICSE_install_commands_byte_identical": true,
+  "worker_paths_verified": "run.py provision state/label/worker.json; Child writes config.parent/worker.stderr.log",
+  "network_execution": false,
+  "workflow_activated": false
+}
