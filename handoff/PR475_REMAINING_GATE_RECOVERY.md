@@ -54,3 +54,14 @@ on that event. Short ICSE may finish sooner, but no repeated progress polling is
 needed. Existing30-minute heartbeat remains; intervening unchanged runs stay quiet.
 No source freeze/merge/physical deployment, protected Recorder-data access, Docker
 reset/prune, AQG dependency or P07/P12. Coordination-only files stay outside candidates.
+
+## Startup verified
+
+Attempt2 accepted for both runs. Release new shard2 on Nettking-Linux and
+Windows transport/storage on Nettking started05:41:23UTC; other Linux jobs
+queued. ICSE Linux on Beast-Linux-WSL started05:41:52UTC. All nine retained
+successes have identical original run/step timestamps despite cloned API IDs.
+Receipt diagnostics/pr475-remaining-recovery-startup.json. Actual candidate
+checkout verification waits for completed native logs. No extra successful
+execution was scheduled. Short ICSE is eligible for one completion check after
+05:52UTC; release remains due06:35UTC. No repeated unchanged progress queries.
