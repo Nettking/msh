@@ -1,0 +1,19 @@
+{
+  "pr": 488,
+  "base": "e91e521813aff67c44bae51d00dfae212b56ef7e",
+  "head": "1345244efb6f3c081e077471e587f8d2b63f258d",
+  "source": "1bd199b317eef613c3ba289ef39a20ae48f089e5",
+  "tree": "4f45748e55e7d976ef9936b8f77933eae8a5aa29",
+  "qualification_sha256": "14ca97bca99590ce26c925259ea8f0b3caec87909d7c481543dc83bea6f53708",
+  "reviewed_at": "2026-09-13T22:49:08.610211+00:00",
+  "status": "MERGED",
+  "method": "merge",
+  "admin_or_bypass": false,
+  "response": {
+    "sha": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+    "merged": true,
+    "message": "Pull Request successfully merged"
+  },
+  "actual_main": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "actual_main_verified_at": "2026-09-13T22:49:12.007013+00:00"
+}

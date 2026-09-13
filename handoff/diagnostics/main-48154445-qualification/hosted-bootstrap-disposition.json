@@ -1,0 +1,12 @@
+{
+  "action": "Retain observation; no retry, billing/account change or runner-pool change.",
+  "annotation": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings",
+  "candidate_code_executed": false,
+  "classification": "INFRASTRUCTURE_ACCOUNT_JOB_NOT_STARTED",
+  "head": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "job_id": 103806642746,
+  "mandatory_release_gate_job": false,
+  "run_id": 34787907975,
+  "runner_assigned": false,
+  "steps_executed": 0
+}

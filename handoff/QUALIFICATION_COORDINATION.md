@@ -1,96 +1,71 @@
 # Federation v1 current release checkpoint
 
-Updated 2026-09-13T22:09Z. Active context: clean handoff + this file + live GitHub.
+Updated 2026-09-13T22:53Z. Active context: clean handoff + this file + live GitHub.
 Historical coordination is evidence only; consult it for a specific current need.
 
 ## Current source / heads
-- Main=e91e521813aff67c44bae51d00dfae212b56ef7e, PR487 merged normally.
-  Tree=c61eb8e838e8c3d44628af8909da4ed8ed347acf. No override/bypass.
-- Clean detached harness: C:/wsl/fcp-v1-e91e5218-main-20260913.
-  C2 frozen but BLOCKED by demonstrated Windows activation defect. No release.
-- Repair PR488 head1345244efb6f3c081e077471e587f8d2b63f258d;
-  synthetic source1bd199b317eef613c3ba289ef39a20ae48f089e5. Qualification running.
-- Old C=1aac6148759d7b2fd488ec26b97e1a786bdafa80 is immutable evidence only.
-  PR487 repairs its demonstrated storage-reply ownership race. No cross-SHA PASS.
-- Native main checkout prepared at C:/wsl/fcp-v1-native-main-runtime-20260913,
-  now clean main C2/stopped, campaign initialized, membership preserved in place.
-  Normal update-trial target branch retained at76ad339f.
+- PR488 merged normally, no bypass. Actual main/C3:
+  48154445d380980047bb5cbc39ae5b4c1a6889c0; tree4f45748e55e7d976ef9936b8f77933eae8a5aa29.
+- C3 clean source staged Windows C:/wsl/fcp-v1-48154445-main-20260914 (H),
+  Nitro /home/martin/fcp-v1-48154445-main-20260914/source. NOT FROZEN/ACTIVATED.
+- Native runtime clean main C2=e91e5218, stopped; data/membership preserved
+  in old1aac6148 harness .acceptance/native-faults/data. Trial ref76ad339f retained.
+- Creator source C2/live core images1aac; other Windows source/images1aac;
+  Nitro workbench source/imagesC2. New admissions await qualified C3 freeze.
 
-## Current green gates / release decision
-- Repair: two production files, seven new regressions;77/77 related tests PASS.
-- PR487 exact-tree release16/16 and ICSE4/4 PASS; immutable proofs archived.
-- Actual-main qualification COMPLETE: release34780575628 attempt2=16/16 PASS;
-  ICSE4/4 and other companions PASS except explicit standalone Phase2 below.
-  Final source/native/JUnit/publication audit PASS;38 native source proofs,
-  40 logs,4535 exact test identities,4 disjoint shards equal both full orders.
-- Windows103786726556 had6failures/14setup errors, all allocation-exhausted:
-  our44GiB pressure preparation lowered C: below the unchanged64GiB reserve.
-  Host-capacity interference, no demonstrated candidate defect; no source change.
-  Original native log/JUnit and cause retained under diagnostics/
-  main-e91e5218-qualification/windows-capacity-failure/.
-- Capacity RESTORED: exact inactive images retained as sparse archives, every
-  changed range verified zero, full before/after SHA+size equal;93.28GiB free.
-  ARCHIVE_ONLY marker forbids pressure reuse. Originals retained, no deletion.
-  Nitro partial copies retained; no complete transfer claimed. Operational Docker
-  and protected data unchanged. Required recovery margin>=72GiB remains enforced.
-- One failed-job+dependent recovery PASS, run34780575628 attempt2;
-  Windows103795715019 PASS.12successful executions retained, pool unchanged.
-  POST succeeded; local success-shape assertion failed, live attempt2 confirmed
-  dispatch. No duplicate request. Receipt: windows-capacity-failure/targeted-recovery.json.
-- Standalone main Phase2 Windows103786775814:5s plan-publish timeout; Linux PASS.
-  FAIL retained: exact same test non-skipped PASS in recovered Windows and both
-  full orders. Unresolved timing observation, no demonstrated candidate defect.
-  No Phase2 retry; checked mandatory release verdict is16jobs, not legacy37.
+## Green gates / release decision
+- PR488 exact synthetic1bd199b3 release16/16, ICSE4/4, current executed companion
+  gates PASS; audit29native source proofs/2aggregates/publication Git bytes PASS.
+  Original ICSE Windows pre-check failure retained; one targeted recovery PASS,
+  unchanged source/assertions. No demonstrated defect or further diagnostic loop.
+- Real C2 Windows warm-activation defect repaired minimally in PR488: host-port
+  owner resolution/current Compose project.43related tests + live red-to-green.
+- C3 actual-main qualification started once at22:49. Release34787907931,
+  ICSE34787907928; automatic companions running. Only missing permanent CF7-A
+  34787920705 and registry34787922087 dispatched. No blanket CI dispatch.
+- Main hosted bootstrap34787907975/job103806642746 never started (billing,
+  empty runner/0steps), independently retained infrastructure disposition.
+- C2 physical11strict P04/P05/P09 PASS remains C2 evidence only. Checked C3 map
+  marks all12scenarios fresh/0carry. No physical campaign PASS or release/tag.
 
 ## Actual blockers / prerequisites
-- Freeze and checked revalidation DONE; unknown analysis_runtime path denies
-  all12carry-forwards. ALL_SCENARIOS_FRESH_NO_CARRY_FORWARD; map unchanged.
-  Exact C2 native readiness PASS on Windows and Nitro.
-- All physical P01-P12, CF7 and B01-B09 remain incomplete as a campaign.
-  P07 real1h and P12 real24h NOT STARTED. No physical PASS claim.
-- Passive timed duration/outbox/file-ledger/history collectors prepared and
-  self-checked. Review actual load/capacity before timers; traffic unchanged.
-- Two reachable real CNC sources remain a separate CF7 requirement. Configured
-  QuickTurn/IG500/VTC timed out; user asked once, answer pending. Timers independent.
+- Finish current C3 exact-main qualification16release+ICSE4+CF7A/B2each+registry,
+  native/artifact/source audit; freeze then checked revalidation and readiness.
+- Fresh P01-P12/CF7/B01-B09 incomplete. P07>=1realhour/P12>=24realhours
+  NOT STARTED. Require complete measured coverage and actual capacity baseline.
+- Two real CNC sources still required separately for CF7; configured sources
+  timed out. User asked once, answer pending. Timed campaign independent.
 
 ## Active work / next action
-1. Root controls: coord/.acceptance/c2-release-preparation. PR488 fixes P01/P03
-   supported warm activation: use actual host TCP binding, pass current project.
-   Two production files;43 related tests PASS, focused red-to-green and actual
-   owned resolver red-to-green PASS. No container state changed. Review complete.
-2. PR488 mandatory release/ICSE/other automatic jobs queued/running. Hosted-only
-   Windows bootstrap never started (account billing),0steps; no candidate defect,
-   retry, account/pool change. Not a mandatory16-job release dependency.
-   Nitro qualified-Python staging and supported C2 admission PASS,21:49-22:01.
-   Exact3core C2 images verified; original system-Python refusal retained.
-3. Reuse native data/membership/checkpoints IN PLACE at old harness
-   .acceptance/native-faults/data. No supervisor/source Agent active. P06 basic ->
-   crash fence -> real branch trial/main restore, chaining latest Agent state.
-   Finish shared creator clock/outbox faults before reserving it for P07/P12.
-4. Existing owned creator source C:/wsl/fcp-v1-1aac6148-onboarding-runtime-20260913;
-   preserve its data/coordinator volume/credentials/readonly model mounts.
-   Creator runtime stilloldC/sourceC2. Next admission separates these baselines.
-5. NEW Nitro44GiB isolated pressure fixture ready;679GiB outer free. First3s
-   daemon readiness timeout retained; read-only adoption PASS, empty private
-   daemon. No product/filler. Old sparse archives/partial copies retained.
-6. SMB transport ready:13positive checks + real64MiB negative share. Old helper
-   retained stopped; new owned helper active. P11 separate C2 source/config ready
-   at C:/wsl/fcp-v1-p11-e91e5218-20260913, no activation/volumes/backup yet.
-   Recorder isolated portable Python3.12 manifest/imports verified; no physical
-   DPAPI/key assertion. P11 baseline awaits creator activation disposition.
-7. C2 eleven isolated assertions strict PASS: P09first5/12actualcrashwindows,
-   P04maximum+eight-source, P05slow/oversized/gap/eventstorm. Fixtures stopped.
-   Launcher map globally invalidates all prior physical evidence; use fresh
-   next-SHA runs, no relabeling. Agents prepare new controls/source observer hashes.
-   Root qualifies PR488 -> normal merge -> actual main gate -> freeze -> fresh
-   admission/early faults -> actual P07/P12. Existing
-   30-minute heartbeat targets this thread. Keep details outside this checkpoint.
+1. Root owns main qualification/freeze/admission/shared creator/native faults.
+   coord/.acceptance/c3-release-preparation: snapshot_actual_main.py,
+   actual-main-source.json, reviewed freeze_qualified.py/admit_owned.py.
+   c3-qualification-preparation: reviewed retention/finalizer; finalizer corrected
+   API-head/source bookkeeping only, original refusal/evidence retained.
+2. General C3 controls: c3-general-physical-preparation/generated-48154445-r2,
+   copied/hash-verified into Windows H/.acceptance/physical-controls (16files).
+   P06/timed/P09 controls: .acceptance/c3-physical-48154445-20260914.
+   Nitro exact freeze/qualification/control transfer helper being prepared.
+3. After freeze/readiness, admit creator/native/Windows/Nitro, initialize fresh
+   campaign; isolated P04/P05/P09 and dedicated P11 can run independently.
+4. Root P06 basic -> crash fence -> actual trial/main restore; chain latest
+   Agent observations through every run. Finish shared clock/outbox/creator faults
+   before timed reservation, then measure healthy allocation and start real timers.
+5. Nitro private pressure44GiB fixture+guardian empty, no product/filler. C3
+   bindings prepared; extra cgroup/observer completeness guards under review.
+   Windows images are sparse ARCHIVE_ONLY; retain originals/Nitro partials.
+6. P11 existing fixture empty; C3 rebind/entrypoints reviewed; SMB positive13checks
+   and negative64MiB share ready. Recorder isolated Python manifest/imports valid,
+   no protected data/key assertion/backup performed. Root activation still needed.
+7. Existing30minute heartbeat follows this thread. Do substantive work on a
+   meaningful state change/action; no historical recap or repeated green checks.
 
 ## Immutable safety constraints
 - Never weaken assertions, quorum/authority, deadlines, security or acceptance.
-- Only credible current-candidate contract violations block v1; preserve host noise.
-- No broad sweep, blanket retry, unnecessary runner/account/label changes.
-- AQG gate deliberately off, never a dependency. AQG7NCC host offline; no wait.
+- Only credible current-candidate checked-contract violations block v1.
+- No broad sweep/blanket retry or needless runner/account/label changes.
+- AQG off/nondependency. AGQ7NCC offline until tomorrow; no wait.
 - Protected Recorder data untouched. No reset, operational Docker prune, volume
-  deletion, Arrowhead restart or protected-data action. Supported lifecycle may
-  bound only its own regenerable builder cache. Final tag must equal accepted SHA.
+  deletion or Arrowhead restart. Retain old evidence/images/partial copies.
+- Windows64GiB floor unchanged; require growth margin. Timers actual durations,
+  one frozen accepted SHA; final tag only after required physical acceptance.

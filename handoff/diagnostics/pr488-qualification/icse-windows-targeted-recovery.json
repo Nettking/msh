@@ -1,0 +1,19 @@
+{
+  "run_id": 34785372265,
+  "failed_job_id": 103799764777,
+  "head": "1345244efb6f3c081e077471e587f8d2b63f258d",
+  "source": "1bd199b317eef613c3ba289ef39a20ae48f089e5",
+  "status": "RECOVERY_REQUEST_ACCEPTED",
+  "requested_at": "2026-09-13T22:15:28.417207+00:00",
+  "preserved_successful_job_ids": [
+    103799764819,
+    103799764823
+  ],
+  "original_failure_log_sha256": "8dfc5954d4ec6ac51e7437cdfccdc3078378d0da7b5fbea90d4c1a647cbdbb96",
+  "original_artifact_count": 5,
+  "product_changes": false,
+  "runner_pool_changes": false,
+  "deadline_or_assertion_changes": false,
+  "reason": "Initial Windows RuntimeError before any checks; original detail expired with runner temp. Identical demo/product Python passed on C2 and current Linux/Compose. One bounded recovery with passive private-error retention; no demonstrated current candidate defect.",
+  "response": {}
+}

@@ -1,0 +1,25 @@
+{
+  "source": "1bd199b317eef613c3ba289ef39a20ae48f089e5",
+  "run_id": 34785372265,
+  "job_id": 103799764777,
+  "classification": "UNRESOLVED_NON_DEMONSTRATED_CANDIDATE_DEFECT",
+  "failure": "RuntimeError before first process-identity check; no detailed message in native log/public summary.",
+  "all_owned_processes_stopped": true,
+  "original_private_temp_directory": "NO_LONGER_PRESENT_AT_SINGLE_BOUNDED_READ",
+  "unchanged_paths_since_c2": [
+    "demo/icse",
+    "catalog/federation",
+    "catalog/relay",
+    "catalog/node"
+  ],
+  "artifact": {
+    "run_id": 34785372265,
+    "id": 10325934411,
+    "name": "icse-network-summary-Windows",
+    "digest": "sha256:91fa3f07b78e1c86aaa441cf8fce1fa79b8e2670bd7eecfa9ab0a43ff928b49c",
+    "bytes": 1187,
+    "created_at": "2026-09-13T22:04:32Z",
+    "api_workflow_head": "1345244efb6f3c081e077471e587f8d2b63f258d"
+  },
+  "decision": "One targeted failed Windows job recovery with passive detail retention; keep Linux/Compose successful executions. No source/deadline/assertion/pool changes."
+}

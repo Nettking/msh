@@ -1,0 +1,19 @@
+{
+  "records": [
+    {
+      "artifact_id": 10325924047,
+      "digest": "sha256:a39cdf64db14acb2f4014db683b9a7752143ac99c5fc75a393dcd073e0718670",
+      "os": "Linux",
+      "skipped": 0,
+      "tests": 12
+    },
+    {
+      "artifact_id": 10326516940,
+      "digest": "sha256:d56d7e401ee3ae7f0de050f4dc0e2f9db9311dda34aa5eb71a97efb8703714bd",
+      "os": "Windows",
+      "skipped": 0,
+      "tests": 12
+    }
+  ],
+  "source": "1bd199b317eef613c3ba289ef39a20ae48f089e5"
+}

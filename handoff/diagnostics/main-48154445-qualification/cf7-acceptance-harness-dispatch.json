@@ -1,0 +1,11 @@
+{
+  "candidate": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "workflow": "cf7-acceptance-harness.yml",
+  "recorded_at": "2026-09-13T22:49:30.999926+00:00",
+  "status": "MISSING_CONTRACT_GATE_REQUEST_ACCEPTED",
+  "existing_run_ids": [],
+  "whole_ci_rerun": false,
+  "response": {
+    "http_status": 204
+  }
+}

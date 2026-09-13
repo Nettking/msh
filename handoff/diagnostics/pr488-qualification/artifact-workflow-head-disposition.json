@@ -1,0 +1,23 @@
+{
+  "pr": 488,
+  "source": "1bd199b317eef613c3ba289ef39a20ae48f089e5",
+  "api_head": "1345244efb6f3c081e077471e587f8d2b63f258d",
+  "classification": "DETERMINISTIC_OWNED_AUDIT_HELPER_METADATA_ERROR",
+  "observation": "The helper compared artifact workflow_run.head_sha to the synthetic checkout. Fresh API reads bind that metadata to the PR workflow head; retained native logs and shard/publication manifests independently bind the synthetic checkout.",
+  "evidence": {
+    "artifact_ids_freshly_verified": [10326935902, 10327066293],
+    "retained_artifacts_with_matching_api_head": 19,
+    "native_exact_checkout_proofs": 29,
+    "metadata_semantics_proof_sha256": "51dd475b36194e44af74b7cdbf8a0012d43a22fcb36b5faf685ababb5b8f5432",
+    "exact_predicate_red_to_green_proof_sha256": "ae49743ebd6e41650d4524b76a90b1f36946d1a8e257fccbde913fa7f4ed9327"
+  },
+  "repair": "Two API metadata comparisons now require the exact API run head. All native checkout, manifest, artifact digest and exact Git archive checks are unchanged.",
+  "proof": "Both retained cases change from helper refusal to acceptance; incorrect retained or fresh API heads still refuse, and PR-head substitution for actual native/manifest source still refuses.",
+  "refused_helper_sha256": "da836f6fc714edb6d819a8088546692ca537e2a18562e2a3c61d0882bb8b69b3",
+  "corrected_helper_sha256": "018c73e2b55b149bbbf008c9382ce9a97ddf985f552bf7a3cf80fbcc3a051d9a",
+  "candidate_source_changed": false,
+  "workflow_retry_or_dispatch_for_this_correction": false,
+  "acceptance_criteria_changed": false,
+  "original_refusal_preserved": true,
+  "physical_acceptance": "NOT_EVALUATED"
+}
