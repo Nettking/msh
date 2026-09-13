@@ -1,0 +1,22 @@
+{
+  "at": "2026-09-13T08:01:54.718265+00:00",
+  "pr": 483,
+  "head": "06b956787ae63215982d5afd7198dead366e05ea",
+  "base": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "base_ref": "codex/fix-d13-windows-refusal-response",
+  "merge_commit_sha": "f104038a2b77705adaa547cdd1df7d895bf80a41",
+  "parent_pr475_head": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "remote_refs": [
+    "5e6f184311019b9982e8544a18f3dc02c1b16e98\trefs/heads/codex/fix-d13-windows-refusal-response",
+    "06b956787ae63215982d5afd7198dead366e05ea\trefs/heads/codex/fix-d20-icse-failure-evidence"
+  ],
+  "files": [
+    ".github/workflows/icse-tool-demo.yml",
+    "catalog/federation/tests/test_icse_network_failure_reporting.py",
+    "demo/icse/network/run.py"
+  ],
+  "push": "Succeeded old701->06 with exact lease; immediate post-push API assertion failed, so repeat authoritative state read retained here",
+  "manual_dispatch": false,
+  "physical_runtime_changed": false,
+  "protected_recorder_data": "Not accessed/changed"
+}
