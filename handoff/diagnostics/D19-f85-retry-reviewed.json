@@ -1,0 +1,30 @@
+{
+  "recorded_at_utc": "2026-09-13T05:40:39.554354+00:00",
+  "source_commit": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "run_id": 34734864966,
+  "attempt": 2,
+  "result": "F85_BOTH_OS_NATIVE_QUALIFICATION_PASS",
+  "new_windows_native_proof": {
+    "job_id": 103671816139,
+    "run_id": 34734864966,
+    "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+    "runner_name": "Nettking",
+    "conclusion": "success",
+    "bytes": 107879,
+    "sha256": "4c1ea41c297f0f69737abc7c580912433da11f505a3184474832815adbc32816",
+    "checkout_commits": [
+      "5e6f184311019b9982e8544a18f3dc02c1b16e98"
+    ],
+    "checkout_matches": true
+  },
+  "linux_reused_original_job_id": 103664353237,
+  "linux_current_api_job_id": 103671816605,
+  "linux_original_times_and_steps_identical": true,
+  "required_native_passes_now": 26,
+  "required_total": 37,
+  "companions_passed": 3,
+  "companions_total": 3,
+  "D19_disposition": "F85 interruption recovered by one unchanged-source retry; release cancellations still pending. Infrastructure classification remains supported by GitHub annotation.",
+  "physical_acceptance": "No evidence or PASS",
+  "protected_recorder_data": "Untouched; not accessed"
+}
