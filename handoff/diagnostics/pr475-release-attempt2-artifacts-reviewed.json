@@ -1,0 +1,98 @@
+{
+  "recorded_at_utc": "2026-09-13T03:05:42.162974+00:00",
+  "run_id": 34707260030,
+  "attempt": 2,
+  "actual_native_checkout": "a5e743fee24e27bfd8d6d4f57c8efd589c6c3a42",
+  "pr_head": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "records": [
+    {
+      "id": 10309439754,
+      "name": "full-suite-order-rotating",
+      "digest": "sha256:dfff2e892cbc6fa72c7ab6c44a807fe6610abb54f8c2a4967d1c7e23b585a99d",
+      "bytes": 107457,
+      "created_at": "2026-09-13T02:39:11Z",
+      "junit": [
+        {
+          "file": "order-rotating.xml",
+          "suites": [
+            {
+              "name": "pytest",
+              "errors": "0",
+              "failures": "0",
+              "skipped": "40",
+              "tests": "4500",
+              "time": "528.340",
+              "timestamp": "2026-09-13T04:30:16.697265+02:00",
+              "hostname": "Nettking"
+            }
+          ],
+          "selected_tests": [
+            {
+              "class": "catalog.flask_app.tests.test_capability_benchmark_route",
+              "name": "test_skip_serializes_with_concurrent_benchmark_completion",
+              "seconds": "0.865",
+              "status": "passed"
+            },
+            {
+              "class": "catalog.federation.tests.cf7_acceptance.test_product_acceptance",
+              "name": "test_three_device_federation_keeps_ai_compute_and_storage_authority_separate",
+              "seconds": "0.679",
+              "status": "passed"
+            },
+            {
+              "class": "catalog.federation.tests.test_tailnet_join_responder",
+              "name": "test_unknown_paths_are_refused",
+              "seconds": "0.508",
+              "status": "passed"
+            },
+            {
+              "class": "catalog.federation.tests.test_control_plane_session_authority",
+              "name": "test_reachable_isolated_leader_cannot_report_current_session_authority",
+              "seconds": "6.181",
+              "status": "passed"
+            },
+            {
+              "class": "catalog.node.tests.test_live_storage_reinstatement",
+              "name": "test_live_reinstatement_restores_replica_and_acknowledgement_policy",
+              "seconds": "2.756",
+              "status": "passed"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 10309404751,
+      "name": "windows-regression-journal-artifacts",
+      "digest": "sha256:5c88fa957c1b2aac165433de5469a1ecdab028b08e56974afb4ade10dd6dc6bb",
+      "bytes": 6962,
+      "created_at": "2026-09-13T02:38:24Z",
+      "junit": [
+        {
+          "file": "windows-journal-artifacts.xml",
+          "suites": [
+            {
+              "name": "pytest",
+              "errors": "0",
+              "failures": "0",
+              "skipped": "1",
+              "tests": "298",
+              "time": "358.252",
+              "timestamp": "2026-09-13T04:32:22.317044+02:00",
+              "hostname": "Nettking"
+            }
+          ],
+          "selected_tests": [
+            {
+              "class": "catalog.federation.tests.test_control_plane_session_authority",
+              "name": "test_reachable_isolated_leader_cannot_report_current_session_authority",
+              "seconds": "11.930",
+              "status": "passed"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "interpretation": "Current required retry passed on Nettking; original failures and diagnostic non-reproductions retained, not erased or declared root-cause resolved. No physical evidence."
+}
