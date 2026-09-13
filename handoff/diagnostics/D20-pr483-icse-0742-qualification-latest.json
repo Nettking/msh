@@ -1,0 +1,448 @@
+{
+  "source_commit": "83d059fba6d22b7d8f526be1b7e563c9bc3c0a68",
+  "review_head": "70163ea908741baa1999a9c1084f0805d85dea64",
+  "workflows": [
+    {
+      "workflow": "icse-tool-demo.yml",
+      "run_id": 34744552418,
+      "jobs": [
+        {
+          "id": 103689932396,
+          "run_id": 34744552418,
+          "workflow_name": "ICSE tool demonstration",
+          "head_branch": "codex/fix-d20-icse-failure-evidence",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34744552418",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYJGbObA",
+          "head_sha": "70163ea908741baa1999a9c1084f0805d85dea64",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103689932396",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34744552418/job/103689932396",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-13T07:10:07Z",
+          "started_at": "2026-09-13T07:11:20Z",
+          "completed_at": "2026-09-13T07:12:34Z",
+          "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-13T07:11:22Z",
+              "completed_at": "2026-09-13T07:11:24Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-13T07:11:24Z",
+              "completed_at": "2026-09-13T07:11:24Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-13T07:11:24Z",
+              "completed_at": "2026-09-13T07:11:27Z"
+            },
+            {
+              "name": "Install runtime dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-13T07:11:27Z",
+              "completed_at": "2026-09-13T07:11:57Z"
+            },
+            {
+              "name": "Compile reviewer artifact",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-13T07:11:57Z",
+              "completed_at": "2026-09-13T07:11:57Z"
+            },
+            {
+              "name": "Lint reviewer artifact",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-13T07:11:57Z",
+              "completed_at": "2026-09-13T07:11:58Z"
+            },
+            {
+              "name": "Run E1-E4 directly",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-13T07:11:58Z",
+              "completed_at": "2026-09-13T07:12:06Z"
+            },
+            {
+              "name": "Run actions/upload-artifact@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-13T07:12:06Z",
+              "completed_at": "2026-09-13T07:12:08Z"
+            },
+            {
+              "name": "Run independent-node network demonstration",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-13T07:12:08Z",
+              "completed_at": "2026-09-13T07:12:30Z"
+            },
+            {
+              "name": "Preserve network evidence even after failure",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-09-13T07:12:30Z",
+              "completed_at": "2026-09-13T07:12:31Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 20,
+              "started_at": "2026-09-13T07:12:31Z",
+              "completed_at": "2026-09-13T07:12:31Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 21,
+              "started_at": "2026-09-13T07:12:31Z",
+              "completed_at": "2026-09-13T07:12:31Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103689932396",
+          "labels": [
+            "self-hosted",
+            "fcp-linux-fast"
+          ],
+          "runner_id": 27,
+          "runner_name": "Nettking-Linux",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103689932408,
+          "run_id": 34744552418,
+          "workflow_name": "ICSE tool demonstration",
+          "head_branch": "codex/fix-d20-icse-failure-evidence",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34744552418",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYJGbOeA",
+          "head_sha": "70163ea908741baa1999a9c1084f0805d85dea64",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103689932408",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34744552418/job/103689932408",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-13T07:10:07Z",
+          "started_at": "2026-09-13T07:13:25Z",
+          "completed_at": "2026-09-13T07:13:52Z",
+          "name": "reviewer-compose",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-13T07:13:26Z",
+              "completed_at": "2026-09-13T07:13:28Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-13T07:13:29Z",
+              "completed_at": "2026-09-13T07:13:30Z"
+            },
+            {
+              "name": "Run documented reviewer command",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-13T07:13:30Z",
+              "completed_at": "2026-09-13T07:13:47Z"
+            },
+            {
+              "name": "Validate retained Compose evidence",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-13T07:13:47Z",
+              "completed_at": "2026-09-13T07:13:47Z"
+            },
+            {
+              "name": "Run actions/upload-artifact@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-13T07:13:47Z",
+              "completed_at": "2026-09-13T07:13:48Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-09-13T07:13:48Z",
+              "completed_at": "2026-09-13T07:13:48Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-09-13T07:13:48Z",
+              "completed_at": "2026-09-13T07:13:48Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103689932408",
+          "labels": [
+            "self-hosted",
+            "fcp-linux-fast"
+          ],
+          "runner_id": 27,
+          "runner_name": "Nettking-Linux",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103689932429,
+          "run_id": 34744552418,
+          "workflow_name": "ICSE tool demonstration",
+          "head_branch": "codex/fix-d20-icse-failure-evidence",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34744552418",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYJGbOjQ",
+          "head_sha": "70163ea908741baa1999a9c1084f0805d85dea64",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103689932429",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34744552418/job/103689932429",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-13T07:10:07Z",
+          "started_at": "2026-09-13T07:27:31Z",
+          "completed_at": "2026-09-13T07:30:57Z",
+          "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-13T07:27:33Z",
+              "completed_at": "2026-09-13T07:27:36Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-13T07:27:36Z",
+              "completed_at": "2026-09-13T07:27:41Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-13T07:27:41Z",
+              "completed_at": "2026-09-13T07:27:50Z"
+            },
+            {
+              "name": "Install runtime dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-13T07:27:50Z",
+              "completed_at": "2026-09-13T07:29:48Z"
+            },
+            {
+              "name": "Compile reviewer artifact",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-13T07:29:48Z",
+              "completed_at": "2026-09-13T07:29:48Z"
+            },
+            {
+              "name": "Lint reviewer artifact",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-13T07:29:48Z",
+              "completed_at": "2026-09-13T07:29:49Z"
+            },
+            {
+              "name": "Run E1-E4 directly",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-13T07:29:49Z",
+              "completed_at": "2026-09-13T07:30:06Z"
+            },
+            {
+              "name": "Run actions/upload-artifact@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-09-13T07:30:06Z",
+              "completed_at": "2026-09-13T07:30:08Z"
+            },
+            {
+              "name": "Run independent-node network demonstration",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-09-13T07:30:08Z",
+              "completed_at": "2026-09-13T07:30:48Z"
+            },
+            {
+              "name": "Preserve network evidence even after failure",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-09-13T07:30:48Z",
+              "completed_at": "2026-09-13T07:30:50Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 20,
+              "started_at": "2026-09-13T07:30:50Z",
+              "completed_at": "2026-09-13T07:30:52Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 21,
+              "started_at": "2026-09-13T07:30:52Z",
+              "completed_at": "2026-09-13T07:30:52Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103689932429",
+          "labels": [
+            "self-hosted",
+            "fcp-windows"
+          ],
+          "runner_id": 22,
+          "runner_name": "Nettking",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        },
+        {
+          "id": 103692392176,
+          "run_id": 34744552418,
+          "workflow_name": "ICSE tool demonstration",
+          "head_branch": "codex/fix-d20-icse-failure-evidence",
+          "run_url": "https://api.github.com/repos/Nettking/msh/actions/runs/34744552418",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOPZM3cc8AAAAYJIxW8A",
+          "head_sha": "70163ea908741baa1999a9c1084f0805d85dea64",
+          "url": "https://api.github.com/repos/Nettking/msh/actions/jobs/103692392176",
+          "html_url": "https://github.com/Nettking/msh/actions/runs/34744552418/job/103692392176",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-09-13T07:30:57Z",
+          "started_at": "2026-09-13T07:30:59Z",
+          "completed_at": "2026-09-13T07:31:15Z",
+          "name": "publication-bundle",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-09-13T07:31:01Z",
+              "completed_at": "2026-09-13T07:31:03Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-09-13T07:31:03Z",
+              "completed_at": "2026-09-13T07:31:04Z"
+            },
+            {
+              "name": "Run ./.github/actions/self-hosted-python",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-09-13T07:31:04Z",
+              "completed_at": "2026-09-13T07:31:06Z"
+            },
+            {
+              "name": "Run actions/download-artifact@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-09-13T07:31:06Z",
+              "completed_at": "2026-09-13T07:31:08Z"
+            },
+            {
+              "name": "Run actions/download-artifact@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-09-13T07:31:08Z",
+              "completed_at": "2026-09-13T07:31:09Z"
+            },
+            {
+              "name": "Build publication bundle",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-09-13T07:31:09Z",
+              "completed_at": "2026-09-13T07:31:10Z"
+            },
+            {
+              "name": "Run actions/upload-artifact@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-09-13T07:31:10Z",
+              "completed_at": "2026-09-13T07:31:12Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14,
+              "started_at": "2026-09-13T07:31:12Z",
+              "completed_at": "2026-09-13T07:31:13Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-09-13T07:31:13Z",
+              "completed_at": "2026-09-13T07:31:13Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/Nettking/msh/check-runs/103692392176",
+          "labels": [
+            "self-hosted",
+            "fcp-linux-fast"
+          ],
+          "runner_id": 29,
+          "runner_name": "Beast-Linux-WSL",
+          "runner_group_id": 1,
+          "runner_group_name": "Default"
+        }
+      ]
+    }
+  ]
+}

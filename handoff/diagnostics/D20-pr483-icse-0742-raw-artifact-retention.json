@@ -1,0 +1,59 @@
+{
+  "recorded_at": "2026-09-13T07:43:37.881272+00:00",
+  "records": [
+    {
+      "run_id": 34744552418,
+      "id": 10314090028,
+      "name": "icse-summary-compose",
+      "digest": "sha256:efde6aee211ee5422a69c0d78d57bcad4dbe4900c2d0091239bfc7d4900ec839",
+      "bytes": 1038,
+      "created_at": "2026-09-13T07:13:48Z",
+      "api_workflow_head": "70163ea908741baa1999a9c1084f0805d85dea64"
+    },
+    {
+      "run_id": 34744552418,
+      "id": 10313740818,
+      "name": "icse-summary-Linux",
+      "digest": "sha256:6d7860eb72c99df1763e7362ded071feb75ec1d2a76aa2e9ed81ad474a43455d",
+      "bytes": 1038,
+      "created_at": "2026-09-13T07:12:08Z",
+      "api_workflow_head": "70163ea908741baa1999a9c1084f0805d85dea64"
+    },
+    {
+      "run_id": 34744552418,
+      "id": 10313682217,
+      "name": "icse-network-summary-Windows",
+      "digest": "sha256:1393a20484d74b8028be2b17d2f24a646fb35c5c38e45d4c4e48758e2690e85c",
+      "bytes": 8330,
+      "created_at": "2026-09-13T07:30:50Z",
+      "api_workflow_head": "70163ea908741baa1999a9c1084f0805d85dea64"
+    },
+    {
+      "run_id": 34744552418,
+      "id": 10313674334,
+      "name": "icse-summary-Windows",
+      "digest": "sha256:43f27f7075eb0c34a6daf16da1bdb6b46750722bd230fdb10c05d2140cd75b7f",
+      "bytes": 1046,
+      "created_at": "2026-09-13T07:30:08Z",
+      "api_workflow_head": "70163ea908741baa1999a9c1084f0805d85dea64"
+    },
+    {
+      "run_id": 34744552418,
+      "id": 10313569355,
+      "name": "icse-network-summary-Linux",
+      "digest": "sha256:183c17e6d73087bb3947d698ea77e72550c4b1f812300888c93ff45d3b277775",
+      "bytes": 8225,
+      "created_at": "2026-09-13T07:12:31Z",
+      "api_workflow_head": "70163ea908741baa1999a9c1084f0805d85dea64"
+    },
+    {
+      "run_id": 34744552418,
+      "id": 10312834623,
+      "name": "fcp-icse-tool-demo-bundle-83d059fba6d22b7d8f526be1b7e563c9bc3c0a68",
+      "digest": "sha256:d5c1330993f6534ab7f1807810a01f3085eaf00742ee2bc0ab1f0b6712cdb0b0",
+      "bytes": 4228101,
+      "created_at": "2026-09-13T07:31:12Z",
+      "api_workflow_head": "70163ea908741baa1999a9c1084f0805d85dea64"
+    }
+  ]
+}
