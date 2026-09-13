@@ -1,0 +1,178 @@
+{
+  "recorded_at": "2026-09-13T07:08:28.908190+00:00",
+  "source_sha": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "run_id": 34734869036,
+  "attempt": 2,
+  "release_pass": 16,
+  "new_completions": 9,
+  "preserved_successes": [
+    {
+      "name": "Release checks (Windows)",
+      "original_id": 103664365428,
+      "attempt2_api_id": 103680360708,
+      "original_times_and_steps_identical": true,
+      "current_steps_and_times_unchanged": true
+    },
+    {
+      "name": "Full-suite order (rotating)",
+      "original_id": 103664365418,
+      "attempt2_api_id": 103680360883,
+      "original_times_and_steps_identical": true,
+      "current_steps_and_times_unchanged": true
+    },
+    {
+      "name": "Linux regression shard (0)",
+      "original_id": 103664365388,
+      "attempt2_api_id": 103680361006,
+      "original_times_and_steps_identical": true,
+      "current_steps_and_times_unchanged": true
+    },
+    {
+      "name": "Windows regressions (capability-product)",
+      "original_id": 103664365420,
+      "attempt2_api_id": 103680371478,
+      "original_times_and_steps_identical": true,
+      "current_steps_and_times_unchanged": true
+    },
+    {
+      "name": "Windows regressions (journal-artifacts)",
+      "original_id": 103664365406,
+      "attempt2_api_id": 103680371832,
+      "original_times_and_steps_identical": true,
+      "current_steps_and_times_unchanged": true
+    },
+    {
+      "name": "Full-suite order (fixed)",
+      "original_id": 103664365369,
+      "attempt2_api_id": 103680375086,
+      "original_times_and_steps_identical": true,
+      "current_steps_and_times_unchanged": true
+    },
+    {
+      "name": "PostgreSQL storage release check",
+      "original_id": 103664365326,
+      "attempt2_api_id": 103680377651,
+      "original_times_and_steps_identical": true,
+      "current_steps_and_times_unchanged": true
+    }
+  ],
+  "new_native_checkout_proofs": 7,
+  "aggregates_without_checkout": {
+    "103680360486": "Native log RESULT success; depends on previously proved exact5e fixed/rotating suite executions",
+    "103681495207": "Native log three success assertions; depends on exact5e Linux/Windows release matrices and order aggregate"
+  },
+  "artifact_review": [
+    {
+      "artifact_id": 10312965504,
+      "file": "shard-3.json",
+      "source_sha": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+      "selected_count": 1125,
+      "executed_count": 1125,
+      "source_before_after_identical": true
+    },
+    {
+      "artifact_id": 10312965504,
+      "file": "junit-3.xml",
+      "suites": [
+        {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "0",
+          "skipped": "13",
+          "tests": "1125",
+          "time": "110.238",
+          "timestamp": "2026-09-13T07:49:51.739246+02:00",
+          "hostname": "Nettking"
+        }
+      ],
+      "d17_case": []
+    },
+    {
+      "artifact_id": 10312515683,
+      "file": "shard-2.json",
+      "source_sha": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+      "selected_count": 1125,
+      "executed_count": 1125,
+      "source_before_after_identical": true
+    },
+    {
+      "artifact_id": 10312515683,
+      "file": "junit-2.xml",
+      "suites": [
+        {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "0",
+          "skipped": "2",
+          "tests": "1125",
+          "time": "172.277",
+          "timestamp": "2026-09-13T07:42:06.603943+02:00",
+          "hostname": "Nettking"
+        }
+      ],
+      "d17_case": []
+    },
+    {
+      "artifact_id": 10312239625,
+      "file": "windows-transport-storage.xml",
+      "suites": [
+        {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "0",
+          "skipped": "1",
+          "tests": "371",
+          "time": "92.472",
+          "timestamp": "2026-09-13T07:43:58.013230+02:00",
+          "hostname": "Nettking"
+        }
+      ],
+      "d17_case": [
+        {
+          "classname": "catalog.node.tests.test_storage_agent",
+          "name": "test_storage_node_serves_primary_ingest_over_relay_and_restarts",
+          "time": "1.161"
+        }
+      ]
+    },
+    {
+      "artifact_id": 10311624828,
+      "file": "shard-1.json",
+      "source_sha": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+      "selected_count": 1125,
+      "executed_count": 1125,
+      "source_before_after_identical": true
+    },
+    {
+      "artifact_id": 10311624828,
+      "file": "junit-1.xml",
+      "suites": [
+        {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "0",
+          "skipped": "6",
+          "tests": "1125",
+          "time": "117.579",
+          "timestamp": "2026-09-13T07:47:09.274464+02:00",
+          "hostname": "Nettking"
+        }
+      ],
+      "d17_case": [
+        {
+          "classname": "catalog.node.tests.test_storage_agent",
+          "name": "test_storage_node_serves_primary_ingest_over_relay_and_restarts",
+          "time": "0.506"
+        }
+      ]
+    }
+  ],
+  "required_total_pass": 35,
+  "required_total": 37,
+  "companion_pass": 3,
+  "remaining_required": "ICSE Linux reviewer and dependent publication bundle; D18 unresolved",
+  "D17": "Nettking Windows same-source case PASS1.161s; original Beast cause remains unresolved",
+  "D19": "All six infrastructure-interrupted required scopes recovered on unchanged source; no product repair",
+  "protected_recorder_data": "Not accessed/changed",
+  "physical_pass": false
+}
