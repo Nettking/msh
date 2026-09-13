@@ -33,6 +33,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable
@@ -160,6 +161,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         if self.path != JOIN_PATH:
             self._json(404, {"accepted": False, "error": "unknown-path"})
+            self._discard_refused_post_body()
             return
         try:
             length = int(self.headers.get("Content-Length", "0") or "0")
@@ -196,6 +198,30 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             200,
             {"schema": RESPONSE_SCHEMA, "accepted": True, "pairing_code": code},
         )
+
+    def _discard_refused_post_body(self) -> None:
+        # Closing with an unread segmented POST can reset the Windows socket
+        # before the client receives our refusal. Send the response first, then
+        # discard only a bounded declared body, without invoking any authority.
+        try:
+            remaining = int(self.headers.get("Content-Length", "0") or "0")
+        except ValueError:
+            return
+        if not 0 < remaining <= MAX_REQUEST_BYTES:
+            return
+        deadline = time.monotonic() + GRANT_TIMEOUT_SECONDS
+        while remaining:
+            timeout = deadline - time.monotonic()
+            if timeout <= 0:
+                return
+            try:
+                self.connection.settimeout(timeout)
+                chunk = self.rfile.read1(remaining)
+            except (OSError, ValueError):
+                return
+            if not chunk:
+                return
+            remaining -= len(chunk)
 
 
 class _Server(socketserver.ThreadingTCPServer):
