@@ -1,14 +1,32 @@
 # Federation v1 qualification coordination
 
-**Current actionable checkpoint: 2026-09-13T03:09:47.232615+00:00. PR475 automatic source27/27 PASS; exact-head qualification plan ready.**
+**Current actionable checkpoint: 2026-09-13T03:12:26.594738+00:00. PR475 native exact-head37+3 qualification dispatched and startup verified.**
 
-Required retry34707260030 attempt2 release16/16 green; six new native logs and two digest-verified JUnit ZIPs retained. Actual checkouta5e743fee24e27bfd8d6d4f57c8efd589c6c3a42; Linux4460PASS40skips, Windows297PASS1skip. Ten prior release successes retained. Source tree1c671f446fa215c99a6a58a155806de394aa569a equals intended PR475head5e6f184311019b9982e8544a18f3dc02c1b16e98, but nativea5e proof is not native5e proof. See diagnostics/pr475-release-attempt2-artifacts-reviewed.json and native-evidence.zip. Issues476/477/478 and PR475 updated; original failure causes remain unresolved.
+All13 unchanged workflows were manually dispatched once at5e6f184311019b9982e8544a18f3dc02c1b16e98 between03:10:38 and03:11:41UTC. Each accepted dispatch was committed/pushed individually. Receipt diagnostics/pr475-exact-head-dispatch.json; plan [PR475_EXACT_HEAD_QUALIFICATION_RECONCILIATION.md](PR475_EXACT_HEAD_QUALIFICATION_RECONCILIATION.md). Four initial jobs running: CF7 harness on Beast Windows/Nettking Linux and Phase2 on Nettking Windows/Beast Linux, with setup/tests progressing. Other jobs queued normally; no failure at startup. Full API snapshot diagnostics/pr475-exact-head-startup.json. Native checkout logs await completion; do not claim exact-head PASS from API metadata alone.
 
-NEXT HIGHEST VALUE ACTION: dispatch the standing37+3 exact-head gaps once at unchanged PR4755e6, following [PR475_EXACT_HEAD_QUALIFICATION_RECONCILIATION.md](PR475_EXACT_HEAD_QUALIFICATION_RECONCILIATION.md). Concrete reason is native source/absent gate coverage, not heartbeat cadence or erased reds. Preserve all existing synthetic-source and replacement proofs. Check existing exact-head manual runs before each dispatch; never duplicate any existing run. Then retain startup once and wait until2026-09-13T04:01:37UTC for ordinary qualification polling unless an actual terminal event arrives sooner.
+NEXT HIGHEST VALUE ACTION: no ordinary qualification polling before2026-09-13T04:01:37UTC, unless a real terminal event/user completion message arrives sooner. At the intervening30-minute heartbeat, return minimal quiet no-action status from this checkpoint without job/runner/log queries. At due time inspect only these13 run IDs, retain newly completed native5e logs/artifacts and classify failures before any mutation. Never redispatch existing runs or rerun passing jobs. Existing script dispatch_pr475_exact_head_gaps.py guards duplicate dispatches; it is not the polling command.
 
-PR473 unchanged440123f6bc6dc358eef3d233236bc14f91af60e0; both PRs draft, mainb7194820d8f1940ae60b8c9639e09b7f61e65c55. No merge/main qualification/new candidate yet. Existing exact-source required-head scope37+3 is retained in prior product-fix qualification receipt pr467-final-qualification.json; no optional AQG/short-context diagnosis or new sweep. Last fully qualified17ab3a05(37+3) and PR468/473 native replacement proofs unchanged.
+| Workflow | Native exact-head run | Startup |
+|---|---:|---|
+|cf7-acceptance-harness.yml|34734837531|in_progress|
+|phase2-federation.yml|34734841137|in_progress|
+|cf7b-product-physical-acceptance.yml|34734843741|queued|
+|product-branding.yml|34734846378|queued|
+|federation-software-update.yml|34734849699|queued|
+|cf7c-physical-test-readiness.yml|34734853505|queued|
+|icse-tool-demo.yml|34734857086|queued|
+|cf8-role-retirement.yml|34734861054|queued|
+|phase-f85-operator-federation-surface.yml|34734864966|queued|
+|federation-v1-release.yml|34734869036|queued|
+|ci-test-sharding.yml|34734873183|queued|
+|cfi2-onboarding-composition.yml|34734876309|queued|
+|release-image-metadata.yml|34734879810|queued|
 
-D13 exact two-file repair review found no new actionable correctness issue; external reviews empty. D11/D14/D15/D16 original failures and later passes retained without claiming root-cause resolution. Branch-policy read API403 is unavailable evidence, not an empty policy; never bypass merge requirements. AQG intentionally off/not queried/not a dependency; original optional AQG diagnosis stays cancelled. No runner/service/account/pool/label changes. Physical runtime9b286f93 and protected Recorder data untouched; no physical PASS/P07/P12. Coordination-only workflows never enter candidate branches. Automation remains ACTIVE every30minutes with minimal unchanged runs.
+Previous automatic source qualification is preserved: all27 checks green, release34707260030 attempt2 16/16 green. Actual automatic native checkouta5e743fee24e27bfd8d6d4f57c8efd589c6c3a42 has identical tree1c671f446fa215c99a6a58a155806de394aa569a to PRhead5e; results remain attributed to a5e. Linux4460PASS40skips and Windows297PASS1skip. Ten original passing release jobs retained. Six new native logs/two digest-verified raw JUnit ZIPs in diagnostics/pr475-release-attempt2-native-evidence.zip. Exact-head dispatch reason is source/absent gate coverage in the standing product-fix37+3 scope, not timer cadence, red-check cleanup or repeated optional diagnosis.
+
+PR475/PR473 remain draft/unchanged5e6f1843 and440123f6bc6dc358eef3d233236bc14f91af60e0; mainb7194820d8f1940ae60b8c9639e09b7f61e65c55. No merge/intermediate main qualification/candidate freeze. Last fully qualified17ab3a05(37+3) and PR468/473 native replacement proofs untouched. Qualify final actual merged main once after intended fix/cleanup set completes.
+
+D13 exact two-file repair review found no new actionable correctness issue; external reviews empty. D11/D14/D15/D16 original failures and later native passes remain recorded without root-cause closure; issues476/477/478 and PR475 updated. Branch-policy read403 is unavailable evidence, not permission to bypass requirements. AQG deliberately off/not queried/not a dependency; its optional diagnosis stays cancelled. No new sweep or short-context repetitions. Existing runner accounts/labels/pools unchanged. Runtime9b286f93 and protected Recorder data untouched; no physical PASS/P07/P12. Coordination-only workflows/scripts never enter candidate branches. Existing automation ACTIVE every30minutes, minimal when unchanged.
 
 Current user direction, September 11 2026: execute on state changes, using this
 checkpoint and the completed diagnostic sweep report; do not repeat the sweep.
