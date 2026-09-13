@@ -1,0 +1,14 @@
+{
+  "recorded_at_utc": "2026-09-13T04:19:06.380047+00:00",
+  "finding": "D18",
+  "source_sha": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "run_id": 34734857086,
+  "job_id": 103664331488,
+  "host": "Beast-Linux-WSL",
+  "log_sha256": "4b84a546442086f6b898255a633c66d68188da358fdd3f68623b464442f797c6",
+  "command": "python -B -m demo.icse.network.run --source-sha 5e6f184311019b9982e8544a18f3dc02c1b16e98 --output /opt/actions-runner/_work/_temp/fcp-icse-network-34734857086-1-Linux",
+  "github_artifact": "Pending immediate publication",
+  "repair": "NONE",
+  "protected_recorder_data": "Untouched; no access",
+  "physical_runtime_changed": false
+}
