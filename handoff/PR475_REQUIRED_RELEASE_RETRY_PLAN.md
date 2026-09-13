@@ -62,3 +62,12 @@ retain45-60minutes between checks. No duplicate dispatch or passing-job rerun.
 
 Physical runtime9b286f93 unchanged. Protected Recorder data not accessed or
 changed. No deployments, Docker reset/prune, physical acceptance claims or P07/P12.
+
+## Dispatch and startup result
+
+Attempt2 accepted, both failing test jobs started on Nettking at02:29:35UTC.
+API attempts/jobs includes cloned successful results with new IDs; ten original
+successful jobs have identical original run and step timestamps and did not rerun.
+See diagnostics/pr475-required-release-retry-reviewed.json for exact mapping.
+No runner availability assumption was used to change service/labels/pools.
+Next ordinary check2026-09-13T02:56:37UTC, near known completion.

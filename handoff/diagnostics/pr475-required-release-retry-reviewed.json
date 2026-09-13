@@ -1,0 +1,222 @@
+{
+  "recorded_at_utc": "2026-09-13T02:31:14.514658+00:00",
+  "run_id": 34707260030,
+  "attempt": 2,
+  "source_head": "5e6f184311019b9982e8544a18f3dc02c1b16e98",
+  "expected_native_checkout": "a5e743fee24e27bfd8d6d4f57c8efd589c6c3a42",
+  "native_checkout_proof": "Pending completed native logs; do not infer from API head.",
+  "fresh_executions": [
+    {
+      "name": "Full-suite order (rotating)",
+      "job_id": 103659667010,
+      "runner": "Nettking-Linux",
+      "status": "in_progress",
+      "started_at": "2026-09-13T02:29:35Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run ./.github/actions/self-hosted-python",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install release dependencies",
+          "status": "in_progress",
+          "conclusion": null
+        },
+        {
+          "name": "Ubuntu storage precondition",
+          "status": "pending",
+          "conclusion": null
+        },
+        {
+          "name": "Entire suite in the selected shuffled order",
+          "status": "pending",
+          "conclusion": null
+        },
+        {
+          "name": "Repository stays clean after the suite",
+          "status": "pending",
+          "conclusion": null
+        },
+        {
+          "name": "Preserve full-suite order timings",
+          "status": "pending",
+          "conclusion": null
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "pending",
+          "conclusion": null
+        }
+      ]
+    },
+    {
+      "name": "Windows regressions (journal-artifacts)",
+      "job_id": 103659667021,
+      "runner": "Nettking",
+      "status": "in_progress",
+      "started_at": "2026-09-13T02:29:35Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run ./.github/actions/self-hosted-python",
+          "status": "in_progress",
+          "conclusion": null
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "status": "pending",
+          "conclusion": null
+        },
+        {
+          "name": "Install release dependencies",
+          "status": "pending",
+          "conclusion": null
+        },
+        {
+          "name": "Windows capability and product release regressions",
+          "status": "pending",
+          "conclusion": null
+        },
+        {
+          "name": "Windows transport, storage, and failover regressions",
+          "status": "pending",
+          "conclusion": null
+        },
+        {
+          "name": "Windows replicated journal and reviewer artifact regressions",
+          "status": "pending",
+          "conclusion": null
+        },
+        {
+          "name": "Preserve Windows regression timings",
+          "status": "pending",
+          "conclusion": null
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "pending",
+          "conclusion": null
+        }
+      ]
+    }
+  ],
+  "preserved_successes": [
+    {
+      "name": "Windows regressions (capability-product)",
+      "original_job_id": 103589445964,
+      "attempt2_api_job_id": 103659667254,
+      "started_at": "2026-09-12T17:13:50Z",
+      "completed_at": "2026-09-12T17:22:00Z",
+      "conclusion": "success",
+      "step_timestamps_identical": true
+    },
+    {
+      "name": "Linux regression shard (3)",
+      "original_job_id": 103589446087,
+      "attempt2_api_job_id": 103659667338,
+      "started_at": "2026-09-12T17:22:01Z",
+      "completed_at": "2026-09-12T17:24:36Z",
+      "conclusion": "success",
+      "step_timestamps_identical": true
+    },
+    {
+      "name": "Release checks (Windows)",
+      "original_job_id": 103589446051,
+      "attempt2_api_job_id": 103659667361,
+      "started_at": "2026-09-12T17:19:00Z",
+      "completed_at": "2026-09-12T17:22:23Z",
+      "conclusion": "success",
+      "step_timestamps_identical": true
+    },
+    {
+      "name": "Linux regression shard (2)",
+      "original_job_id": 103589446022,
+      "attempt2_api_job_id": 103659667404,
+      "started_at": "2026-09-12T17:17:19Z",
+      "completed_at": "2026-09-12T17:21:10Z",
+      "conclusion": "success",
+      "step_timestamps_identical": true
+    },
+    {
+      "name": "PostgreSQL storage release check",
+      "original_job_id": 103589446037,
+      "attempt2_api_job_id": 103659667448,
+      "started_at": "2026-09-12T17:21:12Z",
+      "completed_at": "2026-09-12T17:22:00Z",
+      "conclusion": "success",
+      "step_timestamps_identical": true
+    },
+    {
+      "name": "Full-suite order (fixed)",
+      "original_job_id": 103589445906,
+      "attempt2_api_job_id": 103659667460,
+      "started_at": "2026-09-12T17:07:09Z",
+      "completed_at": "2026-09-12T17:17:17Z",
+      "conclusion": "success",
+      "step_timestamps_identical": true
+    },
+    {
+      "name": "Linux regression shard (1)",
+      "original_job_id": 103589446098,
+      "attempt2_api_job_id": 103659667466,
+      "started_at": "2026-09-12T17:24:38Z",
+      "completed_at": "2026-09-12T17:27:18Z",
+      "conclusion": "success",
+      "step_timestamps_identical": true
+    },
+    {
+      "name": "Release checks (Linux)",
+      "original_job_id": 103589446091,
+      "attempt2_api_job_id": 103659667497,
+      "started_at": "2026-09-12T17:27:20Z",
+      "completed_at": "2026-09-12T17:28:36Z",
+      "conclusion": "success",
+      "step_timestamps_identical": true
+    },
+    {
+      "name": "Linux regression shard (0)",
+      "original_job_id": 103589446081,
+      "attempt2_api_job_id": 103659667628,
+      "started_at": "2026-09-12T17:28:21Z",
+      "completed_at": "2026-09-12T17:35:33Z",
+      "conclusion": "success",
+      "step_timestamps_identical": true
+    },
+    {
+      "name": "Windows regressions (transport-storage)",
+      "original_job_id": 103589445965,
+      "attempt2_api_job_id": 103659677357,
+      "started_at": "2026-09-12T17:14:38Z",
+      "completed_at": "2026-09-12T17:18:59Z",
+      "conclusion": "success",
+      "step_timestamps_identical": true
+    }
+  ],
+  "aggregate_jobs": "Four failed dependent aggregates not yet created in startup snapshot; check after dependencies resolve.",
+  "api_note": "Attempt2 API assigns new IDs even to reused successful jobs. Original times/results and every step timestamp are identical, so these ten are retained results, not repeat executions. Initial local receipt assertion incorrectly assumed the attempts/jobs endpoint returned fresh executions only; corrected by timestamp/step reconciliation. No CI test assertion failed or was changed.",
+  "capacity_note": "Earlier runner API snapshot reported offline; both jobs were assigned and started immediately on Nettking. Actual job assignment is current evidence. No runner service/account/label mutation or AQG query.",
+  "next_ordinary_check_utc": "2026-09-13T02:56:37Z",
+  "polling_reason": "Next existing30-minute heartbeat near full-suite historical21-minute duration and checked-in30-minute timeout; no short interval poll.",
+  "protected_recorder_data": "Not accessed or changed",
+  "physical_acceptance": "No PASS; P07/P12 not started."
+}
