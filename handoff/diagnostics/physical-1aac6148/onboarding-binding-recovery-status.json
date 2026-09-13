@@ -1,0 +1,70 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "harness_sha": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "status": "COMPLETED",
+  "classification": "deterministic operator-authored acceptance binding defect",
+  "change": "Bind the existing Compose project to its actual configuration working directory. Source build context, project, config, data, results, and candidate pins unchanged.",
+  "original_failure_retained": true,
+  "launcher_repeated": false,
+  "product_changed": false,
+  "daemon_restarted_by_this_task": false,
+  "physical_pass": false,
+  "protected_data_accessed": false,
+  "AQG_requested": false,
+  "started_at": "2026-09-13T17:50:46.541969+00:00",
+  "host_availability": [
+    {
+      "installation": "original-owned",
+      "http_status": 200
+    },
+    {
+      "installation": "isolated-onboarding",
+      "http_status": 200
+    }
+  ],
+  "verify_exit_code": 0,
+  "verdict": "pass",
+  "P03_assertions": "8/8 PASS",
+  "progress": {
+    "scenario": "P03",
+    "title": "All supported start/update entry points and concurrency",
+    "passed": true,
+    "missing_assertions": [],
+    "failing_assertions": [],
+    "elapsed_seconds": 0.0,
+    "required_elapsed_seconds": 0,
+    "sample_count": 0,
+    "required_samples": 0,
+    "timed_sessions": []
+  },
+  "core_images": [
+    {
+      "id": "ae87863a0f9e47d729efa686a0fa9ff27813e397c5e2b8b14137e437368190d4",
+      "service": "flask",
+      "project": "fcp-v1-1aac6148-onboarding-nettking",
+      "commit": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+      "running": true,
+      "restart_count": 0,
+      "image": "sha256:22eda560bd95bf2f4084f3c940283ab2a211eed98547890a426ba6a86141c16f"
+    },
+    {
+      "id": "d3a29b0f84bdd9577afb672ee477ca0d5500d96e39fb2024b936f0c191781736",
+      "service": "recorder",
+      "project": "fcp-v1-1aac6148-onboarding-nettking",
+      "commit": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+      "running": true,
+      "restart_count": 0,
+      "image": "sha256:1138c0fcb97366abf2d0205d2c70e21a8705bfa879b5454931f60690741bcb25"
+    },
+    {
+      "id": "7ed4837cefff2ad7af9e6a40576a4d7dbbb0c3f09e2fef3f969aee7fe6dc2196",
+      "service": "relay",
+      "project": "fcp-v1-1aac6148-onboarding-nettking",
+      "commit": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+      "running": true,
+      "restart_count": 0,
+      "image": "sha256:52b97ab4d6b5e659df93dcad584f9d95e796ddf71edb49dadd213384e73ee9a8"
+    }
+  ],
+  "finished_at": "2026-09-13T17:50:50.823510+00:00"
+}

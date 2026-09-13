@@ -45,7 +45,7 @@ for service in ['flask','relay','recorder']:
 credentials={'email':'federation-v1-acceptance@example.com','password':secrets.token_urlsafe(40),'purpose':'Local isolated acceptance owner only; no email or other external message is sent.'}
 (c/'owner.private.json').write_text(json.dumps(credentials,indent=2)+'\n')
 (c/'environment.private.json').write_text(json.dumps(settings,indent=2)+'\n')
-binding={'schema':'fcp.v1.physical-runtime-binding.v1','host_id':'nettking','target_candidate_sha':sha,'acceptance_harness_sha':sha,'harness_checkout':str(h),'runtime_kind':'compose','runtime':{'project':project,'working_directory':str(r),'config_files':[str(compose)],'data_root':str(c/'data'),'results_root':str(c/'results')}}
+binding={'schema':'fcp.v1.physical-runtime-binding.v1','host_id':'nettking','target_candidate_sha':sha,'acceptance_harness_sha':sha,'harness_checkout':str(h),'runtime_kind':'compose','runtime':{'project':project,'working_directory':str(c),'config_files':[str(compose)],'data_root':str(c/'data'),'results_root':str(c/'results')}}
 (c/'runtime-binding.json').write_text(json.dumps(binding,indent=2)+'\n')
 out={'candidate':sha,'harness_sha':sha,'status':'PREPARED','runtime_checkout':str(r),'new_empty_data_and_results':True,'separate_compose_project':project,'existing_models_read_only':True,'existing_installations_changed':False,'existing_authority_or_data_copied':False,'reset_requested':False,'protected_data_accessed':False,'AQG_requested':False,'web_port':55040,'relay_port':58796,'join_port':55041,'runtime_activated':False,'physical_pass':False}
 (c/'preparation.json').write_text(json.dumps(out,indent=2)+'\n');print(json.dumps(out))

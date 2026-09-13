@@ -1,11 +1,11 @@
 # Federation v1 current release checkpoint
 
-Updated 2026-09-13T17:47Z. Active context: clean handoff + this file + live GitHub.
+Updated 2026-09-13T17:51Z. Active context: clean handoff + this file + live GitHub.
 Historical coordination is evidence only; consult it for a concrete current need.
 
 ## Current source / heads
 - Frozen C=1aac6148759d7b2fd488ec26b97e1a786bdafa80; live main verified unchanged
-  at17:44Z. Tree=8fd60c5e2886dfedb0248959fda6cbfc60413d2f. PR485 then PR486 merged.
+  this continuation. Tree=8fd60c5e2886dfedb0248959fda6cbfc60413d2f. PR485 then PR486 merged.
 - Freeze: diagnostics/AUTHORITATIVE_CANDIDATE-1aac6148.json. No tag/public release
   or complete physical PASS. Old e6a9b74a freeze is superseded; do not qualify it again.
 - Windows harness C:/wsl/fcp-v1-1aac6148-main-20260913; Nitro harness
@@ -32,23 +32,24 @@ Historical coordination is evidence only; consult it for a concrete current need
   No restart amplification or sustained candidate growth defect demonstrated.
 - Combined native host/observation packets preserve bytes and paths. P01 proof:
   diagnostics/physical-1aac6148/P01-combined-result.json and portable evidence ZIP.
-- P03:7/8 PASS: both native concurrency probes, retired update.cmd, launcher-vs-update,
-  Windows start.cmd, Linux start.sh, and model failure isolation. No repeat needed.
+- P03:8/8 PASS, including the supported Windows tailnet launcher. Checked-in combined
+  scenario_status passes with no missing/failing assertions; do not repeat any launcher.
+  Proof: diagnostics/physical-1aac6148/P03-complete-result.json and evidence ZIP.
+- P03 original FAIL was deterministic operator binding metadata: source directory named
+  instead of Compose's actual configuration directory. One corrected-binding VERIFY
+  passed on the existing action, unchanged candidate/harness/config/project/data/images.
+  Original FAIL retained; no product repair, rebuild, relaunch or assertion change.
+- Windows Docker responded again; both owned workbenches HTTP200 at17:50Z. Same
+  onboarding core IDs/images at C and zero restarts. No daemon restart by this task.
+  Prior HTTP500/timeouts retained as host/transient observation, cause unproven.
 - P05:ollama-absence and malformed-timestamp-path PASS. The model outage was restored
   healthy and preserved core IDs/images/restarts; hostile paths stayed inside data root.
 - Original ICSE trace and bounded PR486 recovery dispositioned; no demonstrated
   shared/deterministic candidate mechanism. Do not reopen the broad diagnostic sweep.
 
 ## Actual blockers / disposition
-- P02, last P03 assertion, remaining P04-P12, fresh CF7 and B01-B09 incomplete.
-- Windows Docker Desktop now returns HTTP500 on container list/inspect. Both owned
-  workbench HTTP reads timed out after earlier successful launcher checks. Host/runtime
-  unavailable; cause unresolved, no demonstrated candidate defect. No daemon restart.
-- P03 start-tailscale.cmd ran once successfully on the separate initialized workbench:
-  product connected, launcher0, three images at C, actual tailnet HTTP200 from Windows
-  and Nitro. Checked-in VERIFY FAILED: all rows excluded as unbound before label check.
-  Need actual Compose working-directory label versus operator binding comparison;
-  Docker unavailability prevented that read. Keep FAIL; do not claim P03 PASS.
+- P02, remaining P04-P12, fresh CF7 and B01-B09 incomplete. No demonstrated current
+  candidate defect remains from P03; original launch had cross-host tailnet HTTP200.
 - Initial new-workbench launch safely refused ambiguous coordinator volumes before
   activation. Explicit project-scoped volume selection repaired the fixture omission;
   one supported recovery completed. Original refusal retained. No product change.
@@ -63,13 +64,12 @@ Historical coordination is evidence only; consult it for a concrete current need
   original fault/samples and detailed limitations remain in diagnostic artifacts.
 
 ## Active work / next action
-1. No acceptance/build/fault executor active. Current bounded onboarding is terminal
-   STOPPED at VERIFY; do not repeat initialization, start.cmd or start-tailscale.cmd.
-   Preserve original receipts. Current detail: diagnostics/physical-1aac6148/
-   onboarding-disposition.json and P03-P05-onboarding-evidence.zip.
-2. On meaningful Docker recovery, inspect exact project/working-directory labels and
-   compare binding. Correct only a proven operator metadata error, then VERIFY the
-   existing prepared action once. No launcher/build repeat to obtain evidence.
+1. No acceptance/build/fault executor active. Onboarding binding recovery COMPLETED;
+   original STOPPED receipt remains immutable evidence, not an active retry instruction.
+   Current detail: diagnostics/physical-1aac6148/onboarding-binding-recovery-status.json.
+2. Prepare controlled MTConnect input on owned test resources for the remaining
+   P04/P05/P06 faults, using actual product execution and checked-in prerequisites.
+   Controlled fault inputs cannot replace the approved real agents/history for P07/P12.
 3. New Windows runtime: C:/wsl/fcp-v1-1aac6148-onboarding-runtime-20260913.
    Its controls/data/results: Windows harness/.acceptance/onboarding-test. Explicit
    new coordinator volume, cached model storage read-only, private local test owner.

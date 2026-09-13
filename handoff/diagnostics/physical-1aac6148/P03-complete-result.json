@@ -1,0 +1,21 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "P03_assertions": "8/8 PASS",
+  "progress": {
+    "scenario": "P03",
+    "title": "All supported start/update entry points and concurrency",
+    "passed": true,
+    "missing_assertions": [],
+    "failing_assertions": [],
+    "elapsed_seconds": 0.0,
+    "required_elapsed_seconds": 0,
+    "sample_count": 0,
+    "required_samples": 0,
+    "timed_sessions": []
+  },
+  "archive_sha256": "7040e1aedcfa262333559ebb0afef8c09ccb0d405f9d5c339879a29ce29c2994",
+  "original_failure_retained": true,
+  "product_changed": false,
+  "physical_pass": false,
+  "protected_data_accessed": false
+}
