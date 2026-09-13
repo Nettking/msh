@@ -1,0 +1,68 @@
+{
+  "candidate": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+  "harness_sha": "501b528e9476878e6a6fe5cde8240b2d54b1d263",
+  "three_activations": "PASS",
+  "hourly_growth": "FAIL",
+  "classification": "infrastructure/host issue: shared-volume measurement confounded by concurrent CI writes",
+  "candidate_defect_demonstrated": false,
+  "used_bytes_delta": 790487040,
+  "growth_bytes_per_hour": 11694370325,
+  "unchanged_ceiling_bytes_per_hour": 1073741824,
+  "images_stable": true,
+  "docker_totals_stable": true,
+  "restart_amplification": [],
+  "surviving_ci_files_created_during_window_bytes": 451089550,
+  "allocation_attribution_complete": false,
+  "release_decision": "Preserve the failed assertion. No new product or harness repair is justified. Finish automatically scheduled CI, then collect one quiescent growth window at the unchanged ceiling; do not repeat the three activations.",
+  "physical_pass": false,
+  "packets": [
+    {
+      "name": "20260913T130658459586Z-sample-0f714de7.json",
+      "sha256": "1a610ffef5a0767bfd21af3366d635b8c3dad9b7703fc21a2f9e1cf670c07b2e",
+      "kind": "sample",
+      "recorded_at": "2026-09-13T13:06:48.502583Z"
+    },
+    {
+      "name": "20260913T130703493219Z-prepare-f3c1a211.json",
+      "sha256": "2d98db786b063e09b6175beaaf8e921be399cf918f5bb66146522b5c4b5f04e2",
+      "kind": "prepare",
+      "recorded_at": "2026-09-13T13:07:03.449582Z"
+    },
+    {
+      "name": "20260913T130817191687Z-sample-a67fd109.json",
+      "sha256": "bc91a81d8e4dc5716ece7b23d5e8f6444ae8f938af339797a11b005b4bb68b39",
+      "kind": "sample",
+      "recorded_at": "2026-09-13T13:08:12.984238Z"
+    },
+    {
+      "name": "20260913T130937791481Z-sample-37dbf110.json",
+      "sha256": "1036b9304d9bcec5fa039b760e7195119f58abede49be67a528727516a4fcae2",
+      "kind": "sample",
+      "recorded_at": "2026-09-13T13:09:28.149985Z"
+    },
+    {
+      "name": "20260913T131056956911Z-sample-3f7d4f2b.json",
+      "sha256": "8e22f94218e038adf60e483108c5888bd24cc9ba96f0a39785e42a2bd3117598",
+      "kind": "sample",
+      "recorded_at": "2026-09-13T13:10:51.846454Z"
+    },
+    {
+      "name": "20260913T131057696033Z-operator-action-4ceea7ff.json",
+      "sha256": "532edd2431ff773ce68f98cfbc51c077ff23088d993f5c409b7ab9c27ee039bb",
+      "kind": "operator-action",
+      "recorded_at": "2026-09-13T13:10:57.695488Z"
+    },
+    {
+      "name": "20260913T131100132753Z-assertion-1fce1c5e.json",
+      "sha256": "d5ae2ee307424ad4673634e1e3a487650c20a2a7348d70195df690971466e8bc",
+      "kind": "assertion",
+      "recorded_at": "2026-09-13T13:11:00.117141Z"
+    },
+    {
+      "name": "20260913T131101288839Z-assertion-48c6d922.json",
+      "sha256": "1edb457f08495d8a7c8d146e7de3492ebc0f857f47ff7f5e8f206dd7e4897f6e",
+      "kind": "assertion",
+      "recorded_at": "2026-09-13T13:11:01.272131Z"
+    }
+  ]
+}

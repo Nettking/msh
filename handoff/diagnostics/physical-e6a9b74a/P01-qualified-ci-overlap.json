@@ -1,0 +1,52 @@
+{
+  "candidate": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+  "harness_sha": "501b528e9476878e6a6fe5cde8240b2d54b1d263",
+  "sample_start": "2026-09-13T13:06:48.502583Z",
+  "sample_end": "2026-09-13T13:10:51.846454Z",
+  "ci_temp_root_on_sampled_device": true,
+  "inventory_metadata_only": true,
+  "files_inspected": 17411,
+  "bounded_inventory_truncated": false,
+  "created_files_still_present": 11601,
+  "created_logical_bytes_still_present": 451089550,
+  "groups": {
+    "d3499feeef597f14": {
+      "files_created": 1,
+      "logical_bytes": 1396,
+      "earliest": 1789304932.383704,
+      "latest": 1789304932.383704,
+      "ci_python_environment": false
+    },
+    "dba29c9907a994ee": {
+      "files_created": 1,
+      "logical_bytes": 251,
+      "earliest": 1789304945.4624941,
+      "latest": 1789304945.4624941,
+      "ci_python_environment": false
+    },
+    "53f27172068b4ca9": {
+      "files_created": 11570,
+      "logical_bytes": 451077691,
+      "earliest": 1789304932.977323,
+      "latest": 1789305051.8454473,
+      "ci_python_environment": true
+    },
+    "7f319cf629f550fc": {
+      "files_created": 1,
+      "logical_bytes": 9285,
+      "earliest": 1789304925.2088253,
+      "latest": 1789304925.2088253,
+      "ci_python_environment": false
+    },
+    "c590f77eefe542b0": {
+      "files_created": 28,
+      "logical_bytes": 927,
+      "earliest": 1789304925.2175415,
+      "latest": 1789304945.444658,
+      "ci_python_environment": false
+    }
+  },
+  "attribution_limit": "Creation times and surviving logical bytes demonstrate concurrent non-product writes; they do not reconstruct exact allocated-byte deltas or deleted files.",
+  "protected_data_accessed": false,
+  "physical_pass": false
+}

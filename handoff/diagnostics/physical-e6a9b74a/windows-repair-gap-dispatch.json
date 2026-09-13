@@ -1,0 +1,59 @@
+{
+  "source": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+  "review_head": "fe21bdc59bc1414fd7c4cdcf1aa4f6d6aa9048fe",
+  "ref": "codex/federation-v1-qualify-94567b0d",
+  "pr": 486,
+  "started_at": "2026-09-13T13:46:12.607178+00:00",
+  "actions": [
+    {
+      "workflow": "cf7-acceptance-harness.yml",
+      "existing_runs": [],
+      "status": "accepted",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "cf7c-physical-test-readiness.yml",
+      "existing_runs": [],
+      "status": "accepted",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "cf8-role-retirement.yml",
+      "existing_runs": [],
+      "status": "accepted",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "ci-test-sharding.yml",
+      "existing_runs": [],
+      "status": "accepted",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "cfi2-onboarding-composition.yml",
+      "existing_runs": [],
+      "status": "accepted",
+      "response": {
+        "http_status": 204
+      }
+    },
+    {
+      "workflow": "release-image-metadata.yml",
+      "existing_runs": [],
+      "status": "accepted",
+      "response": {
+        "http_status": 204
+      }
+    }
+  ],
+  "no_existing_job_rerun": true,
+  "branch_action": "exact source pinned"
+}

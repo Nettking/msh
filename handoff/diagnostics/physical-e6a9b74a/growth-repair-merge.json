@@ -1,0 +1,8 @@
+{
+  "pr": 485,
+  "expected_head_sha": "501b528e9476878e6a6fe5cde8240b2d54b1d263",
+  "product_candidate_sha": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+  "sha": "1492d925d791b9a0ebc7bcee39ce9b3b7477254b",
+  "merged": true,
+  "message": "Pull Request successfully merged"
+}

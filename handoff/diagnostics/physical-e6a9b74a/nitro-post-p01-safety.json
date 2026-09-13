@@ -1,0 +1,32 @@
+{
+  "candidate": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+  "campaign_status": "STOPPED",
+  "owned_builders": [
+    {
+      "running": false,
+      "oom_killed": false,
+      "exit_code": 1
+    }
+  ],
+  "services": [
+    {
+      "service": "flask",
+      "running": true,
+      "candidate": "e6a9b74a1d555609eed6bf40c800e1258f1c9077"
+    },
+    {
+      "service": "relay",
+      "running": true,
+      "candidate": "e6a9b74a1d555609eed6bf40c800e1258f1c9077"
+    },
+    {
+      "service": "recorder",
+      "running": true,
+      "candidate": "e6a9b74a1d555609eed6bf40c800e1258f1c9077"
+    }
+  ],
+  "physical_pass": false,
+  "product_mutated_by_inspection": false,
+  "current_http_error_type": "TimeoutError",
+  "readiness_disposition": "One later activation timed out waiting for readiness after its build succeeded. No additional candidate defect demonstrated; retain this host observation and use fresh acceptance for the replacement candidate."
+}

@@ -1,0 +1,9 @@
+{
+  "host": "nitro",
+  "pid": 2988986,
+  "candidate": "e6a9b74a1d555609eed6bf40c800e1258f1c9077",
+  "harness_sha": "501b528e9476878e6a6fe5cde8240b2d54b1d263",
+  "status": "DISPATCHED_ONCE",
+  "windows_activations_completed_before_start": true,
+  "physical_pass": false
+}

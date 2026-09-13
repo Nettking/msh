@@ -1,0 +1,469 @@
+{
+  "source": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+  "review_head": "fe21bdc59bc1414fd7c4cdcf1aa4f6d6aa9048fe",
+  "pr": 486,
+  "main": "1492d925d791b9a0ebc7bcee39ce9b3b7477254b",
+  "reviewed_at": "2026-09-13T13:55:55.042218+00:00",
+  "missing_workflows": [],
+  "workflows": [
+    {
+      "workflow": "product-branding.yml",
+      "run_id": 34760641390,
+      "api_head_sha": "fe21bdc59bc1414fd7c4cdcf1aa4f6d6aa9048fe",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "required_jobs": 1,
+      "jobs": [
+        {
+          "id": 103732755375,
+          "name": "product-branding",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-13T13:43:41Z",
+          "completed_at": "2026-09-13T13:43:52Z",
+          "runner_name": "Beast-Linux-WSL"
+        }
+      ]
+    },
+    {
+      "workflow": "federation-v1-release.yml",
+      "run_id": 34760641401,
+      "api_head_sha": "fe21bdc59bc1414fd7c4cdcf1aa4f6d6aa9048fe",
+      "event": "pull_request",
+      "status": "queued",
+      "conclusion": null,
+      "required_jobs": 16,
+      "jobs": [
+        {
+          "id": 103732755543,
+          "name": "Full-suite order (rotating)",
+          "status": "queued",
+          "conclusion": null,
+          "started_at": "2026-09-13T13:43:39Z",
+          "completed_at": null,
+          "runner_name": ""
+        },
+        {
+          "id": 103732755611,
+          "name": "Release checks (Windows)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-13T13:43:41Z",
+          "completed_at": "2026-09-13T13:47:57Z",
+          "runner_name": "Beast"
+        },
+        {
+          "id": 103732755623,
+          "name": "Linux regression shard (1)",
+          "status": "in_progress",
+          "conclusion": null,
+          "started_at": "2026-09-13T13:54:38Z",
+          "completed_at": null,
+          "runner_name": "Nettking-Linux"
+        },
+        {
+          "id": 103732755624,
+          "name": "Full-suite order (fixed)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-13T13:44:22Z",
+          "completed_at": "2026-09-13T13:54:36Z",
+          "runner_name": "Nettking-Linux"
+        },
+        {
+          "id": 103732755645,
+          "name": "PostgreSQL storage release check",
+          "status": "queued",
+          "conclusion": null,
+          "started_at": "2026-09-13T13:43:40Z",
+          "completed_at": null,
+          "runner_name": ""
+        },
+        {
+          "id": 103732755647,
+          "name": "Windows regressions (transport-storage)",
+          "status": "queued",
+          "conclusion": null,
+          "started_at": "2026-09-13T13:43:40Z",
+          "completed_at": null,
+          "runner_name": ""
+        },
+        {
+          "id": 103732755659,
+          "name": "Release checks (Linux)",
+          "status": "queued",
+          "conclusion": null,
+          "started_at": "2026-09-13T13:43:40Z",
+          "completed_at": null,
+          "runner_name": ""
+        },
+        {
+          "id": 103732755660,
+          "name": "Linux regression shard (3)",
+          "status": "queued",
+          "conclusion": null,
+          "started_at": "2026-09-13T13:43:40Z",
+          "completed_at": null,
+          "runner_name": ""
+        },
+        {
+          "id": 103732755664,
+          "name": "Windows regressions (capability-product)",
+          "status": "queued",
+          "conclusion": null,
+          "started_at": "2026-09-13T13:43:40Z",
+          "completed_at": null,
+          "runner_name": ""
+        },
+        {
+          "id": 103732755666,
+          "name": "Linux regression shard (0)",
+          "status": "queued",
+          "conclusion": null,
+          "started_at": "2026-09-13T13:43:40Z",
+          "completed_at": null,
+          "runner_name": ""
+        },
+        {
+          "id": 103732755681,
+          "name": "Linux regression shard (2)",
+          "status": "queued",
+          "conclusion": null,
+          "started_at": "2026-09-13T13:43:40Z",
+          "completed_at": null,
+          "runner_name": ""
+        },
+        {
+          "id": 103732755705,
+          "name": "Windows regressions (journal-artifacts)",
+          "status": "queued",
+          "conclusion": null,
+          "started_at": "2026-09-13T13:43:40Z",
+          "completed_at": null,
+          "runner_name": ""
+        }
+      ]
+    },
+    {
+      "workflow": "federation-software-update.yml",
+      "run_id": 34760641413,
+      "api_head_sha": "fe21bdc59bc1414fd7c4cdcf1aa4f6d6aa9048fe",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "required_jobs": 2,
+      "jobs": [
+        {
+          "id": 103732755451,
+          "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-13T13:43:41Z",
+          "completed_at": "2026-09-13T13:50:25Z",
+          "runner_name": "Nettking"
+        },
+        {
+          "id": 103732755547,
+          "name": "update-contracts (Linux, fcp-linux-fast, bash)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-13T13:43:53Z",
+          "completed_at": "2026-09-13T13:45:40Z",
+          "runner_name": "Beast-Linux-WSL"
+        }
+      ]
+    },
+    {
+      "workflow": "phase2-federation.yml",
+      "run_id": 34760641414,
+      "api_head_sha": "fe21bdc59bc1414fd7c4cdcf1aa4f6d6aa9048fe",
+      "event": "pull_request",
+      "status": "in_progress",
+      "conclusion": null,
+      "required_jobs": 2,
+      "jobs": [
+        {
+          "id": 103732755646,
+          "name": "windows",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-13T13:50:27Z",
+          "completed_at": "2026-09-13T13:54:21Z",
+          "runner_name": "Nettking"
+        },
+        {
+          "id": 103732755818,
+          "name": "linux",
+          "status": "in_progress",
+          "conclusion": null,
+          "started_at": "2026-09-13T13:51:41Z",
+          "completed_at": null,
+          "runner_name": "Beast-Linux-WSL"
+        }
+      ]
+    },
+    {
+      "workflow": "phase-f85-operator-federation-surface.yml",
+      "run_id": 34760641442,
+      "api_head_sha": "fe21bdc59bc1414fd7c4cdcf1aa4f6d6aa9048fe",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "required_jobs": 2,
+      "jobs": [
+        {
+          "id": 103732755640,
+          "name": "operator-surface (Linux, fcp-linux-fast, bash)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-13T13:45:42Z",
+          "completed_at": "2026-09-13T13:51:39Z",
+          "runner_name": "Beast-Linux-WSL"
+        },
+        {
+          "id": 103732755730,
+          "name": "operator-surface (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-13T13:47:59Z",
+          "completed_at": "2026-09-13T13:55:48Z",
+          "runner_name": "Beast"
+        }
+      ]
+    },
+    {
+      "workflow": "cf7b-product-physical-acceptance.yml",
+      "run_id": 34760641453,
+      "api_head_sha": "fe21bdc59bc1414fd7c4cdcf1aa4f6d6aa9048fe",
+      "event": "pull_request",
+      "status": "queued",
+      "conclusion": null,
+      "required_jobs": 2,
+      "jobs": [
+        {
+          "id": 103732755729,
+          "name": "acceptance (Linux, fcp-linux-fast, bash)",
+          "status": "queued",
+          "conclusion": null,
+          "started_at": "2026-09-13T13:43:40Z",
+          "completed_at": null,
+          "runner_name": ""
+        },
+        {
+          "id": 103732755936,
+          "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
+          "status": "in_progress",
+          "conclusion": null,
+          "started_at": "2026-09-13T13:55:50Z",
+          "completed_at": null,
+          "runner_name": "Beast"
+        }
+      ]
+    },
+    {
+      "workflow": "icse-tool-demo.yml",
+      "run_id": 34760641469,
+      "api_head_sha": "fe21bdc59bc1414fd7c4cdcf1aa4f6d6aa9048fe",
+      "event": "pull_request",
+      "status": "queued",
+      "conclusion": null,
+      "required_jobs": 4,
+      "jobs": [
+        {
+          "id": 103732755669,
+          "name": "reviewer-compose",
+          "status": "queued",
+          "conclusion": null,
+          "started_at": "2026-09-13T13:43:40Z",
+          "completed_at": null,
+          "runner_name": ""
+        },
+        {
+          "id": 103732755738,
+          "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
+          "status": "queued",
+          "conclusion": null,
+          "started_at": "2026-09-13T13:43:40Z",
+          "completed_at": null,
+          "runner_name": ""
+        },
+        {
+          "id": 103732755790,
+          "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
+          "status": "queued",
+          "conclusion": null,
+          "started_at": "2026-09-13T13:43:40Z",
+          "completed_at": null,
+          "runner_name": ""
+        }
+      ]
+    },
+    {
+      "workflow": "cf7-acceptance-harness.yml",
+      "run_id": 34760765480,
+      "api_head_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "event": "workflow_dispatch",
+      "status": "queued",
+      "conclusion": null,
+      "required_jobs": 2,
+      "jobs": [
+        {
+          "id": 103733081089,
+          "name": "harness (Linux, fcp-linux-fast, bash)",
+          "status": "queued",
+          "conclusion": null,
+          "started_at": "2026-09-13T13:46:17Z",
+          "completed_at": null,
+          "runner_name": ""
+        },
+        {
+          "id": 103733081183,
+          "name": "harness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Byp...",
+          "status": "queued",
+          "conclusion": null,
+          "started_at": "2026-09-13T13:46:17Z",
+          "completed_at": null,
+          "runner_name": ""
+        }
+      ]
+    },
+    {
+      "workflow": "cf7c-physical-test-readiness.yml",
+      "run_id": 34760767150,
+      "api_head_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "event": "workflow_dispatch",
+      "status": "queued",
+      "conclusion": null,
+      "required_jobs": 2,
+      "jobs": [
+        {
+          "id": 103733084873,
+          "name": "readiness (Linux, fcp-linux-fast, bash)",
+          "status": "queued",
+          "conclusion": null,
+          "started_at": "2026-09-13T13:46:19Z",
+          "completed_at": null,
+          "runner_name": ""
+        },
+        {
+          "id": 103733084960,
+          "name": "readiness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy B...",
+          "status": "queued",
+          "conclusion": null,
+          "started_at": "2026-09-13T13:46:19Z",
+          "completed_at": null,
+          "runner_name": ""
+        }
+      ]
+    },
+    {
+      "workflow": "cf8-role-retirement.yml",
+      "run_id": 34760769024,
+      "api_head_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "event": "workflow_dispatch",
+      "status": "queued",
+      "conclusion": null,
+      "required_jobs": 2,
+      "jobs": [
+        {
+          "id": 103733090039,
+          "name": "role-retirement (Linux, fcp-linux-fast, bash)",
+          "status": "queued",
+          "conclusion": null,
+          "started_at": "2026-09-13T13:46:22Z",
+          "completed_at": null,
+          "runner_name": ""
+        },
+        {
+          "id": 103733090159,
+          "name": "role-retirement (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+          "status": "queued",
+          "conclusion": null,
+          "started_at": "2026-09-13T13:46:22Z",
+          "completed_at": null,
+          "runner_name": ""
+        }
+      ]
+    },
+    {
+      "workflow": "ci-test-sharding.yml",
+      "run_id": 34760770584,
+      "api_head_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "event": "workflow_dispatch",
+      "status": "queued",
+      "conclusion": null,
+      "required_jobs": 2,
+      "jobs": [
+        {
+          "id": 103733095007,
+          "name": "Shard contract (Linux, shared-pool)",
+          "status": "queued",
+          "conclusion": null,
+          "started_at": "2026-09-13T13:46:24Z",
+          "completed_at": null,
+          "runner_name": ""
+        },
+        {
+          "id": 103733095058,
+          "name": "Shard contract (Windows, shared-pool)",
+          "status": "queued",
+          "conclusion": null,
+          "started_at": "2026-09-13T13:46:24Z",
+          "completed_at": null,
+          "runner_name": ""
+        }
+      ]
+    },
+    {
+      "workflow": "cfi2-onboarding-composition.yml",
+      "run_id": 34760772078,
+      "api_head_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "event": "workflow_dispatch",
+      "status": "queued",
+      "conclusion": null,
+      "required_jobs": 2,
+      "jobs": [
+        {
+          "id": 103733099296,
+          "name": "onboarding (Linux, fcp-test-linux, bash, 3.12.13)",
+          "status": "queued",
+          "conclusion": null,
+          "started_at": "2026-09-13T13:46:27Z",
+          "completed_at": null,
+          "runner_name": ""
+        },
+        {
+          "id": 103733099393,
+          "name": "onboarding (Windows, fcp-test-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPo...",
+          "status": "in_progress",
+          "conclusion": null,
+          "started_at": "2026-09-13T13:54:23Z",
+          "completed_at": null,
+          "runner_name": "Nettking"
+        }
+      ]
+    },
+    {
+      "workflow": "release-image-metadata.yml",
+      "run_id": 34760773510,
+      "api_head_sha": "94567b0d9ac916eec9e4f094d2f6754562b966aa",
+      "event": "workflow_dispatch",
+      "status": "queued",
+      "conclusion": null,
+      "required_jobs": 1,
+      "jobs": [
+        {
+          "id": 103733103439,
+          "name": "Verify immutable release image metadata",
+          "status": "queued",
+          "conclusion": null,
+          "started_at": "2026-09-13T13:46:29Z",
+          "completed_at": null,
+          "runner_name": ""
+        }
+      ]
+    }
+  ],
+  "all_expected_green": false
+}
