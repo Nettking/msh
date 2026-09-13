@@ -1,0 +1,77 @@
+{
+  "sha256": "cdf867df8491b1065d41429e51351ed45baaf7a1ea1328921e4b0e7334ef5892",
+  "automated": {
+    "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+    "harness_sha": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+    "host": "nitro",
+    "status": "COMPLETED",
+    "started_at": "2026-09-13T17:08:03.818112+00:00",
+    "results": [
+      {
+        "assertion": "posix-concurrent-launchers",
+        "exit_code": 0,
+        "verdict": "pass",
+        "evidence": "evidence/v1-physical/observations/P03/20260913T170805013800Z-assertion-dd28a700.json"
+      }
+    ],
+    "physical_pass": false,
+    "runtime_activation_requested": false,
+    "protected_data_accessed": false,
+    "finished_at": "2026-09-13T17:08:05.094446+00:00"
+  },
+  "launchers": {
+    "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+    "harness_sha": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+    "host": "nitro",
+    "status": "COMPLETED",
+    "started_at": "2026-09-13T17:11:48.044482+00:00",
+    "results": [
+      {
+        "assertion": "start-sh",
+        "verdict": "pass",
+        "prepare_id": "a968658b5e0644179f3ba0d44291ed0f",
+        "launcher_exit_code": 0,
+        "configured_http_status": 200,
+        "core_images": [
+          {
+            "service": "flask",
+            "container": "32ff54a316679bddca4f50ae15fd0f812e5aec2ad2e5ea733c54bb32de5cfc5f",
+            "image": "sha256:069bd42eb14965efa6cbbde85a57bd3cd65df63b39e2007887ba9c804a31e9c5",
+            "running": true,
+            "restart_count": 0,
+            "started_at": "2026-09-13T15:56:43.279182527Z",
+            "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80"
+          },
+          {
+            "service": "relay",
+            "container": "ce8ce356defb02d541e353462434799e0b438eb3c0be218a15b3c85379558d48",
+            "image": "sha256:a0261dfe7528042bed5e42ee5b3a4eb223e1f93525301992331d1109a48e2484",
+            "running": true,
+            "restart_count": 0,
+            "started_at": "2026-09-13T15:56:19.833147817Z",
+            "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80"
+          },
+          {
+            "service": "recorder",
+            "container": "06e4e1730f305d3bc6b07d8d1bc2f62df05314a4b45d8da0573267c716500bf4",
+            "image": "sha256:87e41cc42fa284c59c6d885e7146aed71ee1d2671ac225b0e50326f1494ea0a1",
+            "running": true,
+            "restart_count": 0,
+            "started_at": "2026-09-13T15:56:19.966602017Z",
+            "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80"
+          }
+        ],
+        "log_sha256": "78ca2700bfff3810d22ed3671e42c2244fec66e6eddf8457bd8a6f51b1f85bd6"
+      }
+    ],
+    "physical_pass": false,
+    "protected_data_accessed": false,
+    "prepare_id": "a968658b5e0644179f3ba0d44291ed0f",
+    "last_launcher_exit_code": 0,
+    "last_log_sha256": "78ca2700bfff3810d22ed3671e42c2244fec66e6eddf8457bd8a6f51b1f85bd6",
+    "finished_at": "2026-09-13T17:20:15.304017+00:00",
+    "supplemental_http_observation": "unresolved but non-demonstrated candidate defect; one unchanged-deadline read-only recovery passed",
+    "original_timeout_retained": true,
+    "launcher_repeated": false
+  }
+}

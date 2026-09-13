@@ -1,6 +1,6 @@
 # Federation v1 current release checkpoint
 
-Updated 2026-09-13T16:55Z. Active context: clean handoff + this file + live GitHub.
+Updated 2026-09-13T17:26Z. Active context: clean handoff + this file + live GitHub.
 Historical coordination is evidence only; consult it for a concrete current need.
 
 ## Current source / heads
@@ -38,33 +38,50 @@ Historical coordination is evidence only; consult it for a concrete current need
   Proof: diagnostics/physical-1aac6148/P01-combined-result.json and evidence ZIP.
 - Original ICSE trace and bounded PR486 recovery are dispositioned. No demonstrated
   shared/deterministic candidate mechanism. Do not reopen the completed broad sweep.
+- Fresh P03:7/8 PASS. Both native concurrency probes, retired update.cmd, launcher
+  versus update, Windows start.cmd, Linux start.sh, and model failure isolation pass.
+- P05 Ollama absence PASS from the same bounded model outage. Same model container
+  restored healthy; core IDs/images/restart counts unchanged; workbench HTTP200.
+  Proof: diagnostics/physical-1aac6148/P03-progress-result.json and portable archives.
 
 ## Actual blockers / disposition
-- P02-P12, fresh CF7 and B01-B09 physical acceptance remain incomplete. P01 alone
-  is not full physical PASS and does not authorize public release.
+- P02, the last P03 assertion, P04-P12, fresh CF7 and B01-B09 remain incomplete.
+- P02 needs independent test storage: Nitro checkout/data/results/Docker share one
+  system filesystem. No pressure injected. Native sudo is unavailable; Windows is
+  not elevated. User input requested once for isolated mounts or an admin-enabled
+  test host; keep pending. Never exhaust the shared system disk to bypass isolation.
+- P03 start-tailscale.cmd is not attempted. Existing Windows fixture is loopback-only
+  and workbench status is identity-missing. Tailnet input delta is reviewed/staged
+  at Windows harness/.acceptance/p03-tailnet, NOT activated; no identity fabricated.
+  Need product-level onboarding in an isolated owned test installation, preserving
+  existing data/authority and the no-reset constraint. AQG remains off.
 - P07/P12 have NOT STARTED. Owned corpora are empty; aged history insufficient.
   Pending user input already requested: two approved real MTConnect endpoints and
   a non-protected aged test corpus. Do not ask again or access protected Recorder data.
-- Windows fault helper initially missed the line-wrapped core_image_build_failed:1
-  error. Deterministic local evidence-helper defect; parser corrected, same fault
-  verified without repeating the build. Original STOPPED record/logs retained.
-  Live cores retain prior verified images, have zero restarts and predate the fault;
-  immediate pre-fault container IDs were not durably saved. No product change needed.
+- Nitro P03 launcher exited0; supplemental HTTP10s timed out. One read-only recovery
+  returned200 in1.381s with the same deadline; exact core labels/zero restarts verified.
+  Original timeout retained, no launch repeated, no demonstrated candidate defect.
+- Windows P01 wrapped-error parser defect was repaired in the local evidence helper;
+  existing real fault verified without repeating it. Detailed original evidence retained.
 - Windows short-window growth remains an archived observation, not a demonstrated
   candidate defect. The one declared follow-up completed; no further growth diagnosis.
 
 ## Active work / next action
-1. No P01 executor remains active. Never repeat its green activations/probes/faults.
+1. No physical executor remains active. Never repeat green P01/P03 checks.
    Combined coordinator evidence: Windows harness/evidence/v1-physical, containing
    both native host records and all original packets. Native roots remain retained.
-2. Continue checked-in physical acceptance from P02. Inspect its current plan and
-   owned backing-resource mapping; make the bounded fault target and recovery concrete
-   before pressure injection. Keep protected installations/data outside test mutations.
-3. Complete fresh P02-P12, CF7 and B01-B09 under the checked-in contract. P07 real1h
+2. Prepare isolated product-level onboarding for the remaining P03 tailnet path.
+   Existing P01/P03 fixture records remain evidence. Do not reset or overwrite their
+   identity/data to manufacture onboarding, and do not run AQG or a broad diagnostic sweep.
+   Native P03 recovery is terminal. Windows staged tailnet inputs are not live defaults.
+3. Resume P02 when isolated owned storage/admin test host is available; define bounded
+   filler and recovery against the real resource before injection. Pending request is
+   missing setup information, not authorization to lower thresholds or fill unrelated disks.
+4. Complete fresh P02-P12, CF7 and B01-B09 under the checked-in contract. P07 real1h
    and P12 real24h require strict single-run evidence and approved source/corpus inputs.
    No full PASS or public release before every required observation/validation finishes;
    tag must equal C. Preserve valid exact-source evidence instead of retesting it.
-4. Mutable controls/evidence/venv stay outside runtime build contexts:
+5. Mutable controls/evidence/venv stay outside runtime build contexts:
    C:/wsl/fcp-v1-73c779-nettking-runtime-20260910 and
    /home/martin/fcp-v1-73c779-nitro-20260910/source.
    Both harness controls preserve exact live configuration and existing owned mounts;

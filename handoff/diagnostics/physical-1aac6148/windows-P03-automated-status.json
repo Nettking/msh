@@ -1,0 +1,31 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "harness_sha": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "host": "nettking",
+  "status": "COMPLETED",
+  "started_at": "2026-09-13T17:08:02.893326+00:00",
+  "results": [
+    {
+      "assertion": "update-cmd-disposition",
+      "exit_code": 0,
+      "verdict": "pass",
+      "evidence": "evidence/v1-physical/observations/P03/20260913T170803783655Z-assertion-f18d90a8.json"
+    },
+    {
+      "assertion": "windows-concurrent-launchers",
+      "exit_code": 0,
+      "verdict": "pass",
+      "evidence": "evidence/v1-physical/observations/P03/20260913T170804870936Z-assertion-9aa1ec0e.json"
+    },
+    {
+      "assertion": "launcher-vs-update",
+      "exit_code": 0,
+      "verdict": "pass",
+      "evidence": "evidence/v1-physical/observations/P03/20260913T170806234485Z-assertion-fbea189c.json"
+    }
+  ],
+  "physical_pass": false,
+  "runtime_activation_requested": false,
+  "protected_data_accessed": false,
+  "finished_at": "2026-09-13T17:08:06.264747+00:00"
+}

@@ -1,0 +1,31 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "host": "nettking",
+  "status": "INPUTS_REVIEWED",
+  "existing_mounts_user_credentials_and_source_preserved": true,
+  "change": "Bind existing owned web and relay ports to the logged-in tailnet address; use the supported matching human-auth base URL and a free owned join-responder port.",
+  "web_port": 55030,
+  "relay_port": 58795,
+  "join_port": 55031,
+  "review": [
+    {
+      "service": "flask",
+      "mounts_user_credentials_and_other_configuration_preserved": true
+    },
+    {
+      "service": "ollama",
+      "mounts_user_credentials_and_other_configuration_preserved": true
+    },
+    {
+      "service": "recorder",
+      "mounts_user_credentials_and_other_configuration_preserved": true
+    },
+    {
+      "service": "relay",
+      "mounts_user_credentials_and_other_configuration_preserved": true
+    }
+  ],
+  "runtime_activated": false,
+  "physical_pass": false,
+  "protected_data_accessed": false
+}

@@ -1,0 +1,45 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "harness_sha": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "host": "nettking",
+  "status": "STOPPED",
+  "started_at": "2026-09-13T17:09:21.008211+00:00",
+  "results": [
+    {
+      "assertion": "start-cmd",
+      "verdict": "pass",
+      "prepare_id": "cd8b1991f0c14bd6b5f2292af1b25a93",
+      "launcher_exit_code": 0,
+      "configured_http_status": 200,
+      "core_images": [
+        {
+          "service": "flask",
+          "container": "82e8f8243598392a672ad22146b96775b5a6a33a60e9661d29d01992051c522d",
+          "image": "sha256:bda3c9f1e10f966382afd4f63f6d7b0643fb235def339be7333dc3167d54dae1",
+          "restart_count": 0
+        },
+        {
+          "service": "relay",
+          "container": "b75f21dbb16678597115c8a0c998f7739afc9755df81bbab71c257f0320e7668",
+          "image": "sha256:a15d875c3815ce9dbc407ad65821699c0c599c01df98ebbe8b21e39dab7b9036",
+          "restart_count": 0
+        },
+        {
+          "service": "recorder",
+          "container": "493fc59695cef93b818b0e95aff6c92706f1fc8e16c0a39c2c58b668cadc0fab",
+          "image": "sha256:bb71b4e2b273a2d1f8b625ae2c048299320186e4c6c0f0adcd03f7502ca0435d",
+          "restart_count": 0
+        }
+      ],
+      "log_sha256": "4bb796fb1af037eb79de5a062656a48aacf63f62b3b9a6dfc3066f172d0fb7d3"
+    }
+  ],
+  "physical_pass": false,
+  "protected_data_accessed": false,
+  "active_assertion": "start-cmd",
+  "prepare_id": "cd8b1991f0c14bd6b5f2292af1b25a93",
+  "last_launcher_exit_code": 0,
+  "last_log_sha256": "4bb796fb1af037eb79de5a062656a48aacf63f62b3b9a6dfc3066f172d0fb7d3",
+  "error_type": "AssertionError",
+  "error": "Owned web binding does not expose the actual tailnet path"
+}

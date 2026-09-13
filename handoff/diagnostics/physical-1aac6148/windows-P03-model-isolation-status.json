@@ -1,0 +1,59 @@
+{
+  "candidate": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "harness_sha": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "host": "nettking",
+  "status": "COMPLETED",
+  "started_at": "2026-09-13T17:16:52.554509+00:00",
+  "model_container": "0f62adf71567547cbb1b8b9b1717f0b8e142203f4d3745ebd4ddf9dd5f3a41aa",
+  "core_before": {
+    "flask": {
+      "Id": "82e8f8243598392a672ad22146b96775b5a6a33a60e9661d29d01992051c522d",
+      "Image": "sha256:bda3c9f1e10f966382afd4f63f6d7b0643fb235def339be7333dc3167d54dae1",
+      "RestartCount": 0
+    },
+    "relay": {
+      "Id": "b75f21dbb16678597115c8a0c998f7739afc9755df81bbab71c257f0320e7668",
+      "Image": "sha256:a15d875c3815ce9dbc407ad65821699c0c599c01df98ebbe8b21e39dab7b9036",
+      "RestartCount": 0
+    },
+    "recorder": {
+      "Id": "493fc59695cef93b818b0e95aff6c92706f1fc8e16c0a39c2c58b668cadc0fab",
+      "Image": "sha256:bb71b4e2b273a2d1f8b625ae2c048299320186e4c6c0f0adcd03f7502ca0435d",
+      "RestartCount": 0
+    }
+  },
+  "results": [
+    {
+      "scenario": "P03",
+      "assertion": "identity-and-isolation",
+      "verdict": "pass",
+      "prepare_id": "f2a76e8e86194629ac1925ce5b975aa4"
+    },
+    {
+      "scenario": "P05",
+      "assertion": "ollama-absence",
+      "verdict": "pass",
+      "prepare_id": "d77ccc423acc4a6b8a6f43026e07c2dd"
+    }
+  ],
+  "model_stopped": true,
+  "model_restored": true,
+  "physical_pass": false,
+  "protected_data_accessed": false,
+  "prepared": [
+    {
+      "scenario": "P03",
+      "assertion": "identity-and-isolation",
+      "prepare_id": "f2a76e8e86194629ac1925ce5b975aa4"
+    },
+    {
+      "scenario": "P05",
+      "assertion": "ollama-absence",
+      "prepare_id": "d77ccc423acc4a6b8a6f43026e07c2dd"
+    }
+  ],
+  "provider_path_unavailable": true,
+  "workbench_http_status_during_outage": 200,
+  "core_containers_unchanged": true,
+  "finished_at": "2026-09-13T17:17:26.115419+00:00"
+}
