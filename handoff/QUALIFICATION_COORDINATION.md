@@ -1,6 +1,8 @@
 # Federation v1 qualification coordination
 
-**Current actionable checkpoint: 2026-09-13T03:12:26.594738+00:00. PR475 native exact-head37+3 qualification dispatched and startup verified.**
+**Current actionable checkpoint: 2026-09-13 04:14UTC. All13 native5e qualification runs terminal; failures/cancellations require evidence triage.**
+
+NEXT (supersedes prior wait/startup): preserve new completed native logs, first inspect release Windows transport/storage failure and ICSE Linux failure plus release/F85 cancellations. No retry, source change or merge before classification. API snapshot diagnostics/pr475-exact-head-state-20260913T0414.json; heads5e/440 and baseb719 unchanged. Passing results remain valid. No physical state change.
 
 All13 unchanged workflows were manually dispatched once at5e6f184311019b9982e8544a18f3dc02c1b16e98 between03:10:38 and03:11:41UTC. Each accepted dispatch was committed/pushed individually. Receipt diagnostics/pr475-exact-head-dispatch.json; plan [PR475_EXACT_HEAD_QUALIFICATION_RECONCILIATION.md](PR475_EXACT_HEAD_QUALIFICATION_RECONCILIATION.md). Four initial jobs running: CF7 harness on Beast Windows/Nettking Linux and Phase2 on Nettking Windows/Beast Linux, with setup/tests progressing. Other jobs queued normally; no failure at startup. Full API snapshot diagnostics/pr475-exact-head-startup.json. Native checkout logs await completion; do not claim exact-head PASS from API metadata alone.
 
