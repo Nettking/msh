@@ -1,0 +1,195 @@
+{
+  "status": "POSITIVE_AND_NEGATIVE_TRANSPORT_READY",
+  "updated_at": "2026-09-13T21:01:10.394215+00:00",
+  "source_independent_preparation_only": true,
+  "backup_started": false,
+  "product_quiescence": false,
+  "physical_assertions_run": false,
+  "protected_data_accessed": false,
+  "helper_image_id": "sha256:2fcb56517a564601652902bc24709e4ff399226f558f4d13e20989f0db80d50a",
+  "helper_container_id": "4509e12ce79ef52cbe347fa78b392ef157cdcf7b3b2d5169e6a4e07512916cca",
+  "helper_pid": 3053076,
+  "helper_restart_count": 0,
+  "config_sha256": "2e666c77755d741fd9bf70c7fa322cd291437e8bb0d348ba2e02bdfab5a801be",
+  "old_helper_stopped_retained": true,
+  "old_effective_fields_identical": true,
+  "one_additional_tmpfs_share_only": true,
+  "listener_exact_tailnet_ipv4_445_only": true,
+  "negative_capacity": {
+    "actual_windows_total_bytes": 67108864,
+    "actual_windows_available_bytes": 67108864,
+    "actual_nitro_capacity": {
+      "total_bytes": 67108864,
+      "free_bytes": 67108864,
+      "entries": 0
+    },
+    "empty": true,
+    "encrypted_signed": true
+  },
+  "positive_checks": {
+    "owned_nonpersistent_mapping": true,
+    "smb3_encrypted_signed": true,
+    "native_write_fsync_atomic_replace": true,
+    "native_copy2_metadata": true,
+    "ordinary_win32_closed_copy_quick_check": true,
+    "two_process_lock_conflict_refused_without_commit": true,
+    "lock_release_recovery_exact_once": true,
+    "windows_docker_cp_unc": true,
+    "owned_copy_source_pid_restart_unchanged": true,
+    "direct_nitro_file_digest_equality": true,
+    "direct_nitro_quick_check": true,
+    "windows_reopen_after_nitro_check": true,
+    "actual_two_host_capacity_measured": true
+  },
+  "durable_available_bytes_both_hosts": 828408508416,
+  "durable_available_inodes": 60242482,
+  "preserved_first_failure": {
+    "stage": "scratch atomic replace",
+    "type": "PermissionError",
+    "winerror": 5,
+    "owner_modes_and_dos_attrs_normal": true,
+    "no_open_files_after_mapping_closed": true,
+    "disposition": "unresolved host/transport transient; not demonstrated candidate or deterministic helper defect"
+  },
+  "one_bounded_actual_diagnostic": {
+    "result": "EXACT_REPLACE_PASS",
+    "attempts": 1,
+    "duration_seconds": 10.84,
+    "exact_authenticated_worker_only": true,
+    "debug_restored_zero": true,
+    "diagnostic_receipt_sha256": "cb3b6af708acf4601f420986c5092463d930871a749dcad7dfd26328d1f1e591"
+  },
+  "trace_setup_refusal": {
+    "cause": "numeric-text PID parser required integer",
+    "actual_filesystem_attempts": 0,
+    "debug_changes": 0,
+    "retained": true
+  },
+  "positive_remaining_preflight_sha256": "d5726a5655add50d87555c59af169d244a94186ad1fffa1d1a2eb113a7a4f747",
+  "private_remote_artifacts": [
+    {
+      "name": "status.json",
+      "bytes": 1029,
+      "sha256": "49057e1f0578f1d667a9dab27413f40633376ef30d2c8091d127dc37ff4fa3ef"
+    },
+    {
+      "name": "old-status.json",
+      "bytes": 1267,
+      "sha256": "39ddc91e293d4336db693dab5f0c51a3ee377a680b8e73cf99101ce78348262a"
+    },
+    {
+      "name": "old-inspect.private.json",
+      "bytes": 6780,
+      "sha256": "b9d7c74304e705c8c7c36722bab55efad4d8d2380d8c4a25f266ca3e79375ade"
+    },
+    {
+      "name": "old-stopped-inspect.private.json",
+      "bytes": 6616,
+      "sha256": "2d1b65701d624c1beff12891e39dece6ccea237e1f3548600c551837727b64c0"
+    },
+    {
+      "name": "old-testparm.private.log",
+      "bytes": 944,
+      "sha256": "77eaa6765f942eb098290c685503f4c8c787763773ce1d3756c5241796feca00"
+    },
+    {
+      "name": "new-testparm.private.log",
+      "bytes": 1208,
+      "sha256": "da4ce9705015902e34e934602904dd48d03fbca1c80d0981aa3a849e02a13713"
+    },
+    {
+      "name": "listeners.private.json",
+      "bytes": 136,
+      "sha256": "3ea892e86aa5b2b86f0eda6f8171e608e95450bdba1873dccb80329ef52bd29d"
+    },
+    {
+      "name": "container-inspect.private.json",
+      "bytes": 6957,
+      "sha256": "1813cdcebb75ad2828647502b099ec1d83c349ddcd5cd21599e906845b9d9f96"
+    },
+    {
+      "name": "capacity.private.json",
+      "bytes": 287,
+      "sha256": "a13a2bbc29a3c63c6e700db9542cb71b97b766de173f627363b3fa00b9267829"
+    },
+    {
+      "name": "negotiated-security.private.json",
+      "bytes": 1869,
+      "sha256": "f38e4ec5944e204b5ee7a97517fa43ad1f5dd5ae3f6ee78f47fd937961289db0"
+    },
+    {
+      "name": "remaining-negotiated-security.private.json",
+      "bytes": 3416,
+      "sha256": "f609ec5a3134cae725ffd54b3c4e6136baa8503d66f266c635a87b33b8e1b6a6"
+    },
+    {
+      "name": "negative-security.private.json",
+      "bytes": 3412,
+      "sha256": "ada11f96d946c2b02f7836143dcf12272624df4fca844c648ce0a549bb663a79"
+    },
+    {
+      "name": "replacement-failure-smbstatus.private.json",
+      "bytes": 179,
+      "sha256": "dd9a4a735079701d29a74ce4a51de2f77c2206a8214148966b4721b49ea69a1c"
+    },
+    {
+      "name": "replacement-failure-inspect.json",
+      "bytes": 609,
+      "sha256": "393d8179faacb1e8807509424133903f6bfeb37ab7a19a13fcae6130adf99cea"
+    },
+    {
+      "name": "replacement-attrs-smbstatus.private.json",
+      "bytes": 1345,
+      "sha256": "dc10dd476a46724417bf90961b88689c9156cc32749bab1d16464dc22a1e0528"
+    },
+    {
+      "name": "replacement-attrs.json",
+      "bytes": 636,
+      "sha256": "393c5c27ac6d265204e5473090454620859e9fdc619f6b40b6d5e3933079448b"
+    },
+    {
+      "name": "final-transport-receipt.json",
+      "bytes": 4272,
+      "sha256": "b312d29bee3148b6dfa254b4516fc5a8b97312e3b14a11620492525190fbc1b1"
+    },
+    {
+      "name": "private/smb.conf",
+      "bytes": 1661,
+      "sha256": "2e666c77755d741fd9bf70c7fa322cd291437e8bb0d348ba2e02bdfab5a801be"
+    },
+    {
+      "name": "rename-one-diagnostic-pid-parser/debug-before.private.log",
+      "bytes": 466,
+      "sha256": "f09a50d99dacaf2b7d925ff6b31ec3cedeb78f50677a844ca6d6ade0119c9cb9"
+    },
+    {
+      "name": "rename-one-diagnostic-pid-parser/debug-during.private.log",
+      "bytes": 467,
+      "sha256": "6d63c0b1be9f3e08037ffa896a40e661ade1a56741673f343d6578f1418df79e"
+    },
+    {
+      "name": "rename-one-diagnostic-pid-parser/debug-after.private.log",
+      "bytes": 466,
+      "sha256": "f09a50d99dacaf2b7d925ff6b31ec3cedeb78f50677a844ca6d6ade0119c9cb9"
+    },
+    {
+      "name": "rename-one-diagnostic-pid-parser/smbstatus.private.json",
+      "bytes": 3277,
+      "sha256": "b582e0acd1712d75a41c837a6e24a4cb7fe9caea0e6838c1deaeace7549ce39a"
+    },
+    {
+      "name": "rename-one-diagnostic-pid-parser/rename-smb2.private.log",
+      "bytes": 36937,
+      "sha256": "3b83c1201b36b529772204b54ed4598b55fbd75d2e119c4fadeb0a81cc40822f"
+    },
+    {
+      "name": "rename-one-diagnostic-pid-parser/result.json",
+      "bytes": 185,
+      "sha256": "27add65c89d4d88c5b3dec1f006c5998fecab2aa5b2a91397ca411cf494ee9d2"
+    }
+  ],
+  "credentials_private_dpapi_only_on_windows": true,
+  "no_host_account_firewall_package_service_change": true,
+  "current_private_binding": "coord/.acceptance/p11-capacity-share-preparation/remaining-preflight/windows-binding-serverproof.private.json",
+  "negative_private_binding": "coord/.acceptance/p11-capacity-share-preparation/negative-binding.private.json"
+}

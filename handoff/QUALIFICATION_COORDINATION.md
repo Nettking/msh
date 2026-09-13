@@ -1,6 +1,6 @@
 # Federation v1 current release checkpoint
 
-Updated 2026-09-13T20:25Z. Active context: clean handoff + this file + live GitHub.
+Updated 2026-09-13T21:10Z. Active context: clean handoff + this file + live GitHub.
 Historical coordination is evidence only; consult it for a concrete current need.
 
 ## Current source / heads
@@ -33,10 +33,19 @@ Historical coordination is evidence only; consult it for a concrete current need
 - Actual main qualification started once; only missing workflows dispatched once.
   Snapshot: diagnostics/main-e91e5218-qualification/qualification-current.json.
   Release34780575628; ICSE34780575682. Refresh existing runs; never redispatch green.
+- Main Phase2 Windows103786775814:5s failover-plan publish timeout; Linux PASS.
+  Same-tree PR Windows case PASS. Await already-scheduled actual-main release case
+  and full-order evidence before disposition; no Phase2 retry started.
 - Old C actual-main37+3 jobs and old physical P01 10/10, P03 8/8, P04 2/6,
   P05 9/16, P10 floor/P11 prestage retained under physical-1aac6148 only.
 
 ## Actual blockers / prerequisites
+- Main Windows transport-storage103786726556:6failed/14setup errors, all correct
+  allocation-exhausted refusals. Our44GiB pressure-prep files lowered C: to50.9GiB
+  below unchanged64GiB floor. Host interference; no candidate defect. Copying both
+  unused images to Nitro, then remove verified originals; require>=72GiB free.
+  Failed native log/JUnit retained under main-e91e5218/windows-capacity-failure.
+  One failed-job+dependent recovery after capacity restoration; preserve green jobs.
 - Actual main e91 qualification, authoritative freeze and checked-in revalidation
   still required. Expected impact-map unknown analysis_runtime denies all carry;
   run it unchanged and perform all fresh scenarios, never change map for green.
@@ -51,6 +60,8 @@ Historical coordination is evidence only; consult it for a concrete current need
 ## Active work / next action
 1. Finish actual-main CI/source/JUnit/artifact audit once; freeze e91; run checked-in
    revalidation; then activate exact-C2 runtimes and fresh physical campaign.
+   Root controls: coord/.acceptance/c2-release-preparation. Nitro clean e91 source
+   staged too; no runtime activation. Independent fresh P09 crash checkout prepared.
 2. Existing native data/membership/checkpoints remain in place:
    C:/wsl/fcp-v1-1aac6148-main-20260913/.acceptance/native-faults.
    Supervisor/source driver stopped cleanly, no active fault. Saved signed identity
@@ -58,14 +69,15 @@ Historical coordination is evidence only; consult it for a concrete current need
 3. Existing owned creator source C:/wsl/fcp-v1-1aac6148-onboarding-runtime-20260913;
    private controls in old harness/.acceptance/onboarding-test. Preserve its owned
    coordinator volume, credentials and model mount. Other owned runtimes separate.
-4. Isolated pressure resources READY: fully allocated24+20GiB ext4 files, dedicated
-   Docker/containerd/private network namespace, zero images/containers. Outer free
-   56.05GB (>40GiB floor). Agent prepares normal creator/authority and real drivers.
-   No pressure assertion or filler applied. No shared-system-disk pressure allowed.
-5. Nitro independent SMB backup transport READY:13/13 preflight, real SMB3 encryption,
-   two-process SQLite locking and Nitro digests. Owned helper + nonpersistent mapping;
-   no formal backup/quiescence. P11 agent prepares coherent restore/negative capacity
-   and normal replacement enrollment. Evidence: p11-smb-transport-preparation.json.
+4. Isolated pressure fixture MIGRATING: empty private WSL daemons stopped, exact
+   loops unmounted/detached; both24+20GiB files retained pending Nitro full-copy
+   fsync/SHA proof. Original operational Docker unchanged. No product/filler ran.
+   Native CI requires64GiB storage floor plus8GiB margin; old40GiB prep guard wrong.
+   Adapt pressure controls to Nitro only after separate resource/identity checks.
+5. Nitro SMB transport READY: positive13checks and empty64MiB negative share.
+   New helper active; prior helper retained stopped. One first atomic WinError5
+   retained; bounded unchanged follow-up PASS, no security change. No backup yet.
+   P11 needs a separate legitimate C2 fixture; existing workbench lacks corpus/auth.
 6. P06/P09/outbox/timed executors prepared in coord/.acceptance. Real native faults
    must precede reservation of aged runtime for P07/P12. Clock faults process-scoped
    only; no host clock change. Timed collection needs creator history/latency proof.
@@ -77,7 +89,7 @@ Historical coordination is evidence only; consult it for a concrete current need
 - Never weaken assertions, quorum/authority, deadlines, security or acceptance.
 - Only credible current-candidate contract violations block v1; preserve host noise.
 - No broad sweep, blanket retry, unnecessary runner/account/label changes.
-- AQG deliberately off, now offline, never a dependency. No wait for its return.
+- AQG gate deliberately off, never a dependency. AQG7NCC host offline; no wait.
 - Protected Recorder data untouched. No reset, operational Docker prune, volume
   deletion, Arrowhead restart or protected-data action. Supported lifecycle may
   bound only its own regenerable builder cache. Final tag must equal accepted SHA.

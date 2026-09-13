@@ -1,0 +1,25 @@
+{
+  "source": "e91e521813aff67c44bae51d00dfae212b56ef7e",
+  "run_id": 34780575628,
+  "attempt": 1,
+  "job_id": 103786726556,
+  "artifact": {
+    "run_id": 34780575628,
+    "id": 10325645209,
+    "name": "windows-regression-transport-storage",
+    "digest": "sha256:0ea8094f3a3a781d14c0a8827b78071f153dc572d8efad8a1850d70b66fc8a60",
+    "bytes": 20483,
+    "created_at": "2026-09-13T20:51:13Z",
+    "api_workflow_head": "e91e521813aff67c44bae51d00dfae212b56ef7e"
+  },
+  "test_counts": {
+    "failed": 6,
+    "passed": 350,
+    "skipped": 1,
+    "setup_errors": 14
+  },
+  "all_failures_same_reserved_space_refusal": true,
+  "original_native_log_sha256": "b4984c6df6ade95423be5299da1f5685281937332ece54b7474374ee17baeab5",
+  "product_changes": false,
+  "physical_acceptance": "NOT_STARTED"
+}
