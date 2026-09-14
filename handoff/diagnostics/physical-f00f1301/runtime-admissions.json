@@ -1,0 +1,237 @@
+{
+  "schema": 1,
+  "status": "RUNTIME_ADMISSIONS_COMPLETED",
+  "candidate": "f00f13013b58e0023f1a506e32daa86df37af7ae",
+  "tree": "49c6f273afa82059d45dbc2bdffb5168b083f25d",
+  "baseline": "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d",
+  "retained_at": "2026-09-14T07:25:42.137248+00:00",
+  "freeze": {
+    "private_receipt": ".acceptance/pr490-runtime-admission-retention/local/source/authoritative-freeze.json",
+    "sha256": "0c5127ae2d2dc8885182f38c908dc544789f38cf3e9de69bc12d1f1e56366d25"
+  },
+  "qualification": {
+    "private_receipt": ".acceptance/pr490-runtime-admission-retention/local/source/main-qualification.json",
+    "sha256": "9d4c1c55046ca86110e728e6638a2e4a7d15e36c9cd4db377af82a0984ae6ff4"
+  },
+  "admissions": {
+    "windows-creator": {
+      "status": "COMPLETED",
+      "candidate": "f00f13013b58e0023f1a506e32daa86df37af7ae",
+      "normal_launcher_exit_code": 0,
+      "started_at": "2026-09-14T07:08:27.535350+00:00",
+      "finished_at": "2026-09-14T07:09:35.770353+00:00",
+      "core_images_verified": 3,
+      "core_images": {
+        "flask": {
+          "image_id": "sha256:5988a5967875b778e84815e797d906fc9750547c5d61367839e9901eeadf56ab",
+          "build_commit": "f00f13013b58e0023f1a506e32daa86df37af7ae"
+        },
+        "relay": {
+          "image_id": "sha256:98d9779632751a03b93e6279d7617e76d96a5cbbaf1f77eeeb5197ee43d2f497",
+          "build_commit": "f00f13013b58e0023f1a506e32daa86df37af7ae"
+        },
+        "recorder": {
+          "image_id": "sha256:cc8a4b5379c2e0889b9b49a5486d3c6f25e4b5eb5327beb18bf158c0a14e47bb",
+          "build_commit": "f00f13013b58e0023f1a506e32daa86df37af7ae"
+        }
+      },
+      "actual_binding_verified": true,
+      "mount_environment_user_preservation_verified": true,
+      "activation": {
+        "private_receipt": ".acceptance/pr490-runtime-admission-retention/local/creator-control/activation.json",
+        "sha256": "21dd15e9a9eb8b88777143498e1a43a602b7278535cb6dee6d5664a74b7e1dd8"
+      },
+      "binding": {
+        "private_receipt": ".acceptance/pr490-runtime-admission-retention/local/creator-control/runtime-binding.json",
+        "sha256": "dac9b2eceb4e897c353ee85336a6a68b08ec1966777ea74fa7612a601df0d7ef"
+      },
+      "binding_observation": {
+        "private_receipt": ".acceptance/pr490-runtime-admission-retention/local/creator-control/binding-observation.json",
+        "sha256": "70a12f3f64ab51959ce4e82217596950cf8f9d426c73d37122dce82f611dac96"
+      },
+      "raw_log": {
+        "private_receipt": ".acceptance/pr490-runtime-admission-retention/local/creator-control/activation.private.log",
+        "sha256": "61781790fabe930c54c086cd12d19068431d1cc10977006c9be622f6c03a5708"
+      }
+    },
+    "windows-warm": {
+      "status": "COMPLETED",
+      "candidate": "f00f13013b58e0023f1a506e32daa86df37af7ae",
+      "normal_launcher_exit_code": 0,
+      "started_at": "2026-09-14T07:10:29.875250+00:00",
+      "finished_at": "2026-09-14T07:11:38.864579+00:00",
+      "core_images_verified": 3,
+      "core_images": {
+        "flask": {
+          "image_id": "sha256:86e65d9479e680059073386e8cfcf67acfb5b72a06bf82c79c93a7848c83dde5",
+          "build_commit": "f00f13013b58e0023f1a506e32daa86df37af7ae"
+        },
+        "relay": {
+          "image_id": "sha256:735308f9921aede62b0166161760516e53687f868428a4b9aff048afeed5670f",
+          "build_commit": "f00f13013b58e0023f1a506e32daa86df37af7ae"
+        },
+        "recorder": {
+          "image_id": "sha256:c3d5c234c5ec686541043db6612a309a4f7a9e116c1b4fe8a207473ae892ade2",
+          "build_commit": "f00f13013b58e0023f1a506e32daa86df37af7ae"
+        }
+      },
+      "actual_binding_verified": true,
+      "mount_environment_user_preservation_verified": true,
+      "activation": {
+        "private_receipt": ".acceptance/pr490-runtime-admission-retention/local/windows/runtime-control/candidate-admission.json",
+        "sha256": "f86afc128c100be8a2ae7322491f1c2aefc4e9256bb49d8c7f6705e0c74abfc2"
+      },
+      "binding": {
+        "private_receipt": ".acceptance/pr490-runtime-admission-retention/local/windows/runtime-control/runtime-binding.json",
+        "sha256": "949abac272fca4d672e4ce929e8faf5411e056432b238b6ccd6f190a533f9d4c"
+      },
+      "binding_observation": {
+        "private_receipt": ".acceptance/pr490-runtime-admission-retention/local/windows/runtime-control/binding-observation.json",
+        "sha256": "b33a6bd533f0b79e2adb0624dfac5cf23d4016ae976fdd771275ee138d72f759"
+      },
+      "raw_log": {
+        "private_receipt": ".acceptance/pr490-runtime-admission-retention/local/windows/runtime-control/candidate-admission.private.log",
+        "sha256": "89407a790c311381747e49f2f911e224b54f23dccc8db53b01a0690f4617bf07"
+      }
+    },
+    "nitro-warm": {
+      "status": "COMPLETED",
+      "candidate": "f00f13013b58e0023f1a506e32daa86df37af7ae",
+      "normal_launcher_exit_code": 0,
+      "started_at": "2026-09-14T07:13:13.739536+00:00",
+      "finished_at": "2026-09-14T07:21:53.009791+00:00",
+      "core_images_verified": 3,
+      "core_images": {
+        "flask": {
+          "image_id": "sha256:00e302ffd771f5bbaa8caa1b6a9f1364378fee08beed21a9dd887d85bcb02b34",
+          "build_commit": "f00f13013b58e0023f1a506e32daa86df37af7ae"
+        },
+        "relay": {
+          "image_id": "sha256:4bfc610ef662a6554aa2a49418d8d918116593e60695a39f077a7c907617dce7",
+          "build_commit": "f00f13013b58e0023f1a506e32daa86df37af7ae"
+        },
+        "recorder": {
+          "image_id": "sha256:0e21be63853123f6a9751a1372ce2e4ec42a15e3a82494486be39a85c2259de7",
+          "build_commit": "f00f13013b58e0023f1a506e32daa86df37af7ae"
+        }
+      },
+      "actual_binding_verified": true,
+      "mount_environment_user_preservation_verified": true,
+      "activation": {
+        "private_receipt": ".acceptance/pr490-runtime-admission-retention/nitro/retained/runtime-control/candidate-admission.json",
+        "sha256": "10bcee347a0e7796d5dae4ad2a787ec1fbff061ceb3fb0d4cdb0ab06b04d4bb3"
+      },
+      "binding": {
+        "private_receipt": ".acceptance/pr490-runtime-admission-retention/nitro/retained/runtime-control/runtime-binding.json",
+        "sha256": "fe2805abebd3620ff1614c46181fce3f7873b124a9f04888cc2caaef505dcf32"
+      },
+      "binding_observation": {
+        "private_receipt": ".acceptance/pr490-runtime-admission-retention/nitro/retained/runtime-control/binding-observation.json",
+        "sha256": "4d7b1992aaa07e60b62ad4566d98d41872a60cfa1f3ae8b8b0bacfb306a30af3"
+      },
+      "raw_log": {
+        "private_receipt": ".acceptance/pr490-runtime-admission-retention/nitro/retained/runtime-control/candidate-admission.private.log",
+        "sha256": "6538d11ac44b2321bd082cf2de0182f129f5ead64445edf0b26158e61bd20f2e"
+      }
+    }
+  },
+  "native_source_preparation": {
+    "status": "SOURCE_PREPARED",
+    "candidate": "f00f13013b58e0023f1a506e32daa86df37af7ae",
+    "source_admission": {
+      "private_receipt": ".acceptance/pr490-runtime-admission-retention/native-append/native-control/source-admission.json",
+      "sha256": "b8a8a073f38e223bb91fbb509cdd93d06694b1099852e7e11edb9ba3b1755ef1"
+    },
+    "binding": {
+      "private_receipt": ".acceptance/pr490-runtime-admission-retention/native-append/native-control/runtime-binding.json",
+      "sha256": "8ed9fb680472396fcd8b549a27c89797e1c7f276b0d3b6d6e53df9d429f68977"
+    },
+    "membership_preserved_in_place": true,
+    "native_runtime_started_by_source_admission": false,
+    "pairing_continuity_proof": {
+      "private_receipt": ".acceptance/pr490-runtime-admission-retention/native-append/pairing-continuity/proof.json",
+      "sha256": "34dc371e60f994bc8bc2c4c9a8fc6a716468b7dda247a8cf0eac6444900e9c88"
+    },
+    "root_review": {
+      "private_receipt": ".acceptance/pr490-runtime-admission-retention/native-append/pairing-continuity/root-review.json",
+      "sha256": "ec460c4010576a4e7df1ab68fb3fbab1925776471f80c0fd41b57ceff3e92950"
+    },
+    "scope": "Reviewed expected pairing hash correction to exact current bytes; native source staging only. No membership mutation or physical acceptance result."
+  },
+  "quiescence": {
+    "windows-warm": {
+      "status": "EXACT_OWNED_AGENT_QUIESCENCE_OBSERVED",
+      "receipt": {
+        "private_receipt": ".acceptance/pr490-runtime-admission-retention/local/windows/quiescence-f00/status.json",
+        "sha256": "a720c4d22f549f4d682b8904481c21bfa130d56529af29c7dd0f169891b86fb9"
+      },
+      "boundary": {
+        "private_receipt": ".acceptance/pr490-runtime-admission-retention/local/windows/quiescence-f00/boundary.private.json",
+        "sha256": "b6f2d0bdb6ea2087c30e1da021fcb97ccfcf82f1e7488793882541c86646643d"
+      }
+    },
+    "nitro-warm": {
+      "status": "EXACT_OWNED_AGENT_QUIESCENCE_OBSERVED",
+      "receipt": {
+        "private_receipt": ".acceptance/pr490-runtime-admission-retention/nitro/retained/warm-agent-quiescence/nitro-quiescence-f00/status.json",
+        "sha256": "c046195748e6ed348ff37b52b260cc3f734953b06733fb2d0c13f901b7974bfc"
+      },
+      "boundary": {
+        "private_receipt": ".acceptance/pr490-runtime-admission-retention/nitro/retained/warm-agent-quiescence/nitro-quiescence-f00/boundary.private.json",
+        "sha256": "f7c0a455b87e50c0ae6418eb362684eef8f420537471b5fd375575d865abc73c"
+      }
+    },
+    "windows-creator": {
+      "original_status": "REFUSED",
+      "successful_original_stop_receipt_available": false,
+      "original_signal_outcome": "Unknown because the boundary receipt write failed; no successful stop is inferred.",
+      "mechanism": "Relative receipt path resolved under the child runtime working directory.",
+      "original_refusal": {
+        "private_receipt": ".acceptance/pr490-runtime-admission-retention/local/creator-transition/quiescence-f00/status.json",
+        "sha256": "b45a583aad552360cde20ee9224c8c018c6042a6131a35af76cfe749499d9622"
+      },
+      "original_raw_stderr": {
+        "private_receipt": ".acceptance/pr490-runtime-admission-retention/local/creator-transition/quiescence-f00/stderr.private.log",
+        "sha256": "d1413e8f12aed110f4de6c960b097ebeb68d4f9c891cbd5ca54b1f4698e5ab99"
+      },
+      "disposition": {
+        "private_receipt": ".acceptance/pr490-runtime-admission-retention/local/creator-transition/quiescence-followup/disposition.json",
+        "sha256": "73073d21afd8af01a490c39fb50b754a95754f781493190ba20bc10b2bb4eeb7"
+      },
+      "later_single_read_only_absence_observation": {
+        "private_receipt": ".acceptance/pr490-runtime-admission-retention/local/creator-transition/quiescence-followup/private-identity-state.json",
+        "sha256": "3f8f40e8bea82c1c9e4b103b717c4e32ad904ca38ffc144af7d691d85f5187c0"
+      },
+      "continuation": "The captured pair was absent; subsequent normal stage guards passed and activation produced a verified new ordinary resident pair.",
+      "new_resident": {
+        "private_receipt": ".acceptance/pr490-runtime-admission-retention/local/creator-transition/resident-f00/status.json",
+        "sha256": "dcbaa7dbf1f56dc1c2d2442d5b8f62eb5d8af8cf1b4d233b219294a3d09c36ad"
+      },
+      "new_resident_boundary": {
+        "private_receipt": ".acceptance/pr490-runtime-admission-retention/local/creator-transition/resident-f00/process-boundary.private.json",
+        "sha256": "1153e6ecd922ae6287d39f882537503c1c9636b2da6c4122e3c335ab39fe7a2f"
+      },
+      "stop_retry_performed": false
+    }
+  },
+  "private_retention_manifests": {
+    "local": {
+      "private_receipt": ".acceptance/pr490-runtime-admission-retention/local-retention.private.json",
+      "sha256": "83e4cba79d873fa6ef8b2d2fac062bafa774c627ec822e19f7c5da9285f60737"
+    },
+    "nitro": {
+      "private_receipt": ".acceptance/pr490-runtime-admission-retention/nitro-retention.private.json",
+      "sha256": "22366876453f590a735c10514b7726e849cde26d31de0b90a134d329cf43ccc4"
+    },
+    "native_append": {
+      "private_receipt": ".acceptance/pr490-runtime-admission-retention/native-append-retention.private.json",
+      "sha256": "d16381766fa2fd335ec2fecffbc901c5a25c5639b7ba3aa55f6b8ad3a2f516d1"
+    }
+  },
+  "evidence_scope": "Completed source/runtime admissions only. No P01-P12 physical result is asserted or carried from another candidate.",
+  "warm_resident_proof": "Not part of these admission receipts; do not infer a separate live process-identity verification.",
+  "protected_recorder_data_accessed": false,
+  "aqg_dependency": false,
+  "runtime_actions_by_retention": 0,
+  "physical_acceptance_pass": false
+}

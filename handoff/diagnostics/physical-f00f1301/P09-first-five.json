@@ -1,0 +1,231 @@
+{
+  "schema": "fcp.physical.p09.first-five-result.v1",
+  "candidate": "f00f13013b58e0023f1a506e32daa86df37af7ae",
+  "status": "FIVE_ASSERTIONS_TWELVE_WINDOWS_PASS",
+  "started_at": "2026-09-14T07:23:47.026031+00:00",
+  "finished_at": "2026-09-14T07:26:10.806509+00:00",
+  "assertions": [
+    {
+      "assertion": "raw-publication",
+      "verdict": "pass",
+      "windows": [
+        {
+          "kind": "raw",
+          "boundary": "before",
+          "first": 17,
+          "last": 32,
+          "interrupted_exit_code": 137,
+          "checkpoint_after_interruption": 17,
+          "checkpoint_after_recovery": 33,
+          "prior_committed_files_unchanged": true,
+          "primary_proof_sha256": "0773fe8b728852b9fb3f75bb80b5785345aa7decf266740f19bb9a6ae9532de4",
+          "rendezvous_sha256": "fd57a80fe83064cc7b168a668ad39cb6ea36b268c4f91677f632d9f7bdef865e"
+        },
+        {
+          "kind": "raw",
+          "boundary": "after",
+          "first": 33,
+          "last": 48,
+          "interrupted_exit_code": 137,
+          "checkpoint_after_interruption": 33,
+          "checkpoint_after_recovery": 49,
+          "prior_committed_files_unchanged": true,
+          "primary_proof_sha256": "5e9efd932527816cd822700ceb97c62621eb25cd2e3f5dbca961080d9deba027",
+          "rendezvous_sha256": "65b23b41df180ee56c326ebdf0cfee9f943e4cac4a6225fe27eaef6b5a5c2b7b"
+        }
+      ],
+      "canonical_observation_count": 48,
+      "canonical_replay_same_content": true,
+      "checked_verify_sha256": "7e83b386037ec40a79ff379ea69220134441176dc013f0ddba415fd81975d2e2",
+      "checked_packet_sha256": "1a4da511675aad42db7dec717a025d03d30264e950ce431d8d2a4357683a1fcd",
+      "primary_summary_sha256": "2a2aa14fa90f13c06967440ce8861797bd40c6b043c2d40ddfd8edf8e09e27c6"
+    },
+    {
+      "assertion": "raw-manifest",
+      "verdict": "pass",
+      "windows": [
+        {
+          "kind": "manifest",
+          "boundary": "before",
+          "first": 17,
+          "last": 32,
+          "interrupted_exit_code": 137,
+          "checkpoint_after_interruption": 17,
+          "checkpoint_after_recovery": 33,
+          "prior_committed_files_unchanged": true,
+          "primary_proof_sha256": "ed09f2c65a46147518322c4dfdf676a77c9bd226b82f70aa25a79262219cebed",
+          "rendezvous_sha256": "ba395d497b10cb7763b6be3281a7e5939b9b522b67b6f0122c331c45bf761031"
+        },
+        {
+          "kind": "manifest",
+          "boundary": "after",
+          "first": 33,
+          "last": 48,
+          "interrupted_exit_code": 137,
+          "checkpoint_after_interruption": 33,
+          "checkpoint_after_recovery": 49,
+          "prior_committed_files_unchanged": true,
+          "primary_proof_sha256": "e2ec4a95fd3362817285c6216ea6f78a0d34397a03c605e2dcf3c8df9189c740",
+          "rendezvous_sha256": "867b302e3f42fc25219e3b38ec58377d279a2460199b06403df4d9095511624c"
+        }
+      ],
+      "canonical_observation_count": 48,
+      "canonical_replay_same_content": true,
+      "checked_verify_sha256": "ad36d849287c9c2a3a17cea6968d6c8e6515d6ecb82e671647fb1eae5ef33263",
+      "checked_packet_sha256": "adca9baedb3bf33890b77469751a4f27eeb9b44b85c758e058ac7990216f984c",
+      "primary_summary_sha256": "72ca2b75c36cd667238c6234dcf528872e26ef00d7d4415b401c82bc3482c46c"
+    },
+    {
+      "assertion": "observation-archive",
+      "verdict": "pass",
+      "windows": [
+        {
+          "kind": "observations",
+          "boundary": "before",
+          "first": 17,
+          "last": 32,
+          "interrupted_exit_code": 137,
+          "checkpoint_after_interruption": 17,
+          "checkpoint_after_recovery": 33,
+          "prior_committed_files_unchanged": true,
+          "primary_proof_sha256": "e2338beeb997daed3134f5d998bcf68b88574b91aed43847a572b20a82245b29",
+          "rendezvous_sha256": "979334e8db6eebbdfbb48ec1e5d7ef66b101314cdb0f7d9566d6d914d1ed3c05"
+        },
+        {
+          "kind": "observations",
+          "boundary": "after",
+          "first": 33,
+          "last": 48,
+          "interrupted_exit_code": 137,
+          "checkpoint_after_interruption": 33,
+          "checkpoint_after_recovery": 49,
+          "prior_committed_files_unchanged": true,
+          "primary_proof_sha256": "51726e05171c2d4fe16cbb370e89068e85cff32ad8322a13175c72b2dcecedd8",
+          "rendezvous_sha256": "0450089768d344bfb520c8f3cd65b296d4540fe48953ae7bb938eeac3ce38144"
+        }
+      ],
+      "canonical_observation_count": 48,
+      "canonical_replay_same_content": true,
+      "checked_verify_sha256": "2acb8062252975e5289703e511e403b5f21370ebc916584c590507dfc4fe768a",
+      "checked_packet_sha256": "ded98081bad9bfef4a315e9c259a3d3f8cd85dbdd59fcec6c10535fe89ea03dc",
+      "primary_summary_sha256": "4ede664ffa233568fcebad9078296835bdfe01d7d8832abaead59d872900ce0d"
+    },
+    {
+      "assertion": "compat-jsonl",
+      "verdict": "pass",
+      "windows": [
+        {
+          "kind": "jsonl",
+          "boundary": "before",
+          "first": 17,
+          "last": 32,
+          "interrupted_exit_code": 137,
+          "checkpoint_after_interruption": 17,
+          "checkpoint_after_recovery": 33,
+          "prior_committed_files_unchanged": true,
+          "primary_proof_sha256": "8a92911e711ed11b05c8a549b4cb374ffb7c80088050901c103bd69d38bdf830",
+          "rendezvous_sha256": "113d591d315ade92e957a1cbe3593a8f9581bde65ccd579e01295001ea82888b"
+        },
+        {
+          "kind": "jsonl",
+          "boundary": "after",
+          "first": 33,
+          "last": 48,
+          "interrupted_exit_code": 137,
+          "checkpoint_after_interruption": 33,
+          "checkpoint_after_recovery": 49,
+          "prior_committed_files_unchanged": true,
+          "primary_proof_sha256": "bf97c5fad4e4d4afa55b2869a6701e63c26564554e31ee2e1c0f05251ba6370a",
+          "rendezvous_sha256": "fd8b0b497e9051369e56294e880e1cadab7e825a104d58568442b5d5cf5992ab"
+        }
+      ],
+      "canonical_observation_count": 48,
+      "canonical_replay_same_content": true,
+      "checked_verify_sha256": "dfce51ec57efcbb2e2d18e56bc42d56ae79a5ce293b9c20ff695066a03f34aee",
+      "checked_packet_sha256": "8ca1053bcb94c05b7fe708ec6e14d8801ff8e9a7127d92246723885ed333e117",
+      "primary_summary_sha256": "a83b135eec58c1f59b15ffde6151f6b5cd6bda80126f0c00456af65e643dc8e2"
+    },
+    {
+      "assertion": "checkpoint-status",
+      "verdict": "pass",
+      "windows": [
+        {
+          "kind": "checkpoint",
+          "boundary": "before",
+          "first": 17,
+          "last": 32,
+          "interrupted_exit_code": 137,
+          "checkpoint_after_interruption": 17,
+          "checkpoint_after_recovery": 33,
+          "prior_committed_files_unchanged": true,
+          "primary_proof_sha256": "1f81002919b3e0e5ba0df3447e8baa77dfc071ff57df01435032b522989e0fe4",
+          "rendezvous_sha256": "a72eac134f27ed1f879d7727e38b7b46b31df099d161e7e44bc3aa62bc8a8234"
+        },
+        {
+          "kind": "checkpoint",
+          "boundary": "after",
+          "first": 33,
+          "last": 48,
+          "interrupted_exit_code": 137,
+          "checkpoint_after_interruption": 49,
+          "checkpoint_after_recovery": 49,
+          "prior_committed_files_unchanged": true,
+          "primary_proof_sha256": "f5b4f3ac99e4529b187f9c1b4e34b3b5a04f94669849036988f4c66e634ead0e",
+          "rendezvous_sha256": "d636910336410ca2aa615a2eeb6e96bcef5e90d5cdc7c0e70432ac40d30f5ba0"
+        },
+        {
+          "kind": "status",
+          "boundary": "before",
+          "first": 49,
+          "last": 64,
+          "interrupted_exit_code": 137,
+          "checkpoint_after_interruption": 65,
+          "checkpoint_after_recovery": 65,
+          "prior_committed_files_unchanged": true,
+          "primary_proof_sha256": "6077a5b9cd15bab3a83446def31280ab6fc954d7bbbeda1e18ca6f84077ff629",
+          "rendezvous_sha256": "aaf69ccc1272cca1fd9b5b79886d60545f29ea391bcaf1d7cbe2e9fe63313e44"
+        },
+        {
+          "kind": "status",
+          "boundary": "after",
+          "first": 65,
+          "last": 80,
+          "interrupted_exit_code": 137,
+          "checkpoint_after_interruption": 81,
+          "checkpoint_after_recovery": 81,
+          "prior_committed_files_unchanged": true,
+          "primary_proof_sha256": "967aac0b3aef66cd2a47bbfe33c6f9bd2316a59a7313fb49f98d8667ea75a5ee",
+          "rendezvous_sha256": "3c58d6299a6e0dfe403fedd37623d24072fde9985a268c73700f251e7b18242e"
+        }
+      ],
+      "canonical_observation_count": 80,
+      "canonical_replay_same_content": true,
+      "checked_verify_sha256": "bddb39cb2b1b7567d4937c3220fc227e1e2b3c079d9dcd93ec79dac1e8a03a52",
+      "checked_packet_sha256": "cfb2a9a0afa65d6799f58618fdcc4afad3a04192480e7f6c32b0850264e84f83",
+      "primary_summary_sha256": "566b1060335648e64014c00a3608f968df7919c8f40d42a24d9577618127f306"
+    }
+  ],
+  "private_retention_sha256": "1db3f1cc3f4f9d32cd2b96571916318912f0138e98cc8e6251c08530fa0864d7",
+  "source_admission_sha256": "09ad9a1e209c40d1ddc2a605a876026e3d2ce886dfddade334187a47caf1205c",
+  "executor_sha256": "3dbc8084b7febad171ff3db12c48ce2251a114afc5a2b1310c3a3e1145ebd081",
+  "fault_windows": 12,
+  "assertions_passed": 5,
+  "ordinary_product_recovery": true,
+  "manual_repair": false,
+  "assertions_or_deadlines_changed": false,
+  "shared_native_or_creator_touched": false,
+  "protected_data_accessed": false,
+  "timers_started": false,
+  "P09_complete": false,
+  "physical_campaign_pass": false,
+  "remaining_P09": [
+    "outbox-transaction",
+    "analysis-slice",
+    "upload-transitions",
+    "sqlite-wal",
+    "coordinator-disappearance",
+    "positive-clock-skew",
+    "negative-clock-skew",
+    "authority-projection"
+  ]
+}
