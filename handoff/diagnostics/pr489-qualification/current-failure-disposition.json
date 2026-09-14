@@ -1,0 +1,36 @@
+{
+  "source": "a158465bedae7979a4ec5f86d2402b4303ec42b5",
+  "api_head": "14e0193535a9fc1024bde95ae1f49b8940bfd9d9",
+  "reviewed_at": "2026-09-14T01:38:51.481069+00:00",
+  "classification": "UNRESOLVED_NON_DEMONSTRATED_CANDIDATE_DEFECT",
+  "common_observed_mechanism": "Both use a once-ready successor endpoint and later receive the unchanged current-leader fence. This identifies an authority transition at the request boundary, not its cause or duration.",
+  "candidate_repair_path_implicated": false,
+  "infrastructure_cause_proven": false,
+  "deterministic_harness_defect_proven": false,
+  "root_review": "Read exact current ICSE successor selection/reconnect/send, transaction readiness/receipt/grant assertions and require_quorum_leader/enroll_node order. Required runs remain red until qualified recovery; no PASS substitution.",
+  "one_failed_only_recovery_per_run_authorized": true,
+  "recovery_conditions": "Only after attempt1 terminal, same PR synthetic source/head/base, exactly reviewed failing jobs, unchanged source/runner/assertions/deadlines. Retain all original evidence. If failure repeats, no automatic further retry.",
+  "runs": {
+    "34795691398": {
+      "failed_job_ids": [
+        103828224089
+      ],
+      "candidate_defect_demonstrated": false,
+      "disposition_sha256": "833e91ee59ce23f263d71f2b8e814075b488b94e44cd806a3e1726943cd3405f"
+    },
+    "34795691356": {
+      "failed_job_ids": [
+        103828223816
+      ],
+      "candidate_defect_demonstrated": false,
+      "assertion": "reused-enrollment-token expected; federation-quorum-leader-required received",
+      "path": "catalog/federation/tests/test_control_plane_product_transactions.py:316",
+      "native_log_sha256": "17c9cb82aa312ed403636d6df78f9a0f5acbd47a547a3ce2d05a6941332dca47",
+      "artifact_id": 10329264641,
+      "artifact_digest": "sha256:617fbe2eb645d1f6702fa86506fe7961a81e8c7490fb0849579aa166711ff00b"
+    }
+  },
+  "physical_pass": false,
+  "whole_ci_rerun": false,
+  "protected_data_touched": false
+}

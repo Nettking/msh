@@ -1,0 +1,19 @@
+542: 2026-09-14T01:26:06.7625919Z 2026-09-14T01:26:06.761572Z 06 — The original leader process has actually exited
+543: 2026-09-14T01:26:16.4121433Z 2026-09-14T01:26:16.410832Z 07 — Surviving voters retain the Federation and advance authority
+544: 2026-09-14T01:26:41.9583856Z Demonstration failed: WorkerCommandFailure; details retained in private-state
+545: 2026-09-14T01:26:44.9200713Z NETWORK_DEMO=FAIL SOURCE_SHA=a158465bedae7979a4ec5f86d2402b4303ec42b5
+546: 2026-09-14T01:26:44.9549371Z ##[error]Process completed with exit code 1.
+547: 2026-09-14T01:26:44.9621140Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: <redacted-endpoint>
+548: 2026-09-14T01:26:44.9622170Z ##[group]Run actions/upload-artifact@v4
+549: 2026-09-14T01:26:44.9622396Z with:
+550: 2026-09-14T01:26:44.9622570Z   name: icse-network-summary-Linux
+551: 2026-09-14T01:26:44.9622904Z   path: /opt/actions-runner/_work/_temp/fcp-icse-network-34795691398-1-Linux/public/
+552: 2026-09-14T01:26:44.9623253Z   if-no-files-found: error
+553: 2026-09-14T01:26:44.9623449Z   compression-level: 6
+554: 2026-09-14T01:26:44.9623637Z   overwrite: false
+555: 2026-09-14T01:26:44.9623816Z   include-hidden-files: false
+556: 2026-09-14T01:26:44.9624012Z env:
+557: 2026-09-14T01:26:44.9624206Z   TMPDIR: /opt/actions-runner/_work/_temp/fcp-test-tmp
+558: 2026-09-14T01:26:44.9624464Z ##[endgroup]
+559: 2026-09-14T01:26:45.1068385Z (node:192331) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+560: 2026-09-14T01:26:45.1069033Z (Use `node --trace-deprecation ...` to show where the warning was created)

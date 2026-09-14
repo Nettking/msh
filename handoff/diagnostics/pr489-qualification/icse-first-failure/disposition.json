@@ -1,0 +1,178 @@
+{
+  "CI_or_product_mutation_performed": false,
+  "all_owned_demo_processes_stopped": true,
+  "api_head": "14e0193535a9fc1024bde95ae1f49b8940bfd9d9",
+  "authority_ambiguity": "The public artifact has no authority snapshot contemporaneous with the rejection or server-side stack. The error identifies lost/mismatched leader authority at an unchanged guard; it does not establish why or for how long. Infrastructure/transient cause is not proven.",
+  "base_source": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "checks_completed_count": 6,
+  "checks_completed_pass": [
+    "authenticated_enrollment_and_join",
+    "authenticated_payload_delivery",
+    "authenticated_quorum_bootstrap",
+    "automatic_quorum_failover_and_continuity",
+    "discovery_and_owner_authorization",
+    "independent_processes"
+  ],
+  "classification": "UNRESOLVED_NON_DEMONSTRATED_CANDIDATE_DEFECT",
+  "code_anchors": [
+    {
+      "line": 429,
+      "meaning": "exchange uses fixed voter-b sender and voter-c recipient",
+      "path": "demo/icse/network/run.py"
+    },
+    {
+      "line": 473,
+      "meaning": "successor_ready checks current consensus/session leader and readiness once",
+      "path": "demo/icse/network/run.py"
+    },
+    {
+      "line": 494,
+      "meaning": "capture successor relay URL; reconnect all clients; rediscover; exchange(2)",
+      "path": "demo/icse/network/run.py"
+    },
+    {
+      "line": 262,
+      "meaning": "failed worker RPC raises; outer catch at544 retains FAIL",
+      "path": "demo/icse/network/run.py"
+    },
+    {
+      "line": 137,
+      "meaning": "send invokes real RelayNodeClient.send_message",
+      "path": "demo/icse/network/worker.py"
+    },
+    {
+      "line": 624,
+      "meaning": "send_message emits authenticated relay.message",
+      "path": "catalog/node/client.py"
+    },
+    {
+      "line": 1084,
+      "meaning": "relay.error completes the pending request with RelayRemoteError",
+      "path": "catalog/node/client.py"
+    },
+    {
+      "line": 1624,
+      "meaning": "real route authorizes membership and durably deduplicates before delivery",
+      "path": "catalog/relay/service.py"
+    },
+    {
+      "line": 310,
+      "meaning": "error code rejects a runtime that is not local current consensus leader before quorum synchronization",
+      "path": "catalog/federation/control_plane_product.py"
+    }
+  ],
+  "current_related_observation": {
+    "actual": "federation-quorum-leader-required",
+    "common_mechanism_evidence": "Both observe the same authority guard after a formerly-ready selected successor; underlying cause, timing and reproducibility remain unproven. This is not proof of an identity/idempotency bypass.",
+    "expected": "reused-enrollment-token",
+    "job_id": 103828223816,
+    "line": 316,
+    "run_id": 34795691356,
+    "shared_source_pattern": "That test also captures successor_index once after readiness and later uses that same endpoint. Earlier original-receipt retries and grant checks completed before the final enrollment-reuse assertion.",
+    "test": "test_control_plane_product_transactions.py::test_consumed_grants_and_original_request_receipts_survive_automatic_failover",
+    "workflow": "federation-v1-release.yml"
+  },
+  "failed_artifact": {
+    "api_digest": "sha256:90b71ad014864dbae6d5723c370bde2a4f73b5d88c58870e9ede6b22cf421c37",
+    "id": 10329299218,
+    "sha256": "90b71ad014864dbae6d5723c370bde2a4f73b5d88c58870e9ede6b22cf421c37"
+  },
+  "failed_job_id": 103828224089,
+  "failed_scenario": "successor_reconnect_and_delivery",
+  "failure": {
+    "command": {
+      "error_code": "federation-quorum-leader-required",
+      "error_type": "RelayRemoteError",
+      "operation": "send",
+      "worker": "voter-b"
+    },
+    "type": "WorkerCommandFailure"
+  },
+  "last_authority_observation": {
+    "alias": "voter-b",
+    "at": "2026-09-14T01:26:16.410832Z",
+    "consensus_term": 2,
+    "ready": true,
+    "role": "LEADER"
+  },
+  "native_log_sha256": "e4c6f13934bcebdb2b6c24dfa6e663a018adfc2398c7516852131fde8d1c1d3f",
+  "native_source_verified": true,
+  "physical_acceptance": "NOT_EVALUATED",
+  "platform": "Linux",
+  "protected_data_accessed": false,
+  "recommended_next_action": "After the workflow is terminal and root reviews retained evidence, one failed-job-only recovery on unchanged source/runner/settings is justified. Retain this original artifact and log. If the same current mechanism repeats, inspect that bounded current evidence before further retries; no blanket rerun.",
+  "relabelled_pass": false,
+  "release_implication": "This ICSE run remains FAIL and supplies no ten-check network PASS. Current evidence is insufficient to promote the manifest repair to a demonstrated candidate defect or to call this infrastructure proven. The mandatory release failure is separately owned by root and remains blocking until its required gate passes.",
+  "remaining_expected_checks_not_passed": true,
+  "retry_performed": false,
+  "run_attempt": 1,
+  "run_id": 34795691398,
+  "schema": "fcp.current-ci-failure-disposition.v1",
+  "selection_semantics": {
+    "authority_transition_handling": "No retry, fresh successor selection or authority-transition catch surrounds exchange(2); WorkerCommandFailure reaches the outer failure recorder. The producer should not be replaced with a leader merely to obtain green.",
+    "post_selection_operations": "All three clients explicitly reconnect to that captured endpoint and reviewer discovery completes before exchange(2). Reaching the send error proves these earlier RPCs returned.",
+    "recipient": "voter-c is the fixed reading-viewer capability owner",
+    "relay_endpoint": "successor_ready selects whichever surviving voter is ready/current leader; its relay URL is captured once after Step07",
+    "sender": "voter-b is the fixed synthetic-readings capability owner before and after failover; sender selection is not leader selection"
+  },
+  "source": "a158465bedae7979a4ec5f86d2402b4303ec42b5",
+  "source_relationship": {
+    "changed_function_in_retained_failure": false,
+    "changed_paths": [
+      "catalog/federation/manifest_store.py",
+      "catalog/federation/phase_d_control.py",
+      "catalog/federation/tests/test_manifest_read_snapshot.py"
+    ],
+    "identified_path_blobs": {
+      "catalog/federation/control_plane_facade.py": {
+        "base_blob": "d9e321801765f07782d69aa6c659398ea5b1a233",
+        "source_blob": "d9e321801765f07782d69aa6c659398ea5b1a233",
+        "unchanged": true
+      },
+      "catalog/federation/control_plane_product.py": {
+        "base_blob": "b88217a5c268d8ba0c2f786fe028b31d2238b43c",
+        "source_blob": "b88217a5c268d8ba0c2f786fe028b31d2238b43c",
+        "unchanged": true
+      },
+      "catalog/federation/coordinator.py": {
+        "base_blob": "90dca36e2422ffe2c469f60e1def92703eedc0a9",
+        "source_blob": "90dca36e2422ffe2c469f60e1def92703eedc0a9",
+        "unchanged": true
+      },
+      "catalog/federation/persistence.py": {
+        "base_blob": "d014389dfbb2a5f4044b5d09c8015a2beed41af8",
+        "source_blob": "d014389dfbb2a5f4044b5d09c8015a2beed41af8",
+        "unchanged": true
+      },
+      "catalog/federation/tests/test_control_plane_product_transactions.py": {
+        "base_blob": "d45dc076f24d6f024451df204743819f9fb9c24f",
+        "source_blob": "d45dc076f24d6f024451df204743819f9fb9c24f",
+        "unchanged": true
+      },
+      "catalog/node/client.py": {
+        "base_blob": "02df24402aa46a28b92d8467dda84d49123aef37",
+        "source_blob": "02df24402aa46a28b92d8467dda84d49123aef37",
+        "unchanged": true
+      },
+      "catalog/relay/service.py": {
+        "base_blob": "c8a39e496fe3798f8b3ef4439ebf2cf8ab18d913",
+        "source_blob": "c8a39e496fe3798f8b3ef4439ebf2cf8ab18d913",
+        "unchanged": true
+      },
+      "demo/icse/network/run.py": {
+        "base_blob": "5ff5343673d718071e44d55bc005de0d9db8c532",
+        "source_blob": "5ff5343673d718071e44d55bc005de0d9db8c532",
+        "unchanged": true
+      },
+      "demo/icse/network/worker.py": {
+        "base_blob": "8759ea77a1c3d49966ed56c1697ac9319fe00325",
+        "source_blob": "8759ea77a1c3d49966ed56c1697ac9319fe00325",
+        "unchanged": true
+      }
+    },
+    "statement": "The identified orchestration/client/relay/guard and analogous transaction-test blobs are unchanged from C3. No retained stack implicates manifest history."
+  },
+  "tree": "1e12bfc70c0bc7feecf85ed15a369e2f85bba4ce",
+  "workflow": "icse-tool-demo.yml",
+  "workflow_test_result": "FAIL"
+}

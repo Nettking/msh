@@ -1,6 +1,6 @@
 # Federation v1 current release checkpoint
 
-Updated 2026-09-14T01:33Z. Active context: clean handoff + this file + live GitHub.
+Updated 2026-09-14T01:39Z. Active context: clean handoff + this file + live GitHub.
 Historical coordination is evidence only; consult it for a specific current need.
 
 ## Current source / heads
@@ -31,31 +31,30 @@ Historical coordination is evidence only; consult it for a specific current need
 - F85 standalone Linux timeout remains FAIL; four mandatory actual-main suites
   passed exact non-skipped node. Hosted bootstrap never started: infrastructure.
   Checked dispositions retained. No extra qualification, ICSE capture or retry.
-- Windows/Nitro native readiness complete; fresh canonical campaign registered.
-- Fresh isolated P04/P05/P09:11 assertions PASS, including12 actual OS-kill windows.
-  Native basic:4 PASS; crash-loop fence:1 PASS with real5/15/45/120s backoffs.
-  Windows P03 automated:3 PASS; start.cmd/start-tailscale.cmd PASS; model isolation/
-  absence PASS; P05 path containment/stale responder PID PASS.
-  Corrected P01:three activations/resource baseline/runtime state PASS. Existing
-  actual activations reused; no replacement action.
+- C3 readiness complete;28 physical assertions PASS retained with exact provenance.
+  These cover isolated fault windows, native supervision, Windows launchers/model/
+  path/PID boundaries and corrected P01 activation/resource observations.
 - No physical campaign PASS, release or tag. All C2 evidence remains C2.
 
 ## Actual blockers / prerequisites
-- PR489 qualification running: release34795691356, ICSE34795691398,
-  update34795691374, CF7-B34795691389, Phase2 34795691363; branding34795691376 PASS.
-  ICSE Linux job103828224089 attempt1 failed01:26:49; bounded current-log review
-  active. No retry/disposition yet, no new broad diagnostic sweep.
+- PR489 Phase2 34795691363, CF7-B34795691389 and branding34795691376 PASS.
+  Release34795691356 and update34795691374 still active. Windows journal job
+  103828223816 failed: spent-token assertion hit current-leader fence. ICSE Linux
+  103828224089 hit same fence after reconnect; underlying authority change unknown.
+  Both unresolved/non-demonstrated candidate defects; original evidence retained.
+  ICSE34795691398 failed-only recovery accepted01:38:53; Windows/compose green reused.
+  Release failed-only recovery reviewed, NOT SENT: wait attempt1 terminal; reject
+  additional failures. Details diagnostics/pr489-qualification/current-failure-disposition.json.
 - All12 physical scenarios fresh; zero carry. P07>=1 real hour and P12>=24 real
   hours NOT STARTED. Early faults, complete coverage and measured capacity first.
 - Separate CF7 needs two reachable real CNC sources. Asked once, answer pending.
 - Windows P01 initial per-hour growth FAIL (291.6MB/0.0657h); per-activation PASS.
   Prepared real passive hour; do not start until measured-host builds/faults finish.
 - P09 outbox fault windows not completed; prepared monitoring correction retained.
-- P06 trial not performed: fresh recovery STOPPED00:48:04 with clean native stop.
-  Actual authority ready/committing; eight sequential dataset heads exceed45s.
-  Offline197-revision proof: per-ACK history verifies3full chains,594revision
-  decodes/58,509item validations,5.44sCPU-bound. Aged-data restart defect promoted.
-  No software POST, deadline change or blind restart. AGQ7NCC not in this topology.
+- P06 trial not performed: recovery STOPPED00:48:04, native stopped cleanly.
+  Eight sequential dataset heads exceed45s; aged-manifest startup defect proven.
+  Exact197-revision proof retained in diagnostics/manifest-history-repair.
+  No software POST/deadline change. AGQ7NCC not in this topology.
 - Nitro pressure fixture idle: containment PASS, memory margin refused again00:47
   after completed builds. Host3.26GiB total/1.84GiB available; no product activation.
   Do not repeat until resource state changes; limits unchanged. Inventory retained.
@@ -84,6 +83,8 @@ Historical coordination is evidence only; consult it for a specific current need
    merge/main qualification/new freeze and checked revalidation before physical.
    Agents prepare disabled creator/native and populated-P11 admission controls;
    postrepair-p06-preparation preserves45/100/600/600s limits and latest seed.
+   Prospective checked revalidation: two unknown product paths => all12CF7 fresh,
+   zero carry. This forbids carry, not fresh admission; rerun planner on final main.
 6. C3 general/P01/pressure controls disabled; bindings require next frozen source.
    Current details: diagnostics/physical-48154445/current-physical-dispositions.json.
    Existing30-minute heartbeat active; continue on meaningful state/action changes.

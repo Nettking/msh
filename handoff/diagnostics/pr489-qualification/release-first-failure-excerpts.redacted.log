@@ -1,0 +1,30 @@
+419: 2026-09-14T01:32:30.5053497Z ..........................................s............................. [ 96%]
+420: 2026-09-14T01:32:32.7490032Z ..........                                                               [100%]
+421: 2026-09-14T01:32:32.7491874Z ================================== FAILURES ===================================
+422: 2026-09-14T01:32:32.7492435Z _ test_consumed_grants_and_original_request_receipts_survive_automatic_failover _
+423: 2026-09-14T01:32:32.7492893Z
+424: 2026-09-14T01:32:32.7493417Z tmp_path = WindowsPath('<redacted-path>
+425: 2026-09-14T01:32:32.7493862Z
+426: 2026-09-14T01:32:32.7494320Z     def test_consumed_grants_and_original_request_receipts_survive_automatic_failover(tmp_path: Path) -> None:
+639: 2026-09-14T01:32:32.7602038Z                 await stranger.connect(enrollment_token=enrollment["token"])
+640: 2026-09-14T01:32:32.7602468Z >           assert enrollment_reuse.value.code == "reused-enrollment-token"
+641: 2026-09-14T01:32:32.7602985Z E           AssertionError: assert 'federation-q...ader-required' == 'reused-enrollment-token'
+642: 2026-09-14T01:32:32.7603495Z E
+643: 2026-09-14T01:32:32.7603701Z E             - reused-enrollment-token
+644: 2026-09-14T01:32:32.7603989Z E             + federation-quorum-leader-required
+645: 2026-09-14T01:32:32.7604163Z
+646: 2026-09-14T01:32:32.7604496Z catalog\federation\tests\test_control_plane_product_transactions.py:316: AssertionError
+647: 2026-09-14T01:32:32.7604954Z ============================== warnings summary ===============================
+648: 2026-09-14T01:32:32.7605984Z catalog/federation/tests/test_control_plane_health_leadership_race.py::test_fixture_does_not_retry_listener_bind_error_after_servers_start[reallocated]
+649: 2026-09-14T01:32:32.7607361Z   <redacted-path>
+650: 2026-09-14T01:32:32.7608256Z     fixture_result = next(generator)
+651: 2026-09-14T01:32:32.7608397Z
+672: 2026-09-14T01:32:32.8513428Z 4.85s call     catalog/federation/tests/test_control_plane_session_authority.py::test_real_committed_unsealed_bootstrap_cannot_grant_session_authority
+673: 2026-09-14T01:32:32.8514402Z 4.35s call     catalog/federation/tests/test_control_plane_health_leadership_race.py::test_fixture_does_not_retry_listener_bind_error_after_servers_start[fresh]
+674: 2026-09-14T01:32:32.8515025Z =========================== short test summary info ===========================
+675: 2026-09-14T01:32:32.8516044Z FAILED catalog/federation/tests/test_control_plane_product_transactions.py::test_consumed_grants_and_original_request_receipts_survive_automatic_failover - AssertionError: assert 'federation-q...ader-required' == 'reused-enrollment-token'
+676: 2026-09-14T01:32:32.8516804Z
+677: 2026-09-14T01:32:32.8516993Z   - reused-enrollment-token
+678: 2026-09-14T01:32:32.8517257Z   + federation-quorum-leader-required
+679: 2026-09-14T01:32:32.8517590Z 1 failed, 296 passed, 1 skipped, 1 warning in 491.77s (0:08:11)
+680: 2026-09-14T01:32:33.1395875Z ##[error]Process completed with exit code 1.
