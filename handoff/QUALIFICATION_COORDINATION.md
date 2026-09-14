@@ -1,13 +1,13 @@
 # Federation v1 current release checkpoint
 
-Updated 2026-09-14T01:19Z. Active context: clean handoff + this file + live GitHub.
+Updated 2026-09-14T01:33Z. Active context: clean handoff + this file + live GitHub.
 Historical coordination is evidence only; consult it for a specific current need.
 
 ## Current source / heads
 - Actual main/C3 and AUTHORITATIVE FROZEN candidate (PR488 merged normally):
   48154445d380980047bb5cbc39ae5b4c1a6889c0; tree 4f45748e55e7d976ef9936b8f77933eae8a5aa29.
-- Windows H: C:/wsl/fcp-v1-48154445-main-20260914;
-  Nitro H: /home/martin/fcp-v1-48154445-main-20260914/source. Both clean C3.
+- Clean C3 H: Windows C:/wsl/fcp-v1-48154445-main-20260914;
+  Nitro /home/martin/fcp-v1-48154445-main-20260914/source.
 - Freeze diagnostics/AUTHORITATIVE_CANDIDATE-48154445.json SHA256
   f47949c2b3de0f999b1807dd23af57a681f1f7ad8893bad0492346e2d5b0e9a8.
 - Native source admitted C3; data/membership preserved in old 1aac H in place.
@@ -17,8 +17,10 @@ Historical coordination is evidence only; consult it for a specific current need
 - Checkpoint/evidence branch: codex/federation-v1-diagnostic-sweep-20260911.
 - C3 FROZEN ACCEPTANCE PAUSED: demonstrated aged-manifest startup cost defect.
   Repair worktree C:/wsl/fcp-v1-manifest-history-repair-20260914 from48154445;
-  branch codex/federation-v1-manifest-history-repair; clean local repair
+  branch codex/federation-v1-manifest-history-repair; pushed, PR489 OPEN (not merged):
   14e0193535a9fc1024bde95ae1f49b8940bfd9d9; tree1e12bfc70c0bc7feecf85ed15a369e2f85bba4ce.
+  PR synthetic a158465bedae7979a4ec5f86d2402b4303ec42b5 has exact repair tree;
+  clean checkout C:/wsl/fcp-v1-a158465b-pr489-20260914. Live main unchanged01:30.
 
 ## Current green gates
 - Actual-main release 34787907931:16/16 PASS; ICSE34787907928 attempt2:4/4 PASS.
@@ -39,6 +41,10 @@ Historical coordination is evidence only; consult it for a specific current need
 - No physical campaign PASS, release or tag. All C2 evidence remains C2.
 
 ## Actual blockers / prerequisites
+- PR489 qualification running: release34795691356, ICSE34795691398,
+  update34795691374, CF7-B34795691389, Phase2 34795691363; branding34795691376 PASS.
+  ICSE Linux job103828224089 attempt1 failed01:26:49; bounded current-log review
+  active. No retry/disposition yet, no new broad diagnostic sweep.
 - All12 physical scenarios fresh; zero carry. P07>=1 real hour and P12>=24 real
   hours NOT STARTED. Early faults, complete coverage and measured capacity first.
 - Separate CF7 needs two reachable real CNC sources. Asked once, answer pending.
@@ -65,23 +71,22 @@ Historical coordination is evidence only; consult it for a specific current need
    harness issue: inherited PS7 PSModulePath breaks Windows5 Get-FileHash. Remove
    only that child-env value; native defaults work. No machine/product change.
    Receipts .acceptance/p06-http-trial-c3-preparation/public-agent-native-environment.
-3. Nitro corrected binding and separateHTTP200 follow-up prepared in
-   c3-nitro-binding-review; disabled. Agent acceptance_resources prepares required
-   repair qualification inputs; no inherited optional-workflow inventory/gate.
+3. Exact PR489 read-only qualifier reviewed/enabled; inputs-pr489-reviewed.json
+   under .acceptance/manifest-repair-release-preparation. Six auto workflows;
+   only missing CF7-A+registry dispatch on future actual main. No absent CF8/F85/
+   hosted-bootstrap gate. CF8 covered on Linux in mandatory release; no Windows claim.
 4. Reusable P11 baseline ready in H/.acceptance/p11-control-internal-model-r4:
    real16 records captured/uploadREADY; AI normally disabled,5 owned containers,
    zero host writers. BindingSHA9a8b0f6bc2535771216e9276ba9488572dfbf1d5613d3e9fdb916a84bd21ce5f.
    Future admission must preserve populated state; never use old empty-fixture
    rebind/reset. No backup/keys/restore or C3 physical verdict.
-5. No new C3 qualification/faults/timers. Review repair, focused proof, required
-   exact-source qualification, normal merge/main qualification/new freeze and
-   checked-in revalidation before resuming physical campaign. P07/P12 unstarted.
-6. General controls: c3-general-physical-preparation/generated-48154445-r2.
-   P01 hour controls prepared/disabled in c3-p01-binding-review. Retain all failures.
-7. Pressure controls bound C3 in pressure-c3-preparation/bound-48154445; activation
-   false,18drivers, no remote staging/actions. Existing memory envelope unchanged.
-   Public current details: diagnostics/physical-48154445/current-physical-dispositions.json.
-   Existing30-minute heartbeat active; continue from meaningful state/action changes.
+5. No new C3 qualification/faults/timers. Finish required PR qualification, normal
+   merge/main qualification/new freeze and checked revalidation before physical.
+   Agents prepare disabled creator/native and populated-P11 admission controls;
+   postrepair-p06-preparation preserves45/100/600/600s limits and latest seed.
+6. C3 general/P01/pressure controls disabled; bindings require next frozen source.
+   Current details: diagnostics/physical-48154445/current-physical-dispositions.json.
+   Existing30-minute heartbeat active; continue on meaningful state/action changes.
 
 ## Immutable safety constraints
 - Never weaken assertions, quorum/authority, deadlines, security or acceptance.

@@ -1,0 +1,251 @@
+{
+  "status": "PR_OPEN_QUALIFICATION_INCOMPLETE",
+  "recorded_at": "2026-09-14T01:30:34.500587+00:00",
+  "pr": 489,
+  "url": "https://github.com/Nettking/msh/pull/489",
+  "head": "14e0193535a9fc1024bde95ae1f49b8940bfd9d9",
+  "base": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "source": "a158465bedae7979a4ec5f86d2402b4303ec42b5",
+  "tree": "1e12bfc70c0bc7feecf85ed15a369e2f85bba4ce",
+  "main": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "merged": false,
+  "workflows": [
+    {
+      "workflow": "federation-v1-release.yml",
+      "run_id": 34795691356,
+      "status": "queued",
+      "conclusion": null,
+      "attempt": 1,
+      "jobs": [
+        {
+          "id": 103828223816,
+          "name": "Windows regressions (journal-artifacts)",
+          "status": "in_progress",
+          "conclusion": null,
+          "started_at": "2026-09-14T01:22:12Z",
+          "completed_at": null
+        },
+        {
+          "id": 103828223963,
+          "name": "Windows regressions (transport-storage)",
+          "status": "queued",
+          "conclusion": null,
+          "started_at": "2026-09-14T01:22:10Z",
+          "completed_at": null
+        },
+        {
+          "id": 103828223970,
+          "name": "Release checks (Linux)",
+          "status": "queued",
+          "conclusion": null,
+          "started_at": "2026-09-14T01:22:10Z",
+          "completed_at": null
+        },
+        {
+          "id": 103828223972,
+          "name": "Release checks (Windows)",
+          "status": "queued",
+          "conclusion": null,
+          "started_at": "2026-09-14T01:22:10Z",
+          "completed_at": null
+        },
+        {
+          "id": 103828223983,
+          "name": "Full-suite order (rotating)",
+          "status": "queued",
+          "conclusion": null,
+          "started_at": "2026-09-14T01:22:10Z",
+          "completed_at": null
+        },
+        {
+          "id": 103828223987,
+          "name": "Linux regression shard (3)",
+          "status": "in_progress",
+          "conclusion": null,
+          "started_at": "2026-09-14T01:28:37Z",
+          "completed_at": null
+        },
+        {
+          "id": 103828223995,
+          "name": "Full-suite order (fixed)",
+          "status": "queued",
+          "conclusion": null,
+          "started_at": "2026-09-14T01:22:10Z",
+          "completed_at": null
+        },
+        {
+          "id": 103828223996,
+          "name": "Windows regressions (capability-product)",
+          "status": "queued",
+          "conclusion": null,
+          "started_at": "2026-09-14T01:22:10Z",
+          "completed_at": null
+        },
+        {
+          "id": 103828224001,
+          "name": "Linux regression shard (2)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-14T01:23:45Z",
+          "completed_at": "2026-09-14T01:27:14Z"
+        },
+        {
+          "id": 103828224010,
+          "name": "PostgreSQL storage release check",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-14T01:22:52Z",
+          "completed_at": "2026-09-14T01:23:44Z"
+        },
+        {
+          "id": 103828224025,
+          "name": "Linux regression shard (0)",
+          "status": "queued",
+          "conclusion": null,
+          "started_at": "2026-09-14T01:22:10Z",
+          "completed_at": null
+        },
+        {
+          "id": 103828224046,
+          "name": "Linux regression shard (1)",
+          "status": "queued",
+          "conclusion": null,
+          "started_at": "2026-09-14T01:22:10Z",
+          "completed_at": null
+        }
+      ]
+    },
+    {
+      "workflow": "icse-tool-demo.yml",
+      "run_id": 34795691398,
+      "status": "queued",
+      "conclusion": null,
+      "attempt": 1,
+      "jobs": [
+        {
+          "id": 103828223858,
+          "name": "reviewer-compose",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-14T01:22:12Z",
+          "completed_at": "2026-09-14T01:22:39Z"
+        },
+        {
+          "id": 103828224031,
+          "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
+          "status": "queued",
+          "conclusion": null,
+          "started_at": "2026-09-14T01:22:10Z",
+          "completed_at": null
+        },
+        {
+          "id": 103828224089,
+          "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
+          "status": "completed",
+          "conclusion": "failure",
+          "started_at": "2026-09-14T01:24:52Z",
+          "completed_at": "2026-09-14T01:26:49Z"
+        }
+      ]
+    },
+    {
+      "workflow": "federation-software-update.yml",
+      "run_id": 34795691374,
+      "status": "queued",
+      "conclusion": null,
+      "attempt": 1,
+      "jobs": [
+        {
+          "id": 103828239643,
+          "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+          "status": "queued",
+          "conclusion": null,
+          "started_at": "2026-09-14T01:22:16Z",
+          "completed_at": null
+        },
+        {
+          "id": 103828239720,
+          "name": "update-contracts (Linux, fcp-linux-fast, bash)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-14T01:27:16Z",
+          "completed_at": "2026-09-14T01:28:35Z"
+        }
+      ]
+    },
+    {
+      "workflow": "product-branding.yml",
+      "run_id": 34795691376,
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1,
+      "jobs": [
+        {
+          "id": 103828223698,
+          "name": "product-branding",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-14T01:22:41Z",
+          "completed_at": "2026-09-14T01:22:51Z"
+        }
+      ]
+    },
+    {
+      "workflow": "cf7b-product-physical-acceptance.yml",
+      "run_id": 34795691389,
+      "status": "in_progress",
+      "conclusion": null,
+      "attempt": 1,
+      "jobs": [
+        {
+          "id": 103828223823,
+          "name": "acceptance (Linux, fcp-linux-fast, bash)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-14T01:22:12Z",
+          "completed_at": "2026-09-14T01:24:51Z"
+        },
+        {
+          "id": 103828223966,
+          "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
+          "status": "in_progress",
+          "conclusion": null,
+          "started_at": "2026-09-14T01:27:43Z",
+          "completed_at": null
+        }
+      ]
+    },
+    {
+      "workflow": "phase2-federation.yml",
+      "run_id": 34795691363,
+      "status": "in_progress",
+      "conclusion": null,
+      "attempt": 1,
+      "jobs": [
+        {
+          "id": 103828223916,
+          "name": "windows",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-14T01:22:12Z",
+          "completed_at": "2026-09-14T01:27:41Z"
+        },
+        {
+          "id": 103828224070,
+          "name": "linux",
+          "status": "in_progress",
+          "conclusion": null,
+          "started_at": "2026-09-14T01:26:51Z",
+          "completed_at": null
+        }
+      ]
+    }
+  ],
+  "next_action": "Retain and classify current failed ICSE Linux job103828224089; let other exact-source jobs finish. No retry authorized by this receipt.",
+  "qualification_review_sha256": "c0d8b191a8336991af2b245670a6306af74e305e857fa38802e1733d28179d1b",
+  "physical_acceptance": "PAUSED_ON_C3",
+  "P07": "NOT_STARTED",
+  "P12": "NOT_STARTED",
+  "AGQ7NCC": "INTENTIONALLY_OFFLINE_NON_BLOCKING",
+  "protected_recorder_data_touched": false
+}
