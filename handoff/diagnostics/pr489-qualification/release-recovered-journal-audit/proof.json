@@ -1,0 +1,42 @@
+{
+  "API_calls": 0,
+  "api_head": "14e0193535a9fc1024bde95ae1f49b8940bfd9d9",
+  "artifact_bytes": 6883,
+  "artifact_id": 10330901172,
+  "artifact_selection_basis": "Exact successful native upload line, retained API metadata, downloaded bytes; no ID ordering",
+  "artifact_sha256": "4ee104a6e1968b4cad08174b45ae7a4e35db87fe6267c0dfc872f2ca99347423",
+  "errors": 0,
+  "failures": 0,
+  "finalizer_artifact_selection": {
+    "federation-v1-release.yml/windows-regression-journal-artifacts": 10330901172
+  },
+  "junit_sha256": "81af9115d05886ab94cc758b0e4609cee51a113994f8a7e7b45352a47dde2e68",
+  "native_log_sha256": "3d01bdade8b75b0e5439bd03d0ba6118cf4d50f185c98061ce71e476811cf2eb",
+  "original_artifact_id": 10329264641,
+  "original_artifact_sha256": "617fbe2eb645d1f6702fa86506fe7961a81e8c7490fb0849579aa166711ff00b",
+  "original_evidence_unchanged": true,
+  "original_failure_message": "AssertionError: assert 'federation-q...ader-required' == 'reused-enrollment-token'\n  \n  - reused-enrollment-token\n  + federation-quorum-leader-required",
+  "original_job_id": 103828223816,
+  "original_native_log_sha256": "17c9cb82aa312ed403636d6df78f9a0f5acbd47a547a3ce2d05a6941332dca47",
+  "passed": 297,
+  "physical_acceptance": "NOT_EVALUATED",
+  "qualification_mutated": false,
+  "recovered_job_id": 103837539690,
+  "retention_sha256": "2c3095eb746d4ded769686b40a42d67d27ecbe716ff21766f74b26f883f278fd",
+  "run_attempt": 2,
+  "run_id": 34795691356,
+  "same_original_and_recovered_test_identity_set": true,
+  "same_unrelated_skip_identity_set": true,
+  "skipped": 1,
+  "source": "a158465bedae7979a4ec5f86d2402b4303ec42b5",
+  "status": "RECOVERED_WINDOWS_JOURNAL_EXACT_SOURCE_UNSKIPPED_PASS_VERIFIED",
+  "test": {
+    "classname": "catalog.federation.tests.test_control_plane_product_transactions",
+    "name": "test_consumed_grants_and_original_request_receipts_survive_automatic_failover",
+    "result": "PASS",
+    "seconds": 28.754,
+    "skipped": false
+  },
+  "tests_executed": false,
+  "total_tests": 298
+}

@@ -1,0 +1,13 @@
+2026-09-14T02:37:18.5999689Z SHA256 digest of uploaded artifact zip is e896944728147ceff28638b0b068a2d8a98b981c96f7d905e6dd184b5770d8f9
+2026-09-14T02:37:18.9222320Z Artifact f62-go-module-lock has been successfully uploaded! Final size is 11745 bytes. Artifact ID is 10330941609
+2026-09-14T02:37:23.0534184Z 65 passed in 1.45s
+2026-09-14T02:38:44.5697037Z 253 passed in 80.98s (0:01:20)
+2026-09-14T02:40:45.6243496Z fut = <Future cancelled>, timeout = 3.0
+2026-09-14T02:40:45.6273837Z                     event = await owner.append_event(
+2026-09-14T02:40:45.6931511Z catalog/relay/tests/test_phase2_integration.py:403: in scenario
+2026-09-14T02:40:45.6931901Z     event = await owner.append_event(
+2026-09-14T02:40:45.6932236Z catalog/node/client.py:611: in append_event
+2026-09-14T02:40:45.6932883Z catalog/node/client.py:540: in request
+2026-09-14T02:40:45.6933226Z     return await asyncio.wait_for(
+2026-09-14T02:40:45.6953526Z FAILED catalog/relay/tests/test_phase2_integration.py::test_f2_010_run_forever_reconnects_and_replays_without_duplicates - TimeoutError
+2026-09-14T02:40:45.6954017Z 1 failed, 281 passed in 120.66s (0:02:00)

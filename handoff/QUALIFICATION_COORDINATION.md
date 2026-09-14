@@ -1,95 +1,96 @@
 # Federation v1 current release checkpoint
 
-Updated 2026-09-14T02:33Z. Active context: clean handoff + this file + live GitHub.
+Updated 2026-09-14T02:54Z. Active context: clean handoff + this file + live GitHub.
 Historical coordination is evidence only; consult it for a specific current need.
 
 ## Current source / heads
-- Actual main/C3 and AUTHORITATIVE FROZEN candidate (PR488 merged normally):
-  48154445d380980047bb5cbc39ae5b4c1a6889c0; tree 4f45748e55e7d976ef9936b8f77933eae8a5aa29.
-- Clean C3 H: Windows C:/wsl/fcp-v1-48154445-main-20260914;
-  Nitro /home/martin/fcp-v1-48154445-main-20260914/source.
-- Freeze diagnostics/AUTHORITATIVE_CANDIDATE-48154445.json SHA256
-  f47949c2b3de0f999b1807dd23af57a681f1f7ad8893bad0492346e2d5b0e9a8.
-- Native source admitted C3; data/membership preserved in old 1aac H in place.
-  Creator and other Windows normal activations completed with three C3 core images.
-- Nitro start.sh exited0 and three C3 cores run; preservation and follow-upHTTP200
-  verified. Original admission STOPPED receipt retained; no repeated activation.
-- Checkpoint/evidence branch: codex/federation-v1-diagnostic-sweep-20260911.
-- C3 FROZEN ACCEPTANCE PAUSED: demonstrated aged-manifest startup cost defect.
-  Repair worktree C:/wsl/fcp-v1-manifest-history-repair-20260914 from48154445;
-  branch codex/federation-v1-manifest-history-repair; PR489 QUALIFIED, not merged:
-  14e0193535a9fc1024bde95ae1f49b8940bfd9d9; tree1e12bfc70c0bc7feecf85ed15a369e2f85bba4ce.
-  PR synthetic a158465bedae7979a4ec5f86d2402b4303ec42b5 has exact repair tree;
-  clean checkout C:/wsl/fcp-v1-a158465b-pr489-20260914. Live main unchanged02:25.
+- Actual main after normal PR489 merge:0246bf8b5a2ccdba007e1baf277e5f9a06976f4d;
+  tree1e12bfc70c0bc7feecf85ed15a369e2f85bba4ce. NOT YET QUALIFIED OR FROZEN.
+- Qualified PR synthetic:a158465bedae7979a4ec5f86d2402b4303ec42b5;
+  repair/trial head14e0193535a9fc1024bde95ae1f49b8940bfd9d9, same tree.
+- New clean Windows H:C:/wsl/fcp-v1-0246bf8b-main-20260914.
+  Planned Nitro H:/home/martin/fcp-v1-0246bf8b-main-20260914/source; NOT STAGED.
+- Native source bundle in new H/.acceptance/native-source.bundle:14841bytes,
+  SHA256ace9f6ab15db0b1ef17fca476176a4e751453c0524f97e67d1c57551740296f1.
+  Established1aac..HEAD bundle; source only, no runtime data.
+- Runtime sources/images still C3:48154445d380980047bb5cbc39ae5b4c1a6889c0.
+  C3 frozen acceptance PAUSED after demonstrated aged-manifest startup defect.
+  Old freeze diagnostics/AUTHORITATIVE_CANDIDATE-48154445.json remains unchanged.
+- Checkpoint/evidence branch:codex/federation-v1-diagnostic-sweep-20260911.
+  No0246 runtime activation, physical PASS, tag or publication.
 
 ## Current green gates
-- PR489 exact-source qualification COMPLETE: release34795691356 attempt2 16/16,
-  ICSE34795691398 attempt2 4/4; Phase2, CF7-B, update, branding all PASS.
-  diagnostics/manifest-repair-pr-qualification/qualification.json:25 native proofs,
-  two aggregates, exact shards/full orders and publication source bytes verified.
-- Actual-main release 34787907931:16/16 PASS; ICSE34787907928 attempt2:4/4 PASS.
-- CF7-A/B/C, CF8, update, branding, registry PASS. Native/artifact audit qualified:
-  32 checkout proofs, two aggregates, publication bytes and release shards verified.
-- Qualification diagnostics/main-48154445-qualification/qualification.json SHA256
-  998c6a970c563bfef6ae2ba2f269287ab442eecf25905a24e568e5a4c30b5045.
-- C3-only F85/hosted-bootstrap dispositions retained; not inherited by PR489.
-- C3 readiness complete;28 physical assertions PASS retained with exact provenance.
-  These cover isolated fault windows, native supervision, Windows launchers/model/
-  path/PID boundaries and corrected P01 activation/resource observations.
-- No physical campaign PASS, release or tag. All C2 evidence remains C2.
+- PR489 release34795691356 attempt2:16/16; ICSE34795691398 attempt2:4/4.
+  Phase2, CF7-B, update and branding PASS;25native checkout proofs+2aggregates.
+  Exact shard/full-order sets, artifact digests and publication source verified.
+- PR qualification:diagnostics/manifest-repair-pr-qualification/qualification.json;
+  SHA256dfe8e891ec28f3622afa03bb46af8954f26232a3ae1626fb6ed361b0b530ed8c.
+- Original authority-fence failures retained in diagnostics/pr489-qualification/;
+  each one failed-only recovery passed unchanged, with original green jobs reused.
+  No demonstrated additional candidate defect; no further PR retry/requalification.
+- Main0246 ICSE34799746741:4/4 first-attempt PASS; CF7-B34799746776:2/2 PASS;
+  branding34799746756 and registry34799801591 PASS. Remaining main runs:
+  release34799746727; Phase2 34799746714; update34799746763; CF7-A34799800037.
+  Missing CF7-A and registry dispatched ONCE02:36; Phase2 failed-only recovery02:53.
+- C3 automated qualification/readiness and28physical assertions retained as C3.
+  No full physical scenario/campaign PASS; no relabeling or carry to0246.
 
 ## Actual blockers / prerequisites
-- Original PR489 authority-fence failures retained; each one failed-only recovery
-  passed unchanged. No demonstrated new candidate defect or further retry.
-- All12 physical scenarios fresh; zero carry. P07>=1 real hour and P12>=24 real
-  hours NOT STARTED. Early faults, complete coverage and measured capacity first.
+- Actual-main qualification pending. Phase2 Linux103839826124 initial event-append
+  timeout precedes reconnect; unresolved/non-demonstrated candidate defect. Native
+  trace retained in diagnostics/main-0246bf8b-qualification/phase2-first-failure/.
+  ONE failed-only recovery accepted02:53:42; Windows103839826323 PASS reused.
+  No source/assertion/deadline change or further recovery authorized by this decision.
+- Checked prospective impact:C3->repair has unknown manifest_store/phase_d_control
+  paths, all12CF7 scenarios impacted,0carry. Rerun exact planner after qualification.
+  safe=false forbids carry; it does not forbid fresh acceptance/admission.
+- P07>=1 real hour and P12>=24 real hours NOT STARTED. Early faults, complete
+  source-bound coverage and measured capacity precede shared-runtime timers.
 - Separate CF7 needs two reachable real CNC sources. Asked once, answer pending.
-- Windows P01 initial per-hour growth FAIL (291.6MB/0.0657h); per-activation PASS.
-  Prepared real passive hour; do not start until measured-host builds/faults finish.
-- P09 outbox fault windows not completed; prepared monitoring correction retained.
-- P06 trial not performed: recovery STOPPED00:48:04, native stopped cleanly.
-  Eight sequential dataset heads exceed45s; aged-manifest startup defect proven.
-  Exact197-revision proof retained in diagnostics/manifest-history-repair.
-  No software POST/deadline change. AGQ7NCC not in this topology.
-- Nitro pressure fixture idle: containment PASS, memory margin refused again00:47
-  after completed builds. Host3.26GiB total/1.84GiB available; no product activation.
-  Do not repeat until resource state changes; limits unchanged. Inventory retained.
+- Nitro pressure fixture idle: containment PASS, memory margin refused00:47.
+  Host3.26GiB total/1.84GiB available; no pressure product activation. Do not repeat
+  until resource state changes; no limit/cap/host-pool changes or unrelated stops.
+- C3 P01 per-hour growth FAIL retained; new passive hour after measured-host builds.
+  P09 outbox windows and P06 authenticated update trial still unperformed.
+- P06 stopped native cleanly; creator retains198manifest revisions/native pending
+  work in place. Repair22focused+141existing tests PASS,197-revision5.44->0.99s;
+  full repaired live45s startup remains unproven. No manual drain or reset.
 
 ## Active work / next action
-1. Repair complete:22 focused/141 existing relevant tests PASS; original-C3 red
-   retained; independent integrity/security review found no blocker.197-revision
-   verification3→1full passes,5.44→0.99s offline. Full live startup still unproven.
-   Latest Agent seed: c3-physical-48154445-20260914/run-p06-update-trial-recovery/
-   agent-observations.json SHA256ca35d3afaba47b33c0e8705ce80011ba527e10b5cc0a8a0f9c40591bfebb468c.
-   Future native trial must use a distinct commit with the next frozen tree.
-2. Creator public host agent restored, PID26428 / PTY94516, still active. Proven
-   harness issue: inherited PS7 PSModulePath breaks Windows5 Get-FileHash. Remove
-   only that child-env value; native defaults work. No machine/product change.
-   Receipts .acceptance/p06-http-trial-c3-preparation/public-agent-native-environment.
-3. Exact PR489 read-only qualifier reviewed/enabled; inputs-pr489-reviewed.json
-   under .acceptance/manifest-repair-release-preparation. Six auto workflows;
-   Normal merge489.py next, then prepare_actual_main_source.py and actual-main
-   qualification once. Final PR retentionfe840cf2... +artifact-selection.pr489-reviewed.json;
-   Only missing CF7-A+registry dispatch on future main; no absent CF8/F85/bootstrap.
-4. Reusable P11 baseline ready in H/.acceptance/p11-control-internal-model-r4:
-   real16 records captured/uploadREADY; AI normally disabled,5 owned containers,
-   zero host writers. BindingSHA9a8b0f6bc2535771216e9276ba9488572dfbf1d5613d3e9fdb916a84bd21ce5f.
-   Future admission must preserve populated state; never use old empty-fixture
-   rebind/reset. No backup/keys/restore or C3 physical verdict.
-5. No new C3 qualification/faults/timers. Finish required PR qualification, normal
-   merge/main qualification/new freeze and checked revalidation before physical.
-   Disabled postrepair-admission-preparation and p11-next-candidate-preparation;
-   postrepair-p06-preparation preserves45/100/600/600s limits and latest seed.
-   Prospective checked revalidation: two unknown product paths => all12CF7 fresh,
-   zero carry. This forbids carry, not fresh admission; rerun planner on final main.
-6. C3 general/P01/pressure controls disabled; bindings require next frozen source.
-   Current details: diagnostics/physical-48154445/current-physical-dispositions.json.
-   Existing30-minute heartbeat active; continue on meaningful state/action changes.
+1. PREP=.acceptance/manifest-repair-release-preparation. inspect_actual_main.py;
+   inputs-actual-main.json and read-only authorization now bind0246. Wait on current
+   runs; retain_qualification/finalize_qualification once required jobs green.
+   Do not rerun merge489.py, dispatch helpers or recover_main_phase2_once.py.
+2. After actual-main qualification, freeze_qualified_repair.py under
+   .acceptance/postrepair-freeze-preparation (SHA25624dfbaf260958cd9749c5d942fe54cb32ae7d97e3a28ea20fbd64e3d86569acf).
+   Use exact qualification hash and output diagnostics/AUTHORITATIVE_CANDIDATE-0246bf8b.json.
+   Truthful checked exit2/unknown2/all12fresh/0carry, raw outputs and policy hashes.
+3. Generate reviewed readiness controls there with new H/Nitro H/freeze hash/bundle;
+   stage source-only Nitro H, transfer identical freeze/qualification bytes, then
+   use existing qualified Windows/Nitro3.12venvs for exact-source native readiness.
+4. Disabled admission:.acceptance/postrepair-admission-preparation, current helper
+   SHA10a10cc977496a53aa18a4c4ee5e70ff0459d0a46a15b5b0b73e71461d2fe682.
+   Final-source review before execution; preserve all data/mount/env/user/identity.
+   Quiesce only exact owned creator public agent before source staging; restore
+   ordinary agent afterward. Child env removes only case-insensitive PSModulePath.
+   Final bindings derive actual Compose labels; original preparations stay retained.
+5. .acceptance/postrepair-p06-preparation preserves45/100/600/600s and uses latest
+   Agent seed c3-physical-48154445-20260914/run-p06-update-trial-recovery/agent-observations.json,
+   SHAca35d3afaba47b33c0e8705ce80011ba527e10b5cc0a8a0f9c40591bfebb468c.
+   Admit BOTH creator and native, use distinct same-tree14e01935 trial and new campaign.
+6. Populated P11 preparation:.acceptance/p11-next-candidate-preparation, corrected
+   renderer d62d8931...; baseline in C3 H/.acceptance/p11-control-internal-model-r4.
+   Real16records/uploadREADY,AI disabled,5owned containers,0host writers at baseline.
+   Preserve populated state; never empty-fixture reset/rebind. New updater inventory
+   is required after normal activation. No backup/key/restore PASS yet.
+7. Remaining Windows/Nitro/P01/P09/pressure controls are C3-bound and disabled;
+   require final-source bindings. General controls being prepared without execution.
+   Existing30-minute heartbeat active; advance only on meaningful changes/actions.
 
 ## Immutable safety constraints
 - Never weaken assertions, quorum/authority, deadlines, security or acceptance.
 - Only credible current-candidate checked-contract violations block v1.
-- No broad sweep/blanket retry or needless runner/account/label changes.
+- No broad sweep/blanket retry/new D-number per symptom or needless runner changes.
 - AQG off/nondependency. AGQ7NCC offline until tomorrow; do not wait for it.
 - Protected Recorder data untouched. No reset, operational Docker prune, volume
   deletion or Arrowhead restart. Retain old evidence/images/partial copies.

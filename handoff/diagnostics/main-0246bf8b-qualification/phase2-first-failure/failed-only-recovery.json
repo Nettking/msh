@@ -1,0 +1,16 @@
+{
+  "status": "FAILED_ONLY_RECOVERY_REQUEST_ACCEPTED",
+  "source": "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d",
+  "run_id": 34799746714,
+  "original_attempt": 1,
+  "failed_job_ids": [
+    103839826124
+  ],
+  "green_jobs_to_reuse": [
+    103839826323
+  ],
+  "recorded_at": "2026-09-14T02:53:35.902034+00:00",
+  "whole_ci_rerun": false,
+  "response": {},
+  "accepted_at": "2026-09-14T02:53:42.334393+00:00"
+}

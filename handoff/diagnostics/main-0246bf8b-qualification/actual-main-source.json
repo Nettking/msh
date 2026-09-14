@@ -1,0 +1,17 @@
+{
+  "candidate": "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d",
+  "tree": "1e12bfc70c0bc7feecf85ed15a369e2f85bba4ce",
+  "base": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "pr": 489,
+  "pr_head": "14e0193535a9fc1024bde95ae1f49b8940bfd9d9",
+  "qualified_pr_source": "a158465bedae7979a4ec5f86d2402b4303ec42b5",
+  "windows_harness": "C:/wsl/fcp-v1-0246bf8b-main-20260914",
+  "nitro_harness": "/home/martin/fcp-v1-0246bf8b-main-20260914/source",
+  "bundle_base": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "bundle_sha256": "ace9f6ab15db0b1ef17fca476176a4e751453c0524f97e67d1c57551740296f1",
+  "bundle_bytes": 14841,
+  "merge_receipt_sha256": "1911cd29b3fa1bb3b76ab7f7f348d5cff0da27cec79390d457ee41a449f92f9f",
+  "source_clean": true,
+  "runtime_activated": false,
+  "frozen": false
+}

@@ -1,0 +1,4 @@
+2026-09-14T02:30:05.8661124Z 28.75s call     catalog/federation/tests/test_control_plane_product_transactions.py::test_consumed_grants_and_original_request_receipts_survive_automatic_failover
+2026-09-14T02:30:05.8680048Z 297 passed, 1 skipped, 1 warning in 358.76s (0:05:58)
+2026-09-14T02:30:08.2619915Z SHA256 digest of uploaded artifact zip is 4ee104a6e1968b4cad08174b45ae7a4e35db87fe6267c0dfc872f2ca99347423
+2026-09-14T02:30:08.5493511Z Artifact windows-regression-journal-artifacts has been successfully uploaded! Final size is 6883 bytes. Artifact ID is 10330901172

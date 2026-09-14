@@ -1,0 +1,168 @@
+{
+  "CI_mutation": false,
+  "actual_failure": "Three-second authenticated initial event.append response wait timed out in the pre-reconnect setup loop at test line403; receive Future was cancelled by wait_for.",
+  "artifact": {
+    "bytes": 11745,
+    "id": 10330941609,
+    "name": "f62-go-module-lock",
+    "role": "Go dependency-lock artifact only; no test JUnit is uploaded by this job",
+    "selection_basis": "Exact native upload ID and digest plus API head and downloaded bytes",
+    "sha256": "e896944728147ceff28638b0b068a2d8a98b981c96f7d905e6dd184b5770d8f9"
+  },
+  "attempt": 1,
+  "changed_from_base": [
+    "catalog/federation/manifest_store.py",
+    "catalog/federation/phase_d_control.py",
+    "catalog/federation/tests/test_manifest_read_snapshot.py"
+  ],
+  "checked_contract": {
+    "cf7": "docs/implementation/federation/acceptance/cf7b_product_physical_acceptance.md:215 requires permanent CF7-A/B both OS plus broad regression matrices.",
+    "phase2_workflow": ".github/workflows/phase2-federation.yml:129\u2013130 executes this group; it has no JUnit artifact step.",
+    "release_process": "docs/release_process.md:36 requires every exact-candidate automated release job PASS; line38 registry metadata.",
+    "separate_phase2_green_requirement_in_these_checked_release_contracts": false
+  },
+  "classification": "UNRESOLVED_NON_DEMONSTRATED_CANDIDATE_DEFECT",
+  "current_step_counts": {
+    "failed": 1,
+    "passed": 281
+  },
+  "deterministic_harness_defect_demonstrated": false,
+  "earlier_current_groups_passed": [
+    65,
+    253
+  ],
+  "failed_nodeid": "catalog/relay/tests/test_phase2_integration.py::test_f2_010_run_forever_reconnects_and_replays_without_duplicates",
+  "failing_revision_not_captured": true,
+  "infrastructure_transient_proven": false,
+  "initial_revision_loop": [
+    4,
+    40
+  ],
+  "job_conclusion": "failure",
+  "job_id": 103839826124,
+  "native_log_bytes": 209323,
+  "native_log_sha256": "010dddf6da7f86d40ceb1562a681d95001c8c5d624586ca3c5fadad816b1d123",
+  "physical_acceptance": "NOT_EVALUATED",
+  "product_defect_demonstrated": false,
+  "product_or_runtime_mutated": false,
+  "release_relevant_next_action": "Keep this standalone failure explicit and allow already-running exact-main mandatory release contexts to provide node evidence; root may decide one bounded failed-job recovery after terminal state. No source repair is justified by this trace alone, and no qualification exemption or recovery is performed here.",
+  "repaired_functions_in_captured_stack": false,
+  "retry_performed": false,
+  "run_id": 34799746714,
+  "server_side_call_stack_not_captured": true,
+  "source": "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d",
+  "source_tree_equals_qualified_pr": true,
+  "stage": "INITIAL_APPEND_SETUP_BEFORE_RECONNECT_CLIENT_CREATION_OR_RELAY_STOP",
+  "status": "BOUNDED_CURRENT_FAILURE_ASSESSED",
+  "supporting_pr_evidence_is_not_actual_main_qualification": true,
+  "supporting_same_tree_pr_exact_node_proofs": [
+    {
+      "artifact_id": 10330401079,
+      "artifact_sha256": "ead41441046afe81eb880ee746ab38c5747c075e08fc750243dda86d7ce6ec85",
+      "context": "linux-regression-shard-0",
+      "junit_sha256": "a69560a30d81448ed7af97ddd18349d6ca1f810317b8f68a3099a6dc35eb98cd",
+      "native_job_id": 103837558612,
+      "native_log_sha256": "c18c5dad158e96d1dd3e98e358fcf523e1a7719b061c4909f099d2ec3590b795",
+      "result": "PASS",
+      "seconds": 0.797,
+      "skipped": false,
+      "source": "a158465bedae7979a4ec5f86d2402b4303ec42b5",
+      "test_classname": "catalog.relay.tests.test_phase2_integration",
+      "test_name": "test_f2_010_run_forever_reconnects_and_replays_without_duplicates"
+    },
+    {
+      "artifact_id": 10330176046,
+      "artifact_sha256": "994fb219b8b9e839576cae06278da22b20e88ebe097c5b7e48aa0e3b68dc31ea",
+      "context": "full-suite-order-fixed",
+      "junit_sha256": "e51c2fd2554c03cf2c26761b0db7c14a0aafb044878cab75777722e4480baca4",
+      "native_job_id": 103837563311,
+      "native_log_sha256": "a041ceef1be5687842d5f529a6be8783514f8d39f2574fb34eaba10d0841d3e3",
+      "result": "PASS",
+      "seconds": 0.689,
+      "skipped": false,
+      "source": "a158465bedae7979a4ec5f86d2402b4303ec42b5",
+      "test_classname": "catalog.relay.tests.test_phase2_integration",
+      "test_name": "test_f2_010_run_forever_reconnects_and_replays_without_duplicates"
+    },
+    {
+      "artifact_id": 10329954602,
+      "artifact_sha256": "74f9f074890d3de4caf9468095aa65d5006f7fe896e8f68d7fc4bab0e9d6e954",
+      "context": "full-suite-order-rotating",
+      "junit_sha256": "298aafbcf4de0540b4b6a4471d4551ba12172637d504bf5471423a1dc9de287d",
+      "native_job_id": 103837559028,
+      "native_log_sha256": "eef59bf8f201ad25342cd042e80f2142a8e49e28d7188caa51c227bd93144dee",
+      "result": "PASS",
+      "seconds": 0.843,
+      "skipped": false,
+      "source": "a158465bedae7979a4ec5f86d2402b4303ec42b5",
+      "test_classname": "catalog.relay.tests.test_phase2_integration",
+      "test_name": "test_f2_010_run_forever_reconnects_and_replays_without_duplicates"
+    }
+  ],
+  "supporting_same_tree_pr_phase2": {
+    "conclusion": "success",
+    "group_passed": 282,
+    "job_id": 103828224070,
+    "native_log_sha256": "1813117e9b081625f6707c743e187ef9f59d7f45cf25863233c4ced7a322a577",
+    "run_id": 34795691363,
+    "source": "a158465bedae7979a4ec5f86d2402b4303ec42b5"
+  },
+  "unchanged_git_blobs": [
+    {
+      "base": "9080bfac05d77868b35197b8cd0f369f131a6bf7",
+      "current_main": "9080bfac05d77868b35197b8cd0f369f131a6bf7",
+      "path": "catalog/relay/tests/test_phase2_integration.py",
+      "qualified_pr": "9080bfac05d77868b35197b8cd0f369f131a6bf7",
+      "unchanged": true
+    },
+    {
+      "base": "02df24402aa46a28b92d8467dda84d49123aef37",
+      "current_main": "02df24402aa46a28b92d8467dda84d49123aef37",
+      "path": "catalog/node/client.py",
+      "qualified_pr": "02df24402aa46a28b92d8467dda84d49123aef37",
+      "unchanged": true
+    },
+    {
+      "base": "c8a39e496fe3798f8b3ef4439ebf2cf8ab18d913",
+      "current_main": "c8a39e496fe3798f8b3ef4439ebf2cf8ab18d913",
+      "path": "catalog/relay/service.py",
+      "qualified_pr": "c8a39e496fe3798f8b3ef4439ebf2cf8ab18d913",
+      "unchanged": true
+    },
+    {
+      "base": "90dca36e2422ffe2c469f60e1def92703eedc0a9",
+      "current_main": "90dca36e2422ffe2c469f60e1def92703eedc0a9",
+      "path": "catalog/federation/coordinator.py",
+      "qualified_pr": "90dca36e2422ffe2c469f60e1def92703eedc0a9",
+      "unchanged": true
+    },
+    {
+      "base": "f25f127cc99cf534e8b188d70da9342e5a606458",
+      "current_main": "f25f127cc99cf534e8b188d70da9342e5a606458",
+      "path": ".github/workflows/phase2-federation.yml",
+      "qualified_pr": "f25f127cc99cf534e8b188d70da9342e5a606458",
+      "unchanged": true
+    },
+    {
+      "base": "77e0499850e6044ec1bcebcaa24c7ea68962c667",
+      "current_main": "77e0499850e6044ec1bcebcaa24c7ea68962c667",
+      "path": ".github/workflows/federation-v1-release.yml",
+      "qualified_pr": "77e0499850e6044ec1bcebcaa24c7ea68962c667",
+      "unchanged": true
+    },
+    {
+      "base": "eb6a371d8dadc9371743336ee4dd4f2d4b5e6efb",
+      "current_main": "eb6a371d8dadc9371743336ee4dd4f2d4b5e6efb",
+      "path": "docs/release_process.md",
+      "qualified_pr": "eb6a371d8dadc9371743336ee4dd4f2d4b5e6efb",
+      "unchanged": true
+    },
+    {
+      "base": "84c781d5017ca41be667b93fca8187bd7bb42f9c",
+      "current_main": "84c781d5017ca41be667b93fca8187bd7bb42f9c",
+      "path": "docs/implementation/federation/acceptance/cf7b_product_physical_acceptance.md",
+      "qualified_pr": "84c781d5017ca41be667b93fca8187bd7bb42f9c",
+      "unchanged": true
+    }
+  ]
+}

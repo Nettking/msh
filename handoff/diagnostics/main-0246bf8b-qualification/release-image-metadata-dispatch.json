@@ -1,0 +1,11 @@
+{
+  "candidate": "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d",
+  "workflow": "release-image-metadata.yml",
+  "recorded_at": "2026-09-14T02:36:52.953342+00:00",
+  "status": "MISSING_CONTRACT_GATE_REQUEST_ACCEPTED",
+  "existing_run_ids": [],
+  "whole_ci_rerun": false,
+  "response": {
+    "http_status": 204
+  }
+}

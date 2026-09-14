@@ -1,0 +1,21 @@
+{
+  "status": "ONE_FAILED_ONLY_RECOVERY_REVIEWED",
+  "source": "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d",
+  "run_id": 34799746714,
+  "original_attempt": 1,
+  "failed_job_ids": [
+    103839826124
+  ],
+  "green_jobs_to_reuse": [
+    103839826323
+  ],
+  "classification": "UNRESOLVED_NON_DEMONSTRATED_CANDIDATE_DEFECT",
+  "disposition_sha256": "c9fbebfa9d7a9f020a9d15b6dd97f874078a7ea9f244cec224617b1ecdc20060",
+  "reason": "Initial event.append setup exceeded unchanged three-second response deadline before reconnect began. Same-tree PR passes support classification, not main qualification. No candidate defect or source repair is demonstrated; recover only this current failed job once.",
+  "original_evidence_retained": true,
+  "source_assertions_deadlines_security_unchanged": true,
+  "maximum_failed_only_requests_for_this_run": 1,
+  "whole_ci_rerun": false,
+  "physical_acceptance": "NOT_EVALUATED",
+  "recorded_at": "2026-09-14T02:53:35.902034+00:00"
+}
