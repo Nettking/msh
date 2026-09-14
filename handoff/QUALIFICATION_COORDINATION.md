@@ -1,89 +1,81 @@
 # Federation v1 current release checkpoint
 
-Updated 2026-09-14T07:48Z. Active context: clean handoff + this file + live GitHub.
+Updated 2026-09-14T08:19Z. Active context: clean handoff + this file + live GitHub.
 Historical coordination is evidence only; consult it for a specific current need.
 
 ## Current source / heads
-- PR490 merged normally, no bypass. Actual main:
-  f00f13013b58e0023f1a506e32daa86df37af7ae, tree49c6f273afa82059d45dbc2bdffb5168b083f25d.
-- Repair head/trial d0e5b6b8993b76ccb2e49da699fb304a2684df66,
-  branch codex/federation-v1-ack-validation-repair; same tree as resulting main.
-- Clean H C:/wsl/fcp-v1-f00f1301-main-20260914. Nitro H staged clean/detached:
-  /home/martin/fcp-v1-f00f1301-main-20260914/source. Source-only stage DONE06:33Z;
-  diagnostics/physical-f00f1301/nitro-source-stage.json. Do not replay staging.
-- Authoritative freeze f00f1301 DONE07:00Z, SHA256
-  0c5127ae2d2dc8885182f38c908dc544789f38cf3e9de69bc12d1f1e56366d25.
-  Creator and both warm runtimes now f00, normal activations verified. Creator
-  ordinary resident verified. Native source f00; one P06 startup failed and
-  observer cleanup completed. Retained outbox217completed/711pending, total928.
-  Live origin/main and trial branch still match the above heads.
-- Checkpoint branch codex/federation-v1-diagnostic-sweep-20260911.
-  No full physical PASS, final tag or publication.
+- Main/frozen candidate f00f13013b58e0023f1a506e32daa86df37af7ae,
+  tree49c6f273afa82059d45dbc2bdffb5168b083f25d. PR490 merged normally.
+- Current repair PR491: https://github.com/Nettking/msh/pull/491
+  head3e7becd91c33fa966aba96333c87afd91a0aba69,
+  treeb9c5755f0b2dff2556bbca1713bdd6d2af25bf5b,
+  branch codex/federation-v1-jsonl-startup-scan.
+  Clean worktree C:/wsl/fcp-v1-jsonl-startup-scan-20260914; pushed, not merged.
+- H C:/wsl/fcp-v1-f00f1301-main-20260914; Nitro H
+  /home/martin/fcp-v1-f00f1301-main-20260914/source. Both still exact f00.
+- Creator and both warm runtimes remain admitted f00. Native runtime f00 stopped
+  after one failed P06 observer and successful cleanup. Owned retained outbox:
+  217completed/711pending, total928; no manual drain/reset or data reinitialization.
+- No full physical PASS, final tag or publication. Existing freeze f00 is blocked
+  for acceptance by the demonstrated startup scan defect; no new freeze yet.
 
 ## Current green gates
-- Actual main AUTOMATED_QUALIFIED: release16/16, ICSE4/4, Phase2, CF7-A/B,
-  software update, branding and registry PASS first attempt. No reruns.
+- f00 actual main AUTOMATED_QUALIFIED first attempt: release16/16, ICSE4/4,
+  Phase2, CF7-A/B, software update, branding and registry PASS. No reruns.
   diagnostics/main-f00f1301-qualification/qualification.json SHA256
   9d4c1c55046ca86110e728e6638a2e4a7d15e36c9cd4db377af82a0984ae6ff4.
-- 28 native checkout proofs; complete shard/order/publication source audited.
-  All9new tests unskipped in both fullorders and disjoint shard union;
-  manifest-text-focused-review.json SHA256
-  5717eaf3598a190e8d334e5c9ebeb404e7c7822991ca5cd0796be900bd5ffb39.
-- Checked revalidation DONE: all fresh/no carry; expected unknown product path.
-  physical-f00f1301/revalidation-from-0246bf8b.json SHA256
-  341b26ba7aa104e2cec0df6e27798767212032d3870b2d7f6fbb9348b7ba6d1b.
-  Prior PR qualification/recovery evidence retained separately; do not repeat.
-- Both native readiness runs COMPLETED, four gates PASS/host. Windows3.12.10,
-  Nitro3.12.13. diagnostics/physical-f00f1301/native-readiness.json; no retries.
-- Runtime admissions completed; diagnostics/physical-f00f1301/runtime-admissions.json.
-  Native membership continuity independently proved; exact before/after preserved.
-- P09 isolated first-five assertions PASS across12 actual fault/recovery windows.
-  P09 overall incomplete; no shared-native/container/clock fault claimed.
+- Both f00 native readiness runs: four gates PASS/host. All runtime admissions
+  complete. These source-specific greens do not qualify PR491.
+- f00 P09 first-five assertions PASS across12 actual fault/recovery windows.
+  P09 overall incomplete; any reuse follows the new checked revalidation.
+- Repair focused red-to-green:10PASS/1Windows file-symlink privilege skip.
+  Both real Windows junction tests PASS. Related suites50PASS/1privilege skip.
+  Final independent source review has no blockers. Linux alias coverage pending.
+- Clean PR-head Windows11case supplement complete:10PASS/1privilege skip,
+  repairworktree/.acceptance/candidate-filter-proof/exact-pr-head.json SHA256
+  d1b20018125f37b0bdcf895cc67bbf753e51b54b6ece52509f01a5bf8fe9101e.
+- One stopped-corpus final repair proof: JSONL enumeration17.109s ->3.032s wall,
+  16.422s ->2.906s CPU, identical0eligible-file selection. No live P06 PASS.
 
 ## Actual blockers
-- Fresh physical acceptance outstanding. P06 startup failed07:31-07:32Z on f00.
-  Twelve actual ACKs disprove missing authority. One stopped-corpus exact scan
-  took17.109s/16.422sCPU to return0eligible JSONL files; other reads0.360s.
-  Credible current product defect: excluded-history scan delays required startup.
+- PR491 exact-source qualification, normal merge, actual-main qualification and
+  authoritative freeze/revalidation precede fresh physical acceptance.
+- P06 failed07:31-07:32Z on f00. Twelve actual ACKs disprove missing authority.
+  Exact stopped-corpus scan took17.109s to reject excluded JSONL history;
+  final worker reads took0.360s. Credible current product startup defect.
+  Evidence: diagnostics/physical-f00f1301/p06-first-startup-failure/.
 - P01 hour, P07>=3600s and P12>=86400s NOT STARTED. Real durations required.
 - Separate real-source CF7 needs two reachable CNC sources; asked once.
-- Nitro pressure needs unchanged fresh capacity preflight after builds settle.
-  Prior memory-margin refusal is fixture capacity, not product OOM.
+- Nitro pressure needs unchanged fresh capacity preflight after builds settle;
+  prior memory-margin refusal is fixture capacity, not product OOM.
 
 ## Active work / next action
-1. Main retention/finalization/focused audit DONE once; no CI work outstanding.
-   Release34812799504; seven companion IDs in immutable qualification receipt.
-2. P06 controls generated in pr490-p06-f00f1301-20260914; reviewed wrapper
-   pr490-p06-transition-preparation/prepared-f00/invoke_f00_reviewed.py SHA256
-   6e17053d18cfd811e8b354ad4835de555e3fc86484caa2dcd340bdb9fc34e503.
-   Actual config/HTTP hashes pinned; observer unchanged. Both fresh native
-   campaigns registered. Creator branch discovery verified actual trial head.
-   Observer failed supported startup at100s; normal45s sharing gate unchanged.
-   No trial/restore POST. Original supervisor restart observed; cleanup exit0.
-   Bounded creator logs: identities unchanged; response send after cleanup.
-   Bounded offline proof complete; no further diagnostics/live retry scheduled.
-   Evidence: diagnostics/physical-f00f1301/p06-first-startup-failure/.
-   Next: minimal selection-equivalent early exclusion in clean worktree
-   C:/wsl/fcp-v1-jsonl-startup-scan-20260914, branch
-   codex/federation-v1-jsonl-startup-scan. Focused red-to-green plus one readonly
-   postrepair corpus proof before PR/required exact-source qualification.
-   Native pairing expected-hash correction proved12 immutable continuity checks
-   plus device-to-membership match; native-only stage succeeded, no data write.
-   Original creator receipt-path refusal retained; no stop replay, new resident
-   verified. Use absolute output paths. Both harness dispositions archived.
-3. pr490-general-physical-preparation/generated-f00f1301-disabled generated once,
-   generation ea4546ca; inert only, all receipt/state bindings unset. P11 adapter
-   C3-to-f00 five-path P11 revalidation prepared; populated continuity pending.
-   Warm controls cbf319de installed both hosts; admissions finished, no replay.
-   P09 first-five execution complete in pr490-p09-first-five-execution;
-   retain its five checked packets. Shared outbox lane waits for final P06 state.
-   pr490-timed-physical-preparation has13 helper recipe and14 unchanged supplemental
-   blobs; no execution tree/fixtures/timers. Pressure f00 wrapper still unbound.
-   P12/P07 may overlap only after final shared-runtime state, complete passive
-   coverage and measured whole-volume growth/capacity. Supplemental unchanged-cap
-   fixtures prepared, not executed. No preparation equals physical PASS.
-4. Privacy-review/publish new evidence. Existing30-minute heartbeat active;
-   substantive work only on a meaningful state change or actionable step.
+1. Qualify PR491. Natural PR set: release, ICSE, CF7-B, update, branding, CF8,
+   F85 and B01 JSONL admission. Retain/review current results; no inherited waivers.
+   Phase2 absence is expected for the three changed common/Flask paths.
+   Branding PASS; other required runs queued/running, attempt1. B01 run34821054575
+   refused both hosted jobs before runner/steps for billing/spending admission.
+   No candidate code ran. Retain failed status and audit required actual coverage;
+   diagnostics/physical-f00f1301/pr491-b01-hosted-admission.json. No hosted retry.
+2. Private controls: .acceptance/jsonl-startup-release-preparation; root reviews
+   new toolkit/input hashes and exact B01 disposition before running. Clean PR
+   synthetic checkout C:/wsl/fcp-v1-e6717470-pr491-20260914 staged at e6717470.
+   Linux fullorders/shard must actually
+   run the file-alias case. Keep executed commits explicit; any supplemental
+   Windows proof reuse requires complete Git-tree equality.
+3. After required PR evidence: normal merge, qualify resulting main once.
+   Its seven automatic workflows exclude PR-only B01; dispatch only missing
+   CF7-A and release-image-metadata once. No extra Phase2 or blanket CI rerun.
+4. Freeze actual qualified main, checked revalidation from f00. Current changed
+   production paths are unmapped: preserve safe:false, all12 fresh/zero carry.
+   No physical preparation or previous packet becomes a new-candidate PASS.
+5. Old f00 physical controls/observations remain under .acceptance/pr490-*.
+   Preserve latest P06 source observation, data and all original receipts.
+   Rebind actual new-source admissions before P06; retain45/100/600/600s limits.
+   Finish shared faults before reserving/arming real P07/P12. Require complete
+   passive coverage, measured whole-volume capacity/growth and unchanged floors.
+6. Privacy-review/publish new evidence. Existing30-minute heartbeat active;
+   substantive work only on meaningful state changes or actionable next steps.
 
 ## Immutable safety constraints
 - Never weaken assertions, quorum/authority, deadlines, security or acceptance.

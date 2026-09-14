@@ -1,0 +1,72 @@
+{
+  "actions": {
+    "native_log_gets": 1,
+    "runtime_mutations": 0,
+    "source_changes": 0,
+    "test_invocations": 0,
+    "workflow_reruns": 0
+  },
+  "api_head": "3e7becd91c33fa966aba96333c87afd91a0aba69",
+  "attempt": 1,
+  "candidate_applicability": "The workflow applies to this changed bridge path, but no candidate code, compilation, lint or assertions executed in this run.",
+  "checked_source": {
+    ".github/workflows/b01-federated-jsonl-admission.yml": {
+      "git_blob": "8c7a6e54a849400524ef562ed07c71dda91e7198",
+      "sha256": "a4b3434c6071a5c4a31f69971ae055871fafa0e499e544e42d6e2fd580945f26"
+    },
+    ".github/workflows/federation-v1-release.yml": {
+      "git_blob": "77e0499850e6044ec1bcebcaa24c7ea68962c667",
+      "sha256": "5d75a25b8faaad9802c17bc828dc0b17d91a1d9ba3e95b904a2c7950e3aaced7"
+    },
+    "docs/release_process.md": {
+      "git_blob": "eb6a371d8dadc9371743336ee4dd4f2d4b5e6efb",
+      "sha256": "df5d30e616d5723a1edbdbc184fe891ddf98226e1c460337b13d74d2df18975b"
+    },
+    "pytest.ini": {
+      "git_blob": "42bdc0534e0447bf0e019c219a0a284cc51b25e9",
+      "sha256": "2a039e1384e59d3d79d7884b6f10af88944e05bc186f05835b5db93baf1f061d"
+    },
+    "scripts/ci_pytest_shards.py": {
+      "git_blob": "20ab1321e692762dc17dd43eacff28dbb97518c7",
+      "sha256": "26fa8871ec227a64780cfab04616f5271b25abfb42874299bcfa5c756feee614"
+    }
+  },
+  "classification": "infrastructure_hosted_admission_refusal",
+  "contract": {
+    "compile": "Mandatory Release checks compile all maintained catalog packages.",
+    "coverage": "All eight B01 pytest modules fall within catalog/test_*.py collection used by mandatory exact-source Linux complete-suite orders and file-preserving shards. Their eventual actual JUnit identities/outcomes remain to be audited; no PASS is inferred here.",
+    "lint": "B01-specific lint command was not executed; this disposition makes no lint PASS or complete command-equivalence claim.",
+    "required_sequence": "docs/release_process.md:36 requires all jobs in the automated release gate and registry verification. No separate B01 workflow-success requirement was found there."
+  },
+  "demonstrated_candidate_defect": false,
+  "expected_pr_synthetic_source": "e6717470aa975d4168a77dd136ee26c916981b56",
+  "jobs": [
+    {
+      "annotation_sha256": "8216025c793b5d3719bf46a0c6dad4f9b44b3fa184d4872c0f986143400bf47a",
+      "checkout_observed": false,
+      "conclusion": "failure",
+      "executed_steps": 0,
+      "job_id": 103902484915,
+      "job_name": "Admission boundary (ubuntu-latest)",
+      "runner_assigned": false,
+      "tests_executed": 0
+    },
+    {
+      "annotation_sha256": "8216025c793b5d3719bf46a0c6dad4f9b44b3fa184d4872c0f986143400bf47a",
+      "checkout_observed": false,
+      "conclusion": "failure",
+      "executed_steps": 0,
+      "job_id": 103902485186,
+      "job_name": "Admission boundary (windows-latest)",
+      "runner_assigned": false,
+      "tests_executed": 0
+    }
+  ],
+  "native_checkout_source": null,
+  "physical_pass": false,
+  "reason": "Both GitHub-hosted jobs were refused before runner assignment or steps. Retained check annotations explicitly attribute non-start to account billing/spending admission.",
+  "release_relevant_next_action": "Retain hosted non-execution evidence and continue the currently running exact-source required qualification; audit its actual B01 node coverage. Do not retry unchanged hosted admission or alter account/runner settings based on this observation.",
+  "retention_sha256": "4fcbd6a70abd8a78290e05330e0c2ceb36e59be85410550d0534d98cd1a191f0",
+  "run_id": 34821054575,
+  "schema": "pr491-b01-first-failure-disposition-v1"
+}

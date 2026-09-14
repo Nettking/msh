@@ -1,0 +1,472 @@
+{
+  "base": "f00f13013b58e0023f1a506e32daa86df37af7ae",
+  "candidate": "3e7becd91c33fa966aba96333c87afd91a0aba69",
+  "independent_review": {
+    "retained_file": "independent-review.json",
+    "sha256": "fd69b013bc40721f3033139535a36db26e13f413c521daa97310c3e88e4fa269",
+    "size_bytes": 1233,
+    "verdict": "NO_BLOCKING_FINDINGS"
+  },
+  "limitations": {
+    "clean_pr_head_windows_passed": 10,
+    "clean_pr_head_windows_skipped": 1,
+    "data_changed_by_scan_probes": false,
+    "live_p06_replayed": false,
+    "live_startup_pass": false,
+    "local_related_passed": 50,
+    "local_related_skipped": 1,
+    "local_windows_focused_passed": 10,
+    "local_windows_focused_skipped": 1,
+    "physical_pass": false,
+    "protected_recorder_data_accessed": false,
+    "release_qualification_claimed": false,
+    "skips_not_counted_as_pass": true
+  },
+  "newline_policy": "Only CRLF-to-LF normalization; canonical bytes compare exactly to committed Git blobs. Raw working hashes remain explicit.",
+  "offline_same_owned_corpus": {
+    "baseline_candidate": "f00f13013b58e0023f1a506e32daa86df37af7ae",
+    "baseline_cpu_seconds": 16.421875,
+    "baseline_evidence": {
+      "retained_file": "probes/baseline/remaining-reads-result.json",
+      "sha256": "55585ff87edf8091300bcf1d3e50d46726d4df5390dd1785f9833dbd63c7dd58",
+      "size_bytes": 1656
+    },
+    "baseline_wall_seconds": 17.108999999938533,
+    "baseline_working_source_sha256": {
+      "catalog/common/data_loading.py": "29ae33fdcbade6869b912b8d80b082261a94d5f54993f2e801e3c2c142b1472f",
+      "catalog/federation/outbox.py": "f1da73f650164a9a42fdce2aa2ebd8516541de7e803495b1a191939e24856ea7",
+      "catalog/flask_app/services/_federated_jsonl_product_bridge_impl.py": "665ba44ea731adf2df7f86c3951e01b1618291b2fa5ead599360d80ceb08f211",
+      "catalog/flask_app/services/federated_jsonl_product_bridge.py": "4bb095d466c422be781ffc618c36ba26ac715cf75a245ce39c72d7f99f2c6864"
+    },
+    "corpus": "Stopped, owned acceptance native recorder fixture",
+    "eligible_candidates_all_measurements": 0,
+    "marker_only_disposition": "Improvement was insufficient; no PR or live replay was justified by that intermediate result.",
+    "phases": {
+      "final_parent_cache": {
+        "base_candidate": "f00f13013b58e0023f1a506e32daa86df37af7ae",
+        "comparison_evidence": {
+          "retained_file": "probes/final_parent_cache/comparison.json",
+          "sha256": "d9f87ca323c1ae267aa33c69377d16a8ec5212481e8c26abd672bb93912df311",
+          "size_bytes": 764
+        },
+        "cpu_seconds": 2.90625,
+        "eligible_candidates": 0,
+        "execution_evidence": {
+          "retained_file": "probes/final_parent_cache/execution.json",
+          "sha256": "eeff3eeb89df1266e2c33fd6b3834586620810eee5d35a07a769f621452aa4ba",
+          "size_bytes": 414
+        },
+        "recorded_execution_commit": null,
+        "relative_name_sequence_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "source_provenance": "Read-only probe of hashed working source based on f00; not recorded as execution at the later committed PR head.",
+        "wall_seconds": 3.0320000000065193,
+        "working_source_sha256": {
+          "catalog/common/data_loading.py": "443fd0b4e87d4732d92cfb44c9e97773ddf35d56e5c722f075d04eb880289560",
+          "catalog/flask_app/services/_federated_jsonl_product_bridge_impl.py": "9be03c6e03ffa9acede45903171b472bb04f8fd501a528d4962d419059b70f6b",
+          "catalog/flask_app/tests/test_federated_jsonl_candidate_filter.py": "fb5c6b97533b485a0bc8194ef64d1000348bee14662f523dadd9d48d44737c29"
+        }
+      },
+      "marker_only": {
+        "base_candidate": "f00f13013b58e0023f1a506e32daa86df37af7ae",
+        "comparison_evidence": {
+          "retained_file": "probes/marker_only/comparison.json",
+          "sha256": "c58f917c186ab7c6c1458c8be0dc7c1f07e2adb028b013f72678beddcd07810d",
+          "size_bytes": 765
+        },
+        "cpu_seconds": 11.234375,
+        "eligible_candidates": 0,
+        "execution_evidence": {
+          "retained_file": "probes/marker_only/execution.json",
+          "sha256": "ac87e6577b83fa3da4fb7148ede86ec26bb35db0b12b1dae2b9bbbffa81702f2",
+          "size_bytes": 415
+        },
+        "recorded_execution_commit": null,
+        "relative_name_sequence_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "source_provenance": "Read-only probe of hashed working source based on f00; not recorded as execution at the later committed PR head.",
+        "wall_seconds": 11.98499999998603,
+        "working_source_sha256": {
+          "catalog/common/data_loading.py": "443fd0b4e87d4732d92cfb44c9e97773ddf35d56e5c722f075d04eb880289560",
+          "catalog/flask_app/services/_federated_jsonl_product_bridge_impl.py": "56cda4de18c2a092a71078cdb3148b60ed28f82e74aa98be71f9276221971518",
+          "catalog/flask_app/tests/test_federated_jsonl_candidate_filter.py": "d9675c27a40ffef26466db2a837e63f6b3de8fa7de3b873c71131bffa178b4ab"
+        }
+      }
+    },
+    "same_selection_sequence": true,
+    "scope": "Measured scan cost only; empty selection equality does not replace eligible-input regression tests or prove live startup readiness."
+  },
+  "pr": 491,
+  "private_retention_index": {
+    "file_count": 65,
+    "path": ".acceptance/pr491-premerge-proof-retention-20260914/retention-index-df8828bfa54c9dc6b51d03e371fd0efe23b45c2023573e9a5dc7320d6e6ebf7b.private.json",
+    "sha256": "df8828bfa54c9dc6b51d03e371fd0efe23b45c2023573e9a5dc7320d6e6ebf7b"
+  },
+  "problem": "Excluded JSONL files incurred ancestor import-marker checks and repeated full path resolution during startup discovery.",
+  "red_to_green": [
+    {
+      "green": "green",
+      "meaning": "Missing optional scanner callback and marker work performed on excluded files.",
+      "red": "red"
+    },
+    {
+      "green": "phase2green",
+      "meaning": "Excluded ordinary siblings repeatedly resolved full paths instead of one parent.",
+      "red": "phase2red"
+    }
+  ],
+  "repair": "Optional early file filter plus a per-pass single-parent resolution cache for ordinary non-reparse leaves; all selected files keep the original final containment/exclusion and import-marker checks.",
+  "schema": "pr491-jsonl-scan-premerge-proof-v1",
+  "source_identity": {
+    "catalog/common/data_loading.py": {
+      "canonical_lf_matches_committed_blob": true,
+      "canonical_lf_sha256": "505338f2b6b2af0b63435b75640ba1e8820b3c2c6bc70e943c76c51aa0c69775",
+      "git_blob_id": "9c2df4d47f24175f68593b53d13ae2574cc6181c",
+      "working_sha256": "443fd0b4e87d4732d92cfb44c9e97773ddf35d56e5c722f075d04eb880289560"
+    },
+    "catalog/flask_app/services/_federated_jsonl_product_bridge_impl.py": {
+      "canonical_lf_matches_committed_blob": true,
+      "canonical_lf_sha256": "a9c2fbd964e2145bb4a9788eec5f88fa9a6c7df23aa63af4457a08fb428da104",
+      "git_blob_id": "7879ba6e0b4a74f506636a5d6c3b745c0ef8e6a2",
+      "working_sha256": "9be03c6e03ffa9acede45903171b472bb04f8fd501a528d4962d419059b70f6b"
+    },
+    "catalog/flask_app/tests/test_data_upload.py": {
+      "canonical_lf_matches_committed_blob": true,
+      "canonical_lf_sha256": "e49b48a4da22dd69028f0bef713d9cc87b6a136653e75a10da50d374030d09f1",
+      "git_blob_id": "9e2b4896f3ee13060c1c0a2ca985321926febeef",
+      "working_sha256": "349da9eb9758c17d30b450330b2e03ca3a08b7a4effc39c04e97eff6c57bc684"
+    },
+    "catalog/flask_app/tests/test_federated_jsonl_candidate_filter.py": {
+      "canonical_lf_matches_committed_blob": true,
+      "canonical_lf_sha256": "fb5c6b97533b485a0bc8194ef64d1000348bee14662f523dadd9d48d44737c29",
+      "git_blob_id": "658b5d210b48d243718d818099f4e159940e2e4d",
+      "working_sha256": "fb5c6b97533b485a0bc8194ef64d1000348bee14662f523dadd9d48d44737c29"
+    },
+    "catalog/flask_app/tests/test_federated_jsonl_product_bridge.py": {
+      "canonical_lf_matches_committed_blob": true,
+      "canonical_lf_sha256": "046980a6bc93c706c94bf11e112c17baa7f62f58a817d74261857cba078ea2a6",
+      "git_blob_id": "64218cc3cc5ca6a80d191051227e8166d4b380fa",
+      "working_sha256": "61b61217c402c10ca6694835c733e1c6d8499e831d100d974fefd96760092e99"
+    },
+    "catalog/flask_app/tests/test_federated_jsonl_resource_admission.py": {
+      "canonical_lf_matches_committed_blob": true,
+      "canonical_lf_sha256": "f8517e4608fd2ab99ffabc1e5af3ec5d9bfed5b401840610131627e0a52f9ae2",
+      "git_blob_id": "4eeb3778f2a63d07362c66b41b08ae115dac7448",
+      "working_sha256": "c33e2445607b4d4db15bae888cb75872e1f8f0c8a0a1820744efb2d064228e66"
+    }
+  },
+  "status": "LOCAL_REPAIR_PROOF_RETAINED",
+  "tests": {
+    "exact-pr-head": {
+      "actual_windows_junction_cases_passed": [
+        "test_windows_junction_alias_keeps_current_glob_selection",
+        "test_final_resolution_rejects_junction_rebound_after_prefilter"
+      ],
+      "counts": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 10,
+        "skipped": 1,
+        "total": 11
+      },
+      "evidence": {
+        "junit": {
+          "retained_file": "tests/exact-pr-head.xml",
+          "sha256": "290b42b2abf22d92b8689c64e719235be21bbf754d91281bacbabfbdfa06ae53",
+          "size_bytes": 3008
+        },
+        "native_source": {
+          "retained_file": "tests/exact-pr-head.source.private.json",
+          "sha256": "d5baf7257811b471014d0397cc233697ba1b3f0bbe6ada7d1ae878a1a7e09751",
+          "size_bytes": 4749
+        },
+        "receipt": {
+          "retained_file": "tests/exact-pr-head.json",
+          "sha256": "d1b20018125f37b0bdcf895cc67bbf753e51b54b6ece52509f01a5bf8fe9101e",
+          "size_bytes": 6606
+        },
+        "stderr": {
+          "retained_file": "tests/exact-pr-head.stderr.private.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size_bytes": 0
+        },
+        "stdout": {
+          "retained_file": "tests/exact-pr-head.stdout.private.log",
+          "sha256": "529a9102d619ae0be18a61c3fe1c81da468d03954610d89e7947f6947845dfc5",
+          "size_bytes": 81
+        }
+      },
+      "exit_code": 0,
+      "failed_nodes": [],
+      "recorded_execution_commit": "3e7becd91c33fa966aba96333c87afd91a0aba69",
+      "skips": [
+        {
+          "exact_private_reason_sha256": "6079388b8b0fff7e70b9ee9f56b17d3a10142b1a67dd699966c867502b7d1fd9",
+          "node": "catalog.flask_app.tests.test_federated_jsonl_candidate_filter::test_resolved_file_alias_selection_and_lexical_markers_are_preserved",
+          "reason": "Host cannot create the file symlink required by this case.",
+          "reason_code": "Windows ERROR_PRIVILEGE_NOT_HELD (1314)",
+          "symlink_type": "file"
+        }
+      ],
+      "source_provenance": "Clean exact PR head, before and after.",
+      "working_source_sha256": {
+        "catalog/common/data_loading.py": "443fd0b4e87d4732d92cfb44c9e97773ddf35d56e5c722f075d04eb880289560",
+        "catalog/flask_app/services/_federated_jsonl_product_bridge_impl.py": "9be03c6e03ffa9acede45903171b472bb04f8fd501a528d4962d419059b70f6b",
+        "catalog/flask_app/tests/test_federated_jsonl_candidate_filter.py": "fb5c6b97533b485a0bc8194ef64d1000348bee14662f523dadd9d48d44737c29"
+      }
+    },
+    "green": {
+      "counts": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 6,
+        "skipped": 1,
+        "total": 7
+      },
+      "evidence": {
+        "junit": {
+          "retained_file": "tests/green.xml",
+          "sha256": "63bc3de27291f0c517b3923c380b68522155a0eab2f269d13d125ddd6c299b9c",
+          "size_bytes": 2371
+        },
+        "receipt": {
+          "retained_file": "tests/green.json",
+          "sha256": "56c46556dd87b890cb0381b2abf426c2e88179a8fba2616e02f4a4a3e89af609",
+          "size_bytes": 1032
+        },
+        "stderr": {
+          "retained_file": "tests/green.stderr.private.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size_bytes": 0
+        },
+        "stdout": {
+          "retained_file": "tests/green.stdout.private.log",
+          "sha256": "42e8c5e0f623020194245362b673400e86e917e6ae7ee6236cdd88dea1b9280c",
+          "size_bytes": 81
+        }
+      },
+      "exit_code": 0,
+      "failed_nodes": [],
+      "recorded_execution_commit": null,
+      "skips": [
+        {
+          "exact_private_reason_sha256": "7c740a003896911701290c7415d36c3c25fdeceb153a3633ce64be2614ceadef",
+          "node": "catalog.flask_app.tests.test_federated_jsonl_candidate_filter::test_resolved_file_alias_selection_and_lexical_markers_are_preserved",
+          "reason": "Host cannot create the file symlink required by this case.",
+          "reason_code": "Windows ERROR_PRIVILEGE_NOT_HELD (1314)",
+          "symlink_type": "file"
+        }
+      ],
+      "source_provenance": "Precommit working bytes; individual run receipt does not record HEAD. Content hashes retained without relabeling the run as PR-head execution.",
+      "working_source_sha256": {
+        "catalog/common/data_loading.py": "443fd0b4e87d4732d92cfb44c9e97773ddf35d56e5c722f075d04eb880289560",
+        "catalog/flask_app/services/_federated_jsonl_product_bridge_impl.py": "56cda4de18c2a092a71078cdb3148b60ed28f82e74aa98be71f9276221971518",
+        "catalog/flask_app/tests/test_federated_jsonl_candidate_filter.py": "d9675c27a40ffef26466db2a837e63f6b3de8fa7de3b873c71131bffa178b4ab"
+      }
+    },
+    "phase2green": {
+      "counts": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 10,
+        "skipped": 1,
+        "total": 11
+      },
+      "evidence": {
+        "junit": {
+          "retained_file": "tests/phase2green.xml",
+          "sha256": "3eced95fa043110fb0433b67853b6fa545f2747592c031852f13faddf1542398",
+          "size_bytes": 3008
+        },
+        "receipt": {
+          "retained_file": "tests/phase2green.json",
+          "sha256": "92cb379e85225be2683aaa7be36f09e1bb9f10f0353730d482c5d12f0c123be7",
+          "size_bytes": 1038
+        },
+        "stderr": {
+          "retained_file": "tests/phase2green.stderr.private.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size_bytes": 0
+        },
+        "stdout": {
+          "retained_file": "tests/phase2green.stdout.private.log",
+          "sha256": "529a9102d619ae0be18a61c3fe1c81da468d03954610d89e7947f6947845dfc5",
+          "size_bytes": 81
+        }
+      },
+      "exit_code": 0,
+      "failed_nodes": [],
+      "recorded_execution_commit": null,
+      "skips": [
+        {
+          "exact_private_reason_sha256": "11db69ca468e28cb222cb3212636c18540d77cd862ad1b4c82ed6ddf355c00b8",
+          "node": "catalog.flask_app.tests.test_federated_jsonl_candidate_filter::test_resolved_file_alias_selection_and_lexical_markers_are_preserved",
+          "reason": "Host cannot create the file symlink required by this case.",
+          "reason_code": "Windows ERROR_PRIVILEGE_NOT_HELD (1314)",
+          "symlink_type": "file"
+        }
+      ],
+      "source_provenance": "Precommit working bytes; individual run receipt does not record HEAD. Content hashes retained without relabeling the run as PR-head execution.",
+      "working_source_sha256": {
+        "catalog/common/data_loading.py": "443fd0b4e87d4732d92cfb44c9e97773ddf35d56e5c722f075d04eb880289560",
+        "catalog/flask_app/services/_federated_jsonl_product_bridge_impl.py": "9be03c6e03ffa9acede45903171b472bb04f8fd501a528d4962d419059b70f6b",
+        "catalog/flask_app/tests/test_federated_jsonl_candidate_filter.py": "fb5c6b97533b485a0bc8194ef64d1000348bee14662f523dadd9d48d44737c29"
+      }
+    },
+    "phase2red": {
+      "counts": {
+        "errors": 0,
+        "failed": 1,
+        "passed": 9,
+        "skipped": 1,
+        "total": 11
+      },
+      "evidence": {
+        "junit": {
+          "retained_file": "tests/phase2red.xml",
+          "sha256": "319c3778b20f138a27d1aa77ba2df4bd65652a5ddabcd1c0e40cb6058f8cfc01",
+          "size_bytes": 5250
+        },
+        "receipt": {
+          "retained_file": "tests/phase2red.json",
+          "sha256": "1f32e2140644f0e97d40fbc3a8cb8fe82030138e76092103c182eab6f8dbfa93",
+          "size_bytes": 1036
+        },
+        "stderr": {
+          "retained_file": "tests/phase2red.stderr.private.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size_bytes": 0
+        },
+        "stdout": {
+          "retained_file": "tests/phase2red.stdout.private.log",
+          "sha256": "39d3cdd428d1fa67bf221befec4127e8a6171254d6b1edd454e6644aa61cae59",
+          "size_bytes": 2000
+        }
+      },
+      "exit_code": 1,
+      "failed_nodes": [
+        "catalog.flask_app.tests.test_federated_jsonl_candidate_filter::test_excluded_regular_siblings_resolve_parent_once"
+      ],
+      "recorded_execution_commit": null,
+      "skips": [
+        {
+          "exact_private_reason_sha256": "61a9f2e1a988de9f009e476980f3a1e8e1a0b268531f8e761d89ac8df58a3321",
+          "node": "catalog.flask_app.tests.test_federated_jsonl_candidate_filter::test_resolved_file_alias_selection_and_lexical_markers_are_preserved",
+          "reason": "Host cannot create the file symlink required by this case.",
+          "reason_code": "Windows ERROR_PRIVILEGE_NOT_HELD (1314)",
+          "symlink_type": "file"
+        }
+      ],
+      "source_provenance": "Precommit working bytes; individual run receipt does not record HEAD. Content hashes retained without relabeling the run as PR-head execution.",
+      "working_source_sha256": {
+        "catalog/common/data_loading.py": "443fd0b4e87d4732d92cfb44c9e97773ddf35d56e5c722f075d04eb880289560",
+        "catalog/flask_app/services/_federated_jsonl_product_bridge_impl.py": "56cda4de18c2a092a71078cdb3148b60ed28f82e74aa98be71f9276221971518",
+        "catalog/flask_app/tests/test_federated_jsonl_candidate_filter.py": "fb5c6b97533b485a0bc8194ef64d1000348bee14662f523dadd9d48d44737c29"
+      }
+    },
+    "red": {
+      "counts": {
+        "errors": 0,
+        "failed": 3,
+        "passed": 3,
+        "skipped": 1,
+        "total": 7
+      },
+      "evidence": {
+        "junit": {
+          "retained_file": "tests/red.xml",
+          "sha256": "22a835622ca7802602448a9bf5b17ac0be32067e953530bdd9624f7d75eea48d",
+          "size_bytes": 8672
+        },
+        "receipt": {
+          "retained_file": "tests/red.json",
+          "sha256": "cb48632955dbad9b26e37c9a7c84d12bd47c4760a437b9e0745ad2824c71dd59",
+          "size_bytes": 1030
+        },
+        "stderr": {
+          "retained_file": "tests/red.stderr.private.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size_bytes": 0
+        },
+        "stdout": {
+          "retained_file": "tests/red.stdout.private.log",
+          "sha256": "8547361fbbc1ece9c1bc7cbbb46df5a94e210674bda33e165538fd8a57e0ab6a",
+          "size_bytes": 5914
+        }
+      },
+      "exit_code": 1,
+      "failed_nodes": [
+        "catalog.flask_app.tests.test_federated_jsonl_candidate_filter::test_excluded_candidates_skip_ancestor_marker_checks[True]",
+        "catalog.flask_app.tests.test_federated_jsonl_candidate_filter::test_excluded_candidates_skip_ancestor_marker_checks[False]",
+        "catalog.flask_app.tests.test_federated_jsonl_candidate_filter::test_optional_file_filter_preserves_sorted_default_discovery"
+      ],
+      "recorded_execution_commit": null,
+      "skips": [
+        {
+          "exact_private_reason_sha256": "77aeb3368f336fdc51902e76874a92a7063b8823d41ee83cea27235a82b3511a",
+          "node": "catalog.flask_app.tests.test_federated_jsonl_candidate_filter::test_resolved_file_alias_selection_and_lexical_markers_are_preserved",
+          "reason": "Host cannot create the file symlink required by this case.",
+          "reason_code": "Windows ERROR_PRIVILEGE_NOT_HELD (1314)",
+          "symlink_type": "file"
+        }
+      ],
+      "source_provenance": "Precommit working bytes; individual run receipt does not record HEAD. Content hashes retained without relabeling the run as PR-head execution.",
+      "working_source_sha256": {
+        "catalog/common/data_loading.py": "29ae33fdcbade6869b912b8d80b082261a94d5f54993f2e801e3c2c142b1472f",
+        "catalog/flask_app/services/_federated_jsonl_product_bridge_impl.py": "665ba44ea731adf2df7f86c3951e01b1618291b2fa5ead599360d80ceb08f211",
+        "catalog/flask_app/tests/test_federated_jsonl_candidate_filter.py": "d9675c27a40ffef26466db2a837e63f6b3de8fa7de3b873c71131bffa178b4ab"
+      }
+    },
+    "related-final": {
+      "counts": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 50,
+        "skipped": 1,
+        "total": 51
+      },
+      "evidence": {
+        "junit": {
+          "retained_file": "tests/related-final.xml",
+          "sha256": "aae09315fb67a450e86e1110336cb99f6e5cca5113fdbc3d742a28e3e82d074f",
+          "size_bytes": 9286
+        },
+        "receipt": {
+          "retained_file": "tests/related-final.json",
+          "sha256": "1d8c9e075eefda03e8bbeaa33b24c63e2bdf1cc191274b3d44c48cfda6f07d45",
+          "size_bytes": 2772
+        },
+        "stderr": {
+          "retained_file": "tests/related-final.stderr.private.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "size_bytes": 0
+        },
+        "stdout": {
+          "retained_file": "tests/related-final.stdout.private.log",
+          "sha256": "631a5990ded9a4b483c70d5f1fb1e8512ec05724ae7ccdd078bdea1005bb710a",
+          "size_bytes": 81
+        }
+      },
+      "exit_code": 0,
+      "failed_nodes": [],
+      "recorded_execution_commit": null,
+      "skips": [
+        {
+          "exact_private_reason_sha256": "0a3af7ef51324defbf614f0c002ba32d0120d2f9b257bebe258a89119a5422da",
+          "node": "catalog.flask_app.tests.test_federated_jsonl_resource_admission::test_materialization_rejects_redirect_component_without_outside_write",
+          "reason": "Host cannot create the directory symlink required by this case.",
+          "reason_code": "Windows ERROR_PRIVILEGE_NOT_HELD (1314)",
+          "symlink_type": "directory"
+        }
+      ],
+      "source_provenance": "Precommit working bytes; individual run receipt does not record HEAD. Content hashes retained without relabeling the run as PR-head execution.",
+      "working_source_sha256": {
+        "catalog/common/data_loading.py": "443fd0b4e87d4732d92cfb44c9e97773ddf35d56e5c722f075d04eb880289560",
+        "catalog/flask_app/services/_federated_jsonl_product_bridge_impl.py": "9be03c6e03ffa9acede45903171b472bb04f8fd501a528d4962d419059b70f6b",
+        "catalog/flask_app/tests/test_data_upload.py": "349da9eb9758c17d30b450330b2e03ca3a08b7a4effc39c04e97eff6c57bc684",
+        "catalog/flask_app/tests/test_federated_jsonl_candidate_filter.py": "fb5c6b97533b485a0bc8194ef64d1000348bee14662f523dadd9d48d44737c29",
+        "catalog/flask_app/tests/test_federated_jsonl_product_bridge.py": "61b61217c402c10ca6694835c733e1c6d8499e831d100d974fefd96760092e99",
+        "catalog/flask_app/tests/test_federated_jsonl_resource_admission.py": "c33e2445607b4d4db15bae888cb75872e1f8f0c8a0a1820744efb2d064228e66"
+      }
+    }
+  },
+  "tree": "b9c5755f0b2dff2556bbca1713bdd6d2af25bf5b"
+}
