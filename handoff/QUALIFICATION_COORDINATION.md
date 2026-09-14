@@ -1,6 +1,6 @@
 # Federation v1 current release checkpoint
 
-Updated 2026-09-14T06:22Z. Active context: clean handoff + this file + live GitHub.
+Updated 2026-09-14T06:38Z. Active context: clean handoff + this file + live GitHub.
 Historical coordination is evidence only; consult it for a specific current need.
 
 ## Current source / heads
@@ -8,8 +8,9 @@ Historical coordination is evidence only; consult it for a specific current need
   f00f13013b58e0023f1a506e32daa86df37af7ae, tree49c6f273afa82059d45dbc2bdffb5168b083f25d.
 - Repair head/trial d0e5b6b8993b76ccb2e49da699fb304a2684df66,
   branch codex/federation-v1-ack-validation-repair; same tree as resulting main.
-- Clean H C:/wsl/fcp-v1-f00f1301-main-20260914. Nitro H planned:
-  /home/martin/fcp-v1-f00f1301-main-20260914/source. Native bundle retained.
+- Clean H C:/wsl/fcp-v1-f00f1301-main-20260914. Nitro H staged clean/detached:
+  /home/martin/fcp-v1-f00f1301-main-20260914/source. Source-only stage DONE06:33Z;
+  diagnostics/physical-f00f1301/nitro-source-stage.json. Do not replay staging.
 - Existing runtime/freeze remains0246bf8b; no newmain activation/freeze yet.
   Native stopped after P06 startup failure;205completed/723pending preserved.
 - Checkpoint branch codex/federation-v1-diagnostic-sweep-20260911.
@@ -26,7 +27,9 @@ Historical coordination is evidence only; consult it for a specific current need
 - Phase2 sole failed-job recovery PASS381/1unrelated skip; original failednode
   passed, originalLinux execution retained. Cause unknown/non-demonstrated defect.
   diagnostics/pr490-148dbdb2-phase2-recovery/recovery-review.json. No more retry.
-- New main branding PASS; other required gates running/queued, no failures06:19Z.
+- New main ICSE4/4, Phase2, update, branding and registry PASS first attempt.
+  Release5PASS/2running/5queued (4dependent unstarted), CF7-A/B each1PASS plus
+  1queued/running; no failures06:35Z. Main is not yet fully qualified.
 
 ## Actual blockers
 - Fresh physical acceptance outstanding. Old0246 P06 startup failed45s sharing/
@@ -47,13 +50,21 @@ Historical coordination is evidence only; consult it for a specific current need
    CF7-B34812799532, update34812799444, branding34812799431 automatic.
    Only missing CF7-A34812886619 and registry34812889190 dispatched06:18Z.
    inspect_main.py is read-only; retain/finalize when terminal, then9caseaudit.
-2. Prepare native readiness/freeze/revalidation in pr490-main-physical-preparation;
-   next P06 in pr490-p06-transition-preparation; general/P11 in
-   pr490-general-physical-preparation. Execution disabled until bound review.
+2. Native readiness/freeze/revalidation prepared/root source-reviewed in
+   pr490-main-physical-preparation; final hashes unset. Nitro source-stage raw
+   receipts match aad507928e30c9a35a6c70ce7ac5ba7d18fe4e57ca88c3a3a21d3915c79e1c28.
+   P06 prepared-f00/INVOCATIONS.md under pr490-p06-transition-preparation gives
+   exact next actions; root reviewed diffs, offline history-guard proof active.
    Latest C4 agent seed and current-agent capture01c6b873 retained;
    revalidate identity/quiescence before transition. Never reset queues/state.
-3. Warm, pressure and timed postrepair recipes remain available. Windows C4
-   admission uses separate candidate-admission.verified.json, preserving original.
+3. pr490-general-physical-preparation/generated-f00f1301-disabled generated once,
+   generation ea4546ca; inert only, all receipt/state bindings unset. P11 adapter
+   still needs actual C3-to-f00 five-path revalidation and populated continuity.
+   pr490-warm-physical-preparation independently reviewed; no generation/activation.
+   Windows C4 uses candidate-admission.verified.json, preserving original.
+   Current warm-agent capture controls being prepared, not executed.
+   pr490-timed-physical-preparation has13 helper recipe and14 unchanged supplemental
+   blobs; no execution tree/fixtures/timers. Pressure recipe still unbound.
    P12/P07 may overlap only after final shared-runtime state, complete passive
    coverage and measured whole-volume growth/capacity. Supplemental unchanged-cap
    fixtures prepared, not executed. No preparation equals physical PASS.

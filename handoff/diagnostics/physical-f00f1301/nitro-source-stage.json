@@ -1,0 +1,49 @@
+{
+  "base_checkout_unchanged": true,
+  "bundle_bytes": 17949,
+  "bundle_sha256": "162bfed63723b7a2a8592d5d4d2016af3e7bd7cf7b0eb44bf77e135ec1146aa6",
+  "candidate": "f00f13013b58e0023f1a506e32daa86df37af7ae",
+  "evidence": [
+    {
+      "bytes": 3478,
+      "local_receipt": ".acceptance/pr490-main-physical-preparation/source-stage-execution-f00/retained/new-harness-source-stage.json",
+      "sha256": "aad507928e30c9a35a6c70ce7ac5ba7d18fe4e57ca88c3a3a21d3915c79e1c28"
+    },
+    {
+      "bytes": 3478,
+      "local_receipt": ".acceptance/pr490-main-physical-preparation/source-stage-execution-f00/retained/base-attempt-status.json",
+      "sha256": "aad507928e30c9a35a6c70ce7ac5ba7d18fe4e57ca88c3a3a21d3915c79e1c28"
+    },
+    {
+      "local_receipt": ".acceptance/pr490-main-physical-preparation/source-stage-execution-f00/retained/retention.private.json",
+      "sha256": "ddb5e5973eb477261ff29be5c0a1b009af7190a932df8bfb1b729ec595ab8743"
+    },
+    {
+      "local_receipt": ".acceptance/pr490-main-physical-preparation/source-stage-execution-f00/transport-receipt.private.json",
+      "sha256": "85a5dd9020a4e632501db3f292774ca8b50b4d098aaec539348810d3eebeb8b7"
+    }
+  ],
+  "freeze_evaluated_by_action": false,
+  "host_alias": "nitro",
+  "native_readiness_run_by_action": false,
+  "note": "Source staging and its two final receipts only. Qualification, freeze, native readiness, runtime admission and physical acceptance require their separate evidence.",
+  "original_stage_exit_code": 0,
+  "original_stage_stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "original_stage_stdout_sha256": "c7cf7c91e9b933e204487e346cb3baff4b5fa337f618b36372ab12ff9a524214",
+  "physical_assertions_run": false,
+  "protected_data_accessed": false,
+  "qualification_evaluated_by_action": false,
+  "qualified_python_version": "3.12.13",
+  "remote_stage_receipts_byte_identical": true,
+  "runtime_activated": false,
+  "schema": "fcp.v1.physical-source-stage-evidence.v1",
+  "source_bundle_base": "1aac6148759d7b2fd488ec26b97e1a786bdafa80",
+  "source_stage_helper_sha256": "e0e2d1f1ff9313edd2b54cdfc254fe928879f9daa9705f5666773ca8fc8e53db",
+  "stage_finished_at": "2026-09-14T06:33:19.537131+00:00",
+  "stage_observed_detached_head": true,
+  "stage_observed_source_clean": true,
+  "stage_started_at": "2026-09-14T06:33:14.775393+00:00",
+  "status": "SOURCE_STAGED_ONLY",
+  "transport_helper_sha256": "ab95d3e979d9f7285868bd04d208f9cb88c0b9c4d1595ae171990a1880f70e8b",
+  "tree": "49c6f273afa82059d45dbc2bdffb5168b083f25d"
+}
