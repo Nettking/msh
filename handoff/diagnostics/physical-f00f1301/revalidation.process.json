@@ -1,0 +1,9 @@
+{
+  "baseline": "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d",
+  "candidate": "f00f13013b58e0023f1a506e32daa86df37af7ae",
+  "disposition_not_yet_applied": true,
+  "exit_code": 2,
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_sha256": "f5bd923ff1b71b1f3ea65a7fc6f0a1f7a6c5e0b52cbab8a0999c180bab17d43f",
+  "timed_out": false
+}

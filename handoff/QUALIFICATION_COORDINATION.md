@@ -1,6 +1,6 @@
 # Federation v1 current release checkpoint
 
-Updated 2026-09-14T06:38Z. Active context: clean handoff + this file + live GitHub.
+Updated 2026-09-14T07:02Z. Active context: clean handoff + this file + live GitHub.
 Historical coordination is evidence only; consult it for a specific current need.
 
 ## Current source / heads
@@ -11,25 +11,26 @@ Historical coordination is evidence only; consult it for a specific current need
 - Clean H C:/wsl/fcp-v1-f00f1301-main-20260914. Nitro H staged clean/detached:
   /home/martin/fcp-v1-f00f1301-main-20260914/source. Source-only stage DONE06:33Z;
   diagnostics/physical-f00f1301/nitro-source-stage.json. Do not replay staging.
-- Existing runtime/freeze remains0246bf8b; no newmain activation/freeze yet.
+- Authoritative freeze f00f1301 DONE07:00Z, SHA256
+  0c5127ae2d2dc8885182f38c908dc544789f38cf3e9de69bc12d1f1e56366d25.
+  Existing runtime remains0246bf8b; no newmain activation yet.
   Native stopped after P06 startup failure;205completed/723pending preserved.
 - Checkpoint branch codex/federation-v1-diagnostic-sweep-20260911.
   No full physical PASS, final tag or publication.
 
 ## Current green gates
-- PR native148dbdb21d1f98dfb5a1db08c8e7081a299cb149 qualified, tree49c6:
-  diagnostics/pr490-148dbdb2-qualification/qualification.json,
-  SHA2568cb643f1bcf054bf22303564708fe0365fc90f75a458cf58cb866eefbcc9c5f2.
-- PR release16/16; ICSE4/4; Phase2, CF7-B, update, branding PASS.
-  25 native checkout proofs; complete shard/order/publication source audited.
-- All9new tests unskipped in both fullorders and disjoint shard union:
-  manifest-text-focused-review.json SHA256f90284ba7993b19eefc546190853357f84d1982baa205d5f92b93b9c163b66cc.
-- Phase2 sole failed-job recovery PASS381/1unrelated skip; original failednode
-  passed, originalLinux execution retained. Cause unknown/non-demonstrated defect.
-  diagnostics/pr490-148dbdb2-phase2-recovery/recovery-review.json. No more retry.
-- New main ICSE4/4, Phase2, update, branding and registry PASS first attempt.
-  Release5PASS/2running/5queued (4dependent unstarted), CF7-A/B each1PASS plus
-  1queued/running; no failures06:35Z. Main is not yet fully qualified.
+- Actual main AUTOMATED_QUALIFIED: release16/16, ICSE4/4, Phase2, CF7-A/B,
+  software update, branding and registry PASS first attempt. No reruns.
+  diagnostics/main-f00f1301-qualification/qualification.json SHA256
+  9d4c1c55046ca86110e728e6638a2e4a7d15e36c9cd4db377af82a0984ae6ff4.
+- 28 native checkout proofs; complete shard/order/publication source audited.
+  All9new tests unskipped in both fullorders and disjoint shard union;
+  manifest-text-focused-review.json SHA256
+  5717eaf3598a190e8d334e5c9ebeb404e7c7822991ca5cd0796be900bd5ffb39.
+- Checked revalidation DONE: all fresh/no carry; expected unknown product path.
+  physical-f00f1301/revalidation-from-0246bf8b.json SHA256
+  341b26ba7aa104e2cec0df6e27798767212032d3870b2d7f6fbb9348b7ba6d1b.
+  Prior PR qualification/recovery evidence retained separately; do not repeat.
 
 ## Actual blockers
 - Fresh physical acceptance outstanding. Old0246 P06 startup failed45s sharing/
@@ -37,24 +38,23 @@ Historical coordination is evidence only; consult it for a specific current need
   Minimal equivalent predicate repair merged490.8ACK profile76.27s ->38.01s,
   all206 manifest rows byte-identical; no live startup PASS inferred.
   Evidence: diagnostics/physical-0246bf8b/full-ack-repair-proof.json.
-- Main must qualify/freeze/revalidate before fresh campaign; no physical carry.
+- Fresh native readiness running on both hosts; runtime admission still required.
 - P01 hour, P07>=3600s and P12>=86400s NOT STARTED. Real durations required.
 - Separate real-source CF7 needs two reachable CNC sources; asked once.
 - Nitro pressure needs unchanged fresh capacity preflight after builds settle.
   Prior memory-margin refusal is fixture capacity, not product OOM.
 
 ## Active work / next action
-1. Qualify resulting main once using .acceptance/ack-validation-release-preparation.
-   inputs.main.json + authorization.root-reviewed-main.json bind exactsource.
-   Release34812799504, ICSE34812799419, Phase234812799566,
-   CF7-B34812799532, update34812799444, branding34812799431 automatic.
-   Only missing CF7-A34812886619 and registry34812889190 dispatched06:18Z.
-   inspect_main.py is read-only; retain/finalize when terminal, then9caseaudit.
-2. Native readiness/freeze/revalidation prepared/root source-reviewed in
-   pr490-main-physical-preparation; final hashes unset. Nitro source-stage raw
+1. Main retention/finalization/focused audit DONE once; no CI work outstanding.
+   Release34812799504; seven companion IDs in immutable qualification receipt.
+2. pr490-main-physical-preparation freeze/revalidation DONE. Generated readiness
+   controls installed byte-identically both hosts; one native readiness started
+   each07:02Z. Inspect status/results, do not relaunch. Nitro source-stage raw
    receipts match aad507928e30c9a35a6c70ce7ac5ba7d18fe4e57ca88c3a3a21d3915c79e1c28.
    P06 prepared-f00/INVOCATIONS.md under pr490-p06-transition-preparation gives
-   exact next actions; root reviewed diffs, offline history-guard proof active.
+   exact next actions; root reviewed diffs, offline history-guard12cases verified
+   (4accepted/8refused). Prepared invoke_reviewed.py preserves child-only
+   PSModulePath removal; bind its actual generated HTTP/config hashes before use.
    Latest C4 agent seed and current-agent capture01c6b873 retained;
    revalidate identity/quiescence before transition. Never reset queues/state.
 3. pr490-general-physical-preparation/generated-f00f1301-disabled generated once,
@@ -62,7 +62,8 @@ Historical coordination is evidence only; consult it for a specific current need
    still needs actual C3-to-f00 five-path revalidation and populated continuity.
    pr490-warm-physical-preparation independently reviewed; no generation/activation.
    Windows C4 uses candidate-admission.verified.json, preserving original.
-   Current warm-agent capture controls being prepared, not executed.
+   Current warm-agent identity capture DONE once/host: both idle, no extra
+   descendants/signals/changes. Concrete quiescence controls being prepared.
    pr490-timed-physical-preparation has13 helper recipe and14 unchanged supplemental
    blobs; no execution tree/fixtures/timers. Pressure recipe still unbound.
    P12/P07 may overlap only after final shared-runtime state, complete passive

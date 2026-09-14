@@ -1,0 +1,395 @@
+{
+  "api_head": "f00f13013b58e0023f1a506e32daa86df37af7ae",
+  "source": "f00f13013b58e0023f1a506e32daa86df37af7ae",
+  "tree": "49c6f273afa82059d45dbc2bdffb5168b083f25d",
+  "workflows": [
+    {
+      "api_head_sha": "f00f13013b58e0023f1a506e32daa86df37af7ae",
+      "conclusion": "success",
+      "event": "workflow_dispatch",
+      "jobs": [
+        {
+          "completed_at": "2026-09-14T06:25:19Z",
+          "conclusion": "success",
+          "id": 103877559202,
+          "name": "harness (Linux, fcp-linux-fast, bash)",
+          "runner": "Beast-Linux-WSL",
+          "started_at": "2026-09-14T06:21:37Z",
+          "status": "completed",
+          "steps_executed": 26
+        },
+        {
+          "completed_at": "2026-09-14T06:41:53Z",
+          "conclusion": "success",
+          "id": 103877559398,
+          "name": "harness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Byp...",
+          "runner": "Beast",
+          "started_at": "2026-09-14T06:38:02Z",
+          "status": "completed",
+          "steps_executed": 26
+        }
+      ],
+      "run_attempt": 1,
+      "run_id": 34812886619,
+      "status": "completed",
+      "workflow": "cf7-acceptance-harness.yml"
+    },
+    {
+      "api_head_sha": "f00f13013b58e0023f1a506e32daa86df37af7ae",
+      "conclusion": "success",
+      "event": "push",
+      "jobs": [
+        {
+          "completed_at": "2026-09-14T06:21:35Z",
+          "conclusion": "success",
+          "id": 103877306630,
+          "name": "acceptance (Linux, fcp-linux-fast, bash)",
+          "runner": "Beast-Linux-WSL",
+          "started_at": "2026-09-14T06:18:57Z",
+          "status": "completed",
+          "steps_executed": 19
+        },
+        {
+          "completed_at": "2026-09-14T06:38:01Z",
+          "conclusion": "success",
+          "id": 103877306787,
+          "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
+          "runner": "Beast",
+          "started_at": "2026-09-14T06:34:29Z",
+          "status": "completed",
+          "steps_executed": 19
+        }
+      ],
+      "run_attempt": 1,
+      "run_id": 34812799532,
+      "status": "completed",
+      "workflow": "cf7b-product-physical-acceptance.yml"
+    },
+    {
+      "api_head_sha": "f00f13013b58e0023f1a506e32daa86df37af7ae",
+      "conclusion": "success",
+      "event": "push",
+      "jobs": [
+        {
+          "completed_at": "2026-09-14T06:18:56Z",
+          "conclusion": "success",
+          "id": 103877306260,
+          "name": "update-contracts (Linux, fcp-linux-fast, bash)",
+          "runner": "Beast-Linux-WSL",
+          "started_at": "2026-09-14T06:17:03Z",
+          "status": "completed",
+          "steps_executed": 15
+        },
+        {
+          "completed_at": "2026-09-14T06:31:34Z",
+          "conclusion": "success",
+          "id": 103877306460,
+          "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+          "runner": "Beast",
+          "started_at": "2026-09-14T06:26:07Z",
+          "status": "completed",
+          "steps_executed": 15
+        }
+      ],
+      "run_attempt": 1,
+      "run_id": 34812799444,
+      "status": "completed",
+      "workflow": "federation-software-update.yml"
+    },
+    {
+      "api_head_sha": "f00f13013b58e0023f1a506e32daa86df37af7ae",
+      "conclusion": "success",
+      "event": "push",
+      "jobs": [
+        {
+          "completed_at": "2026-09-14T06:36:40Z",
+          "conclusion": "success",
+          "id": 103877306753,
+          "name": "Full-suite order (fixed)",
+          "runner": "Nettking-Linux",
+          "started_at": "2026-09-14T06:25:37Z",
+          "status": "completed",
+          "steps_executed": 10
+        },
+        {
+          "completed_at": "2026-09-14T06:26:38Z",
+          "conclusion": "success",
+          "id": 103877306778,
+          "name": "Windows regressions (journal-artifacts)",
+          "runner": "Nettking",
+          "started_at": "2026-09-14T06:17:03Z",
+          "status": "completed",
+          "steps_executed": 12
+        },
+        {
+          "completed_at": "2026-09-14T06:25:36Z",
+          "conclusion": "success",
+          "id": 103877306841,
+          "name": "Linux regression shard (3)",
+          "runner": "Nettking-Linux",
+          "started_at": "2026-09-14T06:22:25Z",
+          "status": "completed",
+          "steps_executed": 12
+        },
+        {
+          "completed_at": "2026-09-14T06:26:05Z",
+          "conclusion": "success",
+          "id": 103877306874,
+          "name": "Release checks (Windows)",
+          "runner": "Beast",
+          "started_at": "2026-09-14T06:22:32Z",
+          "status": "completed",
+          "steps_executed": 18
+        },
+        {
+          "completed_at": "2026-09-14T06:31:31Z",
+          "conclusion": "success",
+          "id": 103877306907,
+          "name": "Windows regressions (transport-storage)",
+          "runner": "Nettking",
+          "started_at": "2026-09-14T06:26:40Z",
+          "status": "completed",
+          "steps_executed": 12
+        },
+        {
+          "completed_at": "2026-09-14T06:38:24Z",
+          "conclusion": "success",
+          "id": 103877306914,
+          "name": "Windows regressions (capability-product)",
+          "runner": "Nettking",
+          "started_at": "2026-09-14T06:31:33Z",
+          "status": "completed",
+          "steps_executed": 12
+        },
+        {
+          "completed_at": "2026-09-14T06:51:44Z",
+          "conclusion": "success",
+          "id": 103877306919,
+          "name": "Full-suite order (rotating)",
+          "runner": "Nettking-Linux",
+          "started_at": "2026-09-14T06:41:40Z",
+          "status": "completed",
+          "steps_executed": 10
+        },
+        {
+          "completed_at": "2026-09-14T06:18:11Z",
+          "conclusion": "success",
+          "id": 103877306921,
+          "name": "PostgreSQL storage release check",
+          "runner": "Nettking-Linux",
+          "started_at": "2026-09-14T06:17:17Z",
+          "status": "completed",
+          "steps_executed": 10
+        },
+        {
+          "completed_at": "2026-09-14T06:40:14Z",
+          "conclusion": "success",
+          "id": 103877306932,
+          "name": "Linux regression shard (2)",
+          "runner": "Nettking-Linux",
+          "started_at": "2026-09-14T06:36:42Z",
+          "status": "completed",
+          "steps_executed": 12
+        },
+        {
+          "completed_at": "2026-09-14T06:41:39Z",
+          "conclusion": "success",
+          "id": 103877306965,
+          "name": "Release checks (Linux)",
+          "runner": "Nettking-Linux",
+          "started_at": "2026-09-14T06:40:16Z",
+          "status": "completed",
+          "steps_executed": 18
+        },
+        {
+          "completed_at": "2026-09-14T06:54:44Z",
+          "conclusion": "success",
+          "id": 103877306979,
+          "name": "Linux regression shard (1)",
+          "runner": "Nettking-Linux",
+          "started_at": "2026-09-14T06:51:46Z",
+          "status": "completed",
+          "steps_executed": 12
+        },
+        {
+          "completed_at": "2026-09-14T06:55:56Z",
+          "conclusion": "success",
+          "id": 103877307057,
+          "name": "Linux regression shard (0)",
+          "runner": "AQG7NCC-Linux",
+          "started_at": "2026-09-14T06:48:22Z",
+          "status": "completed",
+          "steps_executed": 12
+        },
+        {
+          "completed_at": "2026-09-14T06:54:51Z",
+          "conclusion": "success",
+          "id": 103884412987,
+          "name": "Clean-checkout suite order independence",
+          "runner": "Nettking-Linux",
+          "started_at": "2026-09-14T06:54:45Z",
+          "status": "completed",
+          "steps_executed": 3
+        },
+        {
+          "completed_at": "2026-09-14T06:56:23Z",
+          "conclusion": "success",
+          "id": 103885295673,
+          "name": "Release matrix (Linux)",
+          "runner": "AQG7NCC-Linux",
+          "started_at": "2026-09-14T06:56:01Z",
+          "status": "completed",
+          "steps_executed": 7
+        },
+        {
+          "completed_at": "2026-09-14T06:56:08Z",
+          "conclusion": "success",
+          "id": 103885295886,
+          "name": "Release matrix (Windows)",
+          "runner": "Nettking-Linux",
+          "started_at": "2026-09-14T06:55:58Z",
+          "status": "completed",
+          "steps_executed": 7
+        },
+        {
+          "completed_at": "2026-09-14T06:56:31Z",
+          "conclusion": "success",
+          "id": 103885393290,
+          "name": "Federation v1 automated release verdict",
+          "runner": "Nettking-Linux",
+          "started_at": "2026-09-14T06:56:25Z",
+          "status": "completed",
+          "steps_executed": 3
+        }
+      ],
+      "run_attempt": 1,
+      "run_id": 34812799504,
+      "status": "completed",
+      "workflow": "federation-v1-release.yml"
+    },
+    {
+      "api_head_sha": "f00f13013b58e0023f1a506e32daa86df37af7ae",
+      "conclusion": "success",
+      "event": "push",
+      "jobs": [
+        {
+          "completed_at": "2026-09-14T06:21:01Z",
+          "conclusion": "success",
+          "id": 103877306270,
+          "name": "reviewer-compose",
+          "runner": "Nettking-Linux",
+          "started_at": "2026-09-14T06:20:31Z",
+          "status": "completed",
+          "steps_executed": 7
+        },
+        {
+          "completed_at": "2026-09-14T06:22:23Z",
+          "conclusion": "success",
+          "id": 103877306486,
+          "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
+          "runner": "Nettking-Linux",
+          "started_at": "2026-09-14T06:21:02Z",
+          "status": "completed",
+          "steps_executed": 12
+        },
+        {
+          "completed_at": "2026-09-14T06:34:28Z",
+          "conclusion": "success",
+          "id": 103877306518,
+          "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
+          "runner": "Beast",
+          "started_at": "2026-09-14T06:31:36Z",
+          "status": "completed",
+          "steps_executed": 12
+        },
+        {
+          "completed_at": "2026-09-14T06:34:48Z",
+          "conclusion": "success",
+          "id": 103880887893,
+          "name": "publication-bundle",
+          "runner": "Beast-Linux-WSL",
+          "started_at": "2026-09-14T06:34:30Z",
+          "status": "completed",
+          "steps_executed": 9
+        }
+      ],
+      "run_attempt": 1,
+      "run_id": 34812799419,
+      "status": "completed",
+      "workflow": "icse-tool-demo.yml"
+    },
+    {
+      "api_head_sha": "f00f13013b58e0023f1a506e32daa86df37af7ae",
+      "conclusion": "success",
+      "event": "push",
+      "jobs": [
+        {
+          "completed_at": "2026-09-14T06:22:31Z",
+          "conclusion": "success",
+          "id": 103877306617,
+          "name": "windows",
+          "runner": "Beast",
+          "started_at": "2026-09-14T06:17:03Z",
+          "status": "completed",
+          "steps_executed": 10
+        },
+        {
+          "completed_at": "2026-09-14T06:20:29Z",
+          "conclusion": "success",
+          "id": 103877306742,
+          "name": "linux",
+          "runner": "Nettking-Linux",
+          "started_at": "2026-09-14T06:18:13Z",
+          "status": "completed",
+          "steps_executed": 20
+        }
+      ],
+      "run_attempt": 1,
+      "run_id": 34812799566,
+      "status": "completed",
+      "workflow": "phase2-federation.yml"
+    },
+    {
+      "api_head_sha": "f00f13013b58e0023f1a506e32daa86df37af7ae",
+      "conclusion": "success",
+      "event": "push",
+      "jobs": [
+        {
+          "completed_at": "2026-09-14T06:17:16Z",
+          "conclusion": "success",
+          "id": 103877306069,
+          "name": "product-branding",
+          "runner": "Nettking-Linux",
+          "started_at": "2026-09-14T06:17:03Z",
+          "status": "completed",
+          "steps_executed": 6
+        }
+      ],
+      "run_attempt": 1,
+      "run_id": 34812799431,
+      "status": "completed",
+      "workflow": "product-branding.yml"
+    },
+    {
+      "api_head_sha": "f00f13013b58e0023f1a506e32daa86df37af7ae",
+      "conclusion": "success",
+      "event": "workflow_dispatch",
+      "jobs": [
+        {
+          "completed_at": "2026-09-14T06:25:29Z",
+          "conclusion": "success",
+          "id": 103877566299,
+          "name": "Verify immutable release image metadata",
+          "runner": "Beast-Linux-WSL",
+          "started_at": "2026-09-14T06:25:20Z",
+          "status": "completed",
+          "steps_executed": 6
+        }
+      ],
+      "run_attempt": 1,
+      "run_id": 34812889190,
+      "status": "completed",
+      "workflow": "release-image-metadata.yml"
+    }
+  ]
+}

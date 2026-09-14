@@ -1,0 +1,23 @@
+{
+  "P07": "NOT_STARTED",
+  "P12": "NOT_STARTED",
+  "actual_main_verified": true,
+  "all_release_contracts_satisfied": true,
+  "candidate_sha": "f00f13013b58e0023f1a506e32daa86df37af7ae",
+  "frozen_at": "2026-09-14T07:00:37.428165+00:00",
+  "icse_jobs_passed": 4,
+  "native_checkout_proofs": 28,
+  "physical_acceptance": "NOT_PASSED",
+  "physical_revalidation": "physical-f00f1301/revalidation-from-0246bf8b.json",
+  "physical_revalidation_decision": "ALL_FRESH_NO_CARRY",
+  "physical_revalidation_sha256": "341b26ba7aa104e2cec0df6e27798767212032d3870b2d7f6fbb9348b7ba6d1b",
+  "protected_recorder_data": "UNTOUCHED",
+  "qualification": "main-f00f1301-qualification/qualification.json",
+  "qualification_sha256": "9d4c1c55046ca86110e728e6638a2e4a7d15e36c9cd4db377af82a0984ae6ff4",
+  "reason": "PR490 repairs measured ACK validation CPU cost while preserving validation and source identity.",
+  "required_release_gate_jobs_passed": 16,
+  "state": "AUTHORITATIVE_FROZEN_CANDIDATE",
+  "supersedes_blocked_candidate": "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d",
+  "tag_or_publication_created": false,
+  "tree": "49c6f273afa82059d45dbc2bdffb5168b083f25d"
+}

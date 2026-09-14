@@ -1,0 +1,55 @@
+{
+  "baseline": "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d",
+  "candidate": "f00f13013b58e0023f1a506e32daa86df37af7ae",
+  "decision": "ALL_FRESH_NO_CARRY",
+  "exit_code": 2,
+  "fresh_cf7_scenarios": [
+    "physical.fresh-windows-checkout",
+    "physical.fresh-linux-checkout",
+    "physical.multi-host-relay-and-network-path",
+    "physical.mtconnect-recorder-source",
+    "physical.ollama-model-and-accelerator",
+    "physical.mobile-and-desktop-browser-review",
+    "physical.recorder-plus-ai-simultaneous-contribution",
+    "physical.separate-ai-compute-storage-contributors",
+    "physical.benchmark-expiry-and-rerun",
+    "physical.contribution-disable-and-reenable",
+    "physical.restart-and-reconciliation",
+    "physical.revocation-and-controlled-rejoin"
+  ],
+  "p01_p12": "FRESH_EXACT_CANDIDATE_REQUIRED",
+  "physical_evidence_carried": 0,
+  "policy_source_sha256": {
+    "catalog/federation/tests/cf7_acceptance/physical_evidence.py": "337f679e4c46bf4a4906202d0e72128dacfad4db81bb990711acfcfcc3a7af85",
+    "catalog/federation/tests/cf7_acceptance/physical_impact_map.json": "5debad4c7b9cb4520966b8e812ffb35fce6c8cdaee0571a25ded642b5b93c96e",
+    "catalog/federation/tests/cf7_acceptance/physical_revalidation.py": "0e7a4708f2efb71e6c44f6fe1d81e953b0ca816b3938a72adb7067b105ee676f"
+  },
+  "report": {
+    "carry_forward_scenarios": [],
+    "changed_paths": [
+      "catalog/federation/manifest.py",
+      "catalog/federation/tests/test_manifest_text_validation.py"
+    ],
+    "impacted_scenarios": [
+      "physical.fresh-windows-checkout",
+      "physical.fresh-linux-checkout",
+      "physical.multi-host-relay-and-network-path",
+      "physical.mtconnect-recorder-source",
+      "physical.ollama-model-and-accelerator",
+      "physical.mobile-and-desktop-browser-review",
+      "physical.recorder-plus-ai-simultaneous-contribution",
+      "physical.separate-ai-compute-storage-contributors",
+      "physical.benchmark-expiry-and-rerun",
+      "physical.contribution-disable-and-reenable",
+      "physical.restart-and-reconciliation",
+      "physical.revocation-and-controlled-rejoin"
+    ],
+    "safe": false,
+    "schema": "fcp.cf7.physical-revalidation-plan.v1",
+    "unknown_paths": [
+      "catalog/federation/manifest.py"
+    ]
+  },
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_sha256": "f5bd923ff1b71b1f3ea65a7fc6f0a1f7a6c5e0b52cbab8a0999c180bab17d43f"
+}
