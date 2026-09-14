@@ -240,6 +240,22 @@ class PhaseDControlPlane:
         session_id: str,
         group_id: str,
     ) -> tuple[AuthoritativeStorageManifest, ...]:
+        snapshot = self.snapshot(session_id)
+        if group_id not in snapshot.groups:
+            raise FederationValidationError(
+                "unknown-storage-group",
+                "group_id",
+                "storage group is not registered",
+            )
+        try:
+            # history() already verifies the complete chain and its head in one
+            # read snapshot. Reading manifest() first repeats that entire work
+            # for every recorder acknowledgement as retained history grows.
+            return self.manifests.history(session_id, group_id)
+        except FederationValidationError as exc:
+            if exc.code != "manifest-not-found":
+                raise
+        # Preserve lazy genesis for a group predating the manifest subsystem.
         self.manifest(session_id, group_id)
         return self.manifests.history(session_id, group_id)
 
