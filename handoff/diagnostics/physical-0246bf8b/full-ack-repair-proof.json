@@ -1,0 +1,60 @@
+{
+  "status": "FOCUSED_FULL_ACK_REPAIR_PROOF",
+  "baseline": "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d",
+  "repair": "d0e5b6b8993b76ccb2e49da699fb304a2684df66",
+  "production_change": "Compile the identical ASCII C0 control-character predicate in manifest._required_text; no cache or skipped validation.",
+  "before_cycle": {
+    "wall_seconds": 76.26878749998286,
+    "cpu_seconds": 72.140625,
+    "acks": 8
+  },
+  "after_cycle": {
+    "wall_seconds": 38.00707089994103,
+    "cpu_seconds": 36.390625,
+    "acks": 8
+  },
+  "all_eight_requests_committed": true,
+  "real_durable_duplicate_verified": true,
+  "same_revision_decodes_and_bytes_for_every_ack": true,
+  "all_206_resulting_manifest_rows_byte_identical": true,
+  "profiled_duplicate_wall_seconds_including_profiler_overhead": [
+    43.14709400001448,
+    9.78937000001315
+  ],
+  "focused_tests": {
+    "passed": 9,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "junit_sha256": "d83e6263dacf34c4d4f4976ac4242ecf40266a611a633fa9d69017137a9a0165"
+  },
+  "existing_regressions": {
+    "exit_code": 0,
+    "files": [
+      "test_phase_e0_contracts.py",
+      "test_phase_e1_manifest_store.py",
+      "test_phase_e1_service_manifest.py",
+      "test_manifest_read_snapshot.py",
+      "test_phase_d7_d8_ack_handover.py"
+    ],
+    "python": "3.12.10",
+    "qualification_evidence": false
+  },
+  "independent_review": {
+    "result": "NO_BLOCKING_FINDINGS",
+    "scope": "Exact C0 semantics, Unicode/DEL/C1 acceptance, type/blank/error/identity behavior, no skipped history/transaction/authority checks."
+  },
+  "profiler_sha256": "3ed89f24e4452243a8e65755767d577d7555514c219674728e1344f2432701b8",
+  "repaired_proof_sha256": "15831b43df67d4fd032592d4cc6363f96f88e4d4153388a2d02e9179e2c3ac0c",
+  "repaired_execution_sha256": "bad21aea5a76a7b155409f6202f32d8b34e0292fa1d7fa5d29fb84ee406f5a32",
+  "physical_pass": false,
+  "limits": [
+    "No relay/network/scheduling latency measured",
+    "Historical diagnostic clock uses existing injected-clock API; no live lease claim",
+    "Old provider index/bodies/intents/ack stores not reconstructed; actual new ingest plus its durable duplicate measured",
+    "Default host admission/floor retained; private contribution preallocation omitted and declared",
+    "Count wrapper byte-length overhead included; no elapsed-time subtraction",
+    "38-second isolated CPU-path result does not certify the live45-second startup deadline; fresh physical startup remains required."
+  ],
+  "next_action": "Qualify exact repair source and resulting main under the checked release contract, then fresh physical startup and acceptance."
+}

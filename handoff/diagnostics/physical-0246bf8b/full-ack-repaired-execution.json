@@ -1,0 +1,10 @@
+{
+  "candidate": "d0e5b6b8993b76ccb2e49da699fb304a2684df66",
+  "status": "COMPLETED",
+  "physical_pass": false,
+  "authorization_sha256": "21c766323ec386c6b8a68e37ae3b50f70bc250dda686484d32610ab1f14f31ec",
+  "started_at": "2026-09-14T05:06:51.317385+00:00",
+  "exit_code": 0,
+  "finished_at": "2026-09-14T05:07:41.760175+00:00",
+  "export_unchanged": true
+}

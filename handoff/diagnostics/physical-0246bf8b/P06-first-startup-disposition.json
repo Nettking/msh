@@ -1,0 +1,125 @@
+{
+  "candidate": "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d",
+  "status": "FIRST_FROZEN_STARTUP_REFUSED",
+  "recorded_at": "2026-09-14T04:52:48.457675+00:00",
+  "classification": "Materially credible current-candidate startup obstruction; integrated cost attribution pending",
+  "started_at": "2026-09-14T04:41:11.039010+00:00",
+  "finished_at": "2026-09-14T04:42:51.179709+00:00",
+  "observer_limit_seconds": 100,
+  "product_sharing_limit_seconds": 45,
+  "trial_restore_limits_seconds": [
+    600,
+    600
+  ],
+  "actual_error": "Bounded observation unavailable: supported startup",
+  "actual_sharing_snapshot_state": "discovering",
+  "software_commands_posted": 0,
+  "trial_or_restore_started": false,
+  "physical_pass": false,
+  "observer_retries": 0,
+  "ordinary_supervisor_retry_observed": true,
+  "operator_stop_exit_code": 0,
+  "owned_native_writer_and_builder_absent": true,
+  "native_outbox_before": {
+    "completed": 194,
+    "pending": 734
+  },
+  "native_outbox_after": {
+    "completed": 205,
+    "pending": 723
+  },
+  "actual_completed_rows_during_window": [
+    {
+      "outbox_id": 56,
+      "state": "completed",
+      "attempt_count": 0,
+      "updated_at": "2026-09-14T04:41:21.294841+00:00",
+      "last_error": null
+    },
+    {
+      "outbox_id": 103,
+      "state": "completed",
+      "attempt_count": 0,
+      "updated_at": "2026-09-14T04:41:28.178536+00:00",
+      "last_error": null
+    },
+    {
+      "outbox_id": 152,
+      "state": "completed",
+      "attempt_count": 0,
+      "updated_at": "2026-09-14T04:41:35.160290+00:00",
+      "last_error": null
+    },
+    {
+      "outbox_id": 213,
+      "state": "completed",
+      "attempt_count": 0,
+      "updated_at": "2026-09-14T04:41:42.984219+00:00",
+      "last_error": null
+    },
+    {
+      "outbox_id": 280,
+      "state": "completed",
+      "attempt_count": 0,
+      "updated_at": "2026-09-14T04:41:51.370211+00:00",
+      "last_error": null
+    },
+    {
+      "outbox_id": 336,
+      "state": "completed",
+      "attempt_count": 1,
+      "updated_at": "2026-09-14T04:41:57.807670+00:00",
+      "last_error": null
+    },
+    {
+      "outbox_id": 57,
+      "state": "completed",
+      "attempt_count": 0,
+      "updated_at": "2026-09-14T04:42:18.054975+00:00",
+      "last_error": null
+    },
+    {
+      "outbox_id": 104,
+      "state": "completed",
+      "attempt_count": 0,
+      "updated_at": "2026-09-14T04:42:25.835510+00:00",
+      "last_error": null
+    },
+    {
+      "outbox_id": 153,
+      "state": "completed",
+      "attempt_count": 0,
+      "updated_at": "2026-09-14T04:42:33.223934+00:00",
+      "last_error": null
+    },
+    {
+      "outbox_id": 214,
+      "state": "completed",
+      "attempt_count": 0,
+      "updated_at": "2026-09-14T04:42:41.748107+00:00",
+      "last_error": null
+    },
+    {
+      "outbox_id": 281,
+      "state": "completed",
+      "attempt_count": 0,
+      "updated_at": "2026-09-14T04:42:50.138693+00:00",
+      "last_error": null
+    }
+  ],
+  "finding": "Successful sequential ACKs required approximately7\u20138seconds each; the initial eight-dataset pass did not finish before45seconds. Discovering is the pre-cycle snapshot and does not establish absent authority.",
+  "source_inference": "The integrated coordinator/provider ACK path appears to validate the complete authoritative manifest history five times. This is source-based work attribution, not yet an integrated timing profile.",
+  "next_action": "One bounded full-ACK offline profile on isolated owned-data copies; demonstrate a full-path correctness-preserving red-to-green repair before another qualification cycle if a candidate defect is confirmed.",
+  "latest_honest_agent_state": ".acceptance\\postrepair-p06-0246bf8b-20260914\\run-p06-update-trial-recovery\\agent-observations.json",
+  "evidence_sha256": {
+    "status.json": "15c199d186b1a080f3e3565f4be1c5e747e6c539f56dbac82843ac0d64cc59cd",
+    "supervisor.private.log": "b1d5f7a163e958037356e5c0cfb601d18d032002acd05aed5830c17cf62dd760",
+    "agent-observations.json": "ca35d3afaba47b33c0e8705ce80011ba527e10b5cc0a8a0f9c40591bfebb468c"
+  },
+  "creator_window_disposition_sha256": "4755fd566f5283e174b8deb053da4807de5a6648de4ab70d2122a44d15ab002f",
+  "source_or_data_modified_by_retention": false,
+  "manual_restart_or_drain": false,
+  "P07_started": false,
+  "P12_started": false,
+  "protected_data_accessed": false
+}

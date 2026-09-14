@@ -1,0 +1,46 @@
+{
+  "candidate": "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d",
+  "classification": "PRODUCT_DEFECT",
+  "finding": "Current aged-history integrated ACK validation is CPU-bound and exceeds the supported startup budget across the required initial dataset pass.",
+  "live_evidence": "P06-first-startup-disposition.json",
+  "offline_cycle_wall_seconds": 76.26878749998286,
+  "offline_cycle_cpu_seconds": 72.140625,
+  "history_validations_per_ack": 5,
+  "unprofiled_ack_wall_range_seconds": [
+    8.639489999972284,
+    10.895795900025405
+  ],
+  "profiled_duplicate": {
+    "wall_seconds_with_profiler_overhead": 43.14709400001448,
+    "decoded_revisions": 1030,
+    "history_cumulative_seconds": 42.5430477,
+    "required_text_cumulative_seconds": 33.395553,
+    "interpretation": "Cost attribution only; profiled elapsed time is not compared with an unprofiled deadline."
+  },
+  "checked_contract": {
+    "source": "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d",
+    "startup": "start_recorder.py:209-227 requires ready authenticated logical storage before capture, default sharing timeout45s.",
+    "acceptance": "P06 native supervision requires successful supported startup before exercising recovery; the original45s product and100s observer limits remain unchanged."
+  },
+  "next_action": "Test equivalent compiled control-character predicate in manifest._required_text; retain all five full validations and every existing integrity/authority check. Compare complete ACK path before another qualification cycle.",
+  "attribution_limits": [
+    "No relay/network/scheduling latency measured",
+    "Historical diagnostic clock uses existing injected-clock API; no live lease claim",
+    "Old provider index/bodies/intents/ack stores not reconstructed; actual new ingest plus its durable duplicate measured",
+    "Default host admission/floor retained; private contribution preallocation omitted and declared",
+    "Count wrapper byte-length overhead included; no elapsed-time subtraction"
+  ],
+  "retained_evidence_sha256": {
+    "proof.json": "b37947f423290f12436e0b2f98dd229dac4ea93030a2469d4dca7179310b1c35",
+    "execution.json": "83ffe686f2b6d81e1ea1b9eb31e0c6f45ba3f7ef3d1fe0913a73d89862296cc0",
+    "fixture.private.json": "3e71471b7121ef0cae4ced5765588cf67faf94ca0331954af3d9456a1432fb3f",
+    "actual-product-responses.private.json": "dcefc76053f3439dc1fa97c47ddf0e1899cb30f98f94521369109164abcdef09",
+    "duplicate-full-ack.private.pstats": "44e0519ba1dd12ae9ef45082df8aa15d5264a75333388331e5e92e02c2e9004a"
+  },
+  "profiler_sha256": "3ed89f24e4452243a8e65755767d577d7555514c219674728e1344f2432701b8",
+  "authorization_sha256": "e9b4dc1aea17681fb8b681581a3e1052570422d3cfdf67356df3061609a3c9a0",
+  "physical_pass": false,
+  "live_runtime_or_protected_data_modified_by_profile": false,
+  "P07_started": false,
+  "P12_started": false
+}

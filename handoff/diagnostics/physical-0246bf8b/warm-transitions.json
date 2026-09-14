@@ -1,0 +1,128 @@
+{
+  "schema": "fcp.owned-warm-transition-evidence.v1",
+  "candidate": "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d",
+  "source_baseline": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "status": "WARM_ADMISSIONS_AND_ORDINARY_AGENTS_VERIFIED",
+  "freeze_sha256": "c8fd12588a527b795209b13f841d3378836f42cc5d4a429acffff74044bc5a77",
+  "qualification_sha256": "6c0366cd9721a02996d8930ea3ac733b3e6d4545490fa4e49baec9ac2c9e76bd",
+  "controls_sha256": "c5f3dc1006ce67b8e9ef52accaa8d7f9792423970fc908827b0d7803d5466f05",
+  "source_bundle_sha256": "ace9f6ab15db0b1ef17fca476176a4e751453c0524f97e67d1c57551740296f1",
+  "scope": "Owned Windows and Nitro warm installations; admission evidence only.",
+  "windows": {
+    "host_alias": "nettking",
+    "normal_launcher": "start.cmd",
+    "normal_launcher_exit_code": 0,
+    "normal_activation_count": 1,
+    "source_and_core_builds": "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d",
+    "core_image_digests": {
+      "flask": "sha256:c55dbcc6c8649cb47456cd58d052bfe86e26a9eabc9b0db966235a956097a4bf",
+      "recorder": "sha256:2b944a83052a046a47f2f8d49269dd1cac6e9986eac3f46f5705adc508b77261",
+      "relay": "sha256:1689899455b83ad46838c72fff1b91bf98f0dad7c04299415baa2be601ffb263"
+    },
+    "configured_http_status": 200,
+    "actual_binding_verified": true,
+    "original_admission": {
+      "receipt": "candidate-admission.json",
+      "sha256": "ecdf6b31771d47b387f93878df79343967f833a2d4cc066a6e8ccc90677da84c",
+      "status": "STOPPED",
+      "refusal": "Post-launch full mount Source spelling comparison for the Flask data/results bind mounts.",
+      "classification": "DETERMINISTIC_ACCEPTANCE_HELPER_PATH_REPRESENTATION_CHECK"
+    },
+    "separate_completion": {
+      "receipt": "candidate-admission.verified.json",
+      "sha256": "af0d0a81a94fd5f600d57d975d5f3c9011c92f3924281c703e0d32a63e8c52bb",
+      "status": "COMPLETED",
+      "kind": "READ_ONLY_COMPLETION_OF_ORIGINAL_ACTIVATION",
+      "original_receipt_overwritten": false,
+      "launcher_replayed": false,
+      "bind_source_alias_normalization_only": true,
+      "normalization": "Existing Windows drive-to-Docker-Desktop bind Source mapping only; every other full mount field remains exact.",
+      "original_activation_interval": {
+        "started_at": "2026-09-14T04:38:44.386212+00:00",
+        "completed_invocation_upper_bound_at": "2026-09-14T04:39:55.4160205+00:00",
+        "completion_bound_source": "unchanged original STOPPED receipt filesystem LastWriteTimeUtc",
+        "exact_launcher_finished_at_recorded": false,
+        "original_status_mtime_ns": 1789360795416020500,
+        "original_launcher_log_mtime_ns": 1789360794825244900
+      },
+      "verification_started_at": "2026-09-14T04:50:15.448270+00:00",
+      "verification_finished_at": "2026-09-14T04:50:18.932837+00:00",
+      "verifier_sha256": "0dc07f2c4f2a3fa54a1f99591735c3510e3ddb4b4531904553e2e74a19b3ec69"
+    },
+    "agent_residency": {
+      "status": "ORDINARY_NEW_GENERATION_RESIDENT",
+      "ordinary_new_agent_processes": 2,
+      "no_competing_agent_started": true,
+      "status_sha256": "cd60e81bbba09d0f44766befe577e64f5079384ac691cc9099487b52a1daeb8d",
+      "boundary_sha256": "b110e870bbdd2898af83c7f1b346d31efd831e800369b6ccf2126a5f69d93fe1",
+      "generation_window": "Original launcher start through explicitly labelled original invocation completion upper bound."
+    },
+    "evidence_sha256": {
+      "readiness": "f9cd70ab4b97c32085274f781caf1aecdfc287b1be02fbe740688adf3c91ee7b",
+      "binding": "7f2082039a1972bdd8a26cdbefe5e6ed9d5f22ebddbc71906f0d367ad848176b",
+      "binding_observation": "533589580be426177a7721c14dd1e23d89648c9740c6dd7d71875bc80172e68c",
+      "before": "f0a3811068511f992f14fc4859cae0896c84ef483e8672d06fb368359c31a093",
+      "retained_after": "35a4ea43e42b164a7b84932591ebc09dd4a65885b26088f3ba65aceefdbcf270",
+      "verified_after": "e07f3bfb7cbc2370be158c088339b21a2fee7a0da7e3ec9a0b55d0aba2c77a6c",
+      "configuration": "873eea23dfa7c9fa08aabdb4eca20f2d09c352f703b6bb5fef4f6ac7bced64f3",
+      "environment": "72bbd0682a663d06999e7d01acf29a8dc90b42c3ae4b5b331ee40ffeb2baf735",
+      "normal_launcher_log": "9af240d78a2391d71093a6851dd1032c34717990397f169c38cd6134b4b30f32"
+    }
+  },
+  "nitro": {
+    "host_alias": "nitro",
+    "normal_launcher": "start.sh",
+    "normal_launcher_exit_code": 0,
+    "normal_activation_count": 1,
+    "source_and_core_builds": "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d",
+    "core_image_digests": {
+      "flask": "sha256:14ac4ed1351faada45fe59ad1072b17c71a0fa177cb9e191e07b5a4b3c6e061c",
+      "relay": "sha256:c1c2a149fb855fcd49abba779367336c28f7366af6e093c5da3266d23a4f1ddc",
+      "recorder": "sha256:488acc419b3f356e9572a70db4de5b43a85ed2b34064f07ef8e87800f2fe71eb"
+    },
+    "admission": {
+      "receipt": "candidate-admission.json",
+      "status": "COMPLETED",
+      "sha256": "d42e7c9f8ca3e3915e83c71c459258e84681e2deff53df49f47856790558d403",
+      "started_at": "2026-09-14T04:28:28.753879+00:00",
+      "finished_at": "2026-09-14T04:36:25.581044+00:00"
+    },
+    "configured_http_status": 200,
+    "actual_binding_verified": true,
+    "agent_residency": {
+      "status": "ORDINARY_NEW_GENERATION_RESIDENT",
+      "ordinary_new_agent_processes": 1,
+      "within_actual_activation_window": true,
+      "old_generation_absent": true,
+      "pidfd_identity_verified_without_signal": true,
+      "no_competing_agent_started": true,
+      "receipt_sha256": "5cb9644b6a3d97fe9ef95dd43280287fe99cff1a3ff7f584a4435a85a1da6e37"
+    },
+    "evidence_sha256": {
+      "readiness": "32f83d2ccec92d40d0150d57091382c29655e4a9f838eaa220aaff40edeb7333",
+      "binding": "7eaa121fe108f97d5ce4c816ea66037d8e0755dfbf66a9084748cf617349ee47",
+      "binding_observation": "c6fabd81df9da46675361eea579e63e231b9cbb242d75991b1139791ab58c589",
+      "before": "2e039e5d6b05255bc618c108c5456a0cb5ae9721092e67606eea05abaab4a0fa",
+      "after": "8542fc7ee8f05b2ba215076f21db5eeb4b7e9f11c041a37c7915941706536917",
+      "configuration": "41287fa981c1821016fe6edef8ab6e2c958161b69c7c543b40b3b01b8bb99ecb",
+      "environment": "b58d4be80c163f94986b21495ab29821a38c475a05ade8f5f36d8eca8314b82c",
+      "normal_launcher_log": "04e091e3fbd0d5c7652c4f05547895a979536bc97fdda4502853fe1419d13217",
+      "transfer": "684edf8bd39283c89e953aa81ed2187f1317888710133453ed51e586335f738e",
+      "retention_index": "55f1553d556fbcbacc7ef9999757229679f7c73cd3ee32342fd814001f6f9441"
+    }
+  },
+  "preservation": {
+    "all_original_data_results_mounts_preserved": true,
+    "all_other_full_mount_fields_exact": true,
+    "service_users_preserved": true,
+    "core_environment_changes_only_candidate_build_commit": true,
+    "noncore_container_image_pid_start_restart_environment_preserved": true,
+    "all_profile_configuration_verified": true,
+    "protected_recorder_data_accessed": false
+  },
+  "physical_pass": false,
+  "physical_assertions_relabelled": false,
+  "timed_campaigns_started_by_this_record": false,
+  "pressure_or_p06_followthrough_enabled_by_this_record": false,
+  "publication_state": "ROOT_REVIEWED_FOR_EVIDENCE_PUBLICATION"
+}

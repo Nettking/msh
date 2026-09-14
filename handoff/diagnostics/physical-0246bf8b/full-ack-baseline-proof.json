@@ -1,0 +1,486 @@
+{
+  "status": "OFFLINE_FULL_PRODUCT_ACK_PATH_PROFILE",
+  "candidate": "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d",
+  "cycle": {
+    "wall_seconds": 76.26878749998286,
+    "cpu_seconds": 72.140625,
+    "acks": 8
+  },
+  "acks": [
+    {
+      "index": 0,
+      "duplicate": false,
+      "wall_seconds": 9.054952999926172,
+      "cpu_seconds": 8.640625,
+      "profiled": false,
+      "outcome_state": "stored",
+      "decoded_revisions": 992,
+      "manifest_json_bytes_decoded": 83554032
+    },
+    {
+      "index": 1,
+      "duplicate": false,
+      "wall_seconds": 8.639489999972284,
+      "cpu_seconds": 8.015625,
+      "profiled": false,
+      "outcome_state": "stored",
+      "decoded_revisions": 997,
+      "manifest_json_bytes_decoded": 84386297
+    },
+    {
+      "index": 2,
+      "duplicate": false,
+      "wall_seconds": 9.00676909997128,
+      "cpu_seconds": 8.5,
+      "profiled": false,
+      "outcome_state": "stored",
+      "decoded_revisions": 1002,
+      "manifest_json_bytes_decoded": 85221587
+    },
+    {
+      "index": 3,
+      "duplicate": false,
+      "wall_seconds": 10.170581300044432,
+      "cpu_seconds": 9.796875,
+      "profiled": false,
+      "outcome_state": "stored",
+      "decoded_revisions": 1007,
+      "manifest_json_bytes_decoded": 86059900
+    },
+    {
+      "index": 4,
+      "duplicate": false,
+      "wall_seconds": 9.841858099913225,
+      "cpu_seconds": 9.40625,
+      "profiled": false,
+      "outcome_state": "stored",
+      "decoded_revisions": 1012,
+      "manifest_json_bytes_decoded": 86901235
+    },
+    {
+      "index": 5,
+      "duplicate": false,
+      "wall_seconds": 8.73746850003954,
+      "cpu_seconds": 7.828125,
+      "profiled": false,
+      "outcome_state": "stored",
+      "decoded_revisions": 1017,
+      "manifest_json_bytes_decoded": 87745591
+    },
+    {
+      "index": 6,
+      "duplicate": false,
+      "wall_seconds": 9.845313899917528,
+      "cpu_seconds": 9.5625,
+      "profiled": false,
+      "outcome_state": "stored",
+      "decoded_revisions": 1022,
+      "manifest_json_bytes_decoded": 88592962
+    },
+    {
+      "index": 7,
+      "duplicate": false,
+      "wall_seconds": 10.895795900025405,
+      "cpu_seconds": 10.328125,
+      "profiled": false,
+      "outcome_state": "stored",
+      "decoded_revisions": 1027,
+      "manifest_json_bytes_decoded": 89443360
+    },
+    {
+      "index": 0,
+      "duplicate": true,
+      "wall_seconds": 43.14709400001448,
+      "cpu_seconds": 41.1875,
+      "profiled": true,
+      "outcome_state": "already-stored",
+      "decoded_revisions": 1030,
+      "manifest_json_bytes_decoded": 89954695,
+      "top_cumulative": [
+        {
+          "function": "PhaseDLogicalStorageClient.ingest_batch",
+          "file": "phase_d_client.py",
+          "line": 140,
+          "calls": 1,
+          "recursive_calls": 0,
+          "cumulative_seconds": 43.1468894,
+          "self_seconds": 1.7800000000000002e-05
+        },
+        {
+          "function": "PhaseDLogicalStorageClient.ingest",
+          "file": "phase_d_client.py",
+          "line": 173,
+          "calls": 1,
+          "recursive_calls": 0,
+          "cumulative_seconds": 43.1466428,
+          "self_seconds": 0.004926300000000001
+        },
+        {
+          "function": "AuthoritativeManifestStore._history",
+          "file": "manifest_store.py",
+          "line": 691,
+          "calls": 5,
+          "recursive_calls": 0,
+          "cumulative_seconds": 42.5430477,
+          "self_seconds": 0.0016578
+        },
+        {
+          "function": "AuthoritativeManifestStore._history.<locals>.<genexpr>",
+          "file": "manifest_store.py",
+          "line": 702,
+          "calls": 1035,
+          "recursive_calls": 0,
+          "cumulative_seconds": 42.3561187,
+          "self_seconds": 0.0030046
+        },
+        {
+          "function": "main.<locals>.counted",
+          "file": "profile_full_ack.py",
+          "line": 192,
+          "calls": 1030,
+          "recursive_calls": 0,
+          "cumulative_seconds": 42.3531141,
+          "self_seconds": 0.007080100000000001
+        },
+        {
+          "function": "AuthoritativeManifestStore._decode_revision",
+          "file": "manifest_store.py",
+          "line": 639,
+          "calls": 1030,
+          "recursive_calls": 0,
+          "cumulative_seconds": 42.330022400000004,
+          "self_seconds": 0.058956800000000004
+        },
+        {
+          "function": "AuthoritativeStorageManifest.from_dict",
+          "file": "manifest.py",
+          "line": 771,
+          "calls": 1030,
+          "recursive_calls": 0,
+          "cumulative_seconds": 41.7742495,
+          "self_seconds": 0.07206910000000001
+        },
+        {
+          "function": "ManifestItem.from_dict",
+          "file": "manifest.py",
+          "line": 338,
+          "calls": 105987,
+          "recursive_calls": 0,
+          "cumulative_seconds": 38.238514900000006,
+          "self_seconds": 0.8791676
+        },
+        {
+          "function": "AuthoritativeStorageManifest.from_dict.<locals>.<genexpr>",
+          "file": "manifest.py",
+          "line": 809,
+          "calls": 106605,
+          "recursive_calls": 0,
+          "cumulative_seconds": 38.2238058,
+          "self_seconds": 0.1444366
+        },
+        {
+          "function": "__create_fn__.<locals>.__init__",
+          "file": "<string>",
+          "line": 2,
+          "calls": 106002,
+          "recursive_calls": 0,
+          "cumulative_seconds": 37.23002,
+          "self_seconds": 0.49599020000000005
+        },
+        {
+          "function": "ManifestItem.__post_init__",
+          "file": "manifest.py",
+          "line": 238,
+          "calls": 106002,
+          "recursive_calls": 0,
+          "cumulative_seconds": 36.7340298,
+          "self_seconds": 1.8720072
+        },
+        {
+          "function": "AuthoritativeManifestStore._head",
+          "file": "manifest_store.py",
+          "line": 723,
+          "calls": 5,
+          "recursive_calls": 0,
+          "cumulative_seconds": 34.075581,
+          "self_seconds": 0.013181600000000002
+        },
+        {
+          "function": "_required_text",
+          "file": "manifest.py",
+          "line": 26,
+          "calls": 770369,
+          "recursive_calls": 0,
+          "cumulative_seconds": 33.395553,
+          "self_seconds": 1.0894517000000001
+        },
+        {
+          "function": "_required_text.<locals>.<genexpr>",
+          "file": "manifest.py",
+          "line": 30,
+          "calls": 58041868,
+          "recursive_calls": 0,
+          "cumulative_seconds": 23.1699182,
+          "self_seconds": 15.8608331
+        },
+        {
+          "function": "main.<locals>.ProductDispatchTransport.request",
+          "file": "profile_full_ack.py",
+          "line": 159,
+          "calls": 1,
+          "recursive_calls": 0,
+          "cumulative_seconds": 17.731243300000003,
+          "self_seconds": 9.180000000000001e-05
+        },
+        {
+          "function": "PhaseDStorageService.dispatch",
+          "file": "phase_d_service.py",
+          "line": 108,
+          "calls": 1,
+          "recursive_calls": 0,
+          "cumulative_seconds": 17.730836500000002,
+          "self_seconds": 4.19e-05
+        },
+        {
+          "function": "PhaseDStorageService._ingest_primary",
+          "file": "phase_d_service.py",
+          "line": 303,
+          "calls": 1,
+          "recursive_calls": 0,
+          "cumulative_seconds": 17.7303891,
+          "self_seconds": 4.97e-05
+        },
+        {
+          "function": "PhaseDControlPlane.finalize_batch_manifest_intent",
+          "file": "phase_d_control.py",
+          "line": 512,
+          "calls": 2,
+          "recursive_calls": 0,
+          "cumulative_seconds": 17.716132700000003,
+          "self_seconds": 4.8700000000000005e-05
+        },
+        {
+          "function": "AuthoritativeManifestStore.finalize_intent",
+          "file": "manifest_store.py",
+          "line": 1227,
+          "calls": 2,
+          "recursive_calls": 0,
+          "cumulative_seconds": 17.6345172,
+          "self_seconds": 0.0001212
+        },
+        {
+          "function": "AuthoritativeManifestStore._commit_in_transaction",
+          "file": "manifest_store.py",
+          "line": 1418,
+          "calls": 2,
+          "recursive_calls": 0,
+          "cumulative_seconds": 17.6241723,
+          "self_seconds": 0.0131166
+        },
+        {
+          "function": "PhaseDLogicalStorageClient._accept_success",
+          "file": "phase_d_client.py",
+          "line": 275,
+          "calls": 1,
+          "recursive_calls": 0,
+          "cumulative_seconds": 17.490526300000003,
+          "self_seconds": 4.0900000000000005e-05
+        },
+        {
+          "function": "PhaseDControlPlane.prepare_batch_manifest",
+          "file": "phase_d_control.py",
+          "line": 285,
+          "calls": 2,
+          "recursive_calls": 0,
+          "cumulative_seconds": 16.7811714,
+          "self_seconds": 0.00023960000000000002
+        },
+        {
+          "function": "PhaseDControlPlane.manifest",
+          "file": "phase_d_control.py",
+          "line": 213,
+          "calls": 2,
+          "recursive_calls": 0,
+          "cumulative_seconds": 16.7138722,
+          "self_seconds": 1.39e-05
+        },
+        {
+          "function": "AuthoritativeManifestStore.head",
+          "file": "manifest_store.py",
+          "line": 871,
+          "calls": 2,
+          "recursive_calls": 0,
+          "cumulative_seconds": 16.6558627,
+          "self_seconds": 0.011420600000000001
+        },
+        {
+          "function": "PhaseDLogicalStorageClient._finalize_distributed_manifest",
+          "file": "phase_d_client.py",
+          "line": 393,
+          "calls": 1,
+          "recursive_calls": 0,
+          "cumulative_seconds": 8.969778900000001,
+          "self_seconds": 2.54e-05
+        },
+        {
+          "function": "PhaseDStorageService._commit_manifest",
+          "file": "phase_d_service.py",
+          "line": 373,
+          "calls": 1,
+          "recursive_calls": 0,
+          "cumulative_seconds": 8.7535226,
+          "self_seconds": 8.400000000000001e-06
+        },
+        {
+          "function": "PhaseDControlPlane.commit_batch_manifest",
+          "file": "phase_d_control.py",
+          "line": 539,
+          "calls": 1,
+          "recursive_calls": 0,
+          "cumulative_seconds": 8.753514000000001,
+          "self_seconds": 2.3800000000000003e-05
+        },
+        {
+          "function": "PhaseDControlPlane.manifest_history",
+          "file": "phase_d_control.py",
+          "line": 238,
+          "calls": 1,
+          "recursive_calls": 0,
+          "cumulative_seconds": 8.520553300000001,
+          "self_seconds": 9.2e-06
+        },
+        {
+          "function": "AuthoritativeManifestStore.history",
+          "file": "manifest_store.py",
+          "line": 882,
+          "calls": 1,
+          "recursive_calls": 0,
+          "cumulative_seconds": 8.485701800000001,
+          "self_seconds": 0.0026795
+        },
+        {
+          "function": "PhaseDLogicalStorageClient._prepare_distributed_manifest",
+          "file": "phase_d_client.py",
+          "line": 241,
+          "calls": 1,
+          "recursive_calls": 0,
+          "cumulative_seconds": 7.8889443,
+          "self_seconds": 2.5500000000000003e-05
+        },
+        {
+          "function": "_sha256",
+          "file": "manifest.py",
+          "line": 86,
+          "calls": 108057,
+          "recursive_calls": 0,
+          "cumulative_seconds": 4.8971131,
+          "self_seconds": 0.13670780000000002
+        },
+        {
+          "function": "ManifestItem.__post_init__.<locals>.<genexpr>",
+          "file": "manifest.py",
+          "line": 314,
+          "calls": 212004,
+          "recursive_calls": 0,
+          "cumulative_seconds": 3.2285413000000003,
+          "self_seconds": 0.0773279
+        },
+        {
+          "function": "__create_fn__.<locals>.__init__",
+          "file": "<string>",
+          "line": 2,
+          "calls": 1030,
+          "recursive_calls": 0,
+          "cumulative_seconds": 2.5318184,
+          "self_seconds": 0.0106595
+        },
+        {
+          "function": "AuthoritativeStorageManifest.__post_init__",
+          "file": "manifest.py",
+          "line": 594,
+          "calls": 1030,
+          "recursive_calls": 0,
+          "cumulative_seconds": 2.5211589,
+          "self_seconds": 0.1702266
+        },
+        {
+          "function": "AuthoritativeStorageManifest.calculated_hash",
+          "file": "manifest.py",
+          "line": 838,
+          "calls": 1030,
+          "recursive_calls": 0,
+          "cumulative_seconds": 1.9681796,
+          "self_seconds": 0.012741800000000001
+        },
+        {
+          "function": "dumps",
+          "file": "__init__.py",
+          "line": 183,
+          "calls": 1060,
+          "recursive_calls": 0,
+          "cumulative_seconds": 0.9539365000000001,
+          "self_seconds": 0.0070704
+        },
+        {
+          "function": "JSONEncoder.encode",
+          "file": "encoder.py",
+          "line": 183,
+          "calls": 1060,
+          "recursive_calls": 0,
+          "cumulative_seconds": 0.9449063000000001,
+          "self_seconds": 0.006675800000000001
+        },
+        {
+          "function": "AuthoritativeStorageManifest.from_dict.<locals>.<genexpr>",
+          "file": "manifest.py",
+          "line": 806,
+          "calls": 9090,
+          "recursive_calls": 0,
+          "cumulative_seconds": 0.9424505000000001,
+          "self_seconds": 0.0104077
+        },
+        {
+          "function": "JSONEncoder.iterencode",
+          "file": "encoder.py",
+          "line": 205,
+          "calls": 1060,
+          "recursive_calls": 0,
+          "cumulative_seconds": 0.9351396000000001,
+          "self_seconds": 0.9351396000000001
+        },
+        {
+          "function": "DatasetManifest.from_dict",
+          "file": "manifest.py",
+          "line": 487,
+          "calls": 8078,
+          "recursive_calls": 0,
+          "cumulative_seconds": 0.9344666,
+          "self_seconds": 0.0625168
+        }
+      ]
+    }
+  ],
+  "export_unchanged": true,
+  "final_revision": 205,
+  "new_items": 8,
+  "duplicate_added_revision": false,
+  "source_sha256": {
+    "catalog/federation/phase_d_client.py": "9f8bb3ef6721b083863af72e40d32d5222663f3298b1ef26dd41292d34779d60",
+    "catalog/federation/phase_d_service.py": "94a1bc16bbbb3d85cad8ca93f81ac2be3ed2e9cb088378efc04419ae61376981",
+    "catalog/federation/phase_d_control.py": "ecb6405fef7c81992fe62a32dce4a371c20b73b5ac928f355e56cb75e2918893",
+    "catalog/federation/manifest_store.py": "fca9f6a4470325577dc05c11648baf1f683c5e0226b831594451cf316fa3927d",
+    "catalog/federation/manifest.py": "8d2f0e24c60881d99f8b66ed6819115e5613cb10695d0d9c9f4b0a5e9e207e5a",
+    "catalog/federation/local_storage.py": "084e6c822f3adb138a069ed76e4d26e1d1f6eddc09a32d473b31922f60532dd5",
+    "catalog/federation/commit_tracking.py": "68ce7d7701d253dfed6107746ceedd1740c0dc5ceadf51d7f26a1c4522483c48",
+    "catalog/federation/outbox.py": "f1da73f650164a9a42fdce2aa2ebd8516541de7e803495b1a191939e24856ea7",
+    "catalog/federation/storage_allocation.py": "c3515ff5456b021c1bca1aeee8fb08ba27f4d3e1efe481f41bb9736188ce6a2b"
+  },
+  "physical_pass": false,
+  "limits": [
+    "No relay/network/scheduling latency measured",
+    "Historical diagnostic clock uses existing injected-clock API; no live lease claim",
+    "Old provider index/bodies/intents/ack stores not reconstructed; actual new ingest plus its durable duplicate measured",
+    "Default host admission/floor retained; private contribution preallocation omitted and declared",
+    "Count wrapper byte-length overhead included; no elapsed-time subtraction"
+  ]
+}
