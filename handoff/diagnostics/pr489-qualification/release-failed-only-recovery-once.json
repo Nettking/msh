@@ -1,0 +1,32 @@
+{
+  "status": "FAILED_ONLY_RECOVERY_REQUEST_ACCEPTED",
+  "source": "a158465bedae7979a4ec5f86d2402b4303ec42b5",
+  "api_head": "14e0193535a9fc1024bde95ae1f49b8940bfd9d9",
+  "run_id": 34795691356,
+  "original_attempt": 1,
+  "original_failed_job_ids": [
+    103828223816,
+    103832734231,
+    103832734259,
+    103834320864
+  ],
+  "recorded_at": "2026-09-14T02:21:47.328500+00:00",
+  "whole_ci_rerun": false,
+  "source_or_assertion_or_deadline_changed": false,
+  "original_evidence_retained": true,
+  "green_jobs_to_reuse": [
+    103828223963,
+    103828223970,
+    103828223972,
+    103828223983,
+    103828223987,
+    103828223995,
+    103828223996,
+    103828224001,
+    103828224010,
+    103828224025,
+    103828224046,
+    103834259820
+  ],
+  "response": {}
+}

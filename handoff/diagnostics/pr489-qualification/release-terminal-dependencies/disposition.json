@@ -1,0 +1,124 @@
+{
+  "CI_mutation": false,
+  "api_head": "14e0193535a9fc1024bde95ae1f49b8940bfd9d9",
+  "attempt": 1,
+  "jobs": [
+    {
+      "checked_source_anchors": [
+        {
+          "file": ".github/workflows/federation-v1-release.yml",
+          "line": 452
+        },
+        {
+          "file": ".github/workflows/federation-v1-release.yml",
+          "line": 460
+        },
+        {
+          "file": ".github/workflows/federation-v1-release.yml",
+          "line": 468
+        },
+        {
+          "file": ".github/workflows/federation-v1-release.yml",
+          "line": 469
+        }
+      ],
+      "checkout_status": "SKIPPED_AFTER_DEPENDENCY_GUARD_FAILURE",
+      "classification": "DEPENDENT_GATE_PROPAGATION",
+      "conclusion": "failure",
+      "distinct_test_defect_demonstrated": false,
+      "excerpt_sha256": "1a5d46328af206920912d1ad368ffcefd0ea8b5cbd4e541ccd814917bd422fbf",
+      "failed_steps": [
+        "Require release checks and every regression shard"
+      ],
+      "job_id": 103832734231,
+      "name": "Release matrix (Windows)",
+      "native_checkout_commits": [],
+      "native_log_bytes": 1701,
+      "native_log_sha256": "ae3aafb45db22e4e5d32e843606a888630cf9d9f8f5dc58f947b45a3bd48ac2f",
+      "trigger": "Upstream windows-regressions matrix result failure; checks and Linux regressions success"
+    },
+    {
+      "checked_source_anchors": [
+        {
+          "file": ".github/workflows/federation-v1-release.yml",
+          "line": 452
+        },
+        {
+          "file": ".github/workflows/federation-v1-release.yml",
+          "line": 460
+        },
+        {
+          "file": ".github/workflows/federation-v1-release.yml",
+          "line": 468
+        },
+        {
+          "file": ".github/workflows/federation-v1-release.yml",
+          "line": 469
+        }
+      ],
+      "checkout_status": "SKIPPED_AFTER_DEPENDENCY_GUARD_FAILURE",
+      "classification": "DEPENDENT_GATE_PROPAGATION",
+      "conclusion": "failure",
+      "distinct_test_defect_demonstrated": false,
+      "excerpt_sha256": "df2f66bd202934d348162783993acc3f54fd67ca9b78c93f18869d73900ca198",
+      "failed_steps": [
+        "Require release checks and every regression shard"
+      ],
+      "job_id": 103832734259,
+      "name": "Release matrix (Linux)",
+      "native_checkout_commits": [],
+      "native_log_bytes": 1699,
+      "native_log_sha256": "3ea6ea4fa2645a9df3dc2f86419334b544dae298965d5ba292a83f5e6321c514",
+      "trigger": "Upstream windows-regressions matrix result failure; checks and Linux regressions success"
+    },
+    {
+      "checked_source_anchors": [
+        {
+          "file": ".github/workflows/federation-v1-release.yml",
+          "line": 494
+        },
+        {
+          "file": ".github/workflows/federation-v1-release.yml",
+          "line": 501
+        },
+        {
+          "file": ".github/workflows/federation-v1-release.yml",
+          "line": 504
+        }
+      ],
+      "checkout_status": "AGGREGATE_DOES_NOT_CHECK_OUT",
+      "classification": "DEPENDENT_GATE_PROPAGATION",
+      "conclusion": "failure",
+      "distinct_test_defect_demonstrated": false,
+      "excerpt_sha256": "f730b5a8f909070971ff9b7d3e10369ca1046d934e4b969aa8a4ffa4db473d06",
+      "failed_steps": [
+        "Require every automated release job"
+      ],
+      "job_id": 103834320864,
+      "name": "Federation v1 automated release verdict",
+      "native_checkout_commits": [],
+      "native_log_bytes": 1263,
+      "native_log_sha256": "21206661ba51c1725ceaf5562593e9db0cedff932278729b980b9b7451326735",
+      "trigger": "release-matrix failure; PostgreSQL storage and suite-order-independence success"
+    }
+  ],
+  "new_job_checkout_claimed": false,
+  "physical_acceptance": "NOT_EVALUATED",
+  "release_decision": "Current mandatory release gate remains FAIL. These three jobs introduce no independent failure path; root may perform only its already-reviewed failed-job recovery. Successful recovery must actually pass all16 required jobs.",
+  "retry_performed": false,
+  "run_id": 34795691356,
+  "source": "a158465bedae7979a4ec5f86d2402b4303ec42b5",
+  "status": "THREE_DEPENDENCY_FAILURES_NO_NEW_TEST_DEFECT",
+  "upstream_failure": {
+    "artifact_id": 10329264641,
+    "capture_sha256": "7ce6a95d469c46e45475266cc85a02d4a111ab4923fa7bf358b3cf5c9a3a4fc0",
+    "classification_unchanged": true,
+    "job_id": 103828223816,
+    "native_log_sha256": "17c9cb82aa312ed403636d6df78f9a0f5acbd47a547a3ce2d05a6941332dca47",
+    "native_source": [
+      "a158465bedae7979a4ec5f86d2402b4303ec42b5"
+    ]
+  },
+  "workflow_git_blob": "77e0499850e6044ec1bcebcaa24c7ea68962c667",
+  "workflow_sha256": "9b3bb7daa6dae152fcf9569a5db689f77028fb7ab9f20eb0e0a9fef60f689d21"
+}

@@ -1,0 +1,45 @@
+{
+  "source": "a158465bedae7979a4ec5f86d2402b4303ec42b5",
+  "api_head": "14e0193535a9fc1024bde95ae1f49b8940bfd9d9",
+  "classification": "ONE_PRODUCT_TEST_FAILURE_PLUS_THREE_DEPENDENT_GATES",
+  "review": {
+    "failed_job_ids": [
+      103828223816,
+      103832734231,
+      103832734259,
+      103834320864
+    ],
+    "candidate_defect_demonstrated": false,
+    "assertion": "reused-enrollment-token expected; federation-quorum-leader-required received",
+    "path": "catalog/federation/tests/test_control_plane_product_transactions.py:316",
+    "native_log_sha256": "17c9cb82aa312ed403636d6df78f9a0f5acbd47a547a3ce2d05a6941332dca47",
+    "artifact_id": 10329264641,
+    "artifact_digest": "sha256:617fbe2eb645d1f6702fa86506fe7961a81e8c7490fb0849579aa166711ff00b",
+    "dependency_only_failures": [
+      {
+        "job_id": 103832734231,
+        "native_log_sha256": "ae3aafb45db22e4e5d32e843606a888630cf9d9f8f5dc58f947b45a3bd48ac2f",
+        "classification": "DEPENDENT_GATE_PROPAGATION",
+        "product_test_executed": false
+      },
+      {
+        "job_id": 103832734259,
+        "native_log_sha256": "3ea6ea4fa2645a9df3dc2f86419334b544dae298965d5ba292a83f5e6321c514",
+        "classification": "DEPENDENT_GATE_PROPAGATION",
+        "product_test_executed": false
+      },
+      {
+        "job_id": 103834320864,
+        "native_log_sha256": "21206661ba51c1725ceaf5562593e9db0cedff932278729b980b9b7451326735",
+        "classification": "DEPENDENT_GATE_PROPAGATION",
+        "product_test_executed": false
+      }
+    ],
+    "root_reviewed_at": "2026-09-14T02:21:44.745501+00:00",
+    "original_terminal_retention_sha256": "015a662bd061997443fc1e02ffaca431e0f6054a5519cf787f9ceafec1d76f71",
+    "contract": "federation-v1-release.yml:460-469 rejects WINDOWS failure before checkout; final verdict rejects release-matrix failure. No new failing product test."
+  },
+  "one_failed_only_recovery_authorized": true,
+  "additional_product_defect_demonstrated": false,
+  "source_or_tests_changed": false
+}

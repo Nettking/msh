@@ -1,0 +1,8 @@
+2026-09-14T02:01:55.6159750Z ##[group]Run test "$CHECKS" = success
+2026-09-14T02:01:55.6161752Z test "$CHECKS" = success
+2026-09-14T02:01:55.6162897Z test "$LINUX" = success
+2026-09-14T02:01:55.6163975Z test "$WINDOWS" = success
+2026-09-14T02:01:55.6182346Z   CHECKS: success
+2026-09-14T02:01:55.6183132Z   LINUX: success
+2026-09-14T02:01:55.6183914Z   WINDOWS: failure
+2026-09-14T02:01:55.6345301Z ##[error]Process completed with exit code 1.

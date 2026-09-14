@@ -1,0 +1,5 @@
+2026-09-14T02:02:17.6168840Z ##[group]Run test "failure" = "success"
+2026-09-14T02:02:17.6169396Z test "failure" = "success"
+2026-09-14T02:02:17.6169785Z test "success" = "success"
+2026-09-14T02:02:17.6170164Z test "success" = "success"
+2026-09-14T02:02:17.6411074Z ##[error]Process completed with exit code 1.

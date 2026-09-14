@@ -1,6 +1,6 @@
 # Federation v1 current release checkpoint
 
-Updated 2026-09-14T01:47Z. Active context: clean handoff + this file + live GitHub.
+Updated 2026-09-14T02:25Z. Active context: clean handoff + this file + live GitHub.
 Historical coordination is evidence only; consult it for a specific current need.
 
 ## Current source / heads
@@ -20,7 +20,7 @@ Historical coordination is evidence only; consult it for a specific current need
   branch codex/federation-v1-manifest-history-repair; pushed, PR489 OPEN (not merged):
   14e0193535a9fc1024bde95ae1f49b8940bfd9d9; tree1e12bfc70c0bc7feecf85ed15a369e2f85bba4ce.
   PR synthetic a158465bedae7979a4ec5f86d2402b4303ec42b5 has exact repair tree;
-  clean checkout C:/wsl/fcp-v1-a158465b-pr489-20260914. Live main unchanged01:45.
+  clean checkout C:/wsl/fcp-v1-a158465b-pr489-20260914. Live main unchanged02:25.
 
 ## Current green gates
 - Actual-main release 34787907931:16/16 PASS; ICSE34787907928 attempt2:4/4 PASS.
@@ -35,15 +35,16 @@ Historical coordination is evidence only; consult it for a specific current need
 - No physical campaign PASS, release or tag. All C2 evidence remains C2.
 
 ## Actual blockers / prerequisites
-- PR489 Phase2 34795691363, CF7-B34795691389 and branding34795691376 PASS.
-  Release34795691356 and update34795691374 still active. Windows journal job
+- PR489 Phase2 34795691363, CF7-B34795691389, branding34795691376 and
+  update34795691374 PASS. Release34795691356 original Windows journal job
   103828223816 failed: spent-token assertion hit current-leader fence. ICSE Linux
   103828224089 hit same fence after reconnect; underlying authority change unknown.
   Both unresolved/non-demonstrated candidate defects; original evidence retained.
   ICSE34795691398 attempt2 now4/4 PASS; recovered artifacts/publication verified
   against exact source1412files. Windows/compose reused; original FAIL retained.
-  Release failed-only recovery reviewed, NOT SENT: wait attempt1 terminal; reject
-  additional failures. Details diagnostics/pr489-qualification/current-failure-disposition.json.
+  Original release12PASS +one Windows failure +three dependent gates (verified).
+  ONE release failed-only recovery accepted02:21:47; attempt2 active,12PASS reused.
+  No further retry authorized. Details diagnostics/pr489-qualification/.
 - All12 physical scenarios fresh; zero carry. P07>=1 real hour and P12>=24 real
   hours NOT STARTED. Early faults, complete coverage and measured capacity first.
 - Separate CF7 needs two reachable real CNC sources. Asked once, answer pending.
@@ -71,8 +72,8 @@ Historical coordination is evidence only; consult it for a specific current need
    Receipts .acceptance/p06-http-trial-c3-preparation/public-agent-native-environment.
 3. Exact PR489 read-only qualifier reviewed/enabled; inputs-pr489-reviewed.json
    under .acceptance/manifest-repair-release-preparation. Six auto workflows;
-   recover_reviewed_failures_once.py release after original terminal, once only.
-   Then final retain/audit with explicit ICSE+recovered-Windows artifact selection;
+   Wait active release attempt2; on PASS final retain/audit with explicit artifact selection.
+   Original terminal retention1c98a4c5... preserved27logs/18artifacts for reuse;
    ICSE map: icse-34795691398-recovery-final/artifact-selection.icse-reviewed.json.
    Only missing CF7-A+registry dispatch on future main; no absent CF8/F85/bootstrap.
 4. Reusable P11 baseline ready in H/.acceptance/p11-control-internal-model-r4:
