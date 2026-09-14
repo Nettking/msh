@@ -21,13 +21,14 @@ from .models import CommitState
 
 MANIFEST_SCHEMA = "fcp.authoritative_storage_manifest.v1"
 _SHA256_PATTERN = re.compile(r"sha256:[0-9a-f]{64}")
+_CONTROL_CHARACTER_PATTERN = re.compile(r"[\x00-\x1f]")
 
 
 def _required_text(value: Any, field: str) -> str:
     if (
         not isinstance(value, str)
         or not value.strip()
-        or any(ord(character) < 32 for character in value)
+        or _CONTROL_CHARACTER_PATTERN.search(value) is not None
     ):
         raise FederationValidationError(
             "invalid-id",
