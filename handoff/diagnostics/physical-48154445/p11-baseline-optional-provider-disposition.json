@@ -1,0 +1,27 @@
+{
+  "recorded_at": "2026-09-14T00:36:07.356086+00:00",
+  "candidate": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "stage": "P11_DEDICATED_BASELINE_PREPARATION",
+  "supported_start": {
+    "status": "VERIFIED",
+    "core_candidate_images": 3,
+    "optional_provider_unavailable": true,
+    "receipt_sha256": "c56fbe5a2892c6ea45d6096f562817c81093f964871a174d62e215c16609b7b0"
+  },
+  "actual_admin_bootstrap_and_browser_login": "COMPLETED",
+  "technical_source_configuration": "PERSISTED",
+  "automatic_capability_bootstrap": {
+    "result": "REFUSED",
+    "error": "automatic-benchmarks-incomplete",
+    "message": "all applicable benchmarks must finish before automatic activation (benchmark.ai.ollama-inference.v1)",
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "a08d1768754bab7dcd64152014e0a99958a999a59879c0bdf90fa81836103efb"
+  },
+  "classification": "ISOLATED_BASELINE_HAS_UNREACHABLE_CONFIGURED_OPTIONAL_AI_TARGET",
+  "mechanism": "Model-less network_mode:none provider cannot be detected; the checked benchmark plan retains unavailable-target as blocked and correctly withholds activation. No benchmark result, skip decision or authority may be invented.",
+  "proposed_next_action": "Root review a reachable empty owned Ollama baseline target with all pull/model installation still disabled, so its actual missing-model benchmark can fail as evidence and leave AI unapproved. Isolated restore retains unavailable-provider fault. No action authorized by this receipt.",
+  "capture_upload_inventory": "NOT_COMPLETED",
+  "backup_keys_replacement": "NOT_STARTED",
+  "physical_pass": false,
+  "protected_data_accessed": false
+}

@@ -1,0 +1,65 @@
+{
+  "candidate_sha": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "recorded_at": "2026-09-14T00:40:06.865532+00:00",
+  "P01_binding": {
+    "classification": "deterministic harness input defect",
+    "cause": "Core Compose working-directory labels name the external Compose-file parent; original acceptance binding named the source checkout.",
+    "corrected_observation": "Three activations, resource baseline and runtime state PASS after input correction; native source pinned independently.",
+    "activations_repeated": false,
+    "original_failures_retained": true,
+    "new_action_fabricated": false
+  },
+  "P01_growth": {
+    "initial_verdict": "FAIL",
+    "per_activation_verdict": "PASS",
+    "bytes_per_activation": 97192618,
+    "measured_interval_hours": 0.0657,
+    "initial_bytes_per_hour": 4437135404,
+    "limit_bytes_per_hour": 1073741824,
+    "next_action": "Collect the real post-build passive hour with unchanged limits; retain original samples and failure.",
+    "hour_started": false
+  },
+  "P09_outbox": {
+    "classification": "unresolved but non-demonstrated candidate defect",
+    "observation": "Instrumented native startup did not establish storage sharing in the bounded startup window; no transaction fault was injected.",
+    "receipt_sha256": "63a2c006ccd0c7deca53571f330756ff8ef44c1d16257a4e08de6d235ce488f5",
+    "operator_stop_exit_code": 0,
+    "candidate_cause_demonstrated": false,
+    "separate_harness_finding": "Unarmed global tracing adds measured overhead; monitoring replacement retains exact transaction boundaries and is prepared, not executed."
+  },
+  "P06_initial_trial": {
+    "classification": "deterministic harness environment defect",
+    "observation": "The observer exhausted its unchanged600s while creator branch discovery lacked a host agent; send guard refused before software POST.",
+    "receipt_sha256": "6834c2d9f1a89e5927660ff020d5ac844b50c7e14ce1a29f81fae5889a2ea173",
+    "software_command_posted": false,
+    "proven_cause": "Inherited PowerShell7 PSModulePath prevents native Windows PowerShell5 from resolving Get-FileHash.",
+    "repair": "Only remove inherited PSModulePath from owned child environment; public host agent now serves real branch discovery.",
+    "machine_environment_modified": false,
+    "product_modified": false,
+    "next_action": "Fresh bounded authenticated native trial and exact pinned main restore."
+  },
+  "Nitro_admission": {
+    "ordinary_start_exit_code": 0,
+    "actual_C3_runtime_activated": true,
+    "source_images_mounts_environment_preservation_verified": true,
+    "original_admission_status": "STOPPED",
+    "final_HTTP_check": "timeout following redirect",
+    "retained_proof_sha256": "36b4cec231870353919d111517244624fdd5ccac17b4ef29cb187d399cbb5a36",
+    "physical_pass": false
+  },
+  "P11": {
+    "first_start_outcome": "unknown after harness cp1252 decoding failure",
+    "second_start": "real image_identity_unavailable refusal caused by fixture-added recorder dependency expanding Compose image lookup",
+    "capture_repair": "complete raw streams retained; display decoded separately",
+    "dependency_repair": "same owned source started explicitly; core dependency removed from original and restore fixture inputs only",
+    "repaired_start_and_owner_bootstrap": "PASS as baseline preparation, not physical acceptance",
+    "current_prerequisite": "Legitimate capability setup with optional AI unavailable; no forced skip or approval.",
+    "backup_keys_restore_started": false
+  },
+  "physical_campaign_pass": false,
+  "P07": "NOT_STARTED",
+  "P12": "NOT_STARTED",
+  "protected_recorder_data": "UNTOUCHED",
+  "AQG": "OFF_NONDEPENDENCY",
+  "AGQ7NCC": "Not required while offline"
+}

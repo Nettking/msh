@@ -1,0 +1,20 @@
+{
+  "assertion": "windows-runtime-state",
+  "classification": "automated-probe",
+  "evidence": "evidence/v1-physical/observations/P01/20260914T003823476845Z-assertion-793f6411.json",
+  "probes": [
+    {
+      "probe_id": "running-commit-identity",
+      "status": "pass",
+      "summary": "every running component carries the candidate build commit"
+    },
+    {
+      "probe_id": "service-health",
+      "status": "pass",
+      "summary": "every observable core worker is alive and its health is visible"
+    }
+  ],
+  "recorded": true,
+  "scenario": "P01",
+  "verdict": "pass"
+}

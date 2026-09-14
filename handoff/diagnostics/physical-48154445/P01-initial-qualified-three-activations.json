@@ -1,0 +1,21 @@
+{
+  "assertion": "windows-three-activations",
+  "classification": "operator-fault-injection",
+  "evidence": "evidence/v1-physical/observations/P01/20260914T001617227714Z-assertion-37106588.json",
+  "prepare_id": "27519b1fa452452cb69e346d8b52b4c5",
+  "probes": [
+    {
+      "probe_id": "activation-growth",
+      "status": "pass",
+      "summary": "per-activation growth stays inside the declared bound"
+    },
+    {
+      "probe_id": "running-commit-identity",
+      "status": "fail",
+      "summary": "a running component does not carry the candidate build commit"
+    }
+  ],
+  "recorded": true,
+  "scenario": "P01",
+  "verdict": "fail"
+}

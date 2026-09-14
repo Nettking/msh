@@ -1,0 +1,58 @@
+{
+  "recorded_at": "2026-09-14T00:22:07.461948+00:00",
+  "candidate": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "stage": "DEDICATED_P11_BASELINE_PREPARATION",
+  "rebind": "COMPLETED",
+  "first_attempt": {
+    "classification": "DETERMINISTIC_HARNESS_OUTPUT_DECODING_DEFECT",
+    "error": "cp1252 UnicodeDecodeError byte0x81 then private_log TypeError stdout=None",
+    "startup_outcome": "UNKNOWN",
+    "original_controls_and_zero_byte_log_preserved": true
+  },
+  "capture_revision": {
+    "sha256": "13e9120b6053d2702a3cfc4fdb7639f9fb5e18f89cfb0dc95f1de24b6f08d0d7",
+    "focused_arbitrary_byte_redgreen": "PASS"
+  },
+  "one_recovery": {
+    "result": "SUPPORTED_START_REFUSED_BEFORE_PRODUCT_CONTAINERS",
+    "exit_nonzero": true,
+    "numeric_exit_code_not_retained": true,
+    "reported_error": "built_image_identity_unavailable",
+    "all_three_builds_completed": true,
+    "classification": "DETERMINISTIC_ISOLATED_FIXTURE_COMPOSITION_DEFECT",
+    "mechanism": "Fixture recorder depends_on p11-source makes docker compose config --images recorder return two references. Checked host-build identity resolver requires one. Base core services have no such dependency.",
+    "source_path": "scripts/windows/fcp_host_build.ps1:632",
+    "candidate_image_defect_demonstrated": false
+  },
+  "next_action": "Root disposition: prepare isolated source as a separately started fixture service, preserving product image-identity checks; no automatic retry or source change.",
+  "baseline_bootstrap_capture_upload_inventory": "NOT_STARTED",
+  "backup_replacement_dpapi": "NOT_STARTED",
+  "physical_pass": false,
+  "protected_data_accessed": false,
+  "evidence": {
+    "initial-supported-start.private.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "recovered-supported-start.stdout.private.bin": {
+      "bytes": 3932,
+      "sha256": "6d2b6ca79cf0d42da5a5ac9499b1b96d97623e643d4a859c59f18db820f76a56"
+    },
+    "recovered-supported-start.stderr.private.bin": {
+      "bytes": 1064,
+      "sha256": "1a021fe852cb3b84a8b8cdd4f48aab1675eec26740788b0a8bba7ac0a29a1d89"
+    },
+    "recovered-supported-start.private.log": {
+      "bytes": 5151,
+      "sha256": "e96294c400035a7fbd640a51cd3b56997741d73b4e9cef365ec960e33ff451cc"
+    },
+    "recovery-image-lookup.private.json": {
+      "bytes": 558,
+      "sha256": "771604694e206d8014a2ef58dbb2f9e6aa5ceb2d516664ccf7547d9228c2f31e"
+    },
+    "recovery-preflight.private.json": {
+      "bytes": 1211,
+      "sha256": "aa9efa2e67fee9b132c29f3a1300b3640c8cc19ca57c8e788104b7e430df455b"
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "assertion": "windows-growth-bounded",
+  "classification": "automated-probe",
+  "evidence": "evidence/v1-physical/observations/P01/20260914T001618050895Z-assertion-0793b0b9.json",
+  "probes": [
+    {
+      "probe_id": "growth-analysis",
+      "status": "fail",
+      "summary": "measured growth exceeds the declared per-hour ceiling"
+    }
+  ],
+  "recorded": true,
+  "scenario": "P01",
+  "verdict": "fail"
+}

@@ -1,0 +1,20 @@
+{
+  "assertion": "windows-resource-baseline",
+  "classification": "automated-probe",
+  "evidence": "evidence/v1-physical/observations/P01/20260914T003820257664Z-assertion-01980776.json",
+  "probes": [
+    {
+      "probe_id": "host-resource-baseline",
+      "status": "pass",
+      "summary": "host, Docker, data/results, logs and model storage are all measured"
+    },
+    {
+      "probe_id": "docker-state",
+      "status": "pass",
+      "summary": "Docker state and its backing host resource are both observable"
+    }
+  ],
+  "recorded": true,
+  "scenario": "P01",
+  "verdict": "pass"
+}

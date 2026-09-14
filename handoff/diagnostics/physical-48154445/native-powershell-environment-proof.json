@@ -1,0 +1,22 @@
+{
+  "status": "DETERMINISTIC_INHERITED_MODULE_PATH_DEFECT_PROVEN",
+  "rows": [
+    {
+      "mode": "inherited",
+      "exit_code": 1,
+      "command": null
+    },
+    {
+      "mode": "native-default-module-path",
+      "exit_code": 0,
+      "command": {
+        "Name": "Get-FileHash",
+        "Source": "Microsoft.PowerShell.Utility"
+      }
+    }
+  ],
+  "only_environment_delta": "Remove inherited PSModulePath from child so Windows PowerShell constructs its native defaults",
+  "machine_configuration_modified": false,
+  "product_modified": false,
+  "physical_pass": false
+}
