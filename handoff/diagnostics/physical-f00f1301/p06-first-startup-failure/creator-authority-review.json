@@ -1,0 +1,66 @@
+{
+  "schema": 1,
+  "candidate": "f00f13013b58e0023f1a506e32daa86df37af7ae",
+  "status": "BOUNDED_CREATOR_AUTHORITY_REVIEW_COMPLETE",
+  "component_classification": "unresolved but non-demonstrated creator authority candidate defect",
+  "window": {
+    "since": "2026-09-14T07:31:00Z",
+    "until": "2026-09-14T07:33:00Z"
+  },
+  "identity_observation": "All three current core container IDs/images/project/service labels match actual f00 admission; running with unchanged StartedAt and RestartCount.",
+  "observations": [
+    {
+      "timestamp": "2026-09-14T07:32:43.851Z",
+      "path": "RecorderLogicalStorageAuthority.handle_request -> client.send_message at recorder_storage_relay.py:499",
+      "result": "target-disconnected after reported observer cleanup",
+      "meaning": "An actual storage-authority handler reached response sending. The log lacks operation/correlation and does not prove response success, duration or which native request."
+    },
+    {
+      "timestamps": [
+        "2026-09-14T07:31:03.830Z",
+        "2026-09-14T07:32:15.040Z"
+      ],
+      "result": "Zero-byte EOF while reading websocket opening HTTP request",
+      "meaning": "Compatible with a TCP listener check that opens and closes without HTTP; no matched client/request evidence establishes a causal role in publication."
+    },
+    {
+      "route": "GET /federation/health",
+      "result": "Sign-in page; no semantic health snapshot observed",
+      "additional_authentication_or_retry": false
+    }
+  ],
+  "release_relevance": "No creator container restart or unavailable authority is demonstrated by this bounded evidence. Independently reported successful native ACKs strengthen actual route availability; they are not a proof of completed JSONL sharing or full P06 readiness.",
+  "next_action": "Use the already retained native outbox/worker trace to identify the remaining JSONL/cycle completion cost. Do not restart creator or repeat the native probe based on this component review.",
+  "evidence": {
+    "full_private_disposition": {
+      "private_receipt": ".acceptance/pr490-p06-authority-window/disposition.json",
+      "sha256": "21e4c3b3658484648999e09d7629d50779cf171f64eb08a6d508b630d7f8336b"
+    },
+    "identity_and_window": {
+      "private_receipt": ".acceptance/pr490-p06-authority-window/retained-window/receipt.private.json",
+      "sha256": "94b0274ece89e74733b8e57c6251475245c120e11e67a471f6ca34fbd30f5c08"
+    },
+    "flask_redacted_excerpt": {
+      "private_receipt": ".acceptance/pr490-p06-authority-window/retained-window/flask.selected.redacted.log",
+      "sha256": "9c3a307ecfd111c2aac1f521131457b6fd0aa2eb02a2c080fc4e555921ff93b1"
+    },
+    "relay_redacted_excerpt": {
+      "private_receipt": ".acceptance/pr490-p06-authority-window/retained-window/relay.selected.redacted.log",
+      "sha256": "506b126a5e33756f3cc7365c0282bd8932dfff8708c377da24383cfb9a2d77f1"
+    },
+    "health_read_receipt": {
+      "private_receipt": ".acceptance/pr490-p06-authority-window/current-health-once/receipt.json",
+      "sha256": "d9722dde5df47c5a6a7cd42419eee4dabe13fffdcee508324d66991ab3d454df"
+    }
+  },
+  "source_anchors": [
+    "catalog/federation/recorder_storage_relay.py:435-505",
+    "catalog/flask_app/federation_recorder_routes.py:90-119",
+    "catalog/flask_app/services/federation_storage_authority_install.py:213-233"
+  ],
+  "source_identity_policy": "Exact f00 clean checkout; actual working bytes compared to Git blobs with LF/CRLF canonicalization only. Digests retained privately.",
+  "runtime_actions": 0,
+  "source_or_config_mutations": 0,
+  "protected_recorder_data_accessed": false,
+  "physical_acceptance_pass": false
+}

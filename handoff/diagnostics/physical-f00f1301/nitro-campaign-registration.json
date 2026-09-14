@@ -1,0 +1,64 @@
+{
+  "schema": 1,
+  "status": "FRESH_NITRO_CAMPAIGN_AND_HOST_REGISTERED",
+  "candidate": "f00f13013b58e0023f1a506e32daa86df37af7ae",
+  "harness_sha": "f00f13013b58e0023f1a506e32daa86df37af7ae",
+  "host_id": "nitro",
+  "host_fingerprint": "ad885120af1f11cf",
+  "role": "school-control",
+  "profile": "school-control",
+  "os_family": "linux",
+  "os_category": "posix",
+  "python": "3.12.13",
+  "recorded_at": "2026-09-14T07:29:47.398501Z",
+  "evidence_initially_absent": true,
+  "campaign_accepted": false,
+  "commands": {
+    "init": {
+      "exit_code": 0,
+      "started_at": "2026-09-14T07:29:45.514714+00:00",
+      "finished_at": "2026-09-14T07:29:47.036109+00:00",
+      "timeout_seconds": 90,
+      "stdout_sha256": "1b152fbed25bb0935945f882f1e9a8ddd8768a45e62d97cb67fedcaa4d0f712b",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "host": {
+      "exit_code": 0,
+      "started_at": "2026-09-14T07:29:47.054659+00:00",
+      "finished_at": "2026-09-14T07:29:47.520105+00:00",
+      "timeout_seconds": 90,
+      "stdout_sha256": "35d97811758d1b94c42250e9301c4f0ad2cddf4359fe1036d80c17cf626b61cb",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "freeze_sha256": "0c5127ae2d2dc8885182f38c908dc544789f38cf3e9de69bc12d1f1e56366d25",
+  "qualification_sha256": "9d4c1c55046ca86110e728e6638a2e4a7d15e36c9cd4db377af82a0984ae6ff4",
+  "readiness_sha256": "d214ac3c0bfd6afed1feed1121b529260ae3a90952cfd4abf1975cb88a90136e",
+  "runtime_admission_sha256": "10bcee347a0e7796d5dae4ad2a787ec1fbff061ceb3fb0d4cdb0ab06b04d4bb3",
+  "campaign": {
+    "private_receipt": ".acceptance/pr490-campaign-registration-preparation/nitro-registration-once/retained/campaign.json",
+    "sha256": "1b152fbed25bb0935945f882f1e9a8ddd8768a45e62d97cb67fedcaa4d0f712b"
+  },
+  "host_packet": {
+    "private_receipt": ".acceptance/pr490-campaign-registration-preparation/nitro-registration-once/retained/hosts/nitro.json",
+    "sha256": "35d97811758d1b94c42250e9301c4f0ad2cddf4359fe1036d80c17cf626b61cb"
+  },
+  "process_receipt": {
+    "private_receipt": ".acceptance/pr490-campaign-registration-preparation/nitro-registration-once/retained/process-receipt.private.json",
+    "sha256": "85bf7e3485645fd8e29c6cd9c7de0b3b02cbe3194c1776b568f29b4914648848"
+  },
+  "transport_receipt": {
+    "private_receipt": ".acceptance/pr490-campaign-registration-preparation/nitro-registration-once/transport-receipt.private.json",
+    "sha256": "43ee1942f784f25adb6fac04cbd0e2f10f6f9c6d46fd22a8e32ddee9e2b0167d"
+  },
+  "reviewed_inputs": {
+    "private_receipt": ".acceptance/pr490-campaign-registration-preparation/registration-inputs.nitro.root-reviewed.private.json",
+    "sha256": "2bb4c129fac8837ea3206b1f628380357ba029ffa4b4e20ac131e34db815a692"
+  },
+  "original_pending_inputs_preserved": true,
+  "scenario_runs": 0,
+  "timer_starts": 0,
+  "runtime_actions": 0,
+  "physical_acceptance_pass": false,
+  "windows_campaign_replayed": false
+}

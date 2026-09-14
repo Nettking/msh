@@ -1,0 +1,161 @@
+{
+  "candidate": "f00f13013b58e0023f1a506e32daa86df37af7ae",
+  "classification": "CURRENT_STARTUP_FAILURE_WITH_WORKING_AUTHORITY; EXACT_POST_PROBE_CAUSE_UNRESOLVED",
+  "failure_window": {
+    "started_at": "2026-09-14T07:31:02.420800+00:00",
+    "finished_at": "2026-09-14T07:32:42.562553+00:00"
+  },
+  "completed_before": 205,
+  "completed_after": 217,
+  "pending_before": 723,
+  "pending_after": 711,
+  "total_rows_unchanged": 928,
+  "new_completed_rows": 12,
+  "first_generation_distinct_dataset_heads": 8,
+  "first_eight_ack_timestamps": [
+    "2026-09-14T07:31:09.912111+00:00",
+    "2026-09-14T07:31:15.003754+00:00",
+    "2026-09-14T07:31:22.247583+00:00",
+    "2026-09-14T07:31:26.558513+00:00",
+    "2026-09-14T07:31:32.328226+00:00",
+    "2026-09-14T07:31:36.056009+00:00",
+    "2026-09-14T07:31:40.459009+00:00",
+    "2026-09-14T07:31:45.100777+00:00"
+  ],
+  "second_generation_completed_heads": 4,
+  "all_twelve_last_error_cleared": true,
+  "first_to_eighth_ack_seconds": 35.188666,
+  "observer_start_to_eighth_ack_seconds": 42.679977,
+  "inter_ack_intervals_seconds": [
+    5.091643,
+    7.243829,
+    4.31093,
+    5.769713,
+    3.727783,
+    4.403,
+    4.641768
+  ],
+  "limitations": [
+    "ACK timestamps bound whole sequential delivery intervals; they do not measure CPU time.",
+    "The supervisor log has no exact first sharing-gate start timestamp or code stack.",
+    "A completed eighth ACK does not alone prove run_cycle retirement-summary processing or the following JSONL pass completed.",
+    "No new trace, restart, profile, test, source edit or data mutation was performed."
+  ],
+  "source_findings": [
+    {
+      "path": "catalog/federation/recorder_delivery.py",
+      "lines": [
+        286,
+        335,
+        389,
+        391
+      ],
+      "finding": "Fresh queue sequentially probes one retained head per dataset; acknowledge only follows a committed authenticated outcome."
+    },
+    {
+      "path": "catalog/mtconnect_recorder/federation_node.py",
+      "lines": [
+        938,
+        998,
+        1001,
+        1018
+      ],
+      "finding": "Successful authority selection builds route, then entire worker cycle and JSONL publication complete before initial discovering snapshot is replaced."
+    },
+    {
+      "path": "catalog/mtconnect_recorder/federation_node.py",
+      "lines": [
+        531,
+        539,
+        567
+      ],
+      "finding": "Readiness accepts publishing with committed progress only after JSONL ready; same declared deadline is unchanged."
+    },
+    {
+      "path": "catalog/federation/recorder_storage_relay.py",
+      "lines": [
+        435,
+        499,
+        549,
+        782,
+        816
+      ],
+      "finding": "Real completed native outbox rows imply request through owned authority into logical client and matching committed response. A missingauthority explanation contradicts current evidence."
+    },
+    {
+      "path": "catalog/flask_app/services/_federated_jsonl_product_bridge_impl.py",
+      "lines": [
+        872,
+        1008,
+        1012,
+        1030,
+        1060,
+        1097
+      ],
+      "finding": "Required JSONL pass scans/prepares local candidates then publishes up to64 chunks before returning readiness."
+    },
+    {
+      "path": "catalog/flask_app/services/federated_data_runtime.py",
+      "lines": [
+        53,
+        72,
+        90
+      ],
+      "finding": "Generic JSONL chunk ingests are sequential through actual correlated storage client; synchronous submit retains existing timeout."
+    },
+    {
+      "path": "docs/implementation/v1_robustness_reconciliation.md",
+      "lines": [
+        795,
+        803,
+        822,
+        867,
+        912,
+        916
+      ],
+      "finding": "P06 recovery/checkpoint continuity, restart during backlog, aged-history P12 and aged-data performance exit criterion apply to this retained legitimate corpus. This failed startup supplies no physicalPASS."
+    }
+  ],
+  "release_decision": "P06 remains incomplete on current frozen candidate. Authority absence is disproved. Previous C0validation cost may contribute to3.7\u20137.2s delivery intervals, but current evidence does not attribute that time to CPU or show whether the post-probe JSONL path consumed the remaining gate budget. Do not change deadlines/readiness or diagnose solely from stale discovering text.",
+  "minimum_next_proof": "Root review of exact startup gate/fairness/JSONL contract plus currentcreatorhealth evidence. An additional runtime is not authorized by this disposition. If furtherdiagnosis is chosen, first resolve time in worker retirement-summary, JSONLcandidate scan, and final pendingread rather than repeat the alreadydemonstrated ACK CPU benchmark.",
+  "source_sha256": {
+    "catalog/mtconnect_recorder/federation_node.py": "6ff3a02b331ef68b62c2d62ee034366b350b2574b3eea1204831617b7d8bea77",
+    "catalog/federation/recorder_delivery.py": "884dd45371ff4cb3242cc5f6c85b84e35cd9d5966114e01165f454213f054c4b",
+    "catalog/federation/recorder_publication.py": "ca97dcee6c241b5c3d5eacf60b24a35936818022458ed747de08aeb11f26782c",
+    "catalog/federation/recorder_storage_relay.py": "f2ac11d7c6df9794871b5b1c46750b87b3594f759ca24b2266fed84b6cf5797e",
+    "catalog/flask_app/services/_federated_jsonl_product_bridge_impl.py": "665ba44ea731adf2df7f86c3951e01b1618291b2fa5ead599360d80ceb08f211",
+    "catalog/flask_app/services/federated_data_runtime.py": "842d5ecadf45357ae7a173c098944b4f6921378e7d2d88549a652d0e3b7c00d9",
+    "catalog/flask_app/services/federation_pairing_service.py": "db7bfe8cafebfe656b8a5b684e0b5ebbc54248f040c059d671f59d2196b773f9",
+    "docs/implementation/v1_robustness_reconciliation.md": "c294ed3ae05be8fe2921bd13c8af66c60a457ae3b2aac42d1909fe5d5fc8932c",
+    "start_recorder.py": "ecb2f9be9c3a2c453072bcbacfebb597d6b93bb43480d764b75425f0a665404a"
+  },
+  "outbox_private_sha256": "26bf9240a6671839dd1905b90883c3493ffcade2d60cb4cc5a4ddd3e86b0fc3f",
+  "outbox_public_sha256": "6fb0df9a7a6ee4eef3048867c2c0376f2a5dcd7c2bffa71b86ba001bc3a44f0f",
+  "original_status_sha256": "81824f46bd2babfb0c6095e2d3a728c03a8c88cbcf3461fee10ece0755b6b4aa",
+  "original_supervisor_log_sha256": "b1d5f7a163e958037356e5c0cfb601d18d032002acd05aed5830c17cf62dd760",
+  "physical_pass": false,
+  "completed_at": "2026-09-14T07:42:04.607337+00:00",
+  "prior_disposition_sha256": "99878372c8068474ccfa309792fd118f0d8589cf77eca0a95ced136172f7defb",
+  "jsonl_observation_private_sha256": "11bdcb0700cffedfc4695cac43f54dab0f7fa777ff43c58e2e3f59b1e7839d5c",
+  "jsonl_observation_sha256": "3e54c81dc056abaf06058edac6189545f0a9675829ddaf3a882c3c194babca4c",
+  "jsonl_observation": {
+    "local_files": 0,
+    "seen_batches": 0,
+    "total_chunks": 0,
+    "completed_chunks": 0,
+    "database_bytes": 32768,
+    "database_last_modified": "2026-09-14T00:04:56.424883+00:00",
+    "wal_present": false,
+    "meaning": "No durable JSONL file preparation or chunk publication was observed in this failure window. A read-only empty/excluded corpus pass would leave the same DB state, so this does not prove the pass was never entered."
+  },
+  "checked_readiness_contract": {
+    "general_exit": "docs/implementation/v1_robustness_reconciliation.md:912 capture remains performant with aged data; :916 corrected P01\u2013P12 passes on one exact commit.",
+    "specific_test": "catalog/mtconnect_recorder/tests/test_federation_node.py:345 test_publication_loop_proves_each_dataset_before_full_backlog_drain; :532 both dataset heads attempted; :537 JSONL failure means retrying/backlogged; :542 successful completed probe means publishing/2commits/JSONLready with backlog remaining.",
+    "readiness_unit_tests": "test_federation_node.py:228 forbids pending without committed progress; :237 requires actual JSONL ready; :248 permits committed backlog cycle before fullcatchup.",
+    "required_boundary": "Complete one fair startup route probe and actual JSONL pass, retain the active worker and authenticated selected authority. Full backlog drain is not required. Reporting readiness after only one successfulhead while other datasetheads remain unprobed would contradict the checked integration regression.",
+    "test_file_sha256": "d4868c92500f8911e5bfe86c1fc733fbb6c4470da42c2d165139a908f00a4134"
+  },
+  "demonstrated_mechanism": "The actual authenticated sequential startup probe consumes most of the declared readiness budget: eight distinct dataset heads ACK by42.680s afterobserverstart, with3.728\u20137.244s interACK intervals. Readiness remains at initial discovering until cycle+JSONL+pendingread complete. The twelve durable completions disprove missingauthority, but the final blocking stage is not observable in the retained logs/state.",
+  "unresolved_mechanism": "CPU time versus network/provider scheduling is not separated by ACK timestamps. The unchanged emptyJSONL DB supplies no durable evidence of JSONLingests or scanprogress. Existing source scans/sorts all JSONL paths before exclusion; postcycle pendingread also decodes retained rows. Neither is demonstrated responsible from this bounded capture.",
+  "repair_recommendation": "No new productrepair is justified from these receipts alone. Do not weaken the45s gate, skip JSONL, require fullcatchup, relabel initial discovering as missingauthority, or propose concurrency/cache as a proven fix. If root chooses one further targeted proof, measure only the remaining postprobe boundaries on an exact owned offline fixture or with bounded passive actualcode timing, preserving all assertions; no genericrerun."
+}

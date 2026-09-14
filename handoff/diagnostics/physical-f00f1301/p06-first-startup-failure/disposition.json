@@ -1,0 +1,93 @@
+{
+  "schema": 1,
+  "candidate": "f00f13013b58e0023f1a506e32daa86df37af7ae",
+  "classification": "product defect",
+  "status": "CURRENT_CANDIDATE_STARTUP_BLOCKED_BY_EXCLUDED_JSONL_SCAN_COST",
+  "recorded_at": "2026-09-14T07:48:02.352553+00:00",
+  "physical_pass": false,
+  "attempt": {
+    "started_at": "2026-09-14T07:31:02.420800+00:00",
+    "finished_at": "2026-09-14T07:32:42.562553+00:00",
+    "phase": "SUPPORTED_STARTUP",
+    "error": "Bounded observation unavailable: supported startup",
+    "operator_stop_exit_code": 0,
+    "update_posts": 0,
+    "new_grant_requested": false,
+    "sharing_deadline_seconds": 45,
+    "observer_bound_seconds": 100,
+    "live_observer_invocations": 1
+  },
+  "current_native_outbox": {
+    "completed": 217,
+    "pending": 711,
+    "total": 928,
+    "new_actual_committed_acknowledgements": 12,
+    "first_generation_dataset_heads": 8
+  },
+  "mechanism": "The first eight dataset heads committed by 42.680 seconds after observer start. The exact required local JSONL enumeration on the same stopped owned corpus then measured 17.109 seconds wall / 16.422 seconds CPU and found zero eligible files. Exclusion occurs after recursive traversal and ancestor import-marker inspection. The readiness snapshot is published only after this enumeration and the full JSONL pass. Required startup therefore remains coupled to processing history explicitly excluded from JSONL publication.",
+  "control_measurements": {
+    "retired_summary_seconds": 0.063,
+    "pending_read_seconds": 0.297
+  },
+  "limits": [
+    "The offline measurement is not an instrumented stack trace of the failed live process.",
+    "ACK intervals alone do not measure network or authority CPU time.",
+    "No evidence establishes JSONL network delay; its database remained empty.",
+    "The actual sharing-gate start timestamp is absent from the supervisor log."
+  ],
+  "contract": [
+    "docs/standalone_recorder.md:32-46 requires a usable publication path and reuses retained state on restart.",
+    "docs/implementation/v1_robustness_reconciliation.md:912 requires performance with aged data; :916 requires complete P01-P12 on one exact commit.",
+    "catalog/mtconnect_recorder/tests/test_federation_node.py:345 requires all dataset heads and a successful JSONL pass before ready; these stay intact."
+  ],
+  "authority_disposition": "No unavailable authority demonstrated: 12 actual committed ACKs and unchanged admitted creator container identities. The late target-disconnected response followed cleanup.",
+  "next_action": "Implement the smallest selection-equivalent early JSONL exclusion, prove focused red-to-green and one bounded postrepair same-corpus measurement. Do not rerun live P06 until a viable repair completes required exact-source qualification and release revalidation.",
+  "safety": {
+    "protected_recorder_data_accessed": false,
+    "data_reset_or_prune": false,
+    "source_or_runtime_changed_during_diagnosis": false,
+    "assertions_deadlines_authority_security_changed": false
+  },
+  "retained_evidence": {
+    "original-status.json": {
+      "private_receipt": ".acceptance/pr490-p06-startup-disposition/original-status.json",
+      "sha256": "81824f46bd2babfb0c6095e2d3a728c03a8c88cbcf3461fee10ece0755b6b4aa"
+    },
+    "original-supervisor.private.log": {
+      "private_receipt": ".acceptance/pr490-p06-startup-disposition/original-supervisor.private.log",
+      "sha256": "b1d5f7a163e958037356e5c0cfb601d18d032002acd05aed5830c17cf62dd760"
+    },
+    "final-disposition.json": {
+      "private_receipt": ".acceptance/pr490-p06-startup-disposition/final-disposition.json",
+      "sha256": "17a9c111c36675d1f808b30d570fddd2b57e78275159772b60582a9c88ceaf1a"
+    },
+    "outbox-observation.private.json": {
+      "private_receipt": ".acceptance/pr490-p06-startup-disposition/outbox-observation.private.json",
+      "sha256": "26bf9240a6671839dd1905b90883c3493ffcade2d60cb4cc5a4ddd3e86b0fc3f"
+    },
+    "jsonl-observation.private.json": {
+      "private_receipt": ".acceptance/pr490-p06-startup-disposition/jsonl-observation.private.json",
+      "sha256": "11bdcb0700cffedfc4695cac43f54dab0f7fa777ff43c58e2e3f59b1e7839d5c"
+    },
+    "remaining_reads_probe.py": {
+      "private_receipt": ".acceptance/pr490-p06-startup-disposition/remaining_reads_probe.py",
+      "sha256": "8a7b3b6091ce1547e4b7b879945ce5c12fa6a425b844391b0fb427adbb18086f"
+    },
+    "remaining-reads-result.json": {
+      "private_receipt": ".acceptance/pr490-p06-startup-disposition/remaining-reads-result.json",
+      "sha256": "55585ff87edf8091300bcf1d3e50d46726d4df5390dd1785f9833dbd63c7dd58"
+    },
+    "remaining-reads-execution.json": {
+      "private_receipt": ".acceptance/pr490-p06-startup-disposition/remaining-reads-execution.json",
+      "sha256": "2720bee9b19feadd3cae7f5a9563af48194a59d54e74b2819d60b03a48b18913"
+    },
+    "remaining-reads.stdout.private.log": {
+      "private_receipt": ".acceptance/pr490-p06-startup-disposition/remaining-reads.stdout.private.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "remaining-reads.stderr.private.log": {
+      "private_receipt": ".acceptance/pr490-p06-startup-disposition/remaining-reads.stderr.private.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

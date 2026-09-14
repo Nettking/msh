@@ -1,0 +1,46 @@
+{
+  "candidate": "f00f13013b58e0023f1a506e32daa86df37af7ae",
+  "readonly": true,
+  "runtime_or_client_constructed": false,
+  "bridge_init_called": false,
+  "sql_connection_seam": "URI mode=ro plus query_only and explicit read transaction; same production method bodies",
+  "pending_dataset_groups": 8,
+  "pending_rows": 711,
+  "measurements": [
+    {
+      "step": "jsonl-exact-enumeration",
+      "wall_seconds": 17.108999999938533,
+      "cpu_seconds": 16.421875,
+      "value": {
+        "eligible_candidates": 0,
+        "relative_name_sequence_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "step": "outbox-exact-retired-summary",
+      "wall_seconds": 0.06299999996554106,
+      "cpu_seconds": 0.0625,
+      "value": {
+        "total": 0,
+        "dataset_count": 0,
+        "truncated": false
+      }
+    },
+    {
+      "step": "outbox-exact-pending",
+      "wall_seconds": 0.2970000000204891,
+      "cpu_seconds": 0.3125,
+      "value": {
+        "rows": 711,
+        "dataset_count": 8
+      }
+    }
+  ],
+  "source_sha256": {
+    "catalog/common/data_loading.py": "29ae33fdcbade6869b912b8d80b082261a94d5f54993f2e801e3c2c142b1472f",
+    "catalog/federation/outbox.py": "f1da73f650164a9a42fdce2aa2ebd8516541de7e803495b1a191939e24856ea7",
+    "catalog/flask_app/services/_federated_jsonl_product_bridge_impl.py": "665ba44ea731adf2df7f86c3951e01b1618291b2fa5ead599360d80ceb08f211",
+    "catalog/flask_app/services/federated_jsonl_product_bridge.py": "4bb095d466c422be781ffc618c36ba26ac715cf75a245ce39c72d7f99f2c6864"
+  },
+  "physical_pass": false
+}

@@ -1,6 +1,6 @@
 # Federation v1 current release checkpoint
 
-Updated 2026-09-14T07:28Z. Active context: clean handoff + this file + live GitHub.
+Updated 2026-09-14T07:48Z. Active context: clean handoff + this file + live GitHub.
 Historical coordination is evidence only; consult it for a specific current need.
 
 ## Current source / heads
@@ -14,8 +14,9 @@ Historical coordination is evidence only; consult it for a specific current need
 - Authoritative freeze f00f1301 DONE07:00Z, SHA256
   0c5127ae2d2dc8885182f38c908dc544789f38cf3e9de69bc12d1f1e56366d25.
   Creator and both warm runtimes now f00, normal activations verified. Creator
-  ordinary resident verified. Native source f00 staged, still stopped;
-  latest seed205completed/723pending preserved. No P06 restart yet.
+  ordinary resident verified. Native source f00; one P06 startup failed and
+  observer cleanup completed. Retained outbox217completed/711pending, total928.
+  Live origin/main and trial branch still match the above heads.
 - Checkpoint branch codex/federation-v1-diagnostic-sweep-20260911.
   No full physical PASS, final tag or publication.
 
@@ -40,8 +41,10 @@ Historical coordination is evidence only; consult it for a specific current need
   P09 overall incomplete; no shared-native/container/clock fault claimed.
 
 ## Actual blockers
-- Fresh physical acceptance outstanding; P06 must prove the qualified repair
-  on the live owned fixture. No new candidate defect demonstrated this cycle.
+- Fresh physical acceptance outstanding. P06 startup failed07:31-07:32Z on f00.
+  Twelve actual ACKs disprove missing authority. One stopped-corpus exact scan
+  took17.109s/16.422sCPU to return0eligible JSONL files; other reads0.360s.
+  Credible current product defect: excluded-history scan delays required startup.
 - P01 hour, P07>=3600s and P12>=86400s NOT STARTED. Real durations required.
 - Separate real-source CF7 needs two reachable CNC sources; asked once.
 - Nitro pressure needs unchanged fresh capacity preflight after builds settle.
@@ -53,10 +56,17 @@ Historical coordination is evidence only; consult it for a specific current need
 2. P06 controls generated in pr490-p06-f00f1301-20260914; reviewed wrapper
    pr490-p06-transition-preparation/prepared-f00/invoke_f00_reviewed.py SHA256
    6e17053d18cfd811e8b354ad4835de555e3fc86484caa2dcd340bdb9fc34e503.
-   Actual config/HTTP hashes pinned; observer unchanged. Fresh Windows campaign/
-   host initialized07:17:55. Nitro native campaign registration active.
-   Next: real creator branch discovery proof -> one P06 observer -> review/send
-   real one-device trial/restore forms. Preserve45/100/600/600s and latest seed.
+   Actual config/HTTP hashes pinned; observer unchanged. Both fresh native
+   campaigns registered. Creator branch discovery verified actual trial head.
+   Observer failed supported startup at100s; normal45s sharing gate unchanged.
+   No trial/restore POST. Original supervisor restart observed; cleanup exit0.
+   Bounded creator logs: identities unchanged; response send after cleanup.
+   Bounded offline proof complete; no further diagnostics/live retry scheduled.
+   Evidence: diagnostics/physical-f00f1301/p06-first-startup-failure/.
+   Next: minimal selection-equivalent early exclusion in clean worktree
+   C:/wsl/fcp-v1-jsonl-startup-scan-20260914, branch
+   codex/federation-v1-jsonl-startup-scan. Focused red-to-green plus one readonly
+   postrepair corpus proof before PR/required exact-source qualification.
    Native pairing expected-hash correction proved12 immutable continuity checks
    plus device-to-membership match; native-only stage succeeded, no data write.
    Original creator receipt-path refusal retained; no stop replay, new resident
