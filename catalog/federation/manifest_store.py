@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import closing
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -724,6 +725,8 @@ class AuthoritativeManifestStore:
         connection: sqlite3.Connection,
         session_id: str,
         group_id: str,
+        *,
+        verified_history: tuple[AuthoritativeStorageManifest, ...] | None = None,
     ) -> AuthoritativeStorageManifest:
         head_row = connection.execute(
             """SELECT revision, manifest_hash FROM storage_manifest_heads
@@ -736,7 +739,13 @@ class AuthoritativeManifestStore:
                 "group_id",
                 "storage group has no authoritative manifest",
             )
-        history = self._history(connection, session_id, group_id)
+        # Callers may reuse a chain fully validated in this same transaction.
+        # Nothing is trusted across operations or SQLite snapshots.
+        history = (
+            self._history(connection, session_id, group_id)
+            if verified_history is None
+            else verified_history
+        )
         if not history:
             raise FederationValidationError(
                 "manifest-head-corrupt",
@@ -866,7 +875,8 @@ class AuthoritativeManifestStore:
     ) -> AuthoritativeStorageManifest:
         session_id = _text(session_id, "session_id")
         group_id = _text(group_id, "group_id")
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
+            connection.execute("BEGIN")
             return self._head(connection, session_id, group_id)
 
     def history(
@@ -876,7 +886,8 @@ class AuthoritativeManifestStore:
     ) -> tuple[AuthoritativeStorageManifest, ...]:
         session_id = _text(session_id, "session_id")
         group_id = _text(group_id, "group_id")
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
+            connection.execute("BEGIN")
             manifests = self._history(connection, session_id, group_id)
             if not manifests:
                 raise FederationValidationError(
@@ -884,7 +895,9 @@ class AuthoritativeManifestStore:
                     "group_id",
                     "storage group has no authoritative manifest",
                 )
-            self._head(connection, session_id, group_id)
+            self._head(
+                connection, session_id, group_id, verified_history=manifests
+            )
             return manifests
 
     def at_revision(
@@ -896,9 +909,12 @@ class AuthoritativeManifestStore:
         session_id = _text(session_id, "session_id")
         group_id = _text(group_id, "group_id")
         revision = _uint(revision, "revision")
-        with self._connect() as connection:
-            self._head(connection, session_id, group_id)
+        with closing(self._connect()) as connection, connection:
+            connection.execute("BEGIN")
             history = self._history(connection, session_id, group_id)
+            self._head(
+                connection, session_id, group_id, verified_history=history
+            )
             if revision >= len(history):
                 raise FederationValidationError(
                     "manifest-revision-not-found",
