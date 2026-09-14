@@ -1,0 +1,42 @@
+{
+  "baseline": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "candidate": "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d",
+  "exit_code": 2,
+  "decision": "ALL_FRESH_NO_CARRY",
+  "report": {
+    "carry_forward_scenarios": [],
+    "changed_paths": [
+      "catalog/federation/manifest_store.py",
+      "catalog/federation/phase_d_control.py",
+      "catalog/federation/tests/test_manifest_read_snapshot.py"
+    ],
+    "impacted_scenarios": [
+      "physical.fresh-windows-checkout",
+      "physical.fresh-linux-checkout",
+      "physical.multi-host-relay-and-network-path",
+      "physical.mtconnect-recorder-source",
+      "physical.ollama-model-and-accelerator",
+      "physical.mobile-and-desktop-browser-review",
+      "physical.recorder-plus-ai-simultaneous-contribution",
+      "physical.separate-ai-compute-storage-contributors",
+      "physical.benchmark-expiry-and-rerun",
+      "physical.contribution-disable-and-reenable",
+      "physical.restart-and-reconciliation",
+      "physical.revocation-and-controlled-rejoin"
+    ],
+    "safe": false,
+    "schema": "fcp.cf7.physical-revalidation-plan.v1",
+    "unknown_paths": [
+      "catalog/federation/manifest_store.py",
+      "catalog/federation/phase_d_control.py"
+    ]
+  },
+  "policy_source_sha256": {
+    "catalog/federation/tests/cf7_acceptance/physical_revalidation.py": "0e7a4708f2efb71e6c44f6fe1d81e953b0ca816b3938a72adb7067b105ee676f",
+    "catalog/federation/tests/cf7_acceptance/physical_impact_map.json": "5debad4c7b9cb4520966b8e812ffb35fce6c8cdaee0571a25ded642b5b93c96e",
+    "catalog/federation/tests/cf7_acceptance/physical_evidence.py": "337f679e4c46bf4a4906202d0e72128dacfad4db81bb990711acfcfcc3a7af85"
+  },
+  "physical_evidence_carried": 0,
+  "stdout_sha256": "153e0e1632e792728d958b69737c46bded2e2d898d5712f3952947cedd5b59ab",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

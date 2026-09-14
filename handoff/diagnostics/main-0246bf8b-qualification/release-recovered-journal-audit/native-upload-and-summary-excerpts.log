@@ -1,0 +1,3 @@
+2026-09-14T04:04:09.4836963Z 297 passed, 1 skipped, 1 warning in 373.52s (0:06:13)
+2026-09-14T04:04:12.0837017Z SHA256 digest of uploaded artifact zip is 0181531b4d10136f5d04c62c4022a637c62dcb13a74fdc937dc4a228bd970469
+2026-09-14T04:04:12.4013446Z Artifact windows-regression-journal-artifacts has been successfully uploaded! Final size is 6987 bytes. Artifact ID is 10332252187

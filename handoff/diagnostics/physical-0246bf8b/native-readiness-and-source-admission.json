@@ -1,0 +1,112 @@
+{
+  "candidate": "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d",
+  "recorded_at": "2026-09-14T04:24:53.317263+00:00",
+  "freeze_sha256": "c8fd12588a527b795209b13f841d3378836f42cc5d4a429acffff74044bc5a77",
+  "qualification_sha256": "6c0366cd9721a02996d8930ea3ac733b3e6d4545490fa4e49baec9ac2c9e76bd",
+  "native_readiness": {
+    "nettking": {
+      "status": "COMPLETED",
+      "candidate": "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d",
+      "raw_status_sha256": "f9cd70ab4b97c32085274f781caf1aecdfc287b1be02fbe740688adf3c91ee7b",
+      "started_at": "2026-09-14T04:09:15.277549+00:00",
+      "finished_at": "2026-09-14T04:11:15.036554+00:00",
+      "python_version": "Python 3.12.10",
+      "gate_checks": [
+        {
+          "duration_seconds": 71.344,
+          "name": "cf7-acceptance",
+          "passed": true,
+          "returncode": 0
+        },
+        {
+          "duration_seconds": 44.109,
+          "name": "capability-routes",
+          "passed": true,
+          "returncode": 0
+        },
+        {
+          "duration_seconds": 0.375,
+          "name": "compose-config",
+          "passed": true,
+          "returncode": 0
+        },
+        {
+          "duration_seconds": 0.047,
+          "name": "diff-hygiene",
+          "passed": true,
+          "returncode": 0
+        }
+      ]
+    },
+    "nitro": {
+      "status": "COMPLETED",
+      "candidate": "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d",
+      "raw_status_sha256": "32f83d2ccec92d40d0150d57091382c29655e4a9f838eaa220aaff40edeb7333",
+      "started_at": "2026-09-14T04:12:13.046660+00:00",
+      "finished_at": "2026-09-14T04:18:21.057458+00:00",
+      "python_version": "Python 3.12.13",
+      "gate_checks": [
+        {
+          "name": "cf7-acceptance",
+          "duration_seconds": 180.257,
+          "passed": true,
+          "returncode": 0
+        },
+        {
+          "name": "capability-routes",
+          "duration_seconds": 164.071,
+          "passed": true,
+          "returncode": 0
+        },
+        {
+          "name": "compose-config",
+          "duration_seconds": 1.275,
+          "passed": true,
+          "returncode": 0
+        },
+        {
+          "name": "diff-hygiene",
+          "duration_seconds": 0.005,
+          "passed": true,
+          "returncode": 0
+        }
+      ],
+      "verification": "Existing run exit0 plus read-nitro-result.py exact source/status/gate assertions on retained remote raw receipt."
+    }
+  },
+  "native_source_admission": {
+    "raw_status_sha256": "1986f4f5c6ddf4eb962b0dd714fc7beab34b274aabde4c89fe3b78083ebb4192",
+    "receipt": {
+      "candidate": "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d",
+      "source_baseline": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+      "runtime_baseline": null,
+      "role": "native",
+      "status": "SOURCE_PREPARED",
+      "started_at": "2026-09-14T04:21:40.975348+00:00",
+      "physical_pass": false,
+      "protected_data_accessed": false,
+      "freeze_sha256": "c8fd12588a527b795209b13f841d3378836f42cc5d4a429acffff74044bc5a77",
+      "qualification_sha256": "6c0366cd9721a02996d8930ea3ac733b3e6d4545490fa4e49baec9ac2c9e76bd",
+      "readiness_sha256": "f9cd70ab4b97c32085274f781caf1aecdfc287b1be02fbe740688adf3c91ee7b",
+      "clean_main_checkout": true,
+      "membership_unchanged_in_place": true,
+      "native_runtime_started": false,
+      "campaign_initialized": false,
+      "origin_main_verified": true,
+      "retained_software_trial_ref_verified": true,
+      "binding_sha256": "02c9f03b1aeb7d0160d63657685e85f3852b143c4bf094dd87374d849ed55f27"
+    }
+  },
+  "fresh_campaign_initialized_at": "2026-09-14T04:22:42.396147Z",
+  "registered_host": {
+    "host": "nettking",
+    "profile": "local-ai",
+    "role": "local-ai",
+    "os": "windows"
+  },
+  "physical_pass": false,
+  "physical_evidence_carried": 0,
+  "P07_started": false,
+  "P12_started": false,
+  "protected_data_accessed": false
+}

@@ -1,0 +1,8 @@
+{
+  "baseline": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "candidate": "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d",
+  "exit_code": 2,
+  "stdout_sha256": "153e0e1632e792728d958b69737c46bded2e2d898d5712f3952947cedd5b59ab",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "disposition_not_yet_applied": true
+}

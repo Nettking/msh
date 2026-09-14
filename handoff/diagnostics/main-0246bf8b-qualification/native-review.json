@@ -1,0 +1,422 @@
+{
+  "api_head": "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d",
+  "records": [
+    {
+      "bytes": 58133,
+      "checkout_commits": [
+        "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d"
+      ],
+      "checkout_matches": true,
+      "conclusion": "success",
+      "job_id": 103839980780,
+      "name": "harness (Linux, fcp-linux-fast, bash)",
+      "run_id": 34799800037,
+      "runner": "Nettking-Linux",
+      "sha256": "1f3f80c71ffd132c41e8dbc486cdb04b7a2ec3ed4a759ff16a3077457b99652c",
+      "workflow": "cf7-acceptance-harness.yml"
+    },
+    {
+      "bytes": 63435,
+      "checkout_commits": [
+        "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d"
+      ],
+      "checkout_matches": true,
+      "conclusion": "success",
+      "job_id": 103839980997,
+      "name": "harness (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Byp...",
+      "run_id": 34799800037,
+      "runner": "Nettking",
+      "sha256": "6adf2404d170c252bafbfb1416423060f2bbfa0dfbacb702c7eeca6623c8bec2",
+      "workflow": "cf7-acceptance-harness.yml"
+    },
+    {
+      "bytes": 70814,
+      "checkout_commits": [
+        "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d"
+      ],
+      "checkout_matches": true,
+      "conclusion": "success",
+      "job_id": 103839826271,
+      "name": "acceptance (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy ...",
+      "run_id": 34799746776,
+      "runner": "Beast",
+      "sha256": "d88da4c54597bd09866ea98fce994612604057bff5ca2022fffb26e5539aadcc",
+      "workflow": "cf7b-product-physical-acceptance.yml"
+    },
+    {
+      "bytes": 70254,
+      "checkout_commits": [
+        "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d"
+      ],
+      "checkout_matches": true,
+      "conclusion": "success",
+      "job_id": 103839826413,
+      "name": "acceptance (Linux, fcp-linux-fast, bash)",
+      "run_id": 34799746776,
+      "runner": "Nettking-Linux",
+      "sha256": "3e24da7610ecd89400b9c0e77933be4a1fa1aba80557bb6833a0f3445c9aca72",
+      "workflow": "cf7b-product-physical-acceptance.yml"
+    },
+    {
+      "bytes": 63375,
+      "checkout_commits": [
+        "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d"
+      ],
+      "checkout_matches": true,
+      "conclusion": "success",
+      "job_id": 103839826251,
+      "name": "update-contracts (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -ExecutionP...",
+      "run_id": 34799746763,
+      "runner": "Nettking",
+      "sha256": "85863a707b0da843bf75d3492a2697c915adfffcc367f3b9edc425b0f3dfaaae",
+      "workflow": "federation-software-update.yml"
+    },
+    {
+      "bytes": 50680,
+      "checkout_commits": [
+        "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d"
+      ],
+      "checkout_matches": true,
+      "conclusion": "success",
+      "job_id": 103839826312,
+      "name": "update-contracts (Linux, fcp-linux-fast, bash)",
+      "run_id": 34799746763,
+      "runner": "Beast-Linux-WSL",
+      "sha256": "33525c8c657372eb02e9b7329ca542f84c04042545980bdd9f7b7e40ce7b2e25",
+      "workflow": "federation-software-update.yml"
+    },
+    {
+      "bytes": 53786,
+      "checkout_commits": [
+        "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d"
+      ],
+      "checkout_matches": true,
+      "conclusion": "success",
+      "job_id": 103852728513,
+      "name": "Windows regressions (journal-artifacts)",
+      "run_id": 34799746727,
+      "runner": "Nettking",
+      "sha256": "1bb74ba3a6ff335effc6c02525f0a8f3960d7eb2ee85b01df6cfa0fc0e99ee09",
+      "workflow": "federation-v1-release.yml"
+    },
+    {
+      "bytes": 43448,
+      "checkout_commits": [
+        "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d"
+      ],
+      "checkout_matches": true,
+      "conclusion": "success",
+      "job_id": 103852729002,
+      "name": "PostgreSQL storage release check",
+      "run_id": 34799746727,
+      "runner": "Nettking-Linux",
+      "sha256": "657e9accb27c83c4590c723d407572f099fe85203c0e6ed2bec70a0764739363",
+      "workflow": "federation-v1-release.yml"
+    },
+    {
+      "bytes": 64293,
+      "checkout_commits": [
+        "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d"
+      ],
+      "checkout_matches": true,
+      "conclusion": "success",
+      "job_id": 103852729184,
+      "name": "Linux regression shard (1)",
+      "run_id": 34799746727,
+      "runner": "Nettking-Linux",
+      "sha256": "697beda4929a03ca8fba838ec68ce1c0dd73f07640a4770dd6720ed6f8b16acb",
+      "workflow": "federation-v1-release.yml"
+    },
+    {
+      "bytes": 54110,
+      "checkout_commits": [
+        "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d"
+      ],
+      "checkout_matches": true,
+      "conclusion": "success",
+      "job_id": 103852729489,
+      "name": "Windows regressions (transport-storage)",
+      "run_id": 34799746727,
+      "runner": "Beast",
+      "sha256": "8225d2790530d5c08ec80bd849f60465c90dab206f24c92f86f3c6f696db848b",
+      "workflow": "federation-v1-release.yml"
+    },
+    {
+      "bytes": 57026,
+      "checkout_commits": [
+        "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d"
+      ],
+      "checkout_matches": true,
+      "conclusion": "success",
+      "job_id": 103852729657,
+      "name": "Release checks (Windows)",
+      "run_id": 34799746727,
+      "runner": "Beast",
+      "sha256": "0f478b39f9504485a32a15e08df302f7bc2f15bbdf4a52f85913f0960a995e7a",
+      "workflow": "federation-v1-release.yml"
+    },
+    {
+      "bytes": 1101,
+      "checkout_commits": [],
+      "checkout_matches": null,
+      "conclusion": "success",
+      "job_id": 103852730000,
+      "name": "Clean-checkout suite order independence",
+      "run_id": 34799746727,
+      "runner": "Nettking-Linux",
+      "sha256": "5409f462a88444e5282ee993643d390807b879ffb8b4972627419fe8dd359e5a",
+      "workflow": "federation-v1-release.yml"
+    },
+    {
+      "bytes": 57651,
+      "checkout_commits": [
+        "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d"
+      ],
+      "checkout_matches": true,
+      "conclusion": "success",
+      "job_id": 103852745165,
+      "name": "Linux regression shard (3)",
+      "run_id": 34799746727,
+      "runner": "Nettking-Linux",
+      "sha256": "fca351101be54b70705217dbe0b22fa111f9e151a9e95bae7e5af6d749aec02b",
+      "workflow": "federation-v1-release.yml"
+    },
+    {
+      "bytes": 70114,
+      "checkout_commits": [
+        "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d"
+      ],
+      "checkout_matches": true,
+      "conclusion": "success",
+      "job_id": 103852745299,
+      "name": "Full-suite order (fixed)",
+      "run_id": 34799746727,
+      "runner": "Nettking-Linux",
+      "sha256": "ab4003e38100b39c3670badf9ee675662df3f9053333d3dea6608a354dc92f02",
+      "workflow": "federation-v1-release.yml"
+    },
+    {
+      "bytes": 53647,
+      "checkout_commits": [
+        "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d"
+      ],
+      "checkout_matches": true,
+      "conclusion": "success",
+      "job_id": 103852745498,
+      "name": "Linux regression shard (0)",
+      "run_id": 34799746727,
+      "runner": "Nettking-Linux",
+      "sha256": "bc645a34035aae332e39ad854a679019222e98670348b120b3924fcce1744c24",
+      "workflow": "federation-v1-release.yml"
+    },
+    {
+      "bytes": 62262,
+      "checkout_commits": [
+        "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d"
+      ],
+      "checkout_matches": true,
+      "conclusion": "success",
+      "job_id": 103852747731,
+      "name": "Linux regression shard (2)",
+      "run_id": 34799746727,
+      "runner": "Nettking-Linux",
+      "sha256": "fbd2699df5a37b529f4ec865b97e70f5c2473402faa03b14f6ad8a6e4bb7a147",
+      "workflow": "federation-v1-release.yml"
+    },
+    {
+      "bytes": 60863,
+      "checkout_commits": [
+        "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d"
+      ],
+      "checkout_matches": true,
+      "conclusion": "success",
+      "job_id": 103852749267,
+      "name": "Windows regressions (capability-product)",
+      "run_id": 34799746727,
+      "runner": "Beast",
+      "sha256": "c5dce7d63da7ed4c009a3abb6545be6d0c37f186d6ac44d4caccf56ee5e39416",
+      "workflow": "federation-v1-release.yml"
+    },
+    {
+      "bytes": 56979,
+      "checkout_commits": [
+        "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d"
+      ],
+      "checkout_matches": true,
+      "conclusion": "success",
+      "job_id": 103852751082,
+      "name": "Release checks (Linux)",
+      "run_id": 34799746727,
+      "runner": "Nettking-Linux",
+      "sha256": "c19549efc11f77f86ef77473ae6d77fde3752cdd828dba165b7035f47afa2b65",
+      "workflow": "federation-v1-release.yml"
+    },
+    {
+      "bytes": 70086,
+      "checkout_commits": [
+        "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d"
+      ],
+      "checkout_matches": true,
+      "conclusion": "success",
+      "job_id": 103852756670,
+      "name": "Full-suite order (rotating)",
+      "run_id": 34799746727,
+      "runner": "Nettking-Linux",
+      "sha256": "4c22d909e4e44d56d39571458563bac8f60be5158e9648abbec52541c4cbe156",
+      "workflow": "federation-v1-release.yml"
+    },
+    {
+      "bytes": 19235,
+      "checkout_commits": [
+        "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d"
+      ],
+      "checkout_matches": true,
+      "conclusion": "success",
+      "job_id": 103854199153,
+      "name": "Release matrix (Linux)",
+      "run_id": 34799746727,
+      "runner": "Nettking-Linux",
+      "sha256": "b9d424337d4901e95a33f190f3e96697e643697d86d334928ebbb77d6f932aaa",
+      "workflow": "federation-v1-release.yml"
+    },
+    {
+      "bytes": 15395,
+      "checkout_commits": [
+        "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d"
+      ],
+      "checkout_matches": true,
+      "conclusion": "success",
+      "job_id": 103854199177,
+      "name": "Release matrix (Windows)",
+      "run_id": 34799746727,
+      "runner": "Nettking-Linux",
+      "sha256": "e014e4104324566cf1618cc8abf5929f6be00612080eb1d909ffad81fc87ccdb",
+      "workflow": "federation-v1-release.yml"
+    },
+    {
+      "bytes": 1189,
+      "checkout_commits": [],
+      "checkout_matches": null,
+      "conclusion": "success",
+      "job_id": 103854264408,
+      "name": "Federation v1 automated release verdict",
+      "run_id": 34799746727,
+      "runner": "Nettking-Linux",
+      "sha256": "1a9a355fc06f2ed68098cd09211ace73a948162ea822462086681a5d96ee102a",
+      "workflow": "federation-v1-release.yml"
+    },
+    {
+      "bytes": 54155,
+      "checkout_commits": [
+        "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d"
+      ],
+      "checkout_matches": true,
+      "conclusion": "success",
+      "job_id": 103839826200,
+      "name": "reviewer-entrypoint (Windows, fcp-windows, powershell -NoLogo -NoProfile -NonInteractive -Executi...",
+      "run_id": 34799746741,
+      "runner": "Nettking",
+      "sha256": "afc1450448b866a80fc79d16b0b3b10dc0f57b2e0cd496f7ad5f158965cf99f6",
+      "workflow": "icse-tool-demo.yml"
+    },
+    {
+      "bytes": 26305,
+      "checkout_commits": [
+        "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d"
+      ],
+      "checkout_matches": true,
+      "conclusion": "success",
+      "job_id": 103839826318,
+      "name": "reviewer-compose",
+      "run_id": 34799746741,
+      "runner": "Nettking-Linux",
+      "sha256": "ffaef06eacdbb395875b2095c4e9080452688b8188fe272cdc974694a079aa74",
+      "workflow": "icse-tool-demo.yml"
+    },
+    {
+      "bytes": 49108,
+      "checkout_commits": [
+        "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d"
+      ],
+      "checkout_matches": true,
+      "conclusion": "success",
+      "job_id": 103839826336,
+      "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
+      "run_id": 34799746741,
+      "runner": "Nettking-Linux",
+      "sha256": "86bc3b8e19a556c938f8b021cf69c2c1ea11c6d8a970127b3504f957874ff254",
+      "workflow": "icse-tool-demo.yml"
+    },
+    {
+      "bytes": 26515,
+      "checkout_commits": [
+        "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d"
+      ],
+      "checkout_matches": true,
+      "conclusion": "success",
+      "job_id": 103840490929,
+      "name": "publication-bundle",
+      "run_id": 34799746741,
+      "runner": "Beast-Linux-WSL",
+      "sha256": "3b41eed854a5f49e92cce1d60cf83ed92b0371877a1e82d17adf4719c7c33b1b",
+      "workflow": "icse-tool-demo.yml"
+    },
+    {
+      "bytes": 192157,
+      "checkout_commits": [
+        "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d"
+      ],
+      "checkout_matches": true,
+      "conclusion": "success",
+      "job_id": 103842701735,
+      "name": "linux",
+      "run_id": 34799746714,
+      "runner": "Beast-Linux-WSL",
+      "sha256": "3833cef4da55bcf58b0f5a073db25ab0afbebd35a81d783a1bc866096fc76ac3",
+      "workflow": "phase2-federation.yml"
+    },
+    {
+      "bytes": 48422,
+      "checkout_commits": [
+        "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d"
+      ],
+      "checkout_matches": true,
+      "conclusion": "success",
+      "job_id": 103842702658,
+      "name": "windows",
+      "run_id": 34799746714,
+      "runner": "Nettking",
+      "sha256": "c45be6bf3730a3071e0a80d16d209ff41cadd14cacd8abc08b456f296b284e49",
+      "workflow": "phase2-federation.yml"
+    },
+    {
+      "bytes": 11272,
+      "checkout_commits": [
+        "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d"
+      ],
+      "checkout_matches": true,
+      "conclusion": "success",
+      "job_id": 103839826026,
+      "name": "product-branding",
+      "run_id": 34799746756,
+      "runner": "Nettking-Linux",
+      "sha256": "2839fffac46bcb21cf925b15dfb182b2e711d932bf013aefe9e250341a87237b",
+      "workflow": "product-branding.yml"
+    },
+    {
+      "bytes": 12988,
+      "checkout_commits": [
+        "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d"
+      ],
+      "checkout_matches": true,
+      "conclusion": "success",
+      "job_id": 103839985567,
+      "name": "Verify immutable release image metadata",
+      "run_id": 34799801591,
+      "runner": "Beast-Linux-WSL",
+      "sha256": "15a9e98180b8a34673a99bbb55f75e0308d5ebd02d271eafa3d1603978dec5bb",
+      "workflow": "release-image-metadata.yml"
+    }
+  ],
+  "source_commit": "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d"
+}

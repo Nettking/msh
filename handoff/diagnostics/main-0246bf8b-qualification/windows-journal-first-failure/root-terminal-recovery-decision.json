@@ -1,0 +1,42 @@
+{
+  "status": "TERMINAL_FAILED_SET_REVIEWED_ONE_RECOVERY",
+  "source": "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d",
+  "run_id": 34799746727,
+  "original_attempt": 1,
+  "failed_job_ids": [
+    103839826327,
+    103847065417,
+    103847065435,
+    103847133706
+  ],
+  "green_jobs_to_reuse": [
+    103839826160,
+    103839826238,
+    103839826245,
+    103839826282,
+    103839826291,
+    103839826299,
+    103839826322,
+    103839826331,
+    103839826359,
+    103839826379,
+    103839826418,
+    103845673471
+  ],
+  "disposition_sha256": "3b27bd81c9a07e92f6cc9261eaa7c97cbea2de890f861a1c2a7a67f97d4466e3",
+  "root_plan_sha256": "d63106f28df938da42425f41bf14ad67e343f09ddb7fda1b934d52851b41417e",
+  "terminal_retention_sha256": "7f04496a5daf0853daef18867141934a1e97340947a6a69c1899a879e1e6aae9",
+  "failed_native_log_sha256": {
+    "103839826327": "a1d98d57503488a84447a6e4754e8b95b1c7f3c24f8aca3d7815890e8c1b150f",
+    "103847065417": "432200774e4bed8b9cc91e2a7485060d2399af3bbc48459cfc0af29866b2f48f",
+    "103847065435": "e41b67e78c064908fd4aa5a79da01a377a151aee0a801c215ac1c87d6a266db4",
+    "103847133706": "9e29a2de9d881b25402c7455536369cd51d8e5a10e1aefe0c2ce79dabd697275"
+  },
+  "dependent_gate_review": "Both matrices stop on WINDOWS=failure before checkout/coverage. Verdict stops on failed matrix dependency. Independent review confirms no additional tests executed in these three jobs.",
+  "original_evidence_retained": true,
+  "maximum_failed_only_requests_for_this_run": 1,
+  "whole_ci_rerun": false,
+  "source_assertions_quorum_deadlines_security_unchanged": true,
+  "physical_acceptance": "NOT_EVALUATED",
+  "recorded_at": "2026-09-14T03:55:04.556347+00:00"
+}

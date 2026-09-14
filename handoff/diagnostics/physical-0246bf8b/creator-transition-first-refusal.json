@@ -1,0 +1,17 @@
+{
+  "candidate": "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d",
+  "status": "REFUSED_BEFORE_PROCESS_OR_RUNTIME_ACTION",
+  "classification": "deterministic harness defect",
+  "finding": "The owned-agent guard rejected the persistent native Windows console-host child as an active operation before opening termination handles. The exact original public agent and runner remained unchanged.",
+  "original_wrapper_sha256": "c6cc2f7db88e4b7238149ba34b58e97025e08bf8a0774a2a07a61a906a8f5358",
+  "original_boundary_sha256": "7266f5e3251274b017922ae6d0918934088ea8ca64d34f93be734d5706977655",
+  "process_boundary_receipt_sha256": "d5841c8520b12ada1975eb80318516cb4fba28696e863fcf045f8cc0307ad038",
+  "exact_console_identity_evidence_sha256": "73546aaa6c912d60aa56a1c73a8bae17b8012faae09f304767f0bb5b327f0933",
+  "private_evidence_directory": ".acceptance/postrepair-agent-transition-preparation/quiescence-0246",
+  "next_action": "Review a narrowly pinned console-child allowance, retaining process identity checks and the original two termination targets. No generic console exemption or added termination target.",
+  "candidate_source_changed": false,
+  "processes_terminated": 0,
+  "runtime_or_data_modified": false,
+  "physical_pass": false,
+  "release_decision_changed": false
+}

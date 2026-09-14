@@ -1,0 +1,23 @@
+{
+  "candidate_sha": "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d",
+  "tree": "1e12bfc70c0bc7feecf85ed15a369e2f85bba4ce",
+  "state": "AUTHORITATIVE_FROZEN_CANDIDATE",
+  "actual_main_verified": true,
+  "frozen_at": "2026-09-14T04:08:05.103276+00:00",
+  "required_release_gate_jobs_passed": 16,
+  "all_release_contracts_satisfied": true,
+  "icse_jobs_passed": 4,
+  "native_checkout_proofs": 28,
+  "qualification_sha256": "6c0366cd9721a02996d8930ea3ac733b3e6d4545490fa4e49baec9ac2c9e76bd",
+  "qualification": "main-0246bf8b-qualification/qualification.json",
+  "physical_revalidation": "physical-0246bf8b/revalidation-from-48154445.json",
+  "physical_revalidation_sha256": "256bc8f2d2f7ab92ba772f39965330bf31c4ba852112f391b0a60dab978d33b6",
+  "physical_revalidation_decision": "ALL_FRESH_NO_CARRY",
+  "supersedes_blocked_candidate": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "reason": "PR489 repairs demonstrated aged manifest-history startup cost without skipping integrity validation.",
+  "physical_acceptance": "NOT_PASSED",
+  "P07": "NOT_STARTED",
+  "P12": "NOT_STARTED",
+  "protected_recorder_data": "UNTOUCHED",
+  "tag_or_publication_created": false
+}

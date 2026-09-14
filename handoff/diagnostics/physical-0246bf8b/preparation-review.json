@@ -4,6 +4,15 @@
   "source_qualified_or_frozen_by_this_receipt": false,
   "general_preparation": ".acceptance/postrepair-general-preparation/READY.md",
   "generation_sha256": "a97e5ac025aa521a25c31c30149415658cc178bb9f42c535ef55b561027d27fa",
+  "creator_agent_transition": {
+    "preparation": ".acceptance/postrepair-agent-transition-preparation",
+    "wrapper_sha256": "c6cc2f7db88e4b7238149ba34b58e97025e08bf8a0774a2a07a61a906a8f5358",
+    "boundary_sha256": "7266f5e3251274b017922ae6d0918934088ea8ca64d34f93be734d5706977655",
+    "independent_review_sha256": "595a675f9227d747a1edbc28de7d3d6f99e7c3c5a059244b7db3adf9693d40c6",
+    "review_result": "No blockers; exact owned process handles, full executable and parsed argument paths, current creation and parent identities, pending-work fences and admitted activation interval verified.",
+    "root_review": "Root read the corrected wrapper and boundary; quiescence retains the unchanged host lease and exact original pair. Normal supported startup restores the agent; no competing launcher is required.",
+    "executed": false
+  },
   "p01_ordering": {
     "root_review": "The checked P01 contract requires real failed-build cleanup and bounded growth without requiring an earlier passive hour. The corrected paired controls perform the build failure while the hour is unarmed and unattempted; the fresh hour requires the actual exact-candidate cleanup PASS, stopped owned writer and unchanged core containers. Root reviewed the ordering diff, producer fields, new guards and checked campaign contract.",
     "review_sha256": "7e11c7c816e7b1747ffe1d8c413579f3282d0ad4c8f1ac80a0e9148a359d0687",

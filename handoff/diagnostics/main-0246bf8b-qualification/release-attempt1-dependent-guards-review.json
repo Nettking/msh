@@ -1,0 +1,137 @@
+{
+  "status": "TERMINAL_FAILED_SET_REVIEWED",
+  "source": "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d",
+  "tree": "1e12bfc70c0bc7feecf85ed15a369e2f85bba4ce",
+  "run_id": 34799746727,
+  "attempt": 1,
+  "run_status": "completed",
+  "run_conclusion": "failure",
+  "job_count": 16,
+  "success_count": 12,
+  "failure_count": 4,
+  "last_job_completed_at": "2026-09-14T03:20:26Z",
+  "full_failed_job_ids": [
+    103839826327,
+    103847065417,
+    103847065435,
+    103847133706
+  ],
+  "retention_receipt_sha256": "7f04496a5daf0853daef18867141934a1e97340947a6a69c1899a879e1e6aae9",
+  "workflow_source_sha256": "9b3bb7daa6dae152fcf9569a5db689f77028fb7ab9f20eb0e0a9fef60f689d21",
+  "workflow_worktree_sha256": "5d75a25b8faaad9802c17bc828dc0b17d91a1d9ba3e95b904a2c7950e3aaced7",
+  "workflow_crlf_normalized_content_matches_git_blob": true,
+  "new_dependent_failures": [
+    {
+      "job_id": 103847065417,
+      "name": "Release matrix (Windows)",
+      "started_at": "2026-09-14T03:20:05Z",
+      "completed_at": "2026-09-14T03:20:11Z",
+      "conclusion": "failure",
+      "native_log_sha256": "432200774e4bed8b9cc91e2a7485060d2399af3bbc48459cfc0af29866b2f48f",
+      "native_log_bytes": 1701,
+      "failed_step": "Require release checks and every regression shard",
+      "dependency_results": {
+        "release-checks": "success",
+        "linux-regressions": "success",
+        "windows-regressions": "failure"
+      },
+      "exit_code": 1,
+      "workflow_source_lines": {
+        "start_line": 449,
+        "guard_start_line": 460,
+        "guard_end_line": 468,
+        "checkout_line": 469,
+        "coverage_step_line": 475
+      },
+      "checkout_executed": false,
+      "tests_executed": false,
+      "coverage_verification_executed": false,
+      "subsequent_source_or_coverage_steps_not_reached": [
+        "candidate checkout",
+        "shard artifact download",
+        "exact complete Linux coverage verification"
+      ],
+      "classification": "DETERMINISTIC_DEPENDENCY_GUARD_FAILURE",
+      "new_executed_test_defect": false,
+      "actual_runner_os": "Linux"
+    },
+    {
+      "job_id": 103847065435,
+      "name": "Release matrix (Linux)",
+      "started_at": "2026-09-14T03:20:13Z",
+      "completed_at": "2026-09-14T03:20:19Z",
+      "conclusion": "failure",
+      "native_log_sha256": "e41b67e78c064908fd4aa5a79da01a377a151aee0a801c215ac1c87d6a266db4",
+      "native_log_bytes": 1699,
+      "failed_step": "Require release checks and every regression shard",
+      "dependency_results": {
+        "release-checks": "success",
+        "linux-regressions": "success",
+        "windows-regressions": "failure"
+      },
+      "exit_code": 1,
+      "workflow_source_lines": {
+        "start_line": 449,
+        "guard_start_line": 460,
+        "guard_end_line": 468,
+        "checkout_line": 469,
+        "coverage_step_line": 475
+      },
+      "checkout_executed": false,
+      "tests_executed": false,
+      "coverage_verification_executed": false,
+      "subsequent_source_or_coverage_steps_not_reached": [
+        "candidate checkout",
+        "shard artifact download",
+        "exact complete Linux coverage verification"
+      ],
+      "classification": "DETERMINISTIC_DEPENDENCY_GUARD_FAILURE",
+      "new_executed_test_defect": false,
+      "actual_runner_os": "Linux"
+    },
+    {
+      "job_id": 103847133706,
+      "name": "Federation v1 automated release verdict",
+      "started_at": "2026-09-14T03:20:21Z",
+      "completed_at": "2026-09-14T03:20:26Z",
+      "conclusion": "failure",
+      "native_log_sha256": "9e29a2de9d881b25402c7455536369cd51d8e5a10e1aefe0c2ce79dabd697275",
+      "native_log_bytes": 1263,
+      "failed_step": "Require every automated release job",
+      "dependency_results": {
+        "release-matrix": "failure",
+        "postgres-storage": "success",
+        "suite-order-independence": "success"
+      },
+      "exit_code": 1,
+      "workflow_source_lines": {
+        "start_line": 491,
+        "guard_start_line": 501,
+        "guard_end_line": 506
+      },
+      "checkout_executed": false,
+      "tests_executed": false,
+      "coverage_verification_executed": false,
+      "subsequent_source_or_coverage_steps_not_reached": [],
+      "classification": "DETERMINISTIC_DEPENDENCY_GUARD_FAILURE",
+      "new_executed_test_defect": false,
+      "actual_runner_os": "Linux"
+    }
+  ],
+  "previous_primary_failure": {
+    "job_id": 103839826327,
+    "disposition_sha256": "3b27bd81c9a07e92f6cc9261eaa7c97cbea2de890f861a1c2a7a67f97d4466e3",
+    "classification": "UNRESOLVED_NON_DEMONSTRATED_CANDIDATE_DEFECT",
+    "independently_reopened": false
+  },
+  "source_provenance": "Retained workflow API head and exact local candidate workflow; these guards fail before checkout, so no native checkout proof is claimed for them.",
+  "release_decision": "No new executed-test defect. Full failed set is the reviewed Windows journal failure and three expected dependent guards.",
+  "bounded_failed_only_recovery_eligible": true,
+  "eligibility_scope": "One root-owned failed-only recovery of this terminal run, conditional on root accepting the existing primary-failure disposition and rechecking current source/attempt. No full rerun or source/contract change.",
+  "recovery_dispatched": false,
+  "API_calls": 0,
+  "source_or_runtime_mutated": false,
+  "tests_run_by_review": 0,
+  "qualification_pass_claimed": false,
+  "physical_acceptance": "NOT_EVALUATED"
+}
