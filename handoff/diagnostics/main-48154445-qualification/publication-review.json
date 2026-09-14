@@ -1,0 +1,20 @@
+{
+  "all_manifest_digests_valid": true,
+  "api_artifact_sha256": "a3e879932276da2c78c27ac6e61879f3c13f76830f657ddf9a00dacb9c91483c",
+  "archive_conversion": "Explicit verification-only core.autocrlf=false, core.eol=lf",
+  "artifact_id": 10327532233,
+  "component_executions_passed": [
+    "Linux",
+    "Windows",
+    "compose"
+  ],
+  "network_executions_10_of_10_passed": [
+    "Linux",
+    "Windows"
+  ],
+  "physical_acceptance": "NOT_EVALUATED",
+  "publication_archive_sha256": "2d689d534cf7ef574b99560d16a062de547b9692a6d41ffaca8df2b7e0078cb7",
+  "source": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "source_equals_exact_git_archive": true,
+  "source_files": 1411
+}

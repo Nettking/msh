@@ -1,7 +1,7 @@
 {
-  "files_reviewed": 2,
-  "characters_scanned": 19711,
+  "files_reviewed": 30,
+  "characters_scanned": 12696429,
   "high_confidence_secret_or_tailnet_findings": [],
-  "reviewed_checked_in_test_parameter_occurrences": 0,
+  "reviewed_checked_in_test_parameter_occurrences": 9,
   "fixture_source": "1aac6148759d7b2fd488ec26b97e1a786bdafa80:catalog/relay/tests/test_federated_jsonl_payload_filter.py"
 }

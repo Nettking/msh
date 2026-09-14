@@ -1,0 +1,188 @@
+{
+  "candidate": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "harness_sha": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "mode": "basic",
+  "status": "COMPLETED",
+  "started_at": "2026-09-14T00:04:46.104575+00:00",
+  "results": [
+    {
+      "scenario": "P06",
+      "assertion": "unexpected-child-restart",
+      "prepare_id": "b26f22f5a73a4af98afdb18a986d816b",
+      "verdict": "pass",
+      "detail": {
+        "before_native_runtime": {
+          "build_commit": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+          "pid": 6652,
+          "process_nonce": "a59abd364c28430394067081e2150cc7",
+          "runtime_type": "native-python",
+          "schema": "fcp.recorder-native-runtime.v1",
+          "supervisor_session": "16c62dad585b44c791ad31d4914cb960"
+        },
+        "after_native_runtime": {
+          "build_commit": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+          "pid": 34644,
+          "process_nonce": "271aa5fb61314d66831009f421036274",
+          "runtime_type": "native-python",
+          "schema": "fcp.recorder-native-runtime.v1",
+          "supervisor_session": "16c62dad585b44c791ad31d4914cb960"
+        },
+        "before_checkpoints": {
+          "s01": 1605,
+          "s02": 1597,
+          "s03": 1561,
+          "s04": 1557,
+          "s05": 1601,
+          "s06": 1000000000557,
+          "s07": 1201,
+          "s08": 21185
+        },
+        "after_checkpoints": {
+          "s01": 1637,
+          "s02": 1629,
+          "s03": 1593,
+          "s04": 1589,
+          "s05": 1633,
+          "s06": 1000000000589,
+          "s07": 1233,
+          "s08": 21217
+        },
+        "observed_restart_and_advancement_seconds": 22.984000000054948
+      }
+    },
+    {
+      "scenario": "P06",
+      "assertion": "checkpoint-continuity",
+      "prepare_id": "5b58d1276d654364bad0681df077406a",
+      "verdict": "pass",
+      "detail": {
+        "before_native_runtime": {
+          "build_commit": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+          "pid": 6652,
+          "process_nonce": "a59abd364c28430394067081e2150cc7",
+          "runtime_type": "native-python",
+          "schema": "fcp.recorder-native-runtime.v1",
+          "supervisor_session": "16c62dad585b44c791ad31d4914cb960"
+        },
+        "after_native_runtime": {
+          "build_commit": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+          "pid": 34644,
+          "process_nonce": "271aa5fb61314d66831009f421036274",
+          "runtime_type": "native-python",
+          "schema": "fcp.recorder-native-runtime.v1",
+          "supervisor_session": "16c62dad585b44c791ad31d4914cb960"
+        },
+        "before_checkpoints": {
+          "s01": 1605,
+          "s02": 1597,
+          "s03": 1561,
+          "s04": 1557,
+          "s05": 1601,
+          "s06": 1000000000557,
+          "s07": 1201,
+          "s08": 21185
+        },
+        "after_checkpoints": {
+          "s01": 1637,
+          "s02": 1629,
+          "s03": 1593,
+          "s04": 1589,
+          "s05": 1633,
+          "s06": 1000000000589,
+          "s07": 1233,
+          "s08": 21217
+        },
+        "observed_restart_and_advancement_seconds": 22.984000000054948
+      }
+    },
+    {
+      "scenario": "P05",
+      "assertion": "native-recorder-crash",
+      "prepare_id": "b6720552bc324ebaab0b35b58e9a6ed1",
+      "verdict": "pass",
+      "detail": {
+        "before_native_runtime": {
+          "build_commit": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+          "pid": 6652,
+          "process_nonce": "a59abd364c28430394067081e2150cc7",
+          "runtime_type": "native-python",
+          "schema": "fcp.recorder-native-runtime.v1",
+          "supervisor_session": "16c62dad585b44c791ad31d4914cb960"
+        },
+        "after_native_runtime": {
+          "build_commit": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+          "pid": 34644,
+          "process_nonce": "271aa5fb61314d66831009f421036274",
+          "runtime_type": "native-python",
+          "schema": "fcp.recorder-native-runtime.v1",
+          "supervisor_session": "16c62dad585b44c791ad31d4914cb960"
+        },
+        "before_checkpoints": {
+          "s01": 1605,
+          "s02": 1597,
+          "s03": 1561,
+          "s04": 1557,
+          "s05": 1601,
+          "s06": 1000000000557,
+          "s07": 1201,
+          "s08": 21185
+        },
+        "after_checkpoints": {
+          "s01": 1637,
+          "s02": 1629,
+          "s03": 1593,
+          "s04": 1589,
+          "s05": 1633,
+          "s06": 1000000000589,
+          "s07": 1233,
+          "s08": 21217
+        },
+        "observed_restart_and_advancement_seconds": 22.984000000054948
+      }
+    },
+    {
+      "scenario": "P06",
+      "assertion": "operator-stop",
+      "prepare_id": "a7efbddc2a294fa6ba9e243c001106fa",
+      "verdict": "pass",
+      "detail": {
+        "supervisor_exit_code": 0,
+        "child_absent": true,
+        "observation_seconds": 6
+      }
+    }
+  ],
+  "crashes": [
+    {
+      "native_runtime": {
+        "build_commit": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+        "pid": 6652,
+        "process_nonce": "a59abd364c28430394067081e2150cc7",
+        "runtime_type": "native-python",
+        "schema": "fcp.recorder-native-runtime.v1",
+        "supervisor_session": "16c62dad585b44c791ad31d4914cb960"
+      },
+      "injected_exit_code": 42,
+      "at": "2026-09-14T00:05:18.400709+00:00"
+    }
+  ],
+  "defaults": {
+    "started_runtime_seconds": 10,
+    "healthy_runtime_seconds": 120,
+    "restart_backoff_seconds": [
+      5,
+      15,
+      45,
+      120
+    ],
+    "max_rapid_restarts": 5
+  },
+  "policy_overrides": false,
+  "new_grant_requested": false,
+  "protected_data_accessed": false,
+  "physical_pass": false,
+  "phase": "COMPLETE",
+  "supervisor_pid": 33336,
+  "operator_stop_exit_code": 0,
+  "finished_at": "2026-09-14T00:05:57.054155+00:00"
+}

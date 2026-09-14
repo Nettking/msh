@@ -1,0 +1,20 @@
+{
+  "candidate_sha": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "tree": "4f45748e55e7d976ef9936b8f77933eae8a5aa29",
+  "state": "AUTHORITATIVE_FROZEN_CANDIDATE",
+  "actual_main_verified": true,
+  "frozen_at": "2026-09-13T23:54:39.368854+00:00",
+  "required_release_gate_jobs_passed": 16,
+  "all_release_contracts_satisfied": true,
+  "icse_jobs_passed": 4,
+  "native_checkout_proofs": 32,
+  "qualification_sha256": "998c6a970c563bfef6ae2ba2f269287ab442eecf25905a24e568e5a4c30b5045",
+  "qualification": "main-48154445-qualification/qualification.json",
+  "supersedes_blocked_candidate": "e91e521813aff67c44bae51d00dfae212b56ef7e",
+  "reason": "PR488 repairs demonstrated supported Windows warm activation.",
+  "physical_acceptance": "NOT_PASSED",
+  "P07": "NOT_STARTED",
+  "P12": "NOT_STARTED",
+  "protected_recorder_data": "UNTOUCHED",
+  "tag_or_publication_created": false
+}

@@ -1,0 +1,163 @@
+{
+  "status": "ELEVEN_FRESH_ISOLATED_ASSERTIONS_PASS",
+  "candidate_sha": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "harness_sha": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "host_id": "nettking",
+  "os_category": "windows",
+  "recorded_at": "2026-09-14T00:09:08.248753+00:00",
+  "freeze_sha256": "f47949c2b3de0f999b1807dd23af57a681f1f7ad8893bad0492346e2d5b0e9a8",
+  "assertion_count": 11,
+  "actual_p09_crash_windows": 12,
+  "p09_started_at": "2026-09-14T00:03:21.765993+00:00",
+  "p09_finished_at": "2026-09-14T00:05:35.162138+00:00",
+  "ingress_started_at": "2026-09-14T00:05:50.525309+00:00",
+  "ingress_finished_at": "2026-09-14T00:07:13.207958+00:00",
+  "original_attempts": {
+    "p09": 1,
+    "ingress": 1
+  },
+  "failed_attempts": 0,
+  "assertions": [
+    {
+      "scenario": "P09",
+      "assertion": "raw-publication",
+      "verdict": "PASS",
+      "actual_crash_windows": 2,
+      "primary_sha256": "42f1a71c0b463cff28c759d6ae2c569429224aeb04475433cfa672e19214ab22",
+      "strict_observation": "evidence/v1-physical/observations/P09/20260914T000355525093Z-assertion-0d756130.json",
+      "strict_observation_sha256": "89352f273af868e66144757dc8daa16e6f7fb85ac83d658ed7cd9dc2be5e8f4f",
+      "verify_receipt_sha256": "71441b3ffa5899cced0cf2587e13b12222db2cd9193cbb43e844cf65870fcf09",
+      "prepare_id": "b3f16c533d7e42eb9c091ffc1f927262"
+    },
+    {
+      "scenario": "P09",
+      "assertion": "raw-manifest",
+      "verdict": "PASS",
+      "actual_crash_windows": 2,
+      "primary_sha256": "2f8281a3b71b387ba19007250bdab835c29b0d8a6061e6d4a89d05976f327146",
+      "strict_observation": "evidence/v1-physical/observations/P09/20260914T000417160697Z-assertion-6e242597.json",
+      "strict_observation_sha256": "9d4921e0786324f3922986f70b533548352752c28092d76285b687fa27116f50",
+      "verify_receipt_sha256": "39f813cd19c3f0b677f4db72a95d5ce08de841b78eac9f078f3a7eaa1c9e3386",
+      "prepare_id": "4cd8200ef7224c09b973bfaa0ceb0bef"
+    },
+    {
+      "scenario": "P09",
+      "assertion": "observation-archive",
+      "verdict": "PASS",
+      "actual_crash_windows": 2,
+      "primary_sha256": "548e3f1ced4469e6b629c7b06190dc42d9d2c6da0618c61b78dd2cce0a083a2c",
+      "strict_observation": "evidence/v1-physical/observations/P09/20260914T000436396080Z-assertion-6dd22023.json",
+      "strict_observation_sha256": "6f84d894926ca859b8ba4e59b5ae734c3da137a368b71f42b1a9e16e0d882d84",
+      "verify_receipt_sha256": "06c17e5cd4a7855f588ad6526e6a5ad6a95456f855d58f3751e40e8131179171",
+      "prepare_id": "ac8e92d386bb4d48b733acc68d869801"
+    },
+    {
+      "scenario": "P09",
+      "assertion": "compat-jsonl",
+      "verdict": "PASS",
+      "actual_crash_windows": 2,
+      "primary_sha256": "43df53cf4ee6bf10fce46481b68691caf7c6a5c61078bab7173fc02a9e6decd4",
+      "strict_observation": "evidence/v1-physical/observations/P09/20260914T000456148510Z-assertion-e8d1db51.json",
+      "strict_observation_sha256": "940ded051ec7edcf681c7b5d94b7c71a55a54f7186cd450ace5605d6efcf0d73",
+      "verify_receipt_sha256": "79412a14ae756537df7fdebb2608b967db549e1d8be170f7841a9ca061dcf18c",
+      "prepare_id": "16b602a3cec5462a95b497d09058d085"
+    },
+    {
+      "scenario": "P09",
+      "assertion": "checkpoint-status",
+      "verdict": "PASS",
+      "actual_crash_windows": 4,
+      "primary_sha256": "f183981adaad6e43bc905a53133c1f45f75bf5d1308856d872cfc9ade875f570",
+      "strict_observation": "evidence/v1-physical/observations/P09/20260914T000534888363Z-assertion-75c2e4df.json",
+      "strict_observation_sha256": "0903b410bacd3f5708a184c3b3f573fe0f6fd754524e31b3ce2d6b20dc62d33a",
+      "verify_receipt_sha256": "95f76076fd3062e1eec4cfd4a7ce2f1019872f9cae87e0af087808191f205ea3",
+      "prepare_id": "7a6954a90cac43d5bc6e50c6e5bfa712"
+    },
+    {
+      "scenario": "P04",
+      "assertion": "maximum-ingress",
+      "verdict": "PASS",
+      "actual_crash_windows": 0,
+      "primary_sha256": "1423f8911d550190f901916085554c0f680e0bb2d9e80e1fbadb8eba020a2491",
+      "strict_observation": "evidence/v1-physical/observations/P04/20260914T000600339442Z-assertion-a48a9e55.json",
+      "strict_observation_sha256": "36e91a593d0c0d1ac3af6cdd3807dc1466ce6749bffd390053a1190413919156",
+      "verify_receipt_sha256": "cfefffd736a3bfe908bd63e24a1a1679fd776b54dbd04fd6f237395e6ad1b76b",
+      "prepare_id": "bf1a893ac70c425cbbfe34551113ece7"
+    },
+    {
+      "scenario": "P04",
+      "assertion": "concurrent-sources",
+      "verdict": "PASS",
+      "actual_crash_windows": 0,
+      "primary_sha256": "7449ce9c3ec518cb1abc071c8620bc9888b201ef72b55cb0f7a45079f9b15711",
+      "strict_observation": "evidence/v1-physical/observations/P04/20260914T000605403135Z-assertion-784c4729.json",
+      "strict_observation_sha256": "8be36154f88930981da1f7f263a4e2232bbb33d6ded3db7a8e64dc11dca06837",
+      "verify_receipt_sha256": "d597ca771ce0c394495a4d2db060d7ccdb935a1577b58cc1a8d6987457c46852",
+      "prepare_id": "c799fc40fd1345c4b1adfd8c8e26782d"
+    },
+    {
+      "scenario": "P05",
+      "assertion": "slow-trickle-response",
+      "verdict": "PASS",
+      "actual_crash_windows": 0,
+      "primary_sha256": "9dd81b26b0a802c06eb4f7608ed4b6d1e583609d0a36573ff45260d2ac95ce8d",
+      "strict_observation": "evidence/v1-physical/observations/P05/20260914T000620837023Z-assertion-56c6eb0f.json",
+      "strict_observation_sha256": "93d76f4765b2cd494877fbf454d22c1884dd7e51b438e301c6c2e69b200c0fde",
+      "verify_receipt_sha256": "dce77760b5155f7a5ecd00b233ab5ed3545cf9983f8e86b31422532470d7d803",
+      "prepare_id": "6c613968d4dd4f66afec8ed82181cdae"
+    },
+    {
+      "scenario": "P05",
+      "assertion": "oversized-ingress",
+      "verdict": "PASS",
+      "actual_crash_windows": 0,
+      "primary_sha256": "e95ce4618b8f59b3fc6cd613ee8a608f85ba45cc41b40b7ee099f616f58f78cd",
+      "strict_observation": "evidence/v1-physical/observations/P05/20260914T000631875824Z-assertion-58a26929.json",
+      "strict_observation_sha256": "8374c332051c81ea9698b79299d557c1d635a07cf4b60348cea3ba9fd88e9abc",
+      "verify_receipt_sha256": "5cb4768a883c01bd12cc871ed716d592ba78ef35920c108b10d6c2b02d8e278b",
+      "prepare_id": "9f947a23d3b44dc691e66bb5e99cda9a"
+    },
+    {
+      "scenario": "P05",
+      "assertion": "huge-sequence-gap",
+      "verdict": "PASS",
+      "actual_crash_windows": 0,
+      "primary_sha256": "6b022a69dcb1a2db4a648790f6db51d7f5033dc0bc14caf140dce056a26aa6e6",
+      "strict_observation": "evidence/v1-physical/observations/P05/20260914T000635925060Z-assertion-e8726643.json",
+      "strict_observation_sha256": "0c7115f593dd40ec6e4c75d9568806ce74e256d265b621a4a1c915815868b094",
+      "verify_receipt_sha256": "98ea39640ff98e8f9c60b59eb26525367154070f0288f8368198e2c405b776af",
+      "prepare_id": "dc8ebe3b8a324b43942dceb8bf8d2e4d"
+    },
+    {
+      "scenario": "P05",
+      "assertion": "event-storm",
+      "verdict": "PASS",
+      "actual_crash_windows": 0,
+      "primary_sha256": "21d002f27291619e7fe3c0f9484218aec1ca1f8bb0834e4b80f164732602959b",
+      "strict_observation": "evidence/v1-physical/observations/P05/20260914T000712709347Z-assertion-69b91f51.json",
+      "strict_observation_sha256": "f0fded1b8f12afb64e6296575cea9710285a0c2df4b2a2bdd2aa34144ed04950",
+      "verify_receipt_sha256": "dba59d60bed9b3459581b30eae1883a635afc8278cb98507f35914d3af6cb821",
+      "prepare_id": "f3fbe60a6d424717a6b66735cbb73707"
+    }
+  ],
+  "strict_receipts_archive": "P04-P05-P09-isolated-strict-receipts.zip",
+  "strict_receipts_archive_sha256": "f2cf247d3b83ace955bc62e7ad70d146916bd5fe17492430f7214ebb5303562e",
+  "strict_receipts_archive_entries": 22,
+  "private_primary_evidence_retained": true,
+  "owned_executors_exited_zero": true,
+  "owned_processes_observed_absent": true,
+  "source_runtime_paths_are_fresh": true,
+  "source_or_product_deadlines_changed": false,
+  "prior_identity_or_data_used": false,
+  "protected_recorder_data_accessed": false,
+  "shared_creator_or_native_faults_performed": false,
+  "timed_tests_started": false,
+  "previous_c2_evidence_carried": false,
+  "physical_campaign_pass": false,
+  "actual_blockers_in_this_lane": [],
+  "executor_sha256": {
+    "p09-first-five-c2-namefirst-recovery/launch.py": "2fe6701813c9ebb25724a359cd9c1c30bd231c7c126793dfde7aea55a9082321",
+    "p09-first-five-c2-namefirst-recovery/p09_native_windows.py": "fa87a4a67caf887d87d2b8ba43770494e8daa5085da3bd1dffb80a187f1cb95d",
+    "p04-p05-c2-preparation/run-fresh-ingress.py": "3113b65f389303ccbc4bcfb19454bfd4132a9b5768728550e88b9b69d00e396a"
+  }
+}

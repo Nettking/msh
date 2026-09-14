@@ -1,0 +1,98 @@
+{
+  "candidate_sha": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "recorded_at": "2026-09-14T00:11:19.322542+00:00",
+  "rows": [
+    {
+      "evidence": "H/.acceptance/native-readiness/status.json",
+      "sha256": "ea94c6fd3a5d71367a284edfd111e6d71d11080f5af3abfe9aae33a4c8adbe5c",
+      "candidate": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+      "host": "nettking",
+      "status": "COMPLETED",
+      "started_at": "2026-09-13T23:55:12.132379+00:00",
+      "finished_at": "2026-09-13T23:57:08.060696+00:00",
+      "physical_pass": false,
+      "protected_data_accessed": false,
+      "native_readiness_passed": true
+    },
+    {
+      "evidence": "H/.acceptance/native-control/source-admission.json",
+      "sha256": "78c123dfff08d8e1e2b6333aeb729b3c658a7086cbf39e4a72b9957f3168d05c",
+      "candidate": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+      "role": "native",
+      "status": "SOURCE_PREPARED",
+      "started_at": "2026-09-14T00:02:12.687105+00:00",
+      "physical_pass": false,
+      "protected_data_accessed": false,
+      "membership_unchanged_in_place": true,
+      "origin_main_verified": true,
+      "native_runtime_started": false
+    },
+    {
+      "evidence": "H/.acceptance/creator-control/activation.json",
+      "sha256": "7fe79a71e0aa48ba9143c34833fd8b798669026906e83c27b9e33be65b68e1fd",
+      "candidate": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+      "role": "creator",
+      "status": "COMPLETED",
+      "started_at": "2026-09-14T00:03:06.585837+00:00",
+      "finished_at": "2026-09-14T00:04:09.983545+00:00",
+      "physical_pass": false,
+      "protected_data_accessed": false,
+      "launcher_exit_code": 0,
+      "core_images_verified": 3,
+      "existing_mounts_preserved": true,
+      "model_image_and_mounts_preserved": true
+    },
+    {
+      "evidence": "H/.acceptance/runtime-control/candidate-admission.json",
+      "sha256": "3d5d6a4516cc161f1bdef70d6c66d03385e31bb885acf566c9836bce4156c3d7",
+      "candidate": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+      "role": "windows",
+      "status": "COMPLETED",
+      "started_at": "2026-09-14T00:07:06.579322+00:00",
+      "finished_at": "2026-09-14T00:08:22.740520+00:00",
+      "physical_pass": false,
+      "protected_data_accessed": false,
+      "launcher_exit_code": 0,
+      "core_images_verified": 3,
+      "existing_mounts_preserved": true,
+      "model_image_and_mounts_preserved": true
+    },
+    {
+      "evidence": "H/.acceptance/runtime-control/P03-automated-status.json",
+      "sha256": "31b4e78f231046135dba8782766fab3f2c5ad760fbdf75ab70119f8d529e26d7",
+      "candidate": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+      "host": "nettking",
+      "status": "COMPLETED",
+      "started_at": "2026-09-14T00:10:29.538570+00:00",
+      "finished_at": "2026-09-14T00:10:33.222358+00:00",
+      "physical_pass": false,
+      "protected_data_accessed": false,
+      "results": [
+        {
+          "assertion": "update-cmd-disposition",
+          "verdict": "pass"
+        },
+        {
+          "assertion": "windows-concurrent-launchers",
+          "verdict": "pass"
+        },
+        {
+          "assertion": "launcher-vs-update",
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "evidence": ".acceptance/c3-physical-48154445-20260914/run-p06-basic",
+      "status_sha256": "290191e0d0c34488aac852c60aba184e4fb4d6d430dbdea363455591d5fa0cbe",
+      "final_agent_state_sha256": "9d0d522172c4c6b7df5b453892d53ec7b238379c4ed91929a22ebdcfb91e2e92",
+      "mode": "basic",
+      "status": "COMPLETED",
+      "assertions_passed": 4
+    }
+  ],
+  "physical_campaign_pass": false,
+  "P07": "NOT_STARTED",
+  "P12": "NOT_STARTED",
+  "protected_recorder_data": "UNTOUCHED"
+}

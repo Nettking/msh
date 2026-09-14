@@ -1,0 +1,32 @@
+{
+  "baseline": "e91e521813aff67c44bae51d00dfae212b56ef7e",
+  "candidate": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "exit_code": 0,
+  "decision": "ALL_SCENARIOS_FRESH_NO_CARRY_FORWARD",
+  "report": {
+    "carry_forward_scenarios": [],
+    "changed_paths": [
+      "catalog/flask_app/tests/test_windows_runtime_state_resolver.py",
+      "catalog/flask_app/tests/test_windows_start_script.py",
+      "scripts/windows/resolve_fcp_web_port.ps1",
+      "start.cmd"
+    ],
+    "impacted_scenarios": [
+      "physical.fresh-windows-checkout",
+      "physical.fresh-linux-checkout",
+      "physical.multi-host-relay-and-network-path",
+      "physical.mtconnect-recorder-source",
+      "physical.ollama-model-and-accelerator",
+      "physical.mobile-and-desktop-browser-review",
+      "physical.recorder-plus-ai-simultaneous-contribution",
+      "physical.separate-ai-compute-storage-contributors",
+      "physical.benchmark-expiry-and-rerun",
+      "physical.contribution-disable-and-reenable",
+      "physical.restart-and-reconciliation",
+      "physical.revocation-and-controlled-rejoin"
+    ],
+    "safe": true,
+    "schema": "fcp.cf7.physical-revalidation-plan.v1",
+    "unknown_paths": []
+  }
+}

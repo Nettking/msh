@@ -1,0 +1,73 @@
+{
+  "classification": "UNRESOLVED_NON_DEMONSTRATED_CANDIDATE_DEFECT",
+  "contract_basis": "docs/release_process.md:36-38 and cf7b_product_physical_acceptance.md:215; all 16 release jobs, registry and permanent CF7 A/B remain required",
+  "disposition_sha256": "711d0ead9351b6414d9e95a1c5934edfd8de4f499b9a391d5c47ff3648dcfaf7",
+  "original_failure": {
+    "assertion_line": 203,
+    "conclusion": "failure",
+    "deadline_seconds": 20.0,
+    "failed_node": "catalog/capabilities/tests/test_analysis_driver_supervision.py::test_a_store_failure_while_reading_pending_work_does_not_kill_the_driver",
+    "job_id": 103806642710,
+    "native_checkout_verified": true,
+    "native_log_sha256": "8b72ce3762fa4955fa9f583107526a02d824ce796bda436e3d8efa93f2401933",
+    "original_failure_signature_verified": true,
+    "run_attempt": 1,
+    "run_id": 34787908014,
+    "source": "48154445d380980047bb5cbc39ae5b4c1a6889c0"
+  },
+  "physical_acceptance": "NOT_EVALUATED",
+  "required_actual_main_node_proofs": [
+    {
+      "artifact_digest": "sha256:f7149f45ea6c3dcecb4a6dc2b4a256d524fdf99c06ad64e9d05a68f90a0f43a2",
+      "artifact_id": 10327078658,
+      "context": "linux-regression-shard-2",
+      "job_id": 103806642834,
+      "native_log_sha256": "e9d114e293b5e90e2ff4e17c573818acd4dd7cacb5eaeaaaf233b019d10743c9",
+      "node": "catalog/capabilities/tests/test_analysis_driver_supervision.py::test_a_store_failure_while_reading_pending_work_does_not_kill_the_driver",
+      "result": "PASS",
+      "run_id": 34787907931,
+      "skipped": false,
+      "source": "48154445d380980047bb5cbc39ae5b4c1a6889c0"
+    },
+    {
+      "artifact_digest": "sha256:614ad478bc9b7c34d24ec8266abb45155a6bb79c1970d4bf84e489e30cacb7c8",
+      "artifact_id": 10327795423,
+      "context": "full-suite-order-fixed",
+      "job_id": 103806642841,
+      "native_log_sha256": "7f9fb1e24193d251125bbd6cbb9402fe23c0bfad8f0c8dc30e3399e29ff80c55",
+      "node": "catalog/capabilities/tests/test_analysis_driver_supervision.py::test_a_store_failure_while_reading_pending_work_does_not_kill_the_driver",
+      "result": "PASS",
+      "run_id": 34787907931,
+      "skipped": false,
+      "source": "48154445d380980047bb5cbc39ae5b4c1a6889c0"
+    },
+    {
+      "artifact_digest": "sha256:c119b31e942b3f0938947267bcf79ef3ced8f30db044bc53ebd1515394ea68bc",
+      "artifact_id": 10327765598,
+      "context": "full-suite-order-rotating",
+      "job_id": 103806642839,
+      "native_log_sha256": "74e75cd2ff5c590d04ee8169ba3c80acadfb4dd6bd0368cbdfb0169eb8b0eb89",
+      "node": "catalog/capabilities/tests/test_analysis_driver_supervision.py::test_a_store_failure_while_reading_pending_work_does_not_kill_the_driver",
+      "result": "PASS",
+      "run_id": 34787907931,
+      "skipped": false,
+      "source": "48154445d380980047bb5cbc39ae5b4c1a6889c0"
+    },
+    {
+      "artifact_digest": "sha256:eaa19f9e312e740b66120006ab1885fa234e5500d45c30fea6c582c93f4224a7",
+      "artifact_id": 10326519377,
+      "context": "windows-regression-capability-product",
+      "job_id": 103806642833,
+      "native_log_sha256": "efdabdc0d6d92093f743f580c016d1b4c9131b89e16024b98ed37fa58583fe74",
+      "node": "catalog/capabilities/tests/test_analysis_driver_supervision.py::test_a_store_failure_while_reading_pending_work_does_not_kill_the_driver",
+      "result": "PASS",
+      "run_id": 34787907931,
+      "skipped": false,
+      "source": "48154445d380980047bb5cbc39ae5b4c1a6889c0"
+    }
+  ],
+  "source": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "standalone_workflow_conclusion": "failure",
+  "standalone_workflow_relabelled_pass": false,
+  "tree": "4f45748e55e7d976ef9936b8f77933eae8a5aa29"
+}
