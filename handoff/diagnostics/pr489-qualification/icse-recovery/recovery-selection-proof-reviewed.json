@@ -1,0 +1,95 @@
+{
+  "CI_mutation": false,
+  "api_head": "14e0193535a9fc1024bde95ae1f49b8940bfd9d9",
+  "artifacts": [
+    {
+      "api_head": "14e0193535a9fc1024bde95ae1f49b8940bfd9d9",
+      "id": 10330270652,
+      "name": "icse-summary-Linux",
+      "native_source": "a158465bedae7979a4ec5f86d2402b4303ec42b5",
+      "selection_basis": "exact successful native upload line plus API identity/digest and downloaded-byte digest",
+      "sha256": "b1b78f5e8362f49b5ddae3ce2be85f51c58cc6b9b3d1c0e1b9eee3f012c6d2f9",
+      "size_bytes": 1038,
+      "upload_job": 103830791709
+    },
+    {
+      "api_head": "14e0193535a9fc1024bde95ae1f49b8940bfd9d9",
+      "id": 10330136093,
+      "name": "icse-network-summary-Linux",
+      "native_source": "a158465bedae7979a4ec5f86d2402b4303ec42b5",
+      "selection_basis": "exact successful native upload line plus API identity/digest and downloaded-byte digest",
+      "sha256": "9333949251105b851be8f880c98e51192afa43c45a9d1f99eab0ffeb6bbe299f",
+      "size_bytes": 8274,
+      "upload_job": 103830791709
+    },
+    {
+      "api_head": "14e0193535a9fc1024bde95ae1f49b8940bfd9d9",
+      "id": 10330136116,
+      "name": "fcp-icse-tool-demo-bundle-a158465bedae7979a4ec5f86d2402b4303ec42b5",
+      "native_source": "a158465bedae7979a4ec5f86d2402b4303ec42b5",
+      "selection_basis": "exact successful native upload line plus API identity/digest and downloaded-byte digest",
+      "sha256": "b72376136ec549125782a8b0ac318030ff97956ae8d955dd00e10803f5232cef",
+      "size_bytes": 4234216,
+      "upload_job": 103831044789
+    }
+  ],
+  "attempt": 2,
+  "component_note": "Recovered upload identity is proven; deterministic component payloads alone need not distinguish successful executions.",
+  "finalizer_artifact_selection": {
+    "icse-tool-demo.yml/fcp-icse-tool-demo-bundle-a158465bedae7979a4ec5f86d2402b4303ec42b5": 10330136116
+  },
+  "jobs_passed": 4,
+  "linux_recovered_component_bytes_match_bundle": true,
+  "linux_recovered_network_all_files_match_bundle": true,
+  "native_logs": [
+    {
+      "conclusion": "success",
+      "job_id": 103830791709,
+      "name": "reviewer-entrypoint (Linux, fcp-linux-fast, bash)",
+      "native_log_bytes": 53019,
+      "native_log_sha256": "4613168e641ada436f89d5e73f8b0c57dd524628e82a3a992563b330397d2684",
+      "native_source": "a158465bedae7979a4ec5f86d2402b4303ec42b5"
+    },
+    {
+      "conclusion": "success",
+      "job_id": 103831044789,
+      "name": "publication-bundle",
+      "native_log_bytes": 23757,
+      "native_log_sha256": "6e62f5d8b5f964f45ebf3b61fd84e0de0bb3ded8166bc9292c9566a4ed200590",
+      "native_source": "a158465bedae7979a4ec5f86d2402b4303ec42b5"
+    }
+  ],
+  "old_failed_network_not_embedded": true,
+  "physical_acceptance": "NOT_EVALUATED",
+  "preparation_input_correction": {
+    "actual_finalizer_key_expression_evaluated": true,
+    "finalizer_source_sha256": "917c932e2aa0eeb3d9ab9ef809d1753c643b7793555bd2d2b66c0b96f868face",
+    "prior_evidence_retained": true,
+    "prior_receipt_sha256": "44a2441a284e53aa5a68a4d8c6c12b2f5f97af6b46f087f735d6bd27e7f6e235",
+    "reason": "Initial preparation map used colon; unchanged finalizer key expression requires slash. All artifact, native and embedded-byte proofs remain unchanged."
+  },
+  "prior_windows_and_compose_success_reused": true,
+  "publication_audit": {
+    "all_manifest_digests_valid": true,
+    "archive_conversion": "Explicit verification-only core.autocrlf=false, core.eol=lf",
+    "component_executions_passed": [
+      "Linux",
+      "Windows",
+      "compose"
+    ],
+    "network_executions_10_of_10_passed": [
+      "Linux",
+      "Windows"
+    ],
+    "physical_acceptance": "NOT_EVALUATED",
+    "publication_archive_sha256": "69024fce84373b514faddf3bdea2ff32135552e9cc6bc5760c5bd4a5e07d13b4",
+    "source": "a158465bedae7979a4ec5f86d2402b4303ec42b5",
+    "source_equals_exact_git_archive": true,
+    "source_files": 1412
+  },
+  "qualification_finalizer_executed": false,
+  "run_id": 34795691398,
+  "source": "a158465bedae7979a4ec5f86d2402b4303ec42b5",
+  "state_checks": 1,
+  "status": "ICSE_RECOVERY_AND_EXPLICIT_PUBLICATION_SELECTION_VERIFIED"
+}

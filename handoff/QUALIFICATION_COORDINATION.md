@@ -1,6 +1,6 @@
 # Federation v1 current release checkpoint
 
-Updated 2026-09-14T01:39Z. Active context: clean handoff + this file + live GitHub.
+Updated 2026-09-14T01:47Z. Active context: clean handoff + this file + live GitHub.
 Historical coordination is evidence only; consult it for a specific current need.
 
 ## Current source / heads
@@ -20,7 +20,7 @@ Historical coordination is evidence only; consult it for a specific current need
   branch codex/federation-v1-manifest-history-repair; pushed, PR489 OPEN (not merged):
   14e0193535a9fc1024bde95ae1f49b8940bfd9d9; tree1e12bfc70c0bc7feecf85ed15a369e2f85bba4ce.
   PR synthetic a158465bedae7979a4ec5f86d2402b4303ec42b5 has exact repair tree;
-  clean checkout C:/wsl/fcp-v1-a158465b-pr489-20260914. Live main unchanged01:30.
+  clean checkout C:/wsl/fcp-v1-a158465b-pr489-20260914. Live main unchanged01:45.
 
 ## Current green gates
 - Actual-main release 34787907931:16/16 PASS; ICSE34787907928 attempt2:4/4 PASS.
@@ -28,9 +28,7 @@ Historical coordination is evidence only; consult it for a specific current need
   32 checkout proofs, two aggregates, publication bytes and release shards verified.
 - Qualification diagnostics/main-48154445-qualification/qualification.json SHA256
   998c6a970c563bfef6ae2ba2f269287ab442eecf25905a24e568e5a4c30b5045.
-- F85 standalone Linux timeout remains FAIL; four mandatory actual-main suites
-  passed exact non-skipped node. Hosted bootstrap never started: infrastructure.
-  Checked dispositions retained. No extra qualification, ICSE capture or retry.
+- C3-only F85/hosted-bootstrap dispositions retained; not inherited by PR489.
 - C3 readiness complete;28 physical assertions PASS retained with exact provenance.
   These cover isolated fault windows, native supervision, Windows launchers/model/
   path/PID boundaries and corrected P01 activation/resource observations.
@@ -42,7 +40,8 @@ Historical coordination is evidence only; consult it for a specific current need
   103828223816 failed: spent-token assertion hit current-leader fence. ICSE Linux
   103828224089 hit same fence after reconnect; underlying authority change unknown.
   Both unresolved/non-demonstrated candidate defects; original evidence retained.
-  ICSE34795691398 failed-only recovery accepted01:38:53; Windows/compose green reused.
+  ICSE34795691398 attempt2 now4/4 PASS; recovered artifacts/publication verified
+  against exact source1412files. Windows/compose reused; original FAIL retained.
   Release failed-only recovery reviewed, NOT SENT: wait attempt1 terminal; reject
   additional failures. Details diagnostics/pr489-qualification/current-failure-disposition.json.
 - All12 physical scenarios fresh; zero carry. P07>=1 real hour and P12>=24 real
@@ -72,8 +71,10 @@ Historical coordination is evidence only; consult it for a specific current need
    Receipts .acceptance/p06-http-trial-c3-preparation/public-agent-native-environment.
 3. Exact PR489 read-only qualifier reviewed/enabled; inputs-pr489-reviewed.json
    under .acceptance/manifest-repair-release-preparation. Six auto workflows;
-   only missing CF7-A+registry dispatch on future actual main. No absent CF8/F85/
-   hosted-bootstrap gate. CF8 covered on Linux in mandatory release; no Windows claim.
+   recover_reviewed_failures_once.py release after original terminal, once only.
+   Then final retain/audit with explicit ICSE+recovered-Windows artifact selection;
+   ICSE map: icse-34795691398-recovery-final/artifact-selection.icse-reviewed.json.
+   Only missing CF7-A+registry dispatch on future main; no absent CF8/F85/bootstrap.
 4. Reusable P11 baseline ready in H/.acceptance/p11-control-internal-model-r4:
    real16 records captured/uploadREADY; AI normally disabled,5 owned containers,
    zero host writers. BindingSHA9a8b0f6bc2535771216e9276ba9488572dfbf1d5613d3e9fdb916a84bd21ce5f.
@@ -81,7 +82,7 @@ Historical coordination is evidence only; consult it for a specific current need
    rebind/reset. No backup/keys/restore or C3 physical verdict.
 5. No new C3 qualification/faults/timers. Finish required PR qualification, normal
    merge/main qualification/new freeze and checked revalidation before physical.
-   Agents prepare disabled creator/native and populated-P11 admission controls;
+   Disabled postrepair-admission-preparation and p11-next-candidate-preparation;
    postrepair-p06-preparation preserves45/100/600/600s limits and latest seed.
    Prospective checked revalidation: two unknown product paths => all12CF7 fresh,
    zero carry. This forbids carry, not fresh admission; rerun planner on final main.

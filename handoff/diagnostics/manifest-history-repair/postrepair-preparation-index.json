@@ -1,0 +1,29 @@
+{
+  "status": "PREPARED_ONLY_NEXT_ACTUAL_MAIN_REQUIRED",
+  "base": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "repair": "14e0193535a9fc1024bde95ae1f49b8940bfd9d9",
+  "records": {
+    "creator_native_admission": {
+      "local_path": ".acceptance/postrepair-admission-preparation/preparation-status.json",
+      "sha256": "1230b90d502ec971c3f08ad4735deffc23aa59bd720858b7320d71d60f6fc74d"
+    },
+    "p06_recovery": {
+      "local_path": ".acceptance/postrepair-p06-preparation/preparation-status.json",
+      "sha256": "c5ea6497c1216a50cf60b7f657cbb7d2e0a0ca8f69fab81367bcf55fed5a735b"
+    },
+    "populated_p11": {
+      "local_path": ".acceptance/p11-next-candidate-preparation/preparation-r2.json",
+      "sha256": "bd4efaa800728d3fdeb1b445519bbde6acc1ccbef90cef512441dee941c5e588"
+    },
+    "prospective_revalidation": {
+      "local_path": ".acceptance/manifest-repair-release-preparation/prospective-physical-revalidation.json",
+      "sha256": "ab5e1c360629eb840d881c543ca5a5d16e0cb9edf99f0f95a7edce3aa3712f31"
+    }
+  },
+  "root_plan_review": "Root reviewed full admission helper/guard and P11 renderer; precise child-env, actual Compose binding, and truthful no-carry gate corrections prepared. Final source-dependent executable review remains required before admission.",
+  "revalidation": "Truthful unknown-path/all12fresh/0carry; do not coerce safeTrue or edit policy. P01-P12 stay exactcandidate.",
+  "physical_pass": false,
+  "runtime_mutations": 0,
+  "P07": "NOT_STARTED",
+  "P12": "NOT_STARTED"
+}
