@@ -16,6 +16,7 @@ import gzip
 import hashlib
 import os
 import sqlite3
+import stat
 import threading
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager, nullcontext
@@ -729,7 +730,38 @@ class FederatedJsonlProductBridge:
 
     def _local_candidates(self) -> Iterable[tuple[str, Path]]:
         excluded = self._excluded_prefixes()
-        for path in iter_jsonl_files(self.data_root, recursive=True):
+        last_parent: Path | None = None
+        last_resolved_parent: Path | None = None
+
+        def include_file(path: Path) -> bool:
+            nonlocal last_parent, last_resolved_parent
+            # Resolve before excluding: a lexical alias below an excluded
+            # directory can still refer to an eligible local source. Files
+            # already excluded need no ancestor upload-marker inspection.
+            try:
+                metadata = path.lstat()
+                if stat.S_ISREG(metadata.st_mode) and not (
+                    getattr(metadata, "st_file_attributes", 0)
+                    & stat.FILE_ATTRIBUTE_REPARSE_POINT
+                ):
+                    # Sorted siblings share a parent. Retain only one successful
+                    # resolution for this pass; never cache upload-marker state.
+                    # Selected paths still get the fresh full check below.
+                    parent = path.parent
+                    if parent != last_parent or last_resolved_parent is None:
+                        resolved_parent = parent.resolve()
+                        last_parent, last_resolved_parent = parent, resolved_parent
+                    resolved = last_resolved_parent / path.name
+                else:
+                    resolved = path.resolve()
+                relative = resolved.relative_to(self.data_root).as_posix()
+            except (OSError, ValueError):
+                return False
+            return not any(relative.startswith(prefix) for prefix in excluded)
+
+        for path in iter_jsonl_files(
+            self.data_root, recursive=True, file_filter=include_file
+        ):
             try:
                 relative = path.resolve().relative_to(self.data_root).as_posix()
             except (OSError, ValueError):
