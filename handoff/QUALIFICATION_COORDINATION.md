@@ -1,6 +1,6 @@
 # Federation v1 current release checkpoint
 
-Updated 2026-09-14T07:02Z. Active context: clean handoff + this file + live GitHub.
+Updated 2026-09-14T07:11Z. Active context: clean handoff + this file + live GitHub.
 Historical coordination is evidence only; consult it for a specific current need.
 
 ## Current source / heads
@@ -13,7 +13,8 @@ Historical coordination is evidence only; consult it for a specific current need
   diagnostics/physical-f00f1301/nitro-source-stage.json. Do not replay staging.
 - Authoritative freeze f00f1301 DONE07:00Z, SHA256
   0c5127ae2d2dc8885182f38c908dc544789f38cf3e9de69bc12d1f1e56366d25.
-  Existing runtime remains0246bf8b; no newmain activation yet.
+  Creator runtime now f00 with ordinary resident verified; Windows warm f00
+  activation running. Nitro warm remains0246, agent quiesced; native0246 stopped.
   Native stopped after P06 startup failure;205completed/723pending preserved.
 - Checkpoint branch codex/federation-v1-diagnostic-sweep-20260911.
   No full physical PASS, final tag or publication.
@@ -31,6 +32,8 @@ Historical coordination is evidence only; consult it for a specific current need
   physical-f00f1301/revalidation-from-0246bf8b.json SHA256
   341b26ba7aa104e2cec0df6e27798767212032d3870b2d7f6fbb9348b7ba6d1b.
   Prior PR qualification/recovery evidence retained separately; do not repeat.
+- Both native readiness runs COMPLETED, four gates PASS/host. Windows3.12.10,
+  Nitro3.12.13. diagnostics/physical-f00f1301/native-readiness.json; no retries.
 
 ## Actual blockers
 - Fresh physical acceptance outstanding. Old0246 P06 startup failed45s sharing/
@@ -38,7 +41,8 @@ Historical coordination is evidence only; consult it for a specific current need
   Minimal equivalent predicate repair merged490.8ACK profile76.27s ->38.01s,
   all206 manifest rows byte-identical; no live startup PASS inferred.
   Evidence: diagnostics/physical-0246bf8b/full-ack-repair-proof.json.
-- Fresh native readiness running on both hosts; runtime admission still required.
+- Native source stage refused before mutation: saved pairing-file hash differs
+  from old anchor; device identity unchanged. Focused field comparison active.
 - P01 hour, P07>=3600s and P12>=86400s NOT STARTED. Real durations required.
 - Separate real-source CF7 needs two reachable CNC sources; asked once.
 - Nitro pressure needs unchanged fresh capacity preflight after builds settle.
@@ -47,25 +51,23 @@ Historical coordination is evidence only; consult it for a specific current need
 ## Active work / next action
 1. Main retention/finalization/focused audit DONE once; no CI work outstanding.
    Release34812799504; seven companion IDs in immutable qualification receipt.
-2. pr490-main-physical-preparation freeze/revalidation DONE. Generated readiness
-   controls installed byte-identically both hosts; one native readiness started
-   each07:02Z. Inspect status/results, do not relaunch. Nitro source-stage raw
-   receipts match aad507928e30c9a35a6c70ce7ac5ba7d18fe4e57ca88c3a3a21d3915c79e1c28.
-   P06 prepared-f00/INVOCATIONS.md under pr490-p06-transition-preparation gives
-   exact next actions; root reviewed diffs, offline history-guard12cases verified
-   (4accepted/8refused). Prepared invoke_reviewed.py preserves child-only
-   PSModulePath removal; bind its actual generated HTTP/config hashes before use.
-   Latest C4 agent seed and current-agent capture01c6b873 retained;
-   revalidate identity/quiescence before transition. Never reset queues/state.
+2. Freeze/revalidation/readiness DONE. Creator stage + normal activation DONE,
+   all209 observed history revisions preserved; resident-f00 verified. Original
+   quiescence receipt failed due relative child output path; no stop replay.
+   One read proved old pair absent; ordinary stage guards confirmed idle state.
+   Use absolute --output for every transition. P06 prepared-f00 controls under
+   pr490-p06-transition-preparation; native stage pairing-hash refusal before
+   mutation under review. No native/P06 start until disposition; preserve seed.
+   Invoke wrapper keeps child-only PSModulePath removal; actual HTTP/config
+   hashes still unset. Fresh campaign/host registration and actual UI required.
 3. pr490-general-physical-preparation/generated-f00f1301-disabled generated once,
    generation ea4546ca; inert only, all receipt/state bindings unset. P11 adapter
-   still needs actual C3-to-f00 five-path revalidation and populated continuity.
-   pr490-warm-physical-preparation independently reviewed; no generation/activation.
-   Windows C4 uses candidate-admission.verified.json, preserving original.
-   Current warm-agent identity capture DONE once/host: both idle, no extra
-   descendants/signals/changes. Concrete quiescence controls being prepared.
+   C3-to-f00 five-path P11 revalidation prepared; populated continuity pending.
+   Warm controls cbf319de installed both hosts. Both warm agents quiesced once.
+   Windows warm stage DONE/activation running session71633; Nitro stage/activate
+   next via prepared exact dispatchers. Inspect receipts; no launcher replay.
    pr490-timed-physical-preparation has13 helper recipe and14 unchanged supplemental
-   blobs; no execution tree/fixtures/timers. Pressure recipe still unbound.
+   blobs; no execution tree/fixtures/timers. Pressure f00 wrapper still unbound.
    P12/P07 may overlap only after final shared-runtime state, complete passive
    coverage and measured whole-volume growth/capacity. Supplemental unchanged-cap
    fixtures prepared, not executed. No preparation equals physical PASS.

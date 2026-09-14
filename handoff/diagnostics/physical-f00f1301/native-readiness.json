@@ -1,0 +1,111 @@
+{
+  "schema": "fcp.physical.native-readiness-retention.v1",
+  "candidate": "f00f13013b58e0023f1a506e32daa86df37af7ae",
+  "status": "BOTH_NATIVE_READINESS_COMPLETED_GATES_PASS",
+  "qualification_sha256": "9d4c1c55046ca86110e728e6638a2e4a7d15e36c9cd4db377af82a0984ae6ff4",
+  "freeze_sha256": "0c5127ae2d2dc8885182f38c908dc544789f38cf3e9de69bc12d1f1e56366d25",
+  "hosts": {
+    "windows": {
+      "status": "COMPLETED",
+      "started_at": "2026-09-14T07:01:38.586097+00:00",
+      "finished_at": "2026-09-14T07:03:38.204081+00:00",
+      "python_version": "Python 3.12.10",
+      "native_environment_reused": true,
+      "gate_checks": [
+        {
+          "duration_seconds": 70.953,
+          "name": "cf7-acceptance",
+          "passed": true,
+          "returncode": 0
+        },
+        {
+          "duration_seconds": 44.407,
+          "name": "capability-routes",
+          "passed": true,
+          "returncode": 0
+        },
+        {
+          "duration_seconds": 0.437,
+          "name": "compose-config",
+          "passed": true,
+          "returncode": 0
+        },
+        {
+          "duration_seconds": 0.094,
+          "name": "diff-hygiene",
+          "passed": true,
+          "returncode": 0
+        }
+      ],
+      "gates_passed": true,
+      "transfer_status": "READINESS_INPUTS_TRANSFERRED_BYTE_IDENTICALLY",
+      "readiness_status_sha256": "fd9cdde8def1491ac28abb002b38227996c71271fb563d11885c7644e6607532",
+      "transfer_receipt_sha256": "d816a32f2afd1f7670ef3e0a43e5272ce5e01e97de952a1490aa5a30213234e4",
+      "native_commands_log_sha256": "80e686a19938758a1601185aa5d6a0dc6590f0850b605c9a538724979deba2cc",
+      "native_log_sha256": {
+        "dependency-check.private.log": "f224655f1ff1d95e2b2a3014fe5560b31fa92ad15dac4fd90897e156ebeac2fd",
+        "gates.private.log": "567695926553d96760c2c05070a6b7c101fe141427096726c958ef2e5e679512",
+        "init.private.log": "ad1cfe94ab432b680a334dba4c75ed8bf4c8634c73dd1bdde646a9c05f72917d",
+        "preflight.private.log": "1fb34b8543e622d8d8d53b5acdcacf89989a3c4ea899723c52639da1cd85a818",
+        "python-version.private.log": "8b78285e9c3d1a1e0a9933cdb28c59d53d8be20e4a10aecd72cb0ee6d4b4ca52",
+        "storage-precondition.private.log": "c28af98f12b08491746f4ddae8901f01bd8cd175790913b8d90b43e8570445da"
+      },
+      "physical_acceptance_passed": false,
+      "runtime_activated_by_readiness": false
+    },
+    "nitro": {
+      "status": "COMPLETED",
+      "started_at": "2026-09-14T07:01:39.743356+00:00",
+      "finished_at": "2026-09-14T07:07:13.670781+00:00",
+      "python_version": "Python 3.12.13",
+      "native_environment_reused": true,
+      "gate_checks": [
+        {
+          "duration_seconds": 145.391,
+          "name": "cf7-acceptance",
+          "passed": true,
+          "returncode": 0
+        },
+        {
+          "duration_seconds": 167.769,
+          "name": "capability-routes",
+          "passed": true,
+          "returncode": 0
+        },
+        {
+          "duration_seconds": 0.203,
+          "name": "compose-config",
+          "passed": true,
+          "returncode": 0
+        },
+        {
+          "duration_seconds": 0.004,
+          "name": "diff-hygiene",
+          "passed": true,
+          "returncode": 0
+        }
+      ],
+      "gates_passed": true,
+      "transfer_status": "READINESS_INPUTS_TRANSFERRED_BYTE_IDENTICALLY",
+      "readiness_status_sha256": "d214ac3c0bfd6afed1feed1121b529260ae3a90952cfd4abf1975cb88a90136e",
+      "transfer_receipt_sha256": "0e2644da3c002ed28bce5cdc59e1ef6406ffd02eb117313d5645e9c8b6f9281b",
+      "native_commands_log_sha256": "878c49e937997ec8d77c24904b29491a65d29f59b5f5ce0ac439553dcd23909f",
+      "native_log_sha256": {
+        "dependency-check.private.log": "a10f75b992f2f250449978aa5040718b580021919b995d4757300e84e5c3a219",
+        "gates.private.log": "f3aad7c2990183fdeb108c310d8aa65e4db3f7ade86bb0d98b1d4f60a60e5c61",
+        "init.private.log": "38ecfbd8889893e574b0360e6d6c6967fba3685ca595484791499c7c7feea97a",
+        "preflight.private.log": "0ce5b86017d0b90e05f2f77066ccf0ec3b01810082a78e77c7f02e10b64e9205",
+        "python-version.private.log": "940debe0cfc727dd5f2751e4b33529b6e2b58219b148ca4f305cdf3dfebabedb",
+        "storage-precondition.private.log": "2f1b532da7d0aa70ea1220f883b829d6f7ae9f652828ab754a0b9108d585d30f"
+      },
+      "physical_acceptance_passed": false,
+      "runtime_activated_by_readiness": false
+    }
+  },
+  "private_retention_sha256": "fc06f6e86e63a06da42ce349a1e92e052031728adbe5ed2dcbcfb78356f174da",
+  "fresh_per_host_readiness_runs": 1,
+  "readiness_reruns": 0,
+  "physical_pass": false,
+  "runtime_activation_proven": false,
+  "note": "Native readiness gates are preparation. They do not replace runtime admission or P01\u2013P12 physical acceptance."
+}
