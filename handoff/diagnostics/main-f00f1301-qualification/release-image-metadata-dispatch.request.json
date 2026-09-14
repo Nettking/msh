@@ -1,0 +1,9 @@
+{
+  "candidate": "f00f13013b58e0023f1a506e32daa86df37af7ae",
+  "existing_run_ids": [],
+  "merge_receipt_sha256": "535dc64826ba485c42ba9956d71d979f844778086272fa2ccc5ca0aff3bf088b",
+  "recorded_at": "2026-09-14T06:18:15.817597+00:00",
+  "status": "REQUESTING_MISSING_CONTRACT_GATE",
+  "whole_ci_rerun": false,
+  "workflow": "release-image-metadata.yml"
+}

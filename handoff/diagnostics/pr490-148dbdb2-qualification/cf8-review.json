@@ -1,0 +1,33 @@
+{
+  "mandatory_release_cf8_platform": "Linux",
+  "mandatory_release_proofs_audited": true,
+  "records": [
+    {
+      "artifact_id": 10334932222,
+      "context": "full-suite-order-fixed",
+      "digest": "sha256:3496bf41fef8c70362dbe8a1af7adf9cd4a9d3ef63a9eb246ecc3d0b77ff6981",
+      "proof_kind": "mandatory-release-context",
+      "skipped": 0,
+      "tests": 12
+    },
+    {
+      "artifact_id": 10333987872,
+      "context": "full-suite-order-rotating",
+      "digest": "sha256:e3b3e879582dc6b6c1b0f9462fd72c7d068cd50612677d71991876bff7f745dc",
+      "proof_kind": "mandatory-release-context",
+      "skipped": 0,
+      "tests": 12
+    },
+    {
+      "artifact_id": 10334163482,
+      "context": "linux-regression-shard-0",
+      "digest": "sha256:9d449144dec50f642fba479b6ac04c19a0fa36bb0971b6390ecb55af3b738ed6",
+      "proof_kind": "mandatory-release-context",
+      "skipped": 0,
+      "tests": 12
+    }
+  ],
+  "source": "148dbdb21d1f98dfb5a1db08c8e7081a299cb149",
+  "standalone_workflow": "NOT_TRIGGERED",
+  "windows_cf8_standalone": "NOT_TRIGGERED_NO_WINDOWS_CF8_PASS_CLAIM"
+}

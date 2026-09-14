@@ -1,0 +1,183 @@
+{
+  "API_called_by_audit": false,
+  "api_head": "d0e5b6b8993b76ccb2e49da699fb304a2684df66",
+  "disjoint_shard_union_unskipped_passed": 9,
+  "expected_cases": 9,
+  "full_orders_unskipped_passed": 2,
+  "mode": "pr",
+  "physical_pass": false,
+  "qualification_sha256": "8cb643f1bcf054bf22303564708fe0365fc90f75a458cf58cb866eefbcc9c5f2",
+  "records": [
+    {
+      "artifact_id": 10334163482,
+      "cases": [
+        [
+          "catalog.federation.tests.test_manifest_text_validation",
+          "test_nonempty_text_is_returned_without_normalization_or_copying"
+        ],
+        [
+          "catalog.federation.tests.test_manifest_text_validation",
+          "test_nontext_and_blank_inputs_keep_the_same_error_contract"
+        ],
+        [
+          "catalog.federation.tests.test_manifest_text_validation",
+          "test_optional_source_and_acknowledgement_ids_keep_control_validation"
+        ],
+        [
+          "catalog.federation.tests.test_manifest_text_validation",
+          "test_public_manifest_contracts_preserve_printable_c1_and_unicode[dataset-dataset_id]"
+        ],
+        [
+          "catalog.federation.tests.test_manifest_text_validation",
+          "test_public_manifest_contracts_preserve_printable_c1_and_unicode[item-item_id]"
+        ],
+        [
+          "catalog.federation.tests.test_manifest_text_validation",
+          "test_public_manifest_contracts_preserve_printable_c1_and_unicode[manifest-session_id]"
+        ],
+        [
+          "catalog.federation.tests.test_manifest_text_validation",
+          "test_public_manifest_contracts_reject_every_ascii_control[dataset-dataset_id]"
+        ],
+        [
+          "catalog.federation.tests.test_manifest_text_validation",
+          "test_public_manifest_contracts_reject_every_ascii_control[item-item_id]"
+        ],
+        [
+          "catalog.federation.tests.test_manifest_text_validation",
+          "test_public_manifest_contracts_reject_every_ascii_control[manifest-session_id]"
+        ]
+      ],
+      "digest": "sha256:9d449144dec50f642fba479b6ac04c19a0fa36bb0971b6390ecb55af3b738ed6",
+      "job_id": 103865575900,
+      "name": "linux-regression-shard-0",
+      "native_log_sha256": "99c1b6e75fe95004dc5f2cc1dcb59f304789c56d2ac418e427bc13410c7e5d78",
+      "unskipped_passed": 9
+    },
+    {
+      "artifact_id": 10334940337,
+      "cases": [],
+      "digest": "sha256:360a97215e61722b82b11307a9efe9ba34839b82c7f2f9ceb3b81ce60aca7e6f",
+      "job_id": 103865575859,
+      "name": "linux-regression-shard-1",
+      "native_log_sha256": "7fd5dcbe0531f7c70be0063c278b3e7f3e54cdc50bb3ab7195498aa94f32988e",
+      "unskipped_passed": 0
+    },
+    {
+      "artifact_id": 10334322575,
+      "cases": [],
+      "digest": "sha256:f8bedde00ec98a2d3ae8e1b534f69684a909acd13f99ea88f683efbb277c9b55",
+      "job_id": 103865575886,
+      "name": "linux-regression-shard-2",
+      "native_log_sha256": "bb5fbceb332bb6d766550e03286f5b62c207a47b7e1db7574b4ba228f491be84",
+      "unskipped_passed": 0
+    },
+    {
+      "artifact_id": 10334906010,
+      "cases": [],
+      "digest": "sha256:b771b0ad99fc5544b3a91329b0a101bfbf0b8fb06640cd0a38b0e97f116b3f8c",
+      "job_id": 103865575906,
+      "name": "linux-regression-shard-3",
+      "native_log_sha256": "f0ee17bec16e4295411fbcf406015b21bbe53718367d4b45cbc0b529fe646bd1",
+      "unskipped_passed": 0
+    },
+    {
+      "artifact_id": 10334932222,
+      "cases": [
+        [
+          "catalog.federation.tests.test_manifest_text_validation",
+          "test_nonempty_text_is_returned_without_normalization_or_copying"
+        ],
+        [
+          "catalog.federation.tests.test_manifest_text_validation",
+          "test_nontext_and_blank_inputs_keep_the_same_error_contract"
+        ],
+        [
+          "catalog.federation.tests.test_manifest_text_validation",
+          "test_optional_source_and_acknowledgement_ids_keep_control_validation"
+        ],
+        [
+          "catalog.federation.tests.test_manifest_text_validation",
+          "test_public_manifest_contracts_preserve_printable_c1_and_unicode[dataset-dataset_id]"
+        ],
+        [
+          "catalog.federation.tests.test_manifest_text_validation",
+          "test_public_manifest_contracts_preserve_printable_c1_and_unicode[item-item_id]"
+        ],
+        [
+          "catalog.federation.tests.test_manifest_text_validation",
+          "test_public_manifest_contracts_preserve_printable_c1_and_unicode[manifest-session_id]"
+        ],
+        [
+          "catalog.federation.tests.test_manifest_text_validation",
+          "test_public_manifest_contracts_reject_every_ascii_control[dataset-dataset_id]"
+        ],
+        [
+          "catalog.federation.tests.test_manifest_text_validation",
+          "test_public_manifest_contracts_reject_every_ascii_control[item-item_id]"
+        ],
+        [
+          "catalog.federation.tests.test_manifest_text_validation",
+          "test_public_manifest_contracts_reject_every_ascii_control[manifest-session_id]"
+        ]
+      ],
+      "digest": "sha256:3496bf41fef8c70362dbe8a1af7adf9cd4a9d3ef63a9eb246ecc3d0b77ff6981",
+      "job_id": 103865575905,
+      "name": "full-suite-order-fixed",
+      "native_log_sha256": "302d2a07711873de90404117cf1b42868ded51b4660858df7b9634892c598089",
+      "unskipped_passed": 9
+    },
+    {
+      "artifact_id": 10333987872,
+      "cases": [
+        [
+          "catalog.federation.tests.test_manifest_text_validation",
+          "test_nonempty_text_is_returned_without_normalization_or_copying"
+        ],
+        [
+          "catalog.federation.tests.test_manifest_text_validation",
+          "test_nontext_and_blank_inputs_keep_the_same_error_contract"
+        ],
+        [
+          "catalog.federation.tests.test_manifest_text_validation",
+          "test_optional_source_and_acknowledgement_ids_keep_control_validation"
+        ],
+        [
+          "catalog.federation.tests.test_manifest_text_validation",
+          "test_public_manifest_contracts_preserve_printable_c1_and_unicode[dataset-dataset_id]"
+        ],
+        [
+          "catalog.federation.tests.test_manifest_text_validation",
+          "test_public_manifest_contracts_preserve_printable_c1_and_unicode[item-item_id]"
+        ],
+        [
+          "catalog.federation.tests.test_manifest_text_validation",
+          "test_public_manifest_contracts_preserve_printable_c1_and_unicode[manifest-session_id]"
+        ],
+        [
+          "catalog.federation.tests.test_manifest_text_validation",
+          "test_public_manifest_contracts_reject_every_ascii_control[dataset-dataset_id]"
+        ],
+        [
+          "catalog.federation.tests.test_manifest_text_validation",
+          "test_public_manifest_contracts_reject_every_ascii_control[item-item_id]"
+        ],
+        [
+          "catalog.federation.tests.test_manifest_text_validation",
+          "test_public_manifest_contracts_reject_every_ascii_control[manifest-session_id]"
+        ]
+      ],
+      "digest": "sha256:e3b3e879582dc6b6c1b0f9462fd72c7d068cd50612677d71991876bff7f745dc",
+      "job_id": 103865575822,
+      "name": "full-suite-order-rotating",
+      "native_log_sha256": "97a237f3bd9b0b7b2552d677d530e5fbec7235d9f17d2b0e054ab38c09bff6e9",
+      "unskipped_passed": 9
+    }
+  ],
+  "source": "148dbdb21d1f98dfb5a1db08c8e7081a299cb149",
+  "status": "MANIFEST_TEXT_FOCUSED_ARTIFACT_PASS",
+  "test_blob": "6e204788e82f9882b7cbba6ea31177f4572eef4c",
+  "test_path": "catalog/federation/tests/test_manifest_text_validation.py",
+  "tests_executed_by_audit": false,
+  "tree": "49c6f273afa82059d45dbc2bdffb5168b083f25d"
+}

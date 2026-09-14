@@ -1,0 +1,5 @@
+Exact-source Phase2 Windows recovery: 381 passed, 1 skipped in 104.61s.
+Both original/recovery executed the same complete checked command.
+382 progress positions unchanged except original failed position 98 changes F to dot.
+The sole skip remains position 5: Windows POSIX-mode permissions test.
+Original Linux and latest copied-record native logs are byte-identical; timestamps precede recovery.

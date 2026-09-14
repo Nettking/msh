@@ -1,0 +1,21 @@
+{
+  "actual_main": "f00f13013b58e0023f1a506e32daa86df37af7ae",
+  "actual_main_verified_at": "2026-09-14T06:17:00.088804+00:00",
+  "admin_or_bypass": false,
+  "authorization_sha256": "157d16205959ff3adf274bad4532e657d88bc371f8135e019353de42cd614838",
+  "base": "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d",
+  "focus_audit_sha256": "f90284ba7993b19eefc546190853357f84d1982baa205d5f92b93b9c163b66cc",
+  "head": "d0e5b6b8993b76ccb2e49da699fb304a2684df66",
+  "method": "merge",
+  "pr": 490,
+  "qualification_sha256": "8cb643f1bcf054bf22303564708fe0365fc90f75a458cf58cb866eefbcc9c5f2",
+  "response": {
+    "merged": true,
+    "message": "Pull Request successfully merged",
+    "sha": "f00f13013b58e0023f1a506e32daa86df37af7ae"
+  },
+  "reviewed_at": "2026-09-14T06:16:57.137012+00:00",
+  "source": "148dbdb21d1f98dfb5a1db08c8e7081a299cb149",
+  "status": "MERGED",
+  "tree": "49c6f273afa82059d45dbc2bdffb5168b083f25d"
+}
