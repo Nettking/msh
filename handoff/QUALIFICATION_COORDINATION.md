@@ -1,6 +1,6 @@
 # Federation v1 current release checkpoint
 
-Updated 2026-09-14T08:19Z. Active context: clean handoff + this file + live GitHub.
+Updated 2026-09-14T08:43Z. Active context: clean handoff + this file + live GitHub.
 Historical coordination is evidence only; consult it for a specific current need.
 
 ## Current source / heads
@@ -30,7 +30,7 @@ Historical coordination is evidence only; consult it for a specific current need
   P09 overall incomplete; any reuse follows the new checked revalidation.
 - Repair focused red-to-green:10PASS/1Windows file-symlink privilege skip.
   Both real Windows junction tests PASS. Related suites50PASS/1privilege skip.
-  Final independent source review has no blockers. Linux alias coverage pending.
+  Final independent source review has no blockers. Linux fixed+shard:9PASS/2Windows-only skips; rotating pending.
 - Clean PR-head Windows11case supplement complete:10PASS/1privilege skip,
   repairworktree/.acceptance/candidate-filter-proof/exact-pr-head.json SHA256
   d1b20018125f37b0bdcf895cc67bbf753e51b54b6ece52509f01a5bf8fe9101e.
@@ -50,19 +50,27 @@ Historical coordination is evidence only; consult it for a specific current need
   prior memory-margin refusal is fixture capacity, not product OOM.
 
 ## Active work / next action
-1. Qualify PR491. Natural PR set: release, ICSE, CF7-B, update, branding, CF8,
-   F85 and B01 JSONL admission. Retain/review current results; no inherited waivers.
-   Phase2 absence is expected for the three changed common/Flask paths.
-   Branding PASS; other required runs queued/running, attempt1. B01 run34821054575
-   refused both hosted jobs before runner/steps for billing/spending admission.
-   No candidate code ran. Retain failed status and audit required actual coverage;
-   diagnostics/physical-f00f1301/pr491-b01-hosted-admission.json. No hosted retry.
-2. Private controls: .acceptance/jsonl-startup-release-preparation; root reviews
-   new toolkit/input hashes and exact B01 disposition before running. Clean PR
-   synthetic checkout C:/wsl/fcp-v1-e6717470-pr491-20260914 staged at e6717470.
-   Linux fullorders/shard must actually
-   run the file-alias case. Keep executed commits explicit; any supplemental
-   Windows proof reuse requires complete Git-tree equality.
+1. PR491 ICSE4/4, CF7-B, update, branding, CF8 and F85 PASS attempt1.
+   Release34821054538 still running: fixed full order and all four Linux shards
+   PASS; Windows journal job103902485286 has3 quorum/leadership startup failures.
+   Exact-current Linux fixed+shards pass all3 failed Windows cases unskipped.
+   Exact failure review: unresolved non-demonstrated candidate defect; no proven
+   harness/host cause. Required job remains red. Await terminal16-job evidence,
+   then one reviewed failed-only recovery if the failure set remains unchanged.
+   .acceptance/pr491-release-first-failure/EXECUTION.md; helper3a6ffd10 root-reviewed,
+   disabled until terminal retention and actual dependency IDs/hashes are bound.
+   Root disposition96721e32 retained under diagnostics/pr491-e6717470-qualification/
+   release-first-failure/. No broad rerun or deadline/assertion change.
+   B01 run34821054575 failed both jobs before runner/steps for billing admission;
+   preserve failure and audit actual required coverage; no hosted retry.
+   diagnostics/physical-f00f1301/pr491-b01-hosted-admission.json.
+2. .acceptance/jsonl-startup-release-preparation: exact controls root-reviewed;
+   only read-only qualification enabled. First retention022f3ae6 has23native logs/
+   16artifacts; immutable original failures retained. Clean synthetic H
+   C:/wsl/fcp-v1-e6717470-pr491-20260914. Full Linux scanner audit awaits final
+   order evidence; Windows supplement reuse requires full-tree equality.
+   Freeze adapter root-reviewed/disabled: .acceptance/jsonl-startup-freeze-preparation.
+   Native readiness recipe: .acceptance/pr491-native-readiness-preparation/README.private.md.
 3. After required PR evidence: normal merge, qualify resulting main once.
    Its seven automatic workflows exclude PR-only B01; dispatch only missing
    CF7-A and release-image-metadata once. No extra Phase2 or blanket CI rerun.

@@ -1,0 +1,422 @@
+{
+  "api_calls": 0,
+  "api_head": "3e7becd91c33fa966aba96333c87afd91a0aba69",
+  "comparison_summary": "All three Windows-failed nodes passed unskipped in current Linux fixed full order and exactly one current Linux shard each. This is comparative execution evidence; no Windows root cause or product classification is inferred.",
+  "contexts": [
+    {
+      "artifact_api_digest": "sha256:548360b436c21bd83893887fd13809f042de4db0438382ff1d3822447f2b2958",
+      "artifact_bytes": 111576,
+      "artifact_id": 10338682956,
+      "artifact_name": "full-suite-order-fixed",
+      "failed_windows_case_comparison": [
+        {
+          "class": "catalog.federation.tests.test_control_plane_product_transactions",
+          "name": "test_consumed_grants_and_original_request_receipts_survive_automatic_failover",
+          "outcome": "PASS",
+          "seconds": 23.092
+        },
+        {
+          "class": "catalog.federation.tests.test_control_plane_public_journal",
+          "name": "test_follower_relay_lifecycle_cannot_append_an_independent_public_revision",
+          "outcome": "PASS",
+          "seconds": 16.916
+        },
+        {
+          "class": "catalog.flask_app.tests.test_c03_provider_operator",
+          "name": "test_configured_c03_provider_page_and_manual_pending_approval",
+          "outcome": "PASS",
+          "seconds": 15.431
+        }
+      ],
+      "job_conclusion": "success",
+      "job_id": 103902484927,
+      "junit_member": "order-fixed.xml",
+      "junit_sha256": "fcfdc0c6ec672ea5eef069dd6b667f36fb147db0a3e7ddb5a28da3099547bcab",
+      "native_artifact_digest_lines": [
+        "2026-09-14T08:31:45.4006382Z SHA256 digest of uploaded artifact zip is 548360b436c21bd83893887fd13809f042de4db0438382ff1d3822447f2b2958"
+      ],
+      "native_artifact_id_lines": [
+        "2026-09-14T08:31:45.6956626Z Artifact full-suite-order-fixed.zip successfully finalized. Artifact ID 10338682956"
+      ],
+      "native_checkout_lines": [
+        "2026-09-14T08:07:10.4790577Z e6717470aa975d4168a77dd136ee26c916981b56"
+      ],
+      "native_log_sha256": "3f21940d53046c2426a3a54c4c1ea8eb9cadd04253c32f2b76fc2946a62f90e0",
+      "scanner_cases": [
+        {
+          "class": "catalog.flask_app.tests.test_federated_jsonl_candidate_filter",
+          "name": "test_optional_file_filter_preserves_sorted_default_discovery",
+          "outcome": "PASS",
+          "seconds": 0.005
+        },
+        {
+          "class": "catalog.flask_app.tests.test_federated_jsonl_candidate_filter",
+          "name": "test_final_resolution_rejects_junction_rebound_after_prefilter",
+          "outcome": "SKIP",
+          "seconds": 0.0,
+          "skip_reason": "Windows directory junction rebinding"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_federated_jsonl_candidate_filter",
+          "name": "test_parent_resolution_is_refreshed_for_each_pass",
+          "outcome": "PASS",
+          "seconds": 0.188
+        },
+        {
+          "class": "catalog.flask_app.tests.test_federated_jsonl_candidate_filter",
+          "name": "test_reparse_leaf_falls_back_to_full_resolution",
+          "outcome": "PASS",
+          "seconds": 0.071
+        },
+        {
+          "class": "catalog.flask_app.tests.test_federated_jsonl_candidate_filter",
+          "name": "test_excluded_regular_siblings_resolve_parent_once",
+          "outcome": "PASS",
+          "seconds": 0.074
+        },
+        {
+          "class": "catalog.flask_app.tests.test_federated_jsonl_candidate_filter",
+          "name": "test_resolved_file_alias_selection_and_lexical_markers_are_preserved",
+          "outcome": "PASS",
+          "seconds": 0.668
+        },
+        {
+          "class": "catalog.flask_app.tests.test_federated_jsonl_candidate_filter",
+          "name": "test_candidate_marker_errors_still_fail_closed",
+          "outcome": "PASS",
+          "seconds": 0.275
+        },
+        {
+          "class": "catalog.flask_app.tests.test_federated_jsonl_candidate_filter",
+          "name": "test_candidates_keep_prefix_boundaries_and_hidden_imports",
+          "outcome": "PASS",
+          "seconds": 0.08
+        },
+        {
+          "class": "catalog.flask_app.tests.test_federated_jsonl_candidate_filter",
+          "name": "test_windows_junction_alias_keeps_current_glob_selection",
+          "outcome": "SKIP",
+          "seconds": 0.0,
+          "skip_reason": "Windows directory junction semantics"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_federated_jsonl_candidate_filter",
+          "name": "test_excluded_candidates_skip_ancestor_marker_checks[False]",
+          "outcome": "PASS",
+          "seconds": 0.202
+        },
+        {
+          "class": "catalog.flask_app.tests.test_federated_jsonl_candidate_filter",
+          "name": "test_excluded_candidates_skip_ancestor_marker_checks[True]",
+          "outcome": "PASS",
+          "seconds": 0.065
+        }
+      ]
+    },
+    {
+      "artifact_api_digest": "sha256:f773d0e50dff78a1ad3387f8e6404a117a8456091efa1c4fb95c889aeadeb3fb",
+      "artifact_bytes": 162159,
+      "artifact_id": 10338687021,
+      "artifact_name": "linux-regression-shard-0",
+      "failed_windows_case_comparison": [
+        {
+          "class": "catalog.federation.tests.test_control_plane_product_transactions",
+          "name": "test_consumed_grants_and_original_request_receipts_survive_automatic_failover",
+          "outcome": "NOT_IN_THIS_SHARD"
+        },
+        {
+          "class": "catalog.federation.tests.test_control_plane_public_journal",
+          "name": "test_follower_relay_lifecycle_cannot_append_an_independent_public_revision",
+          "outcome": "NOT_IN_THIS_SHARD"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_c03_provider_operator",
+          "name": "test_configured_c03_provider_page_and_manual_pending_approval",
+          "outcome": "NOT_IN_THIS_SHARD"
+        }
+      ],
+      "job_conclusion": "success",
+      "job_id": 103902485124,
+      "junit_member": "junit-0.xml",
+      "junit_sha256": "91df72931240e433b81d02a21de22f8d897d796d2a0ddc1bff703df29e6aadeb",
+      "native_artifact_digest_lines": [
+        "2026-09-14T08:23:14.8235274Z SHA256 digest of uploaded artifact zip is f773d0e50dff78a1ad3387f8e6404a117a8456091efa1c4fb95c889aeadeb3fb"
+      ],
+      "native_artifact_id_lines": [
+        "2026-09-14T08:23:15.1711393Z Artifact linux-regression-shard-0.zip successfully finalized. Artifact ID 10338687021"
+      ],
+      "native_checkout_lines": [
+        "2026-09-14T08:17:49.7400498Z e6717470aa975d4168a77dd136ee26c916981b56"
+      ],
+      "native_log_sha256": "0670f4b0c46531737aa82ccf5c0e2d7f16b35cb4e99fd95cfdfe43567e79ab6a",
+      "scanner_cases": []
+    },
+    {
+      "artifact_api_digest": "sha256:b46fdffeb8d71e90a2bbe8f4d496c7771175fec465b9b186f922b513f14319b2",
+      "artifact_bytes": 166913,
+      "artifact_id": 10338234563,
+      "artifact_name": "linux-regression-shard-1",
+      "failed_windows_case_comparison": [
+        {
+          "class": "catalog.federation.tests.test_control_plane_product_transactions",
+          "name": "test_consumed_grants_and_original_request_receipts_survive_automatic_failover",
+          "outcome": "NOT_IN_THIS_SHARD"
+        },
+        {
+          "class": "catalog.federation.tests.test_control_plane_public_journal",
+          "name": "test_follower_relay_lifecycle_cannot_append_an_independent_public_revision",
+          "outcome": "NOT_IN_THIS_SHARD"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_c03_provider_operator",
+          "name": "test_configured_c03_provider_page_and_manual_pending_approval",
+          "outcome": "NOT_IN_THIS_SHARD"
+        }
+      ],
+      "job_conclusion": "success",
+      "job_id": 103902485207,
+      "junit_member": "junit-1.xml",
+      "junit_sha256": "e1208d39b89bf647d8ddd8a4e1d5bdb377ab335891de45f3edb30a0214666a77",
+      "native_artifact_digest_lines": [
+        "2026-09-14T08:32:25.6310805Z SHA256 digest of uploaded artifact zip is b46fdffeb8d71e90a2bbe8f4d496c7771175fec465b9b186f922b513f14319b2"
+      ],
+      "native_artifact_id_lines": [
+        "2026-09-14T08:32:25.9657483Z Artifact linux-regression-shard-1.zip successfully finalized. Artifact ID 10338234563"
+      ],
+      "native_checkout_lines": [
+        "2026-09-14T08:27:52.8002824Z e6717470aa975d4168a77dd136ee26c916981b56"
+      ],
+      "native_log_sha256": "10cd289c33b3adcb83819a0f4863bc2fbebad65ce9b99d1e9a47f8ab128f94fa",
+      "scanner_cases": [
+        {
+          "class": "catalog.flask_app.tests.test_federated_jsonl_candidate_filter",
+          "name": "test_excluded_candidates_skip_ancestor_marker_checks[True]",
+          "outcome": "PASS",
+          "seconds": 0.051
+        },
+        {
+          "class": "catalog.flask_app.tests.test_federated_jsonl_candidate_filter",
+          "name": "test_excluded_candidates_skip_ancestor_marker_checks[False]",
+          "outcome": "PASS",
+          "seconds": 0.066
+        },
+        {
+          "class": "catalog.flask_app.tests.test_federated_jsonl_candidate_filter",
+          "name": "test_optional_file_filter_preserves_sorted_default_discovery",
+          "outcome": "PASS",
+          "seconds": 0.015
+        },
+        {
+          "class": "catalog.flask_app.tests.test_federated_jsonl_candidate_filter",
+          "name": "test_candidate_marker_errors_still_fail_closed",
+          "outcome": "PASS",
+          "seconds": 0.049
+        },
+        {
+          "class": "catalog.flask_app.tests.test_federated_jsonl_candidate_filter",
+          "name": "test_candidates_keep_prefix_boundaries_and_hidden_imports",
+          "outcome": "PASS",
+          "seconds": 0.085
+        },
+        {
+          "class": "catalog.flask_app.tests.test_federated_jsonl_candidate_filter",
+          "name": "test_resolved_file_alias_selection_and_lexical_markers_are_preserved",
+          "outcome": "PASS",
+          "seconds": 0.068
+        },
+        {
+          "class": "catalog.flask_app.tests.test_federated_jsonl_candidate_filter",
+          "name": "test_windows_junction_alias_keeps_current_glob_selection",
+          "outcome": "SKIP",
+          "seconds": 0.001,
+          "skip_reason": "Windows directory junction semantics"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_federated_jsonl_candidate_filter",
+          "name": "test_excluded_regular_siblings_resolve_parent_once",
+          "outcome": "PASS",
+          "seconds": 0.087
+        },
+        {
+          "class": "catalog.flask_app.tests.test_federated_jsonl_candidate_filter",
+          "name": "test_reparse_leaf_falls_back_to_full_resolution",
+          "outcome": "PASS",
+          "seconds": 0.08
+        },
+        {
+          "class": "catalog.flask_app.tests.test_federated_jsonl_candidate_filter",
+          "name": "test_parent_resolution_is_refreshed_for_each_pass",
+          "outcome": "PASS",
+          "seconds": 0.08
+        },
+        {
+          "class": "catalog.flask_app.tests.test_federated_jsonl_candidate_filter",
+          "name": "test_final_resolution_rejects_junction_rebound_after_prefilter",
+          "outcome": "SKIP",
+          "seconds": 0.007,
+          "skip_reason": "Windows directory junction rebinding"
+        }
+      ]
+    },
+    {
+      "artifact_api_digest": "sha256:4007637d6be719dababdd709464cdf2679d78a8efc22aa034e8a8bc0fce1998f",
+      "artifact_bytes": 162335,
+      "artifact_id": 10339116892,
+      "artifact_name": "linux-regression-shard-2",
+      "failed_windows_case_comparison": [
+        {
+          "class": "catalog.federation.tests.test_control_plane_product_transactions",
+          "name": "test_consumed_grants_and_original_request_receipts_survive_automatic_failover",
+          "outcome": "NOT_IN_THIS_SHARD"
+        },
+        {
+          "class": "catalog.federation.tests.test_control_plane_public_journal",
+          "name": "test_follower_relay_lifecycle_cannot_append_an_independent_public_revision",
+          "outcome": "PASS",
+          "seconds": 6.548
+        },
+        {
+          "class": "catalog.flask_app.tests.test_c03_provider_operator",
+          "name": "test_configured_c03_provider_page_and_manual_pending_approval",
+          "outcome": "PASS",
+          "seconds": 7.402
+        }
+      ],
+      "job_conclusion": "success",
+      "job_id": 103902485240,
+      "junit_member": "junit-2.xml",
+      "junit_sha256": "d28792f04fa54629d947ce56f6363c911ef83240d22abc5ca0cd290857867de6",
+      "native_artifact_digest_lines": [
+        "2026-09-14T08:27:37.3408861Z SHA256 digest of uploaded artifact zip is 4007637d6be719dababdd709464cdf2679d78a8efc22aa034e8a8bc0fce1998f"
+      ],
+      "native_artifact_id_lines": [
+        "2026-09-14T08:27:37.6338589Z Artifact linux-regression-shard-2.zip successfully finalized. Artifact ID 10339116892"
+      ],
+      "native_checkout_lines": [
+        "2026-09-14T08:23:33.3298947Z e6717470aa975d4168a77dd136ee26c916981b56"
+      ],
+      "native_log_sha256": "23d7a4d0cdfaf60e19c8f358350e936e208e48a3a6e908619642b26d6ea20043",
+      "scanner_cases": []
+    },
+    {
+      "artifact_api_digest": "sha256:f5b7406b1bbf71791a2139a7591bcf0fc3530443a9b108efb64d17601caaaf22",
+      "artifact_bytes": 164600,
+      "artifact_id": 10338441979,
+      "artifact_name": "linux-regression-shard-3",
+      "failed_windows_case_comparison": [
+        {
+          "class": "catalog.federation.tests.test_control_plane_product_transactions",
+          "name": "test_consumed_grants_and_original_request_receipts_survive_automatic_failover",
+          "outcome": "PASS",
+          "seconds": 19.8
+        },
+        {
+          "class": "catalog.federation.tests.test_control_plane_public_journal",
+          "name": "test_follower_relay_lifecycle_cannot_append_an_independent_public_revision",
+          "outcome": "NOT_IN_THIS_SHARD"
+        },
+        {
+          "class": "catalog.flask_app.tests.test_c03_provider_operator",
+          "name": "test_configured_c03_provider_page_and_manual_pending_approval",
+          "outcome": "NOT_IN_THIS_SHARD"
+        }
+      ],
+      "job_conclusion": "success",
+      "job_id": 103902485161,
+      "junit_member": "junit-3.xml",
+      "junit_sha256": "385ebdc26377771d2f44a3371fdd4d4b132d1ce14dfe8dd814e022c1926032a2",
+      "native_artifact_digest_lines": [
+        "2026-09-14T08:16:04.1322846Z SHA256 digest of uploaded artifact zip is f5b7406b1bbf71791a2139a7591bcf0fc3530443a9b108efb64d17601caaaf22"
+      ],
+      "native_artifact_id_lines": [
+        "2026-09-14T08:16:04.4936842Z Artifact linux-regression-shard-3.zip successfully finalized. Artifact ID 10338441979"
+      ],
+      "native_checkout_lines": [
+        "2026-09-14T08:10:50.5707334Z e6717470aa975d4168a77dd136ee26c916981b56"
+      ],
+      "native_log_sha256": "c36f81473ffe5df6bf9af784dad5ae8cd41edc71dcb1bb98c39c4db601e0cbfc",
+      "scanner_cases": []
+    },
+    {
+      "artifact_api_digest": "sha256:eb65fde5666ef0c763ea7e1c6c399ce57f1efceba3f37acd8910dd2ef6a467fd",
+      "artifact_bytes": 15106,
+      "artifact_id": 10339026050,
+      "artifact_name": "windows-regression-journal-artifacts",
+      "failed_windows_case_comparison": [
+        {
+          "class": "catalog.federation.tests.test_control_plane_product_transactions",
+          "name": "test_consumed_grants_and_original_request_receipts_survive_automatic_failover",
+          "outcome": "FAIL",
+          "seconds": 37.82
+        },
+        {
+          "class": "catalog.federation.tests.test_control_plane_public_journal",
+          "name": "test_follower_relay_lifecycle_cannot_append_an_independent_public_revision",
+          "outcome": "FAIL",
+          "seconds": 25.693
+        },
+        {
+          "class": "catalog.flask_app.tests.test_c03_provider_operator",
+          "name": "test_configured_c03_provider_page_and_manual_pending_approval",
+          "outcome": "FAIL",
+          "seconds": 23.127
+        }
+      ],
+      "job_conclusion": "failure",
+      "job_id": 103902485286,
+      "junit_member": "windows-journal-artifacts.xml",
+      "junit_sha256": "4d997782a953ec8de97fdd153a9b2eb57f6f1f347e0db82ba0aae4893fca3eee",
+      "native_artifact_digest_lines": [
+        "2026-09-14T08:20:13.1773605Z SHA256 digest of uploaded artifact zip is eb65fde5666ef0c763ea7e1c6c399ce57f1efceba3f37acd8910dd2ef6a467fd"
+      ],
+      "native_artifact_id_lines": [
+        "2026-09-14T08:20:13.5176104Z Artifact windows-regression-journal-artifacts.zip successfully finalized. Artifact ID 10339026050"
+      ],
+      "native_checkout_lines": [
+        "2026-09-14T08:11:34.6614337Z e6717470aa975d4168a77dd136ee26c916981b56"
+      ],
+      "native_log_sha256": "c0834f010c2494f2227ea8ef43e5cf02c36cf6b31593385c5a78c7adde019602",
+      "scanner_cases": []
+    }
+  ],
+  "failed_windows_job_id": 103902485286,
+  "original_failure_log_sha256": "c0834f010c2494f2227ea8ef43e5cf02c36cf6b31593385c5a78c7adde019602",
+  "original_failure_signatures": [
+    {
+      "signature": "websockets.exceptions.ConnectionClosedError: received 1011 (internal error) internal relay error; then sent 1011 (internal error) internal relay error",
+      "test_node": "catalog/federation/tests/test_control_plane_product_transactions.py::test_consumed_grants_and_original_request_receipts_survive_automatic_failover",
+      "timestamp": "2026-09-14T08:20:11.1333726Z"
+    },
+    {
+      "signature": "catalog.federation.control_plane_replication.StaleTerm: leadership was lost during the proposal",
+      "test_node": "catalog/federation/tests/test_control_plane_public_journal.py::test_follower_relay_lifecycle_cannot_append_an_independent_public_revision",
+      "timestamp": "2026-09-14T08:20:11.1335709Z"
+    },
+    {
+      "signature": "catalog.federation.control_plane_replication.StaleTerm: bootstrap proposal lost its leader term",
+      "test_node": "catalog/flask_app/tests/test_c03_provider_operator.py::test_configured_c03_provider_page_and_manual_pending_approval",
+      "timestamp": "2026-09-14T08:20:11.1337195Z"
+    }
+  ],
+  "physical_pass": false,
+  "private_original_sha256": "00f4024993237505b79d308499d3c86a870d959b7e0e5fd8aa7e0623e52fbd3c",
+  "retention_evidence_digest": "022f3ae6ff66be9a6e125bd068c0459ec8094092eae6fc86809784b28ab7170a",
+  "retention_sha256": "cff998c608bfe8483b43d5b587069e031668e403b077c60ce9539e2ed72135b6",
+  "run_attempt": 1,
+  "run_id": 34821054538,
+  "runtime_queries": 0,
+  "scanner_summary": {
+    "disjoint_shard_cases": 11,
+    "disjoint_shard_unskipped_pass": 9,
+    "disjoint_shard_windows_only_skips": 2,
+    "fixed_cases": 11,
+    "fixed_unskipped_pass": 9,
+    "fixed_windows_only_skips": 2,
+    "rotating_not_audited": true,
+    "windows_supplement_not_reaudited": true
+  },
+  "schema": "pr491-current-retained-linux-crossproof-v1",
+  "source": "e6717470aa975d4168a77dd136ee26c916981b56",
+  "tests_run": 0,
+  "tree": "b9c5755f0b2dff2556bbca1713bdd6d2af25bf5b"
+}

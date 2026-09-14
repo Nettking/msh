@@ -1,0 +1,52 @@
+{
+  "api_head": "3e7becd91c33fa966aba96333c87afd91a0aba69",
+  "classification": "UNRESOLVED_NON_DEMONSTRATED_CANDIDATE_DEFECT",
+  "comparison_limits": "Linux execution does not prove a Windows PASS or establish a host root cause. One Windows failed-job recovery is needed for the required release gate; this disposition does not waive that gate.",
+  "current_comparison": "All three Windows-failed nodes passed unskipped in current Linux fixed full order and exactly one current Linux shard each. This is comparative execution evidence; no Windows root cause or product classification is inferred.",
+  "deterministic_harness_defect_demonstrated": false,
+  "executed_failed_job_id": 103902485286,
+  "failure_paths": [
+    {
+      "observation": "Initial member.connect enrollment before failover/token-reuse assertions receives relay1011; captured log names QuorumUnavailable without its underlying raise site. Precise cause unresolved.",
+      "test": "catalog/federation/tests/test_control_plane_product_transactions.py::test_consumed_grants_and_original_request_receipts_survive_automatic_failover"
+    },
+    {
+      "observation": "Entering the shared real-voter _cluster fails initializing the bootstrap public journal. node.propose rejects changed leadership at control_plane_replication.py:2234. Intended follower-lifecycle assertions were not reached.",
+      "test": "catalog/federation/tests/test_control_plane_public_journal.py::test_follower_relay_lifecycle_cannot_append_an_independent_public_revision"
+    },
+    {
+      "observation": "Entering the same _cluster fails before page/approval logic. control_plane_bootstrap_proposal.py:83 rejects term/role change after synchronize.",
+      "test": "catalog/flask_app/tests/test_c03_provider_operator.py::test_configured_c03_provider_page_and_manual_pending_approval"
+    }
+  ],
+  "infrastructure_cause_demonstrated": false,
+  "job_url": "https://github.com/Nettking/msh/actions/runs/34821054538/job/103902485286",
+  "maximum_failed_only_requests_for_this_run": 1,
+  "mechanism_assessment": "The two bootstrap failures share leadership fencing in real-voter startup. The enrollment failure shares the cluster fixture but lacks evidence establishing the same inner mechanism. Observed authority checks fail closed; no evidence demonstrates an unsafe commit or an applicable liveness-contract violation.",
+  "next_action": "After terminal16-job native retention, review the complete failure set. Permit at most one failed-only recovery of this release run if only the original journal job and its matrix/verdict dependencies failed; reuse green jobs unchanged.",
+  "original_attempt": 1,
+  "original_failed_artifact_sha256": "eb65fde5666ef0c763ea7e1c6c399ce57f1efceba3f37acd8910dd2ef6a467fd",
+  "original_native_log_sha256": "c0834f010c2494f2227ea8ef43e5cf02c36cf6b31593385c5a78c7adde019602",
+  "original_retention_sha256": "cff998c608bfe8483b43d5b587069e031668e403b077c60ce9539e2ed72135b6",
+  "physical_pass": false,
+  "private_crossproof_sha256": "00f4024993237505b79d308499d3c86a870d959b7e0e5fd8aa7e0623e52fbd3c",
+  "product_defect_demonstrated": false,
+  "public_crossproof_sha256": "3e11bd7812cb0ce2b70d74ef1b5e3160ca7064929e6e5fc0e1611b89671b8176",
+  "recorded_at": "2026-09-14T08:40:26.279313+00:00",
+  "recovery_request_sent": false,
+  "release_qualified": false,
+  "required_windows_job_status": "FAIL",
+  "run_id": 34821054538,
+  "runner_or_account_configuration_changed": false,
+  "schema": "pr491-current-windows-release-disposition-v1",
+  "source": "e6717470aa975d4168a77dd136ee26c916981b56",
+  "source_or_assertions_or_quorum_or_deadlines_changed": false,
+  "tree": "b9c5755f0b2dff2556bbca1713bdd6d2af25bf5b",
+  "unchanged_from_base_git_blobs": {
+    "catalog/federation/control_plane_bootstrap_proposal.py": "9fcd91d5409595689a44d65c9cc53238d368d2bd",
+    "catalog/federation/control_plane_replication.py": "9753fcfe183f3498e58909e819b360b80245afc5",
+    "catalog/federation/tests/test_control_plane_product_transactions.py": "d45dc076f24d6f024451df204743819f9fb9c24f",
+    "catalog/federation/tests/test_control_plane_public_journal.py": "d03032071477fe1981cf8d0b11372d8263dbc449",
+    "catalog/flask_app/tests/test_c03_provider_operator.py": "82aa2d2af04ecbe77f9d1bb3d96e5b894991f437"
+  }
+}
