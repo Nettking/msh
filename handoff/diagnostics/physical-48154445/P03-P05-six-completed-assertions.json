@@ -1,0 +1,67 @@
+{
+  "candidate": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "host": "nettking",
+  "status": "SIX_CHECKED_ASSERTIONS_PASS",
+  "assertions": [
+    {
+      "scenario": "P03",
+      "assertion": "start-cmd",
+      "verdict": "pass",
+      "evidence": "evidence/v1-physical/observations/P03/20260914T004034403890Z-assertion-d302acd8.json",
+      "evidence_sha256": "6e513b7299764fe6184647387b9ae2e67f682e41b0548b785da30e7ab9d02dd4",
+      "result_path": "C:\\wsl\\fcp-v1-48154445-main-20260914\\.acceptance\\runtime-control\\P03-start-cmd-verify.json",
+      "result_sha256": "24cde11ad366616435d15c18b700f74c18584a01f1782af4706183f718898724"
+    },
+    {
+      "scenario": "P03",
+      "assertion": "identity-and-isolation",
+      "verdict": "pass",
+      "evidence": "evidence/v1-physical/observations/P03/20260914T010112062232Z-assertion-794c5543.json",
+      "evidence_sha256": "0b711d9bd5801bab38ad5f95ef9808753e02087a33d6e23a9f8cf486c53eaee9",
+      "result_path": "C:\\wsl\\fcp-v1-diagnostic-sweep-20260911\\.acceptance\\c3-model-isolation-execution\\P03-identity-and-isolation-verify.json",
+      "result_sha256": "107820cf3aaa14352918ad64684f9bb09deffec16199dfc4b3f12afa230fd312"
+    },
+    {
+      "scenario": "P03",
+      "assertion": "start-tailscale-cmd",
+      "verdict": "pass",
+      "evidence": "evidence/v1-physical/observations/P03/20260914T010416120437Z-assertion-97aa9a70.json",
+      "evidence_sha256": "8be347511c2aad812229c04c93eb325525aff0a588cd8a8fd4a44575a705cb0d",
+      "result_path": "C:\\wsl\\fcp-v1-diagnostic-sweep-20260911\\.acceptance\\c3-p03-creator-tailnet-preparation\\P03-start-tailscale-cmd-verify.json",
+      "result_sha256": "57e86e698a78fa0aba559c40b55a729ce769d36595b53b5ecc5b32b8e37ac334"
+    },
+    {
+      "scenario": "P05",
+      "assertion": "malformed-timestamp-path",
+      "verdict": "pass",
+      "evidence": "evidence/v1-physical/observations/P05/20260914T005427149404Z-assertion-2fae5644.json",
+      "evidence_sha256": "9f59fe1f564ee81cd21ba2a2aa4865465b1d824e8c9dfff5f73101900cee27a9",
+      "result_path": "C:\\wsl\\fcp-v1-diagnostic-sweep-20260911\\.acceptance\\c3-p05-path-containment-execution\\stdout.private.json",
+      "result_sha256": "4dbf3dfd5a527531b8d8b26f44252f055ad34b99b7b76fb29d946b68f51accb9"
+    },
+    {
+      "scenario": "P05",
+      "assertion": "ollama-absence",
+      "verdict": "pass",
+      "evidence": "evidence/v1-physical/observations/P05/20260914T010114251102Z-assertion-04000733.json",
+      "evidence_sha256": "ae6fcf930d38043667184de13a4175c97dd303216ccd26ea7fffac522dd5b357",
+      "result_path": "C:\\wsl\\fcp-v1-diagnostic-sweep-20260911\\.acceptance\\c3-model-isolation-execution\\P05-ollama-absence-verify.json",
+      "result_sha256": "3cb422de70a5f410d334fcc7c18eb7d18217718d1d0f417140b01e15eb9846df"
+    },
+    {
+      "scenario": "P05",
+      "assertion": "stale-responder-pid",
+      "verdict": "pass",
+      "evidence": "evidence/v1-physical/observations/P05/20260914T010549975240Z-assertion-1e669319.json",
+      "evidence_sha256": "4ebd9af7dc3d32dab40393563488a3ac82f5c7fb4d18d2e84a27c4b6815b5a45",
+      "result_path": "C:\\wsl\\fcp-v1-diagnostic-sweep-20260911\\.acceptance\\c3-p05-stale-responder-execution\\owned-dummy-case\\verify.json",
+      "result_sha256": "21e5234983adf21e5b69c5a2865ca8e50ef5ab1c86ccd6821d9155c215f7881d"
+    }
+  ],
+  "old_failed_observations_retained": true,
+  "new_qualification_or_future_candidate_carry": false,
+  "p07_p12_started_by_this_work": false,
+  "passive_hour_started": false,
+  "physical_campaign_pass": false,
+  "protected_data_accessed": false
+}

@@ -1,0 +1,98 @@
+{
+  "status": "OFFLINE_EXACT_SOURCE_COST_PROOF",
+  "candidate_sha": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "created_at": "2026-09-14T01:06:00.332368+00:00",
+  "physical_pass": false,
+  "runtime_started": false,
+  "live_data_mutations": 0,
+  "export_sha256": "a23f1ea95265790532234be3e0b5a24196eca51a983bb657c461daf24cf5f041",
+  "sizes": [
+    98,
+    197
+  ],
+  "results": [
+    {
+      "prefix_revision": 98,
+      "retained_revisions": 99,
+      "retained_manifest_bytes": 4263405,
+      "retained_item_records": 4851,
+      "head_item_count": 98,
+      "methods": {
+        "manifest_head": {
+          "decoded_revisions": 99,
+          "manifest_json_bytes_decoded": 4263405,
+          "retained_item_records_validated": 4851,
+          "wall_seconds": 0.24710790009703487,
+          "cpu_seconds": 0.25,
+          "verified_exact_retained_head": true,
+          "full_history_passes": 1
+        },
+        "manifest_history": {
+          "decoded_revisions": 198,
+          "manifest_json_bytes_decoded": 8526810,
+          "retained_item_records_validated": 9702,
+          "wall_seconds": 0.4642586000263691,
+          "cpu_seconds": 0.453125,
+          "verified_exact_retained_head": true,
+          "full_history_passes": 2
+        },
+        "phase_d_manifest_history": {
+          "decoded_revisions": 297,
+          "manifest_json_bytes_decoded": 12790215,
+          "retained_item_records_validated": 14553,
+          "wall_seconds": 0.7112596000079066,
+          "cpu_seconds": 0.71875,
+          "verified_exact_retained_head": true,
+          "full_history_passes": 3
+        }
+      },
+      "sqlite_bytes_unchanged": true
+    },
+    {
+      "prefix_revision": 197,
+      "retained_revisions": 198,
+      "retained_manifest_bytes": 16644322,
+      "retained_item_records": 19503,
+      "head_item_count": 197,
+      "methods": {
+        "manifest_head": {
+          "decoded_revisions": 198,
+          "manifest_json_bytes_decoded": 16644322,
+          "retained_item_records_validated": 19503,
+          "wall_seconds": 1.174297200050205,
+          "cpu_seconds": 1.171875,
+          "verified_exact_retained_head": true,
+          "full_history_passes": 1
+        },
+        "manifest_history": {
+          "decoded_revisions": 396,
+          "manifest_json_bytes_decoded": 33288644,
+          "retained_item_records_validated": 39006,
+          "wall_seconds": 2.4877588000381365,
+          "cpu_seconds": 2.40625,
+          "verified_exact_retained_head": true,
+          "full_history_passes": 2
+        },
+        "phase_d_manifest_history": {
+          "decoded_revisions": 594,
+          "manifest_json_bytes_decoded": 49932966,
+          "retained_item_records_validated": 58509,
+          "wall_seconds": 5.441916199983098,
+          "cpu_seconds": 5.25,
+          "verified_exact_retained_head": true,
+          "full_history_passes": 3
+        }
+      },
+      "sqlite_bytes_unchanged": true
+    }
+  ],
+  "source_sha256": {
+    "catalog/federation/manifest_store.py": "7b188c1691a9c3d2d3ef0f486d929fd5225883c79de9fbc904a4d2ff90b2dce7",
+    "catalog/federation/phase_d_control.py": "59b857633e1134f3cb6aa7197967b6eb483f99157110f2db01df6cd339d21ecd",
+    "catalog/federation/phase_d_client.py": "9f8bb3ef6721b083863af72e40d32d5222663f3298b1ef26dd41292d34779d60",
+    "catalog/federation/phase_d_service.py": "94a1bc16bbbb3d85cad8ca93f81ac2be3ed2e9cb088378efc04419ae61376981",
+    "catalog/federation/manifest.py": "8d2f0e24c60881d99f8b66ed6819115e5613cb10695d0d9c9f4b0a5e9e207e5a"
+  },
+  "scope": "Unmodified frozen manifest head/history and PhaseD manifest_history methods, with read-only connection factory. Decoder counter delegates every call to the exact original validator. No latency injected. Current storage events are identical for both retained manifest prefixes. Prefix head points to its actual exported revision; retained manifest JSON bytes are unchanged. No authority or network success is fabricated or asserted.",
+  "limits": "One child per prefix,35-second process deadline, only three method calls per child. Local Windows copy timings are not Docker/live timings; deterministic work counts establish repeated history cost."
+}

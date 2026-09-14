@@ -1,6 +1,6 @@
 {
   "candidate_sha": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
-  "recorded_at": "2026-09-14T00:40:06.865532+00:00",
+  "recorded_at": "2026-09-14T01:19:35.432986+00:00",
   "P01_binding": {
     "classification": "deterministic harness input defect",
     "cause": "Core Compose working-directory labels name the external Compose-file parent; original acceptance binding named the source checkout.",
@@ -61,5 +61,84 @@
   "P12": "NOT_STARTED",
   "protected_recorder_data": "UNTOUCHED",
   "AQG": "OFF_NONDEPENDENCY",
-  "AGQ7NCC": "Not required while offline"
+  "AGQ7NCC": "Not required while offline",
+  "P03": {
+    "candidate": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+    "status": "START_CMD_PASS_TAILSCALE_NOT_STARTED",
+    "start_cmd": {
+      "assertion": "start-cmd",
+      "verdict": "pass",
+      "prepare_id": "323e26a6cd4c460a8f72dd9412fbd3be",
+      "launcher_exit_code": 0,
+      "configured_http_status": 200,
+      "log_sha256": "7936c72cfacaf6169c3548a31a5a38070a158b12292af387372d92f036dfc4d8"
+    },
+    "exact_candidate_core_images": 3,
+    "start_tailscale_cmd": {
+      "classification": "DETERMINISTIC_ACCEPTANCE_FIXTURE_PRECONDITION_UNSATISFIED",
+      "reason": "The owned workbench is explicitly loopback-bound; no configured tailnet web path exists.",
+      "prepared": false,
+      "operator_action_recorded": false,
+      "launcher_executed": false,
+      "physical_pass": false
+    },
+    "retained_terminal_receipt_sha256": "3211bfd134b74c66621445446e686edbf7332cb534472140928845884986684f",
+    "physical_campaign_pass": false
+  },
+  "P06_bounded_recovery": {
+    "classification": "product defect demonstrated by exact-shape offline history proof",
+    "observation": "Untraced native startup also did not reach recording in the original100s bounded startup. No update command or fault injection occurred.",
+    "receipt_sha256": "b52f66bd8f3eb9e424c5b0e4913a208e1a16b4bb21d170ec6aed9640aeef0974",
+    "software_command_posted": false,
+    "ordinary_supervisor_stop_exit_code": 0,
+    "next_action": "Complete focused review/tests, qualify required exact repair source, normal merge/main qualification/new freeze, then checked revalidation and remaining physical acceptance."
+  },
+  "pressure_host": {
+    "candidate": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+    "classification": "infrastructure/host resource prerequisite",
+    "observation": "Whole-host memory cannot cover the existing helper allowance plus 512MiB margin",
+    "checked_at": "2026-09-14T00:47:55.014097+00:00",
+    "retained_memory_limit_bytes": 2415919104,
+    "retained_no_swap": true,
+    "host_margin_bytes": 536870912,
+    "live_boundary_verified": true,
+    "receipt_sha256": "8c49d1fbbc6be473434468971c7c7ff1f402e570ddb9b6096fa4211691b8a94e",
+    "product_started": false,
+    "next_action": "Complete independent owned Nitro work; consider resource scheduling only after preserving active acceptance ownership. No repeated memory check without a meaningful state change.",
+    "physical_pass": false
+  },
+  "P03_P05_model_outage": {
+    "candidate": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+    "harness_sha": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+    "host": "nettking",
+    "status": "COMPLETED",
+    "started_at": "2026-09-14T01:00:43.730811+00:00",
+    "finished_at": "2026-09-14T01:01:27.279769+00:00",
+    "results": [
+      {
+        "scenario": "P03",
+        "assertion": "identity-and-isolation",
+        "verdict": "pass",
+        "prepare_id": "f683a10a9cc2431eba6d055d90551f2b"
+      },
+      {
+        "scenario": "P05",
+        "assertion": "ollama-absence",
+        "verdict": "pass",
+        "prepare_id": "b60e4a574aba44d18eb7a76e1ff7f32d"
+      }
+    ],
+    "model_stopped": true,
+    "model_restored": true,
+    "provider_path_unavailable": true,
+    "workbench_http_status_during_outage": 200,
+    "core_containers_unchanged": true,
+    "protected_data_accessed": false,
+    "physical_pass": false,
+    "retained_primary_receipt_sha256": "b5c216522728ed471421bc6ed856e467f507cebb1cdff7356724187b1f20bb0b"
+  },
+  "release_disposition": {
+    "status": "PAUSED_FOR_DEMONSTRATED_CANDIDATE_REPAIR",
+    "decision": "../manifest-history-repair/release-decision.json"
+  }
 }

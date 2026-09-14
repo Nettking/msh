@@ -1,0 +1,19 @@
+{
+  "candidate_sha": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "classified_at": "2026-09-14T01:19:35.432986+00:00",
+  "classification": "product defect",
+  "physical_campaign": "PAUSED_FOR_SOURCE_REPAIR",
+  "mechanism": "Each startup acknowledgement synchronously validates the complete accumulated manifest history three times. Eight legitimate pending dataset heads could not finish the fair startup pass within the unchanged45s sharing gate.",
+  "current_source_live_evidence": "../physical-48154445/P06-trial-recovery-startup-disposition.json",
+  "offline_exact_shape_proof_sha256": "da7cb115b70bf1f44958cacc00ad7c6cb9e6804abba3b922ddc1c6601962bf27",
+  "offline_repair_proof_sha256": "896e9d0fd4f182c18956984546b7ec774380159550ffe3b2baffe3e201cd9baa",
+  "checked_contract": "docs/implementation/v1_robustness_reconciliation.md:799-803 supervised restart/continuity and:912 aged-data performance; docs/release_process.md:45-55 repair/new candidate/required acceptance.",
+  "repair": "Validate each full historical chain once per read operation in one explicit SQLite snapshot; preserve historical corruption, chain/hash, head-pointer, group, genesis and authority checks. No persistent validation cache.",
+  "physical_green_not_claimed": true,
+  "full_repaired_live_startup_not_yet_measured": true,
+  "next_action": "Complete focused review/tests, qualify required exact repair source, normal merge/main qualification/new freeze, then checked revalidation and remaining physical acceptance.",
+  "deadlines_or_assertions_changed": false,
+  "protected_recorder_data_accessed": false,
+  "P07": "NOT_STARTED",
+  "P12": "NOT_STARTED"
+}

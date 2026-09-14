@@ -1,0 +1,30 @@
+{
+  "candidate": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "harness_sha": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "mode": "update-trial-observe",
+  "status": "STOPPED",
+  "started_at": "2026-09-14T00:46:24.213598+00:00",
+  "results": [],
+  "crashes": [],
+  "defaults": {
+    "started_runtime_seconds": 10,
+    "healthy_runtime_seconds": 120,
+    "restart_backoff_seconds": [
+      5,
+      15,
+      45,
+      120
+    ],
+    "max_rapid_restarts": 5
+  },
+  "policy_overrides": false,
+  "new_grant_requested": false,
+  "protected_data_accessed": false,
+  "physical_pass": false,
+  "phase": "SUPPORTED_STARTUP",
+  "supervisor_pid": 48920,
+  "error_type": "RuntimeError",
+  "error": "Bounded observation unavailable: supported startup",
+  "finished_at": "2026-09-14T00:48:04.264117+00:00",
+  "operator_stop_exit_code": 0
+}

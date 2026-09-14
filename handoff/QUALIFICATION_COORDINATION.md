@@ -1,6 +1,6 @@
 # Federation v1 current release checkpoint
 
-Updated 2026-09-14T00:49Z. Active context: clean handoff + this file + live GitHub.
+Updated 2026-09-14T01:19Z. Active context: clean handoff + this file + live GitHub.
 Historical coordination is evidence only; consult it for a specific current need.
 
 ## Current source / heads
@@ -12,9 +12,13 @@ Historical coordination is evidence only; consult it for a specific current need
   f47949c2b3de0f999b1807dd23af57a681f1f7ad8893bad0492346e2d5b0e9a8.
 - Native source admitted C3; data/membership preserved in old 1aac H in place.
   Creator and other Windows normal activations completed with three C3 core images.
-- Nitro start.sh exited0 and three C3 cores run; source/mount/env preservation
-  verified. Original admission STOPPED on final redirected HTTP timeout. No retry.
-- Last pushed checkpoint/evidence commit 6692ec2f. New physical dispositions pending.
+- Nitro start.sh exited0 and three C3 cores run; preservation and follow-upHTTP200
+  verified. Original admission STOPPED receipt retained; no repeated activation.
+- Checkpoint/evidence branch: codex/federation-v1-diagnostic-sweep-20260911.
+- C3 FROZEN ACCEPTANCE PAUSED: demonstrated aged-manifest startup cost defect.
+  Repair worktree C:/wsl/fcp-v1-manifest-history-repair-20260914 from48154445;
+  branch codex/federation-v1-manifest-history-repair; clean local repair
+  14e0193535a9fc1024bde95ae1f49b8940bfd9d9; tree1e12bfc70c0bc7feecf85ed15a369e2f85bba4ce.
 
 ## Current green gates
 - Actual-main release 34787907931:16/16 PASS; ICSE34787907928 attempt2:4/4 PASS.
@@ -28,8 +32,10 @@ Historical coordination is evidence only; consult it for a specific current need
 - Windows/Nitro native readiness complete; fresh canonical campaign registered.
 - Fresh isolated P04/P05/P09:11 assertions PASS, including12 actual OS-kill windows.
   Native basic:4 PASS; crash-loop fence:1 PASS with real5/15/45/120s backoffs.
-  Windows P03 automated:3 PASS; normal start.cmd PASS. Corrected P01:three activations/resource baseline/
-  runtime state PASS. Existing actual activations reused; no replacement action.
+  Windows P03 automated:3 PASS; start.cmd/start-tailscale.cmd PASS; model isolation/
+  absence PASS; P05 path containment/stale responder PID PASS.
+  Corrected P01:three activations/resource baseline/runtime state PASS. Existing
+  actual activations reused; no replacement action.
 - No physical campaign PASS, release or tag. All C2 evidence remains C2.
 
 ## Actual blockers / prerequisites
@@ -38,46 +44,43 @@ Historical coordination is evidence only; consult it for a specific current need
 - Separate CF7 needs two reachable real CNC sources. Asked once, answer pending.
 - Windows P01 initial per-hour growth FAIL (291.6MB/0.0657h); per-activation PASS.
   Prepared real passive hour; do not start until measured-host builds/faults finish.
-- P09 outbox instrumented startup timed out storage-authority discovery, before
-  fault injection. No demonstrated candidate cause; observer overhead is measured.
-  Prepared monitoring correction preserves actual commit/kill/recovery assertions.
-- P06 trial not performed: original600s expired during missing host-agent diagnosis.
-  Fresh bounded recovery started00:46:24; untraced startup also timed out discovery.
-  No software POST yet. Agent permits ordinary restart within original100s startup.
-- P03 start-tailscale.cmd never started: workbench explicitly loopback-bound.
-  Prepare the existing owned tailnet-bound creator fixture; no network change.
-- P11 baseline startup/bootstrap pass; capability setup blocked on unavailable AI.
-  Review legitimate baseline applicability/provider; no forced skip/approval.
+- P09 outbox fault windows not completed; prepared monitoring correction retained.
+- P06 trial not performed: fresh recovery STOPPED00:48:04 with clean native stop.
+  Actual authority ready/committing; eight sequential dataset heads exceed45s.
+  Offline197-revision proof: per-ACK history verifies3full chains,594revision
+  decodes/58,509item validations,5.44sCPU-bound. Aged-data restart defect promoted.
+  No software POST, deadline change or blind restart. AGQ7NCC not in this topology.
 - Nitro pressure fixture idle: containment PASS, memory margin refused again00:47
   after completed builds. Host3.26GiB total/1.84GiB available; no product activation.
   Do not repeat until resource state changes; limits unchanged. Inventory retained.
 
 ## Active work / next action
-1. Agent p06_reply_path owns shared native trial/recovery, root approved exact
-   helper83d65f5e/configb5d404be and real single-device trial/restore action scope;
-   no other shared creator/native fault until it finishes. Existing PR488 branch
-   1345244efb6f3c081e077471e587f8d2b63f258d has the exact frozen executable tree.
-   Latest Agent seed: c3-physical-48154445-20260914/run-p06-update-trial-observe/
-   agent-observations.json. Chain every subsequent run; never return to old seed.
+1. Repair complete:22 focused/141 existing relevant tests PASS; original-C3 red
+   retained; independent integrity/security review found no blocker.197-revision
+   verification3→1full passes,5.44→0.99s offline. Full live startup still unproven.
+   Latest Agent seed: c3-physical-48154445-20260914/run-p06-update-trial-recovery/
+   agent-observations.json SHA256ca35d3afaba47b33c0e8705ce80011ba527e10b5cc0a8a0f9c40591bfebb468c.
+   Future native trial must use a distinct commit with the next frozen tree.
 2. Creator public host agent restored, PID26428 / PTY94516, still active. Proven
    harness issue: inherited PS7 PSModulePath breaks Windows5 Get-FileHash. Remove
    only that child-env value; native defaults work. No machine/product change.
    Receipts .acceptance/p06-http-trial-c3-preparation/public-agent-native-environment.
-3. Agent acceptance_resources prepares never-started tailscale case on creator;
-   no shared runtime action until P06 releases ownership. Authorized independent
-   P05 path-containment and owned dummy-process stale-responder checks next.
-4. Agent remaining_acceptance owns dedicated P11 source-start-r3 baseline fixture.
-   Capture decoding and fixture depends_on issues repaired in controls only.
-   Internal-only empty-model baseline design reviewed; exact executor preparation
-   pending. Original/restore inputs retained; no backup/keys/restore yet.
-5. Root reviewed p09-outbox-monitoring-recovery dispatch and unchanged OS-kill
-   parent. Bind fresh final Agent seed after P06 disposition; no automatic retry.
-   Then creator/clock/storage fault windows,
-   final inventory and measured capacity before exclusive P07/P12 reservation.
+3. Nitro corrected binding and separateHTTP200 follow-up prepared in
+   c3-nitro-binding-review; disabled. Agent acceptance_resources prepares required
+   repair qualification inputs; no inherited optional-workflow inventory/gate.
+4. Reusable P11 baseline ready in H/.acceptance/p11-control-internal-model-r4:
+   real16 records captured/uploadREADY; AI normally disabled,5 owned containers,
+   zero host writers. BindingSHA9a8b0f6bc2535771216e9276ba9488572dfbf1d5613d3e9fdb916a84bd21ce5f.
+   Future admission must preserve populated state; never use old empty-fixture
+   rebind/reset. No backup/keys/restore or C3 physical verdict.
+5. No new C3 qualification/faults/timers. Review repair, focused proof, required
+   exact-source qualification, normal merge/main qualification/new freeze and
+   checked-in revalidation before resuming physical campaign. P07/P12 unstarted.
 6. General controls: c3-general-physical-preparation/generated-48154445-r2.
-   P01 hour controls prepared/disabled in c3-p01-binding-review. Preserve all old
-   failures. No repeated activations or completed automated P03/CI checks.
-7. Public current details: diagnostics/physical-48154445/current-physical-dispositions.json.
+   P01 hour controls prepared/disabled in c3-p01-binding-review. Retain all failures.
+7. Pressure controls bound C3 in pressure-c3-preparation/bound-48154445; activation
+   false,18drivers, no remote staging/actions. Existing memory envelope unchanged.
+   Public current details: diagnostics/physical-48154445/current-physical-dispositions.json.
    Existing30-minute heartbeat active; continue from meaningful state/action changes.
 
 ## Immutable safety constraints

@@ -1,0 +1,63 @@
+{
+  "candidate": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "host": "nitro",
+  "status": "ORIGINAL_ACTIVATION_AND_FRESH_HTTP_PREREQUISITES_OBSERVED",
+  "original_admission_status": "STOPPED",
+  "original_admission_receipt_sha256": "24e108919e23bd6c1fc3290f7be487a1572ccc2e66adef2d7823ad655d065b64",
+  "original_launcher_exit_code": 0,
+  "original_launcher_log_sha256": "436a42959fe9bf11ad2bb5704bcc544935a454043485d352ca4823114f0e4c27",
+  "fresh_http_status": 200,
+  "fresh_http_elapsed_seconds": 1.8385413389187306,
+  "http_timeout_seconds_unchanged": 10,
+  "fresh_http_followup_sha256": "127ee611e19af04c409c6a5256ee499307a1db8826fa14d85329652a0f8bd099",
+  "actual_native_source_checkout": "/home/martin/fcp-v1-73c779-nitro-20260910/source",
+  "native_source_sha": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "native_source_independently_pinned": true,
+  "harness_sha": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "core_images": {
+    "flask": {
+      "container_id": "4e57dc96dc545675af0438214bb026eddf4c63b6d83023ae2cb4c27c27099d37",
+      "image_id": "sha256:e8a5b2c22963f782460c59d384965f012868e4d24dda22a004198509bce91772",
+      "build_commit": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+      "working_directory_is_compose_parent": true,
+      "working_directory_matches_original_binding": false,
+      "exact_config_files_match": true,
+      "started_at": "2026-09-14T00:17:24.359607323Z",
+      "restart_count": 0
+    },
+    "relay": {
+      "container_id": "571d9a9ac9f86936dfe34f8dbfa5cc2211deee2c007a3b397bb967ee38cbde48",
+      "image_id": "sha256:cc45141d5825d7bad879e07c50c996b8d2e07f46b86bfffaed0abddb1732bc11",
+      "build_commit": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+      "working_directory_is_compose_parent": true,
+      "working_directory_matches_original_binding": false,
+      "exact_config_files_match": true,
+      "started_at": "2026-09-14T00:17:00.261266245Z",
+      "restart_count": 0
+    },
+    "recorder": {
+      "container_id": "83b9bc8d63f518775f55483bacabd880e3905d7f5771f6bb7f61d0c109b351de",
+      "image_id": "sha256:dc4ff279fa6814333304dd88550bf0753a4ab29b3ef8aa46d135ba8fbbdb0aad",
+      "build_commit": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+      "working_directory_is_compose_parent": true,
+      "working_directory_matches_original_binding": false,
+      "exact_config_files_match": true,
+      "started_at": "2026-09-14T00:17:00.360213675Z",
+      "restart_count": 0
+    }
+  },
+  "mounts_environment_users_preserved": true,
+  "noncore_ids_images_unchanged": true,
+  "old_binding_sha256": "55b851a1752db3e266b0b675faa5d078b1baedb79318e11c70a07fc32b096438",
+  "corrected_binding_sha256": "11773ce103be04f7b2b4cd34376b46daabd912c09abf7cb33903d4fcc7514459",
+  "binding_change_only": "runtime.working_directory becomes observed Compose configuration parent",
+  "effective_config_structurally_unchanged": true,
+  "effective_config_sha256": "127ba1ace8b63788618e9dad15f241aefb21f5d92d7b738bc035f7036bf77c63",
+  "original_admission_or_binding_overwritten": false,
+  "source_or_runtime_mutated": false,
+  "qualification_for_future_candidate": false,
+  "launcher_repeated": false,
+  "new_physical_assertion": false,
+  "physical_campaign_pass": false,
+  "protected_data_accessed": false
+}

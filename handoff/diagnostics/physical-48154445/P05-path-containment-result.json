@@ -1,0 +1,23 @@
+{
+  "candidate": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "checked_probe": {
+    "assertion": "malformed-timestamp-path",
+    "classification": "automated-probe",
+    "evidence": "evidence/v1-physical/observations/P05/20260914T005427149404Z-assertion-2fae5644.json",
+    "probes": [
+      {
+        "probe_id": "recorder-path-containment",
+        "status": "pass",
+        "summary": "malformed path components cannot escape the recorder durable root"
+      }
+    ],
+    "recorded": true,
+    "scenario": "P05",
+    "verdict": "pass"
+  },
+  "auxiliary_observer_refusal_retained": true,
+  "current_source_and_core_identity_unchanged": true,
+  "probe_repeated": false,
+  "retained_disposition_sha256": "b8be7519ed774c11889f7a80c37d0911bc8ec1684cb2986532641e634dbe849b",
+  "physical_campaign_pass": false
+}

@@ -1,0 +1,88 @@
+{
+  "status": "REPAIR_OFFLINE_HISTORY_PROOF",
+  "base_candidate_sha": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "created_at": "2026-09-14T01:13:02.926144+00:00",
+  "physical_pass": false,
+  "same_export_sha256": "a23f1ea95265790532234be3e0b5a24196eca51a983bb657c461daf24cf5f041",
+  "results": [
+    {
+      "prefix_revision": 98,
+      "retained_revisions": 99,
+      "retained_manifest_bytes": 4263405,
+      "retained_item_records": 4851,
+      "head_item_count": 98,
+      "methods": {
+        "manifest_head": {
+          "decoded_revisions": 99,
+          "manifest_json_bytes_decoded": 4263405,
+          "retained_item_records_validated": 4851,
+          "wall_seconds": 0.22726000007241964,
+          "cpu_seconds": 0.203125,
+          "verified_exact_retained_head": true,
+          "full_history_passes": 1
+        },
+        "manifest_history": {
+          "decoded_revisions": 99,
+          "manifest_json_bytes_decoded": 4263405,
+          "retained_item_records_validated": 4851,
+          "wall_seconds": 0.22740299999713898,
+          "cpu_seconds": 0.234375,
+          "verified_exact_retained_head": true,
+          "full_history_passes": 1
+        },
+        "phase_d_manifest_history": {
+          "decoded_revisions": 99,
+          "manifest_json_bytes_decoded": 4263405,
+          "retained_item_records_validated": 4851,
+          "wall_seconds": 0.26085359998978674,
+          "cpu_seconds": 0.25,
+          "verified_exact_retained_head": true,
+          "full_history_passes": 1
+        }
+      },
+      "sqlite_bytes_unchanged": true
+    },
+    {
+      "prefix_revision": 197,
+      "retained_revisions": 198,
+      "retained_manifest_bytes": 16644322,
+      "retained_item_records": 19503,
+      "head_item_count": 197,
+      "methods": {
+        "manifest_head": {
+          "decoded_revisions": 198,
+          "manifest_json_bytes_decoded": 16644322,
+          "retained_item_records_validated": 19503,
+          "wall_seconds": 0.8857182000065222,
+          "cpu_seconds": 0.875,
+          "verified_exact_retained_head": true,
+          "full_history_passes": 1
+        },
+        "manifest_history": {
+          "decoded_revisions": 198,
+          "manifest_json_bytes_decoded": 16644322,
+          "retained_item_records_validated": 19503,
+          "wall_seconds": 0.8467919999966398,
+          "cpu_seconds": 0.828125,
+          "verified_exact_retained_head": true,
+          "full_history_passes": 1
+        },
+        "phase_d_manifest_history": {
+          "decoded_revisions": 198,
+          "manifest_json_bytes_decoded": 16644322,
+          "retained_item_records_validated": 19503,
+          "wall_seconds": 0.9897006000392139,
+          "cpu_seconds": 0.953125,
+          "verified_exact_retained_head": true,
+          "full_history_passes": 1
+        }
+      },
+      "sqlite_bytes_unchanged": true
+    }
+  ],
+  "all_methods_validate_each_revision_once": true,
+  "modified_production_sha256": {
+    "catalog/federation/manifest_store.py": "5310a5726963bf30b02dd1a0776b006dbeffffd621f02891e745e389ca2fa095",
+    "catalog/federation/phase_d_control.py": "7472d9505d52ba3c5d67d24a6e7aabfb50b11aa66209db2cd9a2978e04c0eab6"
+  }
+}

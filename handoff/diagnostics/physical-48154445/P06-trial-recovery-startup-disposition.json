@@ -1,0 +1,174 @@
+{
+  "schema": "fcp.physical-diagnostic-observation.v1",
+  "candidate_sha": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "captured_at": "2026-09-14T00:56:24.894472+00:00",
+  "status": "BOUNDED_STARTUP_REFUSED_NO_SOFTWARE_COMMAND",
+  "physical_pass": false,
+  "started_at": "2026-09-14T00:46:24.213598+00:00",
+  "finished_at": "2026-09-14T00:48:04.264117+00:00",
+  "observer_limit_seconds": 100,
+  "product_sharing_limit_seconds": 45,
+  "trial_restore_limits_seconds": [
+    600,
+    600
+  ],
+  "trial_restore_started": false,
+  "software_commands_posted": 0,
+  "observer_retries": 0,
+  "default_supervisor_retry_observed": true,
+  "cleanup": {
+    "supervisor_absent": true,
+    "last_native_absent": true,
+    "cleanup_error": null,
+    "operator_stop_exit_code": 0
+  },
+  "native_outbox_states": {
+    "completed": 194,
+    "pending": 734
+  },
+  "pending_datasets": [
+    {
+      "dataset_alias": "22ced70e8cc3",
+      "pending": 9
+    },
+    {
+      "dataset_alias": "caf7149c599a",
+      "pending": 26
+    },
+    {
+      "dataset_alias": "9b835b18183f",
+      "pending": 41
+    },
+    {
+      "dataset_alias": "eec40a95c3ad",
+      "pending": 44
+    },
+    {
+      "dataset_alias": "67eb8926fd06",
+      "pending": 41
+    },
+    {
+      "dataset_alias": "0fccf543376f",
+      "pending": 49
+    },
+    {
+      "dataset_alias": "a3d4de5b4fc2",
+      "pending": 54
+    },
+    {
+      "dataset_alias": "bddb26189722",
+      "pending": 470
+    }
+  ],
+  "completed_during_window": [
+    {
+      "updated_at": "2026-09-14T00:46:36.835240+00:00",
+      "dataset_alias": "22ced70e8cc3",
+      "idempotency_alias": "542166e79439"
+    },
+    {
+      "updated_at": "2026-09-14T00:46:45.735825+00:00",
+      "dataset_alias": "caf7149c599a",
+      "idempotency_alias": "02e339e36fe7"
+    },
+    {
+      "updated_at": "2026-09-14T00:46:55.070802+00:00",
+      "dataset_alias": "9b835b18183f",
+      "idempotency_alias": "4c792748913c"
+    },
+    {
+      "updated_at": "2026-09-14T00:47:05.704237+00:00",
+      "dataset_alias": "eec40a95c3ad",
+      "idempotency_alias": "37cd39eacb38"
+    },
+    {
+      "updated_at": "2026-09-14T00:47:14.398185+00:00",
+      "dataset_alias": "67eb8926fd06",
+      "idempotency_alias": "dfb457e414da"
+    },
+    {
+      "updated_at": "2026-09-14T00:47:35.257951+00:00",
+      "dataset_alias": "22ced70e8cc3",
+      "idempotency_alias": "c95b22a96e95"
+    },
+    {
+      "updated_at": "2026-09-14T00:47:45.112047+00:00",
+      "dataset_alias": "caf7149c599a",
+      "idempotency_alias": "39c538ef5c5f"
+    },
+    {
+      "updated_at": "2026-09-14T00:47:53.488684+00:00",
+      "dataset_alias": "9b835b18183f",
+      "idempotency_alias": "e8cb1a2395d2"
+    },
+    {
+      "updated_at": "2026-09-14T00:48:03.644264+00:00",
+      "dataset_alias": "eec40a95c3ad",
+      "idempotency_alias": "5c18ba727a0c"
+    }
+  ],
+  "jsonl_rows": {
+    "local_files": 0,
+    "seen_batches": 0,
+    "materialized_files": 0
+  },
+  "creator": {
+    "session_count": 1,
+    "enrolled_nodes": 2,
+    "owner_connected": true,
+    "storage_control_ready": true,
+    "storage_ready": true,
+    "storage_provider": {
+      "role": "primary",
+      "eligible": true,
+      "policy_state": "allowed",
+      "desired_state": "enabled",
+      "benchmark_state": "green",
+      "owned_local_provider_matches": true
+    },
+    "external_offline_host_required": false,
+    "all_core_running": true,
+    "all_core_restart_counts_zero": true,
+    "storage_intents_committed": 197,
+    "storage_intents_uncommitted": 0
+  },
+  "host_snapshot_after_refusal": {
+    "CpuLoadPercent": 57,
+    "TotalPhysicalKiB": 33251384,
+    "FreePhysicalKiB": 3038656,
+    "CapturedAt": "2026-09-14T00:55:09.1438781Z"
+  },
+  "demonstrated_mechanism": "Initial fair startup delivery pass had not completed: sequential successful heads from eight dataset groups exceeded the 45-second sharing admission bound. First child completed five dataset heads; ordinary replacement completed four before observer cleanup. Authority was available and committed. JSONL is called after the worker pass and has no retained progress in this run.",
+  "causal_limit": "No process stack was captured during this uninstrumented run; exact suspended frame and reason for approximately 9-10 seconds per acknowledged item remain unresolved. Discovering is a pre-cycle snapshot and does not prove discovery failure.",
+  "classification": "Materially credible exact-candidate startup obstruction; product performance versus current host/storage contribution unresolved. Missing external provider and global trace as sole cause excluded. No candidate repair selected or product PASS claimed.",
+  "repair_proposal": "Evaluate reducing actual authority round-trip cost first. If latency is healthy and contract applicable, bounded concurrent probes across independent datasets may preserve fairness/FIFO and the complete-pass plus JSONL readiness barrier. Do not expose readiness after just the first successful dataset or change deadlines.",
+  "focused_red_test_proposal": "Eight ordered datasets, each with an old due/deferred head and later work; controlled independent successful route delays. Prove sequential initial full fair pass exceeds the modelled admission bound, then any proposed bounded implementation commits one head from every dataset without a second head, preserves order/ACK authority and completes JSONL before readiness. Include one failing dataset and cancellation to reject false readiness.",
+  "source_lines": [
+    "start_recorder.py:219 (45-second default)",
+    "catalog/mtconnect_recorder/federation_node.py:916 (actual status/selection)",
+    "catalog/mtconnect_recorder/federation_node.py:998 (await complete worker pass)",
+    "catalog/mtconnect_recorder/federation_node.py:1001 (subsequent JSONL pass)",
+    "catalog/mtconnect_recorder/federation_node.py:1017 (post-cycle snapshot)",
+    "catalog/federation/recorder_delivery.py:334 (sequential startup fair probe)",
+    "catalog/federation/recorder_publication.py:1041 (await queue run_once)"
+  ],
+  "immutable_safety": {
+    "identity_data_preserved": true,
+    "journal_mutations": 0,
+    "manual_restarts": 0,
+    "deadlines_changed": false,
+    "assertions_weakened": false,
+    "protected_recorder_data_access": false
+  },
+  "evidence_sha256": {
+    "status.json": "b52f66bd8f3eb9e424c5b0e4913a208e1a16b4bb21d170ec6aed9640aeef0974",
+    "agent-observations.json": "ca35d3afaba47b33c0e8705ce80011ba527e10b5cc0a8a0f9c40591bfebb468c",
+    "supervisor.private.log": "b1d5f7a163e958037356e5c0cfb601d18d032002acd05aed5830c17cf62dd760",
+    "observation.private.json": "5979d9c19c0bab43aebf3d28e7295424a90adf48d14c36700c86627b9ca15838",
+    "flask.private.log": "0131a16c37a10bdb373457e1d2887240d1df8121ca9e2d9c32a1c5e3628e2f23",
+    "relay.private.log": "617e2e1e7b5d238ad4a3c8b13c2200ca951c475f7a43b9c18b544772d7a60551",
+    "topology.private.log": "e9e6d90a10fd8f56f5f2d3eaa091136c05bc3872e5cab208f919b66134570243",
+    "commits-redacted.json": "cb2f3633709df26ea8d55b7d65d956506b245d5474f6339471bcf118087673f4",
+    "native-completed-window-redacted.json": "1614354a75e6163a92c04cbec2a01fb819898ad729b43289fe406c507e6da20f"
+  }
+}

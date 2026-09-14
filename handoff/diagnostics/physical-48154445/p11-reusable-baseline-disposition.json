@@ -1,0 +1,72 @@
+{
+  "baseline": {
+    "actual_live_ai_has_no_provider": true,
+    "actual_uploaded_records": 16,
+    "ai_activation_state": "inactive",
+    "ai_desired_state": "disabled",
+    "contiguous_next_sequence": 17,
+    "existing_benchmark_records_retained": true,
+    "model_downloads": 0,
+    "model_list_empty": true,
+    "new_recorder_check": "passed",
+    "owned_container_count": 5,
+    "owned_host_writer_count": 0,
+    "raw_manifests": 1,
+    "real_capture_records": 16,
+    "restore_config_unchanged": true,
+    "same_owned_identity_preserved": true,
+    "source_addresses_scanned": 1,
+    "upload_status": "ready"
+  },
+  "candidate_source": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "dispositions": [
+    {
+      "classification": "Expected unavailable optional provider; normal check retained, no benchmark rerun",
+      "observation": "Actual AI benchmark FAILED/NOT_RECOMMENDED HTTP404 with empty model list"
+    },
+    {
+      "classification": "Deterministic harness expectation error; original result and refusal preserved; current plan and full actual result reused",
+      "observation": "Harness expected SKIPPED/UNSUPPORTED before automatic bootstrap"
+    },
+    {
+      "classification": "Fixture-design expectation mismatch; checked CFI-5 policy enables permitted intent and separate federation authority remains required. No checked candidate defect demonstrated here. Ordinary admin choice disabled AI; real /32 discovery supplied missing recorder evidence.",
+      "observation": "Normal bootstrap enabled local AI contribution; recorder candidate absent"
+    },
+    {
+      "classification": "Unused fixture UI assumption; no discovery POST or token bypass; exact checked discovery service API used once.",
+      "observation": "Status page lacked recorder CSRF; retired setup link redirected"
+    }
+  ],
+  "next_action": "Preserve this owned installation and data. Bind future exact candidate through reviewed source/runtime admission, then complete new-candidate P11 acceptance after root authorization.",
+  "private_receipt_sha256": {
+    "actual-captured-jsonl-upload.json": "5b884d3a9097faf19814ce65111881618609c2203dc6e66f8515e2f12c9c407b",
+    "actual-complete-plan-after-recorder-check.stdout.private.bin": "0b92ca1940dbb1c950fc835778f3ea66f802785dc28d2b862902710ac026d828",
+    "actual-controlled-capture.json": "1dc65c825a1d0cde16c55e4d9791c390ac8046878ada8a34c83736e12cd007be",
+    "actual-empty-model-tags.stdout.private.bin": "4abe89aeeba35292092f9a84ec24400ab935b691836eab44e86f8ab230b8a980",
+    "actual-live-ai-after-disable.response.private.bin": "6d26f5d70a1da5cf70702ca74bffcfc8faf3529172e80d202894f037f684e453",
+    "apply-network.completed.json": "f5cef53a088f9c6ff978ef275b77d64486e86f46e4f25e5a0bd35797f3a2ed32",
+    "network-after.private.json": "91cc3b99f56815ad55d7f99b4915870e7e2b15769f2cd8293f25e0a248f1740c",
+    "network-before.private.json": "ef562b7a25d65153286e56ad828202faa2141b7715772123232e5eb0ca2a7d5f",
+    "normal-missing-capability-checks.result.private.json": "88c02d0f9d9a7c00961897658cfa8f2a5bcdd36a68778e8f92a50295358b49a0",
+    "normal-missing-capability-checks.stderr.private.bin": "325bec527e3d7c8a6ae0a45eca90527b8dde0bd2ab2b1be2a58964d4d382e919",
+    "normal-missing-capability-checks.stdout.private.bin": "96b56b47da3274386d85a46c52fbb8d2f49c2f5297082576d6e62e40b1a207c1",
+    "ordinary-admin-configuration.completed.json": "fcff776197d9fcaf4b37e437e92a8c67c91ee8b5895d96afba4698298056f912",
+    "ordinary-exact-source-discovery.stdout.private.bin": "48244c9e07f58647077206ffc444a52677b50ca1c11ba5fb042e8b708f5b1102",
+    "owned-writer-inventory.json": "e7bb2c46daa48d1b9648d51331b14a11c55f14095a2e93778d4229284631cfed",
+    "retained-http404-normal-bootstrap.result.private.json": "953627d0ad9086949e2883034b155ea7961c11569cca9ef9eb832a6b0e4ae3bd",
+    "retained-http404-normal-bootstrap.stderr.private.bin": "98f723f7f0eb3b3f1b5eb4176646aa66539162be4b1da56608e52d5c8b4c523c",
+    "retained-http404-normal-bootstrap.stdout.private.bin": "30d300cb8e0d07543afdf888de0402e3cd696dfc24f775cf97453618a1fe7e85",
+    "reusable-baseline-binding.private.json": "9a8b0f6bc2535771216e9276ba9488572dfbf1d5613d3e9fdb916a84bd21ce5f"
+  },
+  "purpose": "Fixture readiness for a subsequent qualified candidate; no C3 physical assertion or backup verdict",
+  "safety": {
+    "all_future_candidate_acceptance_fresh": true,
+    "backup_or_quiescence_started": false,
+    "dummy_dpapi_key_created": false,
+    "physical_pass": false,
+    "protected_recorder_data_touched": false,
+    "restore_or_replacement_enrollment_started": false
+  },
+  "schema": "fcp.acceptance.p11.baseline-disposition.v1",
+  "status": "REUSABLE_OWNED_FIXTURE_BASELINE_READY"
+}

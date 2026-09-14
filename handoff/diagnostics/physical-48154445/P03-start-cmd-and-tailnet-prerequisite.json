@@ -1,0 +1,23 @@
+{
+  "candidate": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "status": "START_CMD_PASS_TAILSCALE_NOT_STARTED",
+  "start_cmd": {
+    "assertion": "start-cmd",
+    "verdict": "pass",
+    "prepare_id": "323e26a6cd4c460a8f72dd9412fbd3be",
+    "launcher_exit_code": 0,
+    "configured_http_status": 200,
+    "log_sha256": "7936c72cfacaf6169c3548a31a5a38070a158b12292af387372d92f036dfc4d8"
+  },
+  "exact_candidate_core_images": 3,
+  "start_tailscale_cmd": {
+    "classification": "DETERMINISTIC_ACCEPTANCE_FIXTURE_PRECONDITION_UNSATISFIED",
+    "reason": "The owned workbench is explicitly loopback-bound; no configured tailnet web path exists.",
+    "prepared": false,
+    "operator_action_recorded": false,
+    "launcher_executed": false,
+    "physical_pass": false
+  },
+  "retained_terminal_receipt_sha256": "3211bfd134b74c66621445446e686edbf7332cb534472140928845884986684f",
+  "physical_campaign_pass": false
+}

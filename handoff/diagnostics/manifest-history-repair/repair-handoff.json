@@ -1,0 +1,75 @@
+{
+  "status": "LOCAL_REPAIR_COMMITTED_NOT_PUSHED",
+  "candidate_base": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "repair_sha": "14e0193535a9fc1024bde95ae1f49b8940bfd9d9",
+  "repair_tree": "1e12bfc70c0bc7feecf85ed15a369e2f85bba4ce",
+  "branch": "codex/federation-v1-manifest-history-repair",
+  "created_at": "2026-09-14T01:17:02.221378+00:00",
+  "worktree_clean": true,
+  "production_paths": [
+    "catalog/federation/manifest_store.py",
+    "catalog/federation/phase_d_control.py"
+  ],
+  "test_path": "catalog/federation/tests/test_manifest_read_snapshot.py",
+  "production_change": "One full chain validation per read, with head and chain checked in the same explicit SQLite transaction. Known-group validation and lazy genesis remain. No persisted cache or skipped historical validation.",
+  "tests": {
+    "corrected-red.xml": {
+      "tests": 19,
+      "failures": 8,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "181da71bfb1bb7c09b6569095159987ab6747c544a3f5f2c749a906eaead132e"
+    },
+    "post-history-red.xml": {
+      "tests": 3,
+      "failures": 3,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "f56ff9ef389b5739ffbb132caecfc07fcfa916bc032520da503f1fddb256e4b9"
+    },
+    "final-focused.xml": {
+      "tests": 22,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "b28d2272ffa81202d080b80d43284c1c61026158110e8b914c9d6256caf2fe32"
+    },
+    "relevant.xml": {
+      "tests": 141,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "a392bfed1575b33e8d83f4488741615901fd472a23d37211c5a4740d0115fc91"
+    }
+  },
+  "focused_green": 22,
+  "relevant_green": 141,
+  "offline_before_sha256": "da7cb115b70bf1f44958cacc00ad7c6cb9e6804abba3b922ddc1c6601962bf27",
+  "offline_after_sha256": "896e9d0fd4f182c18956984546b7ec774380159550ffe3b2baffe3e201cd9baa",
+  "197_revision_before": {
+    "full_history_passes": 3,
+    "decoded_revisions": 594,
+    "historical_item_validations": 58509,
+    "wall_seconds": 5.441916199983098
+  },
+  "197_revision_after": {
+    "full_history_passes": 1,
+    "decoded_revisions": 198,
+    "historical_item_validations": 19503,
+    "wall_seconds": 0.9897006000392139
+  },
+  "independent_review": "No blocking integrity/security finding; requested post-history/pre-head append regression added and proved red on C3/green on repair.",
+  "release_decision": "Exact candidate performance defect promoted by root against aged-data exit criterion docs/implementation/v1_robustness_reconciliation.md:912 and observed blocked P06 restart preparation. This repair is ready for PR integration review, not physical acceptance.",
+  "limits": "Measured full-chain read work only. Complete repaired startup/provider/JSONL path has not yet run; no 45-second physical recovery PASS claimed. No native parallelism, deadline, authority, quorum, checkpoint, membership or data changes.",
+  "remote_actions": {
+    "pushed": false,
+    "pr_created": false,
+    "merged": false,
+    "deployed": false
+  },
+  "source_blob_ids": {
+    "catalog/federation/manifest_store.py": "86d32ecf4b9af8a85c0a7f678259b1bc9c9c95fa",
+    "catalog/federation/phase_d_control.py": "93d607fd2b52a54192ab84531ef0af9084536449",
+    "catalog/federation/tests/test_manifest_read_snapshot.py": "cb5d432f6e9f606f253749117e5577b6abac3236"
+  }
+}

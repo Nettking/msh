@@ -1,0 +1,30 @@
+{
+  "candidate": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "harness_sha": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "host": "nettking",
+  "status": "COMPLETED",
+  "started_at": "2026-09-14T01:00:43.730811+00:00",
+  "finished_at": "2026-09-14T01:01:27.279769+00:00",
+  "results": [
+    {
+      "scenario": "P03",
+      "assertion": "identity-and-isolation",
+      "verdict": "pass",
+      "prepare_id": "f683a10a9cc2431eba6d055d90551f2b"
+    },
+    {
+      "scenario": "P05",
+      "assertion": "ollama-absence",
+      "verdict": "pass",
+      "prepare_id": "b60e4a574aba44d18eb7a76e1ff7f32d"
+    }
+  ],
+  "model_stopped": true,
+  "model_restored": true,
+  "provider_path_unavailable": true,
+  "workbench_http_status_during_outage": 200,
+  "core_containers_unchanged": true,
+  "protected_data_accessed": false,
+  "physical_pass": false,
+  "retained_primary_receipt_sha256": "b5c216522728ed471421bc6ed856e467f507cebb1cdff7356724187b1f20bb0b"
+}

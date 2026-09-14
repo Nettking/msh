@@ -1,0 +1,14 @@
+{
+  "candidate": "48154445d380980047bb5cbc39ae5b4c1a6889c0",
+  "classification": "infrastructure/host resource prerequisite",
+  "observation": "Whole-host memory cannot cover the existing helper allowance plus 512MiB margin",
+  "checked_at": "2026-09-14T00:47:55.014097+00:00",
+  "retained_memory_limit_bytes": 2415919104,
+  "retained_no_swap": true,
+  "host_margin_bytes": 536870912,
+  "live_boundary_verified": true,
+  "receipt_sha256": "8c49d1fbbc6be473434468971c7c7ff1f402e570ddb9b6096fa4211691b8a94e",
+  "product_started": false,
+  "next_action": "Complete independent owned Nitro work; consider resource scheduling only after preserving active acceptance ownership. No repeated memory check without a meaningful state change.",
+  "physical_pass": false
+}
