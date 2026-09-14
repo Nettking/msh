@@ -1,0 +1,31 @@
+{
+  "candidate": "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d",
+  "status": "PREPARATION_ONLY_NOT_EXECUTED",
+  "source_qualified_or_frozen_by_this_receipt": false,
+  "general_preparation": ".acceptance/postrepair-general-preparation/READY.md",
+  "generation_sha256": "a97e5ac025aa521a25c31c30149415658cc178bb9f42c535ef55b561027d27fa",
+  "p01_ordering": {
+    "root_review": "The checked P01 contract requires real failed-build cleanup and bounded growth without requiring an earlier passive hour. The corrected paired controls perform the build failure while the hour is unarmed and unattempted; the fresh hour requires the actual exact-candidate cleanup PASS, stopped owned writer and unchanged core containers. Root reviewed the ordering diff, producer fields, new guards and checked campaign contract.",
+    "review_sha256": "7e11c7c816e7b1747ffe1d8c413579f3282d0ad4c8f1ac80a0e9148a359d0687",
+    "build_control_sha256": "951b577d083a78e4d1f5e97f412f4c49580c75b90a92b6d201a8d95238e542ce",
+    "hour_control_sha256": "d0ef49f22c7dc520c14f060e668e5f71a55eff2fc653e3e85531adbc02aae590",
+    "original_controls_preserved": true,
+    "checked_fault_actions_verifiers_unchanged": true,
+    "hour_seconds": 3600,
+    "sample_pairs": 13,
+    "sample_period_seconds": 300,
+    "growth_limit_bytes_per_hour": 1073741824,
+    "completion_receipt_fabricated": false
+  },
+  "prerequisites": [
+    "Actual-main qualification and authoritative freeze",
+    "Exact-source readiness and observed runtime admission",
+    "Separately reviewed enabled control bytes and fresh input hashes",
+    "Complete current source/container/session bindings and exclusive fault ownership"
+  ],
+  "runtime_fault_or_timer_actions": 0,
+  "physical_assertions_run": 0,
+  "physical_acceptance": "NOT_PASSED",
+  "P07": "NOT_STARTED",
+  "P12": "NOT_STARTED"
+}

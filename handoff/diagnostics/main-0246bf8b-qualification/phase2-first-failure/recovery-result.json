@@ -1,0 +1,36 @@
+{
+  "source": "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d",
+  "run_id": 34799746714,
+  "attempt": 2,
+  "status": "ONE_FAILED_ONLY_RECOVERY_PASSED",
+  "jobs_passed": 2,
+  "original_failure_preserved": true,
+  "original_classification": "UNRESOLVED_NON_DEMONSTRATED_CANDIDATE_DEFECT",
+  "cause_proven_by_recovery": false,
+  "linux": {
+    "job_id": 103842701735,
+    "native_log_sha256": "3833cef4da55bcf58b0f5a073db25ab0afbebd35a81d783a1bc866096fc76ac3",
+    "native_checkout_exact": true,
+    "originally_failing_group_passed": 282,
+    "earlier_groups_passed": [
+      65,
+      253
+    ]
+  },
+  "windows": {
+    "original_job_id": 103839826323,
+    "current_check_run_id": 103842702658,
+    "execution_metadata_unchanged": {
+      "name": "windows",
+      "conclusion": "success",
+      "runner": "Nettking",
+      "steps_executed": 10,
+      "started_at": "2026-09-14T02:39:56Z",
+      "completed_at": "2026-09-14T02:45:10Z"
+    }
+  },
+  "source_assertions_deadlines_security_unchanged": true,
+  "further_retry_authorized_by_this_receipt": false,
+  "actual_main_qualification": "STILL_PENDING_RELEASE_MATRIX",
+  "physical_acceptance": "NOT_EVALUATED"
+}

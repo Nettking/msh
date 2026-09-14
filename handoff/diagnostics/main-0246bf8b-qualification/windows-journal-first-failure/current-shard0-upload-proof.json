@@ -1,0 +1,21 @@
+{
+  "CI_retry_performed": false,
+  "artifact_id": 10331840301,
+  "artifact_sha256": "c827fae4e8195796a3519fc2a65c139c9fc01d39ae92f4373b015b5751d0abcd",
+  "captured_QuorumUnavailable_not_correlated_to_duplicate_request": true,
+  "context": "linux-regression-shard-0",
+  "disposition_sha256": "3b27bd81c9a07e92f6cc9261eaa7c97cbea2de890f861a1c2a7a67f97d4466e3",
+  "evidence_source": "current_main",
+  "job_id": 103839826238,
+  "junit_sha256": "6750271c8014e2696349518076df1fa9a2c70f1a08b5813ba12dc3c931a2d193",
+  "native_bytes_remain_in_original_retention": true,
+  "native_log_sha256": "bc645a34035aae332e39ad854a679019222e98670348b120b3924fcce1744c24",
+  "qualification_changed": false,
+  "quorum_health_not_proven_by_live_fixture": true,
+  "result": "PASS",
+  "seconds": 10.402,
+  "selection_basis": "Successful native job exact upload ID/digest plus retained API digest, ZIP bytes and source-bound unskipped JUnit node",
+  "skipped": false,
+  "source": "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d",
+  "status": "EXACT_CURRENT_NODE_PASS_UPLOAD_PROVEN"
+}

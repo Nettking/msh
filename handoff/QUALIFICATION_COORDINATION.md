@@ -1,6 +1,6 @@
 # Federation v1 current release checkpoint
 
-Updated 2026-09-14T02:54Z. Active context: clean handoff + this file + live GitHub.
+Updated 2026-09-14T03:14Z. Active context: clean handoff + this file + live GitHub.
 Historical coordination is evidence only; consult it for a specific current need.
 
 ## Current source / heads
@@ -10,9 +10,8 @@ Historical coordination is evidence only; consult it for a specific current need
   repair/trial head14e0193535a9fc1024bde95ae1f49b8940bfd9d9, same tree.
 - New clean Windows H:C:/wsl/fcp-v1-0246bf8b-main-20260914.
   Planned Nitro H:/home/martin/fcp-v1-0246bf8b-main-20260914/source; NOT STAGED.
-- Native source bundle in new H/.acceptance/native-source.bundle:14841bytes,
+- New H/.acceptance/native-source.bundle:14841bytes, established1aac..HEAD;
   SHA256ace9f6ab15db0b1ef17fca476176a4e751453c0524f97e67d1c57551740296f1.
-  Established1aac..HEAD bundle; source only, no runtime data.
 - Runtime sources/images still C3:48154445d380980047bb5cbc39ae5b4c1a6889c0.
   C3 frozen acceptance PAUSED after demonstrated aged-manifest startup defect.
   Old freeze diagnostics/AUTHORITATIVE_CANDIDATE-48154445.json remains unchanged.
@@ -25,22 +24,20 @@ Historical coordination is evidence only; consult it for a specific current need
   Exact shard/full-order sets, artifact digests and publication source verified.
 - PR qualification:diagnostics/manifest-repair-pr-qualification/qualification.json;
   SHA256dfe8e891ec28f3622afa03bb46af8954f26232a3ae1626fb6ed361b0b530ed8c.
-- Original authority-fence failures retained in diagnostics/pr489-qualification/;
-  each one failed-only recovery passed unchanged, with original green jobs reused.
-  No demonstrated additional candidate defect; no further PR retry/requalification.
-- Main0246 ICSE34799746741:4/4 first-attempt PASS; CF7-B34799746776:2/2 PASS;
-  branding34799746756 and registry34799801591 PASS. Remaining main runs:
-  release34799746727; Phase2 34799746714; update34799746763; CF7-A34799800037.
-  Missing CF7-A and registry dispatched ONCE02:36; Phase2 failed-only recovery02:53.
+- PR prior failures retained in diagnostics/pr489-qualification/; no further PR actions.
+- Main0246 ICSE34799746741:4/4 first-attempt PASS; CF7-A34799800037 and
+  CF7-B34799746776:2/2 PASS; update34799746763, branding34799746756 and registry
+  34799801591 PASS. Phase2 34799746714 attempt2:2/2 PASS after ONE Linux recovery;
+  282/282 in original failing group; Windows execution reused. Original FAIL retained.
 - C3 automated qualification/readiness and28physical assertions retained as C3.
   No full physical scenario/campaign PASS; no relabeling or carry to0246.
 
 ## Actual blockers / prerequisites
-- Actual-main qualification pending. Phase2 Linux103839826124 initial event-append
-  timeout precedes reconnect; unresolved/non-demonstrated candidate defect. Native
-  trace retained in diagnostics/main-0246bf8b-qualification/phase2-first-failure/.
-  ONE failed-only recovery accepted02:53:42; Windows103839826323 PASS reused.
-  No source/assertion/deadline change or further recovery authorized by this decision.
+- Main release34799746727 attempt1 active:9PASS/1running/2queued/1FAIL at03:14.
+  Windows journal103839826327:initial duplicate HTTP409, type-only QuorumUnavailable;
+  exact current node unskippedPASS10.402s in Linux shard0. No demonstrated defect.
+  Evidence/root plan:diagnostics/main-0246bf8b-qualification/windows-journal-first-failure/.
+  ONE failed-only recovery planned AFTER terminal failed-set review; NOT SENT.
 - Checked prospective impact:C3->repair has unknown manifest_store/phase_d_control
   paths, all12CF7 scenarios impacted,0carry. Rerun exact planner after qualification.
   safe=false forbids carry; it does not forbid fresh acceptance/admission.
@@ -59,7 +56,8 @@ Historical coordination is evidence only; consult it for a specific current need
 ## Active work / next action
 1. PREP=.acceptance/manifest-repair-release-preparation. inspect_actual_main.py;
    inputs-actual-main.json and read-only authorization now bind0246. Wait on current
-   runs; retain_qualification/finalize_qualification once required jobs green.
+   release run; review terminal failures, execute its one failed-only recovery.
+   Then final retain_qualification/finalize_qualification; reuse retained cache.
    Do not rerun merge489.py, dispatch helpers or recover_main_phase2_once.py.
 2. After actual-main qualification, freeze_qualified_repair.py under
    .acceptance/postrepair-freeze-preparation (SHA25624dfbaf260958cd9749c5d942fe54cb32ae7d97e3a28ea20fbd64e3d86569acf).
@@ -71,8 +69,9 @@ Historical coordination is evidence only; consult it for a specific current need
 4. Disabled admission:.acceptance/postrepair-admission-preparation, current helper
    SHA10a10cc977496a53aa18a4c4ee5e70ff0459d0a46a15b5b0b73e71461d2fe682.
    Final-source review before execution; preserve all data/mount/env/user/identity.
-   Quiesce only exact owned creator public agent before source staging; restore
-   ordinary agent afterward. Child env removes only case-insensitive PSModulePath.
+   Agent transition:.acceptance/postrepair-agent-transition-preparation, disabled;
+   resident-verifier scope correction in progress; normal start.cmd restores agent.
+   Quiesce exact owned pair before staging; child env removes only PSModulePath.
    Final bindings derive actual Compose labels; original preparations stay retained.
 5. .acceptance/postrepair-p06-preparation preserves45/100/600/600s and uses latest
    Agent seed c3-physical-48154445-20260914/run-p06-update-trial-recovery/agent-observations.json,
@@ -84,7 +83,9 @@ Historical coordination is evidence only; consult it for a specific current need
    Preserve populated state; never empty-fixture reset/rebind. New updater inventory
    is required after normal activation. No backup/key/restore PASS yet.
 7. Remaining Windows/Nitro/P01/P09/pressure controls are C3-bound and disabled;
-   require final-source bindings. General controls being prepared without execution.
+   require final-source bindings. postrepair-general-preparation remains disabled;
+   P01 paired ordering correction reviewed in p01-sequencing-r2; no execution.
+   Pressure preparation paused; postrepair-pressure-preparation/PAUSED_PREPARATION.md.
    Existing30-minute heartbeat active; advance only on meaningful changes/actions.
 
 ## Immutable safety constraints

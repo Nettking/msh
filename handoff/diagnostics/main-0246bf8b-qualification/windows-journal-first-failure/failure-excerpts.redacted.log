@@ -1,0 +1,9 @@
+2026-09-14T02:58:03.4441263Z                     assert first["status"] == duplicate["status"] == 200
+2026-09-14T02:58:03.4482129Z >               assert first["status"] == duplicate["status"] == 200
+2026-09-14T02:58:03.4482423Z E               assert 200 == 409
+2026-09-14T02:58:03.4482782Z catalog\flask_app\tests\test_c03_pairing_onboarding.py:209: AssertionError
+2026-09-14T02:58:03.4483784Z ERROR    catalog.relay.service:service.py:1188 relay command stopped after an internal QuorumUnavailable
+2026-09-14T02:58:03.5500737Z FAILED catalog/flask_app/tests/test_c03_pairing_onboarding.py::test_configured_flask_process_publishes_through_quorum_and_cannot_fall_back - assert 200 == 409
+2026-09-14T02:58:03.5501389Z 1 failed, 296 passed, 1 skipped, 1 warning in 453.93s (0:07:33)
+2026-09-14T02:58:05.5685223Z SHA256 digest of uploaded artifact zip is 7a712a5ed9bf35d8f3eeb987f41bda845560e44308718513589d61d090732234
+2026-09-14T02:58:05.8735895Z Artifact windows-regression-journal-artifacts has been successfully uploaded! Final size is 8505 bytes. Artifact ID is 10330917883

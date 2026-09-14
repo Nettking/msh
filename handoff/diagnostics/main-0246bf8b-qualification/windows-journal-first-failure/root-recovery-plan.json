@@ -1,0 +1,21 @@
+{
+  "recorded_at": "2026-09-14T03:07:00Z",
+  "source": "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d",
+  "run_id": 34799746727,
+  "original_attempt": 1,
+  "reviewed_failed_job_id": 103839826327,
+  "disposition_sha256": "3b27bd81c9a07e92f6cc9261eaa7c97cbea2de890f861a1c2a7a67f97d4466e3",
+  "current_node_upload_proof_sha256": "a771decf0706a4a4e504c26f78ba67446b3dbff5ed33e57dec636e2b76727bf9",
+  "classification": "UNRESOLVED_NON_DEMONSTRATED_CANDIDATE_DEFECT",
+  "root_source_review": "Quorum verification precedes the local append/idempotency result. Captured type-only QuorumUnavailable and duplicate HTTP409 lack body, raising stack and request correlation. Exact current main passes this unskipped node in mandatory Linux shard0. No receipt corruption, unsafe fallback, authority bypass or applicable repair defect is demonstrated.",
+  "next_action": "When the original run is terminal, retain and review its complete failed-job set. Allow one failed-only recovery for the reviewed Windows failure and any proven purely dependent gate failures; another executed-test failure requires a separate current-source assessment before that same request.",
+  "request_sent": false,
+  "requires_terminal_full_failed_job_review": true,
+  "maximum_failed_only_requests_for_this_run": 1,
+  "whole_ci_rerun_allowed": false,
+  "source_assertions_quorum_deadlines_security_changes_allowed": false,
+  "qualification_waiver": false,
+  "original_evidence_preserved": true,
+  "repeated_same_failure": "Do not retry again; diagnose the concrete current command, response and authority path.",
+  "physical_acceptance": "NOT_EVALUATED"
+}

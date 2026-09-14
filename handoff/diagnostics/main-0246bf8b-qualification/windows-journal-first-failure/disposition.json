@@ -1,0 +1,215 @@
+{
+  "API_calls": 0,
+  "CI_mutation": false,
+  "artifact_bytes": 8505,
+  "artifact_id": 10330917883,
+  "artifact_selection_basis": "Exact failed native upload ID/digest and retained API metadata; no artifact ID ordering",
+  "artifact_sha256": "7a712a5ed9bf35d8f3eeb987f41bda845560e44308718513589d61d090732234",
+  "attempt": 1,
+  "candidate_relevance": "Current-source checked assertion failed and mandatory release remains blocked. Duplicate refusal is real, but no altered payload, duplicate durable append, corrupted receipt, unsafe fallback or security bypass is shown.",
+  "captured_server_log": "relay command stopped after an internal QuorumUnavailable",
+  "checked_contract": "docs/release_process.md:36\u201337 requires all exact-main release jobs PASS. Test209\u2013212 requires200/original receipt for exact duplicate; live quorum authority guard remains mandatory. No waiver, retry or source correction follows automatically.",
+  "classification": "UNRESOLVED_NON_DEMONSTRATED_CANDIDATE_DEFECT",
+  "deterministic_harness_defect_demonstrated": false,
+  "duplicate_error_body_not_captured": true,
+  "failed_test": {
+    "classname": "catalog.flask_app.tests.test_c03_pairing_onboarding",
+    "message": "assert 200 == 409",
+    "name": "test_configured_flask_process_publishes_through_quorum_and_cannot_fall_back",
+    "seconds": 46.467
+  },
+  "infrastructure_transient_proven": false,
+  "job_conclusion": "failure",
+  "job_id": 103839826327,
+  "junit_sha256": "9717c5a265857f13f4587adf246a44c5bf89601fc4bdfe202183e91f535510c9",
+  "minimum_next_action": "Root review this distinct failure and already-running exact-main node evidence. Retain originalfailure; if one bounded failed-job recovery is chosen, it must preserve source/assertions/quorum/deadlines and actually pass mandatory gate. A repeated same failure needs a concrete body/command/authority diagnosis rather than blind further recovery.",
+  "native_log_sha256": "a1d98d57503488a84447a6e4754e8b95b1c7f3c24f8aca3d7815890e8c1b150f",
+  "observed_statuses": {
+    "duplicate": 409,
+    "first": 200
+  },
+  "physical_acceptance": "NOT_EVALUATED",
+  "prior_pr_failed_node_now_current_main_pass": {
+    "classname": "catalog.federation.tests.test_control_plane_product_transactions",
+    "name": "test_consumed_grants_and_original_request_receipts_survive_automatic_failover",
+    "seconds": 30.795,
+    "skipped": false
+  },
+  "product_defect_demonstrated": false,
+  "qualified_pr_evidence_not_actual_main_qualification": true,
+  "repair_functions_not_in_captured_stack": true,
+  "repetition_assessment": "Different test and stage from PR489 consumed-enrollment failover failure. Captured QuorumUnavailable adds a current quorum-availability observation; it does not prove the earlier leader-required mechanism recurred or prove an infrastructure cause.",
+  "run_id": 34799746727,
+  "same_node_retained_pass_proofs": [
+    {
+      "artifact_id": 10331840301,
+      "artifact_sha256": "c827fae4e8195796a3519fc2a65c139c9fc01d39ae92f4373b015b5751d0abcd",
+      "context": "linux-regression-shard-0",
+      "evidence_source": "current_main",
+      "job_id": 103839826238,
+      "junit_sha256": "6750271c8014e2696349518076df1fa9a2c70f1a08b5813ba12dc3c931a2d193",
+      "native_log_sha256": "bc645a34035aae332e39ad854a679019222e98670348b120b3924fcce1744c24",
+      "result": "PASS",
+      "seconds": 10.402,
+      "skipped": false,
+      "source": "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d"
+    },
+    {
+      "artifact_id": 10330901172,
+      "artifact_sha256": "4ee104a6e1968b4cad08174b45ae7a4e35db87fe6267c0dfc872f2ca99347423",
+      "context": "windows-regression-journal-artifacts",
+      "evidence_source": "qualified_pr",
+      "job_id": 103837539690,
+      "junit_sha256": "81af9115d05886ab94cc758b0e4609cee51a113994f8a7e7b45352a47dde2e68",
+      "native_log_sha256": "3d01bdade8b75b0e5439bd03d0ba6118cf4d50f185c98061ce71e476811cf2eb",
+      "result": "PASS",
+      "seconds": 28.818,
+      "skipped": false,
+      "source": "a158465bedae7979a4ec5f86d2402b4303ec42b5"
+    },
+    {
+      "artifact_id": 10330401079,
+      "artifact_sha256": "ead41441046afe81eb880ee746ab38c5747c075e08fc750243dda86d7ce6ec85",
+      "context": "linux-regression-shard-0",
+      "evidence_source": "qualified_pr",
+      "job_id": 103837558612,
+      "junit_sha256": "a69560a30d81448ed7af97ddd18349d6ca1f810317b8f68a3099a6dc35eb98cd",
+      "native_log_sha256": "c18c5dad158e96d1dd3e98e358fcf523e1a7719b061c4909f099d2ec3590b795",
+      "result": "PASS",
+      "seconds": 8.505,
+      "skipped": false,
+      "source": "a158465bedae7979a4ec5f86d2402b4303ec42b5"
+    },
+    {
+      "artifact_id": 10330176046,
+      "artifact_sha256": "994fb219b8b9e839576cae06278da22b20e88ebe097c5b7e48aa0e3b68dc31ea",
+      "context": "full-suite-order-fixed",
+      "evidence_source": "qualified_pr",
+      "job_id": 103837563311,
+      "junit_sha256": "e51c2fd2554c03cf2c26761b0db7c14a0aafb044878cab75777722e4480baca4",
+      "native_log_sha256": "a041ceef1be5687842d5f529a6be8783514f8d39f2574fb34eaba10d0841d3e3",
+      "result": "PASS",
+      "seconds": 9.947,
+      "skipped": false,
+      "source": "a158465bedae7979a4ec5f86d2402b4303ec42b5"
+    },
+    {
+      "artifact_id": 10329954602,
+      "artifact_sha256": "74f9f074890d3de4caf9468095aa65d5006f7fe896e8f68d7fc4bab0e9d6e954",
+      "context": "full-suite-order-rotating",
+      "evidence_source": "qualified_pr",
+      "job_id": 103837559028,
+      "junit_sha256": "298aafbcf4de0540b4b6a4471d4551ba12172637d504bf5471423a1dc9de287d",
+      "native_log_sha256": "eef59bf8f201ad25342cd042e80f2142a8e49e28d7188caa51c227bd93144dee",
+      "result": "PASS",
+      "seconds": 7.224,
+      "skipped": false,
+      "source": "a158465bedae7979a4ec5f86d2402b4303ec42b5"
+    }
+  ],
+  "server_command_correlation_or_underlying_stack_not_captured": true,
+  "source": "0246bf8b5a2ccdba007e1baf277e5f9a06976f4d",
+  "source_or_runtime_mutated": false,
+  "source_path": [
+    {
+      "file": "catalog/flask_app/tests/test_c03_pairing_onboarding.py",
+      "line": 91,
+      "meaning": "FederationOperationError becomes HTTP409 with code body"
+    },
+    {
+      "file": "catalog/flask_app/tests/test_c03_pairing_onboarding.py",
+      "line": 104,
+      "meaning": "Test event calls authorized C03 facade"
+    },
+    {
+      "file": "catalog/flask_app/tests/test_c03_pairing_onboarding.py",
+      "line": 209,
+      "meaning": "Initial duplicate status assertion fails"
+    },
+    {
+      "file": "catalog/flask_app/tests/test_c03_pairing_onboarding.py",
+      "line": 241,
+      "meaning": "Deliberate quorum loss occurs only after failed section"
+    },
+    {
+      "file": "catalog/flask_app/services/c03_pairing_onboarding.py",
+      "line": 110,
+      "meaning": "Real facade uses runtime.append_event_result"
+    },
+    {
+      "file": "catalog/relay/service.py",
+      "line": 1517,
+      "meaning": "Event dispatch calls actual coordinator"
+    },
+    {
+      "file": "catalog/federation/control_plane_facade.py",
+      "line": 70,
+      "meaning": "Durable writes including duplicate calls require actual quorum before local idempotency lookup"
+    },
+    {
+      "file": "catalog/federation/control_plane_product.py",
+      "line": 317,
+      "meaning": "Quorum synchronization may raise QuorumUnavailable; exact raising site not captured"
+    },
+    {
+      "file": "catalog/relay/service.py",
+      "line": 1188,
+      "meaning": "Unexpected exception logged by type and connection closed1011, no underlying stack logged"
+    }
+  ],
+  "source_tree_equals_qualified_pr": true,
+  "stage": "Initial nominal-quorum exact duplicate event publication, before deliberate voter stops",
+  "status": "BOUNDED_DISTINCT_CURRENT_FAILURE_ASSESSED",
+  "tests_executed": false,
+  "unchanged_git_blobs": [
+    {
+      "base": "13d1688b6b08ee8024673857b486b561edfb9b9f",
+      "main": "13d1688b6b08ee8024673857b486b561edfb9b9f",
+      "path": "catalog/flask_app/tests/test_c03_pairing_onboarding.py",
+      "qualified_pr": "13d1688b6b08ee8024673857b486b561edfb9b9f",
+      "unchanged": true
+    },
+    {
+      "base": "ce34f2405cd9b422b7d2083012d1e5caf140a52a",
+      "main": "ce34f2405cd9b422b7d2083012d1e5caf140a52a",
+      "path": "catalog/flask_app/services/c03_pairing_onboarding.py",
+      "qualified_pr": "ce34f2405cd9b422b7d2083012d1e5caf140a52a",
+      "unchanged": true
+    },
+    {
+      "base": "c8a39e496fe3798f8b3ef4439ebf2cf8ab18d913",
+      "main": "c8a39e496fe3798f8b3ef4439ebf2cf8ab18d913",
+      "path": "catalog/relay/service.py",
+      "qualified_pr": "c8a39e496fe3798f8b3ef4439ebf2cf8ab18d913",
+      "unchanged": true
+    },
+    {
+      "base": "d9e321801765f07782d69aa6c659398ea5b1a233",
+      "main": "d9e321801765f07782d69aa6c659398ea5b1a233",
+      "path": "catalog/federation/control_plane_facade.py",
+      "qualified_pr": "d9e321801765f07782d69aa6c659398ea5b1a233",
+      "unchanged": true
+    },
+    {
+      "base": "b88217a5c268d8ba0c2f786fe028b31d2238b43c",
+      "main": "b88217a5c268d8ba0c2f786fe028b31d2238b43c",
+      "path": "catalog/federation/control_plane_product.py",
+      "qualified_pr": "b88217a5c268d8ba0c2f786fe028b31d2238b43c",
+      "unchanged": true
+    },
+    {
+      "base": "d03032071477fe1981cf8d0b11372d8263dbc449",
+      "main": "d03032071477fe1981cf8d0b11372d8263dbc449",
+      "path": "catalog/federation/tests/test_control_plane_public_journal.py",
+      "qualified_pr": "d03032071477fe1981cf8d0b11372d8263dbc449",
+      "unchanged": true
+    },
+    {
+      "base": "d45dc076f24d6f024451df204743819f9fb9c24f",
+      "main": "d45dc076f24d6f024451df204743819f9fb9c24f",
+      "path": "catalog/federation/tests/test_control_plane_product_transactions.py",
+      "qualified_pr": "d45dc076f24d6f024451df204743819f9fb9c24f",
+      "unchanged": true
+    }
+  ]
+}
