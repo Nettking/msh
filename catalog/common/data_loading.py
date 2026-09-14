@@ -50,7 +50,12 @@ def _inside_incomplete_import(file_path: Path, root: Path) -> bool:
         current = current.parent
 
 
-def iter_jsonl_files(data_dir: Path | str, *, recursive: bool = True) -> Iterator[Path]:
+def iter_jsonl_files(
+    data_dir: Path | str,
+    *,
+    recursive: bool = True,
+    file_filter: Callable[[Path], bool] | None = None,
+) -> Iterator[Path]:
     """
     Yield JSONL files from a directory in sorted order.
 
@@ -61,6 +66,9 @@ def iter_jsonl_files(data_dir: Path | str, *, recursive: bool = True) -> Iterato
     recursive : bool, default=True
         If True, search recursively using ``rglob``.
         If False, search only the top level using ``glob``.
+    file_filter : callable, optional
+        Reject otherwise matching files before inspecting ancestor upload
+        markers. Omitted by default, preserving complete JSONL discovery.
 
     Yields
     ------
@@ -77,7 +85,11 @@ def iter_jsonl_files(data_dir: Path | str, *, recursive: bool = True) -> Iterato
     iterator = root.rglob(pattern) if recursive else root.glob(pattern)
 
     for file_path in sorted(iterator):
-        if file_path.is_file() and not _inside_incomplete_import(file_path, root):
+        if not file_path.is_file():
+            continue
+        if file_filter is not None and not file_filter(file_path):
+            continue
+        if not _inside_incomplete_import(file_path, root):
             yield file_path
 
 
