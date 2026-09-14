@@ -1,0 +1,21 @@
+{
+  "source": "148dbdb21d1f98dfb5a1db08c8e7081a299cb149",
+  "api_head": "d0e5b6b8993b76ccb2e49da699fb304a2684df66",
+  "pr": 490,
+  "run_id": 34808706541,
+  "original_attempt": 1,
+  "failed_job_id": 103865575559,
+  "failed_jobs_only": true,
+  "retained_green_job_ids": [
+    103865575321
+  ],
+  "classification": "UNRESOLVED_NON_DEMONSTRATED_CANDIDATE_DEFECT",
+  "reason": "A broad retryable conversion hid its inner cause. The exact same test passed unskipped on current-source Windows release execution; no candidate contract defect or infrastructure root cause is established.",
+  "crossproof_sha256": "099f1d2844fdffb9761bcdb8640e23325b1b7107048e5ec0855312a1fbba852f",
+  "original_log_sha256": "0aedc2819071c794ea81cf682dad00e8c5e946309159ecba92e5d61e04571f88",
+  "requested_at": "2026-09-14T05:30:23.883436+00:00",
+  "status": "ONE_FAILED_ONLY_RECOVERY_ACCEPTED",
+  "assertion_or_deadline_changed": false,
+  "runner_configuration_changed": false,
+  "response": {}
+}

@@ -1,0 +1,8 @@
+PR490 Phase2 Windows original failure; native checkout 148dbdb21d1f98dfb5a1db08c8e7081a299cb149
+test_live_reinstatement_restores_replica_and_acknowledgement_policy
+catalog/node/tests/test_live_storage_reinstatement.py:361
+Expected first_reinstatement.code: reinstatement-tail-catchup-required
+Observed first_reinstatement.code: live-reinstatement-retryable
+Observed status: retryable (preceding assertion passed)
+1 failed, 380 passed, 1 skipped in 108.20s
+Inner exception reason and durable stage were not printed.

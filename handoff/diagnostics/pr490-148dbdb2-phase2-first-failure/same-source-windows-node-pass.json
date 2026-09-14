@@ -1,0 +1,18 @@
+{
+  "api_head": "d0e5b6b8993b76ccb2e49da699fb304a2684df66",
+  "artifact_digest": "sha256:3700c1a2d5b12022cc9e764943836be5243b8b3e1f871ebc1d787fb920d77292",
+  "artifact_id": 10334745080,
+  "artifact_metadata_sha256": "c08395dd81c2aa8d07d640f5535619dfa4e809083c22d5b7e108ab36b3ae7a39",
+  "job_completed_at": "2026-09-14T05:24:09Z",
+  "job_id": 103865575863,
+  "job_metadata_sha256": "74be00c241017d108cec92958d37ab5c3122a55e4ffd1265a4742d7a0a8472ae",
+  "job_started_at": "2026-09-14T05:19:22Z",
+  "log_sha256": "47484ac9d714e4f0411fa638fc771c07073eb41616150b538c929dfc4ce4d8b3",
+  "native_upload_and_checkout_verified": true,
+  "new_test_or_recovery_executed": false,
+  "node": "catalog.node.tests.test_live_storage_reinstatement::test_live_reinstatement_restores_replica_and_acknowledgement_policy",
+  "run_id": 34808706571,
+  "source": "148dbdb21d1f98dfb5a1db08c8e7081a299cb149",
+  "status": "EXACT_CURRENT_PR_SAME_WINDOWS_NODE_UNSKIPPED_PASS",
+  "test_seconds": "8.914"
+}
