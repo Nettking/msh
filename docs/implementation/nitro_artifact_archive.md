@@ -13,12 +13,13 @@ artifacts, LFS, Packages, release assets, cloud storage, or paid runners.
   Twenty-nine `setup-python` pip caches are disabled. Existing Go caches were
   already explicitly disabled; setup-node v4 has no configured cache. Local
   dependency caches and dependency versions are unchanged.
-- Only the isolated synthetic smoke receiver is installed. **Production archive,
-  production credentials and historical evidence migration are not activated.**
-- The proposed production location is `/srv/fcp-artifacts`, owned by the new
-  `fcp-archive` account. Existing Nitro access is `martin`, also Nitro's runner
-  account. Noninteractive sudo is unavailable; sharing that UID would expose
-  ordinary file access to unrelated runner jobs. Administrator setup is required.
+- Production receiver is installed at `/srv/fcp-artifacts`, owned by the dedicated
+  `fcp-archive` account (UID997/GID973, mode0700). Production Actions credentials
+  are configured. **Main workflows are not migrated until reviewed merge.**
+- Administrator setup appeared during the user's manual-setup turn and was
+  independently verified: root-owned receiver/authorized_keys, forced SSH command,
+  no supplementary groups, ordinary `martin` runner denied read/write to archive.
+  No general passwordless sudo or sshd change was made.
 - Nitro had 728,220,061,696 free bytes at inspection. Receiver admission reserves
   200 GiB and limits an individual package to 2 GiB. Local packing, retrieval and
   extraction keep 66 GiB free (64 GiB floor plus 2 GiB margin). On WSL the check
@@ -49,10 +50,20 @@ Transport implementation `5a86c57c`, run `35443127083`, attempt 1:
   Account billing UI showed all five budgets at $0, Stop usage enabled; Actions
   cache API reported zero entries/bytes. Neither setting was changed.
 
-Before transition, an administrator must create the isolated Nitro account and
-the Beast archive admission policy needs an explicit scope decision (see below).
-Production upload/readback, the legacy migration and production access-isolation
-checks remain **unexecuted**. The test receiver holds synthetic data only.
+Production run `35449153626`, source `94d787e5`, attempt1: all four runner SSH probes
+passed as **fcp-archive**; Nettking Windows/Linux upload, streamed download and
+independent native-job/source retention passed. Beast Windows was refused by the
+unchanged capacity guard; Beast Linux stopped earlier with native GitHub job
+binding missing/ambiguous. That earlier API snapshot was not retained, so its
+precise cause is unresolved. No retry was started; overall run is **FAILURE**. There are zero GitHub
+artifacts from this run. All-runner transition remains blocked pending the archive
+policy scope decision below. The previous smoke root contains synthetic data only.
+
+All 26 historical ZIPs were uploaded and fetched back through fcp-archive with
+unchanged original bytes/IDs/digests and native source/attempt bindings. Another
+package protects 52 retained P06 original-failure/diagnostic files (805,294 original
+bytes); all hashes were verified after retrieval. Existing Windows evidence and
+GitHub originals remain intact. Nitro is not the only verified copy of these files.
 
 ### Beast clarification, 2026-09-19 14:25 UTC
 
@@ -217,8 +228,9 @@ These 26 IDs are **deletion candidates only after** production Nitro upload AND
 retrieval verification, continued verification of the independent Windows copy,
 provenance review, and explicit user approval. The exact ID list and binding plan
 remain outside Git in the operator's `nitro-archive-setup` receipts. Current status
-is NOT_TRANSFERRED, so none is yet approved for deletion. P06 raw diagnostics also
-need a protected second copy; they must not be mistaken for an existing Nitro copy.
+is COPIED_AND_RETRIEVED_VERIFIED, but none is approved for deletion. The 52 retained
+P06 failure/diagnostic files now also have a verified Nitro copy. This does not
+constitute physical acceptance or resolve the original P06 failure.
 
 ## Review and activation
 
