@@ -1,0 +1,47 @@
+name: Nitro archive Beast capacity read-only
+on:
+  push:
+    branches: [codex/nitro-artifact-archive]
+    paths: [.github/workflows/nitro-archive-capacity-readonly.yml]
+permissions: {}
+jobs:
+  capacity:
+    runs-on: [self-hosted, beast-windows]
+    timeout-minutes: 2
+    steps:
+      - name: Read volume identity and bounded archive staging inventory
+        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $volume = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='C:'"
+          $physical = Get-Volume -DriveLetter C
+          $rows = @()
+          $dirs = @(Get-ChildItem -LiteralPath $env:RUNNER_TEMP -Directory -Filter 'fcp-evidence-*' -Force | Select-Object -First 100)
+          foreach ($dir in $dirs) {
+            if ($dir.Attributes -band [IO.FileAttributes]::ReparsePoint) { continue }
+            $files = @(Get-ChildItem -LiteralPath $dir.FullName -File -Force)
+            $rows += [pscustomobject]@{
+              path = $dir.FullName
+              direct_file_count = $files.Count
+              direct_file_bytes = ($files | Measure-Object -Property Length -Sum).Sum
+              recursive_scan = $false
+              deletion_authorized = $false
+              activity_and_evidence_retention = 'NOT_PROVEN'
+            }
+          }
+          [pscustomobject]@{
+            utc = [DateTime]::UtcNow.ToString('o')
+            host_name = $env:COMPUTERNAME
+            runner = $env:RUNNER_NAME
+            volume = $volume.DeviceID
+            filesystem = $volume.FileSystem
+            volume_serial = $volume.VolumeSerialNumber
+            volume_unique_id = $physical.UniqueId
+            total_bytes = [long]$volume.Size
+            free_bytes = [long]$volume.FreeSpace
+            runner_temp = $env:RUNNER_TEMP
+            archive_staging_direct_inventory = $rows
+            archive_staging_limit = 100
+            relevant_processes = @(Get-Process -Name 'python*','pytest*','Runner.Worker','wsl*' -ErrorAction SilentlyContinue | Select-Object Id,ProcessName)
+            mutations = 'NONE: no checkout, deletion, test, service change or artifact transfer'
+          } | ConvertTo-Json -Depth 6
