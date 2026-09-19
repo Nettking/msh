@@ -58,7 +58,14 @@ class ArchiveTests(unittest.TestCase):
     def test_local_capacity_refusal_retains_originals(self):
         self.disk_usage.return_value = SimpleNamespace(free=64 * 1024**3)
         with (
-            patch.dict(os.environ, {"RUNNER_NAME": "Nettking"}),
+            patch.dict(
+                os.environ,
+                {
+                    "RUNNER_NAME": "Nettking",
+                    "GITHUB_ACTIONS": "false",
+                    "GITHUB_REPOSITORY": archive.REPO,
+                },
+            ),
             self.assertRaisesRegex(OSError, "free_bytes=.*required_bytes="),
         ):
             self.package()
