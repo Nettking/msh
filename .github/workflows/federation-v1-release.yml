@@ -60,6 +60,7 @@ on:
 
 permissions:
   contents: read
+  actions: read # Native job identity for evidence provenance only.
 
 concurrency:
   group: federation-v1-release-${{ github.workflow }}-${{ github.ref }}
@@ -276,15 +277,18 @@ jobs:
           --junitxml="${{ runner.temp }}/release-shards/junit-${{ matrix.shard }}.xml"
       - name: Preserve shard coverage and timings
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: ./.github/actions/nitro-artifact
         with:
+          operation: upload
+          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
+          host: ${{ vars.NITRO_ARTIFACT_HOST }}
+          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
+          matrix: ${{ toJSON(matrix) }}
+          job-status: ${{ job.status }}
           name: linux-regression-shard-${{ matrix.shard }}
           path: |
             ${{ runner.temp }}/release-shards/shard-${{ matrix.shard }}.json
             ${{ runner.temp }}/release-shards/junit-${{ matrix.shard }}.xml
-          if-no-files-found: error
-          overwrite: true
-          retention-days: 7
       - name: Repository stays clean after the suite
         shell: bash
         run: |
@@ -355,13 +359,16 @@ jobs:
 
       - name: Preserve Windows regression timings
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: ./.github/actions/nitro-artifact
         with:
+          operation: upload
+          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
+          host: ${{ vars.NITRO_ARTIFACT_HOST }}
+          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
+          matrix: ${{ toJSON(matrix) }}
+          job-status: ${{ job.status }}
           name: windows-regression-${{ matrix.suite }}
           path: ${{ runner.temp }}/windows-${{ matrix.suite }}.xml
-          if-no-files-found: error
-          overwrite: true
-          retention-days: 7
   postgres-storage:
     name: PostgreSQL storage release check
     runs-on: [self-hosted, Linux, X64, fcp-docker-linux]
@@ -431,13 +438,16 @@ jobs:
         if: ${{ always() }}
       - name: Preserve full-suite order timings
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: ./.github/actions/nitro-artifact
         with:
+          operation: upload
+          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
+          host: ${{ vars.NITRO_ARTIFACT_HOST }}
+          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
+          matrix: ${{ toJSON(matrix) }}
+          job-status: ${{ job.status }}
           name: full-suite-order-${{ matrix.order }}
           path: ${{ runner.temp }}/order-${{ matrix.order }}.xml
-          if-no-files-found: error
-          overwrite: true
-          retention-days: 7
     strategy:
       fail-fast: false
       matrix:
@@ -467,8 +477,14 @@ jobs:
           test "$LINUX" = success
           test "$WINDOWS" = success
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: ./.github/actions/nitro-artifact
         with:
+          operation: download
+          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
+          host: ${{ vars.NITRO_ARTIFACT_HOST }}
+          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
+          matrix: ${{ toJSON(matrix) }}
+          job-status: ${{ job.status }}
           pattern: linux-regression-shard-*
           merge-multiple: true
           path: ${{ runner.temp }}/verify-release-shards-${{ matrix.os }}

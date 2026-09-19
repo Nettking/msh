@@ -24,6 +24,11 @@ ALLOWED_REPOSITORY_FILES = frozenset(
         "catalog/flask_app/tests/test_windows_migration_script.py",
         "termux/fcp-phone-update-agent.sh",
         "termux/fcp_phone_update_codec.py",
+        # Exact repository identity in archive protocol/provenance, not branding.
+        "scripts/artifact_archive.py",
+        "scripts/artifact_archive_ci.py",
+        "scripts/tests/test_artifact_archive.py",
+        "docs/implementation/nitro_artifact_archive.md",
     }
 )
 
