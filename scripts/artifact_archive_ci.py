@@ -46,6 +46,30 @@ def private_directory(path):
         )
 
 
+def restrict_private_key(path):
+    if os.name != "nt":
+        path.chmod(0o600)
+        return
+    # Service accounts can inherit an OWNER RIGHTS ACE which OpenSSH rejects.
+    # Replace the DACL with only this SID; retain OpenSSH's strict checks.
+    script = r'''
+$ErrorActionPreference = 'Stop'
+$sid = [Security.Principal.WindowsIdentity]::GetCurrent().User
+$acl = [Security.AccessControl.FileSecurity]::new()
+$acl.SetOwner($sid)
+$acl.SetAccessRuleProtection($true, $false)
+$rule = [Security.AccessControl.FileSystemAccessRule]::new($sid, 'Read', 'Allow')
+$acl.AddAccessRule($rule)
+Set-Acl -LiteralPath $env:FCP_ARCHIVE_KEY_PATH -AclObject $acl
+'''
+    subprocess.run(
+        ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
+        env=dict(os.environ, FCP_ARCHIVE_KEY_PATH=str(path)),
+        check=True,
+        capture_output=True,
+    )
+
+
 def main():
     env = os.environ
     trusted_event(env, json.loads(Path(env["GITHUB_EVENT_PATH"]).read_bytes()))
@@ -61,7 +85,7 @@ def main():
         (credentials / "key").write_text(
             env["FCP_ARCHIVE_SSH_KEY"].strip() + "\n", encoding="utf-8"
         )
-        (credentials / "key").chmod(0o600)
+        restrict_private_key(credentials / "key")
         (credentials / "known_hosts").write_text(
             env["FCP_ARCHIVE_KNOWN_HOSTS"].strip() + "\n", encoding="utf-8"
         )
