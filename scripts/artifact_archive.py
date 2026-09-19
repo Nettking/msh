@@ -54,8 +54,14 @@ def require_local_space(path, extra_bytes):
             raise OSError("WSL physical host-volume capacity is unavailable")
         # Also preserve the physical Windows volume, not just the virtual disk.
         volumes.append(Path("/mnt/c"))
-    if any(shutil.disk_usage(p).free < 66 * 1024**3 + extra_bytes for p in volumes):
-        raise OSError("Local evidence operation would breach the free-space reserve")
+    for volume in volumes:
+        free = shutil.disk_usage(volume).free
+        required = 66 * 1024**3 + extra_bytes
+        if free < required:
+            raise OSError(
+                f"Local evidence operation would breach the free-space reserve: "
+                f"volume={volume}, free_bytes={free}, required_bytes={required}"
+            )
 
 
 def component(value):

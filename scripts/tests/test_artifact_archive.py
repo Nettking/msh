@@ -8,6 +8,8 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from scripts import artifact_archive as archive
 from scripts.artifact_archive_ci import trusted_event
@@ -15,6 +17,13 @@ from scripts.artifact_archive_ci import trusted_event
 
 class ArchiveTests(unittest.TestCase):
     def setUp(self):
+        # Files are tiny fixtures. Test host capacity separately from archive
+        # semantics; real transport smoke still uses the unmodified disk guard.
+        disk = patch.object(
+            archive.shutil, "disk_usage", return_value=SimpleNamespace(free=1024**4)
+        )
+        self.disk_usage = disk.start()
+        self.addCleanup(disk.stop)
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
@@ -38,6 +47,13 @@ class ArchiveTests(unittest.TestCase):
 
     def package(self, name="package"):
         return archive.build_package(self.metadata, [str(self.input)], self.root / name)
+
+    def test_local_capacity_refusal_retains_originals(self):
+        self.disk_usage.return_value = SimpleNamespace(free=64 * 1024**3)
+        with self.assertRaisesRegex(OSError, "free_bytes=.*required_bytes="):
+            self.package()
+        self.assertTrue((self.input / "junit.xml").is_file())
+        self.assertFalse((self.root / "package/bundle.zip").exists())
 
     def test_round_trip_structure_and_checksums(self):
         package = self.package()

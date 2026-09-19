@@ -3,7 +3,7 @@ description: Verify immutable evidence over private SSH; never use external arti
 inputs:
   operation:
     required: true
-    description: upload or download
+    description: upload, download, or read-only connectivity probe
   name:
     default: ''
     description: Upload artifact name

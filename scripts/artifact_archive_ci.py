@@ -149,7 +149,13 @@ def main():
             "run_attempt": int(env["GITHUB_RUN_ATTEMPT"]),
         }
         operation = env["ARCHIVE_OPERATION"]
-        if operation == "upload":
+        if operation == "probe":
+            inventory = temp / ("fcp-archive-probe-" + uuid.uuid4().hex + ".json")
+            archive.exchange(config, dict(operation="list", **common), inventory)
+            if not isinstance(json.loads(inventory.read_bytes()), list):
+                raise ValueError("Invalid archive inventory response")
+            summary = "Nitro SSH authentication and pinned host verified; no package archived.\n"
+        elif operation == "upload":
             metadata = dict(
                 common,
                 job=env["GITHUB_JOB"],
