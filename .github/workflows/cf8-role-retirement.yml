@@ -95,11 +95,16 @@ jobs:
           catalog/flask_app/tests/test_cf8_role_retirement.py
       - name: Upload CF8 acceptance diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: ./.github/actions/nitro-artifact
         with:
+          operation: upload
+          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
+          host: ${{ vars.NITRO_ARTIFACT_HOST }}
+          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
+          matrix: ${{ toJSON(matrix) }}
+          job-status: ${{ job.status }}
           name: cf8-acceptance-${{ matrix.os }}
           path: cf8-acceptance.xml
-          if-no-files-found: error
       - name: Enforce CF8 acceptance
         if: steps.cf8_acceptance.outcome != 'success'
         shell: bash

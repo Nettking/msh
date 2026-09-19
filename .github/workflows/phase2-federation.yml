@@ -84,14 +84,18 @@ jobs:
           go build -trimpath -o ../../build/fcp-peer-sidecar .
       - name: Capture Go module lock
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: ./.github/actions/nitro-artifact
         with:
+          operation: upload
+          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
+          host: ${{ vars.NITRO_ARTIFACT_HOST }}
+          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
+          matrix: ${{ toJSON(matrix) }}
+          job-status: ${{ job.status }}
           name: f62-go-module-lock
           path: |
             cmd/fcp-peer-sidecar/go.mod
             cmd/fcp-peer-sidecar/go.sum
-          if-no-files-found: error
-          retention-days: 1
       - name: Ubuntu storage precondition
         uses: ./.github/actions/ubuntu-storage-precondition
 

@@ -80,8 +80,15 @@ jobs:
         run: >-
           python -m demo.icse.run
           --output "${{ runner.temp }}/fcp-icse-components-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}/icse-summary.json"
-      - uses: actions/upload-artifact@v4
+      - if: always()
+        uses: ./.github/actions/nitro-artifact
         with:
+          operation: upload
+          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
+          host: ${{ vars.NITRO_ARTIFACT_HOST }}
+          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
+          matrix: ${{ toJSON(matrix) }}
+          job-status: ${{ job.status }}
           name: icse-summary-${{ matrix.os }}
           path: ${{ runner.temp }}/fcp-icse-components-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}/icse-summary.json
       - name: Run independent-node network demonstration
@@ -92,11 +99,16 @@ jobs:
           --output "${{ runner.temp }}/fcp-icse-network-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}"
       - name: Preserve network evidence even after failure
         if: ${{ always() && (steps.network_demo.outcome == 'success' || steps.network_demo.outcome == 'failure') }}
-        uses: actions/upload-artifact@v4
+        uses: ./.github/actions/nitro-artifact
         with:
+          operation: upload
+          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
+          host: ${{ vars.NITRO_ARTIFACT_HOST }}
+          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
+          matrix: ${{ toJSON(matrix) }}
+          job-status: ${{ job.status }}
           name: icse-network-summary-${{ matrix.os }}
           path: ${{ runner.temp }}/fcp-icse-network-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}/public/
-          if-no-files-found: error
 
   reviewer-compose:
     runs-on: [self-hosted, fcp-linux-fast]
@@ -112,8 +124,15 @@ jobs:
           docker compose -f demo/icse/docker-compose.yml run --build --rm demo --output /evidence/icse-summary.json
       - name: Validate retained Compose evidence
         run: python3 -m json.tool demo/icse/evidence/icse-summary.json > /dev/null
-      - uses: actions/upload-artifact@v4
+      - if: always()
+        uses: ./.github/actions/nitro-artifact
         with:
+          operation: upload
+          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
+          host: ${{ vars.NITRO_ARTIFACT_HOST }}
+          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
+          matrix: ${{ toJSON(matrix) }}
+          job-status: ${{ job.status }}
           name: icse-summary-compose
           path: demo/icse/evidence/icse-summary.json
 
@@ -126,12 +145,24 @@ jobs:
       - uses: ./.github/actions/self-hosted-python
         with:
           python-version: "3.12"
-      - uses: actions/download-artifact@v4
+      - uses: ./.github/actions/nitro-artifact
         with:
+          operation: download
+          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
+          host: ${{ vars.NITRO_ARTIFACT_HOST }}
+          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
+          matrix: ${{ toJSON(matrix) }}
+          job-status: ${{ job.status }}
           pattern: icse-summary-*
           path: downloaded-evidence
-      - uses: actions/download-artifact@v4
+      - uses: ./.github/actions/nitro-artifact
         with:
+          operation: download
+          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
+          host: ${{ vars.NITRO_ARTIFACT_HOST }}
+          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
+          matrix: ${{ toJSON(matrix) }}
+          job-status: ${{ job.status }}
           pattern: icse-network-summary-*
           path: downloaded-network-evidence
       - name: Build publication bundle
@@ -146,7 +177,14 @@ jobs:
             --evidence-root downloaded-evidence \
             --network-evidence-root downloaded-network-evidence \
             --output publication-bundle
-      - uses: actions/upload-artifact@v4
+      - if: always()
+        uses: ./.github/actions/nitro-artifact
         with:
+          operation: upload
+          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
+          host: ${{ vars.NITRO_ARTIFACT_HOST }}
+          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
+          matrix: ${{ toJSON(matrix) }}
+          job-status: ${{ job.status }}
           name: fcp-icse-tool-demo-bundle-${{ github.sha }}
           path: publication-bundle

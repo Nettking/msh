@@ -1,0 +1,68 @@
+name: Nitro evidence archive
+description: Verify immutable evidence over private SSH; never use external artifact storage.
+inputs:
+  operation:
+    required: true
+    description: upload or download
+  name:
+    default: ''
+    description: Upload artifact name
+  path:
+    required: true
+    description: Upload files/directories, or download destination
+  pattern:
+    default: ''
+    description: Required download artifact pattern for this exact checkout/run
+  merge-multiple:
+    default: 'false'
+    description: Merge downloads while refusing filename collisions
+  matrix:
+    default: 'null'
+    description: Actual job matrix JSON
+  job-status:
+    required: true
+    description: Original job status at archival time
+  ssh-key:
+    required: true
+    description: Restricted SSH credential; unavailable to forks
+  host:
+    required: true
+    description: Dedicated archive SSH account and Nitro hostname
+  known-hosts:
+    required: true
+    description: Previously verified pinned Nitro host key
+runs:
+  using: composite
+  steps:
+    - name: Transfer and verify evidence on Linux
+      if: runner.os == 'Linux'
+      shell: bash
+      env:
+        ARCHIVE_OPERATION: ${{ inputs.operation }}
+        ARCHIVE_NAME: ${{ inputs.name }}
+        ARCHIVE_PATH: ${{ inputs.path }}
+        ARCHIVE_PATTERN: ${{ inputs.pattern }}
+        ARCHIVE_MERGE_MULTIPLE: ${{ inputs.merge-multiple }}
+        ARCHIVE_MATRIX: ${{ inputs.matrix }}
+        ARCHIVE_JOB_STATUS: ${{ inputs.job-status }}
+        FCP_ARCHIVE_SSH_KEY: ${{ inputs.ssh-key }}
+        FCP_ARCHIVE_HOST: ${{ inputs.host }}
+        FCP_ARCHIVE_KNOWN_HOSTS: ${{ inputs.known-hosts }}
+      run: /opt/fcp-ci/python/3.12.13/bin/python3.12 -B -m scripts.artifact_archive_ci
+    - name: Transfer and verify evidence on Windows
+      if: runner.os == 'Windows'
+      shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+      env:
+        ARCHIVE_OPERATION: ${{ inputs.operation }}
+        ARCHIVE_NAME: ${{ inputs.name }}
+        ARCHIVE_PATH: ${{ inputs.path }}
+        ARCHIVE_PATTERN: ${{ inputs.pattern }}
+        ARCHIVE_MERGE_MULTIPLE: ${{ inputs.merge-multiple }}
+        ARCHIVE_MATRIX: ${{ inputs.matrix }}
+        ARCHIVE_JOB_STATUS: ${{ inputs.job-status }}
+        FCP_ARCHIVE_SSH_KEY: ${{ inputs.ssh-key }}
+        FCP_ARCHIVE_HOST: ${{ inputs.host }}
+        FCP_ARCHIVE_KNOWN_HOSTS: ${{ inputs.known-hosts }}
+      run: |
+        python -B -m scripts.artifact_archive_ci
+        exit $LASTEXITCODE
