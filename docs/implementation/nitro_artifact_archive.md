@@ -16,13 +16,14 @@ artifacts, LFS, Packages, release assets, cloud storage, or paid runners.
   physical acceptance host. Windows `Beast` and Linux `Beast-Linux-WSL` retain
   only job-local staging; package storage is on Nitro. Failed uploads retain
   bounded, incomplete inputs outside `RUNNER_TEMP` until manual recovery.
-- Beast's archive admission now preserves the existing CI refusal at **<=12 GiB**,
-  including the pending write's bounded extra space. WSL checks both its Linux
-  filesystem and physical `/mnt/c`. The erroneous new 66 GiB rule was removed
-  only for these explicitly authorized Nettking/msh CI runner identities.
-- Other clients keep their existing archive reserve; physical acceptance floors
-  and measured growth margins remain unchanged. Nitro retains its 200 GiB reserve
-  and 2 GiB per-package bound. No runner labels, accounts or services were changed.
+- All four repository CI identities (`Beast`, `Beast-Linux-WSL`, `Nettking`, and
+  `Nettking-Linux`) use the product's existing **12 GiB** CI admission floor,
+  including the bounded pending write. The archive helper's separate 66 GiB
+  margin remains for non-CI/operator use; this does not alter product
+  host-resource thresholds, physical acceptance floors, or measured growth
+  margins. WSL checks both its Linux filesystem and physical `/mnt/c`. Nitro
+  retains its 200 GiB reserve and 2 GiB per-package bound. No runner labels,
+  accounts or services were changed.
 - Ten upload steps and three download steps use the SSH adapter on this branch;
   29 external setup-python pip caches are disabled. Production SSH credentials
   are configured, but **main still uses its original storage until reviewed merge**.

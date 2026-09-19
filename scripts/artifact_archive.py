@@ -29,7 +29,11 @@ REPO = "Nettking/msh"
 MAX_BYTES = 2 * 1024**3
 MAX_HEADER = 8 * 1024**2
 RESERVE_BYTES = 200 * 1024**3  # Existing physical acceptance margin stays available.
-CI_ONLY_RUNNERS = frozenset({"Beast", "Beast-Linux-WSL"})
+# Repository CI identities use the product's CI admission floor.  The
+# separate physical/operator archive margin applies outside GitHub Actions.
+CI_ONLY_RUNNERS = frozenset(
+    {"Beast", "Beast-Linux-WSL", "Nettking", "Nettking-Linux"}
+)
 
 
 def canonical(value):
@@ -52,8 +56,9 @@ def require_local_space(path, extra_bytes):
         and os.environ.get("GITHUB_REPOSITORY") == REPO
         and os.environ.get("RUNNER_NAME") in CI_ONLY_RUNNERS
     )
-    # Beast is explicitly CI-only, not a physical acceptance host or archive.
-    # Keep its existing CI refusal at <=12 GiB, including the pending write.
+    # CI jobs are not physical acceptance runs. Keep the existing CI refusal at
+    # <=12 GiB, including the pending write; physical/operator use retains the
+    # separate 66 GiB margin.
     reserve = (12 if ci_only else 66) * 1024**3
     path = Path(path).absolute()
     while not path.exists():
