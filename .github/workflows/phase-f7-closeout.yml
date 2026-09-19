@@ -62,6 +62,7 @@ on:
 
 permissions:
   contents: read
+  actions: read # Native job identity for evidence provenance only.
 
 concurrency:
   group: f7-closeout-${{ github.workflow }}-${{ github.ref }}

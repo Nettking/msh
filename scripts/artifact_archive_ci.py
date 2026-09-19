@@ -6,6 +6,7 @@ import json
 import os
 import shutil
 import subprocess
+import urllib.request
 import uuid
 from pathlib import Path
 
@@ -52,7 +53,7 @@ def restrict_private_key(path):
         return
     # Service accounts can inherit an OWNER RIGHTS ACE which OpenSSH rejects.
     # Replace the DACL with only this SID; retain OpenSSH's strict checks.
-    script = r'''
+    script = r"""
 $ErrorActionPreference = 'Stop'
 $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User
 $acl = [Security.AccessControl.FileSecurity]::new()
@@ -61,13 +62,57 @@ $acl.SetAccessRuleProtection($true, $false)
 $rule = [Security.AccessControl.FileSystemAccessRule]::new($sid, 'Read', 'Allow')
 $acl.AddAccessRule($rule)
 Set-Acl -LiteralPath $env:FCP_ARCHIVE_KEY_PATH -AclObject $acl
-'''
+"""
     subprocess.run(
         ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
         env=dict(os.environ, FCP_ARCHIVE_KEY_PATH=str(path)),
         check=True,
         capture_output=True,
     )
+
+
+def native_job_identity(env):
+    """Bind a running job to GitHub's numeric identity, not an invented ID."""
+    run_id = env["GITHUB_RUN_ID"]
+    if not run_id.isdecimal():
+        raise ValueError("Invalid GitHub run ID")
+    request = urllib.request.Request(
+        f"https://api.github.com/repos/{archive.REPO}/actions/runs/{run_id}/jobs?filter=latest&per_page=100",
+        headers={
+            "Authorization": "Bearer " + env["ARCHIVE_GITHUB_TOKEN"],
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+    )
+    with urllib.request.urlopen(request, timeout=20) as response:
+        data = json.load(response)
+    if data["total_count"] > 100:
+        raise ValueError(
+            "Native job inventory exceeds bound; explicit binding required"
+        )
+    matches = [
+        job
+        for job in data["jobs"]
+        if job["status"] == "in_progress"
+        and job["runner_name"] == env["RUNNER_NAME"]
+        and job["run_attempt"] == int(env["GITHUB_RUN_ATTEMPT"])
+    ]
+    if len(matches) != 1:
+        raise ValueError("Native GitHub job binding is missing or ambiguous")
+    job = matches[0]
+    return {
+        key: job.get(key)
+        for key in (
+            "id",
+            "name",
+            "run_id",
+            "run_attempt",
+            "head_sha",
+            "runner_id",
+            "runner_name",
+            "started_at",
+        )
+    }
 
 
 def main():
@@ -115,6 +160,7 @@ def main():
                 workflow_ref=env["GITHUB_WORKFLOW_REF"],
                 workflow_sha=env["GITHUB_WORKFLOW_SHA"],
                 event_sha=env["GITHUB_SHA"],
+                native_github_job=native_job_identity(env),
                 job_status_at_archive=env["ARCHIVE_JOB_STATUS"],
             )
             package = archive.build_package(

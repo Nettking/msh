@@ -28,6 +28,7 @@ on:
 
 permissions:
   contents: read
+  actions: read # Native job identity for evidence provenance only.
 
 concurrency:
   group: cf8-role-retirement-${{ github.workflow }}-${{ github.ref }}

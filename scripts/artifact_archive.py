@@ -43,6 +43,21 @@ def sha_file(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
+def require_local_space(path, extra_bytes):
+    path = Path(path).absolute()
+    while not path.exists():
+        path = path.parent
+    volumes = [path]
+    release = Path("/proc/sys/kernel/osrelease")
+    if release.is_file() and "microsoft" in release.read_text().lower():
+        if not Path("/mnt/c").is_dir():
+            raise OSError("WSL physical host-volume capacity is unavailable")
+        # Also preserve the physical Windows volume, not just the virtual disk.
+        volumes.append(Path("/mnt/c"))
+    if any(shutil.disk_usage(p).free < 66 * 1024**3 + extra_bytes for p in volumes):
+        raise OSError("Local evidence operation would breach the free-space reserve")
+
+
 def component(value):
     if not isinstance(value, str) or not re.fullmatch(
         r"[A-Za-z0-9][A-Za-z0-9_.-]{0,159}", value
@@ -200,6 +215,11 @@ def serve(root, reserve=RESERVE_BYTES):
                 with file.open("rb") as stream:
                     os.fsync(stream.fileno())
                 file.chmod(0o400)
+            stage_fd = os.open(stage, os.O_RDONLY)
+            try:
+                os.fsync(stage_fd)
+            finally:
+                os.close(stage_fd)
             destination = package_path(root, ref)
             with server_lock(root):
                 if destination.exists():
@@ -287,9 +307,7 @@ def build_package(metadata, patterns, spool):
         raise ValueError(
             "Evidence exceeds the bounded package size; originals retained"
         )
-    local_reserve = 66 * 1024**3 if os.name == "nt" else 0
-    if shutil.disk_usage(spool).free < local_reserve + total + MAX_HEADER:
-        raise OSError("Local evidence spool would breach free-space reserve")
+    require_local_space(spool, total + MAX_HEADER)
     manifest = dict(
         metadata,
         schema=SCHEMA,
@@ -409,6 +427,7 @@ def upload(config, package):
 
 def fetch(config, receipt, output):
     output = Path(output)
+    require_local_space(output, receipt["zip_size"] * 2 + MAX_HEADER)
     output.mkdir(parents=True, exist_ok=False)
     wire = output / "download.wire"
     exchange(config, {"operation": "get", "reference": receipt["reference"]}, wire)
@@ -440,6 +459,7 @@ def extract(package, destination):
     package, destination = Path(package), Path(destination)
     manifest = json.loads((package / "manifest.json").read_bytes())
     verified_zip(package / "bundle.zip", manifest)
+    require_local_space(destination, sum(row["size"] for row in manifest["files"]))
     destination.mkdir(parents=True, exist_ok=True)
     for row in manifest["files"]:
         target = destination / str(safe_name(row["path"]))

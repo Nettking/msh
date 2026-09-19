@@ -42,6 +42,7 @@ on:
 
 permissions:
   contents: read
+  actions: read # Native job identity for evidence provenance only.
 
 concurrency:
   group: phase2-${{ github.workflow }}-${{ github.ref }}

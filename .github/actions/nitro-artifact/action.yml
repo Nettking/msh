@@ -38,6 +38,7 @@ runs:
       if: runner.os == 'Linux'
       shell: bash
       env:
+        ARCHIVE_GITHUB_TOKEN: ${{ github.token }}
         ARCHIVE_OPERATION: ${{ inputs.operation }}
         ARCHIVE_NAME: ${{ inputs.name }}
         ARCHIVE_PATH: ${{ inputs.path }}
@@ -53,6 +54,7 @@ runs:
       if: runner.os == 'Windows'
       shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
       env:
+        ARCHIVE_GITHUB_TOKEN: ${{ github.token }}
         ARCHIVE_OPERATION: ${{ inputs.operation }}
         ARCHIVE_NAME: ${{ inputs.name }}
         ARCHIVE_PATH: ${{ inputs.path }}

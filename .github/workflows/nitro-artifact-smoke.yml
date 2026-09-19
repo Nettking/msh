@@ -10,6 +10,7 @@ on:
       - scripts/tests/test_artifact_archive.py
 permissions:
   contents: read
+  actions: read # Native job identity for evidence provenance only.
 jobs:
   transport:
     strategy:
@@ -22,6 +23,14 @@ jobs:
             python: /opt/fcp-ci/python/3.12.13/bin/python3.12
           - os: Windows
             runner: nettking
+            shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+            python: python
+          - os: Linux
+            runner: beast-linux
+            shell: bash
+            python: /opt/fcp-ci/python/3.12.13/bin/python3.12
+          - os: Windows
+            runner: beast-windows
             shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
             python: python
     runs-on: [self-hosted, '${{ matrix.runner }}']
@@ -38,7 +47,7 @@ jobs:
       - uses: ./.github/actions/nitro-artifact
         with:
           operation: upload
-          name: archive-smoke-${{ matrix.os }}
+          name: archive-smoke-${{ matrix.os }}-${{ matrix.runner }}
           path: ${{ runner.temp }}/archive-smoke.txt
           matrix: ${{ toJSON(matrix) }}
           job-status: ${{ job.status }}
@@ -48,8 +57,8 @@ jobs:
       - uses: ./.github/actions/nitro-artifact
         with:
           operation: download
-          pattern: archive-smoke-${{ matrix.os }}
-          path: ${{ runner.temp }}/archive-smoke-get-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}
+          pattern: archive-smoke-${{ matrix.os }}-${{ matrix.runner }}
+          path: ${{ runner.temp }}/archive-smoke-get-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}-${{ matrix.runner }}
           matrix: ${{ toJSON(matrix) }}
           job-status: ${{ job.status }}
           ssh-key: ${{ secrets.NITRO_ARTIFACT_SMOKE_SSH_KEY }}
@@ -57,5 +66,5 @@ jobs:
           known-hosts: ${{ vars.NITRO_ARTIFACT_SMOKE_KNOWN_HOSTS }}
       - name: Verify retrieved content
         env:
-          DOWNLOAD: ${{ runner.temp }}/archive-smoke-get-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}/archive-smoke-${{ matrix.os }}/archive-smoke.txt
+          DOWNLOAD: ${{ runner.temp }}/archive-smoke-get-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}-${{ matrix.runner }}/archive-smoke-${{ matrix.os }}-${{ matrix.runner }}/archive-smoke.txt
         run: ${{ matrix.python }} -B -c "from pathlib import Path; import os; assert Path(os.environ['DOWNLOAD']).read_bytes()==(Path(os.environ['RUNNER_TEMP'])/'archive-smoke.txt').read_bytes()"
