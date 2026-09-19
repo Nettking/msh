@@ -1,3 +1,4 @@
+import base64
 import concurrent.futures
 import copy
 import io
@@ -54,6 +55,48 @@ class ArchiveTests(unittest.TestCase):
             self.package()
         self.assertTrue((self.input / "junit.xml").is_file())
         self.assertFalse((self.root / "package/bundle.zip").exists())
+
+    def test_streamed_fetch_verifies_without_a_second_zip_copy(self):
+        package = self.package()
+        manifest = json.loads((package / "manifest.json").read_bytes())
+        payload = (package / "bundle.zip").read_bytes()
+        receipt = {
+            "reference": archive.reference(manifest),
+            "manifest_sha256": archive.sha_file(package / "manifest.json"),
+            "zip_sha256": archive.sha_file(package / "bundle.zip"),
+            "zip_size": len(payload),
+            "complete": True,
+        }
+        header = archive.canonical({"receipt": receipt, "manifest": manifest})
+        for label, data, error in (
+            ("good", payload, None),
+            ("short", payload[:-1], "Truncated"),
+            ("long", payload + b"x", "exceeds declared"),
+            ("corrupt", b"x" + payload[1:], "checksum mismatch"),
+        ):
+            with self.subTest(label=label):
+                wire = base64.b64encode(header + data).decode()
+                command = [
+                    sys.executable,
+                    "-B",
+                    "-c",
+                    (
+                        "import sys,base64;sys.stdin.buffer.read();"
+                        f"sys.stdout.buffer.write(base64.b64decode({wire!r}))"
+                    ),
+                ]
+                output = self.root / label
+                with patch.object(archive, "ssh_command", return_value=command):
+                    if error:
+                        with self.assertRaisesRegex(ValueError, error):
+                            archive.fetch({}, receipt, output)
+                        self.assertFalse((output / "receipt.json").exists())
+                    else:
+                        self.assertEqual(archive.fetch({}, receipt, output), manifest)
+                        self.assertEqual((output / "bundle.zip").read_bytes(), payload)
+                        archive.extract(output, self.root / "fetched-files")
+                self.assertFalse((output / "download.wire").exists())
+                self.assertTrue((package / "bundle.zip").is_file())
 
     def test_round_trip_structure_and_checksums(self):
         package = self.package()

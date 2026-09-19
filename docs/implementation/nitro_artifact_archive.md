@@ -50,9 +50,45 @@ Transport implementation `5a86c57c`, run `35443127083`, attempt 1:
   cache API reported zero entries/bytes. Neither setting was changed.
 
 Before transition, an administrator must create the isolated Nitro account and
-the Beast capacity issue needs a safe resolution without protected-data cleanup.
+the Beast archive admission policy needs an explicit scope decision (see below).
 Production upload/readback, the legacy migration and production access-isolation
 checks remain **unexecuted**. The test receiver holds synthetic data only.
+
+### Beast clarification, 2026-09-19 14:25 UTC
+
+Read-only run `35448691277` used the existing Beast Windows runner, without a
+checkout, tests, archive transfer or cleanup. C: is NTFS, serial `86F91634`, total
+118,917,951,488 bytes (110.75 GiB), free 14,240,579,584 bytes (13.26 GiB). The WSL
+client's `/mnt/c` check protects this same physical volume.
+
+The 66 GiB archive rule was introduced in this infrastructure branch; it is not
+the archive's data size and is not a demonstrated existing blanket Beast test
+requirement. The existing `ci_release_disk_preflight.py` refuses at or below
+12 GiB and warns at or below 16 GiB. `storage_allocation.default_floor_bytes`
+derives `min(max(10 GiB, 5% of volume size), 64 GiB)`, which is 10 GiB on this C:.
+The physical Windows campaign's 64 GiB floor and measured growth margins still
+apply to its actual acceptance volumes. This inspection is not a fresh test gate
+or an audit of every filesystem visible inside Beast WSL.
+
+The archive guard remains unchanged as instructed. Its Windows upload admission
+was `66 GiB + 8 MiB + 39 bytes`; therefore it refuses even a 39-byte input. The
+equivalent retained Nettking package uses 171 ZIP bytes, 1,262 manifest bytes and
+338 receipt bytes: 1,771 additional logical bytes, not 66 GiB. Beast's job metadata
+can differ slightly; its physical NTFS allocation was not measured because the
+guard prevented packaging. The 8 MiB admission allowance is conservative header
+space, not an actual allocation. No archive staging directories were found in the
+bounded `RUNNER_TEMP/fcp-evidence-*` inventory; no cleanup candidates are approved.
+
+Retrieval now streams directly into one ZIP and verifies its declared length,
+manifest, ZIP SHA-256 and all member hashes before publishing a local receipt.
+This removes the redundant `download.wire` copy: peak package bytes fall from
+`2 * ZIP size` to `ZIP size`, plus bounded metadata; extraction adds the restored
+file bytes. One upload ZIP remains necessary for a stable, re-verifiable retry.
+No free-space floor, SSH check, original evidence or frozen source changed.
+Local verification: Linux 12 passed, Windows 10 passed / 2 Linux-only skips;
+real Windows retrieval from the isolated Nitro receiver passed with no wire copy.
+Production and all-runner verification remain pending. Do not clean 52+ GiB on
+Beast merely to satisfy this new unscoped archive rule without a separate decision.
 
 ## Administrator setup
 

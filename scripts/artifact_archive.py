@@ -377,10 +377,13 @@ def ssh_command(config):
     ]
 
 
-def exchange(config, header, output, payload=None):
+def exchange(config, header, output, payload=None, receive=None):
     with Path(output).open("xb") as out, tempfile.TemporaryFile() as err:
         proc = subprocess.Popen(
-            ssh_command(config), stdin=subprocess.PIPE, stdout=out, stderr=err
+            ssh_command(config),
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE if receive else out,
+            stderr=err,
         )
         timer = threading.Timer(600, proc.kill)
         timer.start()
@@ -393,12 +396,16 @@ def exchange(config, header, output, payload=None):
                 proc.stdin.close()
             except BrokenPipeError:
                 pass
+            if receive:
+                receive(proc.stdout, out)
             code = proc.wait(timeout=610)
         finally:
             timer.cancel()
             if proc.poll() is None:
                 proc.kill()
                 proc.wait()
+            if proc.stdout is not None:
+                proc.stdout.close()
         if code:
             err.seek(0)
             raise RuntimeError(
@@ -433,11 +440,14 @@ def upload(config, package):
 
 def fetch(config, receipt, output):
     output = Path(output)
-    require_local_space(output, receipt["zip_size"] * 2 + MAX_HEADER)
+    size = receipt["zip_size"]
+    if type(size) is not int or not 0 < size <= MAX_BYTES:
+        raise ValueError("Invalid download size")
+    require_local_space(output, size + MAX_HEADER)
     output.mkdir(parents=True, exist_ok=False)
-    wire = output / "download.wire"
-    exchange(config, {"operation": "get", "reference": receipt["reference"]}, wire)
-    with wire.open("rb") as stream:
+    received = []
+
+    def receive(stream, dest):
         response = read_header(stream)
         if response["receipt"] != receipt:
             raise ValueError("Requested immutable receipt does not match archive")
@@ -448,8 +458,26 @@ def fetch(config, receipt, output):
             != receipt["manifest_sha256"]
         ):
             raise ValueError("Downloaded manifest identity mismatch")
-        with (output / "bundle.zip").open("xb") as dest:
-            shutil.copyfileobj(stream, dest, 1024**2)
+        left = size
+        while left:
+            chunk = stream.read(min(left, 1024**2))
+            if not chunk:
+                raise ValueError("Truncated download; partial package retained")
+            dest.write(chunk)
+            left -= len(chunk)
+        if stream.read(1):
+            raise ValueError("Download exceeds declared size")
+        dest.flush()
+        os.fsync(dest.fileno())
+        received.append(manifest)
+
+    exchange(
+        config,
+        {"operation": "get", "reference": receipt["reference"]},
+        output / "bundle.zip",
+        receive=receive,
+    )
+    manifest = received[0]
     if (output / "bundle.zip").stat().st_size != receipt["zip_size"] or sha_file(
         output / "bundle.zip"
     ) != receipt["zip_sha256"]:
@@ -457,7 +485,6 @@ def fetch(config, receipt, output):
     verified_zip(output / "bundle.zip", manifest)
     (output / "manifest.json").write_bytes(canonical(manifest))
     (output / "receipt.json").write_bytes(canonical(receipt))
-    wire.unlink()  # Verified local transfer envelope, never original evidence.
     return manifest
 
 
