@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Callable
 from contextlib import closing
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
@@ -26,6 +27,92 @@ from .manifest import (
 )
 from .models import CommitState
 from .storage_control_plane import STORAGE_GROUP_CREATED
+
+_COMPONENT_CACHE_MAX_ENTRIES = 4096
+_COMPONENT_CACHE_MAX_BYTES = 4 * 1024 * 1024
+_COMPONENT_CACHE_MAX_KEY_BYTES = 64 * 1024
+
+
+def _component_key_fits(value: Any, remaining: list[int], depth: int = 0) -> bool:
+    """Conservatively bound key encoding before allocating serialized bytes."""
+    if depth > 32 or remaining[0] < 0:
+        return False
+    kind = type(value)
+    if kind is str:
+        remaining[0] -= 2 + 6 * len(value)
+    elif kind is int:
+        remaining[0] -= 2 + value.bit_length()
+    elif value is None or kind in (bool, float):
+        remaining[0] -= 32
+    elif kind in (dict, list):
+        remaining[0] -= 2 + 2 * len(value)
+        if remaining[0] < 0 or (depth == 32 and value):
+            return False
+        if kind is dict:
+            for key in value:
+                if type(key) is not str:
+                    return False
+                remaining[0] -= 2 + 6 * len(key)
+                if remaining[0] < 0:
+                    return False
+            children = value.values()
+        else:
+            children = value
+        # Inline scalar costs: repeated histories contain many small fields,
+        # so recurse only for actual nested containers.
+        for child in children:
+            child_kind = type(child)
+            if child_kind is str:
+                remaining[0] -= 2 + 6 * len(child)
+            elif child_kind is int:
+                remaining[0] -= 2 + child.bit_length()
+            elif child is None or child_kind in (bool, float):
+                remaining[0] -= 32
+            elif child_kind in (dict, list):
+                if not _component_key_fits(child, remaining, depth + 1):
+                    return False
+            else:
+                return False
+            if remaining[0] < 0:
+                return False
+    else:
+        return False
+    return remaining[0] >= 0
+
+
+class _HistoryComponentDecoder:
+    """Reuse frozen components only within one complete history validation."""
+
+    def __init__(self) -> None:
+        self._cache: dict[tuple[type, bytes], Any] = {}
+        self._bytes = 0
+
+    def decode(self, component: type, raw: Any) -> Any:
+        key = None
+        if _component_key_fits(raw, [_COMPONENT_CACHE_MAX_KEY_BYTES]):
+            try:
+                # Include every raw key and preserve JSON scalar types. Python
+                # value equality would incorrectly equate True, 1 and 1.0.
+                encoded = _json(raw).encode("utf-8")
+                if len(encoded) <= _COMPONENT_CACHE_MAX_KEY_BYTES:
+                    key = (component, encoded)
+            except (TypeError, ValueError, UnicodeError):
+                pass  # Unkeyable input keeps the ordinary decoder's semantics.
+        if key is not None and key in self._cache:
+            return self._cache[key]
+        result = component.from_dict(raw)
+        if (
+            key is not None
+            and len(self._cache) < _COMPONENT_CACHE_MAX_ENTRIES
+            and self._bytes + len(key[1]) <= _COMPONENT_CACHE_MAX_BYTES
+        ):
+            self._cache[key] = result
+            self._bytes += len(key[1])
+        return result
+
+    def clear(self) -> None:
+        self._cache.clear()
+        self._bytes = 0
 
 
 def _text(value: Any, field: str) -> str:
@@ -637,10 +724,14 @@ class AuthoritativeManifestStore:
             )
 
     @staticmethod
-    def _decode_revision(row: sqlite3.Row) -> AuthoritativeStorageManifest:
+    def _decode_revision(
+        row: sqlite3.Row,
+        *,
+        component_decoder: Callable[[type, Any], Any] | None = None,
+    ) -> AuthoritativeStorageManifest:
         try:
-            manifest = AuthoritativeStorageManifest.from_dict(
-                json.loads(row["manifest_json"])
+            manifest = AuthoritativeStorageManifest._from_dict(
+                json.loads(row["manifest_json"]), component_decoder=component_decoder
             )
         except (
             KeyError,
@@ -699,7 +790,13 @@ class AuthoritativeManifestStore:
                WHERE session_id=? AND group_id=? ORDER BY revision""",
             (session_id, group_id),
         ).fetchall()
-        manifests = tuple(self._decode_revision(row) for row in rows)
+        decoder = _HistoryComponentDecoder()
+        try:
+            manifests = tuple(
+                self._decode_revision(row, component_decoder=decoder.decode) for row in rows
+            )
+        finally:
+            decoder.clear()
         for expected_revision, manifest in enumerate(manifests):
             if manifest.revision != expected_revision:
                 raise FederationValidationError(

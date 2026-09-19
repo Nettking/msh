@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
@@ -771,6 +772,15 @@ class AuthoritativeStorageManifest:
 
     @classmethod
     def from_dict(cls, value: Any) -> Self:
+        return cls._from_dict(value)
+
+    @classmethod
+    def _from_dict(
+        cls,
+        value: Any,
+        *,
+        component_decoder: Callable[[type, Any], Any] | None = None,
+    ) -> Self:
         if not isinstance(value, dict):
             raise FederationValidationError(
                 "invalid-object",
@@ -797,6 +807,7 @@ class AuthoritativeStorageManifest:
                 missing[0],
                 "is required",
             )
+        decode = component_decoder or (lambda component, raw: component.from_dict(raw))
         return cls(
             session_id=value["session_id"],
             group_id=value["group_id"],
@@ -805,9 +816,9 @@ class AuthoritativeStorageManifest:
             previous_manifest_hash=value["previous_manifest_hash"],
             commit_state=value["commit_state"],
             datasets=tuple(
-                DatasetManifest.from_dict(item) for item in value["datasets"]
+                decode(DatasetManifest, item) for item in value["datasets"]
             ),
-            items=tuple(ManifestItem.from_dict(item) for item in value["items"]),
+            items=tuple(decode(ManifestItem, item) for item in value["items"]),
             manifest_hash=value["manifest_hash"],
             updated_at=value["updated_at"],
         )

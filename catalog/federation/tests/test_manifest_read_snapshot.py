@@ -40,9 +40,9 @@ def test_every_read_validates_each_retained_revision_once(tmp_path, monkeypatch,
     decoded = []
     original = AuthoritativeManifestStore._decode_revision
 
-    def observe(row):
+    def observe(row, **kwargs):
         decoded.append(row["revision"])
-        return original(row)
+        return original(row, **kwargs)
 
     monkeypatch.setattr(control.manifests, "_decode_revision", observe)
     result = read(control, method)
