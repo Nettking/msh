@@ -4,6 +4,8 @@ import copy
 import io
 import json
 import os
+import runpy
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -13,7 +15,11 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from scripts import artifact_archive as archive
-from scripts.artifact_archive_ci import native_job_identity, trusted_event
+from scripts.artifact_archive_ci import (
+    native_job_identity,
+    preserve_failed_inputs,
+    trusted_event,
+)
 
 
 class ArchiveTests(unittest.TestCase):
@@ -78,7 +84,7 @@ class ArchiveTests(unittest.TestCase):
         for runner, actions, repo in (
             ("Nettking", "true", archive.REPO),
             ("Beast", "false", archive.REPO),
-            ("Beast", "true", "fork/msh"),
+            ("Beast", "true", "fork/example"),
         ):
             with (
                 patch.dict(
@@ -240,6 +246,128 @@ class ArchiveTests(unittest.TestCase):
                 self.metadata, [str(self.root / "absent")], self.root / "absent-package"
             )
 
+    def test_failed_upload_survives_runner_temp_cleanup_without_secret_copy(self):
+        job_temp = self.root / "runner-temp"
+        job_temp.mkdir()
+        source = job_temp / "junit.xml"
+        original = b'<testsuite failures="1"/>'
+        source.write_bytes(original)
+        event = job_temp / "event.json"
+        event.write_text("{}")
+        env = {
+            "GITHUB_ACTIONS": "true",
+            "GITHUB_REPOSITORY": archive.REPO,
+            "GITHUB_EVENT_NAME": "push",
+            "GITHUB_EVENT_PATH": str(event),
+            "GITHUB_RUN_ID": "123",
+            "GITHUB_RUN_ATTEMPT": "1",
+            "GITHUB_JOB": "failed-test",
+            "GITHUB_STEP_SUMMARY": str(job_temp / "summary.md"),
+            "RUNNER_NAME": "Beast",
+            "RUNNER_TEMP": str(job_temp),
+            "ARCHIVE_OPERATION": "upload",
+            "ARCHIVE_NAME": "failure-evidence",
+            "ARCHIVE_PATH": str(source),
+            "ARCHIVE_MATRIX": "null",
+            "ARCHIVE_JOB_STATUS": "failure",
+            "ARCHIVE_GITHUB_TOKEN": "native-api-fixture",
+            "GITHUB_WORKFLOW_REF": "Nettking/msh/.github/workflows/test.yml@refs/heads/test",
+            "GITHUB_WORKFLOW_SHA": "a" * 40,
+            "GITHUB_SHA": "a" * 40,
+            "FCP_ARCHIVE_SSH_KEY": "secret-fixture-never-copy",
+            "FCP_ARCHIVE_HOST": "fcp-archive@nitro.invalid",
+            "FCP_ARCHIVE_KNOWN_HOSTS": "not-a-real-host-key",
+        }
+        native = {
+            "total_count": 1,
+            "jobs": [
+                {
+                    "id": 456,
+                    "run_id": 123,
+                    "run_attempt": 1,
+                    "status": "in_progress",
+                    "runner_name": "Beast",
+                }
+            ],
+        }
+        if os.name == "nt":
+            # Match the native PowerShell environment of the self-hosted action;
+            # do not inherit PowerShell 7 module paths from the test launcher.
+            env["PSMODULEPATH"] = str(
+                Path(os.environ["SYSTEMROOT"])
+                / "System32/WindowsPowerShell/v1.0/Modules"
+            )
+        original_output = subprocess.check_output
+
+        def fixture_checkout(command, *args, **kwargs):
+            if command == ["git", "rev-parse", "HEAD"]:
+                return "a" * 40 + "\n"
+            return original_output(command, *args, **kwargs)
+
+        with (
+            patch.dict(os.environ, env),
+            patch("subprocess.check_output", side_effect=fixture_checkout),
+            patch(
+                "urllib.request.urlopen",
+                return_value=io.BytesIO(json.dumps(native).encode()),
+            ),
+            patch.object(
+                archive, "upload", side_effect=OSError("archive unavailable fixture")
+            ),
+            self.assertRaises(SystemExit) as error,
+        ):
+            runpy.run_path(
+                str(Path(archive.__file__).with_name("artifact_archive_ci.py")),
+                run_name="__main__",
+            )
+        self.assertNotEqual(error.exception.code, 0)
+        self.assertIn("archive unavailable fixture", str(error.exception))
+        self.assertEqual(source.read_bytes(), original)
+        # Simulate the runner's documented end-of-job cleanup, only in this fixture.
+        self.assertTrue(job_temp.resolve().is_relative_to(self.root.resolve()))
+        shutil.rmtree(job_temp)
+        receipts = list((self.root / "fcp-archive-pending").rglob("INCOMPLETE.json"))
+        self.assertEqual(len(receipts), 1)
+        receipt = json.loads(receipts[0].read_bytes())
+        self.assertEqual(receipt["run_id"], "123")
+        self.assertFalse(receipt["archive_complete"])
+        self.assertEqual(len(receipt["files"]), 1)
+        row = receipt["files"][0]
+        saved = receipts[0].parent / "files" / row["path"]
+        self.assertEqual(saved.read_bytes(), original)
+        self.assertEqual(archive.sha_file(saved), row["sha256"])
+        for file in receipts[0].parent.rglob("*"):
+            if file.is_file():
+                self.assertNotIn(b"secret-fixture-never-copy", file.read_bytes())
+
+    def test_pending_retention_keeps_capacity_floor_and_reports_missing_inputs(self):
+        job_temp = self.root / "runner-temp"
+        job_temp.mkdir()
+        event = job_temp / "event.json"
+        event.write_text("{}")
+        env = {
+            "GITHUB_ACTIONS": "true",
+            "GITHUB_REPOSITORY": archive.REPO,
+            "GITHUB_EVENT_NAME": "push",
+            "GITHUB_EVENT_PATH": str(event),
+            "RUNNER_NAME": "Beast",
+            "RUNNER_TEMP": str(job_temp),
+            "ARCHIVE_PATH": str(self.input) + "\n" + str(self.root / "missing.xml"),
+        }
+        with patch.dict(os.environ, env):
+            self.disk_usage.return_value = SimpleNamespace(free=12 * 1024**3)
+            with self.assertRaises(OSError):
+                preserve_failed_inputs(env)
+            self.assertFalse((self.root / "fcp-archive-pending").exists())
+            self.assertTrue((self.input / "junit.xml").is_file())
+            self.disk_usage.return_value = SimpleNamespace(free=13 * 1024**3)
+            pending = preserve_failed_inputs(env)
+        receipt = json.loads((pending / "INCOMPLETE.json").read_bytes())
+        self.assertEqual(len(receipt["files"]), 2)
+        self.assertEqual(receipt["missing_patterns"], [str(self.root / "missing.xml")])
+        self.assertFalse(receipt["archive_complete"])
+        self.assertTrue(all(x["method"] == "hardlink" for x in receipt["files"]))
+
     def test_zip_traversal_and_windows_aliases(self):
         for name in (
             "../outside",
@@ -286,11 +414,37 @@ class ArchiveTests(unittest.TestCase):
                 }
             )
 
+    def test_windows_uses_existing_ssh_when_service_path_omits_it(self):
+        system = self.root / "Windows"
+        native = system / "System32/OpenSSH/ssh.exe"
+        git = self.root / "Git/cmd/git.exe"
+        bundled = self.root / "Git/usr/bin/ssh.exe"
+        for file in (native, git, bundled):
+            file.parent.mkdir(parents=True, exist_ok=True)
+            file.write_bytes(b"synthetic executable path fixture")
+        with (
+            patch.object(archive.sys, "platform", "win32"),
+            patch.dict(os.environ, {"SystemRoot": str(system)}),
+            patch.object(
+                archive.shutil,
+                "which",
+                side_effect=lambda name: str(git) if name == "git" else None,
+            ),
+        ):
+            self.assertEqual(Path(archive.ssh_executable()), native)
+            native.unlink()  # Only this test's synthetic executable fixture.
+            self.assertEqual(Path(archive.ssh_executable()), bundled)
+            bundled.unlink()
+            with self.assertRaisesRegex(
+                FileNotFoundError, "OpenSSH client unavailable"
+            ):
+                archive.ssh_executable()
+
     def test_fork_and_target_events_are_refused(self):
         env = {"GITHUB_REPOSITORY": "Nettking/msh", "GITHUB_EVENT_NAME": "pull_request"}
         with self.assertRaises(ValueError):
             trusted_event(
-                env, {"pull_request": {"head": {"repo": {"full_name": "fork/msh"}}}}
+                env, {"pull_request": {"head": {"repo": {"full_name": "fork/example"}}}}
             )
         trusted_event(
             env, {"pull_request": {"head": {"repo": {"full_name": "Nettking/msh"}}}}

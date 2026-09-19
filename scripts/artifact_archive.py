@@ -369,13 +369,35 @@ def build_package(metadata, patterns, spool):
     return spool
 
 
+def ssh_executable():
+    executable = shutil.which("ssh")
+    if executable:
+        return executable
+    if sys.platform == "win32":
+        candidates = [
+            Path(os.environ.get("SystemRoot", "C:/Windows"))
+            / "System32/OpenSSH/ssh.exe"
+        ]
+        git = shutil.which("git")
+        if git:
+            git_path = Path(git).resolve()
+            candidates.append(git_path.parent.parent / "usr/bin/ssh.exe")
+        for candidate in candidates:
+            if candidate.is_file():
+                return str(candidate)
+    raise FileNotFoundError(
+        "OpenSSH client unavailable: checked PATH, Windows OpenSSH and existing Git for Windows. "
+        "No client installation or storage fallback attempted."
+    )
+
+
 def ssh_command(config):
     # No shell construction; no environment-selected SSH command or host-key bypass.
     host = config["host"]
     if not re.fullmatch(r"[A-Za-z0-9_.@-]+", host) or host.startswith("-"):
         raise ValueError("Invalid SSH destination")
     return [
-        "ssh",
+        ssh_executable(),
         "-F",
         "none",
         "-T",
@@ -392,9 +414,9 @@ def ssh_command(config):
         "-o",
         "ServerAliveCountMax=2",
         "-o",
-        "UserKnownHostsFile=" + str(Path(config["known_hosts"]).absolute()),
+        "UserKnownHostsFile=" + Path(config["known_hosts"]).absolute().as_posix(),
         "-i",
-        str(Path(config["identity_file"]).absolute()),
+        Path(config["identity_file"]).absolute().as_posix(),
         host,
         "fcp-artifact-v1",
     ]

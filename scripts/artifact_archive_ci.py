@@ -1,6 +1,7 @@
 """Actions adapter. Missing credentials/evidence are errors, never cloud fallback."""
 
 import csv
+import datetime as dt
 import fnmatch
 import json
 import os
@@ -168,6 +169,100 @@ def native_job_identity(env):
     return identity
 
 
+def preserve_failed_inputs(env):
+    """Keep incomplete job evidence outside RUNNER_TEMP's automatic cleanup.
+
+    This is pending local recovery, not an archive or qualification receipt.
+    Hard links avoid duplicating payload bytes; hashes must be checked before
+    later recovery because a hard link is not isolated from in-place mutation.
+    """
+    trusted_event(env, json.loads(Path(env["GITHUB_EVENT_PATH"]).read_bytes()))
+    available, missing = [], []
+    for pattern in env["ARCHIVE_PATH"].strip().splitlines():
+        try:
+            archive.select_files([pattern])
+            available.append(pattern)
+        except FileNotFoundError:
+            missing.append(pattern)
+    if not available:
+        raise FileNotFoundError("No available upload inputs to preserve")
+    files = archive.select_files(available)
+    if (
+        len(files) > 100000
+        or sum(p.stat().st_size for p, _ in files) > archive.MAX_BYTES
+    ):
+        raise ValueError("Local failure evidence exceeds the bounded inventory")
+    root = Path(env["RUNNER_TEMP"]).absolute().parent / "fcp-archive-pending"
+    if any(p.is_symlink() for p in (root, *root.parents)):
+        raise ValueError("Pending evidence directory must not traverse symlinks")
+    # Admit directory/link metadata as well as any unavoidable cross-volume copy.
+    device = root.parent.stat().st_dev
+    copied_bytes = sum(p.stat().st_size for p, _ in files if p.stat().st_dev != device)
+    admission = archive.require_local_space(
+        root, archive.MAX_HEADER + len(files) * 16384 + copied_bytes
+    )
+    if not root.exists():
+        private_directory(root)
+    pending = root / uuid.uuid4().hex
+    private_directory(pending)
+    inventory = []
+    for source, name in files:
+        archive.safe_name(name)
+        target = pending / "files" / name
+        target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        digest = archive.sha_file(source)
+        try:
+            os.link(source, target)
+            method = "hardlink"
+        except OSError:
+            # Same-volume hard links may be unsupported. Never cross the floor
+            # to make a copy, and never move/delete the original test output.
+            archive.require_local_space(
+                pending, source.stat().st_size + archive.MAX_HEADER
+            )
+            with source.open("rb") as src, target.open("xb") as dst:
+                shutil.copyfileobj(src, dst, 1024**2)
+            method = "copy"
+        if archive.sha_file(target) != digest:
+            raise ValueError("Failure evidence changed during local preservation")
+        inventory.append(
+            {
+                "path": name,
+                "size": target.stat().st_size,
+                "sha256": digest,
+                "method": method,
+            }
+        )
+    try:
+        tested_sha = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], text=True
+        ).strip()
+    except (OSError, subprocess.SubprocessError):
+        tested_sha = None
+    receipt = {
+        "schema": "fcp.local-incomplete-evidence.v1",
+        "archive_complete": False,
+        "qualification_status": "NOT_EVALUATED",
+        "repo": env["GITHUB_REPOSITORY"],
+        "tested_sha": tested_sha,
+        "run_id": env.get("GITHUB_RUN_ID"),
+        "run_attempt": env.get("GITHUB_RUN_ATTEMPT"),
+        "job": env.get("GITHUB_JOB"),
+        "artifact": env.get("ARCHIVE_NAME"),
+        "workflow_ref": env.get("GITHUB_WORKFLOW_REF"),
+        "workflow_sha": env.get("GITHUB_WORKFLOW_SHA"),
+        "preserved_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+        "native_job_id": None,
+        "native_job_binding": "NOT_VERIFIED_BY_LOCAL_FAILURE_RETENTION",
+        "files": inventory,
+        "missing_patterns": missing,
+        "local_capacity_admission": admission,
+        "recovery": "Verify every recorded hash before manual recovery; no automatic retry or cleanup.",
+    }
+    (pending / "INCOMPLETE.json").write_bytes(archive.canonical(receipt))
+    return pending
+
+
 def main():
     env = os.environ
     trusted_event(env, json.loads(Path(env["GITHUB_EVENT_PATH"]).read_bytes()))
@@ -176,6 +271,7 @@ def main():
             raise ValueError(
                 "Archive incomplete: required configuration missing: " + key
             )
+    print("Archive transport executable: " + archive.ssh_executable())
     temp = Path(env["RUNNER_TEMP"])
     credentials = temp / ("fcp-archive-ssh-" + uuid.uuid4().hex)
     private_directory(credentials)
@@ -291,7 +387,8 @@ def main():
         with Path(env["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as stream:
             stream.write(summary)
     finally:
-        # Only ephemeral SSH credentials are removed; evidence spools survive failure.
+        # Only ephemeral SSH credentials are removed here. RUNNER_TEMP itself
+        # is cleaned by Actions; the failure boundary preserves pending inputs.
         shutil.rmtree(credentials)
 
 
@@ -300,12 +397,22 @@ if __name__ == "__main__":
         main()
     except Exception as exc:  # noqa: BLE001 -- preserve explicit incomplete job summary
         message = "Nitro archive INCOMPLETE: " + str(exc)
-        if os.environ.get("GITHUB_STEP_SUMMARY"):
-            with Path(os.environ["GITHUB_STEP_SUMMARY"]).open(
-                "a", encoding="utf-8"
-            ) as stream:
-                stream.write(
-                    message
-                    + "\nOriginal files and any local evidence spool are retained.\n"
+        if os.environ.get("ARCHIVE_OPERATION") == "upload":
+            try:
+                pending = preserve_failed_inputs(os.environ)
+                message += (
+                    "\nLocal incomplete inputs preserved outside runner cleanup: "
+                    + str(pending)
                 )
+            except Exception as retention_error:  # noqa: BLE001 -- never mask the original failure
+                message += "\nLocal retention NOT CONFIRMED: " + str(retention_error)
+                message += "\nOriginal inputs were not removed by this helper; RUNNER_TEMP is subject to job cleanup."
+        if os.environ.get("GITHUB_STEP_SUMMARY"):
+            try:
+                with Path(os.environ["GITHUB_STEP_SUMMARY"]).open(
+                    "a", encoding="utf-8"
+                ) as stream:
+                    stream.write(message + "\n")
+            except OSError:
+                message += "\nJob summary could not be written; original failure retained here."
         raise SystemExit(message) from None

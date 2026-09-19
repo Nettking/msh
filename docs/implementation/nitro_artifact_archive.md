@@ -14,7 +14,8 @@ artifacts, LFS, Packages, release assets, cloud storage, or paid runners.
   authorization. Ordinary `martin` runner read/write access is denied.
 - **Beast is CI-only.** It is neither a permanent artifact archive nor a P01-P12
   physical acceptance host. Windows `Beast` and Linux `Beast-Linux-WSL` retain
-  only job-local staging under `RUNNER_TEMP`; package storage is on Nitro.
+  only job-local staging; package storage is on Nitro. Failed uploads retain
+  bounded, incomplete inputs outside `RUNNER_TEMP` until manual recovery.
 - Beast's archive admission now preserves the existing CI refusal at **<=12 GiB**,
   including the pending write's bounded extra space. WSL checks both its Linux
   filesystem and physical `/mnt/c`. The erroneous new 66 GiB rule was removed
@@ -99,6 +100,14 @@ files, then removed. Windows keys have a DACL containing only the current SID.
 The smoke key is separate and permits only synthetic packages in its own root.
 Do not repoint it at production evidence or grant the normal `martin` SSH key to CI.
 
+The owner-approved trust model is **Nettking's reviewed, trusted branches only**.
+Repository secrets do not isolate the archive key from people who can change and
+execute workflow code. The live review found only Nettking with write/admin access;
+private-repository fork-PR workflow execution, write tokens and secrets/variables
+were disabled. Keep untrusted code off these persistent runners, including code
+created by agents or bots that has not been reviewed. Reassess this model **before**
+granting other writers access or admitting untrusted contributions to these runners.
+
 ## Package and failure semantics
 
 Layout:
@@ -128,7 +137,24 @@ package hashes and refuse extraction collisions, traversal and symlinks.
 Archive failure fails the archive step and writes INCOMPLETE to the job summary.
 Original test steps and their outcomes remain visible. Uploads attempt to preserve
 available files even after a failing test. Missing files, unavailable SSH or low
-disk never become COMPLETE; original files and local spools remain available.
+disk never become COMPLETE. Because Actions deletes `RUNNER_TEMP` at job end,
+failed uploads preserve available inputs in the private `fcp-archive-pending`
+directory beside `RUNNER_TEMP`, outside that cleanup scope. Unique directories
+contain an `INCOMPLETE.json` inventory and only the selected evidence files;
+credentials are never included. Source files are not moved or removed.
+
+Same-volume hard links avoid duplicating payload bytes; cross-volume/unsupported
+links require a capacity-admitted copy. Link/directory metadata and copy growth
+are checked against the unchanged client reserve. Partial input inventories remain
+explicitly incomplete. If local preservation also fails, the original archive
+failure remains visible and retention is reported NOT CONFIRMED; no durability is
+claimed for files left under `RUNNER_TEMP`. No storage fallback is attempted.
+
+This is temporary pending recovery, not a second permanent archive on Beast.
+Hard links survive unlinking during job cleanup but are not isolated from in-place
+modification: verify every recorded size and SHA-256 before manual recovery.
+The local record is not a native-job qualification receipt, an archive COMPLETE,
+or authorization to retry. No automatic recovery or pending-file deletion occurs.
 There is no automatic deletion/retention job. Interrupted staging is not evidence;
 review any orphan manually instead of pruning the host or deleting runtime data.
 
@@ -148,6 +174,10 @@ python -m scripts.artifact_archive extract --package retrieved-package \
 Both Linux and Windows use the same commands. Retrieval rejects different bytes,
 different metadata or a different immutable reference. The original paths are
 restored beneath the requested destination; existing files are not replaced.
+The client uses an existing OpenSSH executable from PATH, or on Windows the
+installed Windows/Git for Windows OpenSSH path if the service PATH omits it.
+The resolved executable is logged; no software is installed and pinned host-key
+checking remains mandatory. This executable selection is not a storage fallback.
 
 For qualification retention of **new** runs:
 
