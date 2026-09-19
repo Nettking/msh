@@ -1,7 +1,8 @@
 # Nitro artifact archive
 
 This is an infrastructure change, independent of the frozen Federation candidate.
-Do not merge it, move the freeze, or start release qualification implicitly.
+Introduce it through normal PR review and required checks. Infrastructure merge
+does not move the product freeze or authorize physical acceptance on a new SHA.
 There are no new subscriptions, public services, runner pools or storage platforms.
 Keep all GitHub budgets at $0 with Stop usage enabled. Never fall back to Actions
 artifacts, LFS, Packages, release assets, cloud storage, or paid runners.
@@ -203,9 +204,23 @@ constitute physical acceptance or resolve the original P06 failure.
 A branch push triggers only `Nitro artifact transport smoke`: two small jobs on
 existing Beast Windows/Linux runners (manual matrix also retains Nettking), with no dependency install, external
 cache, or Actions artifact upload. Opening a PR triggers broad existing release
-workflows because `.github/actions/**` is watched. Therefore do not open a PR or
-merge automatically merely to publish this change for review; review the branch
-first and coordinate normal introduction without an unsolicited qualification.
+workflows because `.github/actions/**` is watched. The introduction audit matches
+46 PR workflows and 40 main-push workflows for this change. Use those automatic
+runs without duplicate dispatches, preserving all required checks and zero-dollar
+Stop usage budgets. A failed job does not authorize another recovery attempt.
+
+After normal merge, record the actual resulting main SHA and verify the five
+migrated producers (`federation-v1-release`, `icse-tool-demo`, `phase2-federation`,
+`phase-f7-closeout`, `cf8-role-retirement`) against their native checkout logs.
+Verify an ordinary download consumer and its immutable receipts, plus the run's
+empty GitHub artifact inventory. Transport smoke alone does not prove main adoption.
+
+The frozen product candidate remains `a9bb08a2b3391e8bf072755c5b26b2ef3ebc5759`.
+Its qualification is not automatically qualification of the infrastructure merge.
+The checked-in physical impact map treats the five new top-level archive scripts
+as unmapped paths: selecting the new main as a product candidate requires the
+normal qualification, freeze and revalidation process; no physical evidence is
+carried by assumption. The current physical campaign has no completed PASS.
 
 Until reviewed merge, main still contains its original GitHub upload/cache steps.
 No main workflow was dispatched as part of this change. GitHub continues to host
