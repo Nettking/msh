@@ -136,6 +136,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          export PYTHONPATH="$FCP_DIAG_WORKTREE"
           cd "$FCP_DIAG_WORKTREE"
           "$FCP_DIAG_VENV/bin/python" "$GITHUB_WORKSPACE/scripts/diagnostics/pr493_rotating_trace.py" \
             --output-dir "$FCP_DIAGNOSTIC_ROOT" \
@@ -153,11 +154,12 @@ jobs:
           ARCHIVE_MATRIX: '{"diagnostic":"pr493-rotating","seed":"1727","source":"a9e8af7b63e794e3ae1fa515cbf19acb95020dc3"}'
           ARCHIVE_JOB_STATUS: ${{ job.status }}
           ARCHIVE_GITHUB_TOKEN: ${{ github.token }}
-          FCP_ARCHIVE_SSH_KEY: ${{ secrets.FCP_ARCHIVE_SSH_KEY }}
-          FCP_ARCHIVE_HOST: ${{ vars.FCP_ARCHIVE_HOST }}
-          FCP_ARCHIVE_KNOWN_HOSTS: ${{ vars.FCP_ARCHIVE_KNOWN_HOSTS }}
+          FCP_ARCHIVE_SSH_KEY: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
+          FCP_ARCHIVE_HOST: ${{ vars.NITRO_ARTIFACT_HOST }}
+          FCP_ARCHIVE_KNOWN_HOSTS: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
+          export PYTHONPATH="$FCP_DIAG_WORKTREE"
           cd "$FCP_DIAG_WORKTREE"
           "$FCP_DIAG_VENV/bin/python" -B "$GITHUB_WORKSPACE/scripts/artifact_archive_ci.py"
 
