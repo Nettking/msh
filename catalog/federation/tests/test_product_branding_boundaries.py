@@ -52,3 +52,15 @@ def test_hardware_exception_requires_the_exact_host_name(tmp_path, monkeypatch, 
 
 def test_retired_product_path_remains_forbidden(tmp_path, monkeypatch):
     assert _scan(tmp_path, monkeypatch, LEGACY + '.py', 'FCP') == 1
+
+
+@pytest.mark.parametrize('path', [
+    'scripts/artifact_archive.py',
+    'scripts/artifact_archive_ci.py',
+    'scripts/tests/test_artifact_archive.py',
+    'docs/implementation/nitro_artifact_archive.md',
+])
+def test_archive_repository_identity_does_not_waive_product_branding(tmp_path, monkeypatch, path):
+    assert _scan(tmp_path, monkeypatch, path, branding.REPOSITORY_SLUG) == 0
+    assert _scan(tmp_path, monkeypatch, path, branding.REPOSITORY_SLUG + '\nWelcome to ' + LEGACY.upper()) == 1
+    assert _scan(tmp_path, monkeypatch, 'unrelated.py', branding.REPOSITORY_SLUG) == 1

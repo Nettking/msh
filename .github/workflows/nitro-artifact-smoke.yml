@@ -1,0 +1,76 @@
+name: Nitro artifact transport smoke
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/nitro-artifact-archive]
+    paths:
+      - .github/workflows/nitro-artifact-smoke.yml
+      - .github/actions/nitro-artifact/**
+      - scripts/artifact_archive*.py
+      - scripts/tests/test_artifact_archive.py
+permissions:
+  contents: read
+  actions: read # Native job identity for evidence provenance only.
+jobs:
+  transport:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [Linux, Windows]
+        # Branch pushes exercise the currently authorized Beast scope only.
+        # Manual verification keeps both families in the required coverage.
+        family: ${{ fromJSON(github.event_name == 'push' && '["beast"]' || '["nettking", "beast"]') }}
+        include:
+          - os: Linux
+            shell: bash
+            python: /opt/fcp-ci/python/3.12.13/bin/python3.12
+          - os: Windows
+            shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+            python: python
+    runs-on:
+      - self-hosted
+      - ${{ matrix.family == 'beast' && (matrix.os == 'Linux' && 'beast-linux' || 'beast-windows') || (matrix.os == 'Linux' && 'nettking-linux' || 'nettking') }}
+    timeout-minutes: 5
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Focused archive contract tests
+        run: ${{ matrix.python }} -B -m unittest scripts.tests.test_artifact_archive -v
+      - name: Verify restricted SSH independently of local spool capacity
+        uses: ./.github/actions/nitro-artifact
+        with:
+          operation: probe
+          path: ${{ runner.temp }}
+          matrix: ${{ toJSON(matrix) }}
+          job-status: ${{ job.status }}
+          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
+          host: ${{ vars.NITRO_ARTIFACT_HOST }}
+          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
+      - name: Create tiny synthetic evidence
+        run: ${{ matrix.python }} -B -c "from pathlib import Path; import os; p=Path(os.environ['RUNNER_TEMP'])/'archive-smoke.txt'; p.write_text('Synthetic archive transport test only\n')"
+      - uses: ./.github/actions/nitro-artifact
+        with:
+          operation: upload
+          name: archive-smoke-${{ matrix.os }}-${{ matrix.family }}
+          path: ${{ runner.temp }}/archive-smoke.txt
+          matrix: ${{ toJSON(matrix) }}
+          job-status: ${{ job.status }}
+          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
+          host: ${{ vars.NITRO_ARTIFACT_HOST }}
+          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
+      - uses: ./.github/actions/nitro-artifact
+        with:
+          operation: download
+          pattern: archive-smoke-${{ matrix.os }}-${{ matrix.family }}
+          path: ${{ runner.temp }}/archive-smoke-get-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}-${{ matrix.family }}
+          matrix: ${{ toJSON(matrix) }}
+          job-status: ${{ job.status }}
+          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
+          host: ${{ vars.NITRO_ARTIFACT_HOST }}
+          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
+      - name: Verify retrieved content
+        env:
+          DOWNLOAD: ${{ runner.temp }}/archive-smoke-get-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}-${{ matrix.family }}/archive-smoke-${{ matrix.os }}-${{ matrix.family }}/archive-smoke.txt
+        run: ${{ matrix.python }} -B -c "from pathlib import Path; import os; assert Path(os.environ['DOWNLOAD']).read_bytes()==(Path(os.environ['RUNNER_TEMP'])/'archive-smoke.txt').read_bytes()"
