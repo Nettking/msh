@@ -431,9 +431,11 @@ class ArchiveTests(unittest.TestCase):
                 side_effect=lambda name: str(git) if name == "git" else None,
             ),
         ):
-            self.assertEqual(Path(archive.ssh_executable()), native)
+            self.assertTrue(Path(archive.ssh_executable()).samefile(native))
             native.unlink()  # Only this test's synthetic executable fixture.
-            self.assertEqual(Path(archive.ssh_executable()), bundled)
+            # NetworkService temp paths may use Windows 8.3 aliases. Require
+            # the same physical executable, not identical path spellings.
+            self.assertTrue(Path(archive.ssh_executable()).samefile(bundled))
             bundled.unlink()
             with self.assertRaisesRegex(
                 FileNotFoundError, "OpenSSH client unavailable"
