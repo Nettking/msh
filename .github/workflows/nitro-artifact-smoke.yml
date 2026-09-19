@@ -1,6 +1,13 @@
 name: Nitro artifact transport smoke
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: Optional bounded diagnostic mode
+        required: false
+        default: transport
+        type: choice
+        options: [transport, pr493-rotating]
   push:
     branches: [codex/nitro-artifact-archive]
     paths:
@@ -13,6 +20,7 @@ permissions:
   actions: read # Native job identity for evidence provenance only.
 jobs:
   transport:
+    if: inputs.mode != 'pr493-rotating'
     strategy:
       fail-fast: false
       matrix:
@@ -74,3 +82,104 @@ jobs:
         env:
           DOWNLOAD: ${{ runner.temp }}/archive-smoke-get-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}-${{ matrix.family }}/archive-smoke-${{ matrix.os }}-${{ matrix.family }}/archive-smoke.txt
         run: ${{ matrix.python }} -B -c "from pathlib import Path; import os; assert Path(os.environ['DOWNLOAD']).read_bytes()==(Path(os.environ['RUNNER_TEMP'])/'archive-smoke.txt').read_bytes()"
+
+  pr493-rotating-trace:
+    if: inputs.mode == 'pr493-rotating'
+    name: PR493 rotating trace (AQG7NCC-Linux)
+    runs-on: [self-hosted, Linux, X64, aqg7ncc-linux-admission]
+    timeout-minutes: 30
+    env:
+      FCP_DIAGNOSTIC_ROOT: /home/fcp-ci-aqg7ncc/fcp-diagnostics/pr493-rotating-${{ github.run_id }}-${{ github.run_attempt }}
+      FCP_SOURCE_SHA: a9e8af7b63e794e3ae1fa515cbf19acb95020dc3
+      FCP_SEED: "1727"
+    steps:
+      - name: Checkout diagnostic instrumentation
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify runner and requested source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$RUNNER_NAME" = "AQG7NCC-Linux"
+          mkdir -p "$FCP_DIAGNOSTIC_ROOT"
+          chmod 700 "$FCP_DIAGNOSTIC_ROOT"
+          cat > "$FCP_DIAGNOSTIC_ROOT/dispatch-identity.json" <<EOF
+          {"repo":"$GITHUB_REPOSITORY","run_id":"$GITHUB_RUN_ID","run_attempt":"$GITHUB_RUN_ATTEMPT","runner":"$RUNNER_NAME","source_sha":"$FCP_SOURCE_SHA","seed":"$FCP_SEED","workflow_sha":"$GITHUB_WORKFLOW_SHA","utc":"$(date -u +%Y-%m-%dT%H:%M:%SZ)"}
+          EOF
+
+      - name: Materialize exact product source
+        shell: bash
+        run: |
+          set -euo pipefail
+          worktree=$(mktemp -d "$RUNNER_TEMP/fcp-pr493-source.XXXXXX")
+          git fetch --no-tags origin "$FCP_SOURCE_SHA"
+          git worktree add --detach "$worktree" "$FCP_SOURCE_SHA"
+          echo "FCP_DIAG_WORKTREE=$worktree" >> "$GITHUB_ENV"
+
+      - name: Install pinned diagnostic dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=/opt/fcp-ci/python/3.12.13/bin/python3.12
+          test -x "$base"
+          venv=$(mktemp -d "$RUNNER_TEMP/fcp-pr493-venv.XXXXXX")
+          "$base" -m venv "$venv"
+          "$venv/bin/pip" install --upgrade pip==26.2.1
+          "$venv/bin/pip" install -r "$FCP_DIAG_WORKTREE/requirements.txt" -c "$FCP_DIAG_WORKTREE/constraints-release.txt"
+          "$venv/bin/pip" install pytest==9.1.1 pytest-randomly==4.1.0
+          "$venv/bin/pip" freeze > "$FCP_DIAGNOSTIC_ROOT/dependencies.freeze"
+          echo "FCP_DIAG_VENV=$venv" >> "$GITHUB_ENV"
+
+      - name: Run bounded rotating trace
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$FCP_DIAG_WORKTREE"
+          "$FCP_DIAG_VENV/bin/python" "$GITHUB_WORKSPACE/scripts/diagnostics/pr493_rotating_trace.py" \
+            --output-dir "$FCP_DIAGNOSTIC_ROOT" \
+            --junitxml "$FCP_DIAGNOSTIC_ROOT/order-rotating.xml" \
+            --seed "$FCP_SEED"
+
+      - name: Archive diagnostic to Nitro
+        if: always()
+        shell: bash
+        env:
+          ARCHIVE_OPERATION: upload
+          ARCHIVE_NAME: pr493-rotating-diagnostic
+          ARCHIVE_PATH: |
+            ${{ env.FCP_DIAGNOSTIC_ROOT }}
+          ARCHIVE_MATRIX: '{"diagnostic":"pr493-rotating","seed":"1727","source":"a9e8af7b63e794e3ae1fa515cbf19acb95020dc3"}'
+          ARCHIVE_JOB_STATUS: ${{ job.status }}
+          ARCHIVE_GITHUB_TOKEN: ${{ github.token }}
+          FCP_ARCHIVE_SSH_KEY: ${{ secrets.FCP_ARCHIVE_SSH_KEY }}
+          FCP_ARCHIVE_HOST: ${{ vars.FCP_ARCHIVE_HOST }}
+          FCP_ARCHIVE_KNOWN_HOSTS: ${{ vars.FCP_ARCHIVE_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          cd "$FCP_DIAG_WORKTREE"
+          "$FCP_DIAG_VENV/bin/python" -B "$GITHUB_WORKSPACE/scripts/artifact_archive_ci.py"
+
+      - name: Preserve final identity
+        if: always()
+        shell: bash
+        run: |
+          set -u
+          {
+            echo "workflow_sha=$GITHUB_WORKFLOW_SHA"
+            echo "source_sha=$FCP_SOURCE_SHA"
+            echo "run_id=$GITHUB_RUN_ID"
+            echo "run_attempt=$GITHUB_RUN_ATTEMPT"
+            echo "runner=$RUNNER_NAME"
+            echo "utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > "$FCP_DIAGNOSTIC_ROOT/final-identity.txt"
+
+      - name: Remove temporary exact-source checkout
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          if [ -n "${FCP_DIAG_WORKTREE:-}" ]; then
+            git worktree remove --force "$FCP_DIAG_WORKTREE"
+          fi
