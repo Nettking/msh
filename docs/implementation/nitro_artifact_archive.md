@@ -6,100 +6,66 @@ There are no new subscriptions, public services, runner pools or storage platfor
 Keep all GitHub budgets at $0 with Stop usage enabled. Never fall back to Actions
 artifacts, LFS, Packages, release assets, cloud storage, or paid runners.
 
-## Current deployment boundary (2026-09-19)
+## Current deployment and machine roles (2026-09-19)
 
-- Implemented on `codex/nitro-artifact-archive`, based on live main `a9bb08a2`.
-- All ten existing upload steps and three download steps use the SSH adapter.
-  Twenty-nine `setup-python` pip caches are disabled. Existing Go caches were
-  already explicitly disabled; setup-node v4 has no configured cache. Local
-  dependency caches and dependency versions are unchanged.
-- Production receiver is installed at `/srv/fcp-artifacts`, owned by the dedicated
-  `fcp-archive` account (UID997/GID973, mode0700). Production Actions credentials
-  are configured. **Main workflows are not migrated until reviewed merge.**
-- Administrator setup appeared during the user's manual-setup turn and was
-  independently verified: root-owned receiver/authorized_keys, forced SSH command,
-  no supplementary groups, ordinary `martin` runner denied read/write to archive.
-  No general passwordless sudo or sshd change was made.
-- Nitro had 728,220,061,696 free bytes at inspection. Receiver admission reserves
-  200 GiB and limits an individual package to 2 GiB. Local packing, retrieval and
-  extraction keep 66 GiB free (64 GiB floor plus 2 GiB margin). On WSL the check
-  covers both the local filesystem and `/mnt/c`; missing host-volume access fails
-  closed. A virtual disk's logical free space is not physical host capacity.
-- No P06/P07/P12 run was started, stopped or changed. P07/P12 remain unstarted.
+- Nitro is the persistent artifact archive: `/srv/fcp-artifacts`, dedicated
+  `fcp-archive` UID997/GID973, mode0700. Root owns the forced receiver and SSH
+  authorization. Ordinary `martin` runner read/write access is denied.
+- **Beast is CI-only.** It is neither a permanent artifact archive nor a P01-P12
+  physical acceptance host. Windows `Beast` and Linux `Beast-Linux-WSL` retain
+  only job-local staging under `RUNNER_TEMP`; package storage is on Nitro.
+- Beast's archive admission now preserves the existing CI refusal at **<=12 GiB**,
+  including the pending write's bounded extra space. WSL checks both its Linux
+  filesystem and physical `/mnt/c`. The erroneous new 66 GiB rule was removed
+  only for these explicitly authorized Nettking/msh CI runner identities.
+- Other clients keep their existing archive reserve; physical acceptance floors
+  and measured growth margins remain unchanged. Nitro retains its 200 GiB reserve
+  and 2 GiB per-package bound. No runner labels, accounts or services were changed.
+- Ten upload steps and three download steps use the SSH adapter on this branch;
+  29 external setup-python pip caches are disabled. Production SSH credentials
+  are configured, but **main still uses its original storage until reviewed merge**.
+- No paid services, budget changes, release recovery, freeze change or physical
+  acceptance runs are part of this infrastructure work.
 
-## Verification and remaining host prerequisite
+## Verified transport and provenance
 
-Transport implementation `5a86c57c`, run `35443127083`, attempt 1:
+Targeted Beast run **35450087031**, attempt1, exact source **0444aaf8**, is PASS:
+Windows job105915609398 and Linux job105915609366 uploaded, downloaded and verified
+content as `fcp-archive`. Independent operator retention fetched both packages again
+and bound their hashes to native GitHub job IDs, attempts and exact checkout logs.
+No GitHub Actions artifacts were created. Local and runner tests: Linux14 passed;
+Windows12 passed plus two Linux-only receiver skips. Ambiguous identity and a
+missing identity at the deadline still fail; no assertion or identity check was
+relaxed. The original failures remain retained.
 
-- Restricted SSH and pinned-host verification passed on Nettking Windows/Linux
-  and Beast Windows/Linux, under their actual runner identities.
-- Nettking uploaded and fetched the tiny packages on both operating systems.
-  Independent retention fetched them again, verified every hash, and bound the
-  native job IDs and checkout logs to the exact implementation commit.
-- Archive unit tests: each Linux job 11 passed; each Windows job 9 passed plus
-  two Linux receiver tests skipped. They cover concurrent publication, idempotence,
-  conflicts, corruption, truncation, capacity refusal and original-file retention.
-- Beast upload was correctly refused: Windows had 14,242,746,368 free bytes;
-  WSL measured 14,242,881,536 on the same physical C: volume, below the preserved
-  66 GiB margin. **Overall smoke result is FAILURE, not four-runner acceptance.**
-  No retry, cleanup, reserve reduction or storage fallback resolves this implicitly.
-- The earlier Windows service-key ACL failure is preserved in run `35441797000`;
-  the corrected service-account transport passed in run `35441947753`.
-- All four transport runs created zero GitHub artifacts. A separate unavailable
-  SSH destination test failed explicitly with the original file/package retained.
-  Account billing UI showed all five budgets at $0, Stop usage enabled; Actions
-  cache API reported zero entries/bytes. Neither setting was changed.
+The Linux run directly captured GitHub API publication lag: two responses showed
+the executing job as `queued` with null runner identity, then the third showed
+`in_progress`, runner29/Beast-Linux-WSL and the correct native job ID. The helper
+uses the exact attempt endpoint and only re-reads missing assignment within one
+20-second API budget. It never substitutes another attempt/job or accepts an
+ambiguous match. Safe API observations are retained in the manifest (or a local
+failure diagnostic); no token is recorded.
 
-Production run `35449153626`, source `94d787e5`, attempt1: all four runner SSH probes
-passed as **fcp-archive**; Nettking Windows/Linux upload, streamed download and
-independent native-job/source retention passed. Beast Windows was refused by the
-unchanged capacity guard; Beast Linux stopped earlier with native GitHub job
-binding missing/ambiguous. That earlier API snapshot was not retained, so its
-precise cause is unresolved. No retry was started; overall run is **FAILURE**. There are zero GitHub
-artifacts from this run. All-runner transition remains blocked pending the archive
-policy scope decision below. The previous smoke root contains synthetic data only.
+At admission physical C: had14,234,320,896 bytes free, against12 GiB plus the
+8 MiB conservative metadata allowance and the39/38-byte source file. The actual
+Windows ZIP/manifest/receipt total was2,194 logical bytes; Linux was2,785 bytes.
+Extraction adds the source-file size. Filesystem allocation and unrelated runner
+logs are separate. Streamed retrieval keeps one ZIP, avoiding a duplicate wire
+copy. No cleanup or additional disk purchase was needed for the targeted check.
 
-All 26 historical ZIPs were uploaded and fetched back through fcp-archive with
-unchanged original bytes/IDs/digests and native source/attempt bindings. Another
-package protects 52 retained P06 original-failure/diagnostic files (805,294 original
-bytes); all hashes were verified after retrieval. Existing Windows evidence and
-GitHub originals remain intact. Nitro is not the only verified copy of these files.
+Earlier production run35449153626 verified Nettking Windows/Linux upload/get and
+all four SSH identities. Its two Beast failures remain recorded; the targeted
+new run resolves them without replaying a release gate. Branch pushes now run
+only the authorized Beast pair; manual transport verification retains both
+Nettking and Beast families in its matrix. Prior green evidence keeps its own
+source identity; this is not a declaration of release qualification.
 
-### Beast clarification, 2026-09-19 14:25 UTC
-
-Read-only run `35448691277` used the existing Beast Windows runner, without a
-checkout, tests, archive transfer or cleanup. C: is NTFS, serial `86F91634`, total
-118,917,951,488 bytes (110.75 GiB), free 14,240,579,584 bytes (13.26 GiB). The WSL
-client's `/mnt/c` check protects this same physical volume.
-
-The 66 GiB archive rule was introduced in this infrastructure branch; it is not
-the archive's data size and is not a demonstrated existing blanket Beast test
-requirement. The existing `ci_release_disk_preflight.py` refuses at or below
-12 GiB and warns at or below 16 GiB. `storage_allocation.default_floor_bytes`
-derives `min(max(10 GiB, 5% of volume size), 64 GiB)`, which is 10 GiB on this C:.
-The physical Windows campaign's 64 GiB floor and measured growth margins still
-apply to its actual acceptance volumes. This inspection is not a fresh test gate
-or an audit of every filesystem visible inside Beast WSL.
-
-The archive guard remains unchanged as instructed. Its Windows upload admission
-was `66 GiB + 8 MiB + 39 bytes`; therefore it refuses even a 39-byte input. The
-equivalent retained Nettking package uses 171 ZIP bytes, 1,262 manifest bytes and
-338 receipt bytes: 1,771 additional logical bytes, not 66 GiB. Beast's job metadata
-can differ slightly; its physical NTFS allocation was not measured because the
-guard prevented packaging. The 8 MiB admission allowance is conservative header
-space, not an actual allocation. No archive staging directories were found in the
-bounded `RUNNER_TEMP/fcp-evidence-*` inventory; no cleanup candidates are approved.
-
-Retrieval now streams directly into one ZIP and verifies its declared length,
-manifest, ZIP SHA-256 and all member hashes before publishing a local receipt.
-This removes the redundant `download.wire` copy: peak package bytes fall from
-`2 * ZIP size` to `ZIP size`, plus bounded metadata; extraction adds the restored
-file bytes. One upload ZIP remains necessary for a stable, re-verifiable retry.
-No free-space floor, SSH check, original evidence or frozen source changed.
-Local verification: Linux 12 passed, Windows 10 passed / 2 Linux-only skips;
-real Windows retrieval from the isolated Nitro receiver passed with no wire copy.
-Production and all-runner verification remain pending. Do not clean 52+ GiB on
-Beast merely to satisfy this new unscoped archive rule without a separate decision.
+All26 historical GitHub ZIPs were copied and fetched back with original bytes,
+IDs/digests and native source/attempt bindings unchanged. Another package protects
+52 retained P06 original-failure/diagnostic files (805,294 source bytes). Windows
+copies and GitHub originals remain intact; Nitro is not their only verified copy.
+Production migration receipts, raw logs and deletion candidates remain outside Git
+in the operator's `.acceptance/nitro-archive-setup` directory. No deletion is approved.
 
 ## Administrator setup
 
@@ -234,8 +200,8 @@ constitute physical acceptance or resolve the original P06 failure.
 
 ## Review and activation
 
-A branch push triggers only `Nitro artifact transport smoke`: four small jobs on
-existing Nettking and Beast Windows/Linux runners, with no dependency install, external
+A branch push triggers only `Nitro artifact transport smoke`: two small jobs on
+existing Beast Windows/Linux runners (manual matrix also retains Nettking), with no dependency install, external
 cache, or Actions artifact upload. Opening a PR triggers broad existing release
 workflows because `.github/actions/**` is watched. Therefore do not open a PR or
 merge automatically merely to publish this change for review; review the branch
