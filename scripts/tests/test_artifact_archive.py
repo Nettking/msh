@@ -58,14 +58,21 @@ class ArchiveTests(unittest.TestCase):
     def test_local_capacity_refusal_retains_originals(self):
         self.disk_usage.return_value = SimpleNamespace(free=64 * 1024**3)
         with (
-            patch.dict(os.environ, {"RUNNER_NAME": "Nettking"}),
+            patch.dict(
+                os.environ,
+                {
+                    "RUNNER_NAME": "Nettking",
+                    "GITHUB_ACTIONS": "false",
+                    "GITHUB_REPOSITORY": archive.REPO,
+                },
+            ),
             self.assertRaisesRegex(OSError, "free_bytes=.*required_bytes="),
         ):
             self.package()
         self.assertTrue((self.input / "junit.xml").is_file())
         self.assertFalse((self.root / "package/bundle.zip").exists())
 
-    def test_beast_ci_capacity_includes_job_growth_and_rejects_twelve_gib(self):
+    def test_ci_capacity_includes_job_growth_and_rejects_twelve_gib(self):
         env = {
             "GITHUB_ACTIONS": "true",
             "GITHUB_REPOSITORY": archive.REPO,
@@ -81,11 +88,25 @@ class ArchiveTests(unittest.TestCase):
                 with self.assertRaises(OSError):
                     archive.require_local_space(self.root, extra)
         self.disk_usage.return_value = SimpleNamespace(free=13 * 1024**3)
+        for runner in ("Beast", "Beast-Linux-WSL", "Nettking", "Nettking-Linux"):
+            self.disk_usage.return_value = SimpleNamespace(free=13 * 1024**3)
+            with patch.dict(
+                os.environ,
+                {
+                    "RUNNER_NAME": runner,
+                    "GITHUB_ACTIONS": "true",
+                    "GITHUB_REPOSITORY": archive.REPO,
+                },
+            ):
+                rows = archive.require_local_space(self.root, 1)
+                self.assertTrue(all(r["reserve_bytes"] == 12 * 1024**3 for r in rows))
+                self.assertTrue(all(r["role"] == "ci-only" for r in rows))
         for runner, actions, repo in (
-            ("Nettking", "true", archive.REPO),
+            ("Nettking", "false", archive.REPO),
             ("Beast", "false", archive.REPO),
             ("Beast", "true", "fork/example"),
         ):
+            self.disk_usage.return_value = SimpleNamespace(free=13 * 1024**3)
             with (
                 patch.dict(
                     os.environ,
