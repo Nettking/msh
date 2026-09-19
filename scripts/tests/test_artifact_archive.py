@@ -13,7 +13,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from scripts import artifact_archive as archive
-from scripts.artifact_archive_ci import trusted_event
+from scripts.artifact_archive_ci import native_job_identity, trusted_event
 
 
 class ArchiveTests(unittest.TestCase):
@@ -51,10 +51,119 @@ class ArchiveTests(unittest.TestCase):
 
     def test_local_capacity_refusal_retains_originals(self):
         self.disk_usage.return_value = SimpleNamespace(free=64 * 1024**3)
-        with self.assertRaisesRegex(OSError, "free_bytes=.*required_bytes="):
+        with (
+            patch.dict(os.environ, {"RUNNER_NAME": "Nettking"}),
+            self.assertRaisesRegex(OSError, "free_bytes=.*required_bytes="),
+        ):
             self.package()
         self.assertTrue((self.input / "junit.xml").is_file())
         self.assertFalse((self.root / "package/bundle.zip").exists())
+
+    def test_beast_ci_capacity_includes_job_growth_and_rejects_twelve_gib(self):
+        env = {
+            "GITHUB_ACTIONS": "true",
+            "GITHUB_REPOSITORY": archive.REPO,
+            "RUNNER_NAME": "Beast",
+        }
+        with patch.dict(os.environ, env):
+            self.disk_usage.return_value = SimpleNamespace(free=13 * 1024**3)
+            rows = archive.require_local_space(self.root, 8 * 1024**2 + 39)
+            self.assertTrue(all(r["reserve_bytes"] == 12 * 1024**3 for r in rows))
+            self.assertTrue(all(r["role"] == "ci-only" for r in rows))
+            for free, extra in ((12 * 1024**3, 0), (13 * 1024**3, 1024**3)):
+                self.disk_usage.return_value = SimpleNamespace(free=free)
+                with self.assertRaises(OSError):
+                    archive.require_local_space(self.root, extra)
+        self.disk_usage.return_value = SimpleNamespace(free=13 * 1024**3)
+        for runner, actions, repo in (
+            ("Nettking", "true", archive.REPO),
+            ("Beast", "false", archive.REPO),
+            ("Beast", "true", "fork/msh"),
+        ):
+            with (
+                patch.dict(
+                    os.environ,
+                    {
+                        "RUNNER_NAME": runner,
+                        "GITHUB_ACTIONS": actions,
+                        "GITHUB_REPOSITORY": repo,
+                    },
+                ),
+                self.assertRaises(OSError),
+            ):
+                archive.require_local_space(self.root, 1)
+
+    def test_native_identity_waits_for_assignment_without_guessing(self):
+        env = {
+            "GITHUB_RUN_ID": "123",
+            "GITHUB_RUN_ATTEMPT": "2",
+            "RUNNER_NAME": "Beast-Linux-WSL",
+            "ARCHIVE_GITHUB_TOKEN": "test-only",
+            "RUNNER_TEMP": str(self.root),
+        }
+        job = {
+            "id": 456,
+            "run_id": 123,
+            "run_attempt": 2,
+            "status": "in_progress",
+            "runner_id": 29,
+            "runner_name": env["RUNNER_NAME"],
+            "started_at": "2026-09-19T00:00:00Z",
+        }
+        pending = dict(job, status="queued", runner_name="")
+        replies = [
+            io.BytesIO(json.dumps({"total_count": 1, "jobs": [j]}).encode())
+            for j in (pending, job)
+        ]
+        with (
+            patch(
+                "scripts.artifact_archive_ci.urllib.request.urlopen",
+                side_effect=replies,
+            ) as request,
+            patch("scripts.artifact_archive_ci.time.sleep"),
+        ):
+            actual = native_job_identity(env)
+        self.assertEqual(actual["id"], 456)
+        self.assertEqual([x["matches"] for x in actual["binding_observations"]], [0, 1])
+        self.assertIn("/attempts/2/jobs?", request.call_args.args[0].full_url)
+        # Even a valid-looking record from another attempt/run is not eligible.
+        wrong = dict(job, run_id=124, run_attempt=1)
+        clock = [0.0]
+
+        def tick(seconds):
+            clock[0] += seconds
+
+        def response(*args, **kwargs):
+            return io.BytesIO(json.dumps({"total_count": 1, "jobs": [wrong]}).encode())
+
+        with (
+            patch(
+                "scripts.artifact_archive_ci.urllib.request.urlopen",
+                side_effect=response,
+            ),
+            patch(
+                "scripts.artifact_archive_ci.time.monotonic",
+                side_effect=lambda: clock[0],
+            ),
+            patch("scripts.artifact_archive_ci.time.sleep", side_effect=tick),
+            self.assertRaisesRegex(ValueError, "missing or ambiguous"),
+        ):
+            native_job_identity(env)
+        self.assertEqual(clock[0], 20)
+        self.assertTrue(list(self.root.glob("fcp-native-job-binding-*.json")))
+        ambiguous = io.BytesIO(
+            json.dumps({"total_count": 2, "jobs": [job, dict(job, id=457)]}).encode()
+        )
+        with (
+            patch(
+                "scripts.artifact_archive_ci.urllib.request.urlopen",
+                return_value=ambiguous,
+            ),
+            patch("scripts.artifact_archive_ci.time.sleep") as sleep,
+            self.assertRaisesRegex(ValueError, "missing or ambiguous"),
+        ):
+            native_job_identity(env)
+        sleep.assert_not_called()
 
     def test_streamed_fetch_verifies_without_a_second_zip_copy(self):
         package = self.package()

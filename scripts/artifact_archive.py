@@ -29,6 +29,7 @@ REPO = "Nettking/msh"
 MAX_BYTES = 2 * 1024**3
 MAX_HEADER = 8 * 1024**2
 RESERVE_BYTES = 200 * 1024**3  # Existing physical acceptance margin stays available.
+CI_ONLY_RUNNERS = frozenset({"Beast", "Beast-Linux-WSL"})
 
 
 def canonical(value):
@@ -44,6 +45,16 @@ def sha_file(path):
 
 
 def require_local_space(path, extra_bytes):
+    if type(extra_bytes) is not int or extra_bytes < 0:
+        raise ValueError("Invalid local space requirement")
+    ci_only = (
+        os.environ.get("GITHUB_ACTIONS") == "true"
+        and os.environ.get("GITHUB_REPOSITORY") == REPO
+        and os.environ.get("RUNNER_NAME") in CI_ONLY_RUNNERS
+    )
+    # Beast is explicitly CI-only, not a physical acceptance host or archive.
+    # Keep its existing CI refusal at <=12 GiB, including the pending write.
+    reserve = (12 if ci_only else 66) * 1024**3
     path = Path(path).absolute()
     while not path.exists():
         path = path.parent
@@ -54,14 +65,25 @@ def require_local_space(path, extra_bytes):
             raise OSError("WSL physical host-volume capacity is unavailable")
         # Also preserve the physical Windows volume, not just the virtual disk.
         volumes.append(Path("/mnt/c"))
+    observations = []
     for volume in volumes:
         free = shutil.disk_usage(volume).free
-        required = 66 * 1024**3 + extra_bytes
-        if free < required:
+        required = reserve + extra_bytes
+        if free < required or (ci_only and free == required):
             raise OSError(
                 f"Local evidence operation would breach the free-space reserve: "
                 f"volume={volume}, free_bytes={free}, required_bytes={required}"
             )
+        observations.append(
+            {
+                "volume": str(volume),
+                "free_bytes": free,
+                "reserve_bytes": reserve,
+                "extra_bytes_bound": extra_bytes,
+                "role": "ci-only" if ci_only else "acceptance-capacity-preserved",
+            }
+        )
+    return observations
 
 
 def component(value):
@@ -313,12 +335,13 @@ def build_package(metadata, patterns, spool):
         raise ValueError(
             "Evidence exceeds the bounded package size; originals retained"
         )
-    require_local_space(spool, total + MAX_HEADER)
+    admission = require_local_space(spool, total + MAX_HEADER)
     manifest = dict(
         metadata,
         schema=SCHEMA,
         archived_at=dt.datetime.now(dt.timezone.utc).isoformat(),
         tool_sha256=sha_file(__file__),
+        local_capacity_admission=admission,
         files=[],
     )
     reference(manifest)
