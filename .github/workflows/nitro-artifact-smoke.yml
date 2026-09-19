@@ -49,9 +49,9 @@ jobs:
           path: ${{ runner.temp }}
           matrix: ${{ toJSON(matrix) }}
           job-status: ${{ job.status }}
-          ssh-key: ${{ secrets.NITRO_ARTIFACT_SMOKE_SSH_KEY }}
-          host: ${{ vars.NITRO_ARTIFACT_SMOKE_HOST }}
-          known-hosts: ${{ vars.NITRO_ARTIFACT_SMOKE_KNOWN_HOSTS }}
+          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
+          host: ${{ vars.NITRO_ARTIFACT_HOST }}
+          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
       - name: Create tiny synthetic evidence
         run: ${{ matrix.python }} -B -c "from pathlib import Path; import os; p=Path(os.environ['RUNNER_TEMP'])/'archive-smoke.txt'; p.write_text('Synthetic archive transport test only\n')"
       - uses: ./.github/actions/nitro-artifact
@@ -61,9 +61,9 @@ jobs:
           path: ${{ runner.temp }}/archive-smoke.txt
           matrix: ${{ toJSON(matrix) }}
           job-status: ${{ job.status }}
-          ssh-key: ${{ secrets.NITRO_ARTIFACT_SMOKE_SSH_KEY }}
-          host: ${{ vars.NITRO_ARTIFACT_SMOKE_HOST }}
-          known-hosts: ${{ vars.NITRO_ARTIFACT_SMOKE_KNOWN_HOSTS }}
+          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
+          host: ${{ vars.NITRO_ARTIFACT_HOST }}
+          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
       - uses: ./.github/actions/nitro-artifact
         with:
           operation: download
@@ -71,9 +71,9 @@ jobs:
           path: ${{ runner.temp }}/archive-smoke-get-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}-${{ matrix.runner }}
           matrix: ${{ toJSON(matrix) }}
           job-status: ${{ job.status }}
-          ssh-key: ${{ secrets.NITRO_ARTIFACT_SMOKE_SSH_KEY }}
-          host: ${{ vars.NITRO_ARTIFACT_SMOKE_HOST }}
-          known-hosts: ${{ vars.NITRO_ARTIFACT_SMOKE_KNOWN_HOSTS }}
+          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
+          host: ${{ vars.NITRO_ARTIFACT_HOST }}
+          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
       - name: Verify retrieved content
         env:
           DOWNLOAD: ${{ runner.temp }}/archive-smoke-get-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}-${{ matrix.runner }}/archive-smoke-${{ matrix.os }}-${{ matrix.runner }}/archive-smoke.txt
