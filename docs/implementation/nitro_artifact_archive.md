@@ -26,6 +26,34 @@ artifacts, LFS, Packages, release assets, cloud storage, or paid runners.
   closed. A virtual disk's logical free space is not physical host capacity.
 - No P06/P07/P12 run was started, stopped or changed. P07/P12 remain unstarted.
 
+## Verification and remaining host prerequisite
+
+Transport implementation `5a86c57c`, run `35443127083`, attempt 1:
+
+- Restricted SSH and pinned-host verification passed on Nettking Windows/Linux
+  and Beast Windows/Linux, under their actual runner identities.
+- Nettking uploaded and fetched the tiny packages on both operating systems.
+  Independent retention fetched them again, verified every hash, and bound the
+  native job IDs and checkout logs to the exact implementation commit.
+- Archive unit tests: each Linux job 11 passed; each Windows job 9 passed plus
+  two Linux receiver tests skipped. They cover concurrent publication, idempotence,
+  conflicts, corruption, truncation, capacity refusal and original-file retention.
+- Beast upload was correctly refused: Windows had 14,242,746,368 free bytes;
+  WSL measured 14,242,881,536 on the same physical C: volume, below the preserved
+  66 GiB margin. **Overall smoke result is FAILURE, not four-runner acceptance.**
+  No retry, cleanup, reserve reduction or storage fallback resolves this implicitly.
+- The earlier Windows service-key ACL failure is preserved in run `35441797000`;
+  the corrected service-account transport passed in run `35441947753`.
+- All four transport runs created zero GitHub artifacts. A separate unavailable
+  SSH destination test failed explicitly with the original file/package retained.
+  Account billing UI showed all five budgets at $0, Stop usage enabled; Actions
+  cache API reported zero entries/bytes. Neither setting was changed.
+
+Before transition, an administrator must create the isolated Nitro account and
+the Beast capacity issue needs a safe resolution without protected-data cleanup.
+Production upload/readback, the legacy migration and production access-isolation
+checks remain **unexecuted**. The test receiver holds synthetic data only.
+
 ## Administrator setup
 
 Review `scripts/install_nitro_archive.py` and `scripts/artifact_archive.py`.
