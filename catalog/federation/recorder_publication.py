@@ -30,6 +30,7 @@ from .outbox import MAX_PAYLOAD_BYTES, RetiredSummary
 from .recorder_delivery import (
     RECORDER_STORAGE_SCHEMA,
     DurableRecorderDeliveryQueue,
+    RecorderDeliveryProgressObserver,
     RecorderDeliveryRunResult,
 )
 
@@ -966,7 +967,14 @@ class RecorderFederationDeliveryWorker:
         self,
         *,
         force_reconcile: bool = False,
+        progress_observer: RecorderDeliveryProgressObserver | None = None,
     ) -> RecorderWorkerCycleResult:
+        if progress_observer is not None and not callable(progress_observer):
+            raise FederationValidationError(
+                "invalid-recorder-publication",
+                "progress_observer",
+                "must be callable when supplied",
+            )
         stamp = self._checkpoint_stamp()
         changed = (
             force_reconcile
@@ -1038,7 +1046,13 @@ class RecorderFederationDeliveryWorker:
             self._last_checkpoint_stamp = stamp
             self._reconciled_once = True
 
-        delivery = await self.queue.run_once(limit=self.delivery_limit)
+        if progress_observer is None:
+            delivery = await self.queue.run_once(limit=self.delivery_limit)
+        else:
+            delivery = await self.queue.run_once(
+                limit=self.delivery_limit,
+                progress_observer=progress_observer,
+            )
 
         # Read the tombstones back from the database rather than reporting what
         # this cycle happened to retire. A cycle that retires nothing because

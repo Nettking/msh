@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Protocol
@@ -119,6 +121,26 @@ class RecorderStorageClient(Protocol):
         dataset_schema_name: str = "fcp.storage.dataset.opaque",
         dataset_schema_version: int = 1,
     ) -> PhaseDIngestOutcome: ...
+
+
+@dataclass(frozen=True)
+class RecorderDeliveryProgress:
+    """A durable delivery boundary reached during one bounded cycle.
+
+    The progress signal is emitted only after the outbox acknowledgement has
+    committed.  It is intentionally small: the owner needs to know that a
+    route has made durable forward progress, while the outbox remains the
+    source of truth for every row and its ordering.
+    """
+
+    committed: int
+    dataset_id: str | None = None
+    pending: int = 0
+
+
+RecorderDeliveryProgressObserver = Callable[
+    [RecorderDeliveryProgress], Awaitable[None] | None
+]
 
 
 @dataclass(frozen=True)
@@ -247,6 +269,7 @@ class DurableRecorderDeliveryQueue:
         *,
         limit: int = 100,
         retry_deferred_heads: bool | None = None,
+        progress_observer: RecorderDeliveryProgressObserver | None = None,
     ) -> RecorderDeliveryRunResult:
         if isinstance(limit, bool) or not isinstance(limit, int) or limit <= 0:
             raise FederationValidationError(
@@ -261,6 +284,12 @@ class DurableRecorderDeliveryQueue:
                 "invalid-recorder-delivery",
                 "retry_deferred_heads",
                 "must be a boolean when supplied",
+            )
+        if progress_observer is not None and not callable(progress_observer):
+            raise FederationValidationError(
+                "invalid-recorder-delivery",
+                "progress_observer",
+                "must be callable when supplied",
             )
 
         # Read only a bounded, fair delivery window. The SQLite implementation
@@ -390,6 +419,20 @@ class DurableRecorderDeliveryQueue:
                     if outcome.committed:
                         self.outbox.acknowledge(entry.outbox_id, now=self.clock())
                         committed += 1
+                        if progress_observer is not None:
+                            progress = progress_observer(
+                                RecorderDeliveryProgress(
+                                    committed=committed,
+                                    dataset_id=(
+                                        None
+                                        if ordering_key is None
+                                        else ordering_key[2]
+                                    ),
+                                    pending=pending,
+                                )
+                            )
+                            if inspect.isawaitable(progress):
+                                await progress
                     else:
                         self.outbox.record_failure(
                             entry.outbox_id,
