@@ -135,6 +135,7 @@ class RecorderDeliveryProgress:
 
     committed: int
     dataset_id: str | None = None
+    pending: int = 0
 
 
 RecorderDeliveryProgressObserver = Callable[
@@ -427,6 +428,7 @@ class DurableRecorderDeliveryQueue:
                                         if ordering_key is None
                                         else ordering_key[2]
                                     ),
+                                    pending=pending,
                                 )
                             )
                             if inspect.isawaitable(progress):

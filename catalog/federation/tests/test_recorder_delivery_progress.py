@@ -59,6 +59,7 @@ def test_progress_observer_runs_after_each_durable_commit(tmp_path) -> None:
 
     assert result.committed == 2
     assert [item.committed for item in observed] == [1, 2]
+    assert [item.pending for item in observed] == [0, 0]
     assert [item.dataset_id for item in observed] == ["dataset-a", "dataset-b"]
     assert durable_states == [("batch-b",), ()]
     assert outbox.pending() == ()

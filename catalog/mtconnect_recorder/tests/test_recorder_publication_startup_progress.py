@@ -98,6 +98,16 @@ def test_startup_readiness_is_published_at_first_commit(tmp_path, monkeypatch) -
             content={"dataset": index},
             created_at=created_at,
         )
+    # Model a recovered startup backlog: every row carries a historical
+    # failure/backoff marker, but the fresh queue is allowed to probe each
+    # deferred head immediately. The early snapshot must reflect the current
+    # successful route rather than stale error text on untouched rows.
+    for entry in outbox.pending():
+        outbox.record_failure(
+            entry.outbox_id,
+            error="previous federation outage",
+            now=datetime.now(timezone.utc),
+        )
 
     monkeypatch.setattr(
         federation_node_module,

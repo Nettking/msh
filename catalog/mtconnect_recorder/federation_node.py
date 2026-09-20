@@ -1036,19 +1036,30 @@ class RecorderFederationNode:
                                 destination_id=group_id,
                                 schema_id=RECORDER_STORAGE_SCHEMA,
                             )
-                            progress_state, pending_count, progress_error = (
-                                _publication_cycle_status(
-                                    pending_entries=progress_pending,
+                            pending_count = len(
+                                _current_recorder_pending(
+                                    progress_pending,
                                     session_id=state.binding.internal_session_id,
                                     group_id=group_id,
-                                    delivery=RecorderDeliveryRunResult(
-                                        attempted=progress.committed,
-                                        committed=progress.committed,
-                                        pending=0,
-                                    ),
-                                    retired_total=progress_retirement.total,
                                 )
                             )
+                            if progress_retirement.total:
+                                progress_state = "degraded"
+                                progress_error = "recorder-delivery-retired"
+                            elif progress.pending:
+                                progress_state = "backlogged"
+                                progress_error = "recorder-delivery-pending"
+                            elif pending_count:
+                                # A pending row may carry a last_error from a
+                                # prior outage. The current startup probe has
+                                # retried its deferred head successfully, so
+                                # that historical marker must not hide the
+                                # route progress this cycle just proved.
+                                progress_state = "publishing"
+                                progress_error = None
+                            else:
+                                progress_state = "up-to-date"
+                                progress_error = None
                             self._set_snapshot(
                                 status="connected",
                                 storage_state=progress_state,
