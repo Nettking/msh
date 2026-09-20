@@ -33,6 +33,7 @@ from catalog.federation.outbox import SQLiteOutbox
 from catalog.federation.recorder_delivery import (
     RECORDER_STORAGE_SCHEMA,
     DurableRecorderDeliveryQueue,
+    RecorderDeliveryProgress,
     RecorderDeliveryRunResult,
 )
 from catalog.federation.incremental_recorder_publication import (
@@ -994,8 +995,80 @@ class RecorderFederationNode:
                         group_id = selected.group_id
 
                     assert worker is not None and outbox is not None
+                    startup_progress_observer = None
+                    if worker.queue.startup_probe_pending:
+                        startup_progress_reported = False
+
+                        async def _publish_startup_progress(
+                            progress: RecorderDeliveryProgress,
+                        ) -> None:
+                            """Publish readiness at the first durable route.
+
+                            The queue continues its bounded one-head-per-dataset
+                            startup probe after this callback returns.  The
+                            remaining rows stay in the durable outbox and are
+                            therefore still ordered and retryable.
+                            """
+
+                            nonlocal startup_progress_reported
+                            if progress.committed <= 0 or startup_progress_reported:
+                                return
+                            try:
+                                progress_jsonl = await self._publish_jsonl_once(
+                                    state,
+                                    authority_node_id=authority_node_id,
+                                    group_id=group_id,
+                                )
+                            except PUBLICATION_RETRY_ERRORS:
+                                # This is an early readiness hint, not the
+                                # cycle's error boundary. Keep delivering the
+                                # durable startup probe; the unchanged final
+                                # JSONL publication below reports the failure
+                                # through the normal retry path.
+                                startup_progress_reported = True
+                                return
+                            progress_pending = await asyncio.to_thread(
+                                outbox.pending
+                            )
+                            progress_retirement = await asyncio.to_thread(
+                                outbox.retired_summary,
+                                session_id=state.binding.internal_session_id,
+                                destination_id=group_id,
+                                schema_id=RECORDER_STORAGE_SCHEMA,
+                            )
+                            progress_state, pending_count, progress_error = (
+                                _publication_cycle_status(
+                                    pending_entries=progress_pending,
+                                    session_id=state.binding.internal_session_id,
+                                    group_id=group_id,
+                                    delivery=RecorderDeliveryRunResult(
+                                        attempted=progress.committed,
+                                        committed=progress.committed,
+                                        pending=0,
+                                    ),
+                                    retired_total=progress_retirement.total,
+                                )
+                            )
+                            self._set_snapshot(
+                                status="connected",
+                                storage_state=progress_state,
+                                storage_group=group_id,
+                                storage_authority_node_id=authority_node_id,
+                                pending_batches=pending_count,
+                                last_committed_count=progress.committed,
+                                jsonl_state="ready",
+                                jsonl_last_published_count=int(
+                                    getattr(progress_jsonl, "published_chunks", 0)
+                                ),
+                                last_error_code=progress_error,
+                            )
+                            startup_progress_reported = True
+
+                        startup_progress_observer = _publish_startup_progress
                     retry_stage = "delivery"
-                    cycle = await worker.run_cycle()
+                    cycle = await worker.run_cycle(
+                        progress_observer=startup_progress_observer
+                    )
                     local_context = (worker.reconciler, outbox, group_id)
                     retry_stage = "jsonl"
                     jsonl_result = await self._publish_jsonl_once(
