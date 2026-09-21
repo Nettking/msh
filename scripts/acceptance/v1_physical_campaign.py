@@ -991,6 +991,10 @@ def sample_resources(
         raise CampaignError(
             f"{scenario_id} samples must include the active --run-id"
         )
+    if scenario_id == "P12" and (data_root is None or results_root is None):
+        raise CampaignError(
+            "P12 resource samples require bound data_root and results_root"
+        )
     if run_id:
         _active_session(
             root,

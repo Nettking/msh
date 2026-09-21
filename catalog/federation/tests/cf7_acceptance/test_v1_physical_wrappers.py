@@ -91,3 +91,10 @@ def test_wrappers_never_start_a_timed_run_implicitly() -> None:
 def test_wrappers_validate_through_the_strict_release_decision() -> None:
     assert "strict validate --commit" in _posix()
     assert 'Invoke-Strict @("validate"' in _windows()
+
+
+def test_wrappers_forward_the_explicit_runtime_binding_when_configured() -> None:
+    assert "FCP_RUNTIME_BINDING" in _posix()
+    assert "--runtime-binding" in _posix()
+    assert "FCP_RUNTIME_BINDING" in _windows()
+    assert "--runtime-binding" in _windows()

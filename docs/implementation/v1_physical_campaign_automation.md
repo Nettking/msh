@@ -216,6 +216,23 @@ resource snapshot as the base harness plus the recorder, publication, history,
 orphan and CPU/RAM series the P12 series assertions require. The series
 assertions then check the recorded samples rather than trusting a claim.
 
+P12 resource samples must also use an explicit runtime binding. Set
+`FCP_RUNTIME_BINDING` for the platform wrapper, or pass the binding before the
+subcommand when invoking the runner directly:
+
+```bash
+python -m scripts.acceptance.v1_physical_runner \
+  --runtime-binding /absolute/path/p12-runtime-binding.json \
+  sample --commit <candidate-sha> --host nitro --scenario P12 \
+  --run-id <run-id> --label soak-sample
+```
+
+The binding must name both the deployed `runtime.data_root` and
+`runtime.results_root`, and it must pin the candidate and clean acceptance
+harness. An unbound checkout sample is refused because it cannot establish the
+growth surface for the runtime under test. This does not change the growth
+ceiling or any elapsed-time requirement.
+
 Growth probes count each backing filesystem once. Samples retain each measured
 root and an opaque filesystem alias, so `data` and `results` on one volume share
 one measurement while distinct volumes remain additive. Missing identities,

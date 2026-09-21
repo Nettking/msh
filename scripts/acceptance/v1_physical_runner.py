@@ -820,6 +820,13 @@ def sample(
     scenario_id = campaign.require_scenario(scenario)
     binding = record.get("__runtime_binding")
     bound = binding if isinstance(binding, runtime_binding.RuntimeBinding) else None
+    if scenario_id == "P12" and (
+        bound is None or bound.data_root is None or bound.results_root is None
+    ):
+        raise RunnerError(
+            "P12 resource samples require --runtime-binding with both "
+            "runtime.data_root and runtime.results_root"
+        )
     extras = probes.collect_sample_extras(checkout, bound)
     path = campaign.sample_resources(
         checkout,

@@ -24,6 +24,7 @@ host_id="$2"
 profile="$3"
 operator="${4:-Martin}"
 action="${5:-prepare}"
+runtime_binding="${FCP_RUNTIME_BINDING:-}"
 
 [[ "$commit" =~ ^[0-9a-f]{40}$ ]] || { echo "commit must be a 40-character lowercase SHA" >&2; exit 2; }
 [[ "$host_id" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,47}$ ]] || { echo "invalid host id" >&2; exit 2; }
@@ -45,10 +46,14 @@ campaign() {
 }
 
 runner() {
-  python -m scripts.acceptance.v1_physical_runner \
-    --checkout "$checkout" \
-    --evidence-root evidence/v1-physical \
-    "$@"
+  local args=(
+    --checkout "$checkout"
+    --evidence-root evidence/v1-physical
+  )
+  if [[ -n "$runtime_binding" ]]; then
+    args+=(--runtime-binding "$runtime_binding")
+  fi
+  python -m scripts.acceptance.v1_physical_runner "${args[@]}" "$@"
 }
 
 strict() {
@@ -60,6 +65,9 @@ strict() {
 
 # Non-timed scenarios only. P07 and P12 evidence must be bound to an explicit
 # begin/finish run id, so they are never started implicitly by a wrapper.
+# P12 resource samples additionally require FCP_RUNTIME_BINDING to name the
+# deployed data and results roots; an unbound checkout sample cannot establish
+# a growth verdict for the runtime.
 UNTIMED_SCENARIOS=(P01 P02 P03 P04 P05 P06 P08 P09 P10 P11)
 
 case "$action" in

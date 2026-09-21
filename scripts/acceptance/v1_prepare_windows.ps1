@@ -20,6 +20,7 @@ param(
 $ErrorActionPreference = "Stop"
 $Checkout = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 Set-Location $Checkout
+$RuntimeBinding = $env:FCP_RUNTIME_BINDING
 
 if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
     throw "Python is not available on PATH. Install Python 3.11 or newer."
@@ -47,7 +48,12 @@ function Invoke-Campaign {
 
 function Invoke-Runner {
     param([Parameter(Mandatory = $true)][string[]]$Arguments, [switch]$AllowFailure)
-    Invoke-Module -Module "scripts.acceptance.v1_physical_runner" -Arguments $Arguments -AllowFailure:$AllowFailure
+    $runnerArguments = @()
+    if ($RuntimeBinding) {
+        $runnerArguments += @("--runtime-binding", $RuntimeBinding)
+    }
+    $runnerArguments += $Arguments
+    Invoke-Module -Module "scripts.acceptance.v1_physical_runner" -Arguments $runnerArguments -AllowFailure:$AllowFailure
 }
 
 function Invoke-Strict {
@@ -56,7 +62,8 @@ function Invoke-Strict {
 }
 
 # Non-timed scenarios only. P07 and P12 evidence must be bound to an explicit
-# begin/finish run id, so a wrapper never starts one implicitly.
+# begin/finish run id, so a wrapper never starts one implicitly. Set
+# FCP_RUNTIME_BINDING when collecting P12 resource samples.
 $UntimedScenarios = @("P01", "P02", "P03", "P04", "P05", "P06", "P08", "P09", "P10", "P11")
 
 switch ($Action) {
