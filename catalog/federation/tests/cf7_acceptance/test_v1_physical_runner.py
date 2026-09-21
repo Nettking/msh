@@ -16,6 +16,7 @@ import pytest
 from scripts.acceptance import v1_physical_campaign as campaign
 from scripts.acceptance import v1_physical_probes as probes
 from scripts.acceptance import v1_physical_runner as runner
+from scripts.acceptance import v1_physical_runtime_binding as runtime_binding
 from scripts.acceptance.v1_physical_automation import (
     AUTOMATED,
     FAULT_INJECTION,
@@ -337,6 +338,32 @@ def test_sample_attaches_the_p12_soak_series(
     tmp_path: Path,
 ) -> None:
     checkout, root = ready(monkeypatch, tmp_path)
+    data_root = tmp_path / "runtime" / "data"
+    results_root = tmp_path / "runtime" / "results"
+    data_root.mkdir(parents=True)
+    results_root.mkdir(parents=True)
+    binding = runtime_binding.RuntimeBinding(
+        host_id="nitro",
+        target_candidate_sha=COMMIT,
+        acceptance_harness_sha="b" * 40,
+        harness_checkout=checkout,
+        kind="native-recorder",
+        data_root=data_root,
+        results_root=results_root,
+        recorder_status_file=tmp_path / "runtime" / "status.json",
+    )
+    monkeypatch.setattr(runner.runtime_binding, "load", lambda *_args, **_kwargs: binding)
+    monkeypatch.setattr(
+        runner.probes,
+        "collect_sample_extras",
+        lambda *_args, **_kwargs: {
+            "recorder": {},
+            "publication": {},
+            "history": {},
+            "orphan": {},
+            "cpu_ram": {},
+        },
+    )
     run_id, _path = campaign.begin_session(
         checkout,
         root,
@@ -352,6 +379,7 @@ def test_sample_attaches_the_p12_soak_series(
         scenario="P12",
         label="soak-sample",
         run_id=run_id,
+        runtime_binding_file=tmp_path / "runtime-binding.json",
     )
     assert set(result["series"]) >= {
         "recorder",
@@ -363,6 +391,55 @@ def test_sample_attaches_the_p12_soak_series(
     packets = campaign.read_packets(root, "P12", expected_commit=COMMIT)
     samples = [packet for packet in packets if packet.get("kind") == "sample"]
     assert samples and "extras" in samples[0]
+
+
+def test_p12_sample_refuses_unbound_runtime_surface(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    checkout, root = ready(monkeypatch, tmp_path)
+    run_id, _path = campaign.begin_session(
+        checkout,
+        root,
+        commit=COMMIT,
+        host="nitro",
+        scenario="P12",
+    )
+    with pytest.raises(runner.RunnerError, match="P12 resource samples require"):
+        runner.sample(
+            checkout,
+            root,
+            commit=COMMIT,
+            host="nitro",
+            scenario="P12",
+            label="unbound-sample",
+            run_id=run_id,
+        )
+
+
+def test_p12_growth_probe_refuses_unbound_runtime_surface(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    checkout, root = ready(monkeypatch, tmp_path)
+    run_id, _path = campaign.begin_session(
+        checkout,
+        root,
+        commit=COMMIT,
+        host="nitro",
+        scenario="P12",
+    )
+    with pytest.raises(runner.RunnerError, match="P12 growth analysis requires"):
+        runner.probe_assertion(
+            checkout,
+            root,
+            commit=COMMIT,
+            host="nitro",
+            scenario="P12",
+            assertion="no-unexplained-growth",
+            run_id=run_id,
+            overrides={},
+        )
 
 
 def test_probe_detail_is_redacted_before_it_reaches_evidence(

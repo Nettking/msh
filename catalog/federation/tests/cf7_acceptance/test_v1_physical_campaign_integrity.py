@@ -172,3 +172,27 @@ def test_timed_sample_requires_active_run_id(
             scenario="P07",
             label="must be timed",
         )
+
+
+def test_p12_sample_requires_bound_runtime_roots(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    checkout, root = _ready(monkeypatch, tmp_path)
+    run_id, _path = campaign.begin_session(
+        checkout,
+        root,
+        commit=COMMIT,
+        host="nitro",
+        scenario="P12",
+    )
+    with pytest.raises(campaign.CampaignError, match="bound data_root and results_root"):
+        campaign.sample_resources(
+            checkout,
+            root,
+            commit=COMMIT,
+            host="nitro",
+            scenario="P12",
+            label="unbound-sample",
+            run_id=run_id,
+        )
