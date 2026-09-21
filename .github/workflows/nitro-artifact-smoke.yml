@@ -1,22 +1,51 @@
-name: Preserve original Phase2 catchup failure
+name: Diagnose Phase2 catchup delivery
 on:
   workflow_dispatch:
 permissions:
   contents: read
   actions: read
 concurrency:
-  group: original-catchup-106491443153
+  group: catchup-observer-3a908fd1
   cancel-in-progress: false
 jobs:
-  retain-original:
+  observe:
     if: github.repository == 'Nettking/msh' && github.actor == 'Nettking' && github.event_name == 'workflow_dispatch'
     runs-on: [self-hosted, Linux, beast-linux]
-    timeout-minutes: 5
+    timeout-minutes: 20
+    env:
+      FCP_CATCHUP_TRACE: ${{ runner.temp }}/catchup-observer-${{ github.run_id }}/trace.jsonl
     steps:
       - uses: actions/checkout@v4
-      - name: Read the exact failed synthetic test record
-        run: /opt/fcp-ci/python/3.12.13/bin/python3.12 -B scripts/ci_retain_catchup_failure.py
-      - name: Preserve diagnostic evidence on Nitro
+      - uses: ./.github/actions/self-hosted-postgres
+      - uses: ./.github/actions/self-hosted-python
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: cmd/fcp-peer-sidecar/go.mod
+          cache: false
+      - name: Original dependency constraints and diagnostic identity
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install pytest==9.1.1 ruff==0.16.8
+          mkdir -p "$(dirname "$FCP_CATCHUP_TRACE")"
+          python -m pip freeze > "$(dirname "$FCP_CATCHUP_TRACE")/dependencies.txt"
+          git diff 3a908fd1d9503057f3520d8f2dbbf62401a6e6d3 HEAD > "$(dirname "$FCP_CATCHUP_TRACE")/instrumentation.patch"
+          sha256sum "$(dirname "$FCP_CATCHUP_TRACE")/instrumentation.patch"
+      - name: Build direct peer sidecar
+        working-directory: cmd/fcp-peer-sidecar
+        run: |
+          go mod tidy
+          mkdir -p ../../build
+          go build -trimpath -o ../../build/fcp-peer-sidecar .
+      - uses: ./.github/actions/ubuntu-storage-precondition
+      - name: Same failed stage with named first-failure observation
+        run: >-
+          python -m pytest -o addopts= -vv -x --tb=long -p scripts.ci_catchup_observer
+          --junitxml=${{ runner.temp }}/catchup-observer-${{ github.run_id }}/junit.xml
+          catalog/federation/tests/test_phase2_unit.py catalog/node/tests catalog/relay/tests
+      - name: Preserve partial trace independently of JUnit
         if: always()
         uses: ./.github/actions/nitro-artifact
         with:
@@ -25,5 +54,9 @@ jobs:
           host: ${{ vars.NITRO_ARTIFACT_HOST }}
           known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
           job-status: ${{ job.status }}
-          name: original-catchup-failure-106491443153
-          path: ${{ runner.temp }}/catchup-original-106491443153-${{ github.run_id }}
+          name: catchup-observer
+          path: ${{ runner.temp }}/catchup-observer-${{ github.run_id }}
+      - uses: ./.github/actions/self-hosted-postgres
+        if: always()
+        with:
+          operation: stop
