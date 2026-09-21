@@ -417,6 +417,31 @@ def test_p12_sample_refuses_unbound_runtime_surface(
         )
 
 
+def test_p12_growth_probe_refuses_unbound_runtime_surface(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    checkout, root = ready(monkeypatch, tmp_path)
+    run_id, _path = campaign.begin_session(
+        checkout,
+        root,
+        commit=COMMIT,
+        host="nitro",
+        scenario="P12",
+    )
+    with pytest.raises(runner.RunnerError, match="P12 growth analysis requires"):
+        runner.probe_assertion(
+            checkout,
+            root,
+            commit=COMMIT,
+            host="nitro",
+            scenario="P12",
+            assertion="no-unexplained-growth",
+            run_id=run_id,
+            overrides={},
+        )
+
+
 def test_probe_detail_is_redacted_before_it_reaches_evidence(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

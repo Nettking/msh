@@ -66,6 +66,18 @@ def test_wrapper_automation_covers_every_non_timed_scenario() -> None:
     assert windows_scenarios == UNTIMED_SCENARIOS
 
 
+def test_wrappers_can_sample_a_named_timed_run() -> None:
+    posix = _posix()
+    windows = _windows()
+    assert "sample-scenario" in posix
+    assert 'sample_run_id="${7:-}"' in posix
+    assert '"$sample_scenario"' in posix
+    assert '"$sample_run_id"' in posix
+    assert "$SampleScenario" in windows
+    assert "$SampleRunId" in windows
+    assert '"--run-id", $SampleRunId' in windows
+
+
 def _executable_lines(text: str) -> str:
     return "\n".join(
         line for line in text.splitlines() if not line.lstrip().startswith("#")
@@ -77,7 +89,6 @@ def test_wrappers_never_start_a_timed_run_implicitly() -> None:
         executable = _executable_lines(text)
         assert " begin " not in executable
         assert '"begin"' not in executable
-        assert "--run-id" not in executable
         for scenario in TIMED_SCENARIOS:
             for pattern in (
                 rf"--scenario\s+\"?{scenario}\"?",

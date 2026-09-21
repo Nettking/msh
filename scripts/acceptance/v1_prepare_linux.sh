@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
   cat >&2 <<'USAGE'
-usage: v1_prepare_linux.sh <commit> <host-id> <profile> [operator] [action]
+usage: v1_prepare_linux.sh <commit> <host-id> <profile> [operator] [action] [sample-scenario] [sample-run-id]
 
 profiles: local-ai | cnc-recorder | school-control
 actions:
@@ -24,6 +24,8 @@ host_id="$2"
 profile="$3"
 operator="${4:-Martin}"
 action="${5:-prepare}"
+sample_scenario="${6:-P01}"
+sample_run_id="${7:-}"
 runtime_binding="${FCP_RUNTIME_BINDING:-}"
 
 [[ "$commit" =~ ^[0-9a-f]{40}$ ]] || { echo "commit must be a 40-character lowercase SHA" >&2; exit 2; }
@@ -91,7 +93,9 @@ case "$action" in
     runner report --commit "$commit" --host "$host_id"
     ;;
   sample)
-    runner sample --commit "$commit" --host "$host_id" --scenario P01 --label operator-sample
+    sample_args=(sample --commit "$commit" --host "$host_id" --scenario "$sample_scenario" --label operator-sample)
+    [[ -n "$sample_run_id" ]] && sample_args+=(--run-id "$sample_run_id")
+    runner "${sample_args[@]}"
     ;;
   status)
     campaign status --commit "$commit"

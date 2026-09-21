@@ -407,6 +407,15 @@ def probe_assertion(
         scenario=scenario,
         assertion=assertion,
     )
+    if scenario_id == "P12" and assertion == "no-unexplained-growth":
+        bound = record.get("__runtime_binding")
+        if not isinstance(bound, runtime_binding.RuntimeBinding) or (
+            bound.data_root is None or bound.results_root is None
+        ):
+            raise RunnerError(
+                "P12 growth analysis requires --runtime-binding with both "
+                "runtime.data_root and runtime.results_root"
+            )
     plan = plan_for(scenario_id, assertion)
     if plan.classification != AUTOMATED:
         raise RunnerError(

@@ -14,7 +14,12 @@ param(
     [string]$Operator = "Martin",
 
     [ValidateSet("prepare", "automate", "report", "sample", "status", "privacy", "validate")]
-    [string]$Action = "prepare"
+    [string]$Action = "prepare",
+
+    [ValidatePattern("^P(?:0[1-9]|1[0-2])$")]
+    [string]$SampleScenario = "P01",
+
+    [string]$SampleRunId = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -87,7 +92,9 @@ switch ($Action) {
         Invoke-Runner @("report", "--commit", $Commit, "--host", $HostId) -AllowFailure
     }
     "sample" {
-        Invoke-Runner @("sample", "--commit", $Commit, "--host", $HostId, "--scenario", "P01", "--label", "operator-sample")
+        $sampleArguments = @("sample", "--commit", $Commit, "--host", $HostId, "--scenario", $SampleScenario, "--label", "operator-sample")
+        if ($SampleRunId) { $sampleArguments += @("--run-id", $SampleRunId) }
+        Invoke-Runner $sampleArguments
     }
     "status" {
         Invoke-Campaign @("status", "--commit", $Commit)

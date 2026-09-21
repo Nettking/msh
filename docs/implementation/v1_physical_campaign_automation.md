@@ -233,6 +233,14 @@ harness. An unbound checkout sample is refused because it cannot establish the
 growth surface for the runtime under test. This does not change the growth
 ceiling or any elapsed-time requirement.
 
+The POSIX and Windows preparation wrappers accept optional sample arguments
+after the action: `sample-scenario` and `sample-run-id`. To sample the existing
+P12 session without starting a new timed run, set `FCP_RUNTIME_BINDING` and run
+`bash scripts/acceptance/v1_prepare_linux.sh <candidate-sha> nitro school-control Martin sample P12 <run-id>`
+or the equivalent PowerShell command with `-Action sample -SampleScenario P12
+-SampleRunId <run-id>`. The wrapper forwards the explicit run ID and binding to
+the checked-in runner; it does not create or restart a session.
+
 Growth probes count each backing filesystem once. Samples retain each measured
 root and an opaque filesystem alias, so `data` and `results` on one volume share
 one measurement while distinct volumes remain additive. Missing identities,
