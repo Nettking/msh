@@ -2001,6 +2001,23 @@ def _probe_growth_analysis(context: ProbeContext) -> ProbeOutcome:
         "max_growth_bytes_per_hour": ceiling,
         "run_id_bound": bool(context.run_id),
     }
+    if context.scenario == "P12":
+        # A binding supplied during analysis cannot retroactively bind earlier
+        # measurements. Reject the whole series rather than dropping originals.
+        for packet in samples:
+            resources = packet.get("resources")
+            if (
+                packet.get("resource_roots_bound") is not True
+                or packet.get("resource_roots_measured") != ["data", "results"]
+                or not isinstance(resources, Mapping)
+                or set(resources) != {"data", "results"}
+            ):
+                return _outcome(
+                    "growth-analysis",
+                    UNAVAILABLE,
+                    "every P12 sample must prove bound data and results roots",
+                    detail,
+                )
     if len(samples) < 2:
         return _outcome(
             "growth-analysis",
