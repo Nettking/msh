@@ -12,10 +12,10 @@ jobs:
     if: github.repository == 'Nettking/msh' && github.actor == 'Nettking' && github.event_name == 'workflow_dispatch'
     runs-on: [self-hosted, Linux, beast-linux]
     timeout-minutes: 20
-    env:
-      FCP_CATCHUP_TRACE: ${{ runner.temp }}/catchup-observer-${{ github.run_id }}/trace.jsonl
     steps:
       - uses: actions/checkout@v4
+      - name: Select runner-local persistent trace
+        run: echo "FCP_CATCHUP_TRACE=$RUNNER_TEMP/catchup-observer-$GITHUB_RUN_ID/trace.jsonl" >> "$GITHUB_ENV"
       - uses: ./.github/actions/self-hosted-postgres
       - uses: ./.github/actions/self-hosted-python
         with:
