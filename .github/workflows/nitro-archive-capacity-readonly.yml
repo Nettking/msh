@@ -1,47 +1,48 @@
-name: Nitro archive Beast capacity read-only
+name: Recover existing Beast bootstrap research evidence
 on:
   push:
-    branches: [codex/nitro-artifact-archive]
-    paths: [.github/workflows/nitro-archive-capacity-readonly.yml]
-permissions: {}
+    branches: [codex/bootstrap-repro-evidence-recovery]
+    paths:
+      - .github/workflows/nitro-archive-capacity-readonly.yml
+      - scripts/recover_bootstrap_reproduction_evidence.py
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: bootstrap-repro-evidence-recovery-35779391870-once
+  cancel-in-progress: false
 jobs:
-  capacity:
-    runs-on: [self-hosted, beast-windows]
-    timeout-minutes: 2
-    steps:
-      - name: Read volume identity and bounded archive staging inventory
+  recover:
+    name: Recover existing bootstrap observation once
+    if: >-
+      github.repository == 'Nettking/msh' && github.actor == 'Nettking' &&
+      github.triggering_actor == 'Nettking' && github.event_name == 'push' &&
+      github.ref == 'refs/heads/codex/bootstrap-repro-evidence-recovery' && github.run_attempt == 1
+    runs-on: [self-hosted, beast-windows, fcp-test-windows]
+    timeout-minutes: 5
+    defaults:
+      run:
         shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify and preserve exactly ten existing public files
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          $ErrorActionPreference = 'Stop'
-          $volume = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='C:'"
-          $physical = Get-Volume -DriveLetter C
-          $rows = @()
-          $dirs = @(Get-ChildItem -LiteralPath $env:RUNNER_TEMP -Directory -Filter 'fcp-evidence-*' -Force | Select-Object -First 100)
-          foreach ($dir in $dirs) {
-            if ($dir.Attributes -band [IO.FileAttributes]::ReparsePoint) { continue }
-            $files = @(Get-ChildItem -LiteralPath $dir.FullName -File -Force)
-            $rows += [pscustomobject]@{
-              path = $dir.FullName
-              direct_file_count = $files.Count
-              direct_file_bytes = ($files | Measure-Object -Property Length -Sum).Sum
-              recursive_scan = $false
-              deletion_authorized = $false
-              activity_and_evidence_retention = 'NOT_PROVEN'
-            }
-          }
-          [pscustomobject]@{
-            utc = [DateTime]::UtcNow.ToString('o')
-            host_name = $env:COMPUTERNAME
-            runner = $env:RUNNER_NAME
-            volume = $volume.DeviceID
-            filesystem = $volume.FileSystem
-            volume_serial = $volume.VolumeSerialNumber
-            volume_unique_id = $physical.UniqueId
-            total_bytes = [long]$volume.Size
-            free_bytes = [long]$volume.FreeSpace
-            runner_temp = $env:RUNNER_TEMP
-            archive_staging_direct_inventory = $rows
-            archive_staging_limit = 100
-            relevant_processes = @(Get-Process -Name 'python*','pytest*','Runner.Worker','wsl*' -ErrorAction SilentlyContinue | Select-Object Id,ProcessName)
-            mutations = 'NONE: no checkout, deletion, test, service change or artifact transfer'
-          } | ConvertTo-Json -Depth 6
+          python -B scripts/recover_bootstrap_reproduction_evidence.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Archive separate recovery namespace on Nitro
+        if: ${{ always() && env.FCP_BOOTSTRAP_RECOVERY_OUT != '' }}
+        uses: ./.github/actions/nitro-artifact
+        with:
+          operation: upload
+          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
+          host: ${{ vars.NITRO_ARTIFACT_HOST }}
+          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
+          matrix: '{"purpose":"readonly-recovery","original_run":"35779391870"}'
+          job-status: ${{ job.status }}
+          name: readonly-bootstrap-reproduction-recovery-35779391870
+          path: ${{ env.FCP_BOOTSTRAP_RECOVERY_OUT }}
