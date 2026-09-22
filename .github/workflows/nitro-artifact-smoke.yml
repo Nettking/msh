@@ -1,76 +1,163 @@
-name: Nitro artifact transport smoke
-on:
-  workflow_dispatch:
-  push:
-    branches: [codex/nitro-artifact-archive]
-    paths:
-      - .github/workflows/nitro-artifact-smoke.yml
-      - .github/actions/nitro-artifact/**
-      - scripts/artifact_archive*.py
-      - scripts/tests/test_artifact_archive.py
+name: One original Phase2 Linux context with post-test retention
+'on':
+  workflow_dispatch: null
 permissions:
   contents: read
-  actions: read # Native job identity for evidence provenance only.
+  actions: read
+concurrency:
+  group: catchup-original-context-3a908fd1
+  cancel-in-progress: false
 jobs:
-  transport:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [Linux, Windows]
-        # Branch pushes exercise the currently authorized Beast scope only.
-        # Manual verification keeps both families in the required coverage.
-        family: ${{ fromJSON(github.event_name == 'push' && '["beast"]' || '["nettking", "beast"]') }}
-        include:
-          - os: Linux
-            shell: bash
-            python: /opt/fcp-ci/python/3.12.13/bin/python3.12
-          - os: Windows
-            shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
-            python: python
+  linux:
     runs-on:
-      - self-hosted
-      - ${{ matrix.family == 'beast' && (matrix.os == 'Linux' && 'beast-linux' || 'beast-windows') || (matrix.os == 'Linux' && 'nettking-linux' || 'nettking') }}
-    timeout-minutes: 5
-    defaults:
-      run:
-        shell: ${{ matrix.shell }}
+    - self-hosted
+    - Linux
+    - beast-linux
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - name: Focused archive contract tests
-        run: ${{ matrix.python }} -B -m unittest scripts.tests.test_artifact_archive -v
-      - name: Verify restricted SSH independently of local spool capacity
-        uses: ./.github/actions/nitro-artifact
-        with:
-          operation: probe
-          path: ${{ runner.temp }}
-          matrix: ${{ toJSON(matrix) }}
-          job-status: ${{ job.status }}
-          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
-          host: ${{ vars.NITRO_ARTIFACT_HOST }}
-          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
-      - name: Create tiny synthetic evidence
-        run: ${{ matrix.python }} -B -c "from pathlib import Path; import os; p=Path(os.environ['RUNNER_TEMP'])/'archive-smoke.txt'; p.write_text('Synthetic archive transport test only\n')"
-      - uses: ./.github/actions/nitro-artifact
-        with:
-          operation: upload
-          name: archive-smoke-${{ matrix.os }}-${{ matrix.family }}
-          path: ${{ runner.temp }}/archive-smoke.txt
-          matrix: ${{ toJSON(matrix) }}
-          job-status: ${{ job.status }}
-          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
-          host: ${{ vars.NITRO_ARTIFACT_HOST }}
-          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
-      - uses: ./.github/actions/nitro-artifact
-        with:
-          operation: download
-          pattern: archive-smoke-${{ matrix.os }}-${{ matrix.family }}
-          path: ${{ runner.temp }}/archive-smoke-get-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}-${{ matrix.family }}
-          matrix: ${{ toJSON(matrix) }}
-          job-status: ${{ job.status }}
-          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
-          host: ${{ vars.NITRO_ARTIFACT_HOST }}
-          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
-      - name: Verify retrieved content
-        env:
-          DOWNLOAD: ${{ runner.temp }}/archive-smoke-get-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}-${{ matrix.family }}/archive-smoke-${{ matrix.os }}-${{ matrix.family }}/archive-smoke.txt
-        run: ${{ matrix.python }} -B -c "from pathlib import Path; import os; assert Path(os.environ['DOWNLOAD']).read_bytes()==(Path(os.environ['RUNNER_TEMP'])/'archive-smoke.txt').read_bytes()"
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Preserve diagnostic helpers outside exact product checkout
+      run: 'mkdir -p "$RUNNER_TEMP/catchup-context-$GITHUB_RUN_ID"
+
+        cp scripts/retain_catchup_postprocess.py scripts/catchup-original-constraints.txt "$RUNNER_TEMP/catchup-context-$GITHUB_RUN_ID/"
+
+        git diff 3a908fd1d9503057f3520d8f2dbbf62401a6e6d3 HEAD > "$RUNNER_TEMP/catchup-context-$GITHUB_RUN_ID/diagnostic.patch"
+
+        echo "CATCHUP_EVIDENCE=$RUNNER_TEMP/catchup-context-$GITHUB_RUN_ID" >> "$GITHUB_ENV"
+
+        echo "PIP_CONSTRAINT=$RUNNER_TEMP/catchup-context-$GITHUB_RUN_ID/catchup-original-constraints.txt" >> "$GITHUB_ENV"'
+    - uses: actions/checkout@v4
+      with:
+        ref: 3a908fd1d9503057f3520d8f2dbbf62401a6e6d3
+        fetch-depth: 0
+    - name: Start disposable PostgreSQL 16
+      uses: ./.github/actions/self-hosted-postgres
+    - uses: ./.github/actions/self-hosted-python
+      with:
+        python-version: '3.12'
+    - uses: actions/setup-go@v5
+      with:
+        go-version-file: cmd/fcp-peer-sidecar/go.mod
+        cache: false
+    - name: Install dependencies
+      run: 'python -m pip install --upgrade pip
+
+        python -m pip install -r requirements.txt -c constraints-phase2.txt
+
+        python -m pip install pytest ruff
+
+
+        python -m pip freeze > "$CATCHUP_EVIDENCE/dependencies.txt"
+
+        python --version
+
+        go version
+
+        git rev-parse HEAD
+
+        git status --porcelain
+
+        '
+    - name: Go direct peer sidecar
+      working-directory: cmd/fcp-peer-sidecar
+      run: 'go mod tidy
+
+        echo BEGIN_GO_MOD
+
+        cat go.mod
+
+        echo END_GO_MOD
+
+        echo BEGIN_GO_SUM
+
+        cat go.sum
+
+        echo END_GO_SUM
+
+        go test ./...
+
+        mkdir -p ../../build
+
+        go build -trimpath -o ../../build/fcp-peer-sidecar .
+
+        '
+    - name: Capture Go module lock
+      if: always()
+      uses: ./.github/actions/nitro-artifact
+      with:
+        operation: upload
+        ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
+        host: ${{ vars.NITRO_ARTIFACT_HOST }}
+        known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
+        matrix: ${{ toJSON(matrix) }}
+        job-status: ${{ job.status }}
+        name: f62-go-module-lock
+        path: 'cmd/fcp-peer-sidecar/go.mod
+
+          cmd/fcp-peer-sidecar/go.sum
+
+          '
+    - name: Ubuntu storage precondition
+      uses: ./.github/actions/ubuntu-storage-precondition
+    - name: Compile
+      run: python -m compileall catalog setup_fcp.py
+    - name: Phase 0 and 1 regressions
+      run: python -m pytest -o addopts= -q catalog/federation/tests/test_phase0.py catalog/federation/tests/test_phase1.py
+    - name: Phase D and E storage tests
+      run: python -m pytest -o addopts= -q catalog/federation/tests/test_storage_protocol.py catalog/federation/tests/test_local_storage.py
+        catalog/federation/tests/test_phase_d2_postgres.py catalog/federation/tests/test_phase_d3_control_plane.py catalog/federation/tests/test_phase_d4_write_authority.py
+        catalog/federation/tests/test_phase_d5_logical_storage.py catalog/federation/tests/test_phase_d6_replication.py catalog/federation/tests/test_phase_d7_d8_ack_handover.py
+        catalog/federation/tests/test_phase_e0_contracts.py catalog/federation/tests/test_phase_e1_manifest_store.py catalog/federation/tests/test_phase_e1_service_manifest.py
+        catalog/federation/tests/test_phase_e2_watermarks.py catalog/federation/tests/test_phase_e3_reports.py catalog/federation/tests/test_phase_e4_selection.py
+        catalog/federation/tests/test_phase_e5_degraded_state.py catalog/federation/tests/test_phase_e6_promotion_transaction.py
+        catalog/federation/tests/test_phase_e63_provider_fencing.py catalog/federation/tests/test_phase_e64_authority_grant.py
+        catalog/federation/tests/test_phase_e65_finalization.py catalog/federation/tests/test_phase_e66_recovery.py catalog/federation/tests/test_phase_e67_coordinator_publication.py
+        catalog/federation/tests/test_phase_e71_former_primary_recovery.py catalog/federation/tests/test_phase_e72_former_primary_transfer.py
+        catalog/federation/tests/test_phase_e78_former_primary_completion.py
+    - name: Phase 2 unit and integration tests
+      run: 'start=$(date +%s)
+
+        set +e
+
+        python -m pytest -o addopts= -q catalog/federation/tests/test_phase2_unit.py catalog/node/tests catalog/relay/tests
+
+        result=$?
+
+        python -B "$CATCHUP_EVIDENCE/retain_catchup_postprocess.py" "$start" "$result"
+
+        retention=$?
+
+        if [ "$result" -ne 0 ]; then exit "$result"; fi
+
+        exit "$retention"
+
+        '
+    - name: Archive post-test database and record before cleanup
+      if: always()
+      uses: ./.github/actions/nitro-artifact
+      with:
+        operation: upload
+        ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
+        host: ${{ vars.NITRO_ARTIFACT_HOST }}
+        known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
+        job-status: ${{ job.status }}
+        name: catchup-original-context
+        path: ${{ runner.temp }}/catchup-context-${{ github.run_id }}
+    - name: Ruff federation code
+      run: python -m ruff check catalog/federation catalog/node catalog/relay --ignore I001,RUF022,B008,C408,PLC0206
+    - name: Compose validation
+      run: 'docker compose config --quiet
+
+        docker compose --profile relay-dev config --quiet
+
+        '
+    - name: Diff hygiene
+      run: git diff --check origin/${{ github.base_ref || 'main' }}...HEAD
+    - name: Remove disposable PostgreSQL 16
+      if: always()
+      uses: ./.github/actions/self-hosted-postgres
+      with:
+        operation: stop
+    if: github.repository == 'Nettking/msh' && github.actor == 'Nettking' && github.event_name == 'workflow_dispatch'
