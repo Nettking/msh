@@ -1,76 +1,162 @@
-name: Nitro artifact transport smoke
+# DRAFT ONLY. Review before committing/dispatching. No execution is authorized by
+# this file. Install only at .github/workflows/nitro-artifact-smoke.yml on the
+# isolated branch below; its direct parent must be the fixed product commit.
+# The only other changed tracked path may be scripts/ci_icse_reconnect_diagnostic.py.
+# Concurrency prevents overlap, not repeated dispatch. The coordinator must verify
+# that no equivalent run exists and authorize at most one initial dispatch.
+name: Observe one ICSE successor reconnect on Beast
+
 on:
   workflow_dispatch:
-  push:
-    branches: [codex/nitro-artifact-archive]
-    paths:
-      - .github/workflows/nitro-artifact-smoke.yml
-      - .github/actions/nitro-artifact/**
-      - scripts/artifact_archive*.py
-      - scripts/tests/test_artifact_archive.py
+
 permissions:
   contents: read
-  actions: read # Native job identity for evidence provenance only.
+  actions: read # Existing Nitro action's native job provenance only.
+
+concurrency:
+  group: icse-reconnect-observation-106760391543
+  cancel-in-progress: false
+
 jobs:
-  transport:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [Linux, Windows]
-        # Branch pushes exercise the currently authorized Beast scope only.
-        # Manual verification keeps both families in the required coverage.
-        family: ${{ fromJSON(github.event_name == 'push' && '["beast"]' || '["nettking", "beast"]') }}
-        include:
-          - os: Linux
-            shell: bash
-            python: /opt/fcp-ci/python/3.12.13/bin/python3.12
-          - os: Windows
-            shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
-            python: python
-    runs-on:
-      - self-hosted
-      - ${{ matrix.family == 'beast' && (matrix.os == 'Linux' && 'beast-linux' || 'beast-windows') || (matrix.os == 'Linux' && 'nettking-linux' || 'nettking') }}
-    timeout-minutes: 5
+  observe-windows-reconnect:
+    if: >-
+      github.repository == 'Nettking/msh' &&
+      github.actor == 'Nettking' &&
+      github.triggering_actor == 'Nettking' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.run_attempt == 1 &&
+      github.ref == 'refs/heads/codex/icse-reconnect-observation-106760391543'
+    runs-on: [self-hosted, Windows, beast-windows]
+    timeout-minutes: 30 # Exactly the original reviewer-entrypoint job limit.
     defaults:
       run:
-        shell: ${{ matrix.shell }}
+        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+    env:
+      FCP_ICSE_PRODUCT_SHA: 5d5d7e8f215717cf9b7012d3b357eaf03a1400c9
+
     steps:
-      - uses: actions/checkout@v4
-      - name: Focused archive contract tests
-        run: ${{ matrix.python }} -B -m unittest scripts.tests.test_artifact_archive -v
-      - name: Verify restricted SSH independently of local spool capacity
+      - name: Enforce first attempt and original physical runner
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:GITHUB_RUN_ATTEMPT -ne '1') { throw 'Only attempt 1 is authorized; do not rerun this workflow.' }
+          if ($env:RUNNER_NAME -ne 'Beast' -or $env:RUNNER_OS -ne 'Windows') { throw 'This diagnostic is restricted to the original Beast Windows runner.' }
+
+      - name: Check out isolated diagnostic workflow and helper
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Check out unchanged product and tests separately
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 5d5d7e8f215717cf9b7012d3b357eaf03a1400c9
+          path: product
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: ./product/.github/actions/self-hosted-python
+        with:
+          python-version: '3.12'
+
+      # Keep the original dependency commands and their order. The helper records
+      # installed versions for comparison with native job 106760391543; no claim
+      # of dependency equivalence is allowed without that comparison.
+      - name: Install runtime dependencies
+        working-directory: product
+        run: |
+          python -m pip install --upgrade pip
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m pip install ruff
+          exit $LASTEXITCODE
+
+      - name: Prepare exclusive observation and record separate source identities
+        id: prepare
+        env:
+          FCP_ICSE_DIAGNOSTIC_SHA: ${{ github.sha }}
+        run: |
+          python -I -B scripts/ci_icse_reconnect_diagnostic.py prepare --product-root "${{ github.workspace }}/product" --output-root "${{ runner.temp }}/fcp-icse-reconnect-${{ github.run_id }}-${{ github.run_attempt }}-Windows"
+          exit $LASTEXITCODE
+
+      - name: Compile reviewer artifact
+        working-directory: product
+        run: python -m compileall -q demo/icse
+
+      - name: Lint reviewer artifact
+        working-directory: product
+        run: python -m ruff check demo/icse
+
+      - name: Run E1-E4 directly
+        id: components
+        working-directory: product
+        env:
+          FCP_BUILD_COMMIT: 5d5d7e8f215717cf9b7012d3b357eaf03a1400c9
+        run: >-
+          python -m demo.icse.run
+          --output "${{ runner.temp }}/fcp-icse-components-${{ github.run_id }}-${{ github.run_attempt }}-Windows/icse-summary.json"
+
+      # Keep the archive operation before network execution as in the original
+      # job. It executes from the diagnostic checkout: archive tested_sha denotes
+      # the diagnostic commit, while the summary's product SHA remains fixed 5d5d.
+      - name: Preserve component evidence on Nitro
+        if: ${{ always() && steps.prepare.outcome == 'success' && (steps.components.outcome == 'success' || steps.components.outcome == 'failure') }}
         uses: ./.github/actions/nitro-artifact
         with:
-          operation: probe
-          path: ${{ runner.temp }}
-          matrix: ${{ toJSON(matrix) }}
-          job-status: ${{ job.status }}
+          operation: upload
           ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
           host: ${{ vars.NITRO_ARTIFACT_HOST }}
           known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
-      - name: Create tiny synthetic evidence
-        run: ${{ matrix.python }} -B -c "from pathlib import Path; import os; p=Path(os.environ['RUNNER_TEMP'])/'archive-smoke.txt'; p.write_text('Synthetic archive transport test only\n')"
-      - uses: ./.github/actions/nitro-artifact
+          matrix: 'null'
+          job-status: ${{ job.status }}
+          name: diagnostic-icse-components-Windows
+          path: ${{ runner.temp }}/fcp-icse-components-${{ github.run_id }}-${{ github.run_attempt }}-Windows/icse-summary.json
+
+      # The original command, product code, assertions and all protocol/request
+      # deadlines remain unchanged. Only this step receives the separately
+      # identified sitecustomize observer. No private-state directory is uploaded.
+      - name: Run independent-node network demonstration with bounded observation
+        id: network_demo
+        # Diagnostic-only gating: a preceding archive transport failure must not
+        # suppress the single authorized observation after real components PASS.
+        # The ordinary ICSE workflow and all product execution gates are unchanged.
+        if: ${{ always() && steps.prepare.outcome == 'success' && steps.components.outcome == 'success' }}
+        working-directory: product
+        env:
+          PYTHONPATH: ${{ runner.temp }}/fcp-icse-reconnect-${{ github.run_id }}-${{ github.run_attempt }}-Windows/observer
+          FCP_ICSE_DIAGNOSTIC_ROOT: ${{ runner.temp }}/fcp-icse-reconnect-${{ github.run_id }}-${{ github.run_attempt }}-Windows
+          FCP_ICSE_PRODUCT_ROOT: ${{ github.workspace }}/product
+          FCP_ICSE_DIAGNOSTIC_SHA: ${{ github.sha }}
+        run: >-
+          python -B -m demo.icse.network.run
+          --source-sha "5d5d7e8f215717cf9b7012d3b357eaf03a1400c9"
+          --output "${{ runner.temp }}/fcp-icse-reconnect-${{ github.run_id }}-${{ github.run_attempt }}-Windows/network"
+
+      - name: Collect sanitized observation and unchanged public network reports
+        id: collect
+        if: ${{ always() && steps.prepare.outcome == 'success' }}
+        env:
+          FCP_ICSE_DIAGNOSTIC_SHA: ${{ github.sha }}
+          FCP_ICSE_NETWORK_OUTCOME: ${{ steps.network_demo.outcome }}
+          FCP_ICSE_COMPONENTS_OUTCOME: ${{ steps.components.outcome }}
+        run: |
+          python -I -B scripts/ci_icse_reconnect_diagnostic.py collect --product-root "${{ github.workspace }}/product" --output-root "${{ runner.temp }}/fcp-icse-reconnect-${{ github.run_id }}-${{ github.run_attempt }}-Windows"
+          exit $LASTEXITCODE
+
+      - name: Preserve only sanitized diagnostic evidence on Nitro
+        if: ${{ always() && steps.prepare.outcome == 'success' && (steps.collect.outcome == 'success' || steps.collect.outcome == 'failure') }}
+        uses: ./.github/actions/nitro-artifact
         with:
           operation: upload
-          name: archive-smoke-${{ matrix.os }}-${{ matrix.family }}
-          path: ${{ runner.temp }}/archive-smoke.txt
-          matrix: ${{ toJSON(matrix) }}
-          job-status: ${{ job.status }}
           ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
           host: ${{ vars.NITRO_ARTIFACT_HOST }}
           known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
-      - uses: ./.github/actions/nitro-artifact
-        with:
-          operation: download
-          pattern: archive-smoke-${{ matrix.os }}-${{ matrix.family }}
-          path: ${{ runner.temp }}/archive-smoke-get-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}-${{ matrix.family }}
-          matrix: ${{ toJSON(matrix) }}
+          matrix: 'null'
           job-status: ${{ job.status }}
-          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
-          host: ${{ vars.NITRO_ARTIFACT_HOST }}
-          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
-      - name: Verify retrieved content
-        env:
-          DOWNLOAD: ${{ runner.temp }}/archive-smoke-get-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}-${{ matrix.family }}/archive-smoke-${{ matrix.os }}-${{ matrix.family }}/archive-smoke.txt
-        run: ${{ matrix.python }} -B -c "from pathlib import Path; import os; assert Path(os.environ['DOWNLOAD']).read_bytes()==(Path(os.environ['RUNNER_TEMP'])/'archive-smoke.txt').read_bytes()"
+          name: diagnostic-icse-reconnect-Windows
+          path: ${{ runner.temp }}/fcp-icse-reconnect-${{ github.run_id }}-${{ github.run_attempt }}-Windows/retained/
+
+      # There is deliberately no publication-bundle, release verdict, workflow
+      # rerun, alternate-host retry, runtime intervention or evidence cleanup.
