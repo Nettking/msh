@@ -42,20 +42,33 @@ concurrency:
 
 jobs:
   inspection:
+    name: inspection (${{ matrix.os }})
+    if: >-
+      github.repository == 'Nettking/msh' &&
+      (github.event_name != 'pull_request' ||
+       github.event.pull_request.head.repo.full_name == 'Nettking/msh')
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+        include:
+          - os: Linux
+            runner: fcp-linux-fast
+            shell: bash
+          - os: Windows
+            runner: fcp-test-windows
+            shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+    runs-on: [self-hosted, "${{ matrix.os }}", X64, "${{ matrix.runner }}"]
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: ./.github/actions/self-hosted-python
         with:
           python-version: "3.12"
-          cache: "" # No external Actions cache; local pip cache remains available.
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip

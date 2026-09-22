@@ -33,12 +33,27 @@ ALLOWED_REPOSITORY_FILES = frozenset(
 )
 
 # These exact strings identify an existing physical host, a hostile-path
-# redaction fixture, or frozen cryptographic domain separators. They are not
+# redaction fixture, frozen cryptographic domain separators, or repository
+# comparisons that protect self-hosted runners. They are not
 # product branding. Renaming the host would rewrite acceptance provenance;
 # changing a domain separator would break protocol/credential compatibility.
 # Keep each exception scoped to its existing file and reject surrounding or
 # additional retired product spellings normally.
+_TRUSTED_REPOSITORY_GUARD_LITERALS = (
+    "github.repository == '" + REPOSITORY_SLUG + "'",
+    "github.event.pull_request.head.repo.full_name == '" + REPOSITORY_SLUG + "'",
+)
 ALLOWED_NON_PRODUCT_LITERALS = {
+    ".github/workflows/cfi3-device-inspection-composition.yml": (
+        _TRUSTED_REPOSITORY_GUARD_LITERALS
+    ),
+    ".github/workflows/cfi4-benchmark-composition.yml": (
+        _TRUSTED_REPOSITORY_GUARD_LITERALS
+    ),
+    ".github/workflows/cfi5-contribution-composition.yml": (
+        _TRUSTED_REPOSITORY_GUARD_LITERALS
+    ),
+    ".github/workflows/docs-portal.yml": _TRUSTED_REPOSITORY_GUARD_LITERALS,
     "catalog/federation/control_plane_credentials.py": (
         LEGACY.upper() + " FCP Federation v1 private human credential replica",
     ),

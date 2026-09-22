@@ -46,7 +46,7 @@ from .capability_onboarding_service import (
 
 _SERVICE_EXTENSION_KEY = "capability_benchmark_service"
 _MAX_IDENTIFIER_BYTES = 512
-_SKIPPABLE_REVIEW_STATES = frozenset({"pending", "expired", "stale"})
+_SKIPPABLE_REVIEW_STATES = frozenset({"pending", "expired", "stale", "blocked"})
 
 
 def _utc_now() -> datetime:
@@ -638,7 +638,7 @@ class CapabilityBenchmarkService:
     def skip_all(self) -> int:
         device_id, snapshot = self._authorized_snapshot(require_current=True)
         with self._lock:
-            plan = tuple(item for item in self.plan(snapshot) if item.runnable)
+            plan = self.plan(snapshot)
             latest = self._latest_results(
                 self.list_results(),
                 device_id=device_id,
@@ -767,9 +767,19 @@ class CapabilityBenchmarkService:
         action_label = "Run check"
 
         if not item.runnable:
-            state = "blocked"
-            state_label = "Inspect again"
-            summary = item.unavailable_reason or "The benchmark target is unavailable."
+            # An explicit revision-bound skip reviews availability only. The
+            # target stays non-runnable and gains no benchmark result/authority.
+            if skipped:
+                state = "skipped"
+                state_label = "Skipped"
+                summary = (
+                    "This unavailable optional benchmark was skipped. "
+                    "No contribution was enabled."
+                )
+            else:
+                state = "blocked"
+                state_label = "Inspect again"
+                summary = item.unavailable_reason or "The benchmark target is unavailable."
         elif result is not None:
             validity = evaluate_result(
                 result,
