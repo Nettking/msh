@@ -320,14 +320,17 @@ class PhysicalReadyReplicatedFederationRuntime(
 
     def _lifecycle_loop(self) -> None:
         while not self._stop.wait(self.heartbeat_seconds):
-            try:
-                self._lifecycle_round()
-                self._last_error = None
-            except Exception as exc:  # noqa: BLE001 - bounded fail-closed driver
-                self._last_error = type(exc).__name__
-                if self.node.role == ReplicaNode.LEADER:
-                    self.node.force_follower()
-                self._next_election_at = self._election_deadline()
+            # A failed round must relinquish its authority before a subsequent
+            # explicit bootstrap can acquire new leadership under this lock.
+            with self._lifecycle_lock:
+                try:
+                    self._lifecycle_round()
+                    self._last_error = None
+                except Exception as exc:  # noqa: BLE001 - bounded fail-closed driver
+                    self._last_error = type(exc).__name__
+                    if self.node.role == ReplicaNode.LEADER:
+                        self.node.force_follower()
+                    self._next_election_at = self._election_deadline()
 
     def _lifecycle_round(self) -> None:
         with self._lifecycle_lock:
