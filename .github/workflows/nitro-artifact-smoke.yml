@@ -1,76 +1,74 @@
-name: Nitro artifact transport smoke
+name: One-shot original Beast bootstrap observation
 on:
-  workflow_dispatch:
   push:
-    branches: [codex/nitro-artifact-archive]
+    branches: [codex/bootstrap-beast-reproduction]
     paths:
       - .github/workflows/nitro-artifact-smoke.yml
-      - .github/actions/nitro-artifact/**
-      - scripts/artifact_archive*.py
-      - scripts/tests/test_artifact_archive.py
+      - scripts/ci_bootstrap_beast_reproduction.py
 permissions:
   contents: read
-  actions: read # Native job identity for evidence provenance only.
+  actions: read
+concurrency:
+  group: bootstrap-beast-reproduction-11238-once
+  cancel-in-progress: false
 jobs:
-  transport:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [Linux, Windows]
-        # Branch pushes exercise the currently authorized Beast scope only.
-        # Manual verification keeps both families in the required coverage.
-        family: ${{ fromJSON(github.event_name == 'push' && '["beast"]' || '["nettking", "beast"]') }}
-        include:
-          - os: Linux
-            shell: bash
-            python: /opt/fcp-ci/python/3.12.13/bin/python3.12
-          - os: Windows
-            shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
-            python: python
-    runs-on:
-      - self-hosted
-      - ${{ matrix.family == 'beast' && (matrix.os == 'Linux' && 'beast-linux' || 'beast-windows') || (matrix.os == 'Linux' && 'nettking-linux' || 'nettking') }}
-    timeout-minutes: 5
+  observe:
+    name: Observe original Beast journal stage once
+    if: >-
+      github.repository == 'Nettking/msh' && github.actor == 'Nettking' &&
+      github.triggering_actor == 'Nettking' && github.event_name == 'push' &&
+      github.ref == 'refs/heads/codex/bootstrap-beast-reproduction' && github.run_attempt == 1
+    runs-on: [self-hosted, beast-windows, fcp-test-windows]
+    timeout-minutes: 30
     defaults:
       run:
-        shell: ${{ matrix.shell }}
+        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
     steps:
       - uses: actions/checkout@v4
-      - name: Focused archive contract tests
-        run: ${{ matrix.python }} -B -m unittest scripts.tests.test_artifact_archive -v
-      - name: Verify restricted SSH independently of local spool capacity
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Guard one execution and prepare separate exact-C product checkout
+        id: prepare
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python -B scripts/ci_bootstrap_beast_reproduction.py prepare
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: ./.github/actions/self-hosted-python
+        with:
+          python-version: 3.12.10
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: cmd/fcp-peer-sidecar/go.mod
+          cache: false
+      - name: Install release dependencies
+        working-directory: ${{ env.FCP_BOOTSTRAP_PRODUCT }}
+        run: |
+          python -m pip install --upgrade pip==26.2.1
+          python -m pip install -r requirements.txt -c constraints-release.txt
+          python -m pip install pytest==9.1.1 ruff==0.16.3 -c constraints-release.txt
+      - name: Original Windows journal stage with target-only external observation
+        env:
+          TEMP: C:/fcp-qtmp
+          TMP: C:/fcp-qtmp
+        run: |
+          python -B scripts/ci_bootstrap_beast_reproduction.py run
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Collect research result without qualification
+        if: ${{ always() && steps.prepare.outcome == 'success' }}
+        run: |
+          python -B scripts/ci_bootstrap_beast_reproduction.py collect
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Preserve public research evidence on Nitro
+        if: ${{ always() && steps.prepare.outcome == 'success' }}
         uses: ./.github/actions/nitro-artifact
         with:
-          operation: probe
-          path: ${{ runner.temp }}
-          matrix: ${{ toJSON(matrix) }}
-          job-status: ${{ job.status }}
-          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
-          host: ${{ vars.NITRO_ARTIFACT_HOST }}
-          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
-      - name: Create tiny synthetic evidence
-        run: ${{ matrix.python }} -B -c "from pathlib import Path; import os; p=Path(os.environ['RUNNER_TEMP'])/'archive-smoke.txt'; p.write_text('Synthetic archive transport test only\n')"
-      - uses: ./.github/actions/nitro-artifact
-        with:
           operation: upload
-          name: archive-smoke-${{ matrix.os }}-${{ matrix.family }}
-          path: ${{ runner.temp }}/archive-smoke.txt
-          matrix: ${{ toJSON(matrix) }}
-          job-status: ${{ job.status }}
           ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
           host: ${{ vars.NITRO_ARTIFACT_HOST }}
           known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
-      - uses: ./.github/actions/nitro-artifact
-        with:
-          operation: download
-          pattern: archive-smoke-${{ matrix.os }}-${{ matrix.family }}
-          path: ${{ runner.temp }}/archive-smoke-get-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}-${{ matrix.family }}
-          matrix: ${{ toJSON(matrix) }}
+          matrix: '{"suite":"journal-artifacts","purpose":"bootstrap-research"}'
           job-status: ${{ job.status }}
-          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
-          host: ${{ vars.NITRO_ARTIFACT_HOST }}
-          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
-      - name: Verify retrieved content
-        env:
-          DOWNLOAD: ${{ runner.temp }}/archive-smoke-get-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}-${{ matrix.family }}/archive-smoke-${{ matrix.os }}-${{ matrix.family }}/archive-smoke.txt
-        run: ${{ matrix.python }} -B -c "from pathlib import Path; import os; assert Path(os.environ['DOWNLOAD']).read_bytes()==(Path(os.environ['RUNNER_TEMP'])/'archive-smoke.txt').read_bytes()"
+          name: diagnostic-bootstrap-beast-journal-artifacts
+          path: ${{ env.FCP_BOOTSTRAP_RETAINED }}
