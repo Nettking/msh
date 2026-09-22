@@ -60,6 +60,14 @@ CFI-4 adds one local `benchmark_skip_decision` table keyed by:
 
 Skip decisions are onboarding progress only. They are not synthetic benchmark results, contribution intent, policy decisions, provider activation, membership state, storage assignment, job ownership, grants, leases, terms, or fencing.
 
+The explicit optional-skip action also covers a recommended check whose inspected
+target is unavailable. Until that action, the card remains blocked and review is
+incomplete. Afterward it displays the revision-bound skip while retaining the
+unavailability diagnostic and a disabled run action. This lets an unavailable
+optional capability be reviewed without inventing benchmark evidence or blocking
+review of a different capability with a valid result. Current inspection and
+membership checks still apply; running and completed checks are not overwritten.
+
 A successful explicit run clears the matching skip decision. A new inspection revision naturally invalidates previous skip progress because the key includes the inspection revision.
 
 ## Validity and rerun behavior
