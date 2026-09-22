@@ -94,6 +94,17 @@ class RunOnceCapabilityBenchmarkService(CapabilityBenchmarkService):
         active: bool,
         inspection_current: bool,
     ) -> dict[str, object]:
+        if not item.runnable:
+            # Availability review is shared; runnable evidence below keeps the
+            # run-once policy rather than the base service's temporal expiry.
+            return super()._card_model(
+                item=item,
+                result=result,
+                skipped=skipped,
+                active=active,
+                inspection_current=inspection_current,
+            )
+
         state = "pending"
         state_label = "Ready"
         summary = "This bounded local check has not been run."
@@ -102,11 +113,7 @@ class RunOnceCapabilityBenchmarkService(CapabilityBenchmarkService):
         expires_label = None
         action_label = "Run check"
 
-        if not item.runnable:
-            state = "blocked"
-            state_label = "Inspect again"
-            summary = item.unavailable_reason or "The benchmark target is unavailable."
-        elif result is not None:
+        if result is not None:
             validity = evaluate_run_once_result(
                 result,
                 item.definition,

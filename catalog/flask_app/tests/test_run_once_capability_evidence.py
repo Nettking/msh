@@ -4,6 +4,8 @@ from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import pytest
+
 from catalog.capabilities.benchmarking import (
     BenchmarkValidityReason,
     evaluate_result,
@@ -142,11 +144,24 @@ def test_run_once_inspection_treats_legacy_expiry_as_persisted_evidence(
     assert service.state(_expired_snapshot()) == "current"
 
 
+@pytest.mark.parametrize("state", [BenchmarkState.PASSED, BenchmarkState.FAILED])
+@pytest.mark.parametrize("skipped", [False, True])
 def test_run_once_benchmark_card_requires_rerun_only_when_inputs_change(
     tmp_path: Path,
+    state: BenchmarkState,
+    skipped: bool,
 ) -> None:
     definition = _definition()
-    result = _expired_result(definition)
+    result = replace(
+        _expired_result(definition),
+        state=state,
+        recommendation=(
+            BenchmarkRecommendation.USABLE
+            if state is BenchmarkState.PASSED
+            else BenchmarkRecommendation.NOT_RECOMMENDED
+        ),
+        diagnostics=("Original saved diagnostic",),
+    )
     service = RunOnceCapabilityBenchmarkService(
         onboarding_service=object(),
         inspection_service=object(),
@@ -169,20 +184,24 @@ def test_run_once_benchmark_card_requires_rerun_only_when_inputs_change(
     reused_card = service._card_model(
         item=unchanged,
         result=result,
-        skipped=False,
+        skipped=skipped,
         active=False,
         inspection_current=True,
     )
     stale_card = service._card_model(
         item=changed,
         result=result,
-        skipped=False,
+        skipped=skipped,
         active=False,
         inspection_current=True,
     )
 
-    assert reused_card["state"] == "passed"
-    assert reused_card["state_label"] == "Usable"
+    assert reused_card["state"] == state.value
+    assert reused_card["state_label"] == (
+        "Usable" if state is BenchmarkState.PASSED else "Not recommended"
+    )
+    assert reused_card["diagnostic"] == "Original saved diagnostic"
+    assert reused_card["metrics"] == [{"label": "Latency Ms", "value": "42"}]
     assert reused_card["action_label"] == "Run again"
     assert str(reused_card["expires_label"]).startswith("Saved evidence · collected")
     assert stale_card["state"] == "stale"

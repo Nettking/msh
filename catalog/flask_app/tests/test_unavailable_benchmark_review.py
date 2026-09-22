@@ -24,8 +24,14 @@ from catalog.capabilities.contributions import (
 )
 from catalog.federation.errors import FederationOperationError
 from catalog.federation.onboarding_models import BenchmarkState
+from catalog.flask_app.app import create_app
 from catalog.flask_app.services.capability_contribution_service import (
     CapabilityContributionService,
+)
+from catalog.flask_app.services.run_once_capability_evidence import (
+    RunOnceCapabilityBenchmarkService,
+    RunOnceCapabilityContributionService,
+    RunOnceCapabilityInspectionService,
 )
 from catalog.flask_app.tests.test_capability_benchmark_route import (
     NOW,
@@ -40,7 +46,9 @@ STORAGE_ID = "local-storage-candidate"
 UNAVAILABLE_KEY = (OLLAMA_BENCHMARK_ID, "unavailable-target")
 
 
-def _harness(tmp_path: Path, *, benchmark_state: Path | None = None):
+def _harness(
+    tmp_path: Path, *, benchmark_state: Path | None = None, installed: bool = False
+):
     """Real adapters and local storage I/O; Ollama never touches the network."""
     current = [NOW]
 
@@ -93,43 +101,73 @@ def _harness(tmp_path: Path, *, benchmark_state: Path | None = None):
         )
     )
     onboarding = _onboarding_service(tmp_path, clock=clock)
-    inspection = _inspection_service(
-        tmp_path, onboarding, adapters=(ollama, storage), clock=clock
+    sources = (
+        StorageCandidateSource(
+            {
+                STORAGE_ID: StorageCandidateSpec(
+                    provider_id=STORAGE_ID,
+                    protocol="fcp-storage-v1",
+                    display_label="Local storage candidate",
+                    capacity_envelope={"capacity_band": "small"},
+                )
+            }
+        ),
     )
-    benchmarks = _benchmark_service(
-        benchmark_state or tmp_path, onboarding, inspection, clock=clock
-    )
-    contributions = CapabilityContributionService(
-        onboarding_service=onboarding,
-        inspection_service=inspection,
-        benchmark_service=benchmarks,
-        state_database=tmp_path / "onboarding.sqlite3",
-        sources=(
-            StorageCandidateSource(
-                {
-                    STORAGE_ID: StorageCandidateSpec(
-                        provider_id=STORAGE_ID,
-                        protocol="fcp-storage-v1",
-                        display_label="Local storage candidate",
-                        capacity_envelope={"capacity_band": "small"},
-                    )
-                }
+    adapters = (
+        StorageContributionAdapter(
+            is_assigned=lambda provider_id: (
+                authority_calls.append(("is_assigned", provider_id)) or False
+            ),
+            fence_candidate=lambda provider_id: authority_calls.append(
+                ("fence", provider_id)
             ),
         ),
-        adapters=(
-            StorageContributionAdapter(
-                is_assigned=lambda provider_id: (
-                    authority_calls.append(("is_assigned", provider_id)) or False
-                ),
-                fence_candidate=lambda provider_id: authority_calls.append(
-                    ("fence", provider_id)
-                ),
-            ),
-        ),
-        clock=clock,
     )
-    app = _app(onboarding, inspection, benchmarks)
-    app.config["CAPABILITY_CONTRIBUTION_SERVICE"] = contributions
+    if installed:
+        app = create_app()
+        app.config.update(
+            TESTING=True,
+            CAPABILITY_ONBOARDING_SERVICE=onboarding,
+            CAPABILITY_ONBOARDING_STATE_DATABASE=tmp_path / "onboarding.sqlite3",
+            CAPABILITY_ONBOARDING_BENCHMARK_DATABASE=(benchmark_state or tmp_path)
+            / "onboarding.sqlite3",
+            CAPABILITY_ONBOARDING_CONTRIBUTION_DATABASE=tmp_path / "onboarding.sqlite3",
+            CAPABILITY_ONBOARDING_INSPECTION_ADAPTERS=(ollama, storage),
+            CAPABILITY_ONBOARDING_SYSTEM_OBSERVER=lambda: {
+                "cpu": {"logical_cores_band": "8-15"},
+                "memory": {"capacity_band": "16-31-gib"},
+            },
+            CAPABILITY_ONBOARDING_CONTRIBUTION_SOURCES=sources,
+            CAPABILITY_ONBOARDING_CONTRIBUTION_ADAPTERS=adapters,
+        )
+        # Exercise the factory's normal lazy installer, never inject the base
+        # benchmark service (which would conceal the installed-path regression).
+        assert "CAPABILITY_BENCHMARK_SERVICE" not in app.config
+        with app.app_context():
+            inspection = app.config["CAPABILITY_INSPECTION_SERVICE"]
+            benchmarks = app.config["CAPABILITY_BENCHMARK_SERVICE"]
+            contributions = app.config["CAPABILITY_CONTRIBUTION_SERVICE"]
+            assert isinstance(inspection, RunOnceCapabilityInspectionService)
+            assert isinstance(benchmarks, RunOnceCapabilityBenchmarkService)
+            assert isinstance(contributions, RunOnceCapabilityContributionService)
+    else:
+        inspection = _inspection_service(
+            tmp_path, onboarding, adapters=(ollama, storage), clock=clock
+        )
+        benchmarks = _benchmark_service(
+            benchmark_state or tmp_path, onboarding, inspection, clock=clock
+        )
+        contributions = CapabilityContributionService(
+            onboarding_service=onboarding,
+            inspection_service=inspection,
+            benchmark_service=benchmarks,
+            state_database=tmp_path / "onboarding.sqlite3",
+            sources=sources,
+            adapters=adapters,
+            clock=clock,
+        )
+        app = _app(onboarding, inspection, benchmarks)
+        app.config["CAPABILITY_CONTRIBUTION_SERVICE"] = contributions
     client = app.test_client()
     csrf, _command_id = _connect_and_inspect(client)
     assert (
@@ -187,10 +225,12 @@ def _skip_through_route(harness):
     assert _skips(harness) == frozenset({UNAVAILABLE_KEY})
 
 
+@pytest.mark.parametrize("installed", [False, True], ids=["base", "installed-run-once"])
 def test_unavailable_optional_check_requires_explicit_review_without_authority(
     tmp_path: Path,
+    installed: bool,
 ) -> None:
-    harness = _harness(tmp_path)
+    harness = _harness(tmp_path, installed=installed)
     summary, cards, complete = _review(harness)
     unavailable = next(
         card for card in cards if card["benchmark_id"] == OLLAMA_BENCHMARK_ID
@@ -198,6 +238,7 @@ def test_unavailable_optional_check_requires_explicit_review_without_authority(
     assert not complete
     assert unavailable["state"] == "blocked"
     assert unavailable["can_run"] is False
+    original_diagnostic = unavailable["diagnostic"]
     assert _skips(harness) == frozenset()
     with harness.app.app_context(), pytest.raises(FederationOperationError) as error:
         harness.contributions.recommend()
@@ -212,7 +253,8 @@ def test_unavailable_optional_check_requires_explicit_review_without_authority(
     assert complete
     assert unavailable["state"] == "skipped"
     assert unavailable["can_run"] is False
-    assert unavailable["diagnostic"]
+    assert unavailable["diagnostic"] == original_diagnostic
+    assert original_diagnostic
     assert unavailable["metrics"] == []
     assert summary["can_skip"] is False
     with harness.app.app_context():
@@ -234,9 +276,14 @@ def test_unavailable_optional_check_requires_explicit_review_without_authority(
     assert harness.benchmarks.skip_all() == 0
 
 
-def test_unavailable_review_does_not_carry_to_new_inspection(tmp_path: Path) -> None:
-    harness = _harness(tmp_path)
+@pytest.mark.parametrize("installed", [False, True], ids=["base", "installed-run-once"])
+def test_unavailable_review_does_not_carry_to_new_inspection(
+    tmp_path: Path,
+    installed: bool,
+) -> None:
+    harness = _harness(tmp_path, installed=installed)
     _skip_through_route(harness)
+    assert _review(harness)[2]
     previous_revision = harness.inspection.load().revision
     new_snapshot = harness.inspection.run()
     assert new_snapshot.revision == previous_revision + 1
@@ -253,10 +300,17 @@ def test_unavailable_review_does_not_carry_to_new_inspection(tmp_path: Path) -> 
     assert harness.benchmarks.list_results() == harness.results
 
 
-def test_unavailable_review_does_not_carry_to_other_device(tmp_path: Path) -> None:
-    first = _harness(tmp_path / "first")
+@pytest.mark.parametrize("installed", [False, True], ids=["base", "installed-run-once"])
+def test_unavailable_review_does_not_carry_to_other_device(
+    tmp_path: Path,
+    installed: bool,
+) -> None:
+    first = _harness(tmp_path / "first", installed=installed)
     _skip_through_route(first)
-    second = _harness(tmp_path / "second", benchmark_state=tmp_path / "first")
+    assert _review(first)[2]
+    second = _harness(
+        tmp_path / "second", benchmark_state=tmp_path / "first", installed=installed
+    )
     assert first.inspection.load().revision == second.inspection.load().revision
     assert first.inspection.load().device_id != second.inspection.load().device_id
     assert _skips(second) == frozenset()
@@ -283,8 +337,12 @@ def test_expired_inspection_cannot_skip_unavailable_check(tmp_path: Path) -> Non
     assert harness.benchmarks.list_results() == harness.results
 
 
-def test_revoked_membership_cannot_skip_unavailable_check(tmp_path: Path) -> None:
-    harness = _harness(tmp_path)
+@pytest.mark.parametrize("installed", [False, True], ids=["base", "installed-run-once"])
+def test_revoked_membership_cannot_skip_unavailable_check(
+    tmp_path: Path,
+    installed: bool,
+) -> None:
+    harness = _harness(tmp_path, installed=installed)
     device_id = harness.inspection.load().device_id
     assert harness.onboarding.coordinator.revoke_node(
         node_id=device_id, reason="test revocation", request_id="revoke-review-test"
@@ -305,8 +363,13 @@ def test_revoked_membership_cannot_skip_unavailable_check(tmp_path: Path) -> Non
 
 
 @pytest.mark.parametrize("csrf", [None, "invalid-csrf"])
-def test_skip_unavailable_check_keeps_csrf_boundary(tmp_path: Path, csrf) -> None:
-    harness = _harness(tmp_path)
+@pytest.mark.parametrize("installed", [False, True], ids=["base", "installed-run-once"])
+def test_skip_unavailable_check_keeps_csrf_boundary(
+    tmp_path: Path,
+    csrf,
+    installed: bool,
+) -> None:
+    harness = _harness(tmp_path, installed=installed)
     response = harness.client.post(
         "/onboarding/benchmarks/skip",
         data={} if csrf is None else {"_csrf_token": csrf},
@@ -316,3 +379,38 @@ def test_skip_unavailable_check_keeps_csrf_boundary(tmp_path: Path, csrf) -> Non
     assert not _review(harness)[2]
     assert harness.benchmarks.list_results() == harness.results
     assert harness.authority_calls == []
+
+
+def test_installed_skip_keeps_run_once_evidence_across_age_only_expiry(
+    tmp_path: Path,
+) -> None:
+    harness = _harness(tmp_path, installed=True)
+    _skip_through_route(harness)
+    assert _review(harness)[2]
+    revision = harness.inspection.load().revision
+    harness.current[0] += timedelta(days=2)
+
+    summary, cards, complete = _review(harness)
+    assert complete
+    assert summary["can_skip"] is False
+    assert {card["benchmark_id"]: card["state"] for card in cards} == {
+        OLLAMA_BENCHMARK_ID: "skipped",
+        STORAGE_BENCHMARK_ID: "passed",
+    }
+    storage_card = next(
+        card for card in cards if card["benchmark_id"] == STORAGE_BENCHMARK_ID
+    )
+    assert storage_card["expires_label"].startswith("Saved evidence")
+    assert harness.inspection.load().revision == revision
+    assert _skips(harness) == frozenset({UNAVAILABLE_KEY})
+    assert harness.benchmarks.list_results() == harness.results
+    assert harness.benchmarks.accepted_results(harness.inspection.load()) == tuple(
+        harness.results
+    )
+    with harness.app.app_context():
+        candidates = harness.contributions.recommend()
+    assert len(candidates) == 1
+    assert candidates[0].capacity_envelope["authority"] == "candidate-only"
+    assert harness.contributions.intents() == ()
+    assert harness.authority_calls == []
+    assert harness.probe_calls == ["write", "read", "cleanup"]
