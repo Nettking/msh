@@ -64,3 +64,65 @@ def test_archive_repository_identity_does_not_waive_product_branding(tmp_path, m
     assert _scan(tmp_path, monkeypatch, path, branding.REPOSITORY_SLUG) == 0
     assert _scan(tmp_path, monkeypatch, path, branding.REPOSITORY_SLUG + '\nWelcome to ' + LEGACY.upper()) == 1
     assert _scan(tmp_path, monkeypatch, 'unrelated.py', branding.REPOSITORY_SLUG) == 1
+
+
+WORKFLOW_GUARD_PATHS = (
+    ".github/workflows/cfi3-device-inspection-composition.yml",
+    ".github/workflows/cfi4-benchmark-composition.yml",
+    ".github/workflows/cfi5-contribution-composition.yml",
+    ".github/workflows/docs-portal.yml",
+)
+REPOSITORY_GUARD_FIELDS = (
+    "github.repository",
+    "github.event.pull_request.head.repo.full_name",
+)
+
+
+def _repository_guard(repository: str = branding.REPOSITORY_SLUG) -> str:
+    return (
+        "    if: >-\n"
+        f"      github.repository == '{repository}' &&\n"
+        "      (github.event_name != 'pull_request' ||\n"
+        f"       github.event.pull_request.head.repo.full_name == '{repository}')\n"
+    )
+
+
+@pytest.mark.parametrize("path", WORKFLOW_GUARD_PATHS)
+def test_workflow_exact_repository_security_guard_is_not_branding(
+    tmp_path, monkeypatch, path
+):
+    assert _scan(tmp_path, monkeypatch, path, _repository_guard()) == 0
+
+
+@pytest.mark.parametrize("path", WORKFLOW_GUARD_PATHS)
+@pytest.mark.parametrize("product_name", [LEGACY.upper(), " ".join(LEGACY)])
+def test_workflow_guard_does_not_waive_additional_product_branding(
+    tmp_path, monkeypatch, path, product_name
+):
+    text = _repository_guard() + "    name: Welcome to " + product_name
+    assert _scan(tmp_path, monkeypatch, path, text) == 1
+
+
+@pytest.mark.parametrize("field", REPOSITORY_GUARD_FIELDS)
+def test_repository_security_expression_exception_does_not_spread_to_other_files(
+    tmp_path, monkeypatch, field
+):
+    expression = f"{field} == '{branding.REPOSITORY_SLUG}'"
+    assert _scan(tmp_path, monkeypatch, ".github/workflows/unrelated.yml", expression) == 1
+
+
+@pytest.mark.parametrize("path", WORKFLOW_GUARD_PATHS)
+@pytest.mark.parametrize("field", REPOSITORY_GUARD_FIELDS)
+@pytest.mark.parametrize("suffix", ["-fork", "s"])
+def test_repository_security_expression_requires_exact_repository_identity(
+    tmp_path, monkeypatch, path, field, suffix
+):
+    expression = f"{field} == '{branding.REPOSITORY_SLUG}{suffix}'"
+    assert _scan(tmp_path, monkeypatch, path, expression) == 1
+
+
+@pytest.mark.parametrize("path", WORKFLOW_GUARD_PATHS)
+def test_workflow_repository_slug_is_not_exempt_outside_security_expression(
+    tmp_path, monkeypatch, path
+):
+    assert _scan(tmp_path, monkeypatch, path, branding.REPOSITORY_SLUG) == 1
