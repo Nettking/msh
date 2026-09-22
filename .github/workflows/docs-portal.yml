@@ -18,25 +18,38 @@ permissions:
 jobs:
   docs-portal:
     name: docs-portal (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+    if: >-
+      github.repository == 'Nettking/msh' &&
+      (github.event_name != 'pull_request' ||
+       github.event.pull_request.head.repo.full_name == 'Nettking/msh')
+    runs-on: [self-hosted, "${{ matrix.os }}", X64, "${{ matrix.runner }}"]
     strategy:
       fail-fast: false
       matrix:
-        os:
-          - ubuntu-latest
-          - windows-latest
+        include:
+          - os: Linux
+            runner: fcp-linux-fast
+            shell: bash
+          - os: Windows
+            runner: fcp-test-windows
+            shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: ./.github/actions/self-hosted-python
         with:
           python-version: "3.12"
 
-      - name: Install focused test dependencies
-        run: python -m pip install Flask Markdown pytest
+      - name: Install application and test dependencies
+        run: |
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install pytest
 
       - name: Ubuntu storage precondition
         if: runner.os == 'Linux'

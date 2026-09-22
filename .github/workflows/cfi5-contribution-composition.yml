@@ -14,6 +14,7 @@ on:
       - "catalog/flask_app/services/startup_contribution_reconcile.py"
       - "catalog/flask_app/templates/federation/onboarding/_contributions.html"
       - "catalog/flask_app/tests/test_capability_contribution_route.py"
+      - "catalog/flask_app/tests/test_unavailable_benchmark_review.py"
       - "catalog/flask_app/tests/test_mtconnect_discovery_service.py"
       - "catalog/flask_app/tests/test_recorder_control_service.py"
       - "catalog/flask_app/tests/test_run_once_capability_evidence.py"
@@ -39,6 +40,7 @@ on:
       - "catalog/flask_app/services/startup_contribution_reconcile.py"
       - "catalog/flask_app/templates/federation/onboarding/_contributions.html"
       - "catalog/flask_app/tests/test_capability_contribution_route.py"
+      - "catalog/flask_app/tests/test_unavailable_benchmark_review.py"
       - "catalog/flask_app/tests/test_mtconnect_discovery_service.py"
       - "catalog/flask_app/tests/test_recorder_control_service.py"
       - "catalog/flask_app/tests/test_run_once_capability_evidence.py"
@@ -58,20 +60,33 @@ concurrency:
 
 jobs:
   contributions:
+    name: contributions (${{ matrix.os }})
+    if: >-
+      github.repository == 'Nettking/msh' &&
+      (github.event_name != 'pull_request' ||
+       github.event.pull_request.head.repo.full_name == 'Nettking/msh')
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+        include:
+          - os: Linux
+            runner: fcp-linux-fast
+            shell: bash
+          - os: Windows
+            runner: fcp-test-windows
+            shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+    runs-on: [self-hosted, "${{ matrix.os }}", X64, "${{ matrix.runner }}"]
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: ./.github/actions/self-hosted-python
         with:
           python-version: "3.12"
-          cache: "" # No external Actions cache; local pip cache remains available.
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -92,6 +107,7 @@ jobs:
           catalog/flask_app/tests/test_recorder_control_service.py
           catalog/flask_app/tests/test_run_once_capability_evidence.py
           catalog/flask_app/tests/test_startup_contribution_reconcile.py
+          catalog/flask_app/tests/test_unavailable_benchmark_review.py
       - name: Ubuntu storage precondition
         if: runner.os == 'Linux'
         uses: ./.github/actions/ubuntu-storage-precondition
@@ -118,6 +134,7 @@ jobs:
           catalog/flask_app/tests/test_post_setup_handoff.py
           catalog/flask_app/tests/test_connected_ai_provider.py
           catalog/flask_app/tests/test_mtconnect_discovery_service.py
+          catalog/flask_app/tests/test_unavailable_benchmark_review.py
       - name: Validate Compose configuration
         run: docker compose config
       - name: Ruff CFI-5 composition
@@ -135,6 +152,7 @@ jobs:
           catalog/flask_app/tests/test_recorder_control_service.py
           catalog/flask_app/tests/test_run_once_capability_evidence.py
           catalog/flask_app/tests/test_startup_contribution_reconcile.py
+          catalog/flask_app/tests/test_unavailable_benchmark_review.py
       - name: Diff hygiene
         shell: bash
         run: |
