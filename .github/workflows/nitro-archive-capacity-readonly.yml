@@ -1,47 +1,82 @@
-name: Nitro archive Beast capacity read-only
+name: Inspect original Beast bootstrap consensus evidence
 on:
   push:
-    branches: [codex/nitro-artifact-archive]
-    paths: [.github/workflows/nitro-archive-capacity-readonly.yml]
-permissions: {}
+    branches: [codex/bootstrap-original-evidence-readonly]
+    paths:
+      - .github/workflows/nitro-archive-capacity-readonly.yml
+      - scripts/inspect_original_bootstrap_evidence.py
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: original-bootstrap-evidence-106874413640
+  cancel-in-progress: false
 jobs:
-  capacity:
-    runs-on: [self-hosted, beast-windows]
-    timeout-minutes: 2
+  inspect-original:
+    if: github.repository == 'Nettking/msh' && github.actor == 'Nettking' && github.triggering_actor == 'Nettking' && github.event_name == 'push' && github.run_attempt == 1 && github.ref == 'refs/heads/codex/bootstrap-original-evidence-readonly'
+    runs-on: [self-hosted, beast-windows, fcp-test-windows]
+    timeout-minutes: 5
     steps:
-      - name: Read volume identity and bounded archive staging inventory
+      - name: Preserve only the exact original paths before checkout
         shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+        env:
+          OBSERVATION_GITHUB_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $volume = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='C:'"
-          $physical = Get-Volume -DriveLetter C
-          $rows = @()
-          $dirs = @(Get-ChildItem -LiteralPath $env:RUNNER_TEMP -Directory -Filter 'fcp-evidence-*' -Force | Select-Object -First 100)
-          foreach ($dir in $dirs) {
-            if ($dir.Attributes -band [IO.FileAttributes]::ReparsePoint) { continue }
-            $files = @(Get-ChildItem -LiteralPath $dir.FullName -File -Force)
-            $rows += [pscustomobject]@{
-              path = $dir.FullName
-              direct_file_count = $files.Count
-              direct_file_bytes = ($files | Measure-Object -Property Length -Sum).Sum
-              recursive_scan = $false
-              deletion_authorized = $false
-              activity_and_evidence_retention = 'NOT_PROVEN'
-            }
-          }
-          [pscustomobject]@{
-            utc = [DateTime]::UtcNow.ToString('o')
-            host_name = $env:COMPUTERNAME
-            runner = $env:RUNNER_NAME
-            volume = $volume.DeviceID
-            filesystem = $volume.FileSystem
-            volume_serial = $volume.VolumeSerialNumber
-            volume_unique_id = $physical.UniqueId
-            total_bytes = [long]$volume.Size
-            free_bytes = [long]$volume.FreeSpace
-            runner_temp = $env:RUNNER_TEMP
-            archive_staging_direct_inventory = $rows
-            archive_staging_limit = 100
-            relevant_processes = @(Get-Process -Name 'python*','pytest*','Runner.Worker','wsl*' -ErrorAction SilentlyContinue | Select-Object Id,ProcessName)
-            mutations = 'NONE: no checkout, deletion, test, service change or artifact transfer'
-          } | ConvertTo-Json -Depth 6
+          $bootstrapScript = @"
+          import base64, hashlib, json, os, pathlib, subprocess, sys, urllib.request
+          assert os.name == 'nt' and sys.version_info[:3] == (3, 12, 10)
+          assert os.environ['RUNNER_NAME'] == 'Beast'
+          assert os.environ['RUNNER_OS'] == 'Windows'
+          assert os.environ['GITHUB_RUN_ATTEMPT'] == '1'
+          assert os.environ['GITHUB_REPOSITORY'] == 'Nettking/msh'
+          assert os.environ['GITHUB_EVENT_NAME'] == 'push'
+          assert os.environ['GITHUB_REF_NAME'] == 'codex/bootstrap-original-evidence-readonly'
+          base = pathlib.Path('C:/actions-runner/_work')
+          control = base / ('fcp-bootstrap-observer-control-' + os.environ['GITHUB_RUN_ID'])
+          control.mkdir(exist_ok=False)
+          def get(path):
+              request = urllib.request.Request('https://api.github.com/repos/Nettking/msh' + path, headers={'Authorization':'Bearer ' + os.environ['OBSERVATION_GITHUB_TOKEN'], 'Accept':'application/vnd.github+json', 'X-GitHub-Api-Version':'2022-11-28'})
+              with urllib.request.urlopen(request, timeout=20) as response:
+                  raw = response.read(1024 * 1024 + 1)
+                  assert len(raw) <= 1024 * 1024
+                  return json.loads(raw)
+          content = get('/contents/scripts/inspect_original_bootstrap_evidence.py?ref=' + os.environ['GITHUB_SHA'])
+          raw = base64.b64decode(content['content'], validate=False)
+          assert hashlib.sha1(b'blob ' + str(len(raw)).encode() + b'\0' + raw).hexdigest() == content['sha']
+          assert len(raw) < 65536
+          helper = control / 'inspect_original_bootstrap_evidence.py'
+          helper.write_bytes(raw)
+          native = control / 'original-job.json'
+          native.write_text(json.dumps(get('/actions/jobs/106874413640'), sort_keys=True) + '\n', encoding='utf-8')
+          output = base / ('fcp-bootstrap-original-' + os.environ['GITHUB_RUN_ID'])
+          child_env = dict(os.environ)
+          child_env.pop('OBSERVATION_GITHUB_TOKEN', None)
+          result = subprocess.run([sys.executable,'-I','-B',str(helper),'--native-job',str(native),'--base',str(output)], env=child_env, timeout=120)
+          public = output / 'public'
+          if public.is_dir():
+              proof = {'diagnostic_source':os.environ['GITHUB_SHA'],'helper_git_blob':content['sha'],'helper_sha256':hashlib.sha256(raw).hexdigest(),'python':sys.version,'inspection_exit':result.returncode,'test_execution':False,'original_product_source':'11238b6bb6cacaf17c816ded0baece75c59ec5fe','raw_databases_published':False}
+              with (public / 'INSTRUMENTATION_IDENTITY.json').open('x', encoding='utf-8') as stream:
+                  json.dump(proof, stream, indent=2)
+          print('READONLY_OBSERVATION=' + json.dumps({'inspection_exit':result.returncode,'diagnostic_source':os.environ['GITHUB_SHA'],'test_execution':False,'qualification':'NOT_EVALUATED'}))
+          raise SystemExit(result.returncode)
+          "@
+          $bootstrapScript | python -I -B -
+          exit $LASTEXITCODE
+      - name: Check out only the isolated diagnostic source for approved archive action
+        if: always()
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Preserve safe consensus projections and original pending JUnit
+        if: always()
+        uses: ./.github/actions/nitro-artifact
+        with:
+          operation: upload
+          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
+          host: ${{ vars.NITRO_ARTIFACT_HOST }}
+          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
+          job-status: ${{ job.status }}
+          name: original-bootstrap-inspection-106874413640
+          path: C:/actions-runner/_work/fcp-bootstrap-original-${{ github.run_id }}/public/
