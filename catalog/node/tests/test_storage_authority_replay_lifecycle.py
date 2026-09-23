@@ -286,6 +286,13 @@ def test_the_authority_reconnects_and_the_recorder_then_selects_it(
                 session_id, ttl_seconds=60, max_uses=1
             )
 
+            # Invitation lifecycle traffic can schedule a shared replay after
+            # ``create_session`` has returned.  Drain that pre-existing pass
+            # before installing the gate: this test must own the replay it
+            # tears down, rather than wait for a call that intentionally joins
+            # an already-active pass.
+            await creator.request_replay(session_id)
+
             # A teardown while the shared replay is in flight.
             gate = _ReplayGate(creator)
             announcing = asyncio.create_task(
