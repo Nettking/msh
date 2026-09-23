@@ -118,11 +118,28 @@ def test_publication_waits_for_completed_startup_reconciliation(monkeypatch) -> 
 
 
 def test_contribution_refresh_interrupts_periodic_wait_immediately(monkeypatch) -> None:
+    class WakeProbe:
+        def __init__(self) -> None:
+            self.entered = threading.Event()
+            self._event = threading.Event()
+
+        def set(self) -> None:
+            self._event.set()
+
+        def clear(self) -> None:
+            self._event.clear()
+
+        def wait(self, timeout: float | None = None) -> bool:
+            self.entered.set()
+            return self._event.wait(timeout=timeout)
+
     _binding, _context, service = _local_service_context()
     app = Flask(__name__)
     app.config["CAPABILITY_ONBOARDING_LOCAL_RELAY_URL"] = "ws://relay:8765"
     app.extensions["capability_contribution_startup_reconciled"] = True
     monitor = SavedFederationReconnectMonitor(app, service)  # type: ignore[arg-type]
+    wake = WakeProbe()
+    monitor._wake = wake  # type: ignore[assignment]
 
     published = threading.Event()
     publish_count = [0]
@@ -135,6 +152,7 @@ def test_contribution_refresh_interrupts_periodic_wait_immediately(monkeypatch) 
     monitor.start()
     try:
         assert published.wait(timeout=1.0)
+        assert wake.entered.wait(timeout=1.0)
         published.clear()
 
         monitor.request_contribution_refresh()
