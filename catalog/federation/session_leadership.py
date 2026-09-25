@@ -19,7 +19,11 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
 
-from .errors import AuthorizationError, FederationOperationError, FederationValidationError
+from .errors import (
+    AuthorizationError,
+    FederationOperationError,
+    FederationValidationError,
+)
 from .models import CapabilityStatus, SessionEvent
 from .persistence import CoordinatorStore, _request_key, _time, _token_hash
 from .redaction import redact_secrets
@@ -254,6 +258,7 @@ class SessionLeadershipService:
         target_node_id: str,
         request_id: str,
         now: Any,
+        expected_term: int | None = None,
     ) -> tuple[SessionLeadership, SessionEvent | None]:
         if not isinstance(target_node_id, str) or not target_node_id:
             raise FederationValidationError(
@@ -264,6 +269,12 @@ class SessionLeadershipService:
                 database, session_id=session_id, node_id=actor_node_id
             )
             leadership = self._snapshot_tx(database, session_id)
+            if expected_term is not None and leadership.term != expected_term:
+                raise AuthorizationError(
+                    "leadership-term-mismatch",
+                    "leadership changed since the handoff was prepared",
+                    "expected_term",
+                )
             if leadership.leader_node_id != actor_node_id:
                 raise AuthorizationError(
                     "federation-leader-required",
@@ -554,8 +565,8 @@ class SessionLeadershipService:
 
 __all__ = [
     "INITIAL_TERM",
-    "LEADER_CHANGED_EVENT",
     "LEADERSHIP_SCHEMA",
+    "LEADER_CHANGED_EVENT",
     "SessionLeadership",
     "SessionLeadershipService",
 ]

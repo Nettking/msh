@@ -74,6 +74,7 @@ from catalog.federation.shared_file_storage import mask_public_jsonl_chunk_paths
 
 from .authentication import (
     create_authentication_nonce,
+    leadership_transfer_command,
     verify_authentication_signature,
 )
 
@@ -872,6 +873,14 @@ class RelayServer:
             identity = enrollment_identity or self.coordinator.public_identity(
                 request.actor_node_id
             )
+            transfer = None
+            if "leadership_transfer" in request.payload:
+                if enrollment_identity is not None:
+                    raise AuthenticationError(
+                        "leadership-transfer-requires-enrollment",
+                        "a handoff must use an already enrolled identity",
+                    )
+                transfer = leadership_transfer_command(request.payload["leadership_transfer"])
             if not verify_authentication_signature(
                 public_key=identity.public_key,
                 signature=signature,
@@ -879,12 +888,18 @@ class RelayServer:
                 nonce=challenge_nonce,
                 node_id=request.actor_node_id,
                 protocol_version=challenge.protocol_version,
+                leadership_transfer=transfer,
             ):
                 raise AuthenticationError(
                     "invalid-authentication-signature",
                     "signature did not prove possession of the enrolled identity",
                     "signature",
                 )
+            if transfer is not None:
+                await self._transfer_leadership_once(websocket, request, transfer)
+                # Never register, replace, heartbeat or disconnect the managed
+                # node connection for this bounded operator request.
+                return None
             if enrollment_identity is not None:
                 if enrollment_token is None:  # pragma: no cover - state invariant
                     raise AuthenticationError(
@@ -960,6 +975,42 @@ class RelayServer:
                 )
                 await websocket.close(code=4003, reason="authentication rejected")
             return None
+
+    async def _transfer_leadership_once(
+        self,
+        websocket: ServerConnection,
+        request: RelayEnvelope,
+        command: dict[str, str | int],
+    ) -> None:
+        session_id = str(command["session_id"])
+        leadership, event = self.coordinator.transfer_session_leader(
+            session_id=session_id,
+            actor_node_id=request.actor_node_id,
+            target_node_id=str(command["target_node_id"]),
+            request_id=str(command["request_id"]),
+            expected_term=int(command["expected_term"]),
+        )
+        if event is not None:
+            await self._fanout_event(event, request_id=str(command["request_id"]))
+        await self._send_direct(
+            websocket,
+            self._response_envelope(
+                request,
+                message_type="session.leader.transfer.accepted",
+                session_id=session_id,
+                payload={
+                    "request_id": command["request_id"],
+                    "leadership": leadership.to_dict(),
+                    "event_id": event.event_id if event is not None else None,
+                },
+                authorization_context={
+                    "kind": "authenticated-leadership-transfer",
+                    "actor_node_id": request.actor_node_id,
+                    "validated_by": self.coordinator.coordinator_id,
+                },
+            ),
+        )
+        await websocket.close(code=1000, reason="leadership handoff completed")
 
     async def _receive_before(
         self, websocket: ServerConnection, deadline: float

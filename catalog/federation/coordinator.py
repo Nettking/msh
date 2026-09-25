@@ -135,6 +135,7 @@ class SessionCoordinator:
         actor_node_id: str,
         target_node_id: str,
         request_id: str,
+        expected_term: int | None = None,
     ) -> tuple[SessionLeadership, SessionEvent | None]:
         return self.leadership.transfer(
             session_id=session_id,
@@ -142,6 +143,7 @@ class SessionCoordinator:
             target_node_id=target_node_id,
             request_id=request_id,
             now=self._clock(),
+            expected_term=expected_term,
         )
 
     def create_invitation(

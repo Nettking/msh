@@ -15,6 +15,27 @@ AUTHENTICATION_SCHEMA: Final = "fcp.relay.authentication.v1"
 NONCE_BYTES: Final = 32
 
 
+def leadership_transfer_command(value: object) -> dict[str, str | int]:
+    """Validate the complete, signed scope of a one-shot leader handoff."""
+    fields = {"session_id", "target_node_id", "expected_term", "request_id"}
+    if not isinstance(value, dict) or set(value) != fields:
+        raise FederationValidationError(
+            "invalid-leadership-transfer", "leadership_transfer",
+            "requires exactly session_id, target_node_id, expected_term and request_id",
+        )
+    term = value["expected_term"]
+    if isinstance(term, bool) or not isinstance(term, int) or not 1 <= term < 2**63:
+        raise FederationValidationError(
+            "invalid-leadership-term", "expected_term", "must be a positive bounded integer"
+        )
+    return {
+        "session_id": _bounded_text(value["session_id"], field="session_id"),
+        "target_node_id": _bounded_text(value["target_node_id"], field="target_node_id"),
+        "request_id": _bounded_text(value["request_id"], field="request_id"),
+        "expected_term": term,
+    }
+
+
 def _bounded_text(value: object, *, field: str) -> str:
     if (
         not isinstance(value, str)
@@ -65,6 +86,7 @@ def authentication_message(
     nonce: str,
     node_id: str,
     protocol_version: str,
+    leadership_transfer: dict[str, str | int] | None = None,
 ) -> bytes:
     """Return the exact canonical bytes a node signs for one relay challenge.
 
@@ -80,13 +102,17 @@ def authentication_message(
         protocol_version, field="protocol_version"
     )
     protocol_major(protocol_version)
-    value = {
+    value: dict[str, object] = {
         "challenge_id": challenge_id,
         "node_id": node_id,
         "nonce": nonce,
         "protocol_version": protocol_version,
         "schema": AUTHENTICATION_SCHEMA,
     }
+    if leadership_transfer is not None:
+        # A regular login proof cannot be promoted to a handoff, nor can a
+        # signed target/session/term/request be substituted on this connection.
+        value["leadership_transfer"] = leadership_transfer_command(leadership_transfer)
     return json.dumps(
         value,
         ensure_ascii=True,
@@ -104,6 +130,7 @@ def verify_authentication_signature(
     nonce: str,
     node_id: str,
     protocol_version: str,
+    leadership_transfer: dict[str, str | int] | None = None,
 ) -> bool:
     """Verify proof of possession for an enrolled Ed25519 public identity."""
 
@@ -112,5 +139,6 @@ def verify_authentication_signature(
         nonce=nonce,
         node_id=node_id,
         protocol_version=protocol_version,
+        leadership_transfer=leadership_transfer,
     )
     return verify_signature(public_key, message, signature)
