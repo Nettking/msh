@@ -22,7 +22,10 @@ from catalog.federation.errors import (
     FederationValidationError,
     ProtocolCompatibilityError,
 )
-from catalog.federation.host_resources import ProcessResourceAdmission
+from catalog.federation.host_resources import (
+    HostResourceRefused,
+    ProcessResourceAdmission,
+)
 from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
 
 from ..job_store import DurableJobSnapshot
@@ -58,7 +61,11 @@ _SCHEDULING_ERRORS = (
 # loop, not an unexpected one. It is deliberately absent from
 # ``_SCHEDULING_ERRORS`` above: there those errors would silently drop a job
 # from a read/projection surface, which is a different and worse trade.
-_DRIVER_RETRY_ERRORS = (*_SCHEDULING_ERRORS, sqlite3.Error)
+# Admission can refuse a store mutation before claim, or completion bookkeeping
+# after an existing claim. Neither outcome releases the durable work/ownership.
+# Keep refusal at the supervision boundary so it remains visible and backs off;
+# swallowing it per job would make a refused pass look healthy.
+_DRIVER_RETRY_ERRORS = (*_SCHEDULING_ERRORS, sqlite3.Error, HostResourceRefused)
 
 
 @dataclass(frozen=True)
@@ -354,9 +361,12 @@ class AnalysisWorkService:
         for job_id in self.registry.unsettled_job_ids(session_id=self.session_id):
             try:
                 snapshot = self.scheduler.store.snapshot(job_id)
-            except _SCHEDULING_ERRORS:
-                # An unreadable job is not evidence of anything. Leave it
-                # unsettled so a later pass reads it again.
+            except FederationValidationError as exc:
+                if exc.code != "job-not-found":
+                    raise
+                # A definitive absent row is different from an unreadable one.
+                # Propagate read failures to supervision; skipping the only
+                # pending job could otherwise falsely prove an empty backlog.
                 continue
             if snapshot.job.terminal:
                 settled.append(job_id)
@@ -462,9 +472,11 @@ class AnalysisWorkService:
             return None
 
     def _background_pass(self) -> None:
+        fatal = False
         try:
             while not self._scheduler_stop.is_set():
                 self._scheduler_wake.clear()
+                wait_event = self._scheduler_wake
                 try:
                     asyncio.run(self.schedule_pending())
                     # Reading the remaining work is part of the pass, not of
@@ -484,29 +496,37 @@ class AnalysisWorkService:
                     # empty backlog ends the loop; an unreadable one keeps it.
                     if self._pending_job_ids_or_none() == ():
                         return
+                    # New submission/wakeup traffic must not turn sustained
+                    # refusal into a spin loop. Re-use the ordinary poll period,
+                    # while operator shutdown can still interrupt it at once.
+                    wait_event = self._scheduler_stop
                 except BaseException as exc:
                     # Unexpected: this driver stops. Record why, so the exit is
                     # an observable degraded state rather than a stderr
                     # traceback and silently stranded durable work. Re-arming
                     # here instead would turn one deterministic fault into an
                     # unbounded restart loop.
+                    fatal = True
                     self._record_driver_failure(exc)
                     raise
                 else:
                     self._record_driver_success()
                     if self._scheduler_stop.is_set() or not pending:
                         return
-                self._scheduler_wake.wait(self.scheduler_poll_seconds)
+                wait_event.wait(self.scheduler_poll_seconds)
         finally:
             self._scheduling.clear()
             # Close the race where work was submitted after the final pending
             # check but before the scheduling flag cleared. A deliberately
             # stopped/superseded runtime must never resurrect its driver.
             if (
-                not self._scheduler_stop.is_set()
+                not fatal
+                and not self._scheduler_stop.is_set()
                 and self._scheduler_wake.is_set()
-                and self._pending_job_ids_or_none()
             ):
+                # A wake means another request/submission arrived. Let the next
+                # supervised pass read it; a cleanup read could itself fail and
+                # discard the only wakeup for newly committed work.
                 self.request_scheduling_pass()
 
     # ------------------------------------------------------------------
