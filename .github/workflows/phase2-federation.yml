@@ -198,6 +198,7 @@ jobs:
           catalog/node/tests/test_live_storage_reinstatement.py
           catalog/node/tests/test_verified_live_failover.py
           catalog/relay/tests/test_service.py
+          catalog/relay/tests/test_leadership_transfer.py
           catalog/federation/tests/test_phase2_unit.py
           catalog/federation/tests/test_storage_protocol.py
           catalog/federation/tests/test_local_storage.py

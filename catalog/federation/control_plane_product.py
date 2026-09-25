@@ -798,9 +798,28 @@ class ReplicatedSessionCoordinator:
         self.runtime.propose(command)
         return True
 
-    def transfer_session_leader(self, *, session_id: str, actor_node_id: str, target_node_id: str, request_id: str):
+    def transfer_session_leader(self, *, session_id: str, actor_node_id: str, target_node_id: str, request_id: str, expected_term: int | None = None):
         self._leader(session_id, actor_node_id)
         current, term = self.runtime.replicated_leader(session_id)
+        if expected_term is not None and term != expected_term:
+            raise AuthorizationError(
+                "leadership-term-mismatch",
+                "leadership changed since the handoff was prepared",
+                "expected_term",
+            )
+        if expected_term is not None:
+            # The one-shot operator path retains the connected-member policy
+            # even for the older replicated adapter without a product journal.
+            with self.store.read_transaction() as database:
+                self.store._require_membership(database, session_id=session_id, node_id=actor_node_id)
+                self.store._require_membership(database, session_id=session_id, node_id=target_node_id)
+                target = database.execute(
+                    "SELECT state FROM node_connectivity WHERE node_id=?", (target_node_id,)
+                ).fetchone()
+                if target is None or target["state"] != "connected":
+                    raise AuthorizationError(
+                        "leader-target-offline", "leadership target must be connected", "target_node_id"
+                    )
         command = AuthorityCommand(
             command_id=f"leader-transfer-{hashlib.sha256(request_id.encode()).hexdigest()}",
             command_type="LEADER_TRANSITION",
