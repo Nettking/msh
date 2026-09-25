@@ -14,6 +14,7 @@ from contextlib import contextmanager
 from dataclasses import replace
 from pathlib import Path
 
+from catalog.mtconnect_recorder.acceptance_observability import observe_operation
 from catalog.mtconnect_recorder.model import (
     MtconnectProtocolError,
     RawBatchRef,
@@ -70,6 +71,22 @@ class IncrementalRecorderArchiveReconciler(RecorderArchiveReconciler):
         self.frontier = RecorderPublicationFrontier(self.store)
         self._blocked_migrations: dict[str, str] = {}
 
+    @observe_operation(
+        "publication-reconcile",
+        context=lambda self: {
+            "session_id": self.target.session_id,
+            "node_id": self.target.recorder_node_id,
+            "storage_group": self.target.group_id,
+        },
+        progress=lambda result, _context: {
+            "scanned_batches": result.scanned_batches,
+            "eligible_batches": result.eligible_batches,
+            "publication_chunks": result.publication_chunks,
+            "enqueued": result.enqueued,
+            "already_enqueued": result.already_enqueued,
+            "quarantined": result.quarantine.total,
+        },
+    )
     def reconcile(self) -> RecorderReconcileResult:
         self._blocked_migrations = {}
         result = super().reconcile()

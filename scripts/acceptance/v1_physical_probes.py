@@ -1842,6 +1842,26 @@ def collect_sample_extras(
         "restart_states": _restart_states(context),
     }
 
+    # These are product-owned method spans and managed-loop state. Preserve
+    # their provenance rather than inferring operation timing from heartbeats
+    # or treating a nonempty unavailable dictionary as successful evidence.
+    from scripts.acceptance.v1_recorder_observability import read_evidence
+
+    expected_candidate = (
+        runtime_binding.target_candidate_sha if runtime_binding is not None
+        else context.commit
+    )
+    observations = read_evidence(
+        _recorder_status_path(context), expected_candidate=expected_candidate,
+    )
+    extras["recorder"]["acceptance_observability"] = observations
+    extras["publication"]["reconciliation_observations"] = observations.get(
+        "durations", {}
+    ).get("publication-reconcile", {"status": "unavailable"})
+    extras["orphan"]["managed_worker_health"] = observations.get(
+        "worker_health", {"status": "unavailable"}
+    )
+
     extras["cpu_ram"] = _cpu_ram_snapshot()
     return extras
 
@@ -1947,6 +1967,25 @@ def _probe_campaign_series(context: ProbeContext) -> ProbeOutcome:
             f"the {series} series has fewer than {minimum} qualifying samples",
             detail,
         )
+    if series in {"recorder", "publication", "orphan"}:
+        from scripts.acceptance.v1_recorder_observability import evidence_series
+
+        observations = [
+            packet.get("extras", {}).get("recorder", {}).get("acceptance_observability", {})
+            for packet in samples
+        ]
+        reviewed = evidence_series(observations, expected_candidate=context.commit)
+        if series == "orphan":
+            observation = reviewed["worker_health"]
+        else:
+            kind = "recorder-recovery" if series == "recorder" else "publication-reconcile"
+            observation = reviewed["durations"][kind]
+        detail["product_observations"] = reviewed
+        if observation["status"] != PASS:
+            return _outcome(
+                "campaign-series", observation["status"],
+                "required product observations are missing, stale or failed", detail,
+            )
     return _outcome(
         "campaign-series",
         PASS,

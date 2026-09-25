@@ -21,6 +21,8 @@ import requests
 from urllib3 import exceptions as urllib3_exceptions
 from urllib3.util import Timeout as Urllib3Timeout
 
+from .acceptance_observability import observe_operation, source_alias
+from .acceptance_observability import snapshot as acceptance_observability_snapshot
 from .limits import (
     MAX_CURRENT_RESPONSE_BYTES,
     MAX_OBSERVATIONS_PER_BATCH,
@@ -494,6 +496,17 @@ def _record_stop_reason(reason: str) -> None:
             _STOP_REASON = reason
 
 
+def _recovery_observation_context(_runtime: Any, **values: Any) -> dict[str, object]:
+    federation = _federation_status()
+    return {
+        "source_alias": source_alias(values["source_name"]),
+        "agent_instance_id": values["instance_id"],
+        "next_sequence_before": values["expected"],
+        "session_id": federation.get("session_id"),
+        "node_id": federation.get("node_id"),
+    }
+
+
 class RecorderRuntime:
     """Durable MTConnect worker controlled by environment or desired-state files."""
 
@@ -766,6 +779,14 @@ class RecorderRuntime:
                 self.raw_batches_written += 1
             self.last_commit_at = checkpoint.updated_at
 
+    @observe_operation(
+        "recorder-recovery",
+        context=_recovery_observation_context,
+        progress=lambda result, context: {
+            "next_sequence_after": result,
+            "advanced_sequences": result - int(context["next_sequence_before"]),
+        },
+    )
     def _recover_archived_batches(
         self,
         *,
@@ -1331,6 +1352,7 @@ class RecorderRuntime:
                 # Also additive: whether each required background loop is
                 # running, and whether it has been failing rather than idle.
                 "workers": _worker_health(),
+                "acceptance_observability": acceptance_observability_snapshot(),
             }
         try:
             _write_json_atomic(STATUS_FILE, payload)
