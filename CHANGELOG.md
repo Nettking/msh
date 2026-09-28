@@ -16,6 +16,13 @@ trusted AI/compute contribution, durable federated analysis jobs, recorder
 capture/publication/control, deterministic MTConnect operational segmentation,
 human authentication/RBAC, and bounded manual Federation-wide updates.
 
+### Generic JSONL discovery
+
+Generic JSONL discovery now rejects ordinary excluded Recorder files from
+directory-entry metadata before per-file path checks and sorting. Eligible
+files, resolved aliases and incomplete-upload checks retain their behavior,
+reducing unnecessary archive scans that delay Recorder backlog delivery.
+
 ### Native Recorder trial restoration
 
 Federation updates now distinguish authenticated MTConnect capture capabilities
