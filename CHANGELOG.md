@@ -25,6 +25,11 @@ return action in the version view. After an ordinary restart on main, a fresh
 supervised runtime can start another trial without discarding earlier history;
 missing or stale runtime identity still fails closed.
 
+A later authenticated update check that proves the recorder is back on main now
+keeps an earlier trial report as history and makes version selection available
+again. Authoritative event order prevents an older check or its delayed reply
+from hiding a newer trial; prior failed results and pending requests remain intact.
+
 ### Configured quorum authority and journal continuity
 
 Built-in creator storage now announces the exact provider it hosts and withdraws

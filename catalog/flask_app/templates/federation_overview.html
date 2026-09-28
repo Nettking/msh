@@ -215,7 +215,14 @@
         <div>
           <strong>{{ device.label }}</strong>
           <span>Branch <code>{{ device.branch|default('main') }}</code>{% if device.commit %} · <code>{{ device.commit[:8] }}</code>{% endif %}</span>
-          {% if device.safe_commit %}<span>Fallback: <code>{{ device.safe_branch|default('main') }}</code> · <code>{{ device.safe_commit[:8] }}</code></span>{% endif %}
+          {% if device.safe_commit %}<span>{{ 'Previous fallback' if device.trial_history|default(none) else 'Fallback' }}: <code>{{ device.safe_branch|default('main') }}</code> · <code>{{ device.safe_commit[:8] }}</code></span>{% endif %}
+          {% if device.trial_history|default(none) %}
+          <details class="federation-muted">
+            <summary>Earlier trial report: {{ device.trial_history.state.replace('_', ' ') }}</summary>
+            <span>{{ device.trial_history.message or '' }}</span>
+            {% if device.trial_history.target_commit %}<span>Requested: <code>{{ device.trial_history.branch|default('main') }}</code> · <code>{{ device.trial_history.target_commit[:8] }}</code></span>{% endif %}
+          </details>
+          {% endif %}
           {% if device.failure_reason %}<span class="federation-muted">{{ device.failure_reason }}</span>{% elif device.message %}<span class="federation-muted">{{ device.message }}</span>{% endif %}
           {% if device.recovery %}
           <span class="federation-muted">Automatic recovery:
