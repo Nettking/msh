@@ -17,6 +17,7 @@ from __future__ import annotations
 import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -53,6 +54,7 @@ from catalog.mtconnect_recorder.native_trial import (
 from catalog.mtconnect_recorder.native_trial_agent import (
     PROBE_CODE,
     NativeRecorderTrialAgent,
+    TrialRefusedLocally,
 )
 from catalog.mtconnect_recorder.native_update import (
     NativeRecorderUpdatePaths,
@@ -1029,6 +1031,47 @@ def _running_trial(fixture: Fixture, alive: set[int]) -> None:
     assert fixture.agent().trial.evaluate_trial() == TRIAL_RUNNING
 
 
+def _settle_trial_result(
+    fixture: Fixture,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    state: str,
+    request_id: str = "req-restore",
+    target: str | None = None,
+    safe_commit: str | None = None,
+) -> None:
+    """Consume the actual native result through the Federation target fence."""
+
+    from catalog.flask_app.services import federation_update_events as events
+    from catalog.flask_app.services.federation_update_handoff import HostUpdateHandoff
+
+    reports: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        events,
+        "_append_remote_event",
+        lambda _service, _context, _event_type, payload, _request_id: reports.append(
+            payload
+        ),
+    )
+    processor = events.FederationUpdateEventProcessor(
+        SimpleNamespace(),
+        HostUpdateHandoff(fixture.paths.directory),
+        fixture.paths.federation_state_file,
+    )
+    context = SimpleNamespace(
+        credentials=SimpleNamespace(identity=SimpleNamespace(node_id="node-recorder"))
+    )
+    pending = events._read_state(fixture.paths.federation_state_file)
+    processor._finish_pending(context, pending)
+
+    assert len(reports) == 1
+    assert reports[0]["state"] == state
+    assert reports[0]["target_commit"] == (target or fixture.safe)
+    assert reports[0]["safe_commit"] == safe_commit
+    assert events._read_state(fixture.paths.federation_state_file)["pending"] == {}
+    assert fixture.trial_result(request_id) is None
+
+
 def test_a_second_trial_cannot_stack_on_an_unproven_one(
     fixture: Fixture, alive: set[int]
 ) -> None:
@@ -1043,10 +1086,17 @@ def test_a_second_trial_cannot_stack_on_an_unproven_one(
         fixture.trial_result("req-second")["code"]
         == "return_to_pinned_version_required"
     )
+    assert fixture.trial_result("req-second")["target_commit"] == other
+    assert fixture.trial_result("req-second")["trial_commit"] == fixture.trial
+    assert fixture.trial_result("req-second")["safe_commit"] == fixture.safe
 
 
+@pytest.mark.parametrize("legacy_restore_journal", [False, True])
 def test_an_operator_can_return_a_device_to_its_pinned_version(
-    fixture: Fixture, alive: set[int]
+    fixture: Fixture,
+    alive: set[int],
+    monkeypatch: pytest.MonkeyPatch,
+    legacy_restore_journal: bool,
 ) -> None:
     _running_trial(fixture, alive)
     fixture.write_pending("req-restore", fixture.safe)
@@ -1057,6 +1107,17 @@ def test_an_operator_can_return_a_device_to_its_pinned_version(
     record = native_trial.TrialJournal(fixture.paths.trial_journal_file).active()
     assert record["stage"] == TRIAL_STARTING
     assert record["restore"] is True
+    assert record["trial_commit"] == fixture.trial
+    assert record["safe_commit"] == fixture.safe
+    assert fixture.trial_result("req-restore")["target_commit"] == fixture.safe
+    assert fixture.trial_result("req-restore")["branch"] == "main"
+    if legacy_restore_journal:
+        # A supervisor restarting on an older in-flight restore still has the
+        # validated safe pin, without the new explicit request correlation.
+        document = native_update.read_json(fixture.paths.trial_journal_file)
+        document["active"].pop("request_branch")
+        document["active"].pop("request_target_commit")
+        native_update.write_json_atomic(fixture.paths.trial_journal_file, document)
     alive.discard(TRIAL_PID)
     agent = fixture.agent()
     plan = agent.finalize_after_exit()
@@ -1069,7 +1130,50 @@ def test_an_operator_can_return_a_device_to_its_pinned_version(
         pid=ROLLBACK_PID, nonce=ROLLBACK_NONCE, commit=fixture.safe
     )
     assert agent.trial.verify_once() is True
-    assert fixture.trial_result("req-restore")["state"] == SAFE_RESTORED
+    result = fixture.trial_result("req-restore")
+    assert result["state"] == SAFE_RESTORED
+    assert result["target_commit"] == fixture.safe
+    assert result["branch"] == "main"
+    assert result["trial_commit"] == fixture.trial
+    assert result["trial_branch"] == TRIAL_BRANCH
+    assert result["running_commit"] == fixture.safe
+    _settle_trial_result(fixture, monkeypatch, state=SAFE_RESTORED, safe_commit=fixture.safe)
+    # A replay after another agent restart uses the same durable terminal
+    # result, including the restore target, even after host-result retirement.
+    assert fixture.agent().trial.handle_trial(
+        "req-restore", TrialSelection(APPROVED_REPOSITORY, "main", fixture.safe)
+    ) == result
+
+
+def test_refused_restore_reports_the_requested_safe_target_and_settles(
+    fixture: Fixture, alive: set[int], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _running_trial(fixture, alive)
+    fixture.write_pending("req-restore", fixture.safe)
+    fixture.queue_trial("req-restore", branch="main", commit=fixture.safe)
+    journal_before = fixture.paths.trial_journal_file.read_bytes()
+    agent = fixture.agent()
+
+    def unavailable() -> None:
+        raise TrialRefusedLocally(
+            "recorder_runtime_unavailable", "No native recorder runtime identity was published."
+        )
+
+    monkeypatch.setattr(agent.trial, "supervised_recorder", unavailable)
+    agent.poll_once()
+
+    result = fixture.trial_result("req-restore")
+    assert result["state"] == "refused"
+    assert result["code"] == "recorder_runtime_unavailable"
+    # A later successful status read does not turn the refusal into success.
+    assert result["running_commit"] == fixture.trial
+    assert result["target_commit"] == fixture.safe
+    assert result["branch"] == "main"
+    assert result["trial_commit"] == fixture.trial
+    assert result["trial_branch"] == TRIAL_BRANCH
+    assert fixture.paths.trial_journal_file.read_bytes() == journal_before
+    assert TRIAL_PID in alive
+    _settle_trial_result(fixture, monkeypatch, state="refused", safe_commit=fixture.safe)
 
 
 def test_an_update_is_refused_while_a_device_runs_a_test_branch(
@@ -1373,8 +1477,9 @@ def test_a_trial_and_an_update_can_never_run_at_the_same_time(
 # --------------------------------------------------------------------------
 
 
-def test_a_normal_restart_returns_the_device_to_main_and_says_so(
-    fixture: Fixture, alive: set[int]
+@pytest.mark.parametrize("upgraded_main", [False, True])
+def test_a_normal_restart_returns_the_device_to_main_and_allows_a_new_trial(
+    fixture: Fixture, alive: set[int], upgraded_main: bool
 ) -> None:
     """The supervisor relaunches from the production checkout on any restart.
 
@@ -1385,12 +1490,18 @@ def test_a_normal_restart_returns_the_device_to_main_and_says_so(
 
     _running_trial(fixture, alive)
     assert fixture.agent().active_trial() is not None
+    prior_history = fixture.agent().trial.journal.history()
+    running_main = fixture.safe
+    if upgraded_main:
+        running_main = fixture.publish_new_main()
+        _git("fetch", "origin", "main", cwd=fixture.root)
+        _git("merge", "--ff-only", "origin/main", cwd=fixture.root)
 
     # The operator restarted the recorder; the supervisor launched main.
     alive.discard(TRIAL_PID)
     alive.add(RECORDER_PID)
     fixture.clock.advance(1)
-    fixture.write_status(pid=RECORDER_PID, nonce=RECORDER_NONCE, commit=fixture.safe)
+    fixture.write_status(pid=RECORDER_PID, nonce=RECORDER_NONCE, commit=running_main)
     agent = fixture.agent()
 
     assert agent.active_trial() is None
@@ -1398,6 +1509,92 @@ def test_a_normal_restart_returns_the_device_to_main_and_says_so(
     assert result["state"] != "trial_running"
     assert result["trial"]["active"] is False
     assert result["trial"]["branch"] == TRIAL_BRANCH
+
+    prepared = agent.trial.handle_trial(
+        "req-next-trial", TrialSelection(APPROVED_REPOSITORY, TRIAL_BRANCH, fixture.trial)
+    )
+
+    assert prepared["code"] == "trial_prevalidated"
+    assert prepared["safe_commit"] == running_main
+    assert agent.trial.journal.history() == prior_history
+    assert RECORDER_PID in alive
+
+
+@pytest.mark.parametrize("runtime_proof", ["missing", "stale", "different-supervisor"])
+def test_old_trial_history_is_not_bypassed_without_fresh_supervised_runtime(
+    fixture: Fixture, alive: set[int], runtime_proof: str
+) -> None:
+    _running_trial(fixture, alive)
+    journal_before = fixture.paths.trial_journal_file.read_bytes()
+    alive.discard(TRIAL_PID)
+    alive.add(RECORDER_PID)
+    fixture.write_status(
+        commit=fixture.safe,
+        heartbeat_offset=-3600 if runtime_proof == "stale" else 0,
+        supervisor="f" * 32 if runtime_proof == "different-supervisor" else SUPERVISOR,
+    )
+    if runtime_proof == "missing":
+        fixture.paths.status_file.unlink()
+
+    result = fixture.agent().trial.handle_trial(
+        "req-next-trial", TrialSelection(APPROVED_REPOSITORY, TRIAL_BRANCH, fixture.trial)
+    )
+
+    assert result["code"] == "return_to_pinned_version_required"
+    assert fixture.paths.trial_journal_file.read_bytes() == journal_before
+    assert RECORDER_PID in alive
+
+
+@pytest.mark.parametrize("failure", ["second-status-read", "local-checkout-error"])
+def test_restart_prevalidation_refusal_still_settles_its_requested_target(
+    fixture: Fixture, alive: set[int], monkeypatch: pytest.MonkeyPatch, failure: str
+) -> None:
+    _running_trial(fixture, alive)
+    alive.discard(TRIAL_PID)
+    alive.add(RECORDER_PID)
+    fixture.write_status(commit=fixture.safe)
+    journal_before = fixture.paths.trial_journal_file.read_bytes()
+    fixture.write_pending("req-next-trial", fixture.trial)
+    agent = fixture.agent().trial
+    supervised_recorder = agent.supervised_recorder
+    reads = 0
+
+    def read_status():
+        nonlocal reads
+        reads += 1
+        if reads == 2:
+            raise TrialRefusedLocally(
+                "recorder_runtime_unavailable", "The second status read was unavailable."
+            )
+        return supervised_recorder()
+
+    def checkout_error():
+        raise OSError("The checkout became unavailable before prevalidation.")
+
+    if failure == "second-status-read":
+        monkeypatch.setattr(agent, "supervised_recorder", read_status)
+    else:
+        monkeypatch.setattr(agent.adapter, "checkout_baseline", checkout_error)
+
+    result = agent.handle_trial(
+        "req-next-trial", TrialSelection(APPROVED_REPOSITORY, TRIAL_BRANCH, fixture.trial)
+    )
+
+    expected_state = "refused" if failure == "second-status-read" else "error"
+    assert result["state"] == expected_state
+    assert result["target_commit"] == fixture.trial
+    assert result["branch"] == TRIAL_BRANCH
+    assert result["running_commit"] == fixture.safe
+    assert result["trial_commit"] is None
+    assert fixture.paths.trial_journal_file.read_bytes() == journal_before
+    assert RECORDER_PID in alive
+    _settle_trial_result(
+        fixture,
+        monkeypatch,
+        state=expected_state,
+        request_id="req-next-trial",
+        target=fixture.trial,
+    )
 
 
 def test_an_activation_that_never_took_effect_releases_the_trial(

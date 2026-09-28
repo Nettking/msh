@@ -59,10 +59,15 @@ from .federation_active_leader_runtime import (
 )
 from .federation_leader_authority import require_federation_leader
 from .federation_update_events import (
+    CHECK_REPORT_EVENT,
+    CHECK_REQUEST_EVENT,
     TRIAL_REPORT_EVENT,
     TRIAL_REQUEST_EVENT,
+    inspection_from_report,
     trial_command_payload,
     trial_from_report,
+    validate_command_payload,
+    validate_trial_command_payload,
 )
 
 SCHEMA = "fcp.federation-software-version.v1"
@@ -222,11 +227,16 @@ class FederationSoftwareVersionService:
         rows = snapshot.get("devices")
         if not isinstance(rows, list):
             return {}
-        return {
-            str(row.get("node_id")): row
+        rows = {
+            str(row.get("node_id")): dict(row)
             for row in rows
             if isinstance(row, dict) and isinstance(row.get("node_id"), str)
         }
+        if snapshot.get("operation") == "check":
+            for row in rows.values():
+                row["_check_request_id"] = snapshot.get("request_id")
+                row["_check_target_commit"] = snapshot.get("target_commit")
+        return rows
 
     @staticmethod
     def _row(
@@ -239,6 +249,11 @@ class FederationSoftwareVersionService:
     ) -> dict[str, Any]:
         """One device's software version, from durable evidence only."""
 
+        history = None
+        if report and isinstance(report.get("_current_main_check"), dict):
+            update_row = report["_current_main_check"]
+            history = {key: value for key, value in report.items() if not key.startswith("_")}
+            report = None
         update_row = update_row or {}
         trial = update_row.get("trial")
         trial = trial if isinstance(trial, dict) else {}
@@ -263,6 +278,7 @@ class FederationSoftwareVersionService:
             "acceptance": None,
             "recovery": None,
             "trial_state": None,
+            "trial_history": history,
         }
         if report:
             reported_branch = report.get("branch")
@@ -292,6 +308,19 @@ class FederationSoftwareVersionService:
                 row["branch"] = report.get("safe_branch") or APPROVED_BRANCH
                 row["on_test_branch"] = False
                 row["commit"] = report.get("safe_commit") or row["commit"]
+            elif (
+                state in {"refused", "error"}
+                and report.get("trial_branch")
+                and report["trial_branch"] != APPROVED_BRANCH
+                and report.get("trial_commit")
+                and report["trial_commit"] == report.get("running_commit")
+            ):
+                # A refused restore leaves capture on the trial. Its request
+                # target is the safe pin, while this separate runtime proof
+                # keeps the real running branch and restore action visible.
+                row["branch"] = report["trial_branch"]
+                row["on_test_branch"] = True
+                row["commit"] = report["trial_commit"]
         return row
 
     def _reports(
@@ -300,11 +329,66 @@ class FederationSoftwareVersionService:
         actor: str,
         *,
         request_id: str,
+        update_rows: dict[str, dict[str, Any]],
     ) -> dict[str, dict[str, Any]]:
         reports: dict[str, dict[str, Any]] = {}
+        trial_revisions: dict[str, int] = {}
+        checks: dict[str, tuple[int, dict[str, object]]] = {}
+        current_main: dict[str, tuple[int, int, dict[str, object]]] = {}
+        selected_checks = {
+            row["_check_request_id"]
+            for row in update_rows.values()
+            if isinstance(row.get("_check_request_id"), str)
+        }
 
         def apply_page(events: tuple[Any, ...]) -> None:
             for event in events:
+                if event.event_type == TRIAL_REQUEST_EVENT and event.actor_node_id == actor:
+                    try:
+                        payload, _ = validate_trial_command_payload(event.payload)
+                    except (TypeError, ValueError):
+                        continue
+                    for node_id in payload["target_node_ids"]:
+                        trial_revisions[node_id] = event.revision
+                    continue
+                if event.event_type == CHECK_REQUEST_EVENT and event.actor_node_id == actor:
+                    try:
+                        payload = validate_command_payload(event.payload)
+                    except (TypeError, ValueError):
+                        continue
+                    if payload["request_id"] in selected_checks:
+                        checks[str(payload["request_id"])] = (event.revision, payload)
+                    continue
+                if event.event_type == CHECK_REPORT_EVENT:
+                    parsed_check = inspection_from_report(event.payload)
+                    if parsed_check is None:
+                        continue
+                    checked_request, node_id, result = parsed_check
+                    selected = update_rows.get(node_id, {})
+                    command = checks.get(checked_request)
+                    if command is None:
+                        continue
+                    revision, payload = command
+                    if (
+                        node_id != event.actor_node_id
+                        or selected.get("_check_request_id") != checked_request
+                        or selected.get("_check_target_commit") != result.target_commit
+                        or payload["target_commit"] != result.target_commit
+                        or node_id not in payload["target_node_ids"]
+                        or event.revision <= revision
+                    ):
+                        continue
+                    current_main.pop(node_id, None)
+                    if (
+                        result.state not in {"up_to_date", "update_available"}
+                        or result.running_commit is None
+                        or result.current_commit != result.running_commit
+                        or not isinstance(result.trial, dict)
+                        or result.trial.get("active") is not False
+                    ):
+                        continue
+                    current_main[node_id] = (revision, event.revision, result.to_dict())
+                    continue
                 if event.event_type != TRIAL_REPORT_EVENT:
                     continue
                 parsed = trial_from_report(event.payload)
@@ -314,6 +398,7 @@ class FederationSoftwareVersionService:
                 if reported_request != request_id or node_id != event.actor_node_id:
                     continue
                 reports[node_id] = document
+                trial_revisions[node_id] = event.revision
 
         replay_authoritative_history(
             lambda last_revision: context.coordinator.replay_page(
@@ -325,6 +410,13 @@ class FederationSoftwareVersionService:
             apply_page=apply_page,
             max_pages=_MAX_REPORT_REPLAY_PAGES,
         )
+        for node_id, report in reports.items():
+            checked = current_main.get(node_id)
+            if checked is not None and checked[0] > trial_revisions.get(node_id, 0):
+                # Both the selected check command and its authenticated report
+                # follow the trial. A delayed reply to an older check cannot
+                # hide a newer trial, and the original report remains history.
+                report["_current_main_check"] = checked[2]
         return reports
 
     def _refresh(
@@ -339,12 +431,12 @@ class FederationSoftwareVersionService:
             for item in value.get("expected_report_node_ids", [])
             if isinstance(item, str)
         ]
+        update_rows = self._update_rows()
         reports = (
-            self._reports(context, actor, request_id=request_id)
+            self._reports(context, actor, request_id=request_id, update_rows=update_rows)
             if isinstance(request_id, str) and expected
             else {}
         )
-        update_rows = self._update_rows()
         rows: list[dict[str, Any]] = []
         for device in self._authority_devices(context, actor):
             if device.node_id == actor:
@@ -364,6 +456,7 @@ class FederationSoftwareVersionService:
             row
             for row in rows
             if row["node_id"] in expected
+            and row.get("trial_history") is None
             and (row.get("trial_state") or "requested") in PENDING_TRIAL_STATES
         ]
         if expired:

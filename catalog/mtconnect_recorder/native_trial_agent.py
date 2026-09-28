@@ -159,14 +159,23 @@ class NativeRecorderTrialAgent:
         recovery: dict[str, object] | None = None,
     ) -> dict[str, object]:
         source = record or {}
+        # A restore requests the pinned safe version, not the branch being
+        # left. Keep that request correlation separate from trial provenance.
+        # Older active restore journals can still derive their validated target
+        # from the pin; never infer it from whichever process is running now.
+        destination = "safe" if source.get("restore") else "trial"
         value: dict[str, object] = {
             "schema": TRIAL_RESULT_SCHEMA,
             "request_id": request_id,
             "action": "trial",
             "state": state,
             "trial_id": source.get("trial_id"),
-            "branch": source.get("trial_branch"),
-            "target_commit": source.get("trial_commit"),
+            "branch": source.get("request_branch", source.get(f"{destination}_branch")),
+            "target_commit": source.get(
+                "request_target_commit", source.get(f"{destination}_commit")
+            ),
+            "trial_branch": source.get("trial_branch"),
+            "trial_commit": source.get("trial_commit"),
             "safe_branch": source.get("safe_branch", APPROVED_BRANCH),
             "safe_commit": source.get("safe_commit"),
             "running_commit": self.running_commit(),
@@ -383,7 +392,21 @@ class NativeRecorderTrialAgent:
             )
         running = running_trial(self.journal)
         if running is not None:
-            return self._handle_restore(request_id, selection, running)
+            # An ordinary restart launches the permanent checkout but retains
+            # trial history. Only fresh, owned runtime evidence may distinguish
+            # that history from a trial which still needs its pinned restore.
+            try:
+                current = self.supervised_recorder().build_commit
+            except TrialRefusedLocally:
+                current = None
+            if current is None or current == running.get("trial_commit"):
+                return self._handle_restore(request_id, selection, running)
+            # Prevalidation below still requires the supervised runtime to
+            # match the clean permanent checkout before pinning a new fallback.
+        request_record = {
+            "request_branch": selection.branch,
+            "request_target_commit": selection.target_commit,
+        }
         try:
             record = self.prevalidate(selection)
         except TrialRefusedLocally as refused:
@@ -392,6 +415,7 @@ class NativeRecorderTrialAgent:
                 state=refused.state,
                 code=refused.code,
                 message=refused.message,
+                record=request_record,
             )
         except (OSError, RuntimeError, ValueError) as exc:
             # Prevalidation runs Git and an interpreter. Both can fail for local
@@ -405,6 +429,7 @@ class NativeRecorderTrialAgent:
                     "The branch trial could not be validated, so capture was "
                     f"not stopped ({type(exc).__name__})."
                 ),
+                record=request_record,
             )
         record["request_id"] = request_id
         self.paths.trial_stop_file.unlink(missing_ok=True)
@@ -434,6 +459,13 @@ class NativeRecorderTrialAgent:
         stacking on top of an unproven one.
         """
 
+        # A refusal must answer this request too, without changing the running
+        # trial's durable record or mislabelling its original branch and commit.
+        running = {
+            **running,
+            "request_branch": selection.branch,
+            "request_target_commit": selection.target_commit,
+        }
         safe_commit = running.get("safe_commit")
         if (
             not selection.is_approved_branch
@@ -484,6 +516,8 @@ class NativeRecorderTrialAgent:
                         "safe_commit",
                         "safe_root",
                         "safe_state",
+                        "request_branch",
+                        "request_target_commit",
                     )
                 },
                 "request_id": request_id,

@@ -124,7 +124,7 @@ def test_software_version_reports_do_not_return_a_prefix_at_the_existing_page_ce
     )
 
     with pytest.raises(AuthoritativeReplayIncomplete):
-        service._reports(context, "node-leader", request_id="trial-one")
+        service._reports(context, "node-leader", request_id="trial-one", update_rows={})
 
 
 def test_switch_version_persists_an_accepted_request_when_report_replay_is_incomplete(

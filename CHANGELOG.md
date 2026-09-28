@@ -16,6 +16,20 @@ trusted AI/compute contribution, durable federated analysis jobs, recorder
 capture/publication/control, deterministic MTConnect operational segmentation,
 human authentication/RBAC, and bounded manual Federation-wide updates.
 
+### Native Recorder trial restoration
+
+Restore results now identify the requested pinned version separately from the
+trial being left, so both refusals and verified restores settle their matching
+Federation request. A refused restore retains the proved running trial and its
+return action in the version view. After an ordinary restart on main, a fresh
+supervised runtime can start another trial without discarding earlier history;
+missing or stale runtime identity still fails closed.
+
+A later authenticated update check that proves the recorder is back on main now
+keeps an earlier trial report as history and makes version selection available
+again. Authoritative event order prevents an older check or its delayed reply
+from hiding a newer trial; prior failed results and pending requests remain intact.
+
 ### Configured quorum authority and journal continuity
 
 Built-in creator storage now announces the exact provider it hosts and withdraws
