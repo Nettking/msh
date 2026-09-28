@@ -18,6 +18,12 @@ human authentication/RBAC, and bounded manual Federation-wide updates.
 
 ### Native Recorder trial restoration
 
+Federation updates now distinguish authenticated MTConnect capture capabilities
+from F7 workload providers. Native Recorders retain their correlated graceful
+capture shutdown and supervisor handoff; workload providers on the same device
+still require the authoritative job drain before activation. Unknown capability
+metadata continues to fail closed.
+
 Restore results now identify the requested pinned version separately from the
 trial being left, so both refusals and verified restores settle their matching
 Federation request. A refused restore retains the proved running trial and its

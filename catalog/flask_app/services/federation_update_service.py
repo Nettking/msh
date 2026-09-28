@@ -316,6 +316,19 @@ class FederationUpdateService:
             node_id = getattr(capability, "node_id", None)
             capability_id = getattr(capability, "capability_id", None)
             if isinstance(node_id, str) and isinstance(capability_id, str):
+                # MTConnect capture uses the existing correlated native stop,
+                # checkpoint and supervisor handoff. It does not own F7 jobs
+                # or a local F7 claim database. Only its authenticated exact
+                # role is exempt from that separate admission fence; every
+                # other provider on the same node still has to drain.
+                if (
+                    getattr(capability, "capability_type", None) == "recorder"
+                    and getattr(capability, "protocol", None) == "mtconnect"
+                    and getattr(capability, "protocol_version", None) == "1"
+                    and getattr(capability, "kind", None) == "standalone-recorder"
+                    and capability_id in {f"recorder-{node_id}", "recorder-local"}
+                ):
+                    continue
                 provider_ids.setdefault(node_id, []).append(capability_id)
         return {
             node_id: tuple(sorted(set(ids)))
