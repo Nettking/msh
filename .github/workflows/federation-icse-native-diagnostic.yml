@@ -1,0 +1,51 @@
+name: Observe retained ICSE Windows startup failure once
+
+on:
+  push:
+    branches: [codex/federation-icse-native-diagnostic]
+    paths:
+      - .github/workflows/federation-icse-native-diagnostic.yml
+      - scripts/ci_icse_native_diagnostic.py
+
+permissions:
+  contents: read
+
+jobs:
+  observe:
+    name: Observe exact failed ICSE source on Nettking Windows
+    runs-on: [self-hosted, Windows, X64, nettking, fcp-windows]
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Retain observer privately outside runner cleanup
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:GITHUB_REPOSITORY -ne 'Nettking/msh' -or $env:GITHUB_REF -ne 'refs/heads/codex/federation-icse-native-diagnostic' -or $env:GITHUB_EVENT_NAME -ne 'push' -or $env:GITHUB_RUN_ATTEMPT -ne '1' -or $env:RUNNER_NAME -ne 'Nettking' -or $env:COMPUTERNAME -ne 'NETTKING') { throw 'Unexpected observer invocation' }
+          if ($env:GITHUB_RUN_ID -notmatch '^\d+$') { throw 'Invalid run identity' }
+          $observerWork = Split-Path -Parent $env:RUNNER_TEMP
+          $observerRoot = Join-Path $observerWork ('fcp-icse-native-diagnostic-' + $env:GITHUB_RUN_ID)
+          if (Test-Path -LiteralPath $observerRoot) { throw 'Observer output already exists' }
+          New-Item -ItemType Directory -Path $observerRoot | Out-Null
+          $observerSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+          & icacls.exe $observerRoot /inheritance:r /grant:r ('*' + $observerSid + ':(OI)(CI)F') | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw 'Private observer ACL failed' }
+          Copy-Item -LiteralPath (Join-Path $env:GITHUB_WORKSPACE 'scripts/ci_icse_native_diagnostic.py') -Destination (Join-Path $observerRoot 'observer.py')
+          Add-Content -LiteralPath $env:GITHUB_ENV -Value ('FCP_ICSE_DIAGNOSTIC_ROOT=' + $observerRoot)
+      - name: Checkout exact original failed product source
+        uses: actions/checkout@v4
+        with:
+          ref: 9f6ffb5b959608879a7853b838a1823deac7efb1
+          fetch-depth: 0
+      - uses: ./.github/actions/self-hosted-python
+        with:
+          python-version: "3.12"
+      - name: Install original reviewer runtime dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install ruff
+      - name: Read original logs or observe one unmodified network demonstration
+        run: python -B "$env:FCP_ICSE_DIAGNOSTIC_ROOT\observer.py"
