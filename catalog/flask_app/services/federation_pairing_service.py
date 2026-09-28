@@ -575,6 +575,9 @@ class PairingRelayRuntime:
         self._thread: threading.Thread | None = None
         self._client: PairingRelayNodeClient | None = None
         self._relay_url: str | None = None
+        self._closed = False
+        self._loop_ready = threading.Event()
+        self._shutdown_error: str | None = None
         # The thread lock only owns loop startup. Connection operations yield
         # on that loop, so they also need one owner across authentication and
         # initial replay before publishing the client for other callers.
@@ -582,37 +585,124 @@ class PairingRelayRuntime:
 
     def _start_loop(self) -> asyncio.AbstractEventLoop:
         with self._lock:
-            if self._loop is not None and self._thread is not None and self._thread.is_alive():
-                return self._loop
-            ready = threading.Event()
+            if self._closed:
+                raise FederationOperationError(
+                    "pairing-runtime-closed", "the relay pairing runtime is closed"
+                )
+            if self._thread is None or not self._thread.is_alive():
+                self._loop_ready.clear()
 
-            def run() -> None:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                with self._lock:
-                    self._loop = loop
-                ready.set()
-                loop.run_forever()
-                loop.close()
+                def run() -> None:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    with self._lock:
+                        self._loop = loop
+                        if self._closed:
+                            loop.create_task(self._shutdown())
+                    self._loop_ready.set()
+                    try:
+                        loop.run_forever()
+                    finally:
+                        loop.close()
 
-            thread = threading.Thread(
-                target=run,
-                name="fcp-pairing-relay",
-                daemon=True,
-            )
-            self._thread = thread
-            thread.start()
-        if not ready.wait(timeout=5):
+                thread = threading.Thread(
+                    target=run,
+                    name="fcp-pairing-relay",
+                    daemon=True,
+                )
+                self._thread = thread
+                thread.start()
+        # Another submitter may arrive before the new thread has published its
+        # loop. It must wait for the same owner rather than start a second one.
+        if not self._loop_ready.wait(timeout=5):
             raise FederationOperationError(
                 "pairing-runtime-start-failed",
                 "the relay pairing runtime did not start",
             )
-        assert self._loop is not None
-        return self._loop
+        with self._lock:
+            if self._closed:
+                raise FederationOperationError(
+                    "pairing-runtime-closed", "the relay pairing runtime is closed"
+                )
+            assert self._loop is not None
+            return self._loop
+
+    async def _shutdown(self) -> None:
+        # A connect can still own an unpublished client while holding the
+        # connection lock. Cancel it first so its finally/except cleanup runs
+        # before disconnecting the published client and closing the loop.
+        loop = asyncio.get_running_loop()
+        try:
+            current = asyncio.current_task()
+            pending = tuple(task for task in asyncio.all_tasks() if task is not current)
+            for task in pending:
+                task.cancel()
+            if pending:
+                await asyncio.gather(*pending, return_exceptions=True)
+            await self._disconnect_current()
+        except Exception as exc:  # noqa: BLE001 - retain cleanup failure, still drain owned work
+            self._shutdown_error = type(exc).__name__
+        finally:
+            try:
+                await loop.shutdown_asyncgens()
+                # Cancelling to_thread's awaiter does not stop its filesystem
+                # work. Keep this owner alive until those workers actually
+                # finish; close's bounded join then truthfully reports False.
+                await loop.shutdown_default_executor()
+            except Exception as exc:  # noqa: BLE001 - cleanup failure is visible to close
+                self._shutdown_error = type(exc).__name__
+            finally:
+                loop.call_soon(loop.stop)
+
+    def close(self, *, timeout: float = 3.0) -> bool:
+        """Release this runtime's private loop without creating another owner.
+
+        Closing is terminal and idempotent. False means cleanup is still in
+        progress after the caller's bounded wait or encountered an error; the
+        actual thread and error are retained and submissions cannot restart it.
+        """
+
+        if not math.isfinite(timeout) or timeout < 0:
+            raise ValueError("runtime close timeout must be finite and nonnegative")
+        with self._lock:
+            first_close = not self._closed
+            self._closed = True
+            thread = self._thread
+            if thread is None:
+                return True
+            if first_close:
+                # Queue shutdown from the owner thread, after loop startup,
+                # without spending the caller's entire budget waiting for it.
+                def schedule_shutdown() -> None:
+                    loop = self._loop
+                    if loop is not None and not loop.is_closed():
+                        loop.create_task(self._shutdown())
+
+                loop = self._loop
+                if loop is None:
+                    # Startup has already installed this thread as the owner.
+                    # Its ready signal is set immediately before run_forever.
+                    # The startup path below schedules cleanup if closed.
+                    pass
+                elif not loop.is_closed():
+                    loop.call_soon_threadsafe(schedule_shutdown)
+        if thread is threading.current_thread():
+            return False
+        thread.join(timeout=timeout)
+        return not thread.is_alive() and self._shutdown_error is None
 
     def _submit(self, coroutine: Any) -> Any:
-        loop = self._start_loop()
-        future = asyncio.run_coroutine_threadsafe(coroutine, loop)
+        try:
+            loop = self._start_loop()
+            with self._lock:
+                if self._closed:
+                    raise FederationOperationError(
+                        "pairing-runtime-closed", "the relay pairing runtime is closed"
+                    )
+                future = asyncio.run_coroutine_threadsafe(coroutine, loop)
+        except BaseException:
+            coroutine.close()
+            raise
         try:
             return future.result(timeout=self.timeout_seconds)
         except TimeoutError as exc:

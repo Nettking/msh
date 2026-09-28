@@ -390,6 +390,7 @@ class RecorderFederationNode:
             display_name=self.display_name,
             timeout_seconds=self.request_timeout,
         )
+        owned_runtime = self.runtime
         self.service = service or PairingAwareCapabilityOnboardingService(
             identity_directory=self.identity_directory,
             state_database=federation_root / "onboarding" / "onboarding.sqlite3",
@@ -400,6 +401,7 @@ class RecorderFederationNode:
         )
         # Test-injected services may own their own runtime/store.
         self.runtime = getattr(self.service, "relay_runtime", self.runtime)
+        self._owns_runtime = self.runtime is owned_runtime
         self.remote_store = getattr(self.service, "remote_store", self.remote_store)
         self.jsonl_publisher = (
             jsonl_publisher
@@ -1195,15 +1197,20 @@ class RecorderFederationNode:
                 await storage_client.close()
 
     def stop(self, *, timeout: float = 3.0) -> None:
+        deadline = time.monotonic() + max(0.0, timeout)
         self._stop.set()
         future = self._publication_future
         self._publication_future = None
-        if future is None:
-            return
-        try:
-            future.result(timeout=timeout)
-        except Exception:  # noqa: BLE001 - process shutdown is best effort
-            future.cancel()
+        if future is not None:
+            try:
+                future.result(timeout=max(0.0, deadline - time.monotonic()))
+            except Exception:  # noqa: BLE001 - process shutdown is best effort
+                future.cancel()
+        # Bootstrap can fail before publication exists. Its pairing loop is
+        # still ours and must not survive every managed reconnect attempt.
+        # An injected service may share its runtime with another owner.
+        if self._owns_runtime:
+            self.runtime.close(timeout=max(0.0, deadline - time.monotonic()))
 
 
 __all__ = [

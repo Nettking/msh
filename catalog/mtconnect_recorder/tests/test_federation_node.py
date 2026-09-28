@@ -28,6 +28,20 @@ from catalog.mtconnect_recorder.federation_node import (
 from start_recorder import build_parser
 
 
+def test_stop_does_not_close_an_injected_services_runtime(tmp_path) -> None:
+    calls = []
+    runtime = SimpleNamespace(close=lambda **kwargs: calls.append(kwargs))
+    node = RecorderFederationNode(
+        data_directory=tmp_path,
+        display_name="Member",
+        source_names=(),
+        service=SimpleNamespace(relay_runtime=runtime),
+        jsonl_publisher=object(),
+    )
+    node.stop()
+    assert not calls
+
+
 def _status(*capabilities: dict[str, object]) -> dict[str, object]:
     return {
         "sessions": [

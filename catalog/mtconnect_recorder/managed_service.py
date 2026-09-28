@@ -488,6 +488,7 @@ class ManagedRecorderFederationRuntime:
                     (self._health_thread is not None and self._health_thread.is_alive())
                     or (self._health_control_thread is not None and self._health_control_thread.is_alive())
                     or (self._health_publication is not None and not self._health_publication.done())
+                    or (self._health_publication_thread is not None and self._health_publication_thread.is_alive())
                 ):
                     self._health_generation_overlap = True
                     if not self._health_overlapped_workers:

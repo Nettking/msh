@@ -193,6 +193,31 @@ def test_thread_observation_keeps_the_generation_bound_at_start(companion, monke
     assert companion._health_outcome == "starting"
 
 
+def test_cancelled_publication_cannot_hide_its_still_draining_runtime(companion, monkeypatch):
+    old = running_companion(companion)
+    control, future = connected_workers(companion)
+    owner = companion._health_publication_thread
+    old.alive = False
+    control._thread.alive = False
+    future.cancel()
+    companion.stop(timeout=0)
+    monkeypatch.setattr(managed.threading, "Thread", ObservedThread)
+    companion.start()
+    row = companion.health_snapshot()["managed_companion"]
+    assert row["generation_overlap"] is True
+    assert row["generation_current"] is False
+    assert row["healthy"] is False
+    observed = {item["worker"]: item for item in row["overlapped_workers"]}
+    assert observed["recorder_publication"]["pending"] is False
+    assert observed["publication_event_loop"]["alive"] is True
+    owner.alive = False
+    observed = {
+        item["worker"]: item
+        for item in companion.health_snapshot()["managed_companion"]["overlapped_workers"]
+    }
+    assert observed["publication_event_loop"]["alive"] is False
+
+
 def test_wrong_runtime_generation_is_refused_even_when_thread_is_alive(companion):
     running_companion(companion)
     companion._observe_cycle(companion._health_generation, "completed")

@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from websockets.exceptions import ConnectionClosedError, ConnectionClosedOK
+from websockets.frames import Close
 
 import catalog.node.client as node_client_module
 from catalog.federation.models import SessionEvent
@@ -80,6 +82,129 @@ def test_cancelled_authentication_closes_unpublished_websocket(
             task.cancel()
             await asyncio.gather(task, return_exceptions=True)
             await websocket.close()
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("close_code", [1000, 1011])
+@pytest.mark.parametrize("receiver_failed", [False, True])
+def test_request_send_closure_is_retryable_and_cleans_up_connection(
+    tmp_path: Path, close_code: int, receiver_failed: bool,
+) -> None:
+    async def scenario() -> None:
+        client = _client(tmp_path)
+        _join_connected_session(client)
+        closure_type = ConnectionClosedOK if close_code == 1000 else ConnectionClosedError
+        closure = closure_type(Close(close_code, "closed"), None)
+        pending: list[asyncio.Future] = []
+
+        class WebSocket:
+            closed = False
+
+            async def send(self, message):
+                pending.extend(client._pending.values())
+                # The receiver can notice closure while a send is suspended.
+                if receiver_failed:
+                    for future in pending:
+                        future.set_exception(RelayRemoteError("connection-closed", "closed"))
+                raise closure
+
+            async def close(self):
+                self.closed = True
+
+        websocket = WebSocket()
+        receiver = asyncio.create_task(asyncio.Event().wait())
+        client._websocket = websocket  # type: ignore[assignment]
+        client._receiver_task = receiver
+        client.connected_event.set()
+        client.disconnected_event.clear()
+        try:
+            with pytest.raises(RelayRemoteError) as caught:
+                await client.request("heartbeat", payload={})
+            assert caught.value.code == "connection-closed"
+            assert caught.value.__cause__ is closure
+            assert client._pending == {}
+            assert client._websocket is None
+            assert not client.connected_event.is_set()
+            assert client.disconnected_event.is_set()
+            assert client.state.status()["last_error_code"] == "connection-closed"
+            assert receiver.done()
+            assert websocket.closed
+            # No orphaned request error should be reported by asyncio later.
+            assert all(not future._log_traceback for future in pending)
+        finally:
+            for future in pending:
+                if future.done() and not future.cancelled():
+                    future.exception()
+            await client.disconnect()
+
+    asyncio.run(scenario())
+
+
+def test_heartbeat_close_code_is_recorded_without_breaking_disconnect(
+    tmp_path: Path,
+) -> None:
+    async def scenario() -> None:
+        async def sleep(_seconds):
+            await asyncio.sleep(0)
+
+        client = _client(tmp_path, sleep=sleep)
+        _join_connected_session(client)
+
+        class WebSocket:
+            async def close(self):
+                pass
+
+        async def request(*args, **kwargs):
+            raise ConnectionClosedError(Close(1011, "keepalive ping timeout"), None)
+
+        client._websocket = WebSocket()  # type: ignore[assignment]
+        client._receiver_task = asyncio.create_task(asyncio.Event().wait())
+        client.request = request  # type: ignore[method-assign]
+        client.connected_event.set()
+        client.disconnected_event.clear()
+        await asyncio.wait_for(client._heartbeat_loop(), timeout=1)
+        assert client._websocket is None
+        assert client.disconnected_event.is_set()
+        assert client.state.status()["connection_state"] == "error"
+        assert client.state.status()["last_error_code"] == "connection-closed"
+
+    asyncio.run(scenario())
+
+
+def test_failed_old_heartbeat_does_not_disconnect_replacement_socket(tmp_path: Path) -> None:
+    async def scenario() -> None:
+        async def sleep(_seconds):
+            await asyncio.sleep(0)
+
+        client = _client(tmp_path, sleep=sleep)
+        _join_connected_session(client)
+
+        class ReplacementSocket:
+            closed = False
+
+            async def close(self):
+                self.closed = True
+
+        replacement = ReplacementSocket()
+
+        class OldSocket(ReplacementSocket):
+            async def send(self, message):
+                client._websocket = replacement  # type: ignore[assignment]
+                raise ConnectionClosedError(Close(1011, "old connection closed"), None)
+
+        client._websocket = OldSocket()  # type: ignore[assignment]
+        client._receiver_task = asyncio.create_task(asyncio.Event().wait())
+        client.connected_event.set()
+        client.disconnected_event.clear()
+        try:
+            await asyncio.wait_for(client._heartbeat_loop(), timeout=1)
+            assert client._websocket is replacement
+            assert client.connected_event.is_set()
+            assert not replacement.closed
+            assert client._pending == {}
+        finally:
+            await client.disconnect()
 
     asyncio.run(scenario())
 

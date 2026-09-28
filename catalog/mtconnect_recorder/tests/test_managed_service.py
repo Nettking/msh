@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from catalog.federation.errors import FederationOperationError
 from catalog.federation.service_incarnation import (
     STATE_RESTARTING,
     STOP_FAILURE,
@@ -12,6 +13,7 @@ from catalog.federation.service_incarnation import (
     record_service_start,
 )
 from catalog.mtconnect_recorder import managed_service
+from catalog.mtconnect_recorder.federation_node import RecorderFederationNode
 from catalog.mtconnect_recorder.managed_service import (
     ManagedRecorderFederationRuntime,
 )
@@ -25,6 +27,38 @@ class FakeService:
     def authorized_context(self):
         self.calls.append("authorized-context")
         return self.context
+
+
+def test_repeated_failed_bootstrap_releases_each_owned_relay_loop(tmp_path: Path) -> None:
+    nodes = []
+
+    class FailingNode(RecorderFederationNode):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs, jsonl_publisher=object())
+            nodes.append(self)
+
+        def has_saved_membership(self):
+            return True
+
+        def bootstrap(self):
+            async def unavailable():
+                raise FederationOperationError("pairing-relay-timeout", "test outage")
+            return self.runtime._submit(unavailable())
+
+    companion = ManagedRecorderFederationRuntime(
+        data_directory=tmp_path,
+        node_factory=FailingNode,
+        source_names_loader=lambda _path: (),
+    )
+    for _ in range(5):
+        with pytest.raises(FederationOperationError, match="test outage"):
+            companion.connect_once()
+        node = nodes[-1]
+        assert node._publication_future is None
+        assert node.runtime._thread is not None and not node.runtime._thread.is_alive()
+        assert node.runtime._loop is not None and node.runtime._loop.is_closed()
+        assert companion._node is None
+    assert len(nodes) == 5
 
 
 class FakeNode:
