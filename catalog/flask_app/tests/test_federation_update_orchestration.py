@@ -526,3 +526,210 @@ def test_update_all_serializes_remote_then_local_activation_behind_drain(
     owner_drain = drains.get(session_id="session-one", node_id=ACTOR)
     assert owner_drain is not None
     assert owner_drain.state.value == "ready"
+
+
+# Native MTConnect capture has its own correlated graceful-stop protocol. It
+# does not register an F7 job executor or an authoritative F7 ownership store.
+def _capture_capability(**changes: Any) -> dict[str, Any]:
+    value = {
+        "session_id": "session-one",
+        "node_id": REMOTE,
+        "capability_id": f"recorder-{REMOTE}",
+        "type": "recorder",
+        "protocol": "mtconnect",
+        "protocol_version": "1",
+        "status": "ready",
+        "properties": {"kind": "standalone-recorder"},
+    }
+    value.update(changes)
+    return value
+
+
+def _projected_capabilities(*rows: dict[str, Any]) -> tuple[object, ...]:
+    from catalog.federation.projections.authority_adapter import (
+        FederationAuthorityAdapter,
+    )
+
+    adapter = FederationAuthorityAdapter(
+        None, actor_node_id=ACTOR, internal_session_id="session-one"
+    )
+    return adapter._capabilities({"capabilities": rows}, {ACTOR, REMOTE})
+
+
+@pytest.mark.parametrize("capability_id", [f"recorder-{REMOTE}", "recorder-local"])
+def test_capture_update_reaches_existing_native_handoff_without_f7_authority(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capability_id: str
+) -> None:
+    from catalog.mtconnect_recorder.federation_update import (
+        RecorderFederationUpdateWorker,
+    )
+    from catalog.mtconnect_recorder.tests.test_recorder_federation_update import (
+        _Handoff,
+        _Node,
+    )
+
+    coordinator = _EventCoordinator()
+    _install_context(
+        monkeypatch, coordinator,
+        (_device(ACTOR, "connected", "Owner"), _device(REMOTE, "connected", "Recorder")),
+    )
+    _Authority.capabilities = _projected_capabilities(
+        _capture_capability(capability_id=capability_id)
+    )
+    local = _Local()
+    service = FederationUpdateService(local, tmp_path / "updates.json")
+    now = datetime.now(timezone.utc)
+    service._save({
+        "operation": "check", "status": "update_available", "request_id": "check-capture",
+        "checked_at": service._stamp(now),
+        "check_expires_at": service._stamp(now + timedelta(minutes=5)),
+        "report_deadline": service._stamp(now + timedelta(minutes=5)),
+        "target_commit": TARGET, "expected_report_node_ids": [], "eligible_count": 1,
+        "devices": [
+            service._device(ACTOR, "Owner", UpdateInspection("up_to_date", TARGET, TARGET, running_commit=TARGET)),
+            service._device(REMOTE, "Recorder", UpdateInspection("update_available", CURRENT, TARGET, running_commit=CURRENT)),
+        ],
+    })
+    rollout = service.update_all(confirmed_target=TARGET)
+    command = next(e for e in coordinator.events if e.event_type == APPLY_REQUEST_EVENT)
+    assert "drain_node_id" not in command.payload
+    assert "drain_provider_ids" not in command.payload
+    assert rollout["rollout"]["provider_ids_by_node"] == {REMOTE: []}
+
+    # The real native processor has no F7 store. Exercise the authenticated
+    # replay/handoff path, not merely a classification helper returning False.
+    command.revision = 2
+    created = SimpleNamespace(
+        revision=1, session_id="session-one", event_type="session.created",
+        actor_node_id=ACTOR, payload={"session_id": "session-one"},
+    )
+    node = _Node(tmp_path, (created, command))
+    node.context.credentials.identity.node_id = REMOTE
+    node.context.binding.internal_session_id = "session-one"
+    handoff = _Handoff()
+    worker = RecorderFederationUpdateWorker(node, data_directory=tmp_path, handoff=handoff)
+    assert worker.processor.drain_store is None
+    assert worker.process_once() is True
+    assert len(handoff.applies) == 1 and handoff.applies[0][0] == TARGET
+    assert handoff.applies[0][1].startswith("fed-")
+    assert node.appended[-1]["payload"]["state"] == "activation_queued"
+    assert local.apply_calls == []
+
+
+@pytest.mark.parametrize("change", [
+    {"type": "analysis"},
+    {"protocol": "registered-compute"},
+    {"protocol_version": "2"},
+    {"capability_id": "compute-provider-recorder-like"},
+    {"capability_id": "recorder-another-node"},
+    {"properties": {}},
+    {"properties": {"kind": "registered-compute-handler"}},
+    {"properties": {"kind": " standalone-recorder "}},
+])
+def test_unknown_or_changed_capture_metadata_remains_in_f7_drain(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, change: dict[str, Any]
+) -> None:
+    coordinator = _EventCoordinator()
+    _install_context(monkeypatch, coordinator, (_device(REMOTE, "connected", "Remote"),))
+    _Authority.capabilities = _projected_capabilities(_capture_capability(**change))
+    service = FederationUpdateService(_Local(), tmp_path / "updates.json")
+    assert service._provider_ids_by_node(module.get_capability_onboarding_service().authorized_context(), ACTOR) == {
+        REMOTE: (_Authority.capabilities[0].capability_id,)
+    }
+
+
+def test_capture_classification_never_excludes_other_providers_on_same_node(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    coordinator = _EventCoordinator()
+    _install_context(monkeypatch, coordinator, (_device(REMOTE, "connected", "Mixed"),))
+    _Authority.capabilities = _projected_capabilities(
+        _capture_capability(),
+        _capture_capability(capability_id="analysis-provider", type="analysis", protocol="analysis"),
+        _capture_capability(capability_id="storage-provider", type="storage", protocol="storage"),
+    )
+    service = FederationUpdateService(_Local(), tmp_path / "updates.json")
+    providers = service._provider_ids_by_node(module.get_capability_onboarding_service().authorized_context(), ACTOR)
+    assert providers == {REMOTE: ("analysis-provider", "storage-provider")}
+
+    from catalog.flask_app.services.federation_update_events import (
+        FederationUpdateEventProcessor,
+    )
+
+    processor = FederationUpdateEventProcessor(object(), object(), tmp_path / "processor.json")
+    with pytest.raises(ValueError, match="update-drain-unavailable"):
+        processor._request_drain(
+            {"drain_node_id": REMOTE, "drain_provider_ids": list(providers[REMOTE])},
+            session_id="session-one", local_node=REMOTE,
+        )
+
+    # Classifying one capture capability must not remove the actual F7 fence
+    # for another provider on that node, or declare its owned job quiescent.
+    from catalog.capabilities.tests import test_update_drain as workload
+    from catalog.capabilities.update_drain import NodeUpdateDrainTarget
+    from catalog.federation.errors import FederationValidationError
+
+    jobs = SQLiteJobLifecycleStore(tmp_path / "jobs.sqlite3")
+    drains = SQLiteNodeUpdateDrainStore(jobs)
+    workload._claim(jobs, provider_id="analysis-provider")
+    drains.request_drain(
+        session_id=workload.SESSION,
+        target=NodeUpdateDrainTarget(REMOTE, providers[REMOTE]),
+        command_id="mixed-node-drain",
+        now=workload.NOW + timedelta(seconds=3),
+    )
+    assert not drains.is_quiescent(session_id=workload.SESSION, node_id=REMOTE)
+    with pytest.raises(FederationValidationError):
+        workload._claim(jobs, provider_id="analysis-provider", job_id="new-job")
+
+
+def test_capture_kind_projection_is_bounded_and_session_membership_scoped() -> None:
+    rows = _projected_capabilities(
+        _capture_capability(),
+        _capture_capability(session_id="other-session"),
+        _capture_capability(node_id="other-node"),
+        _capture_capability(capability_id="unknown", properties={"kind": "x" * 100000}),
+    )
+    assert len(rows) == 2
+    assert {r.capability_id: r.kind for r in rows} == {
+        f"recorder-{REMOTE}": "standalone-recorder", "unknown": None,
+    }
+
+
+@pytest.mark.parametrize("change", [
+    {"type": " recorder "},
+    {"protocol": " mtconnect "},
+    {"protocol_version": " 1 "},
+    {"capability_id": f" recorder-{REMOTE} "},
+    {"node_id": f" {REMOTE} ", "capability_id": "recorder-local"},
+])
+def test_raw_noncanonical_capture_metadata_never_gains_exemption(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, change: dict[str, Any]
+) -> None:
+    from catalog.federation.models import CapabilityAnnouncement, CapabilityStatus
+    from catalog.federation.projections.authority_adapter import (
+        FederationAuthorityAdapter,
+    )
+
+    values = _capture_capability(**change)
+    values["status"] = CapabilityStatus.READY
+    values["announced_at"] = datetime.now(timezone.utc)
+    announcement = CapabilityAnnouncement(**values)
+    # The actual model retains these strings. Presentation normalization must
+    # not turn them into a proof of capture-only update semantics.
+    assert all(getattr(announcement, key) == value for key, value in change.items())
+    adapter = FederationAuthorityAdapter(
+        None, actor_node_id=ACTOR, internal_session_id="session-one"
+    )
+    records = adapter._capabilities(
+        {"capabilities": [announcement]}, {ACTOR, announcement.node_id}
+    )
+    assert len(records) == 1
+    coordinator = _EventCoordinator()
+    _install_context(monkeypatch, coordinator, (_device(REMOTE, "connected", "Remote"),))
+    _Authority.capabilities = records
+    service = FederationUpdateService(_Local(), tmp_path / "updates.json")
+    assert records[0].kind is None
+    assert service._provider_ids_by_node(
+        module.get_capability_onboarding_service().authorized_context(), ACTOR
+    ) == {records[0].node_id: (records[0].capability_id,)}

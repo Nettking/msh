@@ -50,6 +50,9 @@ class FederatedCapabilityRecord:
     protocol_version: str
     status: str
     last_seen_at: datetime | None
+    # Preserve only the known capture role from authenticated capability
+    # metadata. Missing, malformed or other properties remain unclassified.
+    kind: str | None = None
 
 
 @dataclass(frozen=True)
@@ -489,6 +492,22 @@ class FederationAuthorityAdapter:
                             "last_heartbeat",
                             _value(capability, "last_heartbeat_at"),
                         )
+                    ),
+                    kind=(
+                        "standalone-recorder"
+                        # Display normalization must never manufacture the
+                        # positive role proof used by update admission.
+                        if (
+                            raw_node_id == raw_node_id.strip()
+                            and _value(capability, "type") == "recorder"
+                            and _value(capability, "protocol") == "mtconnect"
+                            and _value(capability, "protocol_version") == "1"
+                            and _value(capability, "capability_id")
+                            in (f"recorder-{raw_node_id}", "recorder-local")
+                            and _value(_value(capability, "properties", {}), "kind")
+                            == "standalone-recorder"
+                        )
+                        else None
                     ),
                 )
             )
