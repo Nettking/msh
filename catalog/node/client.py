@@ -541,6 +541,20 @@ class RelayNodeClient:
                 future,
                 timeout=self.request_timeout if timeout is None else timeout,
             )
+        except ConnectionClosed as exc:
+            # A socket may close during send, before the receiver translates
+            # closure into a structured error for this request. Keep that race
+            # inside the same retryable contract used by delivery workers.
+            self._pending.pop(envelope.request_id, None)
+            if not future.done():
+                future.cancel()
+            elif not future.cancelled():
+                future.exception()
+            if self._websocket is websocket:
+                await self.disconnect(error_code="connection-closed")
+            raise RelayRemoteError(
+                "connection-closed", "relay connection closed during request"
+            ) from exc
         finally:
             self._pending.pop(envelope.request_id, None)
 
@@ -1223,9 +1237,11 @@ class RelayNodeClient:
         return "gap-replay-failed"
 
     async def _heartbeat_loop(self) -> None:
+        websocket = self._websocket
         try:
             while self._websocket is not None:
                 await self._sleep(self.heartbeat_interval)
+                websocket = self._websocket
                 await self.request("heartbeat", payload={})
                 self.state.record_heartbeat(now=self._clock())
         except asyncio.CancelledError:
@@ -1237,9 +1253,13 @@ class RelayNodeClient:
             FederationOperationError,
             FederationValidationError,
         ) as exc:
-            if self._websocket is not None:
+            if websocket is not None and self._websocket is websocket:
                 await self.disconnect(
-                    error_code=getattr(exc, "code", "heartbeat-failed")
+                    error_code=(
+                        "connection-closed"
+                        if isinstance(exc, ConnectionClosed)
+                        else getattr(exc, "code", "heartbeat-failed")
+                    )
                 )
 
     @staticmethod
