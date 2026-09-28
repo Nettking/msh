@@ -267,6 +267,11 @@ def trial_report_payload(
         "recovery": flags("recovery"),
         "reported_at": _stamp(datetime.now(timezone.utc)),
     }
+    trial_branch = branch("trial_branch")
+    trial_commit = commit("trial_commit")
+    if trial_branch is not None and trial_commit is not None:
+        value["trial_branch"] = trial_branch
+        value["trial_commit"] = trial_commit
     _bounded(value)
     return value
 

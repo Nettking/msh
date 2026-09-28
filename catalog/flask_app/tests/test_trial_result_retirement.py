@@ -114,6 +114,33 @@ def test_unsettled_trial_keeps_its_result_and_pending_reader(
     assert persisted.get(events.TRIAL_RETIREMENT_STATE_KEY) in (None, [])
 
 
+@pytest.mark.parametrize("state", ["refused", "safe_restored"])
+def test_restore_result_for_a_different_target_cannot_settle_the_request(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    state: str,
+) -> None:
+    processor, handoff, state_file = _processor(tmp_path, monkeypatch)
+    path = _write_trial_result(handoff.directory, HOST_REQUEST, state)
+    document = json.loads(path.read_text(encoding="utf-8"))
+    document["target_commit"] = "c" * 40
+    document["safe_commit"] = TARGET
+    document["running_commit"] = TARGET
+    path.write_text(json.dumps(document), encoding="utf-8")
+    initial = _pending_state()
+    events._write_state(state_file, initial)
+    reports: list[object] = []
+    monkeypatch.setattr(
+        events, "_append_remote_event", lambda *args, **kwargs: reports.append(args)
+    )
+
+    processor._finish_pending(_context(), initial)
+
+    assert reports == []
+    assert FEDERATION_REQUEST in events._read_state(state_file)["pending"]
+    assert path.exists()
+
+
 def test_failed_state_commit_never_unlinks_the_only_reconciliation_copy(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

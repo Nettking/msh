@@ -292,6 +292,19 @@ class FederationSoftwareVersionService:
                 row["branch"] = report.get("safe_branch") or APPROVED_BRANCH
                 row["on_test_branch"] = False
                 row["commit"] = report.get("safe_commit") or row["commit"]
+            elif (
+                state in {"refused", "error"}
+                and report.get("trial_branch")
+                and report["trial_branch"] != APPROVED_BRANCH
+                and report.get("trial_commit")
+                and report["trial_commit"] == report.get("running_commit")
+            ):
+                # A refused restore leaves capture on the trial. Its request
+                # target is the safe pin, while this separate runtime proof
+                # keeps the real running branch and restore action visible.
+                row["branch"] = report["trial_branch"]
+                row["on_test_branch"] = True
+                row["commit"] = report["trial_commit"]
         return row
 
     def _reports(
