@@ -1733,6 +1733,22 @@ def _probe_host_mutation_serialization(context: ProbeContext) -> ProbeOutcome:
 # --------------------------------------------------------------------------
 
 
+def _recorder_archive_roots(context: ProbeContext) -> tuple[Path, Path]:
+    """Resolve the store layout without changing the bound Federation root.
+
+    Older probe deployments used flat raw/observations roots. Prefer the
+    current store layout whenever present, so retained copies in the old
+    layout cannot inflate the same Recorder corpus or its growth counters.
+    Constructing the store only names paths; it creates no files.
+    """
+    from catalog.mtconnect_recorder.storage import DurableRecorderStore
+
+    store = DurableRecorderStore(context.data_dir)
+    if store.root.exists():
+        return store.raw_root, store.observation_root
+    return context.data_dir / "raw", context.data_dir / "observations"
+
+
 def _probe_corpus_size(context: ProbeContext) -> ProbeOutcome:
     subject = context.option("subject", "recorder")
     if subject not in {"recorder", "history"}:
@@ -1740,9 +1756,9 @@ def _probe_corpus_size(context: ProbeContext) -> ProbeOutcome:
     minimum_files = context.int_option("min_files", 100)
     minimum_bytes = context.int_option("min_bytes", MEBIBYTE)
     if subject == "recorder":
-        roots = [context.data_dir / "raw", context.data_dir / "observations"]
+        roots = _recorder_archive_roots(context)
     else:
-        roots = [context.data_dir]
+        roots = (context.data_dir,)
     totals = {"files": 0, "bytes": 0}
     for root in roots:
         measured = _tree_totals(root)
@@ -1804,7 +1820,8 @@ def collect_sample_extras(
 
     recorder = _recorder_status(context)
     checkpoints = _checkpoint_payload(context) or {}
-    corpus = _tree_totals(context.data_dir / "raw")
+    raw_root, _observations_root = _recorder_archive_roots(context)
+    corpus = _tree_totals(raw_root)
     extras["recorder"] = {
         "status_present": recorder is not None,
         "heartbeat_fresh": bool(recorder and recorder.get("heartbeat_fresh")),
