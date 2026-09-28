@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
 
 from catalog.federation.errors import AuthenticationError, FederationOperationError
+from catalog.federation.models import CapabilityAnnouncement
 from catalog.flask_app.services import trusted_storage_authority_runtime as runtime
 from catalog.node.client import RelayRemoteError
 
@@ -280,6 +282,84 @@ def test_a_stopped_authority_closes_its_relay_endpoint(tmp_path, monkeypatch) ->
     assert endpoints[0]._reader_task is None
     assert client.announced
     assert client.disconnected is True
+
+
+@pytest.mark.parametrize("ending", ["stop", "cancel", "failure"])
+def test_builtin_provider_is_announced_before_scan_and_withdrawn_on_stop(tmp_path, monkeypatch, ending):
+    client = _CreatorClient()
+    async def scenario():
+        endpoints = _compose(monkeypatch, client)
+        stop = asyncio.Event()
+        provider = CapabilityAnnouncement(
+            capability_id="storage-builtin", node_id=client.node_id,
+            session_id="session-a", type="storage-provider", protocol="fcp.storage",
+            protocol_version="1", status="ready", properties={"provider_id": "builtin"},
+            announced_at=datetime.now(timezone.utc),
+        )
+        monkeypatch.setattr(runtime, "_builtin_local_storage_capability", lambda **_kwargs: provider)
+        class ObserveFirstScan(_Failover):
+            async def scan_once(self):
+                assert client.announced[0] is provider
+                if ending == "cancel":
+                    raise asyncio.CancelledError()
+                if ending == "failure":
+                    raise RuntimeError("observed authority failure")
+                stop.set()
+                return ()
+        monkeypatch.setattr(runtime, "StorageFailoverCoordinator", ObserveFirstScan)
+        if ending == "stop":
+            await runtime.run_trusted_storage_authority(_settings(tmp_path), stop=stop)
+        else:
+            error = asyncio.CancelledError if ending == "cancel" else RuntimeError
+            with pytest.raises(error):
+                await runtime.run_trusted_storage_authority(_settings(tmp_path), stop=stop)
+        assert client.announced[-1].type == "storage-provider"
+        assert client.announced[-1].status == "unavailable"
+        assert client.announced[-1].properties == provider.properties
+        assert endpoints[0]._closed
+    asyncio.run(scenario())
+
+
+def test_late_builtin_enrollment_is_announced_before_its_first_scan(tmp_path, monkeypatch):
+    client = _CreatorClient()
+    async def scenario():
+        _compose(monkeypatch, client)
+        stop = asyncio.Event()
+        provider_id = runtime._builtin_local_provider_id(client.node_id)
+        service = runtime.PhaseDStorageService(
+            provider_id=provider_id, provider=SimpleNamespace(), control_plane=SimpleNamespace(),
+        )
+        provider = CapabilityAnnouncement(
+            capability_id=f"storage-{provider_id}", node_id=client.node_id,
+            session_id="session-a", type="storage-provider", protocol="fcp.storage",
+            protocol_version="1", status="ready", properties={"provider_id": provider_id},
+            announced_at=datetime.now(timezone.utc),
+        )
+        ensures = 0
+        def late_service(*, endpoint, **_kwargs):
+            nonlocal ensures
+            ensures += 1
+            if ensures < 3:
+                return None
+            endpoint.services[provider_id] = service
+            return service
+        monkeypatch.setattr(runtime, "_ensure_builtin_local_storage_service", late_service)
+        monkeypatch.setattr(runtime, "_builtin_local_storage_capability", lambda *, service, **_kwargs: provider if service is not None else None)
+        class ObserveEnrollment(_Failover):
+            async def scan_once(self):
+                self.scans += 1
+                providers = [a for a in client.announced if getattr(a, "type", None) == "storage-provider"]
+                if self.scans == 1:
+                    assert not providers
+                else:
+                    assert providers[-1] is provider
+                    stop.set()
+                return ()
+        monkeypatch.setattr(runtime, "StorageFailoverCoordinator", ObserveEnrollment)
+        await runtime.run_trusted_storage_authority(_settings(tmp_path), stop=stop)
+        assert ensures >= 3
+        assert client.announced[-1].status == "unavailable"
+    asyncio.run(scenario())
 
 
 def test_a_relay_teardown_during_announce_is_raised_for_the_supervisor(

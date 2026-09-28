@@ -19,8 +19,12 @@ standalone composition. It is never used by the full-workbench supervisor.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
+from contextlib import suppress
+from dataclasses import replace
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from catalog.capabilities.storage_authority_enrollment import (
     federation_storage_provider_id,
@@ -53,6 +57,10 @@ from catalog.federation.recorder_storage_relay import (
 from catalog.federation.relay_storage import RelayStorageEndpoint
 from catalog.federation.shared_file_storage import FederationLogicalStorageAuthority
 from catalog.federation.storage_allocation import StorageAllocation
+from catalog.federation.storage_protocol import (
+    STORAGE_PROTOCOL,
+    STORAGE_PROTOCOL_VERSION,
+)
 from catalog.node.storage_failover import (
     StorageAuthoritySettings,
     _acknowledgements_database,
@@ -259,6 +267,45 @@ def _ensure_builtin_local_storage_service(
     return service
 
 
+def _builtin_local_storage_capability(
+    *,
+    service: PhaseDStorageService | None,
+    control: PhaseDControlPlane,
+    client: PairingRelayNodeClient,
+    settings: StorageAuthoritySettings,
+) -> CapabilityAnnouncement | None:
+    """Advertise only the exact built-in provider this authority actually hosts."""
+
+    provider_id = _builtin_local_provider_id(client.node_id)
+    if not isinstance(service, PhaseDStorageService) or service.provider_id != provider_id:
+        return None
+    snapshot = control.snapshot(settings.session_id)
+    registration = snapshot.providers.get(provider_id)
+    ready = (
+        registration is not None
+        and registration.node_id == client.node_id
+        and registration.assignable
+        and service.provider.health().get("status") == "ready"
+    )
+    return CapabilityAnnouncement(
+        capability_id=f"storage-{provider_id}",
+        node_id=client.node_id,
+        session_id=settings.session_id,
+        type="storage-provider",
+        protocol=STORAGE_PROTOCOL,
+        protocol_version=STORAGE_PROTOCOL_VERSION,
+        status="ready" if ready else "unavailable",
+        properties={
+            "provider_id": provider_id,
+            "backend": "filesystem",
+            "durable": True,
+            "relay_first": True,
+            "control_revision": snapshot.revision,
+        },
+        announced_at=datetime.now(timezone.utc),
+    )
+
+
 class SharedRecorderAwareStorageControlRelayChannel(
     RecorderAwareStorageControlRelayChannel
 ):
@@ -372,6 +419,8 @@ async def run_trusted_storage_authority(
     endpoint: RelayStorageEndpoint | None = None
     failover: StorageFailoverCoordinator | None = None
     announcement_task: asyncio.Task[None] | None = None
+    provider_announcement: CapabilityAnnouncement | None = None
+    provider_ready_id: str | None = None
     try:
         if client is None:
             client = await _connect_creator(settings)
@@ -433,8 +482,35 @@ async def run_trusted_storage_authority(
             lease_seconds=settings.lease_seconds,
         )
 
-        async def announce() -> None:
-            announcement = _recorder_storage_capability(
+        announcement_lock = asyncio.Lock()
+
+        async def _announce() -> None:
+            nonlocal provider_announcement, provider_ready_id
+            hosted = endpoint.services.get(_builtin_local_provider_id(client.node_id))
+            provider = await asyncio.to_thread(
+                _builtin_local_storage_capability,
+                service=hosted,
+                control=control,
+                client=client,
+                settings=settings,
+            )
+            if provider is None and provider_announcement is not None:
+                provider = replace(
+                    provider_announcement,
+                    status="unavailable",
+                    announced_at=datetime.now(timezone.utc),
+                )
+            if provider is not None:
+                # Failover consumes the same authenticated provider protocol as
+                # a standalone storage node, never a generic storage candidate.
+                provider_announcement = provider
+                await client.announce_capability(provider)
+                provider_ready_id = (
+                    str(provider.properties["provider_id"])
+                    if provider.status == "ready" else None
+                )
+            announcement = await asyncio.to_thread(
+                _recorder_storage_capability,
                 control,
                 client,
                 settings.session_id,
@@ -443,14 +519,23 @@ async def run_trusted_storage_authority(
             if on_announced is not None:
                 on_announced(announcement)
 
+        async def announce() -> None:
+            # Late enrollment and periodic refresh share one ordered writer.
+            async with announcement_lock:
+                await _announce()
+
         async def announce_forever() -> None:
             while stop is None or not stop.is_set():
-                await announce()
                 await _wait_scan_interval(stop, settings.scan_interval)
+                if stop is None or not stop.is_set():
+                    await announce()
 
         await failover.start()
         if on_message_source is not None:
             on_message_source(channel)
+        # A hosted provider must be visible before the first failover scan;
+        # otherwise that scan misclassifies our own live primary as absent.
+        await announce()
         announcement_task = asyncio.create_task(
             announce_forever(),
             name="fcp-storage-authority-announce",
@@ -470,12 +555,14 @@ async def run_trusted_storage_authority(
             # Storage authority enrollment can land after the authority task has
             # started. Reconcile the one built-in runtime before each scan so a
             # newly assigned creator provider becomes callable without restart.
-            _ensure_builtin_local_storage_service(
+            hosted = _ensure_builtin_local_storage_service(
                 endpoint=endpoint,
                 control=control,
                 client=client,
                 settings=settings,
             )
+            if hosted is not None and provider_ready_id != hosted.provider_id:
+                await announce()
             try:
                 await asyncio.wait_for(
                     failover.scan_once(),
@@ -500,6 +587,17 @@ async def run_trusted_storage_authority(
             # leaking the relay endpoint's reader task and leaving the creator
             # connected. Retrieve its outcome without re-raising instead.
             await asyncio.gather(announcement_task, return_exceptions=True)
+        if provider_announcement is not None and client is not None:
+            # The shared workbench connection may outlive this authority. Do
+            # not leave its no-longer-hosted provider advertised as ready.
+            with suppress(Exception):
+                await client.announce_capability(
+                    replace(
+                        provider_announcement,
+                        status="unavailable",
+                        announced_at=datetime.now(timezone.utc),
+                    )
+                )
         if failover is not None:
             await failover.close()
         if endpoint is not None:

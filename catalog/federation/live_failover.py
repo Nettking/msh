@@ -971,8 +971,14 @@ class StorageFailoverCoordinator:
             await asyncio.sleep(scan_interval)
 
     async def scan_once(self) -> tuple[LiveFailoverResult, ...]:
-        status = self._status_snapshot()
-        snapshot = self.control_plane.snapshot(self.session_id)
+        # These stores open a connection per call. Keep complete history
+        # validation, but do not run it on the relay's only event loop. A
+        # cancelled scan can leave only read-only work finishing in a thread;
+        # authority changes and their current-revision/fencing checks stay here.
+        status = await asyncio.to_thread(self._status_snapshot)
+        snapshot = await asyncio.to_thread(
+            self.control_plane.snapshot, self.session_id
+        )
         results: list[LiveFailoverResult] = []
         for group_id, assignment in sorted(snapshot.groups.items()):
             active = self.failover_store.active(self.session_id, group_id)
@@ -990,7 +996,20 @@ class StorageFailoverCoordinator:
                 failed_provider_id, failed_provider.node_id, status
             ):
                 continue
-            manifest = self.control_plane.manifest(self.session_id, group_id)
+            try:
+                manifest = await asyncio.to_thread(
+                    self.control_plane.manifest,
+                    self.session_id,
+                    group_id,
+                    read_only=True,
+                )
+            except FederationValidationError as exc:
+                if exc.code != "manifest-not-found":
+                    raise
+                # Legacy genesis creation is a mutation. Keep it on the owning
+                # loop, after the cancellable read, with the existing control
+                # revision guard rather than starting a detached writer.
+                manifest = self.control_plane.manifest(self.session_id, group_id)
             observation_id = self._observation_id(
                 self.session_id,
                 group_id,
@@ -1361,10 +1380,10 @@ class StorageFailoverCoordinator:
                 actor_node_id=self.credentials.identity.node_id,
                 cursor=cursor,
             )
-            for section in result:
+            for section, rows in result.items():
                 values = page.get(section)
                 if isinstance(values, list):
-                    result[section].extend(values)
+                    rows.extend(values)
             pagination = page.get("pagination")
             if (
                 not isinstance(pagination, dict)

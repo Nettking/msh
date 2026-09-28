@@ -18,6 +18,11 @@ human authentication/RBAC, and bounded manual Federation-wide updates.
 
 ### Configured quorum authority and journal continuity
 
+Built-in creator storage now announces the exact provider it hosts and withdraws
+that announcement when its authority stops. Failover validates retained manifest
+history outside the relay event loop, preserving complete integrity and fencing
+checks while recorder startup and relay responses remain responsive.
+
 The configured replicated deployment uses three authenticated voters and a
 two-vote commit quorum. Complete product operations commit their authority
 changes, exact public events and encrypted private pairing/request receipts

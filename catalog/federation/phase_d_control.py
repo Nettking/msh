@@ -214,6 +214,8 @@ class PhaseDControlPlane:
         self,
         session_id: str,
         group_id: str,
+        *,
+        read_only: bool = False,
     ) -> AuthoritativeStorageManifest:
         snapshot = self.snapshot(session_id)
         if group_id not in snapshot.groups:
@@ -225,7 +227,7 @@ class PhaseDControlPlane:
         try:
             return self.manifests.head(session_id, group_id)
         except FederationValidationError as exc:
-            if exc.code != "manifest-not-found":
+            if exc.code != "manifest-not-found" or read_only:
                 raise
         return self.manifests.ensure_genesis(
             session_id,
