@@ -1,16 +1,23 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from catalog.federation.commit_tracking import DurableAcknowledgementStore
+from catalog.federation.live_failover import StorageFailoverCoordinator
 from catalog.federation.phase_d_client import PhaseDLogicalStorageClient
 from catalog.federation.phase_d_control import PhaseDControlPlane
 from catalog.federation.relay_storage import RelayStorageEndpoint
 from catalog.federation.storage_control_plane import StorageProviderRegistration
-from catalog.federation.storage_protocol import STORAGE_PROTOCOL, STORAGE_PROTOCOL_VERSION
+from catalog.federation.storage_protocol import (
+    STORAGE_PROTOCOL,
+    STORAGE_PROTOCOL_VERSION,
+)
 from catalog.flask_app.services import trusted_storage_authority_runtime as runtime
 
 
@@ -189,3 +196,63 @@ def test_authority_does_not_auto_host_an_arbitrary_registered_provider(
 
     assert service is None
     assert endpoint.services == {}
+
+
+@pytest.mark.parametrize(
+    "condition",
+    ["ready", "no-service", "wrong-service", "wrong-node", "unauthorized", "unavailable", "protocol", "unhealthy"],
+)
+def test_builtin_provider_liveness_requires_the_hosted_authorized_provider(
+    tmp_path: Path, monkeypatch, condition: str
+) -> None:
+    settings = _settings(tmp_path)
+    client = _LoopbackRelayClient("node-creator")
+    control = PhaseDControlPlane(settings.storage_control_database)
+    provider_id = runtime._builtin_local_provider_id(client.node_id)
+    _register_primary(
+        control, session_id=settings.session_id, provider_id=provider_id,
+        node_id=client.node_id, now=datetime.now(timezone.utc),
+    )
+    endpoint = RelayStorageEndpoint(client)
+    service = runtime._ensure_builtin_local_storage_service(
+        endpoint=endpoint, control=control, client=client, settings=settings,
+    )
+    assert service is not None
+    registration = control.snapshot(settings.session_id).providers[provider_id]
+    changes = {
+        "wrong-node": {"node_id": "other-node"},
+        "unauthorized": {"authorized": False},
+        "unavailable": {"status": "unavailable"},
+        "protocol": {"protocol": "other-storage-protocol"},
+    }
+    if condition in changes:
+        control.register_provider(
+            settings.session_id, client.node_id, replace(registration, **changes[condition])
+        )
+    if condition == "no-service":
+        service = None
+    elif condition == "wrong-service":
+        service.provider_id = "some-other-provider"
+    elif condition == "unhealthy":
+        monkeypatch.setattr(service.provider, "health", lambda: {"status": "unavailable"})
+    announcement = runtime._builtin_local_storage_capability(
+        service=service, control=control, client=client, settings=settings,
+    )
+    if condition in {"no-service", "wrong-service"}:
+        assert announcement is None
+        return
+    assert announcement is not None
+    assert announcement.type == "storage-provider"
+    assert announcement.properties["provider_id"] == provider_id
+    assert announcement.status == ("ready" if condition == "ready" else "unavailable")
+    status = {
+        "nodes": [{"node_id": client.node_id, "connection_state": "connected"}],
+        "capabilities": [announcement.to_dict()],
+    }
+    assert StorageFailoverCoordinator._provider_online(provider_id, client.node_id, status) == (condition == "ready")
+    status["capabilities"][0]["type"] = "storage"
+    assert not StorageFailoverCoordinator._provider_online(provider_id, client.node_id, status)
+    status["capabilities"][0]["type"] = "storage-provider"
+    # A disconnected authenticated owner is never made live by its old advert.
+    status["nodes"][0]["connection_state"] = "disconnected"
+    assert not StorageFailoverCoordinator._provider_online(provider_id, client.node_id, status)
