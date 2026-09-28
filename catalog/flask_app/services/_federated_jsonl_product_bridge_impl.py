@@ -733,6 +733,31 @@ class FederatedJsonlProductBridge:
         last_parent: Path | None = None
         last_resolved_parent: Path | None = None
 
+        def include_entry(entry: os.DirEntry[str]) -> bool:
+            nonlocal last_parent, last_resolved_parent
+            # Readdir already knows ordinary leaf types (and Windows attributes).
+            # Avoid Path.stat/lstat RPCs for the large excluded Recorder store.
+            # Aliases/reparse entries still take the unchanged full-path checks;
+            # an alias inside an excluded tree may target an eligible source.
+            try:
+                if not entry.is_file(follow_symlinks=False) or entry.is_symlink():
+                    return True
+                if os.name == "nt" and (
+                    getattr(entry.stat(follow_symlinks=False), "st_file_attributes", 0)
+                    & stat.FILE_ATTRIBUTE_REPARSE_POINT
+                ):
+                    return True
+                parent = Path(entry.path).parent
+                if parent != last_parent or last_resolved_parent is None:
+                    last_resolved_parent = parent.resolve()
+                    last_parent = parent
+                relative = (last_resolved_parent / entry.name).relative_to(
+                    self.data_root
+                ).as_posix()
+            except (OSError, ValueError):
+                return True  # Retain the existing fail-closed full check below.
+            return not any(relative.startswith(prefix) for prefix in excluded)
+
         def include_file(path: Path) -> bool:
             nonlocal last_parent, last_resolved_parent
             # Resolve before excluding: a lexical alias below an excluded
@@ -760,7 +785,8 @@ class FederatedJsonlProductBridge:
             return not any(relative.startswith(prefix) for prefix in excluded)
 
         for path in iter_jsonl_files(
-            self.data_root, recursive=True, file_filter=include_file
+            self.data_root, recursive=True, file_filter=include_file,
+            entry_filter=include_entry,
         ):
             try:
                 relative = path.resolve().relative_to(self.data_root).as_posix()

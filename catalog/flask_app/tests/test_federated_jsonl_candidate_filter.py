@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import builtins
 import errno
 import os
-from pathlib import Path
 import stat
 import subprocess
+from contextlib import contextmanager
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -59,6 +61,19 @@ def test_optional_file_filter_preserves_sorted_default_discovery(tmp_path):
     assert list(data_loading.iter_jsonl_files(root, file_filter=select)) == sorted(files)[0:2]
     assert seen == sorted(files), "The filter must run only after a match is a file"
     assert list(data_loading.iter_jsonl_files(root, recursive=False)) == sorted([files[0], files[2]])
+
+
+@pytest.mark.parametrize("recursive", [True, False])
+def test_entry_metadata_traversal_keeps_native_glob_selection(tmp_path, recursive):
+    root = tmp_path / "entry-default-equivalence"
+    for relative in ("z.jsonl", "A.JSONL", "nested/b.jsonl", "nested/deep/a.jsonl", "ignored.txt"):
+        _file(root, relative)
+    (root / "directory.jsonl").mkdir()
+    hidden = _file(root, "hidden/import.jsonl")
+    (hidden.parent / ".fcp-importing").touch()
+    assert list(data_loading.iter_jsonl_files(root, recursive=recursive, entry_filter=lambda entry: True)) == list(
+        data_loading.iter_jsonl_files(root, recursive=recursive)
+    )
 
 
 def test_candidate_marker_errors_still_fail_closed(tmp_path, monkeypatch):
@@ -153,11 +168,45 @@ def test_excluded_regular_siblings_resolve_parent_once(tmp_path, monkeypatch):
     assert resolved == [files[0].parent]
 
 
-def test_reparse_leaf_falls_back_to_full_resolution(tmp_path, monkeypatch):
+def test_large_excluded_corpus_skips_path_metadata_before_sorting(tmp_path, monkeypatch):
+    bridge = _bridge(tmp_path, "excluded-metadata-cost")
+    root = bridge.data_root
+    excluded = {
+        _file(root, f"sources/mtconnect_recorder/jsonl/machine/1/day/{i}.jsonl")
+        for i in range(32)
+    }
+    visible = [_file(root, name) for name in ("z.jsonl", "exports/a.jsonl")]
+    calls = []
+    sorted_candidates = []
+    original_stat = Path.stat
+
+    def stat_path(self, *args, **kwargs):
+        if self in excluded:
+            calls.append(self)
+        return original_stat(self, *args, **kwargs)
+
+    def sort_candidates(paths):
+        paths = list(paths)
+        sorted_candidates.extend(paths)
+        return builtins.sorted(paths)
+
+    monkeypatch.setattr(Path, "stat", stat_path)
+    monkeypatch.setattr(data_loading, "sorted", sort_candidates, raising=False)
+    assert list(bridge._local_candidates()) == [
+        (path.relative_to(root).as_posix(), path) for path in sorted(visible)
+    ]
+    assert calls == [], "Excluded ordinary leaves must not incur Path stat/lstat RPCs"
+    assert set(sorted_candidates) == set(visible), "Excluded leaves must not accumulate in the global sort"
+
+
+@pytest.mark.parametrize("entry_kind", ["symlink", "windows-reparse"])
+def test_reparse_leaf_falls_back_to_full_resolution(tmp_path, monkeypatch, entry_kind):
+    if entry_kind == "windows-reparse" and os.name != "nt":
+        pytest.skip("Windows reparse attributes")
     bridge = _bridge(tmp_path, "reparse-leaf")
     leaf = _file(bridge.data_root, "federation/reparse.jsonl")
     target = bridge.data_root / "exports/target.jsonl"
-    original_stat, original_resolve = Path.lstat, Path.resolve
+    original_stat, original_resolve, original_scandir = Path.lstat, Path.resolve, os.scandir
     resolved = []
 
     def lstat(self):
@@ -171,8 +220,30 @@ def test_reparse_leaf_falls_back_to_full_resolution(tmp_path, monkeypatch):
         resolved.append(self)
         return target if self == leaf else original_resolve(self, *args, **kwargs)
 
+    class ReparseEntry:
+        def __init__(self, entry):
+            self.entry = entry
+
+        def __getattr__(self, name):
+            return getattr(self.entry, name)
+
+        def is_symlink(self):
+            # Model the same nonordinary leaf at both metadata boundaries.
+            return entry_kind == "symlink"
+
+        def stat(self, **kwargs):
+            metadata = self.entry.stat(**kwargs)
+            return SimpleNamespace(st_mode=metadata.st_mode,
+                                   st_file_attributes=stat.FILE_ATTRIBUTE_REPARSE_POINT)
+
+    @contextmanager
+    def scandir(path):
+        with original_scandir(path) as entries:
+            yield (ReparseEntry(entry) if Path(entry.path) == leaf else entry for entry in entries)
+
     monkeypatch.setattr(Path, "lstat", lstat)
     monkeypatch.setattr(Path, "resolve", resolve)
+    monkeypatch.setattr(os, "scandir", scandir)
     assert list(bridge._local_candidates()) == [("exports/target.jsonl", leaf)]
     assert resolved.count(leaf) == 2, "Reparse leaf and final guard both resolve the full path"
 

@@ -19,7 +19,9 @@ Behavior:
 
 from __future__ import annotations
 
+import fnmatch
 import json
+import os
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
@@ -55,6 +57,7 @@ def iter_jsonl_files(
     *,
     recursive: bool = True,
     file_filter: Callable[[Path], bool] | None = None,
+    entry_filter: Callable[[os.DirEntry[str]], bool] | None = None,
 ) -> Iterator[Path]:
     """
     Yield JSONL files from a directory in sorted order.
@@ -69,6 +72,10 @@ def iter_jsonl_files(
     file_filter : callable, optional
         Reject otherwise matching files before inspecting ancestor upload
         markers. Omitted by default, preserving complete JSONL discovery.
+    entry_filter : callable, optional
+        Reject matching directory entries before constructing/sorting paths or
+        issuing per-file Path metadata calls. Retained candidates still pass
+        the ordinary file and incomplete-import checks. Omitted by default.
 
     Yields
     ------
@@ -82,7 +89,11 @@ def iter_jsonl_files(
     """
     root = Path(data_dir)
     pattern = "*.jsonl"
-    iterator = root.rglob(pattern) if recursive else root.glob(pattern)
+    iterator = (
+        _filtered_jsonl_entries(root, recursive=recursive, entry_filter=entry_filter)
+        if entry_filter is not None
+        else root.rglob(pattern) if recursive else root.glob(pattern)
+    )
 
     for file_path in sorted(iterator):
         if not file_path.is_file():
@@ -91,6 +102,41 @@ def iter_jsonl_files(
             continue
         if not _inside_incomplete_import(file_path, root):
             yield file_path
+
+
+def _filtered_jsonl_entries(
+    root: Path,
+    *,
+    recursive: bool,
+    entry_filter: Callable[[os.DirEntry[str]], bool],
+) -> Iterator[Path]:
+    """Use readdir metadata without changing default discovery callers.
+
+    Like pathlib's recursive glob, do not follow directory symlinks. Native
+    Windows junctions retain their existing directory traversal behavior.
+    Process siblings together so a caller can reuse one resolved parent.
+    """
+    try:
+        with os.scandir(root) as iterator:
+            entries = list(iterator)
+    except (FileNotFoundError, NotADirectoryError, PermissionError):
+        return
+    directories = []
+    for entry in entries:
+        try:
+            directory = entry.is_dir(follow_symlinks=False)
+        except OSError:
+            continue
+        if directory:
+            if recursive:
+                directories.append(Path(entry.path))
+        elif fnmatch.fnmatch(entry.name, "*.jsonl") and entry_filter(entry):
+            yield Path(entry.path)
+    del entries
+    for directory in directories:
+        yield from _filtered_jsonl_entries(
+            directory, recursive=True, entry_filter=entry_filter
+        )
 
 
 def iter_jsonl_records(
