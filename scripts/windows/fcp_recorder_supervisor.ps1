@@ -266,10 +266,12 @@ function Read-LaunchPlan([object[]]$Output) {
     return $null
 }
 
-function Set-RelaunchedNonce([string]$Nonce) {
-    Invoke-Python (
-        Get-AgentArguments @('--mark-relaunched', '--process-nonce', $Nonce)
-    ) | Out-Null
+function Set-RelaunchedNonce([string]$Nonce, [string]$PreviousNonce) {
+    $markArguments = @('--mark-relaunched', '--process-nonce', $Nonce)
+    if (-not [string]::IsNullOrWhiteSpace($PreviousNonce)) {
+        $markArguments += @('--previous-process-nonce', $PreviousNonce)
+    }
+    Invoke-Python (Get-AgentArguments $markArguments) | Out-Null
 }
 
 function Start-Recorder(
@@ -313,6 +315,8 @@ function Start-Recorder(
 
 $mutexReleased = $false
 $replacementPending = $false
+$ordinaryUpdateReplacement = $false
+$previousReplacementNonce = ''
 $launchRoot = $RepoRoot
 $launchDataDirectory = ''
 $launchBuildCommit = ''
@@ -346,8 +350,9 @@ try {
             if ($replacementPending) {
                 # Recorded before the child starts, so the replacement must be
                 # proven to be exactly this process and not an earlier survivor.
-                Set-RelaunchedNonce $nonce
+                Set-RelaunchedNonce $nonce $previousReplacementNonce
                 $replacementPending = $false
+                $previousReplacementNonce = ''
                 if ($childOwner -eq $TrialChild) {
                     # Only for a trial child, and only after the journal names
                     # the instance the watchdog has to judge.
@@ -416,9 +421,14 @@ try {
                     $rapidFailureStreak + ' of ' + $MaxRapidRestarts + ').'
                 )
                 Start-Sleep -Seconds $restartDelaySeconds
-                # Same root, same arguments, fresh nonce, still exactly one
-                # child: an ordinary restart adds no update bookkeeping and
-                # starts no watchdog, so both flags stay false.
+                # A pending update still names the failed child. Only this
+                # supervisor can transfer that exact nonce to its next child;
+                # the agent refuses foreign, completed or expired updates.
+                # Ordinary restarts unrelated to an update remain unchanged.
+                if ($ordinaryUpdateReplacement) {
+                    $previousReplacementNonce = $nonce
+                    $replacementPending = $true
+                }
                 continue
             }
 
@@ -446,6 +456,8 @@ try {
             $launchDataDirectory = ''
             $launchBuildCommit = ''
             $childOwner = $OrdinaryChild
+            $ordinaryUpdateReplacement = [string]$plan.mode -eq 'update'
+            $previousReplacementNonce = ''
             if (-not [string]::IsNullOrWhiteSpace([string]$plan.launch_root)) {
                 $launchRoot = Normalize-DirectoryPath ([string]$plan.launch_root)
             }

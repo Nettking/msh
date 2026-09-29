@@ -201,7 +201,7 @@ def test_the_supervisor_updates_source_only_after_the_child_exits() -> None:
 
     exited = supervisor.index("$exitCode = Start-Recorder $nonce $buildCommit")
     finalize = supervisor.index("$finalize = Invoke-Finalize")
-    relaunch = supervisor.index("$replacementPending = $true")
+    relaunch = supervisor.index("$replacementPending = $true", finalize)
     assert exited < finalize < relaunch
     # The supervisor itself owns no Git mutation; finalize is the only path.
     assert "merge" not in supervisor
@@ -350,6 +350,22 @@ def test_an_ordinary_restart_adds_no_update_or_trial_bookkeeping() -> None:
     """A crash restart is not an update, and must not borrow its authority."""
 
     branch = _ordinary_exit_branch()
+
+    # The one exception transfers an already approved update's exact failed
+    # child nonce. It cannot create an update, choose a source or start a trial.
+    # Without that locally retained plan, the original prohibition is intact.
+    retry = """if ($ordinaryUpdateReplacement) {
+                    $previousReplacementNonce = $nonce
+                    $replacementPending = $true
+                }"""
+    assert branch.count(retry) == 1
+    branch = branch.replace(retry, "")
+    supervisor = _text(SUPERVISOR)
+    assert supervisor.count("$ordinaryUpdateReplacement =") == 2
+    assert "$ordinaryUpdateReplacement = $false" in supervisor
+    ownership = supervisor.index("$ordinaryUpdateReplacement = [string]$plan.mode -eq 'update'")
+    assert supervisor.index("$finalize = Invoke-Finalize") < ownership
+    assert supervisor.index("The approved recorder update did not complete") < ownership
 
     # No relaunch journal entry, no watchdog, no plan, no Git.
     for forbidden in (
@@ -521,7 +537,7 @@ def test_a_failed_finalize_never_relaunches() -> None:
     supervisor = _text(SUPERVISOR)
 
     failure = supervisor.index("The approved recorder update did not complete")
-    relaunch = supervisor.index("$replacementPending = $true")
+    relaunch = supervisor.index("$replacementPending = $true", failure)
     assert failure < relaunch
     assert "exit 5" in supervisor
     # An unreadable checkout is a refusal too, not a relaunch.

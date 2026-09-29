@@ -23,6 +23,13 @@ directory-entry metadata before per-file path checks and sorting. Eligible
 files, resolved aliases and incomplete-upload checks retain their behavior,
 reducing unnecessary archive scans that delay Recorder backlog delivery.
 
+### Native Recorder update retries
+
+An ordinary supervised retry after an update replacement fails can now complete
+the same update. The supervisor records the new child only after proving the
+previous owned child exited; the original verification deadline and exact
+runtime identity checks remain in force.
+
 ### Native Recorder trial restoration
 
 Federation updates now distinguish authenticated MTConnect capture capabilities
