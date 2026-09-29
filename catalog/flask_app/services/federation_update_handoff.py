@@ -27,6 +27,7 @@ from catalog.federation.software_trial import (
     branches_from_result,
     branches_request_document,
     trial_request_document,
+    validate_trial_summary,
 )
 from catalog.federation.software_update import (
     APPROVED_BRANCH,
@@ -112,6 +113,7 @@ class HostUpdateHandoff:
             message=optional_text("message"),
             running_commit=optional_text("running_commit"),
             request_id=optional_text("request_id"),
+            trial=validate_trial_summary(value.get("trial")),
         )
 
     @staticmethod
