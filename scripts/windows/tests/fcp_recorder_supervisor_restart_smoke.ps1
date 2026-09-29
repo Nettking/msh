@@ -343,6 +343,22 @@ public static class FakeRecorder
         Write-Host "  ok   trial watchdogs started = $watched (never more than one)"
     }
 
+    Write-Host 'Scenario 11: an approved update replacement can use ordinary retry'
+    $env:FCP_FAKE_AGENT_PLANS = 'update'
+    $r = Invoke-Supervisor '75,3,0' '0,2,0' @(0) 5 120 1
+    Assert-Equal 'update retry exits normally' 0 $r.ExitCode
+    Assert-Equal 'update retry child count' 3 $r.Starts
+    $agentLog = Join-Path $tempRoot ('run-' + $scenario + '.log.agent')
+    $marks = @(Get-Content -LiteralPath $agentLog | Where-Object { $_ -like '*--mark-relaunched*' })
+    Assert-Equal 'both update replacements recorded' 2 $marks.Count
+    if ($marks.Count -eq 2) {
+        $firstNonce = [regex]::Match($marks[0], '--process-nonce ([0-9a-f]{32})').Groups[1].Value
+        $retryNonce = [regex]::Match($marks[1], '--process-nonce ([0-9a-f]{32})').Groups[1].Value
+        $previousNonce = [regex]::Match($marks[1], '--previous-process-nonce ([0-9a-f]{32})').Groups[1].Value
+        Assert-Equal 'retry names exact previous supervised child' $firstNonce $previousNonce
+        Assert-Equal 'retry gets a fresh nonce' $false ($firstNonce -eq $retryNonce)
+    }
+
     # The child count carries the restart evidence on its own, and it is exact
     # in both directions. Four children is only reachable if child 1 *was*
     # ordinarily restarted -- without that, supervision ends at one child and

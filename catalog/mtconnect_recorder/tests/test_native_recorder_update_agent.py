@@ -700,6 +700,118 @@ def test_a_proven_replacement_reports_a_verified_runtime(
     assert not fixture.paths.activation_file.exists()
 
 
+def test_a_supervised_retry_can_complete_the_same_update(
+    fixture: Fixture, alive: set[int]
+) -> None:
+    agent = _reach_source_updated(fixture, alive)
+    assert agent.mark_relaunched(REPLACEMENT_NONCE)
+    fixture.write_status(
+        pid=REPLACEMENT_PID, nonce=REPLACEMENT_NONCE, commit=fixture.target,
+        federation_status="retrying",
+    )
+    # The first replacement exited before sharing was ready. The same
+    # supervisor supplies its exact nonce before starting its normal retry.
+    retry_nonce = "d" * 32
+    assert agent.mark_relaunched(
+        retry_nonce, previous_process_nonce=REPLACEMENT_NONCE
+    )
+    alive.add(REPLACEMENT_PID + 1)
+    fixture.write_status(
+        pid=REPLACEMENT_PID + 1, nonce=retry_nonce, commit=fixture.target
+    )
+    assert agent.resume()
+    assert _result(fixture, "req-apply")["state"] == "runtime_verified"
+    assert agent.journal.active() is None
+    assert agent.journal.history_entry("req-apply")["replacement_nonce"] == retry_nonce
+
+
+@pytest.mark.parametrize("refusal", [
+    "alive", "wrong_nonce", "wrong_supervisor", "wrong_commit", "dirty_source",
+    "foreign_caller", "same_nonce", "wrong_previous", "expired", "missing_anchor", "missing_owner",
+])
+def test_update_retry_cannot_rebind_an_unproved_replacement(
+    fixture: Fixture, alive: set[int], refusal: str
+) -> None:
+    agent = _reach_source_updated(fixture, alive)
+    assert agent.mark_relaunched(REPLACEMENT_NONCE)
+    values = {"pid": REPLACEMENT_PID, "nonce": REPLACEMENT_NONCE,
+              "commit": fixture.target}
+    if refusal == "alive":
+        alive.add(REPLACEMENT_PID)
+    elif refusal == "wrong_nonce":
+        values["nonce"] = "e" * 32
+    elif refusal == "wrong_supervisor":
+        values["supervisor"] = "e" * 32
+    elif refusal == "wrong_commit":
+        values["commit"] = fixture.current
+    elif refusal == "dirty_source":
+        (fixture.root / "start_recorder.py").write_text("dirty\n")
+    elif refusal == "foreign_caller":
+        agent.supervisor_session = "e" * 32
+    elif refusal == "expired":
+        agent._now = lambda: utc_now() + timedelta(seconds=301)
+    elif refusal in {"missing_anchor", "missing_owner"}:
+        journal = native_update.read_json(fixture.paths.journal_file)
+        del journal["active"][
+            "replacement_started_at" if refusal == "missing_anchor"
+            else "supervisor_session"
+        ]
+        native_update.write_json_atomic(fixture.paths.journal_file, journal)
+    fixture.write_status(**values)
+    before = fixture.paths.journal_file.read_bytes()
+    assert agent.mark_relaunched(
+        REPLACEMENT_NONCE if refusal == "same_nonce" else "d" * 32,
+        previous_process_nonce="e" * 32 if refusal == "wrong_previous" else REPLACEMENT_NONCE,
+    ) is False
+    assert fixture.paths.journal_file.read_bytes() == before
+    assert _result(fixture, "req-apply") is None
+
+
+def test_retry_does_not_extend_the_original_replacement_deadline(
+    fixture: Fixture, alive: set[int]
+) -> None:
+    agent = _reach_source_updated(fixture, alive)
+    assert agent.mark_relaunched(REPLACEMENT_NONCE)
+    anchor = agent.journal.active()["replacement_started_at"]
+    original = native_update.parse_stamp(anchor)
+    assert original is not None
+    fixture.write_status(
+        pid=REPLACEMENT_PID, nonce=REPLACEMENT_NONCE, commit=fixture.target
+    )
+    agent._now = lambda: original + timedelta(seconds=299)
+    assert agent.mark_relaunched("d" * 32, previous_process_nonce=REPLACEMENT_NONCE)
+    assert agent.journal.active()["replacement_started_at"] == anchor
+    agent._now = lambda: original + timedelta(seconds=301)
+    alive.add(REPLACEMENT_PID + 1)
+    fixture.write_status(pid=REPLACEMENT_PID + 1, nonce="d" * 32,
+                         commit=fixture.target, heartbeat_offset=301)
+    assert agent.resume()
+    result = _result(fixture, "req-apply")
+    assert result["code"] == "replacement_verification_timeout"
+    assert result["state"] != "runtime_verified"
+
+
+def test_public_agent_cli_records_only_the_named_retry(
+    fixture: Fixture, alive: set[int], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from scripts import fcp_native_recorder_update_agent as entry
+
+    agent = _reach_source_updated(fixture, alive)
+    assert agent.mark_relaunched(REPLACEMENT_NONCE)
+    fixture.write_status(pid=REPLACEMENT_PID, nonce=REPLACEMENT_NONCE,
+                         commit=fixture.target)
+    monkeypatch.setattr(entry, "NativeRecorderUpdateAgent", lambda **kwargs: agent)
+    assert entry.main([
+        "--repo-root", str(fixture.root), "--data-directory", str(fixture.data),
+        "--supervisor-session", SUPERVISOR, "--mark-relaunched",
+        "--process-nonce", "d" * 32, "--previous-process-nonce", REPLACEMENT_NONCE,
+    ]) == 0
+    assert agent.journal.active()["replacement_nonce"] == "d" * 32
+    before = fixture.paths.journal_file.read_bytes()
+    assert agent.mark_relaunched("e" * 32, previous_process_nonce=REPLACEMENT_NONCE) is False
+    assert fixture.paths.journal_file.read_bytes() == before
+
+
 # --------------------------------------------------------------------------
 # idempotency, crash recovery and journal bounds
 # --------------------------------------------------------------------------

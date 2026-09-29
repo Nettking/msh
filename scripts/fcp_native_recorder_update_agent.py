@@ -114,6 +114,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--mark-relaunched", action="store_true")
     parser.add_argument("--watch-trial", action="store_true")
     parser.add_argument("--process-nonce", default=None)
+    parser.add_argument("--previous-process-nonce", default=None)
     return parser
 
 
@@ -232,7 +233,12 @@ def main(argv: list[str] | None = None) -> int:
         nonce = (args.process_nonce or "").strip().lower()
         if not NONCE_RE.fullmatch(nonce):
             parser.error("--process-nonce must be 32 hexadecimal characters.")
-        print(json.dumps({"marked": agent.mark_relaunched(nonce)}))
+        previous = args.previous_process_nonce
+        if previous is not None and not NONCE_RE.fullmatch(previous):
+            parser.error("--previous-process-nonce must be 32 hexadecimal characters.")
+        print(json.dumps({"marked": agent.mark_relaunched(
+            nonce, previous_process_nonce=previous
+        )}))
         return 0
 
     if args.watch_trial:

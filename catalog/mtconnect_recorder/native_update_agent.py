@@ -501,6 +501,7 @@ class NativeRecorderUpdateAgent:
         write_json_atomic(self.paths.activation_file, intent)
         self.journal.advance(
             STAGE_STOP_REQUESTED,
+            supervisor_session=self.supervisor_session,
             recorder_pid=status.pid,
             process_nonce=status.process_nonce,
             stop_requested_at=stamp(self._now()),
@@ -701,7 +702,11 @@ class NativeRecorderUpdateAgent:
         )
 
     def _deadline_passed(self, active: dict[str, Any], seconds: float) -> bool:
-        updated = parse_stamp(active.get("updated_at"))
+        updated = parse_stamp(
+            active.get("replacement_started_at", active.get("updated_at"))
+            if active.get("stage") == STAGE_REPLACEMENT_STARTED
+            else active.get("updated_at")
+        )
         if updated is None:
             return True
         return (self._now() - updated).total_seconds() > seconds
@@ -918,11 +923,17 @@ class NativeRecorderUpdateAgent:
             )
         return self.journal.advance(STAGE_SOURCE_UPDATED, current_commit=target)
 
-    def mark_relaunched(self, process_nonce: str) -> bool:
+    def mark_relaunched(
+        self, process_nonce: str, *, previous_process_nonce: str | None = None
+    ) -> bool:
         """Record the exact replacement the supervisor started."""
 
         if not NONCE_RE.fullmatch(str(process_nonce)):
             raise ValueError("malformed_process_nonce")
+        if previous_process_nonce is not None:
+            if not NONCE_RE.fullmatch(str(previous_process_nonce)):
+                raise ValueError("malformed_previous_process_nonce")
+            return self._mark_update_retry(process_nonce, previous_process_nonce)
         if self.trial.mark_relaunched(process_nonce):
             return True
         active = self.journal.active()
@@ -931,10 +942,57 @@ class NativeRecorderUpdateAgent:
             STAGE_RECORDER_EXITED,
         }:
             return False
+        # An older source may have created this journal before owner metadata
+        # was recorded. Its exact original child status can prove the owner;
+        # an unrelated supervisor cannot supply it on its own assertion.
+        status = self.recorder_status()
+        if (
+            status.pid != active.get("recorder_pid")
+            or status.process_nonce != active.get("process_nonce")
+            or status.supervisor_session != self.supervisor_session
+            or active.get("supervisor_session", self.supervisor_session)
+            != self.supervisor_session
+        ):
+            return False
         self.journal.advance(
             STAGE_REPLACEMENT_STARTED,
             replacement_nonce=str(process_nonce),
+            replacement_started_at=stamp(self._now()),
+            supervisor_session=self.supervisor_session,
         )
+        return True
+
+    def _mark_update_retry(self, nonce: str, previous_nonce: str) -> bool:
+        """Transfer only a pending update's exited child to its owned retry."""
+
+        active = self.journal.active()
+        if (
+            active is None
+            or active.get("stage") != STAGE_REPLACEMENT_STARTED
+            or active.get("replacement_nonce") != previous_nonce
+            or active.get("supervisor_session") != self.supervisor_session
+            or nonce == previous_nonce
+            or parse_stamp(active.get("replacement_started_at")) is None
+            or self._deadline_passed(active, REPLACEMENT_TIMEOUT_SECONDS)
+        ):
+            return False
+        target = active.get("target_commit")
+        status = self.recorder_status()
+        if (
+            not isinstance(target, str)
+            or not OID_RE.fullmatch(target)
+            or not status.present
+            or status.process_nonce != previous_nonce
+            or status.supervisor_session != self.supervisor_session
+            or status.build_commit != target
+            or process_is_running(status.pid)
+        ):
+            return False
+        inspection = self.adapter.inspect(target=target, fetch=False)
+        if inspection.state != "up_to_date" or inspection.current_commit != target:
+            return False
+        # advance updates the journal's audit time, not the original deadline.
+        self.journal.advance(STAGE_REPLACEMENT_STARTED, replacement_nonce=nonce)
         return True
 
     # ---- polling ---------------------------------------------------------
