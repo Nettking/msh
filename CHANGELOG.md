@@ -32,6 +32,10 @@ runtime identity checks remain in force.
 
 ### Native Recorder trial restoration
 
+Native update checks now preserve the bounded trial summary through the host
+result handoff. A check that proves the recorder has returned to main can clear
+the stale trial view while retaining the earlier trial and failed restore history.
+
 Federation updates now distinguish authenticated MTConnect capture capabilities
 from F7 workload providers. Native Recorders retain their correlated graceful
 capture shutdown and supervisor handoff; workload providers on the same device

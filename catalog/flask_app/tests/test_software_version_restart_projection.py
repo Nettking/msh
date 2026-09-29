@@ -30,15 +30,16 @@ from catalog.flask_app.tests.test_federation_software_version import (
     _service,
     _VersionService,
 )
+from catalog.flask_app.tests.test_handoff_trial_summary import _document, _persist
 
 
-def _projection(monkeypatch, tmp_path, order, *, fault=None):
+def _projection(monkeypatch, tmp_path, order, *, fault=None, result=None):
     now = datetime.now(timezone.utc)
     trial = trial_summary(
         stage="trial_running", branch="fix/old-trial", commit=TRIAL,
         safe_branch="main", safe_commit=SAFE, failure_reason=None, active=False,
     )
-    result = UpdateInspection(
+    result = result or UpdateInspection(
         "up_to_date", current_commit=SAFE, target_commit=SAFE,
         running_commit=SAFE, trial=trial,
     )
@@ -116,6 +117,26 @@ def test_later_correlated_main_check_releases_stale_restore_ui(monkeypatch, tmp_
     assert row["trial_history"]["state"] == old["state"]
     assert row["trial_history"]["target_commit"] == old["target_commit"]
     assert snapshot["status"] == "reported"
+
+
+def test_persisted_native_check_releases_stale_trial_view_without_rewriting_history(monkeypatch, tmp_path):
+    # The real host result decoder must carry active=False even when the saved
+    # trial stage and safe commit still describe an older, failed restore.
+    document = _document()
+    handoff, paths, raw = _persist(tmp_path, document)
+    result = handoff.result_for(document["request_id"])
+    assert result is not None
+    snapshot, old = _projection(monkeypatch, tmp_path, (
+        "trial-request", "trial-report", "check-request", "check-report",
+    ), result=result)
+    row = snapshot["devices"][0]
+    assert row["on_test_branch"] is False
+    assert row["branch"] == "main" and row["commit"] == SAFE
+    assert row["software_state"] == "up_to_date" and row["trial_state"] is None
+    assert row["trial_history"]["state"] == old["state"]
+    assert row["trial_history"]["target_commit"] == old["target_commit"]
+    assert snapshot["status"] == "reported"
+    assert all(path.read_bytes() == raw for path in paths)
 
 
 @pytest.mark.parametrize("order", [
