@@ -12,6 +12,7 @@ storage-control authority.
 from __future__ import annotations
 
 import asyncio
+import logging
 import math
 import sqlite3
 import threading
@@ -28,16 +29,17 @@ from catalog.federation.errors import (
     FederationOperationError,
     FederationValidationError,
 )
+from catalog.federation.incremental_recorder_publication import (
+    IncrementalRecorderArchiveReconciler,
+)
 from catalog.federation.models import CapabilityAnnouncement, CapabilityStatus
 from catalog.federation.outbox import SQLiteOutbox
+from catalog.federation.recorder_control_events import federated_source_labels
 from catalog.federation.recorder_delivery import (
     RECORDER_STORAGE_SCHEMA,
     DurableRecorderDeliveryQueue,
     RecorderDeliveryProgress,
     RecorderDeliveryRunResult,
-)
-from catalog.federation.incremental_recorder_publication import (
-    IncrementalRecorderArchiveReconciler,
 )
 from catalog.federation.recorder_publication import (
     RecorderFederationDeliveryWorker,
@@ -57,8 +59,24 @@ from catalog.flask_app.services.federation_pairing_service import (
     RemotePairingState,
     RemotePairingStore,
 )
-from catalog.federation.recorder_control_events import federated_source_labels
 from catalog.mtconnect_recorder.storage import DurableRecorderStore
+
+_LOGGER = logging.getLogger(__name__)
+
+
+def _safe_log_error_code(error: BaseException) -> str:
+    value = getattr(error, "code", type(error).__name__)
+    if (
+        not isinstance(value, str)
+        or not value
+        or len(value) > 96
+        or any(
+            not (character.isascii() and (character.isalnum() or character in "._:-"))
+            for character in value
+        )
+    ):
+        return type(error).__name__
+    return value
 
 MAX_SHARING_READY_SECONDS = 600.0
 MAX_FEDERATION_REQUEST_SECONDS = 120.0
@@ -894,9 +912,14 @@ class RecorderFederationNode:
             IncrementalRecorderArchiveReconciler, SQLiteOutbox, str
         ] | None = None
         failures = 0
+        last_selection_state: str | None = None
         try:
             while not self._stop.is_set():
                 retry_stage = "connect"
+                cycle_correlation_id = uuid.uuid4().hex
+                selection_state: str | None = None
+                selected_authority_node_id: str | None = None
+                selected_group_id: str | None = None
                 try:
                     await self.runtime._ensure_connected(state)
                     client = self.runtime._connected_client()
@@ -927,6 +950,9 @@ class RecorderFederationNode:
                         session_id=state.binding.internal_session_id,
                         requested_group=self.requested_storage_group,
                     )
+                    selection_state = selected.state
+                    selected_authority_node_id = selected.authority_node_id
+                    selected_group_id = selected.group_id
                     if (
                         previous_local_context is not None
                         and selected.state == "ready"
@@ -937,6 +963,18 @@ class RecorderFederationNode:
                         selected.authority_node_id is None
                         or selected.group_id is None
                     ):
+                        if selected.state != last_selection_state:
+                            _LOGGER.warning(
+                                "recorder_federation_authority_selection_unavailable",
+                                extra={
+                                    "correlation_id": cycle_correlation_id,
+                                    "session_id": state.binding.internal_session_id,
+                                    "selection_state": selected.state,
+                                    "authority_node_id": selected.authority_node_id,
+                                    "storage_group": selected.group_id,
+                                },
+                            )
+                        last_selection_state = selected.state
                         self._set_snapshot(
                             status="connected",
                             storage_state=selected.state,
@@ -948,6 +986,7 @@ class RecorderFederationNode:
                         failures = 0
                         await asyncio.sleep(self.publication_poll_seconds)
                         continue
+                    last_selection_state = None
 
                     retry_stage = "route-build"
                     if (
@@ -1117,6 +1156,21 @@ class RecorderFederationNode:
                     await asyncio.sleep(self.publication_poll_seconds)
                 except PUBLICATION_RETRY_ERRORS as exc:
                     failures += 1
+                    _LOGGER.warning(
+                        "recorder_federation_publication_retry",
+                        extra={
+                            "correlation_id": cycle_correlation_id,
+                            "session_id": state.binding.internal_session_id,
+                            "retry_stage": retry_stage,
+                            "cycle_stage": getattr(worker, "last_cycle_stage", None),
+                            "selection_state": selection_state,
+                            "authority_node_id": selected_authority_node_id,
+                            "storage_group": selected_group_id,
+                            "error_type": type(exc).__name__,
+                            "error_code": _safe_log_error_code(exc),
+                            "consecutive_failures": failures,
+                        },
+                    )
                     reported_error = exc
                     if (
                         local_context is not None
@@ -1190,6 +1244,19 @@ class RecorderFederationNode:
                 storage_state="publication-driver-failed",
                 jsonl_state="publication-driver-failed",
                 last_error_code=str(getattr(exc, "code", type(exc).__name__)),
+            )
+            _LOGGER.error(
+                "recorder_federation_publication_driver_failed",
+                extra={
+                    "session_id": state.binding.internal_session_id,
+                    "retry_stage": retry_stage,
+                    "cycle_stage": getattr(worker, "last_cycle_stage", None),
+                    "selection_state": selection_state,
+                    "authority_node_id": selected_authority_node_id,
+                    "storage_group": selected_group_id,
+                    "error_type": type(exc).__name__,
+                    "error_code": _safe_log_error_code(exc),
+                },
             )
             raise
         finally:

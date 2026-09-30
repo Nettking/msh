@@ -826,6 +826,30 @@ def test_restart_probes_deferred_backlog_before_full_archive_reconcile(tmp_path)
     assert still.idempotency_key == deferred.idempotency_key
 
 
+def test_failed_reconciliation_retains_the_publication_cycle_stage(tmp_path):
+    _store, _checkpoint_file, _outbox, queue, reconciler = _build_reconciler(
+        tmp_path, client=RecordingClient()
+    )
+
+    def _fail_reconcile():
+        raise OSError("test-only reconciliation failure")
+
+    reconciler.reconcile = _fail_reconcile
+    worker = RecorderFederationDeliveryWorker(
+        reconciler=reconciler,
+        queue=queue,
+    )
+
+    try:
+        asyncio.run(worker.run_cycle(force_reconcile=True))
+    except OSError as exc:
+        assert str(exc) == "test-only reconciliation failure"
+    else:
+        raise AssertionError("the test reconciler should fail")
+
+    assert worker.last_cycle_stage == "reconcile"
+
+
 # --------------------------------------------------------------------------
 # B03: durable retirement, and the degraded health it must make visible
 # --------------------------------------------------------------------------
