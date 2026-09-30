@@ -648,6 +648,67 @@ def test_a_stuck_item_does_not_starve_reconciliation_of_newer_evidence(tmp_path)
     assert still.last_error
 
 
+def test_due_backlog_heads_do_not_starve_reconciliation_after_startup_probe(tmp_path):
+    """A multi-row due backlog must not keep new raw evidence out of the outbox.
+
+    A single poison row moves into retry backoff and leaves a moment with no due
+    work. A recovered recorder can have many old rows due at once, however. If
+    one failed head fences the rest of its dataset, the unattempted older
+    timestamps remain due indefinitely and the reconciliation gate never sees
+    an empty due set.
+    """
+
+    client = _PoisonClient()
+    store, checkpoint_file, outbox, queue, reconciler = _build_reconciler(
+        tmp_path, client=client
+    )
+    worker = RecorderFederationDeliveryWorker(
+        reconciler=reconciler,
+        queue=queue,
+        delivery_limit=1,
+    )
+    now = datetime.now(UTC)
+    dataset_id = "mtconnect:node-recorder-1:Mazak"
+    for sequence in range(3):
+        queue.enqueue(
+            session_id="session-1",
+            group_id="telemetry-storage",
+            dataset_id=dataset_id,
+            batch_id=f"Mazak:77:{sequence}:{sequence}:backlog-{sequence}",
+            idempotency_key=f"session-1:{dataset_id}:backlog-{sequence}",
+            content={"sequence": sequence},
+            created_at=now,
+        )
+
+    probe = parse_probe(PROBE_XML)
+    _write_checkpoint(
+        checkpoint_file,
+        probe_sha256=probe.sha256,
+        next_sequence=10,
+    )
+    startup = asyncio.run(worker.run_cycle())
+    assert startup.reconcile is None
+    assert startup.delivery.attempted == 1
+    assert len(outbox.pending(now=queue.clock())) == 2
+
+    _probe, batch, _stored = _store_sample(store, SAMPLE_XML)
+    assert batch.first_observation_sequence == 10
+    _write_checkpoint(
+        checkpoint_file,
+        probe_sha256=probe.sha256,
+        next_sequence=13,
+    )
+
+    resumed = asyncio.run(worker.run_cycle())
+
+    assert resumed.reconcile is not None, (
+        "unattempted due backlog rows fenced behind a failed head suppressed "
+        "reconciliation of newer capture"
+    )
+    assert resumed.reconcile.enqueued == 1
+    assert len(outbox.pending()) == 4
+
+
 def test_a_stuck_dataset_does_not_fence_an_unrelated_dataset(tmp_path):
     """Other datasets keep committing, and the fenced one is surfaced."""
 
