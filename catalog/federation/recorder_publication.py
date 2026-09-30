@@ -938,6 +938,7 @@ class RecorderFederationDeliveryWorker:
         self._reconciled_once = False
         self._consecutive_failures = 0
         self._dropped_reports = 0
+        self.last_cycle_stage: str | None = None
 
     def _checkpoint_stamp(self) -> tuple[int, int] | None:
         try:
@@ -969,12 +970,14 @@ class RecorderFederationDeliveryWorker:
         force_reconcile: bool = False,
         progress_observer: RecorderDeliveryProgressObserver | None = None,
     ) -> RecorderWorkerCycleResult:
+        self.last_cycle_stage = "validate"
         if progress_observer is not None and not callable(progress_observer):
             raise FederationValidationError(
                 "invalid-recorder-publication",
                 "progress_observer",
                 "must be callable when supplied",
             )
+        self.last_cycle_stage = "checkpoint"
         stamp = self._checkpoint_stamp()
         changed = (
             force_reconcile
@@ -1016,6 +1019,7 @@ class RecorderFederationDeliveryWorker:
             # backlog at all, and the scan ran first. The probe is spent after
             # one cycle, so this can delay reconciliation by exactly one cycle
             # per restart and never by a permanently failing row.
+            self.last_cycle_stage = "backlog-probe"
             now = None if self.queue.startup_probe_pending else self.queue.clock()
             has_pending = getattr(self.queue.outbox, "has_pending", None)
             if callable(has_pending):
@@ -1039,6 +1043,7 @@ class RecorderFederationDeliveryWorker:
                 )
 
         if changed and (force_reconcile or not current_backlog):
+            self.last_cycle_stage = "reconcile"
             reconcile = await asyncio.to_thread(self.reconciler.reconcile)
             # Record the stamp observed before reconciliation. If capture commits
             # again during the scan, the next cycle sees the newer stamp and
@@ -1046,6 +1051,7 @@ class RecorderFederationDeliveryWorker:
             self._last_checkpoint_stamp = stamp
             self._reconciled_once = True
 
+        self.last_cycle_stage = "delivery"
         if progress_observer is None:
             delivery = await self.queue.run_once(limit=self.delivery_limit)
         else:
@@ -1059,12 +1065,14 @@ class RecorderFederationDeliveryWorker:
         # the poisoned row was withdrawn days ago must still report degraded,
         # and a cycle that runs after an operator repaired one must stop
         # reporting it. Only durable truth answers both.
+        self.last_cycle_stage = "retirement"
         retirement = await asyncio.to_thread(
             self.queue.outbox.retired_summary,
             session_id=self.queue.session_id,
             destination_id=self.queue.destination_id,
             schema_id=RECORDER_STORAGE_SCHEMA,
         )
+        self.last_cycle_stage = None
         return RecorderWorkerCycleResult(
             checkpoint_changed=changed,
             reconcile=reconcile,
