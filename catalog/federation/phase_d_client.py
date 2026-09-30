@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -13,6 +14,12 @@ from .commit_tracking import DurableAcknowledgementStore
 from .errors import FederationValidationError
 from .manifest import ManifestItemKind
 from .manifest_store import ManifestCommitIntent
+from .storage_catalog import (
+    CommittedBatchDeltaPage,
+    CommittedBatchPage,
+    CommittedBatchReference,
+    ManifestBatchCatalog,
+)
 from .storage_protocol import (
     STORAGE_PROTOCOL,
     STORAGE_PROTOCOL_VERSION,
@@ -24,12 +31,8 @@ from .storage_protocol import (
     StorageResponseEnvelope,
     WriteAuthority,
 )
-from .storage_catalog import (
-    CommittedBatchDeltaPage,
-    CommittedBatchPage,
-    CommittedBatchReference,
-    ManifestBatchCatalog,
-)
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def _now() -> datetime:
@@ -179,64 +182,100 @@ class PhaseDLogicalStorageClient:
             )
         group_id = request.authority.group_id
         route = self._route(group_id)
-        routed = BatchIngestRequest(
-            authority=WriteAuthority(
-                session_id=self.session_id,
-                group_id=group_id,
-                actor_node_id=route.node_id,
-                grant_id=route.grant_id,
-                term=route.term,
-                fencing_token=route.fencing_token,
-                lease_expires_at=route.lease_expires_at,
-            ),
-            dataset_id=request.dataset_id,
-            batch_id=request.batch_id,
-            idempotency_key=request.idempotency_key,
-            content_hash=request.content_hash,
-            content=request.content,
-            created_at=request.created_at,
-            dataset_schema_name=request.dataset_schema_name,
-            dataset_schema_version=request.dataset_schema_version,
-        )
-        intent = self._prepare_distributed_manifest(routed, route)
-        response = await self.transport.request(
-            target_node_id=route.node_id,
-            envelope=StorageRequestEnvelope(
-                request_id=f"storage-{uuid.uuid4().hex}",
-                protocol=STORAGE_PROTOCOL,
-                protocol_version=STORAGE_PROTOCOL_VERSION,
-                operation=StorageOperation.BATCH_INGEST,
-                session_id=self.session_id,
-                actor_node_id=self.actor_node_id,
-                authorization_context={
-                    "kind": "storage-primary-route",
-                    "group_id": group_id,
-                    "provider_id": route.provider_id,
-                },
-                payload=routed.to_dict(),
-            ),
-        )
-        if response.ok:
-            return self._accept_success(
-                request=request,
-                routed=routed,
-                group_id=group_id,
-                value=response.result,
-                intent=intent,
+        correlation_id = uuid.uuid4().hex
+        for attempt in range(2):
+            routed = BatchIngestRequest(
+                authority=WriteAuthority(
+                    session_id=self.session_id,
+                    group_id=group_id,
+                    actor_node_id=route.node_id,
+                    grant_id=route.grant_id,
+                    term=route.term,
+                    fencing_token=route.fencing_token,
+                    lease_expires_at=route.lease_expires_at,
+                ),
+                dataset_id=request.dataset_id,
+                batch_id=request.batch_id,
+                idempotency_key=request.idempotency_key,
+                content_hash=request.content_hash,
+                content=request.content,
+                created_at=request.created_at,
+                dataset_schema_name=request.dataset_schema_name,
+                dataset_schema_version=request.dataset_schema_version,
             )
-        assert response.error is not None
-        if response.error.retryable:
-            return PhaseDIngestOutcome(
-                committed=False,
-                retryable=True,
-                error_code=response.error.code.value,
-                message=response.error.message,
+            intent = self._prepare_distributed_manifest(routed, route)
+            request_id = f"storage-{correlation_id}-{attempt + 1}"
+            response = await self.transport.request(
+                target_node_id=route.node_id,
+                envelope=StorageRequestEnvelope(
+                    request_id=request_id,
+                    protocol=STORAGE_PROTOCOL,
+                    protocol_version=STORAGE_PROTOCOL_VERSION,
+                    operation=StorageOperation.BATCH_INGEST,
+                    session_id=self.session_id,
+                    actor_node_id=self.actor_node_id,
+                    authorization_context={
+                        "kind": "storage-primary-route",
+                        "group_id": group_id,
+                        "provider_id": route.provider_id,
+                    },
+                    payload=routed.to_dict(),
+                ),
             )
-        raise FederationValidationError(
-            response.error.code.value,
-            response.error.field or "storage",
-            response.error.message,
-        )
+            if response.ok:
+                return self._accept_success(
+                    request=request,
+                    routed=routed,
+                    group_id=group_id,
+                    value=response.result,
+                    intent=intent,
+                )
+            assert response.error is not None
+            if response.error.retryable:
+                return PhaseDIngestOutcome(
+                    committed=False,
+                    retryable=True,
+                    error_code=response.error.code.value,
+                    message=response.error.message,
+                )
+            if (
+                attempt == 0
+                and response.error.code is StorageErrorCode.UNKNOWN_GRANT
+            ):
+                try:
+                    refreshed_route = self._route(group_id)
+                except FederationValidationError:
+                    refreshed_route = route
+                if (
+                    refreshed_route.provider_id == route.provider_id
+                    and refreshed_route.node_id == route.node_id
+                    and refreshed_route.grant_id != route.grant_id
+                    and refreshed_route.term > route.term
+                    and refreshed_route.fencing_token > route.fencing_token
+                ):
+                    _LOGGER.warning(
+                        "phase_d_ingest_retry_after_grant_rotation",
+                        extra={
+                            "correlation_id": correlation_id,
+                            "rejected_request_id": request_id,
+                            "session_id": self.session_id,
+                            "group_id": group_id,
+                            "batch_id": request.batch_id,
+                            "provider_id": route.provider_id,
+                            "stale_term": route.term,
+                            "current_term": refreshed_route.term,
+                            "error_code": response.error.code.value,
+                        },
+                    )
+                    route = refreshed_route
+                    continue
+            raise FederationValidationError(
+                response.error.code.value,
+                response.error.field or "storage",
+                response.error.message,
+            )
+
+        raise AssertionError("bounded storage route retry exhausted unexpectedly")
 
     def _prepare_distributed_manifest(
         self,

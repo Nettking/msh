@@ -30,6 +30,8 @@ from catalog.federation.storage_protocol import (
     BatchIngestRequest,
     BatchIngestResult,
     BatchIngestState,
+    StorageError,
+    StorageErrorCode,
     StorageOperation,
     StorageRequestEnvelope,
     StorageResponseEnvelope,
@@ -904,6 +906,142 @@ def test_logical_client_retains_obligation_without_manifest_evidence(
     assert outcome.retryable
     assert outcome.error_code == "invalid-storage-response"
     assert runtime.control.manifest(SESSION_ID, GROUP_ID).revision == 0
+
+
+def test_logical_client_refreshes_grant_after_provider_rejects_stale_route(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    runtime = _runtime(
+        tmp_path,
+        acknowledgement_mode=AcknowledgementMode.PRIMARY,
+    )
+    runtime.service.clock = lambda: NOW + timedelta(seconds=2)
+
+    class GrantRenewalRaceTransport:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, str, str]] = []
+
+        async def request(self, *, target_node_id, envelope):
+            routed = BatchIngestRequest.from_dict(envelope.payload)
+            self.calls.append(
+                (
+                    routed.authority.grant_id,
+                    routed.batch_id,
+                    routed.content_hash,
+                )
+            )
+            if len(self.calls) == 1:
+                # The coordinator renews the same provider's grant after the
+                # logical client prepares its intent, but before the provider
+                # validates the routed write.
+                runtime.control.grant_leader(
+                    SESSION_ID,
+                    "coordinator",
+                    GROUP_ID,
+                    PRIMARY_ID,
+                    "grant-2",
+                    2,
+                    11,
+                    lease_expires_at=NOW + timedelta(minutes=20),
+                    occurred_at=NOW + timedelta(seconds=1),
+                )
+            assert target_node_id == PRIMARY_NODE_ID
+            return await runtime.service.dispatch(envelope)
+
+    transport = GrantRenewalRaceTransport()
+    client = PhaseDLogicalStorageClient(
+        session_id=SESSION_ID,
+        actor_node_id="recorder-node",
+        control_plane=runtime.control,
+        transport=transport,
+        acknowledgements=runtime.acknowledgements,
+        clock=lambda: NOW + timedelta(seconds=2),
+    )
+
+    outcome = asyncio.run(client.ingest(_request()))
+
+    assert outcome.committed
+    assert [grant_id for grant_id, _, _ in transport.calls] == [
+        "grant-1",
+        "grant-2",
+    ]
+    assert len({batch_id for _, batch_id, _ in transport.calls}) == 1
+    assert len({content_hash for _, _, content_hash in transport.calls}) == 1
+    manifest = runtime.control.manifest(SESSION_ID, GROUP_ID)
+    assert manifest.revision == 1
+    assert manifest.items[0].item_id == _request().batch_id
+    retry_records = [
+        record
+        for record in caplog.records
+        if record.message == "phase_d_ingest_retry_after_grant_rotation"
+    ]
+    assert len(retry_records) == 1
+    assert retry_records[0].stale_term == 1
+    assert retry_records[0].current_term == 2
+
+
+def test_logical_client_does_not_retry_across_primary_change(
+    tmp_path: Path,
+) -> None:
+    runtime = _runtime(
+        tmp_path,
+        acknowledgement_mode=AcknowledgementMode.PRIMARY,
+        with_replica=True,
+    )
+    runtime.service.clock = lambda: NOW + timedelta(seconds=2)
+
+    class ProviderChangeTransport:
+        def __init__(self) -> None:
+            self.targets: list[str] = []
+
+        async def request(self, *, target_node_id, envelope):
+            self.targets.append(target_node_id)
+            runtime.control.change_assignment(
+                SESSION_ID,
+                "coordinator",
+                GROUP_ID,
+                REPLICA_ID,
+            )
+            runtime.control.grant_leader(
+                SESSION_ID,
+                "coordinator",
+                GROUP_ID,
+                REPLICA_ID,
+                "grant-2",
+                2,
+                11,
+                lease_expires_at=NOW + timedelta(minutes=20),
+                occurred_at=NOW + timedelta(seconds=1),
+            )
+            return StorageResponseEnvelope(
+                request_id=envelope.request_id,
+                protocol=STORAGE_PROTOCOL,
+                protocol_version=STORAGE_PROTOCOL_VERSION,
+                ok=False,
+                error=StorageError(
+                    code=StorageErrorCode.UNKNOWN_GRANT,
+                    message="test provider rejected the stale routed grant",
+                    field="authority.grant_id",
+                    retryable=False,
+                ),
+            )
+
+    transport = ProviderChangeTransport()
+    client = PhaseDLogicalStorageClient(
+        session_id=SESSION_ID,
+        actor_node_id="recorder-node",
+        control_plane=runtime.control,
+        transport=transport,
+        acknowledgements=runtime.acknowledgements,
+        clock=lambda: NOW + timedelta(seconds=2),
+    )
+
+    with pytest.raises(FederationValidationError) as error:
+        asyncio.run(client.ingest(_request()))
+
+    assert error.value.code == StorageErrorCode.UNKNOWN_GRANT.value
+    assert transport.targets == [PRIMARY_NODE_ID]
 
 
 def test_logical_client_requires_authoritative_manifest_reader(
