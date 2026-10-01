@@ -13,7 +13,7 @@ from catalog.federation.commit_tracking import DurableAcknowledgementStore
 from catalog.federation.errors import FederationOperationError
 from catalog.federation.phase_d_client import PhaseDLogicalStorageClient
 from catalog.federation.phase_d_control import PhaseDControlPlane
-from catalog.federation.relay_storage import RelayStorageEndpoint
+from catalog.federation.relay_storage import RELAY_STORAGE_KIND, RelayStorageEndpoint
 from catalog.flask_app.services import federation_pairing_install as pairing
 from catalog.flask_app.services import federation_storage_authority_install as install
 from catalog.flask_app.services import trusted_storage_authority_runtime as storage
@@ -65,6 +65,41 @@ def test_creator_analysis_waits_for_current_storage_stage(tmp_path, monkeypatch)
         monitor.analysis_authority(identity, tmp_path, lambda: datetime.now(timezone.utc))
     assert error.value.code == "analysis-storage-transport-not-ready"
     assert not calls
+
+
+def test_shared_ai_reader_backpressures_instead_of_dropping_storage_reply():
+    async def scenario():
+        class ObservedQueue(asyncio.Queue):
+            def __init__(self):
+                super().__init__(maxsize=1)
+                self.full_put_waiting = asyncio.Event()
+
+            async def put(self, item):
+                if self.full():
+                    self.full_put_waiting.set()
+                await super().put(item)
+
+        client = _LoopbackRelayClient("node-creator")
+        ai = RelayRemoteAIEndpoint(client, other_message_limit=1)
+        downstream = ObservedQueue()
+        ai._other_messages = downstream
+        first = SimpleNamespace(payload={"kind": "another-protocol", "message": "first"})
+        provider_reply = SimpleNamespace(
+            actor_node_id="node-creator",
+            session_id="session-a",
+            payload={"kind": RELAY_STORAGE_KIND, "message": "response"},
+        )
+        await downstream.put(first)
+        await client._messages.put(provider_reply)
+        try:
+            await ai.start()
+            await asyncio.wait_for(downstream.full_put_waiting.wait(), timeout=1)
+            assert await ai.receive_other(timeout=1) is first
+            assert await ai.receive_other(timeout=1) is provider_reply
+        finally:
+            await ai.close()
+
+    asyncio.run(scenario())
 
 
 @pytest.mark.parametrize("stale", [False, True])
