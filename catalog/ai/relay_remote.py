@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import logging
 import threading
 import time
 from collections.abc import Callable
@@ -35,6 +36,7 @@ from .runtime_contracts import (
 RELAY_REMOTE_AI_KIND = "fcp-remote-ai-invocation-v1"
 MAX_PENDING_REMOTE_AI_INVOCATIONS = 128
 MAX_REMOTE_AI_REPLAY_ENTRIES = 1_024
+_LOGGER = logging.getLogger(__name__)
 
 
 def _utc_now() -> datetime:
@@ -527,10 +529,40 @@ class RelayRemoteAIEndpoint:
                     not isinstance(payload, dict)
                     or payload.get("kind") != RELAY_REMOTE_AI_KIND
                 ):
-                    try:
-                        self._other_messages.put_nowait(message)
-                    except asyncio.QueueFull:
-                        pass
+                    # This queue is the hand-off to the next protocol consumer
+                    # on the shared authenticated relay connection. Dropping a
+                    # frame here can strand a storage request after its
+                    # provider has already committed it. Apply bounded
+                    # backpressure instead so the downstream reader gets every
+                    # non-AI response before this single relay reader advances.
+                    if self._other_messages.full():
+                        payload = getattr(message, "payload", None)
+                        _LOGGER.warning(
+                            "shared relay reader is backpressured by its downstream consumer",
+                            extra={
+                                "relay_message_kind": (
+                                    payload.get("kind")
+                                    if isinstance(payload, dict)
+                                    else None
+                                ),
+                                "relay_message_type": (
+                                    payload.get("message")
+                                    if isinstance(payload, dict)
+                                    else None
+                                ),
+                                "relay_actor_node_id": getattr(
+                                    message, "actor_node_id", None
+                                ),
+                                "relay_session_id": getattr(
+                                    message, "session_id", None
+                                ),
+                                "relay_request_id": getattr(
+                                    message, "request_id", None
+                                ),
+                                "downstream_queue_capacity": self._other_messages.maxsize,
+                            },
+                        )
+                    await self._other_messages.put(message)
                     continue
                 if payload.get("message") == "response":
                     self._accept_response(message, payload)
