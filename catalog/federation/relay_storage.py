@@ -493,23 +493,48 @@ class RelayStorageEndpoint:
         session_id = getattr(relay_message, "session_id", None)
         if not isinstance(target_node_id, str) or not isinstance(session_id, str):
             return
-        delivery = await self.relay_client.send_message(
-            session_id=session_id,
-            target_node_id=target_node_id,
-            request_id=f"relay-response-{response.request_id}",
-            payload={
-                "kind": RELAY_STORAGE_KIND,
-                "message": "response",
-                "provider_id": provider_id,
-                "frame": json.dumps(
-                    response.to_dict(),
-                    sort_keys=True,
-                    separators=(",", ":"),
-                    ensure_ascii=False,
-                    allow_nan=False,
-                ),
-            },
-        )
+        delivery_started = time.monotonic()
+        try:
+            delivery = await self.relay_client.send_message(
+                session_id=session_id,
+                target_node_id=target_node_id,
+                request_id=f"relay-response-{response.request_id}",
+                payload={
+                    "kind": RELAY_STORAGE_KIND,
+                    "message": "response",
+                    "provider_id": provider_id,
+                    "frame": json.dumps(
+                        response.to_dict(),
+                        sort_keys=True,
+                        separators=(",", ":"),
+                        ensure_ascii=False,
+                        allow_nan=False,
+                    ),
+                },
+            )
+        except asyncio.CancelledError:
+            _LOGGER.info("storage response relay delivery cancelled", extra={
+                "storage_stage": "response_delivery_cancelled",
+                "storage_request_id": _diagnostic_text(response.request_id),
+                "storage_session_id": _diagnostic_text(session_id),
+                "storage_target_node_id": _diagnostic_text(target_node_id),
+                "storage_provider_id": _diagnostic_text(provider_id),
+                "storage_elapsed_seconds": round(time.monotonic() - delivery_started, 6),
+                **diagnostic_fields,
+            })
+            raise
+        except Exception as exc:
+            _LOGGER.error("storage response relay delivery failed", extra={
+                "storage_stage": "response_delivery_failed",
+                "storage_request_id": _diagnostic_text(response.request_id),
+                "storage_session_id": _diagnostic_text(session_id),
+                "storage_target_node_id": _diagnostic_text(target_node_id),
+                "storage_provider_id": _diagnostic_text(provider_id),
+                "storage_elapsed_seconds": round(time.monotonic() - delivery_started, 6),
+                "storage_exception_type": type(exc).__name__,
+                **diagnostic_fields,
+            })
+            raise
         _LOGGER.info("storage response relay delivery result", extra={
             "storage_stage":"response_delivery", "storage_request_id":_diagnostic_text(response.request_id),
             "storage_session_id":_diagnostic_text(session_id), "storage_target_node_id":_diagnostic_text(target_node_id),

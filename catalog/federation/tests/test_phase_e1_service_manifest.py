@@ -1034,6 +1034,198 @@ def test_provider_dispatch_timeout_is_logged_with_batch_provenance(
     asyncio.run(scenario())
 
 
+def test_provider_response_delivery_exception_is_logged_by_reader_task(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    async def scenario() -> None:
+        class FailingRelayClient(QueueRelayClient):
+            def __init__(self) -> None:
+                super().__init__()
+                self.delivery_attempted = asyncio.Event()
+
+            async def send_message(self, **_kwargs: object) -> dict[str, bool]:
+                self.delivery_attempted.set()
+                raise TimeoutError("private transport detail must not be logged")
+
+        class ObservedEndpoint(RelayStorageEndpoint):
+            def __init__(self, relay_client: FailingRelayClient) -> None:
+                super().__init__(relay_client)
+                self.handler_finished = asyncio.Event()
+                self.handler_cancelled = False
+                self.handler_exception: BaseException | None = None
+
+            def _finish_handler(self, task: asyncio.Task[None]) -> None:
+                self.handler_cancelled = task.cancelled()
+                self.handler_exception = (
+                    None if task.cancelled() else task.exception()
+                )
+                super()._finish_handler(task)
+                self.handler_finished.set()
+
+        relay = FailingRelayClient()
+        endpoint = ObservedEndpoint(relay)
+        caplog.set_level(logging.INFO, logger="catalog.federation.relay_storage")
+        envelope = StorageRequestEnvelope(
+            request_id="response-delivery-timeout",
+            protocol=STORAGE_PROTOCOL,
+            protocol_version=STORAGE_PROTOCOL_VERSION,
+            operation=StorageOperation.BATCH_INGEST,
+            session_id=SESSION_ID,
+            actor_node_id="recorder-node",
+            authorization_context={"provider_id": REPLICA_ID, "group_id": GROUP_ID},
+            payload={
+                "group_id": GROUP_ID,
+                "dataset_id": "dataset-delivery-timeout",
+                "batch_id": "batch-delivery-timeout",
+                "content_hash": "sha256:" + "c" * 64,
+                "idempotency_key": "idempotency-delivery-timeout",
+            },
+        )
+
+        await endpoint.start()
+        await relay.messages.put(
+            SimpleNamespace(
+                actor_node_id="recorder-node",
+                session_id=SESSION_ID,
+                payload={
+                    "kind": RELAY_STORAGE_KIND,
+                    "message": "request",
+                    "provider_id": REPLICA_ID,
+                    "frame": json.dumps(envelope.to_dict()),
+                },
+            )
+        )
+        await asyncio.wait_for(relay.delivery_attempted.wait(), timeout=1)
+        await asyncio.wait_for(endpoint.handler_finished.wait(), timeout=1)
+        assert not endpoint.handler_cancelled
+        assert isinstance(endpoint.handler_exception, TimeoutError)
+        assert not endpoint._handler_tasks
+        await endpoint.close()
+
+        records = [
+            record
+            for record in caplog.records
+            if record.name == "catalog.federation.relay_storage"
+            and getattr(record, "storage_stage", None) == "response_delivery_failed"
+        ]
+        assert len(records) == 1
+        record = records[0]
+        assert record.storage_request_id == "response-delivery-timeout"
+        assert record.storage_session_id == SESSION_ID
+        assert record.storage_target_node_id == "recorder-node"
+        assert record.storage_provider_id == REPLICA_ID
+        assert record.storage_dataset_id == "dataset-delivery-timeout"
+        assert record.storage_batch_id == "batch-delivery-timeout"
+        assert record.storage_content_hash == "sha256:" + "c" * 64
+        assert record.storage_exception_type == "TimeoutError"
+        assert record.storage_elapsed_seconds >= 0
+        assert record.exc_info is None
+        assert record.exc_text is None
+        assert "private transport detail" not in caplog.text
+        assert "private transport detail" not in repr(vars(record))
+        assert not any(
+            getattr(entry, "storage_stage", None) == "response_delivery"
+            for entry in caplog.records
+        )
+
+    asyncio.run(scenario())
+
+
+def test_provider_response_delivery_cancellation_is_logged_by_reader_task(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    async def scenario() -> None:
+        class BlockingRelayClient(QueueRelayClient):
+            def __init__(self) -> None:
+                super().__init__()
+                self.delivery_started = asyncio.Event()
+
+            async def send_message(self, **_kwargs: object) -> dict[str, bool]:
+                self.delivery_started.set()
+                await asyncio.Future()
+
+        class ObservedEndpoint(RelayStorageEndpoint):
+            def __init__(self, relay_client: BlockingRelayClient) -> None:
+                super().__init__(relay_client)
+                self.handler_finished = asyncio.Event()
+                self.handler_cancelled = False
+
+            def _finish_handler(self, task: asyncio.Task[None]) -> None:
+                self.handler_cancelled = task.cancelled()
+                super()._finish_handler(task)
+                self.handler_finished.set()
+
+        relay = BlockingRelayClient()
+        endpoint = ObservedEndpoint(relay)
+        caplog.set_level(logging.INFO, logger="catalog.federation.relay_storage")
+        envelope = StorageRequestEnvelope(
+            request_id="response-delivery-cancelled",
+            protocol=STORAGE_PROTOCOL,
+            protocol_version=STORAGE_PROTOCOL_VERSION,
+            operation=StorageOperation.BATCH_INGEST,
+            session_id=SESSION_ID,
+            actor_node_id="recorder-node",
+            authorization_context={"provider_id": REPLICA_ID, "group_id": GROUP_ID},
+            payload={
+                "group_id": GROUP_ID,
+                "dataset_id": "dataset-delivery-cancelled",
+                "batch_id": "batch-delivery-cancelled",
+                "content_hash": "sha256:" + "d" * 64,
+                "idempotency_key": "idempotency-delivery-cancelled",
+            },
+        )
+
+        await endpoint.start()
+        await relay.messages.put(
+            SimpleNamespace(
+                actor_node_id="recorder-node",
+                session_id=SESSION_ID,
+                payload={
+                    "kind": RELAY_STORAGE_KIND,
+                    "message": "request",
+                    "provider_id": REPLICA_ID,
+                    "frame": json.dumps(envelope.to_dict()),
+                },
+            )
+        )
+        await asyncio.wait_for(relay.delivery_started.wait(), timeout=1)
+        handler = next(iter(endpoint._handler_tasks))
+        handler.cancel("private cancellation detail must not be logged")
+        await asyncio.wait_for(endpoint.handler_finished.wait(), timeout=1)
+        assert endpoint.handler_cancelled
+        assert not endpoint._handler_tasks
+        await endpoint.close()
+
+        cancellation_records = [
+            record
+            for record in caplog.records
+            if record.name == "catalog.federation.relay_storage"
+            and getattr(record, "storage_stage", None)
+            == "response_delivery_cancelled"
+        ]
+        assert len(cancellation_records) == 1
+        record = cancellation_records[0]
+        assert record.storage_request_id == "response-delivery-cancelled"
+        assert record.storage_session_id == SESSION_ID
+        assert record.storage_target_node_id == "recorder-node"
+        assert record.storage_provider_id == REPLICA_ID
+        assert record.storage_dataset_id == "dataset-delivery-cancelled"
+        assert record.storage_batch_id == "batch-delivery-cancelled"
+        assert record.storage_content_hash == "sha256:" + "d" * 64
+        assert record.storage_elapsed_seconds >= 0
+        assert record.exc_info is None
+        assert record.exc_text is None
+        assert "private cancellation detail" not in caplog.text
+        assert "private cancellation detail" not in repr(vars(record))
+        assert not any(
+            getattr(entry, "storage_stage", None)
+            in {"response_delivery", "response_delivery_failed"}
+            for entry in caplog.records
+        )
+
+    asyncio.run(scenario())
+
+
 def test_retry_after_grant_renewal_finalizes_original_intent_idempotently(
     tmp_path: Path,
 ) -> None:
