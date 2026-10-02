@@ -39,6 +39,7 @@ from catalog.federation.recorder_delivery import (
     RECORDER_STORAGE_SCHEMA,
     DurableRecorderDeliveryQueue,
     RecorderDeliveryProgress,
+    RecorderDeliveryProgressObserver,
     RecorderDeliveryRunResult,
 )
 from catalog.federation.recorder_publication import (
@@ -497,6 +498,85 @@ class RecorderFederationNode:
             authority_node_id=authority_node_id,
             group_id=group_id,
         )
+
+    def _startup_progress_observer(
+        self,
+        *,
+        state: RemotePairingState,
+        authority_node_id: str,
+        group_id: str,
+        outbox: SQLiteOutbox,
+    ) -> RecorderDeliveryProgressObserver:
+        """Return the startup-backlog observer with its route bound once.
+
+        The queue continues its bounded one-head-per-dataset probe after this
+        callback returns. Remaining rows stay in the durable outbox and remain
+        ordered and retryable.
+        """
+        startup_progress_reported = False
+
+        async def publish(progress: RecorderDeliveryProgress) -> None:
+            nonlocal startup_progress_reported
+            if progress.committed <= 0 or startup_progress_reported:
+                return
+            try:
+                progress_jsonl = await self._publish_jsonl_once(
+                    state,
+                    authority_node_id=authority_node_id,
+                    group_id=group_id,
+                )
+            except PUBLICATION_RETRY_ERRORS:
+                # This is an early readiness hint, not the cycle's error
+                # boundary. The final JSONL publication below reports a
+                # failure through the normal retry path.
+                startup_progress_reported = True
+                return
+            progress_pending = await asyncio.to_thread(outbox.pending)
+            progress_retirement = await asyncio.to_thread(
+                outbox.retired_summary,
+                session_id=state.binding.internal_session_id,
+                destination_id=group_id,
+                schema_id=RECORDER_STORAGE_SCHEMA,
+            )
+            pending_count = len(
+                _current_recorder_pending(
+                    progress_pending,
+                    session_id=state.binding.internal_session_id,
+                    group_id=group_id,
+                )
+            )
+            if progress_retirement.total:
+                progress_state = "degraded"
+                progress_error = "recorder-delivery-retired"
+            elif progress.pending:
+                progress_state = "backlogged"
+                progress_error = "recorder-delivery-pending"
+            elif pending_count:
+                # A pending row may carry a last_error from a prior outage.
+                # The current startup probe has retried its deferred head
+                # successfully, so that historical marker must not hide the
+                # route progress this cycle just proved.
+                progress_state = "publishing"
+                progress_error = None
+            else:
+                progress_state = "up-to-date"
+                progress_error = None
+            self._set_snapshot(
+                status="connected",
+                storage_state=progress_state,
+                storage_group=group_id,
+                storage_authority_node_id=authority_node_id,
+                pending_batches=pending_count,
+                last_committed_count=progress.committed,
+                jsonl_state="ready",
+                jsonl_last_published_count=int(
+                    getattr(progress_jsonl, "published_chunks", 0)
+                ),
+                last_error_code=progress_error,
+            )
+            startup_progress_reported = True
+
+        return publish
 
     def snapshot(self) -> RecorderFederationSnapshot:
         with self._lock:
@@ -1038,85 +1118,14 @@ class RecorderFederationNode:
                     assert worker is not None and outbox is not None
                     startup_progress_observer = None
                     if worker.queue.startup_probe_pending:
-                        startup_progress_reported = False
-
-                        async def _publish_startup_progress(
-                            progress: RecorderDeliveryProgress,
-                        ) -> None:
-                            """Publish readiness at the first durable route.
-
-                            The queue continues its bounded one-head-per-dataset
-                            startup probe after this callback returns.  The
-                            remaining rows stay in the durable outbox and are
-                            therefore still ordered and retryable.
-                            """
-
-                            nonlocal startup_progress_reported
-                            if progress.committed <= 0 or startup_progress_reported:
-                                return
-                            try:
-                                progress_jsonl = await self._publish_jsonl_once(
-                                    state,
-                                    authority_node_id=authority_node_id,
-                                    group_id=group_id,
-                                )
-                            except PUBLICATION_RETRY_ERRORS:
-                                # This is an early readiness hint, not the
-                                # cycle's error boundary. Keep delivering the
-                                # durable startup probe; the unchanged final
-                                # JSONL publication below reports the failure
-                                # through the normal retry path.
-                                startup_progress_reported = True
-                                return
-                            progress_pending = await asyncio.to_thread(
-                                outbox.pending
+                        startup_progress_observer = (
+                            self._startup_progress_observer(
+                                state=state,
+                                authority_node_id=authority_node_id,
+                                group_id=group_id,
+                                outbox=outbox,
                             )
-                            progress_retirement = await asyncio.to_thread(
-                                outbox.retired_summary,
-                                session_id=state.binding.internal_session_id,
-                                destination_id=group_id,
-                                schema_id=RECORDER_STORAGE_SCHEMA,
-                            )
-                            pending_count = len(
-                                _current_recorder_pending(
-                                    progress_pending,
-                                    session_id=state.binding.internal_session_id,
-                                    group_id=group_id,
-                                )
-                            )
-                            if progress_retirement.total:
-                                progress_state = "degraded"
-                                progress_error = "recorder-delivery-retired"
-                            elif progress.pending:
-                                progress_state = "backlogged"
-                                progress_error = "recorder-delivery-pending"
-                            elif pending_count:
-                                # A pending row may carry a last_error from a
-                                # prior outage. The current startup probe has
-                                # retried its deferred head successfully, so
-                                # that historical marker must not hide the
-                                # route progress this cycle just proved.
-                                progress_state = "publishing"
-                                progress_error = None
-                            else:
-                                progress_state = "up-to-date"
-                                progress_error = None
-                            self._set_snapshot(
-                                status="connected",
-                                storage_state=progress_state,
-                                storage_group=group_id,
-                                storage_authority_node_id=authority_node_id,
-                                pending_batches=pending_count,
-                                last_committed_count=progress.committed,
-                                jsonl_state="ready",
-                                jsonl_last_published_count=int(
-                                    getattr(progress_jsonl, "published_chunks", 0)
-                                ),
-                                last_error_code=progress_error,
-                            )
-                            startup_progress_reported = True
-
-                        startup_progress_observer = _publish_startup_progress
+                        )
                     retry_stage = "delivery"
                     cycle = await worker.run_cycle(
                         progress_observer=startup_progress_observer

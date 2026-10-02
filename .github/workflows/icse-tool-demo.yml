@@ -51,7 +51,7 @@ jobs:
       matrix:
         include:
           - os: Linux
-            runner: fcp-linux-fast
+            runner: nettking-linux
             shell: bash
           - os: Windows
             runner: fcp-windows
@@ -112,7 +112,7 @@ jobs:
           path: ${{ runner.temp }}/fcp-icse-network-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}/public/
 
   reviewer-compose:
-    runs-on: [self-hosted, fcp-linux-fast]
+    runs-on: [self-hosted, Linux, X64, nettking-linux]
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -139,7 +139,7 @@ jobs:
 
   publication-bundle:
     needs: [reviewer-entrypoint, reviewer-compose]
-    runs-on: [self-hosted, fcp-linux-fast]
+    runs-on: [self-hosted, Linux, X64, nettking-linux]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4

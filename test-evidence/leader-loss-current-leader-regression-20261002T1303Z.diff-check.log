@@ -1,0 +1,5 @@
+warning: in the working copy of 'catalog/federation/recorder_storage_relay.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'catalog/federation/tests/test_control_plane_physical_runtime.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'catalog/federation/tests/test_phase_e1_service_manifest.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'catalog/federation/tests/test_recorder_storage_relay.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'PUBLICATION_REPAIR_REVIEW.md', LF will be replaced by CRLF the next time Git touches it

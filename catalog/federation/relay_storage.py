@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
+import logging
+import re
+import time
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -19,6 +23,46 @@ from .storage_protocol import (
 )
 
 RELAY_STORAGE_KIND = "fcp-storage-v1"
+_LOGGER = logging.getLogger(__name__)
+
+
+def _diagnostic_text(value: Any, *, maximum: int = 2048) -> str | None:
+    if value is None:
+        return None
+    if (
+        isinstance(value, str)
+        and 0 < len(value) <= maximum
+        and all(character.isprintable() for character in value)
+    ):
+        # Correlation fields can contain credential-shaped data. Keep stable
+        # joins in diagnostics without emitting raw identifiers.
+        return "sha256:" + hashlib.sha256(value.encode("utf-8")).hexdigest()
+    return "invalid"
+
+
+def _request_diagnostic_fields(envelope: StorageRequestEnvelope) -> dict[str, Any]:
+    payload = envelope.payload
+    authorization = envelope.authorization_context
+    idempotency_key = _diagnostic_text(payload.get("idempotency_key"))
+    content_hash = payload.get("content_hash")
+    diagnostic_content_hash = (
+        content_hash
+        if isinstance(content_hash, str)
+        and re.fullmatch(r"sha256:[0-9a-f]{64}", content_hash)
+        else _diagnostic_text(content_hash)
+    )
+    return {
+        "storage_operation": getattr(envelope.operation, "value", "unknown"),
+        "storage_group_id": _diagnostic_text(authorization.get("group_id")),
+        "storage_dataset_id": _diagnostic_text(payload.get("dataset_id")),
+        "storage_batch_id": _diagnostic_text(payload.get("batch_id")),
+        "storage_content_hash": diagnostic_content_hash,
+        "storage_idempotency_key_sha256": (
+            idempotency_key.removeprefix("sha256:")
+            if isinstance(idempotency_key, str) and idempotency_key.startswith("sha256:")
+            else idempotency_key
+        ),
+    }
 
 
 class RelayMessageClient(Protocol):
@@ -52,6 +96,7 @@ class _PendingRequest:
     session_id: str
     target_node_id: str
     provider_id: str
+    diagnostic_fields: dict[str, Any]
 
 
 class RelayStorageEndpoint:
@@ -134,11 +179,13 @@ class RelayStorageEndpoint:
             )
         loop = asyncio.get_running_loop()
         future: asyncio.Future[StorageResponseEnvelope] = loop.create_future()
+        diagnostic_fields = _request_diagnostic_fields(envelope)
         self._pending[envelope.request_id] = _PendingRequest(
             future,
             envelope.session_id,
             target_node_id,
             provider_id,
+            diagnostic_fields,
         )
         try:
             delivery = await self.relay_client.send_message(
@@ -159,10 +206,35 @@ class RelayStorageEndpoint:
                 },
             )
             if not isinstance(delivery, dict) or delivery.get("delivered") is not True:
+                _LOGGER.error("storage request delivery not confirmed", extra={
+                    "storage_stage": "request_delivery", "storage_request_id": _diagnostic_text(envelope.request_id),
+                    "storage_session_id": _diagnostic_text(envelope.session_id), "storage_target_node_id": _diagnostic_text(target_node_id),
+                    "storage_provider_id": _diagnostic_text(provider_id), "storage_delivery_confirmed": False,
+                    **diagnostic_fields})
                 raise FederationValidationError(
                     "storage-route-failed", "target_node_id", "relay did not confirm delivery"
                 )
-            return await asyncio.wait_for(future, timeout=self.request_timeout)
+            started = time.monotonic()
+            _LOGGER.info("storage request delivery confirmed", extra={
+                "storage_stage": "request_delivery", "storage_request_id": _diagnostic_text(envelope.request_id),
+                "storage_session_id": _diagnostic_text(envelope.session_id), "storage_target_node_id": _diagnostic_text(target_node_id),
+                "storage_provider_id": _diagnostic_text(provider_id), "storage_delivery_confirmed": True,
+                **diagnostic_fields})
+            try:
+                response = await asyncio.wait_for(future, timeout=self.request_timeout)
+            except asyncio.TimeoutError:
+                _LOGGER.error("storage response wait timed out", extra={
+                    "storage_stage": "response_wait", "storage_request_id": _diagnostic_text(envelope.request_id),
+                    "storage_session_id": _diagnostic_text(envelope.session_id), "storage_target_node_id": _diagnostic_text(target_node_id),
+                    "storage_provider_id": _diagnostic_text(provider_id), "storage_elapsed_seconds": round(time.monotonic()-started, 6),
+                    **diagnostic_fields})
+                raise
+            _LOGGER.info("storage response accepted", extra={
+                "storage_stage": "response_accepted", "storage_request_id": _diagnostic_text(envelope.request_id),
+                "storage_session_id": _diagnostic_text(envelope.session_id), "storage_target_node_id": _diagnostic_text(target_node_id),
+                "storage_provider_id": _diagnostic_text(provider_id), "storage_response_ok": response.ok,
+                **diagnostic_fields})
+            return response
         finally:
             self._pending.pop(envelope.request_id, None)
 
@@ -213,50 +285,140 @@ class RelayStorageEndpoint:
         relay_message: Any,
         payload: dict[str, Any],
     ) -> None:
+        relay_request_id = getattr(relay_message, "request_id", None)
+        relay_request_context = {
+            "storage_relay_request_id": _diagnostic_text(relay_request_id)
+        }
         frame = payload.get("frame")
         if not isinstance(frame, str):
+            _LOGGER.warning(
+                "storage response rejected",
+                extra={
+                    "storage_stage": "response_rejected",
+                    "storage_rejection_reason": "missing_frame",
+                    **relay_request_context,
+                },
+            )
             return
         try:
             response_value = json.loads(frame)
         except json.JSONDecodeError:
+            _LOGGER.warning(
+                "storage response rejected",
+                extra={
+                    "storage_stage": "response_rejected",
+                    "storage_rejection_reason": "invalid_json",
+                    **relay_request_context,
+                },
+            )
             return
         if not isinstance(response_value, dict):
+            _LOGGER.warning(
+                "storage response rejected",
+                extra={
+                    "storage_stage": "response_rejected",
+                    "storage_rejection_reason": "invalid_object",
+                    **relay_request_context,
+                },
+            )
             return
         request_id = response_value.get("request_id")
         if not isinstance(request_id, str):
+            _LOGGER.warning(
+                "storage response rejected",
+                extra={
+                    "storage_stage": "response_rejected",
+                    "storage_rejection_reason": "missing_request_id",
+                    **relay_request_context,
+                },
+            )
             return
         pending = self._pending.get(request_id)
-        if pending is None:
-            return
+        diagnostic_fields = pending.diagnostic_fields if pending is not None else {}
+        actor = getattr(relay_message, "actor_node_id", None)
+        session = getattr(relay_message, "session_id", None)
         response_provider_id = payload.get("provider_id")
-        if (
-            getattr(relay_message, "actor_node_id", None)
-            != pending.target_node_id
-            or getattr(relay_message, "session_id", None) != pending.session_id
-            or (
-                response_provider_id is not None
-                and response_provider_id != pending.provider_id
+        response_context = {
+            "storage_request_id": _diagnostic_text(request_id),
+            **relay_request_context,
+            "storage_actor_node_id": _diagnostic_text(actor),
+            "storage_session_id": _diagnostic_text(session),
+            "storage_provider_id": _diagnostic_text(response_provider_id),
+        }
+        if pending is None:
+            _LOGGER.warning(
+                "storage response rejected",
+                extra={
+                    "storage_stage": "response_rejected",
+                    "storage_rejection_reason": "request_not_pending",
+                    **response_context,
+                },
             )
-        ):
+            return
+        if (session != pending.session_id or actor != pending.target_node_id
+                or response_provider_id != pending.provider_id):
+            reason = (
+                "provider_mismatch"
+                if response_provider_id != pending.provider_id
+                else "route_mismatch"
+            )
+            _LOGGER.warning(
+                "storage response rejected",
+                extra={
+                    "storage_stage": "response_rejected",
+                    "storage_rejection_reason": reason,
+                    **response_context,
+                    **diagnostic_fields,
+                },
+            )
             return
         try:
             response = StorageResponseEnvelope.from_dict(response_value)
-        except FederationValidationError:
-            # A malformed response must not terminate the shared reader loop.
-            # The expected request remains pending so a valid authenticated
-            # response can still arrive before its timeout.
+        except FederationValidationError as exc:
+            _LOGGER.warning(
+                "storage response rejected",
+                extra={
+                    "storage_stage": "response_rejected",
+                    "storage_rejection_reason": "invalid_envelope",
+                    "storage_validation_code": exc.code,
+                    "storage_validation_field": exc.field,
+                    **response_context,
+                    **diagnostic_fields,
+                },
+            )
             return
         if not pending.future.done():
             pending.future.set_result(response)
+            _LOGGER.info(
+                "storage response matched pending request",
+                extra={
+                    "storage_stage": "response_accepted",
+                    **response_context,
+                    "storage_response_ok": response.ok,
+                    **diagnostic_fields,
+                },
+            )
+        else:
+            _LOGGER.warning(
+                "storage response arrived after request completed",
+                extra={
+                    "storage_stage": "response_rejected",
+                    "storage_rejection_reason": "future_already_done",
+                    **response_context,
+                    **diagnostic_fields,
+                },
+            )
 
     async def _handle_request(self, relay_message: Any, payload: dict[str, Any]) -> None:
         frame = payload.get("frame")
         provider_id = payload.get("provider_id")
         if not isinstance(frame, str) or not isinstance(provider_id, str):
             return
+        diagnostic_fields: dict[str, Any] = {}
         try:
             request_value = json.loads(frame)
             request = StorageRequestEnvelope.from_dict(request_value)
+            diagnostic_fields = _request_diagnostic_fields(request)
             authenticated_actor = getattr(relay_message, "actor_node_id", None)
             authenticated_session = getattr(relay_message, "session_id", None)
             if request.actor_node_id != authenticated_actor:
@@ -285,11 +447,39 @@ class RelayStorageEndpoint:
                     ),
                 )
             else:
-                response = await service.dispatch(request)
+                started = time.monotonic()
+                try:
+                    response = await service.dispatch(request)
+                except TimeoutError as exc:
+                    _LOGGER.error("storage provider dispatch timed out", extra={
+                        "storage_stage": "provider_dispatch_timeout",
+                        "storage_request_id": _diagnostic_text(request.request_id),
+                        "storage_session_id": _diagnostic_text(request.session_id),
+                        "storage_actor_node_id": _diagnostic_text(
+                            getattr(relay_message, "actor_node_id", None)
+                        ),
+                        "storage_provider_id": _diagnostic_text(provider_id),
+                        "storage_elapsed_seconds": round(time.monotonic() - started, 6),
+                        "storage_exception_type": type(exc).__name__,
+                        **diagnostic_fields,
+                    })
+                    raise
+                _LOGGER.info("storage provider dispatch completed", extra={
+                    "storage_stage":"provider_dispatch_complete", "storage_request_id":_diagnostic_text(request.request_id),
+                    "storage_session_id":_diagnostic_text(request.session_id), "storage_actor_node_id":_diagnostic_text(getattr(relay_message,"actor_node_id",None)),
+                    "storage_provider_id":_diagnostic_text(provider_id), "storage_response_ok":response.ok,
+                    "storage_elapsed_seconds":round(time.monotonic()-started,6), **diagnostic_fields})
         except (FederationValidationError, json.JSONDecodeError) as exc:
-            request_id = (
-                str(request_value.get("request_id", "invalid-storage-request"))
+            raw_request_id = (
+                request_value.get("request_id")
                 if isinstance(locals().get("request_value"), dict)
+                else None
+            )
+            request_id = (
+                raw_request_id
+                if isinstance(raw_request_id, str)
+                and raw_request_id.strip()
+                and all(ord(character) >= 32 for character in raw_request_id)
                 else "invalid-storage-request"
             )
             if isinstance(exc, FederationValidationError):
@@ -313,20 +503,51 @@ class RelayStorageEndpoint:
         session_id = getattr(relay_message, "session_id", None)
         if not isinstance(target_node_id, str) or not isinstance(session_id, str):
             return
-        await self.relay_client.send_message(
-            session_id=session_id,
-            target_node_id=target_node_id,
-            request_id=f"relay-response-{response.request_id}",
-            payload={
-                "kind": RELAY_STORAGE_KIND,
-                "message": "response",
-                "provider_id": provider_id,
-                "frame": json.dumps(
-                    response.to_dict(),
-                    sort_keys=True,
-                    separators=(",", ":"),
-                    ensure_ascii=False,
-                    allow_nan=False,
-                ),
-            },
-        )
+        delivery_started = time.monotonic()
+        try:
+            delivery = await self.relay_client.send_message(
+                session_id=session_id,
+                target_node_id=target_node_id,
+                request_id=f"relay-response-{response.request_id}",
+                payload={
+                    "kind": RELAY_STORAGE_KIND,
+                    "message": "response",
+                    "provider_id": provider_id,
+                    "frame": json.dumps(
+                        response.to_dict(),
+                        sort_keys=True,
+                        separators=(",", ":"),
+                        ensure_ascii=False,
+                        allow_nan=False,
+                    ),
+                },
+            )
+        except asyncio.CancelledError:
+            _LOGGER.info("storage response relay delivery cancelled", extra={
+                "storage_stage": "response_delivery_cancelled",
+                "storage_request_id": _diagnostic_text(response.request_id),
+                "storage_session_id": _diagnostic_text(session_id),
+                "storage_target_node_id": _diagnostic_text(target_node_id),
+                "storage_provider_id": _diagnostic_text(provider_id),
+                "storage_elapsed_seconds": round(time.monotonic() - delivery_started, 6),
+                **diagnostic_fields,
+            })
+            raise
+        except Exception as exc:
+            _LOGGER.error("storage response relay delivery failed", extra={
+                "storage_stage": "response_delivery_failed",
+                "storage_request_id": _diagnostic_text(response.request_id),
+                "storage_session_id": _diagnostic_text(session_id),
+                "storage_target_node_id": _diagnostic_text(target_node_id),
+                "storage_provider_id": _diagnostic_text(provider_id),
+                "storage_elapsed_seconds": round(time.monotonic() - delivery_started, 6),
+                "storage_exception_type": type(exc).__name__,
+                **diagnostic_fields,
+            })
+            raise
+        _LOGGER.info("storage response relay delivery result", extra={
+            "storage_stage":"response_delivery", "storage_request_id":_diagnostic_text(response.request_id),
+            "storage_session_id":_diagnostic_text(session_id), "storage_target_node_id":_diagnostic_text(target_node_id),
+            "storage_provider_id":_diagnostic_text(provider_id),
+            "storage_delivery_confirmed":isinstance(delivery,dict) and delivery.get("delivered") is True,
+            **diagnostic_fields})

@@ -14,7 +14,9 @@ in the payload.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
+import logging
 import re
 import time
 import uuid
@@ -54,6 +56,18 @@ RECORDER_DATASET_SCHEMA_VERSION = 1
 RECORDER_CONTENT_SCHEMA = "fcp.mtconnect.observations.v1"
 _SHA256 = re.compile(r"sha256:[0-9a-f]{64}")
 _SOURCE_SLUG = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
+_LOGGER = logging.getLogger(__name__)
+_DIAGNOSTIC_OPERATIONS = frozenset(operation.value for operation in StorageOperation)
+
+
+def _diagnostic_identifier(value: Any) -> str:
+    if (
+        isinstance(value, str)
+        and 0 < len(value) <= 256
+        and all(character.isprintable() for character in value)
+    ):
+        return "sha256:" + hashlib.sha256(value.encode("utf-8")).hexdigest()
+    return "invalid"
 
 
 def _text(value: Any, field: str, *, maximum: int = 512) -> str:
@@ -402,7 +416,59 @@ class RecorderAwareStorageControlRelayChannel(StorageControlRelayChannel):
             return
         task = asyncio.create_task(handler(actor, session_id, payload))
         self._recorder_tasks.add(task)
-        task.add_done_callback(self._recorder_tasks.discard)
+        task.add_done_callback(
+            lambda completed: self._recorder_task_done(
+                completed,
+                actor=actor,
+                session_id=session_id,
+                payload=payload,
+            )
+        )
+
+    def _recorder_task_done(
+        self,
+        task: asyncio.Task[None],
+        *,
+        actor: str,
+        session_id: str,
+        payload: dict[str, Any],
+    ) -> None:
+        self._recorder_tasks.discard(task)
+        operation = payload.get("operation", StorageOperation.BATCH_INGEST.value)
+        if not isinstance(operation, str) or operation not in _DIAGNOSTIC_OPERATIONS:
+            operation = "unknown"
+        context = {
+            "storage_correlation_id": _diagnostic_identifier(
+                payload.get("correlation_id")
+            ),
+            "storage_session_id": _diagnostic_identifier(session_id),
+            "storage_actor_node_id": _diagnostic_identifier(actor),
+            "storage_operation": operation,
+            "storage_batch_id": _diagnostic_identifier(payload.get("batch_id")),
+            "storage_dataset_id": _diagnostic_identifier(
+                payload.get("dataset_id")
+            ),
+        }
+        if task.cancelled():
+            _LOGGER.info(
+                "recorder storage request handler task cancelled",
+                extra={
+                    "storage_stage": "recorder_request_handler_task_cancelled",
+                    **context,
+                },
+            )
+            return
+        error = task.exception()
+        if error is None:
+            return
+        _LOGGER.error(
+            "recorder storage request handler task failed",
+            extra={
+                "storage_stage": "recorder_request_handler_task_failed",
+                **context,
+                "storage_exception_type": type(error).__name__,
+            },
+        )
 
 
 class RecorderLogicalStorageAuthority:
@@ -439,7 +505,25 @@ class RecorderLogicalStorageAuthority:
         payload: dict[str, Any],
     ) -> None:
         correlation_id = payload.get("correlation_id")
+        response_correlation_id = "invalid"
         response: dict[str, Any]
+        operation_value = payload.get("operation", StorageOperation.BATCH_INGEST.value)
+        operation = (
+            operation_value
+            if isinstance(operation_value, str)
+            and operation_value in _DIAGNOSTIC_OPERATIONS
+            else "unknown"
+        )
+        _LOGGER.info(
+            "recorder storage authority request received",
+            extra={
+                "storage_stage": "authority_request_received",
+                "storage_correlation_id": _diagnostic_identifier(correlation_id),
+                "storage_session_id": _diagnostic_identifier(session_id),
+                "storage_actor_node_id": _diagnostic_identifier(actor_node_id),
+                "storage_operation": operation,
+            },
+        )
         try:
             actor_node_id = _text(actor_node_id, "actor_node_id")
             if session_id != self.session_id:
@@ -449,10 +533,17 @@ class RecorderLogicalStorageAuthority:
                     "recorder request belongs to another Federation session",
                 )
             correlation_id = _text(correlation_id, "correlation_id")
+            response_correlation_id = correlation_id
             _bounded_payload(payload)
-            operation = payload.get(
+            operation_value = payload.get(
                 "operation",
                 StorageOperation.BATCH_INGEST.value,
+            )
+            operation = (
+                operation_value
+                if isinstance(operation_value, str)
+                and operation_value in _DIAGNOSTIC_OPERATIONS
+                else "unknown"
             )
             if operation == StorageOperation.BATCH_LIST.value:
                 response = self._list_response(
@@ -486,9 +577,7 @@ class RecorderLogicalStorageAuthority:
             response = {
                 "kind": RECORDER_LOGICAL_STORAGE_KIND,
                 "message": "response",
-                "correlation_id": (
-                    correlation_id if isinstance(correlation_id, str) else "invalid"
-                ),
+                "correlation_id": response_correlation_id,
                 "status": "rejected",
                 "error": {
                     "code": exc.code,
@@ -496,11 +585,66 @@ class RecorderLogicalStorageAuthority:
                     "message": exc.message,
                 },
             }
-        await self.client.send_message(
-            session_id=self.session_id,
-            target_node_id=actor_node_id,
-            request_id=f"recorder-storage-response-{uuid.uuid4().hex}",
-            payload=response,
+        try:
+            _LOGGER.info(
+                "recorder storage authority response delivery started",
+                extra={
+                    "storage_stage": "authority_response_delivery_started",
+                    "storage_correlation_id": _diagnostic_identifier(correlation_id),
+                    "storage_session_id": _diagnostic_identifier(self.session_id),
+                    "storage_actor_node_id": _diagnostic_identifier(actor_node_id),
+                    "storage_operation": operation,
+                    "storage_response_status": response.get("status"),
+                },
+            )
+            delivery = await self.client.send_message(
+                session_id=self.session_id,
+                target_node_id=actor_node_id,
+                request_id=f"recorder-storage-response-{uuid.uuid4().hex}",
+                payload=response,
+            )
+        except Exception as exc:
+            _LOGGER.error(
+                "recorder storage authority response delivery failed",
+                extra={
+                    "storage_stage": "authority_response_delivery_failed",
+                    "storage_correlation_id": _diagnostic_identifier(correlation_id),
+                    "storage_session_id": _diagnostic_identifier(self.session_id),
+                    "storage_actor_node_id": _diagnostic_identifier(actor_node_id),
+                    "storage_operation": operation,
+                    "storage_exception_type": type(exc).__name__,
+                },
+            )
+            raise
+        if not isinstance(delivery, dict) or delivery.get("delivered") is not True:
+            _LOGGER.error(
+                "recorder storage authority response was not confirmed delivered",
+                extra={
+                    "storage_stage": "authority_response_delivery_failed",
+                    "storage_correlation_id": _diagnostic_identifier(correlation_id),
+                    "storage_session_id": _diagnostic_identifier(self.session_id),
+                    "storage_actor_node_id": _diagnostic_identifier(actor_node_id),
+                    "storage_operation": operation,
+                    "storage_response_status": response.get("status"),
+                    "storage_delivery_confirmed": False,
+                    "storage_failure_kind": "relay_did_not_confirm_delivery",
+                },
+            )
+            raise FederationValidationError(
+                "storage-response-delivery-failed",
+                "target_node_id",
+                "relay did not confirm authority response delivery",
+            )
+        _LOGGER.info(
+            "recorder storage authority response delivery completed",
+            extra={
+                "storage_stage": "authority_response_delivery_completed",
+                "storage_correlation_id": _diagnostic_identifier(correlation_id),
+                "storage_session_id": _diagnostic_identifier(self.session_id),
+                "storage_actor_node_id": _diagnostic_identifier(actor_node_id),
+                "storage_operation": operation,
+                "storage_response_status": response.get("status"),
+            },
         )
 
     async def _ingest_response(
@@ -546,15 +690,60 @@ class RecorderLogicalStorageAuthority:
             schema_version=schema_version,
             content=payload["content"],
         )
-        outcome = await self.logical_client.ingest_batch(
-            group_id=group_id,
-            dataset_id=dataset_id,
-            batch_id=batch_id,
-            idempotency_key=idempotency_key,
-            content=payload["content"],
-            created_at=created_at,
-            dataset_schema_name=schema_name,
-            dataset_schema_version=schema_version,
+        started = time.monotonic()
+        _LOGGER.info(
+            "recorder storage authority ingest started",
+            extra={
+                "storage_stage": "authority_ingest_started",
+                "storage_correlation_id": _diagnostic_identifier(correlation_id),
+                "storage_session_id": _diagnostic_identifier(session_id),
+                "storage_actor_node_id": _diagnostic_identifier(actor_node_id),
+                "storage_group_id": _diagnostic_identifier(group_id),
+                "storage_dataset_id": _diagnostic_identifier(dataset_id),
+                "storage_batch_id": _diagnostic_identifier(batch_id),
+            },
+        )
+        try:
+            outcome = await self.logical_client.ingest_batch(
+                group_id=group_id,
+                dataset_id=dataset_id,
+                batch_id=batch_id,
+                idempotency_key=idempotency_key,
+                content=payload["content"],
+                created_at=created_at,
+                dataset_schema_name=schema_name,
+                dataset_schema_version=schema_version,
+            )
+        except TimeoutError as exc:
+            _LOGGER.error(
+                "recorder storage authority ingest wait timed out",
+                extra={
+                    "storage_stage": "authority_ingest_wait_timeout",
+                    "storage_correlation_id": _diagnostic_identifier(correlation_id),
+                    "storage_session_id": _diagnostic_identifier(session_id),
+                    "storage_actor_node_id": _diagnostic_identifier(actor_node_id),
+                    "storage_group_id": _diagnostic_identifier(group_id),
+                    "storage_dataset_id": _diagnostic_identifier(dataset_id),
+                    "storage_batch_id": _diagnostic_identifier(batch_id),
+                    "storage_elapsed_seconds": round(time.monotonic() - started, 6),
+                    "storage_exception_type": type(exc).__name__,
+                },
+            )
+            raise
+        _LOGGER.info(
+            "recorder storage authority ingest completed",
+            extra={
+                "storage_stage": "authority_ingest_completed",
+                "storage_correlation_id": _diagnostic_identifier(correlation_id),
+                "storage_session_id": _diagnostic_identifier(session_id),
+                "storage_actor_node_id": _diagnostic_identifier(actor_node_id),
+                "storage_group_id": _diagnostic_identifier(group_id),
+                "storage_dataset_id": _diagnostic_identifier(dataset_id),
+                "storage_batch_id": _diagnostic_identifier(batch_id),
+                "storage_elapsed_seconds": round(time.monotonic() - started, 6),
+                "storage_ingest_committed": outcome.committed,
+                "storage_ingest_retryable": outcome.retryable,
+            },
         )
         return {
             "kind": RECORDER_LOGICAL_STORAGE_KIND,
@@ -1134,10 +1323,10 @@ __all__ = [
     "RECORDER_LOGICAL_STORAGE_KIND",
     "RECORDER_RELAY_MAX_PAYLOAD_BYTES",
     "RECORDER_RELAY_SAFE_CONTENT_BYTES",
-    "RecorderAwareStorageControlRelayChannel",
-    "RecorderLogicalStorageAuthority",
-    "RelayRecorderStorageClient",
     "STORAGE_CONTROL_CAPABILITY_PROTOCOL",
     "STORAGE_CONTROL_CAPABILITY_TYPE",
     "STORAGE_CONTROL_CAPABILITY_VERSION",
+    "RecorderAwareStorageControlRelayChannel",
+    "RecorderLogicalStorageAuthority",
+    "RelayRecorderStorageClient",
 ]
