@@ -1080,6 +1080,46 @@ def test_a_retired_dataset_does_not_fence_an_unrelated_dataset(tmp_path):
     assert result.retired_datasets == ("mtconnect:node-recorder-1:Mazak",)
 
 
+def test_non_object_payload_is_retired_without_blocking_healthy_rows(tmp_path):
+    """Diagnostic context must not dereference corrupt durable JSON first."""
+
+    for index, payload in enumerate(([], None, "scalar", 1)):
+        outbox = SQLiteOutbox(tmp_path / f"non-object-{index}.sqlite3")
+        poison, _created = outbox.enqueue(
+            session_id="session-1",
+            destination_id="fcp-local-storage",
+            schema_id=RECORDER_STORAGE_SCHEMA,
+            payload=payload,
+            idempotency_key=f"non-object-{index}",
+            content_hash="d" * 64,
+            now=datetime(2026, 8, 9, 3, 0, tzinfo=UTC),
+        )
+        healthy_id = _enqueue_row(
+            outbox,
+            dataset_id="mtconnect:node-recorder-1:Okuma",
+            batch_id=f"okuma-{index}",
+        )
+        client = RecordingClient()
+        queue = DurableRecorderDeliveryQueue(
+            outbox=outbox,
+            client=client,
+            session_id="session-1",
+        )
+
+        result = asyncio.run(queue.run_once())
+
+        assert result.retired == 1
+        assert result.committed == 1
+        assert result.pending == 0
+        assert outbox.get(poison.outbox_id).state is OutboxState.RETIRED
+        assert (
+            outbox.get(poison.outbox_id).retirement_reason
+            == "payload-not-an-object"
+        )
+        assert outbox.get(healthy_id).state is OutboxState.COMPLETED
+        assert [call["batch_id"] for call in client.calls] == [f"okuma-{index}"]
+
+
 def test_a_retirement_that_cannot_commit_leaves_the_row_exactly_as_it_was(
     tmp_path,
 ):

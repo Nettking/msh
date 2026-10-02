@@ -410,15 +410,6 @@ class DurableRecorderDeliveryQueue:
 
             attempted += 1
             failed = False
-            entry_context = {
-                "storage_outbox_id": entry.outbox_id,
-                "storage_batch_id": entry.payload.get("batch_id"),
-                "storage_dataset_id": entry.payload.get("dataset_id"),
-                "storage_session_id": entry.session_id,
-                "storage_destination_id": entry.destination_id,
-                "storage_content_sha256": entry.content_hash,
-            }
-
             # The network call is the boundary between "this row is wrong" and
             # "the world is wrong". Everything above it is a pure function of
             # the durable payload; everything at or below it depends on the
@@ -442,6 +433,17 @@ class DurableRecorderDeliveryQueue:
                 pending += 1
                 failed = True
             else:
+                # Build diagnostic context only after validating the decoded
+                # durable payload. SQLiteOutbox can contain any JSON value;
+                # malformed values must be retired without aborting the cycle.
+                entry_context = {
+                    "storage_outbox_id": entry.outbox_id,
+                    "storage_batch_id": request["batch_id"],
+                    "storage_dataset_id": request["dataset_id"],
+                    "storage_session_id": entry.session_id,
+                    "storage_destination_id": entry.destination_id,
+                    "storage_content_sha256": entry.content_hash,
+                }
                 try:
                     outcome = await self.client.ingest_batch(**request)
                 except (
