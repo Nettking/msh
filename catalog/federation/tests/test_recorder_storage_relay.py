@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 from datetime import datetime, timezone
@@ -30,6 +31,10 @@ from catalog.federation.storage_protocol import BatchIngestRequest, StorageOpera
 RAW_SHA256 = "sha256:" + "a" * 64
 RECORDER_DATASET_ID = "mtconnect:node-recorder:Mazak"
 RECORDER_BATCH_ID = f"Mazak:1:1:2:{RAW_SHA256.removeprefix('sha256:')}"
+
+
+def _diagnostic_fingerprint(value: str) -> str:
+    return "sha256:" + hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
 class _AuthorityRelayClient:
@@ -464,35 +469,132 @@ def test_authority_logs_ingest_timeout_without_sending_acknowledgement(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     async def run() -> None:
+        markers = {
+            "correlation": "Bearer synthetic-timeout-correlation",
+            "session": "token-synthetic-timeout-session",
+            "actor": "api_key-synthetic-timeout-actor",
+            "group": "credential-synthetic-timeout-group",
+        }
+        dataset_id = f"mtconnect:{markers['actor']}:Mazak"
+        batch_id = RECORDER_BATCH_ID
         relay = _AuthorityRelayClient()
         logical = _TimeoutAfterLogicalCommit()
         authority = RecorderLogicalStorageAuthority(
             client=relay,
             logical_client=logical,
-            session_id="session-1",
+            session_id=markers["session"],
         )
         caplog.set_level(
             logging.INFO, logger="catalog.federation.recorder_storage_relay"
         )
 
+        payload = _request_payload()
+        payload.update(
+            correlation_id=markers["correlation"],
+            group_id=markers["group"],
+            dataset_id=dataset_id,
+            batch_id=batch_id,
+            idempotency_key=f"{markers['session']}:{dataset_id}:{batch_id}",
+        )
         with pytest.raises(TimeoutError):
             await authority.handle_request(
-                "node-recorder", "session-1", _request_payload()
+                markers["actor"], markers["session"], payload
             )
 
-        assert logical.committed_batch_ids == [RECORDER_BATCH_ID]
+        assert logical.committed_batch_ids == [batch_id]
         assert relay.sent == []
-        stages = [
-            record.storage_stage
+        records = [
+            record
             for record in caplog.records
             if record.name == "catalog.federation.recorder_storage_relay"
             and hasattr(record, "storage_stage")
         ]
-        assert stages == [
+        assert [record.storage_stage for record in records] == [
             "authority_request_received",
             "authority_ingest_started",
             "authority_ingest_wait_timeout",
         ]
+        timeout = records[-1]
+        assert timeout.storage_correlation_id == _diagnostic_fingerprint(
+            markers["correlation"]
+        )
+        assert timeout.storage_session_id == _diagnostic_fingerprint(markers["session"])
+        assert timeout.storage_actor_node_id == _diagnostic_fingerprint(markers["actor"])
+        assert timeout.storage_group_id == _diagnostic_fingerprint(markers["group"])
+        assert timeout.storage_dataset_id == _diagnostic_fingerprint(dataset_id)
+        assert timeout.storage_batch_id == _diagnostic_fingerprint(batch_id)
+        for marker in markers.values():
+            assert marker not in caplog.text
+
+    asyncio.run(run())
+
+
+def test_authority_ingest_success_fingerprints_printable_route_identifiers(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    async def run() -> None:
+        markers = {
+            "correlation": "Bearer synthetic-correlation-secret",
+            "session": "token-synthetic-session-secret",
+            "actor": "api_key-synthetic-actor-secret",
+            "group": "credential-synthetic-group-secret",
+        }
+        dataset_id = f"mtconnect:{markers['actor']}:Mazak"
+        batch_id = RECORDER_BATCH_ID
+        relay = _AuthorityRelayClient()
+        authority = RecorderLogicalStorageAuthority(
+            client=relay,
+            logical_client=_LogicalClient(),
+            session_id=markers["session"],
+        )
+        payload = _request_payload()
+        payload.update(
+            correlation_id=markers["correlation"],
+            group_id=markers["group"],
+            dataset_id=dataset_id,
+            batch_id=batch_id,
+            idempotency_key=(
+                f"{markers['session']}:{dataset_id}:{batch_id}"
+            ),
+        )
+        caplog.set_level(
+            logging.INFO, logger="catalog.federation.recorder_storage_relay"
+        )
+
+        await authority.handle_request(
+            markers["actor"], markers["session"], payload
+        )
+
+        ingest_records = [
+            record
+            for record in caplog.records
+            if record.name == "catalog.federation.recorder_storage_relay"
+            and getattr(record, "storage_stage", None)
+            in {
+                "authority_ingest_started",
+                "authority_ingest_completed",
+            }
+        ]
+        assert {record.storage_stage for record in ingest_records} == {
+            "authority_ingest_started",
+            "authority_ingest_completed",
+        }
+        expected_fields = {
+            "storage_correlation_id": markers["correlation"],
+            "storage_session_id": markers["session"],
+            "storage_actor_node_id": markers["actor"],
+            "storage_group_id": markers["group"],
+            "storage_dataset_id": dataset_id,
+            "storage_batch_id": batch_id,
+        }
+        for record in ingest_records:
+            for field, value in expected_fields.items():
+                assert getattr(record, field) == _diagnostic_fingerprint(value)
+        response = relay.sent[-1]["payload"]
+        assert isinstance(response, dict)
+        assert response["correlation_id"] == markers["correlation"]
+        for marker in markers.values():
+            assert marker not in caplog.text
 
     asyncio.run(run())
 
@@ -594,6 +696,62 @@ def test_authority_rejection_preserves_a_valid_correlation_id() -> None:
         assert isinstance(response, dict)
         assert response["status"] == "rejected"
         assert response["correlation_id"] == "corr-rejected-valid"
+
+    asyncio.run(run())
+
+
+def test_authority_rejection_fingerprints_printable_route_identifiers(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    async def run() -> None:
+        markers = {
+            "actor": "node-credential-marker",
+            "session": "session-credential-marker",
+            "correlation": "correlation-credential-marker",
+        }
+        relay = _AuthorityRelayClient()
+        authority = RecorderLogicalStorageAuthority(
+            client=relay,
+            logical_client=_LogicalClient(),
+            session_id=markers["session"],
+        )
+        caplog.set_level(
+            logging.INFO, logger="catalog.federation.recorder_storage_relay"
+        )
+        payload = _request_payload()
+        payload["correlation_id"] = markers["correlation"]
+        del payload["group_id"]
+
+        await authority.handle_request(
+            markers["actor"], markers["session"], payload
+        )
+
+        response = relay.sent[-1]["payload"]
+        assert isinstance(response, dict)
+        assert response["status"] == "rejected"
+        assert response["correlation_id"] == markers["correlation"]
+        assert relay.sent[-1]["target_node_id"] == markers["actor"]
+        records = [
+            record
+            for record in caplog.records
+            if record.name == "catalog.federation.recorder_storage_relay"
+            and getattr(record, "storage_stage", "").startswith(
+                "authority_response_delivery_"
+            )
+        ]
+        assert len(records) == 2
+        for record in records:
+            assert record.storage_correlation_id == _diagnostic_fingerprint(
+                markers["correlation"]
+            )
+            assert record.storage_session_id == _diagnostic_fingerprint(
+                markers["session"]
+            )
+            assert record.storage_actor_node_id == _diagnostic_fingerprint(
+                markers["actor"]
+            )
+        for marker in markers.values():
+            assert marker not in caplog.text
 
     asyncio.run(run())
 
@@ -997,12 +1155,12 @@ def test_recorder_ingress_task_failure_is_consumed_and_correlated(caplog) -> Non
     assert len(records) == 1
     record = records[0]
     assert record.storage_stage == "recorder_request_handler_task_failed"
-    assert record.storage_correlation_id == "corr-1"
-    assert record.storage_session_id == "session-1"
-    assert record.storage_actor_node_id == "node-recorder"
+    assert record.storage_correlation_id == _diagnostic_fingerprint("corr-1")
+    assert record.storage_session_id == _diagnostic_fingerprint("session-1")
+    assert record.storage_actor_node_id == _diagnostic_fingerprint("node-recorder")
     assert record.storage_operation == StorageOperation.BATCH_INGEST.value
-    assert record.storage_batch_id == RECORDER_BATCH_ID
-    assert record.storage_dataset_id == RECORDER_DATASET_ID
+    assert record.storage_batch_id == _diagnostic_fingerprint(RECORDER_BATCH_ID)
+    assert record.storage_dataset_id == _diagnostic_fingerprint(RECORDER_DATASET_ID)
     assert record.storage_exception_type == "TimeoutError"
     assert "sensitive detail must not be logged" not in caplog.text
     assert "never-log-this-value" not in caplog.text
@@ -1068,11 +1226,11 @@ def test_recorder_ingress_task_cancellation_is_logged_with_safe_correlation(capl
     record = records[0]
     assert record.storage_stage == "recorder_request_handler_task_cancelled"
     assert record.storage_correlation_id == "invalid"
-    assert record.storage_session_id == "session-1"
-    assert record.storage_actor_node_id == "node-recorder"
+    assert record.storage_session_id == _diagnostic_fingerprint("session-1")
+    assert record.storage_actor_node_id == _diagnostic_fingerprint("node-recorder")
     assert record.storage_operation == StorageOperation.BATCH_INGEST.value
-    assert record.storage_batch_id == RECORDER_BATCH_ID
-    assert record.storage_dataset_id == RECORDER_DATASET_ID
+    assert record.storage_batch_id == _diagnostic_fingerprint(RECORDER_BATCH_ID)
+    assert record.storage_dataset_id == _diagnostic_fingerprint(RECORDER_DATASET_ID)
     assert "correlation\\ncredential" not in repr(record.__dict__)
     assert "never-log-this-value" not in repr(record.__dict__)
     assert "credential" not in caplog.text.lower()

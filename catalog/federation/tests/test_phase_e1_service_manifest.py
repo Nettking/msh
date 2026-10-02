@@ -49,6 +49,10 @@ REPLICA_ID = "provider-replica"
 REPLICA_NODE_ID = "node-replica"
 
 
+def _diagnostic_fingerprint(value: str) -> str:
+    return "sha256:" + hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
 @dataclass(frozen=True)
 class Runtime:
     control_database: Path
@@ -740,8 +744,8 @@ def test_relay_response_must_match_authenticated_target_session_and_provider(
         ]
         assert len(rejected) == 5
         for record in rejected:
-            assert record.storage_batch_id == "batch-1"
-            assert record.storage_dataset_id == "dataset-1"
+            assert record.storage_batch_id == _diagnostic_fingerprint("batch-1")
+            assert record.storage_dataset_id == _diagnostic_fingerprint("dataset-1")
             assert record.storage_content_hash == "sha256:" + "a" * 64
             assert record.storage_idempotency_key_sha256 == hashlib.sha256(
                 b"idem-1"
@@ -757,9 +761,9 @@ def test_relay_response_must_match_authenticated_target_session_and_provider(
         }
         for record in correlated:
             assert record.storage_operation == "batch.ingest"
-            assert record.storage_group_id == GROUP_ID
-            assert record.storage_dataset_id == "dataset-1"
-            assert record.storage_batch_id == "batch-1"
+            assert record.storage_group_id == _diagnostic_fingerprint(GROUP_ID)
+            assert record.storage_dataset_id == _diagnostic_fingerprint("dataset-1")
+            assert record.storage_batch_id == _diagnostic_fingerprint("batch-1")
             assert record.storage_content_hash == "sha256:" + "a" * 64
             assert record.storage_idempotency_key_sha256 == hashlib.sha256(
                 b"idem-1"
@@ -852,7 +856,9 @@ def test_late_response_from_timed_out_attempt_cannot_acknowledge_retry(
                 == "request_not_pending"
             ]
             assert len(stale) == 1
-            assert stale[0].storage_request_id == "same-batch-attempt-1"
+            assert stale[0].storage_request_id == _diagnostic_fingerprint(
+                "same-batch-attempt-1"
+            )
         finally:
             await endpoint.close()
 
@@ -894,6 +900,100 @@ def test_untrusted_response_identifiers_are_bounded_in_diagnostics(
     assert "must-not-be-logged" not in caplog.text
 
 
+@pytest.mark.parametrize(
+    ("delivered", "respond", "expected_stage"),
+    [
+        (True, True, "request_delivery"),
+        (False, False, "request_delivery"),
+        (True, False, "response_wait"),
+    ],
+)
+def test_requester_logs_fingerprint_credential_shaped_route_identifiers(
+    caplog: pytest.LogCaptureFixture,
+    delivered: bool,
+    respond: bool,
+    expected_stage: str,
+) -> None:
+    async def scenario() -> None:
+        markers = {
+            "request": "Bearer synthetic-request-secret",
+            "session": "token-synthetic-session-secret",
+            "actor": "api_key-synthetic-actor-secret",
+            "target": "password-synthetic-target-secret",
+            "provider": "secret-synthetic-provider-secret",
+        }
+
+        class RespondingRelay(QueueRelayClient):
+            async def send_message(self, **kwargs: object) -> dict[str, bool]:
+                if delivered and respond:
+                    payload = kwargs["payload"]
+                    assert isinstance(payload, dict)
+                    request_value = json.loads(payload["frame"])
+                    response = StorageResponseEnvelope(
+                        request_id=request_value["request_id"],
+                        protocol=STORAGE_PROTOCOL,
+                        protocol_version=STORAGE_PROTOCOL_VERSION,
+                        ok=True,
+                        result={"accepted": True},
+                    )
+                    await self.messages.put(
+                        SimpleNamespace(
+                            request_id=kwargs["request_id"],
+                            actor_node_id=kwargs["target_node_id"],
+                            session_id=kwargs["session_id"],
+                            payload={
+                                "kind": RELAY_STORAGE_KIND,
+                                "message": "response",
+                                "provider_id": markers["provider"],
+                                "frame": json.dumps(response.to_dict()),
+                            },
+                        )
+                    )
+                return {"delivered": delivered}
+
+        relay = RespondingRelay()
+        endpoint = RelayStorageEndpoint(relay, request_timeout=0.25)
+        envelope = StorageRequestEnvelope(
+            request_id=markers["request"],
+            protocol=STORAGE_PROTOCOL,
+            protocol_version=STORAGE_PROTOCOL_VERSION,
+            operation=StorageOperation.BATCH_INGEST,
+            session_id=markers["session"],
+            actor_node_id=markers["actor"],
+            authorization_context={"provider_id": markers["provider"], "group_id": GROUP_ID},
+            payload=_request().to_dict(),
+        )
+        caplog.set_level(logging.INFO, logger="catalog.federation.relay_storage")
+        try:
+            if delivered and respond:
+                await endpoint.request(target_node_id=markers["target"], envelope=envelope)
+            elif not delivered:
+                with pytest.raises(FederationValidationError, match="did not confirm delivery"):
+                    await endpoint.request(target_node_id=markers["target"], envelope=envelope)
+            else:
+                with pytest.raises(asyncio.TimeoutError):
+                    await endpoint.request(target_node_id=markers["target"], envelope=envelope)
+        finally:
+            await endpoint.close()
+
+        records = [
+            record
+            for record in caplog.records
+            if record.name == "catalog.federation.relay_storage"
+            and getattr(record, "storage_stage", None) == expected_stage
+        ]
+        assert records
+        for record in records:
+            assert record.storage_request_id == _diagnostic_fingerprint(markers["request"])
+            assert record.storage_session_id == _diagnostic_fingerprint(markers["session"])
+            assert record.storage_target_node_id == _diagnostic_fingerprint(markers["target"])
+            assert record.storage_provider_id == _diagnostic_fingerprint(markers["provider"])
+        for marker in markers.values():
+            assert marker not in caplog.text
+
+    asyncio.run(scenario())
+
+
 def test_provider_rejection_keeps_malformed_request_id_out_of_delivery_log(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -931,7 +1031,9 @@ def test_provider_rejection_keeps_malformed_request_id_out_of_delivery_log(
             and getattr(record, "storage_stage", None) == "response_delivery"
         ]
         assert len(records) == 1
-        assert records[0].storage_request_id == "invalid-storage-request"
+        assert records[0].storage_request_id == _diagnostic_fingerprint(
+            "invalid-storage-request"
+        )
         assert records[0].storage_provider_id == "invalid"
         assert "request-id-marker" not in caplog.text
         assert "secret-marker" not in caplog.text
@@ -1020,12 +1122,12 @@ def test_provider_dispatch_timeout_is_logged_with_batch_provenance(
         ]
         assert len(records) == 1
         record = records[0]
-        assert record.storage_request_id == "dispatch-timeout"
-        assert record.storage_session_id == SESSION_ID
-        assert record.storage_provider_id == REPLICA_ID
-        assert record.storage_group_id == GROUP_ID
-        assert record.storage_dataset_id == "dataset-timeout"
-        assert record.storage_batch_id == "batch-timeout"
+        assert record.storage_request_id == _diagnostic_fingerprint("dispatch-timeout")
+        assert record.storage_session_id == _diagnostic_fingerprint(SESSION_ID)
+        assert record.storage_provider_id == _diagnostic_fingerprint(REPLICA_ID)
+        assert record.storage_group_id == _diagnostic_fingerprint(GROUP_ID)
+        assert record.storage_dataset_id == _diagnostic_fingerprint("dataset-timeout")
+        assert record.storage_batch_id == _diagnostic_fingerprint("batch-timeout")
         assert record.storage_content_hash == "sha256:" + "b" * 64
         assert record.storage_idempotency_key_sha256 == hashlib.sha256(
             b"idempotency-timeout"
@@ -1110,12 +1212,12 @@ def test_provider_response_delivery_exception_is_logged_by_reader_task(
         ]
         assert len(records) == 1
         record = records[0]
-        assert record.storage_request_id == "response-delivery-timeout"
-        assert record.storage_session_id == SESSION_ID
-        assert record.storage_target_node_id == "recorder-node"
-        assert record.storage_provider_id == REPLICA_ID
-        assert record.storage_dataset_id == "dataset-delivery-timeout"
-        assert record.storage_batch_id == "batch-delivery-timeout"
+        assert record.storage_request_id == _diagnostic_fingerprint("response-delivery-timeout")
+        assert record.storage_session_id == _diagnostic_fingerprint(SESSION_ID)
+        assert record.storage_target_node_id == _diagnostic_fingerprint("recorder-node")
+        assert record.storage_provider_id == _diagnostic_fingerprint(REPLICA_ID)
+        assert record.storage_dataset_id == _diagnostic_fingerprint("dataset-delivery-timeout")
+        assert record.storage_batch_id == _diagnostic_fingerprint("batch-delivery-timeout")
         assert record.storage_content_hash == "sha256:" + "c" * 64
         assert record.storage_exception_type == "TimeoutError"
         assert record.storage_elapsed_seconds >= 0
@@ -1205,12 +1307,12 @@ def test_provider_response_delivery_cancellation_is_logged_by_reader_task(
         ]
         assert len(cancellation_records) == 1
         record = cancellation_records[0]
-        assert record.storage_request_id == "response-delivery-cancelled"
-        assert record.storage_session_id == SESSION_ID
-        assert record.storage_target_node_id == "recorder-node"
-        assert record.storage_provider_id == REPLICA_ID
-        assert record.storage_dataset_id == "dataset-delivery-cancelled"
-        assert record.storage_batch_id == "batch-delivery-cancelled"
+        assert record.storage_request_id == _diagnostic_fingerprint("response-delivery-cancelled")
+        assert record.storage_session_id == _diagnostic_fingerprint(SESSION_ID)
+        assert record.storage_target_node_id == _diagnostic_fingerprint("recorder-node")
+        assert record.storage_provider_id == _diagnostic_fingerprint(REPLICA_ID)
+        assert record.storage_dataset_id == _diagnostic_fingerprint("dataset-delivery-cancelled")
+        assert record.storage_batch_id == _diagnostic_fingerprint("batch-delivery-cancelled")
         assert record.storage_content_hash == "sha256:" + "d" * 64
         assert record.storage_elapsed_seconds >= 0
         assert record.exc_info is None

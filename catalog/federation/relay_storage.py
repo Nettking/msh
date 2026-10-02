@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import re
 import time
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -33,7 +34,9 @@ def _diagnostic_text(value: Any, *, maximum: int = 2048) -> str | None:
         and 0 < len(value) <= maximum
         and all(character.isprintable() for character in value)
     ):
-        return value
+        # Correlation fields can contain credential-shaped data. Keep stable
+        # joins in diagnostics without emitting raw identifiers.
+        return "sha256:" + hashlib.sha256(value.encode("utf-8")).hexdigest()
     return "invalid"
 
 
@@ -41,15 +44,22 @@ def _request_diagnostic_fields(envelope: StorageRequestEnvelope) -> dict[str, An
     payload = envelope.payload
     authorization = envelope.authorization_context
     idempotency_key = _diagnostic_text(payload.get("idempotency_key"))
+    content_hash = payload.get("content_hash")
+    diagnostic_content_hash = (
+        content_hash
+        if isinstance(content_hash, str)
+        and re.fullmatch(r"sha256:[0-9a-f]{64}", content_hash)
+        else _diagnostic_text(content_hash)
+    )
     return {
         "storage_operation": getattr(envelope.operation, "value", "unknown"),
         "storage_group_id": _diagnostic_text(authorization.get("group_id")),
         "storage_dataset_id": _diagnostic_text(payload.get("dataset_id")),
         "storage_batch_id": _diagnostic_text(payload.get("batch_id")),
-        "storage_content_hash": _diagnostic_text(payload.get("content_hash")),
+        "storage_content_hash": diagnostic_content_hash,
         "storage_idempotency_key_sha256": (
-            hashlib.sha256(idempotency_key.encode("utf-8")).hexdigest()
-            if idempotency_key not in (None, "invalid")
+            idempotency_key.removeprefix("sha256:")
+            if isinstance(idempotency_key, str) and idempotency_key.startswith("sha256:")
             else idempotency_key
         ),
     }
@@ -197,32 +207,32 @@ class RelayStorageEndpoint:
             )
             if not isinstance(delivery, dict) or delivery.get("delivered") is not True:
                 _LOGGER.error("storage request delivery not confirmed", extra={
-                    "storage_stage": "request_delivery", "storage_request_id": envelope.request_id,
-                    "storage_session_id": envelope.session_id, "storage_target_node_id": target_node_id,
-                    "storage_provider_id": provider_id, "storage_delivery_confirmed": False,
+                    "storage_stage": "request_delivery", "storage_request_id": _diagnostic_text(envelope.request_id),
+                    "storage_session_id": _diagnostic_text(envelope.session_id), "storage_target_node_id": _diagnostic_text(target_node_id),
+                    "storage_provider_id": _diagnostic_text(provider_id), "storage_delivery_confirmed": False,
                     **diagnostic_fields})
                 raise FederationValidationError(
                     "storage-route-failed", "target_node_id", "relay did not confirm delivery"
                 )
             started = time.monotonic()
             _LOGGER.info("storage request delivery confirmed", extra={
-                "storage_stage": "request_delivery", "storage_request_id": envelope.request_id,
-                "storage_session_id": envelope.session_id, "storage_target_node_id": target_node_id,
-                "storage_provider_id": provider_id, "storage_delivery_confirmed": True,
+                "storage_stage": "request_delivery", "storage_request_id": _diagnostic_text(envelope.request_id),
+                "storage_session_id": _diagnostic_text(envelope.session_id), "storage_target_node_id": _diagnostic_text(target_node_id),
+                "storage_provider_id": _diagnostic_text(provider_id), "storage_delivery_confirmed": True,
                 **diagnostic_fields})
             try:
                 response = await asyncio.wait_for(future, timeout=self.request_timeout)
             except asyncio.TimeoutError:
                 _LOGGER.error("storage response wait timed out", extra={
-                    "storage_stage": "response_wait", "storage_request_id": envelope.request_id,
-                    "storage_session_id": envelope.session_id, "storage_target_node_id": target_node_id,
-                    "storage_provider_id": provider_id, "storage_elapsed_seconds": round(time.monotonic()-started, 6),
+                    "storage_stage": "response_wait", "storage_request_id": _diagnostic_text(envelope.request_id),
+                    "storage_session_id": _diagnostic_text(envelope.session_id), "storage_target_node_id": _diagnostic_text(target_node_id),
+                    "storage_provider_id": _diagnostic_text(provider_id), "storage_elapsed_seconds": round(time.monotonic()-started, 6),
                     **diagnostic_fields})
                 raise
             _LOGGER.info("storage response accepted", extra={
-                "storage_stage": "response_accepted", "storage_request_id": envelope.request_id,
-                "storage_session_id": envelope.session_id, "storage_target_node_id": target_node_id,
-                "storage_provider_id": provider_id, "storage_response_ok": response.ok,
+                "storage_stage": "response_accepted", "storage_request_id": _diagnostic_text(envelope.request_id),
+                "storage_session_id": _diagnostic_text(envelope.session_id), "storage_target_node_id": _diagnostic_text(target_node_id),
+                "storage_provider_id": _diagnostic_text(provider_id), "storage_response_ok": response.ok,
                 **diagnostic_fields})
             return response
         finally:

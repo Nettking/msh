@@ -48,13 +48,13 @@ jobs:
           ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
           host: ${{ vars.NITRO_ARTIFACT_HOST }}
           known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
-      - name: Create tiny synthetic evidence
-        run: ${{ matrix.python }} -B -c "from pathlib import Path; import os; p=Path(os.environ['RUNNER_TEMP'])/'archive-smoke.txt'; p.write_text('Synthetic archive transport test only\n')"
+      - name: Create 16 MiB synthetic evidence
+        run: ${{ matrix.python }} -B -c "from pathlib import Path; import os; Path(os.environ['RUNNER_TEMP'], 'archive-smoke.bin').write_bytes(bytes(range(256))*65536)"
       - uses: ./.github/actions/nitro-artifact
         with:
           operation: upload
           name: archive-smoke-${{ matrix.os }}-${{ matrix.family }}
-          path: ${{ runner.temp }}/archive-smoke.txt
+          path: ${{ runner.temp }}/archive-smoke.bin
           matrix: ${{ toJSON(matrix) }}
           job-status: ${{ job.status }}
           ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
@@ -72,5 +72,5 @@ jobs:
           known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
       - name: Verify retrieved content
         env:
-          DOWNLOAD: ${{ runner.temp }}/archive-smoke-get-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}-${{ matrix.family }}/archive-smoke-${{ matrix.os }}-${{ matrix.family }}/archive-smoke.txt
-        run: ${{ matrix.python }} -B -c "from pathlib import Path; import os; assert Path(os.environ['DOWNLOAD']).read_bytes()==(Path(os.environ['RUNNER_TEMP'])/'archive-smoke.txt').read_bytes()"
+          DOWNLOAD: ${{ runner.temp }}/archive-smoke-get-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}-${{ matrix.family }}/archive-smoke-${{ matrix.os }}-${{ matrix.family }}/archive-smoke.bin
+        run: ${{ matrix.python }} -B -c "from pathlib import Path; import os; actual=Path(os.environ['DOWNLOAD']).read_bytes(); expected=bytes(range(256))*65536; assert len(actual)==16*1024*1024 and actual==expected"

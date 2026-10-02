@@ -14,6 +14,7 @@ in the payload.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import re
@@ -65,7 +66,7 @@ def _diagnostic_identifier(value: Any) -> str:
         and 0 < len(value) <= 256
         and all(character.isprintable() for character in value)
     ):
-        return value
+        return "sha256:" + hashlib.sha256(value.encode("utf-8")).hexdigest()
     return "invalid"
 
 
@@ -694,12 +695,12 @@ class RecorderLogicalStorageAuthority:
             "recorder storage authority ingest started",
             extra={
                 "storage_stage": "authority_ingest_started",
-                "storage_correlation_id": correlation_id,
-                "storage_session_id": session_id,
-                "storage_actor_node_id": actor_node_id,
-                "storage_group_id": group_id,
-                "storage_dataset_id": dataset_id,
-                "storage_batch_id": batch_id,
+                "storage_correlation_id": _diagnostic_identifier(correlation_id),
+                "storage_session_id": _diagnostic_identifier(session_id),
+                "storage_actor_node_id": _diagnostic_identifier(actor_node_id),
+                "storage_group_id": _diagnostic_identifier(group_id),
+                "storage_dataset_id": _diagnostic_identifier(dataset_id),
+                "storage_batch_id": _diagnostic_identifier(batch_id),
             },
         )
         try:
@@ -718,12 +719,12 @@ class RecorderLogicalStorageAuthority:
                 "recorder storage authority ingest wait timed out",
                 extra={
                     "storage_stage": "authority_ingest_wait_timeout",
-                    "storage_correlation_id": correlation_id,
-                    "storage_session_id": session_id,
-                    "storage_actor_node_id": actor_node_id,
-                    "storage_group_id": group_id,
-                    "storage_dataset_id": dataset_id,
-                    "storage_batch_id": batch_id,
+                    "storage_correlation_id": _diagnostic_identifier(correlation_id),
+                    "storage_session_id": _diagnostic_identifier(session_id),
+                    "storage_actor_node_id": _diagnostic_identifier(actor_node_id),
+                    "storage_group_id": _diagnostic_identifier(group_id),
+                    "storage_dataset_id": _diagnostic_identifier(dataset_id),
+                    "storage_batch_id": _diagnostic_identifier(batch_id),
                     "storage_elapsed_seconds": round(time.monotonic() - started, 6),
                     "storage_exception_type": type(exc).__name__,
                 },
@@ -733,12 +734,12 @@ class RecorderLogicalStorageAuthority:
             "recorder storage authority ingest completed",
             extra={
                 "storage_stage": "authority_ingest_completed",
-                "storage_correlation_id": correlation_id,
-                "storage_session_id": session_id,
-                "storage_actor_node_id": actor_node_id,
-                "storage_group_id": group_id,
-                "storage_dataset_id": dataset_id,
-                "storage_batch_id": batch_id,
+                "storage_correlation_id": _diagnostic_identifier(correlation_id),
+                "storage_session_id": _diagnostic_identifier(session_id),
+                "storage_actor_node_id": _diagnostic_identifier(actor_node_id),
+                "storage_group_id": _diagnostic_identifier(group_id),
+                "storage_dataset_id": _diagnostic_identifier(dataset_id),
+                "storage_batch_id": _diagnostic_identifier(batch_id),
                 "storage_elapsed_seconds": round(time.monotonic() - started, 6),
                 "storage_ingest_committed": outcome.committed,
                 "storage_ingest_retryable": outcome.retryable,
