@@ -537,6 +537,67 @@ def test_authority_distinguishes_response_delivery_timeout(
     asyncio.run(run())
 
 
+def test_authority_rejection_sanitizes_invalid_correlation_in_delivery_logs(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    async def run() -> None:
+        relay = _AuthorityRelayClient()
+        authority = RecorderLogicalStorageAuthority(
+            client=relay,
+            logical_client=_LogicalClient(),
+            session_id="session-1",
+        )
+        caplog.set_level(
+            logging.INFO, logger="catalog.federation.recorder_storage_relay"
+        )
+        payload = _request_payload()
+        payload["correlation_id"] = {"credential": "synthetic-marker-only"}
+
+        await authority.handle_request("node-recorder", "session-1", payload)
+
+        response = relay.sent[-1]["payload"]
+        assert isinstance(response, dict)
+        assert response["status"] == "rejected"
+        assert response["correlation_id"] == "invalid"
+        records = [
+            record
+            for record in caplog.records
+            if record.name == "catalog.federation.recorder_storage_relay"
+            and getattr(record, "storage_stage", "").startswith(
+                "authority_response_delivery_"
+            )
+        ]
+        assert [record.storage_correlation_id for record in records] == [
+            "invalid",
+            "invalid",
+        ]
+        assert "synthetic-marker-only" not in caplog.text
+
+    asyncio.run(run())
+
+
+def test_authority_rejection_preserves_a_valid_correlation_id() -> None:
+    async def run() -> None:
+        relay = _AuthorityRelayClient()
+        authority = RecorderLogicalStorageAuthority(
+            client=relay,
+            logical_client=_LogicalClient(),
+            session_id="session-1",
+        )
+        payload = _request_payload()
+        payload["correlation_id"] = "corr-rejected-valid"
+        del payload["group_id"]
+
+        await authority.handle_request("node-recorder", "session-1", payload)
+
+        response = relay.sent[-1]["payload"]
+        assert isinstance(response, dict)
+        assert response["status"] == "rejected"
+        assert response["correlation_id"] == "corr-rejected-valid"
+
+    asyncio.run(run())
+
+
 def test_authority_rejects_unconfirmed_response_delivery(
     caplog: pytest.LogCaptureFixture,
 ) -> None:

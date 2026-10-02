@@ -504,6 +504,7 @@ class RecorderLogicalStorageAuthority:
         payload: dict[str, Any],
     ) -> None:
         correlation_id = payload.get("correlation_id")
+        response_correlation_id = "invalid"
         response: dict[str, Any]
         operation_value = payload.get("operation", StorageOperation.BATCH_INGEST.value)
         operation = (
@@ -531,6 +532,7 @@ class RecorderLogicalStorageAuthority:
                     "recorder request belongs to another Federation session",
                 )
             correlation_id = _text(correlation_id, "correlation_id")
+            response_correlation_id = correlation_id
             _bounded_payload(payload)
             operation_value = payload.get(
                 "operation",
@@ -574,9 +576,7 @@ class RecorderLogicalStorageAuthority:
             response = {
                 "kind": RECORDER_LOGICAL_STORAGE_KIND,
                 "message": "response",
-                "correlation_id": (
-                    correlation_id if isinstance(correlation_id, str) else "invalid"
-                ),
+                "correlation_id": response_correlation_id,
                 "status": "rejected",
                 "error": {
                     "code": exc.code,
@@ -589,9 +589,9 @@ class RecorderLogicalStorageAuthority:
                 "recorder storage authority response delivery started",
                 extra={
                     "storage_stage": "authority_response_delivery_started",
-                    "storage_correlation_id": correlation_id,
-                    "storage_session_id": self.session_id,
-                    "storage_actor_node_id": actor_node_id,
+                    "storage_correlation_id": _diagnostic_identifier(correlation_id),
+                    "storage_session_id": _diagnostic_identifier(self.session_id),
+                    "storage_actor_node_id": _diagnostic_identifier(actor_node_id),
                     "storage_operation": operation,
                     "storage_response_status": response.get("status"),
                 },
@@ -607,9 +607,9 @@ class RecorderLogicalStorageAuthority:
                 "recorder storage authority response delivery failed",
                 extra={
                     "storage_stage": "authority_response_delivery_failed",
-                    "storage_correlation_id": correlation_id,
-                    "storage_session_id": self.session_id,
-                    "storage_actor_node_id": actor_node_id,
+                    "storage_correlation_id": _diagnostic_identifier(correlation_id),
+                    "storage_session_id": _diagnostic_identifier(self.session_id),
+                    "storage_actor_node_id": _diagnostic_identifier(actor_node_id),
                     "storage_operation": operation,
                     "storage_exception_type": type(exc).__name__,
                 },
@@ -620,9 +620,9 @@ class RecorderLogicalStorageAuthority:
                 "recorder storage authority response was not confirmed delivered",
                 extra={
                     "storage_stage": "authority_response_delivery_failed",
-                    "storage_correlation_id": correlation_id,
-                    "storage_session_id": self.session_id,
-                    "storage_actor_node_id": actor_node_id,
+                    "storage_correlation_id": _diagnostic_identifier(correlation_id),
+                    "storage_session_id": _diagnostic_identifier(self.session_id),
+                    "storage_actor_node_id": _diagnostic_identifier(actor_node_id),
                     "storage_operation": operation,
                     "storage_response_status": response.get("status"),
                     "storage_delivery_confirmed": False,
@@ -638,9 +638,9 @@ class RecorderLogicalStorageAuthority:
             "recorder storage authority response delivery completed",
             extra={
                 "storage_stage": "authority_response_delivery_completed",
-                "storage_correlation_id": correlation_id,
-                "storage_session_id": self.session_id,
-                "storage_actor_node_id": actor_node_id,
+                "storage_correlation_id": _diagnostic_identifier(correlation_id),
+                "storage_session_id": _diagnostic_identifier(self.session_id),
+                "storage_actor_node_id": _diagnostic_identifier(actor_node_id),
                 "storage_operation": operation,
                 "storage_response_status": response.get("status"),
             },

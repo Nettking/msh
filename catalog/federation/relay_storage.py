@@ -443,24 +443,33 @@ class RelayStorageEndpoint:
                 except TimeoutError as exc:
                     _LOGGER.error("storage provider dispatch timed out", extra={
                         "storage_stage": "provider_dispatch_timeout",
-                        "storage_request_id": request.request_id,
-                        "storage_session_id": request.session_id,
-                        "storage_actor_node_id": getattr(relay_message, "actor_node_id", None),
-                        "storage_provider_id": provider_id,
+                        "storage_request_id": _diagnostic_text(request.request_id),
+                        "storage_session_id": _diagnostic_text(request.session_id),
+                        "storage_actor_node_id": _diagnostic_text(
+                            getattr(relay_message, "actor_node_id", None)
+                        ),
+                        "storage_provider_id": _diagnostic_text(provider_id),
                         "storage_elapsed_seconds": round(time.monotonic() - started, 6),
                         "storage_exception_type": type(exc).__name__,
                         **diagnostic_fields,
                     })
                     raise
                 _LOGGER.info("storage provider dispatch completed", extra={
-                    "storage_stage":"provider_dispatch_complete", "storage_request_id":request.request_id,
-                    "storage_session_id":request.session_id, "storage_actor_node_id":getattr(relay_message,"actor_node_id",None),
-                    "storage_provider_id":provider_id, "storage_response_ok":response.ok,
+                    "storage_stage":"provider_dispatch_complete", "storage_request_id":_diagnostic_text(request.request_id),
+                    "storage_session_id":_diagnostic_text(request.session_id), "storage_actor_node_id":_diagnostic_text(getattr(relay_message,"actor_node_id",None)),
+                    "storage_provider_id":_diagnostic_text(provider_id), "storage_response_ok":response.ok,
                     "storage_elapsed_seconds":round(time.monotonic()-started,6), **diagnostic_fields})
         except (FederationValidationError, json.JSONDecodeError) as exc:
-            request_id = (
-                str(request_value.get("request_id", "invalid-storage-request"))
+            raw_request_id = (
+                request_value.get("request_id")
                 if isinstance(locals().get("request_value"), dict)
+                else None
+            )
+            request_id = (
+                raw_request_id
+                if isinstance(raw_request_id, str)
+                and raw_request_id.strip()
+                and all(ord(character) >= 32 for character in raw_request_id)
                 else "invalid-storage-request"
             )
             if isinstance(exc, FederationValidationError):
@@ -502,8 +511,8 @@ class RelayStorageEndpoint:
             },
         )
         _LOGGER.info("storage response relay delivery result", extra={
-            "storage_stage":"response_delivery", "storage_request_id":response.request_id,
-            "storage_session_id":session_id, "storage_target_node_id":target_node_id,
-            "storage_provider_id":provider_id,
+            "storage_stage":"response_delivery", "storage_request_id":_diagnostic_text(response.request_id),
+            "storage_session_id":_diagnostic_text(session_id), "storage_target_node_id":_diagnostic_text(target_node_id),
+            "storage_provider_id":_diagnostic_text(provider_id),
             "storage_delivery_confirmed":isinstance(delivery,dict) and delivery.get("delivered") is True,
             **diagnostic_fields})

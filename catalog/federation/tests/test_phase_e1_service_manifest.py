@@ -894,6 +894,89 @@ def test_untrusted_response_identifiers_are_bounded_in_diagnostics(
     assert "must-not-be-logged" not in caplog.text
 
 
+def test_provider_rejection_keeps_malformed_request_id_out_of_delivery_log(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    async def scenario() -> None:
+        class RecordingRelayClient(QueueRelayClient):
+            def __init__(self) -> None:
+                super().__init__()
+                self.sent: list[dict[str, object]] = []
+
+            async def send_message(self, **kwargs: object) -> dict[str, bool]:
+                self.sent.append(kwargs)
+                return {"delivered": True}
+
+        relay = RecordingRelayClient()
+        endpoint = RelayStorageEndpoint(relay)
+        caplog.set_level(logging.INFO, logger="catalog.federation.relay_storage")
+        request_value = _envelope(
+            _request(), request_id="placeholder-request"
+        ).to_dict()
+        request_value["request_id"] = {"credential": "request-id-marker"}
+        payload = {
+            "provider_id": "provider\nsecret-marker",
+            "frame": json.dumps(request_value),
+        }
+
+        await endpoint._handle_request(
+            SimpleNamespace(actor_node_id="recorder-node", session_id=SESSION_ID),
+            payload,
+        )
+
+        records = [
+            record
+            for record in caplog.records
+            if record.name == "catalog.federation.relay_storage"
+            and getattr(record, "storage_stage", None) == "response_delivery"
+        ]
+        assert len(records) == 1
+        assert records[0].storage_request_id == "invalid-storage-request"
+        assert records[0].storage_provider_id == "invalid"
+        assert "request-id-marker" not in caplog.text
+        assert "secret-marker" not in caplog.text
+        assert len(relay.sent) == 1
+        sent_payload = relay.sent[0]["payload"]
+        assert isinstance(sent_payload, dict)
+        response = json.loads(sent_payload["frame"])
+        assert response["request_id"] == "invalid-storage-request"
+
+    asyncio.run(scenario())
+
+
+def test_provider_rejection_preserves_valid_request_correlation_id() -> None:
+    async def scenario() -> None:
+        class RecordingRelayClient(QueueRelayClient):
+            def __init__(self) -> None:
+                super().__init__()
+                self.sent: list[dict[str, object]] = []
+
+            async def send_message(self, **kwargs: object) -> dict[str, bool]:
+                self.sent.append(kwargs)
+                return {"delivered": True}
+
+        relay = RecordingRelayClient()
+        endpoint = RelayStorageEndpoint(relay)
+        request_value = _envelope(
+            _request(), request_id="corr-valid-rejected"
+        ).to_dict()
+        del request_value["protocol"]
+
+        await endpoint._handle_request(
+            SimpleNamespace(actor_node_id="recorder-node", session_id=SESSION_ID),
+            {"provider_id": REPLICA_ID, "frame": json.dumps(request_value)},
+        )
+
+        assert len(relay.sent) == 1
+        sent_payload = relay.sent[0]["payload"]
+        assert isinstance(sent_payload, dict)
+        response = json.loads(sent_payload["frame"])
+        assert response["request_id"] == "corr-valid-rejected"
+        assert response["ok"] is False
+
+    asyncio.run(scenario())
+
+
 def test_provider_dispatch_timeout_is_logged_with_batch_provenance(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
