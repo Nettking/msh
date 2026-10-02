@@ -21,4 +21,4 @@ This isolated candidate is based on `6e154311dc7378890691eea352657be27a54f54e` i
 
 ## Acceptance boundary
 
-The changes address isolated publication behavior and diagnostic gaps. The live 14:13 transaction remains unresolved because its retained evidence lacks the stage correlation added here. No live code was changed during P12, and isolated passing tests do not establish live MSH-to-Nettking publication or qualify this candidate. The F6 run remains bound to its original F6 candidate and must finish all scheduled measurements, assertions, and finish records before any change to that installation.
+The changes address isolated publication behavior and diagnostic gaps. The live 14:13 transaction remains unresolved because its retained evidence lacks the stage correlation added here. No live code was changed during P12, and isolated passing tests do not establish live publication from the source Recorder to Nettking or qualify this candidate. The F6 run remains bound to its original F6 candidate and must finish all scheduled measurements, assertions, and finish records before any change to that installation.
