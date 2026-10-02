@@ -16,7 +16,7 @@ from catalog.federation.control_plane_product import (
     DeploymentPeer,
     ReplicatedControlPlaneDeployment,
 )
-from catalog.federation.control_plane_replication import ReplicaNode
+from catalog.federation.control_plane_replication import ReplicaNode, StaleTerm
 from catalog.federation.federation_v1_runtime import FederationV1Runtime
 from catalog.node.identity import IdentityStore
 
@@ -204,27 +204,110 @@ def test_permanent_leader_loss_recovers_same_federation_and_fences_returning_hos
         restarted_old = _runtime(deployments[0])
         restarted_old.start()
 
-        def returning_host_has_converged() -> bool:
-            # An acknowledgement from the other survivor says nothing about
-            # the returning host. Require that host to receive the current
-            # term and committed prefix before checking its fenced state.
-            successor.node.synchronize(successor.transport)
+        stale_term_observations = 0
+        last_node_state: list[dict[str, object]] = []
+        session_id = "session-survives-leader-loss"
+
+        def authority_is_current(runtime: FederationV1Runtime) -> bool:
+            leadership = runtime.node.state.get("leaders", {}).get(session_id, {})
             return (
-                restarted_old.node.role == ReplicaNode.FOLLOWER
-                and restarted_old.node.store.current_term >= successor.node.store.current_term
-                and restarted_old.node.store.last_applied >= successor.node.store.commit_index
+                runtime.node.state.get("federation_id") == old_federation_id
+                and leadership.get("leader_node_id") == runtime.node.voter_id
+                and leadership.get("creator_node_id") == creator
+                and runtime.node.store.current_term > old_term
             )
 
-        _wait(returning_host_has_converged)
+        def capture_node_state() -> list[dict[str, object]]:
+            return [
+                {
+                    "label": label,
+                    "role": runtime.node.role,
+                    "term": runtime.node.store.current_term,
+                    "commit": runtime.node.store.commit_index,
+                    "applied": runtime.node.store.last_applied,
+                    "leader_is_self": runtime.node.leader_id == runtime.node.voter_id,
+                    "same_federation": runtime.node.state.get("federation_id")
+                    == old_federation_id,
+                    "authority_is_self": runtime.node.state.get("leaders", {})
+                    .get(session_id, {})
+                    .get("leader_node_id")
+                    == runtime.node.voter_id,
+                    "creator_preserved": runtime.node.state.get("leaders", {})
+                    .get(session_id, {})
+                    .get("creator_node_id")
+                    == creator,
+                }
+                for label, runtime in (
+                    ("a-returning", restarted_old),
+                    ("b-survivor", runtimes[1]),
+                    ("c-survivor", runtimes[2]),
+                )
+                if runtime is not None
+            ]
+
+        def returning_host_has_converged() -> bool:
+            nonlocal stale_term_observations, last_node_state
+            # The elected survivor can itself lose leadership while the
+            # returning host starts. Select the current surviving leader on
+            # each observation instead of reusing the leader captured before
+            # the restart. A StaleTerm here is a missed observation; persistent
+            # leadership churn still fails the bounded wait below.
+            leaders = [
+                runtime for runtime in runtimes[1:]
+                if runtime.node.role == ReplicaNode.LEADER
+            ]
+            last_node_state = capture_node_state()
+            if restarted_old.node.role == ReplicaNode.LEADER or len(leaders) != 1:
+                return False
+            current_leader = leaders[0]
+            if (
+                current_leader.node.leader_id != current_leader.node.voter_id
+                or not authority_is_current(current_leader)
+            ):
+                return False
+            try:
+                # An acknowledgement from another survivor says nothing about
+                # the returning host. Require that host to receive the current
+                # leader's committed prefix before checking its fenced state.
+                current_leader.node.synchronize(current_leader.transport)
+            except StaleTerm:
+                stale_term_observations += 1
+                last_node_state = capture_node_state()
+                return False
+            return (
+                current_leader.node.role == ReplicaNode.LEADER
+                and current_leader.node.leader_id == current_leader.node.voter_id
+                and authority_is_current(current_leader)
+                and restarted_old.node.role == ReplicaNode.FOLLOWER
+                and restarted_old.node.store.current_term >= current_leader.node.store.current_term
+                and restarted_old.node.store.last_applied >= current_leader.node.store.commit_index
+            )
+
+        try:
+            _wait(returning_host_has_converged)
+        except AssertionError as exc:
+            raise AssertionError(
+                f"{exc}; transient_stale_term_observations={stale_term_observations}; "
+                f"last_node_state={last_node_state}"
+            ) from exc
         restarted_old.node.apply_committed()
         restarted_old.materialize()
         assert restarted_old.node.role == ReplicaNode.FOLLOWER
-        assert restarted_old.node.store.current_term >= successor.node.store.current_term
+        current_leaders = [
+            runtime for runtime in runtimes[1:]
+            if runtime.node.role == ReplicaNode.LEADER
+        ]
+        assert len(current_leaders) == 1
+        current_leader = current_leaders[0]
+        assert current_leader.node.leader_id == current_leader.node.voter_id
+        assert authority_is_current(current_leader)
+        assert restarted_old.node.store.current_term >= current_leader.node.store.current_term
+        assert restarted_old.node.store.last_applied >= current_leader.node.store.commit_index
         assert restarted_old.node.state["federation_id"] == old_federation_id
         returned_leadership = restarted_old.node.state["leaders"][
             "session-survives-leader-loss"
         ]
-        assert returned_leadership["leader_node_id"] == successor.node.voter_id
+        assert returned_leadership["leader_node_id"] == current_leader.node.voter_id
         assert returned_leadership["creator_node_id"] == creator
     finally:
         if restarted_old is not None:

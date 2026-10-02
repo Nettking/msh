@@ -1,0 +1,11 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\Martin\AppData\Local\Programs\Python\Python312\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\Martin\.codex\worktrees\publication-validation\msh
+configfile: pytest.ini
+collecting ... collected 2 items
+
+catalog/federation/tests/test_control_plane_physical_runtime.py::test_permanent_leader_loss_recovers_same_federation_and_fences_returning_host PASSED [ 50%]
+catalog/federation/tests/test_control_plane_physical_runtime.py::test_unsealed_replica_never_self_elects_without_proven_bootstrap PASSED [100%]
+
+============================= 2 passed in 11.14s ==============================
