@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from datetime import datetime, timezone
 from types import SimpleNamespace
 from typing import Any
@@ -54,6 +55,15 @@ class _LogicalClient:
             error_code="storage-pending",
             message="replica acknowledgement pending",
         )
+
+
+class _TimeoutAfterLogicalCommit:
+    def __init__(self) -> None:
+        self.committed_batch_ids: list[str] = []
+
+    async def ingest_batch(self, **kwargs):
+        self.committed_batch_ids.append(kwargs["batch_id"])
+        raise TimeoutError("simulated provider response timeout")
 
 
 def _request_payload() -> dict[str, object]:
@@ -450,6 +460,134 @@ def test_authority_roundtrips_delta_and_rejects_incomplete_baseline() -> None:
     asyncio.run(run())
 
 
+def test_authority_logs_ingest_timeout_without_sending_acknowledgement(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    async def run() -> None:
+        relay = _AuthorityRelayClient()
+        logical = _TimeoutAfterLogicalCommit()
+        authority = RecorderLogicalStorageAuthority(
+            client=relay,
+            logical_client=logical,
+            session_id="session-1",
+        )
+        caplog.set_level(
+            logging.INFO, logger="catalog.federation.recorder_storage_relay"
+        )
+
+        with pytest.raises(TimeoutError):
+            await authority.handle_request(
+                "node-recorder", "session-1", _request_payload()
+            )
+
+        assert logical.committed_batch_ids == [RECORDER_BATCH_ID]
+        assert relay.sent == []
+        stages = [
+            record.storage_stage
+            for record in caplog.records
+            if record.name == "catalog.federation.recorder_storage_relay"
+            and hasattr(record, "storage_stage")
+        ]
+        assert stages == [
+            "authority_request_received",
+            "authority_ingest_started",
+            "authority_ingest_wait_timeout",
+        ]
+
+    asyncio.run(run())
+
+
+def test_authority_distinguishes_response_delivery_timeout(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    class _TimeoutRelayClient(_AuthorityRelayClient):
+        async def send_message(self, **kwargs):
+            raise TimeoutError("simulated acknowledgement delivery timeout")
+
+    async def run() -> None:
+        relay = _TimeoutRelayClient()
+        authority = RecorderLogicalStorageAuthority(
+            client=relay,
+            logical_client=_LogicalClient(),
+            session_id="session-1",
+        )
+        caplog.set_level(
+            logging.INFO, logger="catalog.federation.recorder_storage_relay"
+        )
+
+        with pytest.raises(TimeoutError):
+            await authority.handle_request(
+                "node-recorder", "session-1", _request_payload()
+            )
+
+        stages = [
+            record.storage_stage
+            for record in caplog.records
+            if record.name == "catalog.federation.recorder_storage_relay"
+            and hasattr(record, "storage_stage")
+        ]
+        assert stages == [
+            "authority_request_received",
+            "authority_ingest_started",
+            "authority_ingest_completed",
+            "authority_response_delivery_started",
+            "authority_response_delivery_failed",
+        ]
+
+    asyncio.run(run())
+
+
+def test_authority_rejects_unconfirmed_response_delivery(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    class _UnconfirmedRelayClient(_AuthorityRelayClient):
+        async def send_message(self, **kwargs):
+            self.sent.append(kwargs)
+            return {"delivered": False}
+
+    async def run() -> None:
+        relay = _UnconfirmedRelayClient()
+        authority = RecorderLogicalStorageAuthority(
+            client=relay,
+            logical_client=_LogicalClient(),
+            session_id="session-1",
+        )
+        caplog.set_level(
+            logging.INFO, logger="catalog.federation.recorder_storage_relay"
+        )
+
+        with pytest.raises(FederationValidationError) as rejected:
+            await authority.handle_request(
+                "node-recorder", "session-1", _request_payload()
+            )
+
+        assert rejected.value.code == "storage-response-delivery-failed"
+        assert len(relay.sent) == 1
+        stages = [
+            record.storage_stage
+            for record in caplog.records
+            if record.name == "catalog.federation.recorder_storage_relay"
+            and hasattr(record, "storage_stage")
+        ]
+        assert stages == [
+            "authority_request_received",
+            "authority_ingest_started",
+            "authority_ingest_completed",
+            "authority_response_delivery_started",
+            "authority_response_delivery_failed",
+        ]
+        failure = next(
+            record
+            for record in caplog.records
+            if getattr(record, "storage_stage", None)
+            == "authority_response_delivery_failed"
+        )
+        assert failure.storage_delivery_confirmed is False
+        assert failure.storage_failure_kind == "relay_did_not_confirm_delivery"
+
+    asyncio.run(run())
+
+
 class _RecorderRelayClient:
     node_id = "node-recorder"
 
@@ -738,3 +876,142 @@ def test_storage_control_channel_dispatches_recorder_ingress_without_stealing_co
         assert values[0][2]["kind"] == RECORDER_LOGICAL_STORAGE_KIND
 
     asyncio.run(run())
+
+
+def test_recorder_ingress_task_failure_is_consumed_and_correlated(caplog) -> None:
+    async def run() -> None:
+        relay = _AuthorityRelayClient()
+        endpoint = _OtherEndpoint()
+        channel = RecorderAwareStorageControlRelayChannel(
+            relay,
+            endpoint,
+            timeout=1,
+        )
+        started = asyncio.Event()
+        loop = asyncio.get_running_loop()
+        loop_errors: list[dict[str, object]] = []
+        prior_handler = loop.get_exception_handler()
+        loop.set_exception_handler(
+            lambda _loop, context: loop_errors.append(context)
+        )
+
+        async def handler(actor: str, session: str, payload: dict[str, object]):
+            started.set()
+            raise TimeoutError("sensitive detail must not be logged")
+
+        channel.set_recorder_ingest_handler(handler)
+        await channel.start()
+        try:
+            payload = _request_payload()
+            payload["credential"] = "never-log-this-value"
+            await endpoint.queue.put(
+                SimpleNamespace(
+                    actor_node_id="node-recorder",
+                    session_id="session-1",
+                    payload=payload,
+                )
+            )
+            await asyncio.wait_for(started.wait(), timeout=1)
+            for _ in range(20):
+                if not channel._recorder_tasks:
+                    break
+                await asyncio.sleep(0)
+            assert not channel._recorder_tasks
+            assert not loop_errors
+        finally:
+            await channel.close()
+            loop.set_exception_handler(prior_handler)
+
+    with caplog.at_level(
+        logging.ERROR,
+        logger="catalog.federation.recorder_storage_relay",
+    ):
+        asyncio.run(run())
+
+    records = [
+        record
+        for record in caplog.records
+        if record.getMessage() == "recorder storage request handler task failed"
+    ]
+    assert len(records) == 1
+    record = records[0]
+    assert record.storage_stage == "recorder_request_handler_task_failed"
+    assert record.storage_correlation_id == "corr-1"
+    assert record.storage_session_id == "session-1"
+    assert record.storage_actor_node_id == "node-recorder"
+    assert record.storage_operation == StorageOperation.BATCH_INGEST.value
+    assert record.storage_batch_id == RECORDER_BATCH_ID
+    assert record.storage_dataset_id == RECORDER_DATASET_ID
+    assert record.storage_exception_type == "TimeoutError"
+    assert "sensitive detail must not be logged" not in caplog.text
+    assert "never-log-this-value" not in caplog.text
+
+def test_recorder_ingress_task_cancellation_is_logged_with_safe_correlation(caplog) -> None:
+    async def run() -> None:
+        relay = _AuthorityRelayClient()
+        endpoint = _OtherEndpoint()
+        channel = RecorderAwareStorageControlRelayChannel(
+            relay,
+            endpoint,
+            timeout=1,
+        )
+        started = asyncio.Event()
+        hold = asyncio.Event()
+        loop = asyncio.get_running_loop()
+        loop_errors: list[dict[str, object]] = []
+        prior_handler = loop.get_exception_handler()
+        loop.set_exception_handler(
+            lambda _loop, context: loop_errors.append(context)
+        )
+
+        async def handler(actor: str, session: str, payload: dict[str, Any]):
+            started.set()
+            await hold.wait()
+
+        channel.set_recorder_ingest_handler(handler)
+        await channel.start()
+        try:
+            payload = _request_payload()
+            payload["credential"] = "never-log-this-value"
+            payload["correlation_id"] = "correlation\ncredential"
+            await endpoint.queue.put(
+                SimpleNamespace(
+                    actor_node_id="node-recorder",
+                    session_id="session-1",
+                    payload=payload,
+                )
+            )
+            await asyncio.wait_for(started.wait(), timeout=1)
+            task = next(iter(channel._recorder_tasks))
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+            await asyncio.sleep(0)
+            assert not channel._recorder_tasks
+            assert not loop_errors
+        finally:
+            await channel.close()
+            loop.set_exception_handler(prior_handler)
+
+    with caplog.at_level(
+        logging.INFO,
+        logger="catalog.federation.recorder_storage_relay",
+    ):
+        asyncio.run(run())
+
+    records = [
+        record
+        for record in caplog.records
+        if record.getMessage() == "recorder storage request handler task cancelled"
+    ]
+    assert len(records) == 1
+    record = records[0]
+    assert record.storage_stage == "recorder_request_handler_task_cancelled"
+    assert record.storage_correlation_id == "invalid"
+    assert record.storage_session_id == "session-1"
+    assert record.storage_actor_node_id == "node-recorder"
+    assert record.storage_operation == StorageOperation.BATCH_INGEST.value
+    assert record.storage_batch_id == RECORDER_BATCH_ID
+    assert record.storage_dataset_id == RECORDER_DATASET_ID
+    assert "correlation\\ncredential" not in repr(record.__dict__)
+    assert "never-log-this-value" not in repr(record.__dict__)
+    assert "credential" not in caplog.text.lower()

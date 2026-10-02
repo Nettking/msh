@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
+import logging
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -611,22 +613,30 @@ def test_primary_only_manifest_intent_does_not_cap_batch_at_outbox_limit(
 
 
 def test_relay_response_must_match_authenticated_target_session_and_provider(
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     async def scenario() -> None:
         relay = QueueRelayClient()
         endpoint = RelayStorageEndpoint(relay, request_timeout=1)
+        caplog.set_level(logging.INFO, logger="catalog.federation.relay_storage")
         envelope = StorageRequestEnvelope(
             request_id="bound-response",
             protocol=STORAGE_PROTOCOL,
             protocol_version=STORAGE_PROTOCOL_VERSION,
-            operation=StorageOperation.BATCH_EXISTS,
+            operation=StorageOperation.BATCH_INGEST,
             session_id=SESSION_ID,
             actor_node_id="recorder-node",
             authorization_context={
                 "provider_id": REPLICA_ID,
                 "group_id": GROUP_ID,
             },
-            payload={"group_id": GROUP_ID, "batch_id": "batch-1"},
+            payload={
+                "group_id": GROUP_ID,
+                "dataset_id": "dataset-1",
+                "batch_id": "batch-1",
+                "content_hash": "sha256:" + "a" * 64,
+                "idempotency_key": "idem-1",
+            },
         )
         response = StorageResponseEnvelope(
             request_id=envelope.request_id,
@@ -678,12 +688,265 @@ def test_relay_response_must_match_authenticated_target_session_and_provider(
             SimpleNamespace(
                 payload=payload,
                 actor_node_id=REPLICA_NODE_ID,
+                session_id="wrong-session",
+            )
+        )
+        await asyncio.sleep(0.01)
+        assert not request_task.done()
+        await relay.messages.put(
+            SimpleNamespace(
+                payload={**payload, "provider_id": "wrong-provider"},
+                actor_node_id=REPLICA_NODE_ID,
+                session_id=SESSION_ID,
+            )
+        )
+        await asyncio.sleep(0.01)
+        assert not request_task.done()
+        await relay.messages.put(
+            SimpleNamespace(
+                payload={key: value for key, value in payload.items() if key != "provider_id"},
+                actor_node_id=REPLICA_NODE_ID,
+                session_id=SESSION_ID,
+            )
+        )
+        await asyncio.sleep(0.01)
+        assert not request_task.done()
+        await relay.messages.put(
+            SimpleNamespace(
+                payload=payload,
+                actor_node_id=REPLICA_NODE_ID,
                 session_id=SESSION_ID,
             )
         )
 
         assert await request_task == response
+        rejection_reasons = [
+            record.storage_rejection_reason
+            for record in caplog.records
+            if record.name == "catalog.federation.relay_storage"
+            and hasattr(record, "storage_rejection_reason")
+        ]
+        assert rejection_reasons == [
+            "route_mismatch",
+            "route_mismatch",
+            "route_mismatch",
+            "provider_mismatch",
+            "provider_mismatch",
+        ]
+        rejected = [
+            record for record in caplog.records
+            if record.name == "catalog.federation.relay_storage"
+            and getattr(record, "storage_rejection_reason", None) is not None
+        ]
+        assert len(rejected) == 5
+        for record in rejected:
+            assert record.storage_batch_id == "batch-1"
+            assert record.storage_dataset_id == "dataset-1"
+            assert record.storage_content_hash == "sha256:" + "a" * 64
+            assert record.storage_idempotency_key_sha256 == hashlib.sha256(
+                b"idem-1"
+            ).hexdigest()
+        correlated = [
+            record for record in caplog.records
+            if record.name == "catalog.federation.relay_storage"
+            and getattr(record, "storage_stage", None) in {"request_delivery", "response_accepted"}
+        ]
+        assert {record.storage_stage for record in correlated} == {
+            "request_delivery",
+            "response_accepted",
+        }
+        for record in correlated:
+            assert record.storage_operation == "batch.ingest"
+            assert record.storage_group_id == GROUP_ID
+            assert record.storage_dataset_id == "dataset-1"
+            assert record.storage_batch_id == "batch-1"
+            assert record.storage_content_hash == "sha256:" + "a" * 64
+            assert record.storage_idempotency_key_sha256 == hashlib.sha256(
+                b"idem-1"
+            ).hexdigest()
         await endpoint.close()
+
+    asyncio.run(scenario())
+
+
+def test_late_response_from_timed_out_attempt_cannot_acknowledge_retry(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    async def scenario() -> None:
+        relay = QueueRelayClient()
+        endpoint = RelayStorageEndpoint(relay, request_timeout=0.25)
+        caplog.set_level(logging.INFO, logger="catalog.federation.relay_storage")
+
+        def request(request_id: str) -> StorageRequestEnvelope:
+            return StorageRequestEnvelope(
+                request_id=request_id,
+                protocol=STORAGE_PROTOCOL,
+                protocol_version=STORAGE_PROTOCOL_VERSION,
+                operation=StorageOperation.BATCH_INGEST,
+                session_id=SESSION_ID,
+                actor_node_id="recorder-node",
+                authorization_context={
+                    "provider_id": REPLICA_ID,
+                    "group_id": GROUP_ID,
+                },
+                payload={
+                    "group_id": GROUP_ID,
+                    "dataset_id": "dataset-retry",
+                    "batch_id": "same-batch-replay",
+                    "content_hash": "sha256:" + "b" * 64,
+                    "idempotency_key": "same-stable-idempotency-key",
+                },
+            )
+
+        def response(request_id: str) -> SimpleNamespace:
+            envelope = StorageResponseEnvelope(
+                request_id=request_id,
+                protocol=STORAGE_PROTOCOL,
+                protocol_version=STORAGE_PROTOCOL_VERSION,
+                ok=True,
+                result={"state": "committed"},
+            )
+            return SimpleNamespace(
+                payload={
+                    "kind": RELAY_STORAGE_KIND,
+                    "message": "response",
+                    "provider_id": REPLICA_ID,
+                    "frame": json.dumps(envelope.to_dict()),
+                },
+                actor_node_id=REPLICA_NODE_ID,
+                session_id=SESSION_ID,
+            )
+
+        try:
+            with pytest.raises(TimeoutError):
+                await endpoint.request(
+                    target_node_id=REPLICA_NODE_ID,
+                    envelope=request("same-batch-attempt-1"),
+                )
+            assert "same-batch-attempt-1" not in endpoint._pending
+
+            retry = asyncio.create_task(
+                endpoint.request(
+                    target_node_id=REPLICA_NODE_ID,
+                    envelope=request("same-batch-attempt-2"),
+                )
+            )
+            await asyncio.sleep(0)
+            await relay.messages.put(response("same-batch-attempt-1"))
+            await asyncio.sleep(0.01)
+            assert not retry.done()
+            assert set(endpoint._pending) == {"same-batch-attempt-2"}
+
+            retry_response = response("same-batch-attempt-2")
+            committed = StorageResponseEnvelope.from_dict(
+                json.loads(retry_response.payload["frame"])
+            )
+            await relay.messages.put(retry_response)
+            assert await retry == committed
+
+            stale = [
+                record
+                for record in caplog.records
+                if record.name == "catalog.federation.relay_storage"
+                and getattr(record, "storage_rejection_reason", None)
+                == "request_not_pending"
+            ]
+            assert len(stale) == 1
+            assert stale[0].storage_request_id == "same-batch-attempt-1"
+        finally:
+            await endpoint.close()
+
+    asyncio.run(scenario())
+
+
+def test_untrusted_response_identifiers_are_bounded_in_diagnostics(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    relay = QueueRelayClient()
+    endpoint = RelayStorageEndpoint(relay)
+    caplog.set_level(logging.WARNING, logger="catalog.federation.relay_storage")
+    endpoint._accept_response(
+        SimpleNamespace(
+            request_id="relay-response\ncredential",
+            actor_node_id="node\ncredential",
+            session_id="s" * 2049,
+        ),
+        {
+            "provider_id": {"credential": "must-not-be-logged"},
+            "frame": json.dumps({"request_id": "response\ncredential"}),
+        },
+    )
+
+    records = [
+        record
+        for record in caplog.records
+        if record.name == "catalog.federation.relay_storage"
+        and getattr(record, "storage_rejection_reason", None) == "request_not_pending"
+    ]
+    assert len(records) == 1
+    record = records[0]
+    assert record.storage_request_id == "invalid"
+    assert record.storage_relay_request_id == "invalid"
+    assert record.storage_actor_node_id == "invalid"
+    assert record.storage_session_id == "invalid"
+    assert record.storage_provider_id == "invalid"
+    assert "credential" not in caplog.text
+    assert "must-not-be-logged" not in caplog.text
+
+
+def test_provider_dispatch_timeout_is_logged_with_batch_provenance(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    class _TimeoutService:
+        async def dispatch(self, _envelope):
+            raise TimeoutError("simulated provider dispatch timeout")
+
+    async def scenario() -> None:
+        relay = QueueRelayClient()
+        endpoint = RelayStorageEndpoint(relay, services={REPLICA_ID: _TimeoutService()})
+        caplog.set_level(logging.ERROR, logger="catalog.federation.relay_storage")
+        envelope = StorageRequestEnvelope(
+            request_id="dispatch-timeout",
+            protocol=STORAGE_PROTOCOL,
+            protocol_version=STORAGE_PROTOCOL_VERSION,
+            operation=StorageOperation.BATCH_INGEST,
+            session_id=SESSION_ID,
+            actor_node_id="recorder-node",
+            authorization_context={"provider_id": REPLICA_ID, "group_id": GROUP_ID},
+            payload={
+                "group_id": GROUP_ID,
+                "dataset_id": "dataset-timeout",
+                "batch_id": "batch-timeout",
+                "content_hash": "sha256:" + "b" * 64,
+                "idempotency_key": "idempotency-timeout",
+            },
+        )
+        with pytest.raises(TimeoutError):
+            await endpoint._handle_request(
+                SimpleNamespace(actor_node_id="recorder-node", session_id=SESSION_ID),
+                {
+                    "provider_id": REPLICA_ID,
+                    "frame": json.dumps(envelope.to_dict()),
+                },
+            )
+
+        records = [
+            record for record in caplog.records
+            if record.name == "catalog.federation.relay_storage"
+            and getattr(record, "storage_stage", None) == "provider_dispatch_timeout"
+        ]
+        assert len(records) == 1
+        record = records[0]
+        assert record.storage_request_id == "dispatch-timeout"
+        assert record.storage_session_id == SESSION_ID
+        assert record.storage_provider_id == REPLICA_ID
+        assert record.storage_group_id == GROUP_ID
+        assert record.storage_dataset_id == "dataset-timeout"
+        assert record.storage_batch_id == "batch-timeout"
+        assert record.storage_content_hash == "sha256:" + "b" * 64
+        assert record.storage_idempotency_key_sha256 == hashlib.sha256(
+            b"idempotency-timeout"
+        ).hexdigest()
 
     asyncio.run(scenario())
 

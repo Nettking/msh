@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import logging
+import sqlite3
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -15,6 +17,24 @@ from .phase_d_client import PhaseDIngestOutcome
 from .storage_protocol import BatchIngestRequest
 
 RECORDER_STORAGE_SCHEMA = "fcp.recorder.storage_delivery.v1"
+_LOGGER = logging.getLogger(__name__)
+
+
+def _storage_error_code(error: BaseException) -> str:
+    """Return a bounded error identifier without persisting exception text."""
+    sqlite_name = getattr(error, "sqlite_errorname", None)
+    if (
+        isinstance(sqlite_name, str)
+        and sqlite_name.startswith("SQLITE_")
+        and sqlite_name.isascii()
+        and sqlite_name.replace("_", "").isalnum()
+    ):
+        return sqlite_name
+    error_number = getattr(error, "errno", None)
+    if isinstance(error_number, int) and not isinstance(error_number, bool):
+        return f"errno-{error_number}"
+    return type(error).__name__
+
 
 #: Payload fields a durable row must carry before a request can even be built.
 _REQUIRED_PAYLOAD_FIELDS = (
@@ -390,6 +410,14 @@ class DurableRecorderDeliveryQueue:
 
             attempted += 1
             failed = False
+            entry_context = {
+                "storage_outbox_id": entry.outbox_id,
+                "storage_batch_id": entry.payload.get("batch_id"),
+                "storage_dataset_id": entry.payload.get("dataset_id"),
+                "storage_session_id": entry.session_id,
+                "storage_destination_id": entry.destination_id,
+                "storage_content_sha256": entry.content_hash,
+            }
 
             # The network call is the boundary between "this row is wrong" and
             # "the world is wrong". Everything above it is a pure function of
@@ -416,23 +444,163 @@ class DurableRecorderDeliveryQueue:
             else:
                 try:
                     outcome = await self.client.ingest_batch(**request)
+                except (
+                    FederationValidationError,
+                    KeyError,
+                    TypeError,
+                    ValueError,
+                    OSError,
+                    RuntimeError,
+                    sqlite3.Error,
+                ) as exc:
+                    # Storage/database/transport failure. It stays pending and
+                    # retryable however long it persists; time and attempt count
+                    # never promote it to a terminal state, and it is never
+                    # reported as a commit.
+                    self.outbox.record_failure(
+                        entry.outbox_id,
+                        error=str(exc).strip() or type(exc).__name__,
+                        now=self.clock(),
+                    )
+                    _LOGGER.error(
+                        "recorder delivery attempt failed",
+                        extra={
+                            "storage_stage": "delivery_attempt_failed",
+                            **entry_context,
+                            "storage_error_code": _storage_error_code(exc),
+                            "storage_exception_type": type(exc).__name__,
+                        },
+                    )
+                    pending += 1
+                    failed = True
+                else:
                     if outcome.committed:
-                        self.outbox.acknowledge(entry.outbox_id, now=self.clock())
-                        committed += 1
-                        if progress_observer is not None:
-                            progress = progress_observer(
-                                RecorderDeliveryProgress(
-                                    committed=committed,
-                                    dataset_id=(
-                                        None
-                                        if ordering_key is None
-                                        else ordering_key[2]
-                                    ),
-                                    pending=pending,
-                                )
+                        acknowledged = False
+                        try:
+                            self.outbox.acknowledge(
+                                entry.outbox_id, now=self.clock()
                             )
-                            if inspect.isawaitable(progress):
-                                await progress
+                        except (sqlite3.Error, OSError) as exc:
+                            try:
+                                current = self.outbox.get(entry.outbox_id)
+                            except (sqlite3.Error, OSError) as state_error:
+                                _LOGGER.error(
+                                    "recorder outbox acknowledgement state unavailable",
+                                    extra={
+                                        "storage_stage": "delivery_ack_state_unavailable",
+                                        **entry_context,
+                                        "storage_error_code": _storage_error_code(exc),
+                                        "storage_ack_exception_type": type(exc).__name__,
+                                        "storage_state_exception_type": type(state_error).__name__,
+                                    },
+                                )
+                                raise exc from state_error
+
+                            state = (
+                                None
+                                if current is None
+                                else getattr(current.state, "value", current.state)
+                            )
+                            same_identity = (
+                                current is not None
+                                and current.outbox_id == entry.outbox_id
+                                and current.session_id == entry.session_id
+                                and current.destination_id == entry.destination_id
+                                and current.schema_id == entry.schema_id
+                                and current.idempotency_key == entry.idempotency_key
+                                and current.content_hash == entry.content_hash
+                            )
+                            if state == "completed" and same_identity:
+                                acknowledged = True
+                                _LOGGER.warning(
+                                    "recorder outbox acknowledgement raised after durable completion",
+                                    extra={
+                                        "storage_stage": "delivery_ack_error_but_completed",
+                                        **entry_context,
+                                        "storage_error_code": _storage_error_code(exc),
+                                        "storage_exception_type": type(exc).__name__,
+                                    },
+                                )
+                            elif state == "pending" and same_identity:
+                                try:
+                                    self.outbox.record_failure(
+                                        entry.outbox_id,
+                                        error=f"sqlite3.{type(exc).__name__}",
+                                        now=self.clock(),
+                                    )
+                                except (sqlite3.Error, OSError) as persist_error:
+                                    _LOGGER.error(
+                                        "recorder acknowledgement failure could not be persisted",
+                                        extra={
+                                            "storage_stage": "delivery_ack_failure_not_persisted",
+                                            **entry_context,
+                                            "storage_error_code": _storage_error_code(exc),
+                                            "storage_ack_exception_type": type(exc).__name__,
+                                            "storage_persist_exception_type": (
+                                                type(persist_error).__name__
+                                            ),
+                                        },
+                                    )
+                                    raise
+                                failed = True
+                                pending += 1
+                                _LOGGER.error(
+                                    "recorder outbox acknowledgement failed; row remains retryable",
+                                    extra={
+                                        "storage_stage": "delivery_ack_failed",
+                                        **entry_context,
+                                        "storage_error_code": _storage_error_code(exc),
+                                        "storage_exception_type": type(exc).__name__,
+                                        "storage_retry_state_persisted": True,
+                                    },
+                                )
+                            else:
+                                _LOGGER.error(
+                                    "recorder outbox acknowledgement has unexpected durable state",
+                                    extra={
+                                        "storage_stage": "delivery_ack_state_unexpected",
+                                        **entry_context,
+                                        "storage_row_state": state,
+                                        "storage_identity_matches": same_identity,
+                                        "storage_error_code": _storage_error_code(exc),
+                                        "storage_exception_type": type(exc).__name__,
+                                    },
+                                )
+                                raise FederationValidationError(
+                                    "outbox-acknowledgement-state-unknown",
+                                    "outbox_id",
+                                    "durable row state or identity does not match the attempted batch",
+                                )
+                        else:
+                            acknowledged = True
+
+                        if acknowledged:
+                            committed += 1
+                            if progress_observer is not None:
+                                try:
+                                    progress = progress_observer(
+                                        RecorderDeliveryProgress(
+                                            committed=committed,
+                                            dataset_id=(
+                                                None
+                                                if ordering_key is None
+                                                else ordering_key[2]
+                                            ),
+                                            pending=pending,
+                                        )
+                                    )
+                                    if inspect.isawaitable(progress):
+                                        await progress
+                                except Exception as exc:  # noqa: BLE001 - observer cannot undo durable ack
+                                    _LOGGER.error(
+                                        "recorder delivery progress observer failed "
+                                        "after durable commit",
+                                        extra={
+                                            "storage_stage": "delivery_progress_observer_failed",
+                                            "storage_committed_count": committed,
+                                            "storage_exception_type": type(exc).__name__,
+                                        },
+                                    )
                     else:
                         self.outbox.record_failure(
                             entry.outbox_id,
@@ -444,25 +612,6 @@ class DurableRecorderDeliveryQueue:
                         )
                         pending += 1
                         failed = True
-                except (
-                    FederationValidationError,
-                    KeyError,
-                    TypeError,
-                    ValueError,
-                    OSError,
-                    RuntimeError,
-                ) as exc:
-                    # Storage/database/transport failure. It stays pending and
-                    # retryable however long it persists; time and attempt count
-                    # never promote it to a terminal state, and it is never
-                    # reported as a commit.
-                    self.outbox.record_failure(
-                        entry.outbox_id,
-                        error=str(exc),
-                        now=self.clock(),
-                    )
-                    pending += 1
-                    failed = True
 
             if failed and ordering_key is not None:
                 blocked.add(ordering_key)
