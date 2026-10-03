@@ -5,9 +5,9 @@ import ctypes
 import hashlib
 import json
 import os
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
-from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -367,6 +367,122 @@ def test_watch_cancels_final_sync_then_resumes_and_verifies_capture(
     ]
     resume_event = next(event for event in events if event["state"] == "resume-requested")
     assert resume_event["canceled_final_sync"] == [{"result": "terminated"}]
+
+
+def test_restarted_watch_recovers_exact_guard_owned_pause(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = _watch_config(tmp_path)
+    resume_operation_id = "d" * 32
+    pause_observation, pause_control = _watch_observation(heartbeat_age=11.0)
+    assert pause_control is not None
+    pause_control["resume_guard"]["deadline_utc"] = config["hard_deadline_utc"]
+    observations = iter(
+        [
+            (pause_observation, pause_control),
+            (pause_observation, pause_control),
+            _watch_observation(
+                operation_id=resume_operation_id,
+                enabled=True,
+                acknowledged=None,
+                scheduling=False,
+                durable=False,
+            ),
+            _watch_observation(
+                operation_id=resume_operation_id,
+                enabled=True,
+                acknowledged=None,
+                scheduling=True,
+                schedule_count=101,
+                durable=False,
+            ),
+        ]
+    )
+    actions: list[str] = []
+    events: list[dict] = []
+
+    monkeypatch.setattr(guard, "_load_config", lambda _path: config)
+    monkeypatch.setattr(guard, "_host_mutex", lambda _config: (object(), 1234))
+    monkeypatch.setattr(guard, "_release_mutex", lambda *_args: None)
+    monkeypatch.setattr(guard, "_observation", lambda _config: next(observations))
+    monkeypatch.setattr(guard, "_read_json", lambda _path: None)
+    monkeypatch.setattr(
+        guard,
+        "_cancel_final_sync",
+        lambda _config: actions.append("cancel") or [{"result": "terminated"}],
+    )
+    monkeypatch.setattr(
+        guard,
+        "_request_resume",
+        lambda _config: actions.append("resume")
+        or (resume_operation_id, {"result": "accepted"}),
+    )
+    monkeypatch.setattr(
+        guard,
+        "_event",
+        lambda _config, state, **kw: events.append({"state": state, **kw}),
+    )
+    monkeypatch.setattr(guard.time, "sleep", lambda _seconds: None)
+
+    assert guard.watch(tmp_path / "guard.json") == 0
+    assert actions == ["cancel", "resume"]
+    assert events[0]["state"] == "guard-restarted-for-owned-pause"
+    assert events[-1]["state"] == "resume-verified"
+
+
+def test_restarted_watch_refuses_paused_control_with_different_guard_binding(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = _watch_config(tmp_path)
+    observation, control = _watch_observation()
+    assert control is not None
+    control["resume_guard"]["deadline_utc"] = config["hard_deadline_utc"]
+    control["resume_guard"]["runtime_binding_sha256"] = "e" * 64
+    events: list[dict] = []
+    actions: list[str] = []
+
+    monkeypatch.setattr(guard, "_load_config", lambda _path: config)
+    monkeypatch.setattr(guard, "_host_mutex", lambda _config: (object(), 1234))
+    monkeypatch.setattr(guard, "_release_mutex", lambda *_args: None)
+    monkeypatch.setattr(guard, "_observation", lambda _config: (observation, control))
+    monkeypatch.setattr(
+        guard,
+        "_request_resume",
+        lambda _config: actions.append("resume"),
+    )
+    monkeypatch.setattr(
+        guard,
+        "_event",
+        lambda _config, state, **kw: events.append({"state": state, **kw}),
+    )
+
+    assert guard.watch(tmp_path / "guard.json") == 2
+    assert actions == []
+    assert events[-1]["state"] == "control-owner-changed-before-pause"
+
+
+def test_watch_failure_retains_redacted_reason_when_event_file_is_unavailable(
+    monkeypatch, capsys
+) -> None:
+    def _raise_watch_error(_path: Path) -> int:
+        raise RuntimeError("secret-token-value")
+
+    def _raise_config_error(_path: Path) -> dict:
+        raise OSError("protected config unavailable")
+
+    monkeypatch.setattr(
+        guard.sys,
+        "argv",
+        ["recorder_pause_resume_guard.py", "watch", "--config", "guard.json"],
+    )
+    monkeypatch.setattr(guard, "watch", _raise_watch_error)
+    monkeypatch.setattr(guard, "_load_config", _raise_config_error)
+
+    assert guard.main() == 2
+    captured = capsys.readouterr()
+    assert "recorder-pause-guard failed: RuntimeError" in captured.err
+    assert "failure record unavailable: OSError" in captured.err
+    assert "secret-token-value" not in captured.err
 
 
 def test_watch_records_runtime_identity_mismatch_without_stale_resume(

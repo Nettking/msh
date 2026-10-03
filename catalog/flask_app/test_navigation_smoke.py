@@ -319,7 +319,8 @@ def test_recorder_live_status_endpoint_is_small_fresh_and_authority_scoped(
                 "heartbeat_at": "2026-07-28T12:45:10Z",
                 "records_written": 15021 + self.calls,
                 "records_buffered": 0,
-                "last_flush_at": "2026-07-28T12:45:10Z",
+                "last_flush_at": None,
+                "last_commit_at": "2026-07-28T12:45:10Z",
                 "sources": [
                     {
                         "source_name": "DEMO01",
@@ -363,6 +364,7 @@ def test_recorder_live_status_endpoint_is_small_fresh_and_authority_scoped(
     assert first.get_json()["records_written"] == 15022
     assert second.get_json()["records_written"] == 15023
     assert second.get_json()["sources"][0]["next_sequence"] == 10934
+    assert second.get_json()["last_commit_at"] == "2026-07-28T12:45:10Z"
     assert "log_tail" not in second.get_json()
     assert "status_path" not in second.get_json()
 
@@ -380,6 +382,7 @@ def test_recorder_live_script_polls_without_unsafe_html() -> None:
     assert "setTimeout" in script
     assert "textContent" in script
     assert "innerHTML" not in script
+    assert "payload.last_commit_at || payload.last_flush_at" in script
 
 
 def test_recorder_live_status_endpoint_rejects_inactive_contribution(

@@ -30,7 +30,7 @@ GUARD_DIR = Path(__file__).resolve().parent
 if str(GUARD_DIR) not in sys.path:
     sys.path.insert(0, str(GUARD_DIR))
 
-from recorder_pause_resume_guard_logic import (  # noqa: E402
+from recorder_pause_resume_guard_logic import (
     BoundedPauseResumeGuard,
     PauseGuardAction,
     PauseGuardObservation,
@@ -106,7 +106,7 @@ def validate_spec(
 ) -> None:
     runtime = spec.get("runtime_binding")
     if not isinstance(runtime, dict):
-        raise ValueError("runtime_binding must be an object")
+        raise TypeError("runtime_binding must be an object")
     for name in (
         "repo_root",
         "data_root",
@@ -167,7 +167,7 @@ def validate_spec(
     if not isinstance(spec.get("baseline_capture_schedule_count"), int) or isinstance(
         spec["baseline_capture_schedule_count"], bool
     ):
-        raise ValueError("baseline_capture_schedule_count must be an integer")
+        raise TypeError("baseline_capture_schedule_count must be an integer")
     if not isinstance(spec.get("flask_url"), str) or not spec["flask_url"].startswith(
         "http://127.0.0.1:"
     ):
@@ -314,6 +314,28 @@ def _load_config(path: Path) -> dict[str, Any]:
     if _sha256(_canonical_bytes(runtime)) != config.get("runtime_binding_sha256"):
         raise ValueError("runtime binding hash does not match the protected config")
     return config
+
+
+def _control_has_owned_pause(control: dict[str, Any] | None, config: dict[str, Any]) -> bool:
+    """Return true only for this operation's exact, still-owned paused state."""
+
+    if (
+        control is None
+        or control.get("enabled") is not False
+        or control.get("operation_id") != config.get("operation_id")
+    ):
+        return False
+    guard = control.get("resume_guard")
+    return bool(
+        isinstance(guard, dict)
+        and guard.get("operation_id") == config.get("operation_id")
+        and guard.get("prior_control_operation_id")
+        == config.get("prior_control_operation_id")
+        and guard.get("runtime_binding_sha256")
+        == config.get("runtime_binding_sha256")
+        and guard.get("token_sha256") == config.get("resume_token_sha256")
+        and guard.get("deadline_utc") == config.get("hard_deadline_utc")
+    )
 
 
 def _docker_observation(runtime: dict[str, Any], timeout: float = 5.0) -> dict[str, Any] | None:
@@ -650,17 +672,21 @@ def watch(config_path: Path) -> int:
         if observation.runtime_binding_matches is not True:
             _event(config, "identity-unverified-before-pause", binding=observation.runtime_binding_matches)
             return 2
-        if (
-            control is None
-            or control.get("enabled") is not True
-            or control.get("operation_id") != config["prior_control_operation_id"]
-        ):
+        fresh_owner = bool(
+            control is not None
+            and control.get("enabled") is True
+            and control.get("operation_id") == config["prior_control_operation_id"]
+            and control.get("resume_guard") is None
+        )
+        recovering_owned_pause = _control_has_owned_pause(control, config)
+        if not fresh_owner and not recovering_owned_pause:
             _event(config, "control-owner-changed-before-pause")
             return 2
-        if control.get("resume_guard") is not None:
-            _event(config, "existing-resume-guard-present")
-            return 2
-        _event(config, "armed", mutation_lease="Global FCPHostMutation held")
+        _event(
+            config,
+            "armed" if fresh_owner else "guard-restarted-for-owned-pause",
+            mutation_lease="Global FCPHostMutation held",
+        )
         deadline = _parse_utc(config["hard_deadline_utc"])
         if deadline is None:
             _event(config, "invalid-hard-deadline")
@@ -691,20 +717,10 @@ def watch(config_path: Path) -> int:
                 control is not None
                 and control.get("operation_id") == config["operation_id"]
                 and control.get("enabled") is False
+                and not _control_has_owned_pause(control, config)
             ):
-                guard = control.get("resume_guard")
-                if (
-                    not isinstance(guard, dict)
-                    or guard.get("operation_id") != config["operation_id"]
-                    or guard.get("prior_control_operation_id")
-                    != config["prior_control_operation_id"]
-                    or guard.get("runtime_binding_sha256")
-                    != config["runtime_binding_sha256"]
-                    or guard.get("token_sha256") != config["resume_token_sha256"]
-                    or guard.get("deadline_utc") != config["hard_deadline_utc"]
-                ):
-                    _event(config, "resume-guard-control-binding-mismatch")
-                    return 4
+                _event(config, "resume-guard-control-binding-mismatch")
+                return 4
             action = machine.decide(observation, now=now)
             if action is PauseGuardAction.IDENTITY_UNVERIFIED:
                 _event(
@@ -903,8 +919,12 @@ def main() -> int:
             try:
                 config = _load_config(args.config)
                 _event(config, "guard-failed", error_type=type(exc).__name__)
-            except Exception:
-                pass
+            except (OSError, ValueError, RuntimeError, KeyError, TypeError) as record_exc:
+                print(
+                    "recorder-pause-guard failure record unavailable: "
+                    f"{type(record_exc).__name__}",
+                    file=sys.stderr,
+                )
         print(f"recorder-pause-guard failed: {type(exc).__name__}", file=sys.stderr)
         return 2
     return 2
