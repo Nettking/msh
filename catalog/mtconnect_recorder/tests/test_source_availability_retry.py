@@ -588,10 +588,11 @@ def test_startup_does_not_acknowledge_pause_request_from_previous_runtime(
         assert service.pause_acknowledged_operation_id is None
         assert service.state == "draining"
         assert status["capture_control"]["pause_request_predates_runtime"] is True
+        assert status["capture_control"]["restart_recovery_required"] is True
         assert status["capture_control"]["durable_boundary"] is False
 
-        # A newer supported Start followed by a newer Stop is eligible for a
-        # new acknowledgement in this process.
+        # A newer Start/Stop alone still cannot erase the lost incident. First
+        # complete a successful source transaction in this runtime.
         control.update(enabled=True, operation_id="new-start-operation")
         service.refresh_configuration(force=True)
         control.update(enabled=False, operation_id="new-stop-operation")
@@ -599,8 +600,29 @@ def test_startup_does_not_acknowledge_pause_request_from_previous_runtime(
         service.acknowledge_capture_pause()
         service.publish_status(force=True)
         status = json.loads((tmp_path / "status.json").read_text(encoding="utf-8"))
-        assert service.pause_acknowledged_operation_id == "new-stop-operation"
+        assert service.pause_acknowledged_operation_id is None
+        assert status["capture_control"]["restart_recovery_pending_sources"] == 1
+        assert status["capture_control"]["durable_boundary"] is False
+
+        # The worker's successful post-restart source result clears this
+        # startup-only recovery latch; a later fresh Stop can then be proven.
+        control.update(enabled=True, operation_id="recovery-start-operation")
+        service.refresh_configuration(force=True)
+        recovery: Future[tuple[str, bool, str]] = service.executor.submit(
+            lambda: (SOURCE, True, "")
+        )
+        service._capture_futures[SOURCE] = (BASE_URL, recovery)
+        recovery.result(timeout=1.0)
+        service._harvest_capture_results()
+        assert service.restart_pause_recovery_required is False
+        control.update(enabled=False, operation_id="new-stop-after-recovery")
+        service.refresh_configuration(force=True)
+        service.acknowledge_capture_pause()
+        service.publish_status(force=True)
+        status = json.loads((tmp_path / "status.json").read_text(encoding="utf-8"))
+        assert service.pause_acknowledged_operation_id == "new-stop-after-recovery"
         assert status["capture_control"]["pause_request_predates_runtime"] is False
+        assert status["capture_control"]["restart_recovery_required"] is False
         assert status["capture_control"]["durable_boundary"] is True
     finally:
         service.executor.shutdown(wait=True, cancel_futures=False)

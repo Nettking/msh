@@ -533,6 +533,8 @@ class RecorderRuntime:
         self.control_operation_id: str | None = None
         self.control_initialized = False
         self.pause_request_predates_runtime_id: str | None = None
+        self.restart_pause_recovery_required = False
+        self.restart_pause_recovery_urls: set[str] = set()
         self.pause_acknowledged_operation_id: str | None = None
         self.pause_acknowledged_at: str | None = None
         self.capture_drain_error_operation_id: str | None = None
@@ -800,6 +802,12 @@ class RecorderRuntime:
                     # not be persisted. It cannot be acknowledged as a fresh
                     # durable boundary by this process.
                     self.pause_request_predates_runtime_id = operation_id
+                    self.restart_pause_recovery_required = True
+            if self.restart_pause_recovery_required:
+                for source_url in sources.values():
+                    self.restart_pause_recovery_urls.add(
+                        normalize_agent_base_url(source_url)
+                    )
             self.enabled = enabled
             self.control_operation_id = operation_id
             if operation_id != previous_operation_id:
@@ -843,6 +851,11 @@ class RecorderRuntime:
                     self.message = (
                         "The disabled control request predates this Recorder process; "
                         "a new Start/Stop operation is required to prove a boundary."
+                    )
+                elif self.restart_pause_recovery_required:
+                    self.message = (
+                        "A prior-runtime pause requires successful source capture/recovery "
+                        "before a new durable boundary can be acknowledged."
                     )
                 else:
                     self.message = "Recording is disabled; waiting for capture work to drain."
@@ -1429,6 +1442,15 @@ class RecorderRuntime:
                     self.backoff[source_name] = BACKOFF_INITIAL
                     self.next_attempt_at[source_name] = 0.0
                     continue
+                if ok and self.restart_pause_recovery_required:
+                    try:
+                        self.restart_pause_recovery_urls.discard(
+                            normalize_agent_base_url(scheduled_url)
+                        )
+                    except ValueError:
+                        pass
+                    if not self.restart_pause_recovery_urls and self.sources:
+                        self.restart_pause_recovery_required = False
                 self._capture_outcomes[source_name] = ok
 
             if not (self.enabled and self.configuration_ready and self.sources):
@@ -1489,6 +1511,13 @@ class RecorderRuntime:
                 self.message = (
                     "The disabled control request predates this Recorder process; "
                     "a new Start/Stop operation is required to prove a boundary."
+                )
+                return
+            if self.restart_pause_recovery_required:
+                self.state = "draining"
+                self.message = (
+                    "A prior-runtime pause requires successful source capture/recovery "
+                    "before a new durable boundary can be acknowledged."
                 )
                 return
             if self._capture_futures:
@@ -1568,6 +1597,10 @@ class RecorderRuntime:
                         self.control_operation_id
                         and self.pause_request_predates_runtime_id
                         == self.control_operation_id
+                    ),
+                    "restart_recovery_required": self.restart_pause_recovery_required,
+                    "restart_recovery_pending_sources": len(
+                        self.restart_pause_recovery_urls
                     ),
                     "durable_boundary": bool(
                         not self.enabled
