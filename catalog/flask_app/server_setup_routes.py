@@ -121,6 +121,17 @@ def _is_local_resume_guard_request() -> bool:
     )
 
 
+def _has_resume_guard_credentials() -> bool:
+    return any(
+        name in request.headers
+        for name in (
+            "X-FCP-Recorder-Resume-Token",
+            "X-FCP-Recorder-Resume-Operation",
+            "X-FCP-Recorder-Runtime-Binding-SHA256",
+        )
+    )
+
+
 def _require_setup_csrf(*, local_only: bool = False) -> None:
     if _is_local_resume_guard_request():
         return
@@ -363,7 +374,11 @@ def _set_recording_from_request(enabled: bool):
             )
         config = load_capability_config()
         service = get_recorder_control_service()
-        if enabled and _is_local_resume_guard_request():
+        if enabled and _has_resume_guard_credentials():
+            if not _is_local_resume_guard_request():
+                raise RecorderControlError(
+                    "The bounded resume guard credentials are no longer valid."
+                )
             ok, message = service.set_enabled(
                 True,
                 config,

@@ -322,6 +322,7 @@ def test_control_pause_ack_waits_for_capture_store_and_checkpoint_future(
     service._capture_futures[SOURCE] = (BASE_URL, pending)
     service.last_commit_at = None
     monkeypatch.setattr(rt, "STATUS_FILE", tmp_path / "status.json")
+    monkeypatch.setattr(rt, "STATE_FILE", tmp_path / "state.json")
 
     try:
         service.acknowledge_capture_pause()
@@ -371,6 +372,7 @@ def test_pause_does_not_claim_durable_boundary_after_unhandled_capture_future_er
     service._capture_futures[SOURCE] = (BASE_URL, pending)
     service.last_commit_at = None
     monkeypatch.setattr(rt, "STATUS_FILE", tmp_path / "status.json")
+    monkeypatch.setattr(rt, "STATE_FILE", tmp_path / "state.json")
 
     try:
         service.acknowledge_capture_pause()
@@ -388,6 +390,50 @@ def test_pause_does_not_claim_durable_boundary_after_unhandled_capture_future_er
         assert status["capture_control"]["durable_boundary"] is False
         assert status["last_flush_at"] is None
         assert status["last_commit_at"] is None
+        persisted = json.loads((tmp_path / "state.json").read_text(encoding="utf-8"))
+        assert persisted["capture_drain_failures"][0]["state"] == "unresolved"
+        assert persisted["capture_drain_failures"][0]["pause_operation_id"] == operation_id
+
+        # A later Stop operation cannot erase an unresolved write-boundary
+        # failure, and a Recorder process restart must retain that refusal.
+        service.control_operation_id = "pause-operation-003"
+        service.acknowledge_capture_pause()
+        service.publish_status(force=True)
+        status = json.loads((tmp_path / "status.json").read_text(encoding="utf-8"))
+        assert service.pause_acknowledged_operation_id is None
+        assert status["capture_control"]["drain_error_operation_id"] == operation_id
+        assert status["capture_control"]["durable_boundary"] is False
+
+        restored = rt.RecorderRuntime()
+        try:
+            restored.enabled = False
+            restored.control_operation_id = "pause-operation-004"
+            restored.load_state()
+            restored.acknowledge_capture_pause()
+            assert restored.pause_acknowledged_operation_id is None
+            assert restored.capture_drain_error_operation_id == operation_id
+
+            original_save_state = restored.save_state
+
+            def fail_state_write() -> None:
+                raise OSError("state write refused")
+
+            monkeypatch.setattr(restored, "save_state", fail_state_write)
+            with pytest.raises(OSError, match="state write refused"):
+                restored._clear_capture_drain_failures_after_recovery(SOURCE)
+            assert restored.capture_drain_error_operation_id == operation_id
+            assert restored.capture_drain_failures[0]["state"] == "unresolved"
+
+            monkeypatch.setattr(restored, "save_state", original_save_state)
+            # Only the successful recovery path calls this completion method.
+            restored._clear_capture_drain_failures_after_recovery(SOURCE)
+            assert restored.capture_drain_error_operation_id is None
+            assert restored.capture_drain_failures[0]["state"] == "recovered"
+            persisted = json.loads((tmp_path / "state.json").read_text(encoding="utf-8"))
+            assert persisted["capture_drain_failures"][0]["state"] == "recovered"
+        finally:
+            restored.executor.shutdown(wait=True, cancel_futures=False)
+            rt.unregister_stop_target(restored)
     finally:
         service.executor.shutdown(wait=True, cancel_futures=False)
         rt.unregister_stop_target(service)

@@ -141,6 +141,35 @@ def test_supported_start_route_consumes_runtime_bound_guard_and_changes_control(
     assert "resume_guard" not in control
 
 
+def test_guard_credential_revalidation_race_never_falls_through_to_plain_start(
+    tmp_path, monkeypatch
+) -> None:
+    service, headers = _armed_service(tmp_path)
+    config = SimpleNamespace(recorder_sources="IG=http://127.0.0.1:5000")
+    monkeypatch.setattr(routes, "get_recorder_control_service", lambda: service)
+    monkeypatch.setattr(routes, "load_capability_config", lambda: config)
+    monkeypatch.setattr(routes, "_recorder_authorized", lambda: True)
+    validations = iter((True, False))
+    monkeypatch.setattr(
+        routes, "_is_local_resume_guard_request", lambda: next(validations)
+    )
+    app = Flask(__name__)
+    app.register_blueprint(routes.server_setup_web)
+
+    response = app.test_client().post(
+        "/server-setup/recording/start",
+        data={"next": "/"},
+        headers={**headers, "Accept": "application/json"},
+        environ_base={"REMOTE_ADDR": "127.0.0.1"},
+    )
+
+    assert response.status_code == 400
+    assert response.json["ok"] is False
+    control = __import__("json").loads(service.control_path.read_text(encoding="utf-8"))
+    assert control["enabled"] is False
+    assert control["operation_id"] == "a" * 32
+
+
 def test_supported_start_route_keeps_current_authority_check(
     tmp_path, monkeypatch
 ) -> None:

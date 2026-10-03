@@ -8,6 +8,7 @@ import os
 import signal
 import threading
 import time
+import uuid
 from collections.abc import Mapping
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import replace
@@ -533,6 +534,7 @@ class RecorderRuntime:
         self.pause_acknowledged_operation_id: str | None = None
         self.pause_acknowledged_at: str | None = None
         self.capture_drain_error_operation_id: str | None = None
+        self.capture_drain_failures: list[dict[str, Any]] = []
         self.last_error = ""
         self.message = "Recorder service is starting."
         self.state = "starting"
@@ -559,6 +561,17 @@ class RecorderRuntime:
                     "start from the earliest sequence still retained by each Agent."
                 )
             return
+        failures = payload.get("capture_drain_failures")
+        if isinstance(failures, list):
+            self.capture_drain_failures = [
+                dict(item)
+                for item in failures
+                if isinstance(item, dict)
+                and isinstance(item.get("incident_id"), str)
+                and isinstance(item.get("source_name"), str)
+                and item.get("state") in {"unresolved", "recovered"}
+            ]
+            self._refresh_capture_drain_error_operation_id()
         sources = payload.get("sources")
         if not isinstance(sources, dict):
             return
@@ -585,8 +598,75 @@ class RecorderRuntime:
                     name: checkpoint.to_dict()
                     for name, checkpoint in sorted(self.checkpoints.items())
                 },
+                "capture_drain_failures": list(self.capture_drain_failures),
             }
             _write_json_atomic(STATE_FILE, payload)
+
+    def _refresh_capture_drain_error_operation_id(self) -> None:
+        unresolved = next(
+            (
+                item
+                for item in self.capture_drain_failures
+                if item.get("state") == "unresolved"
+            ),
+            None,
+        )
+        operation_id = unresolved.get("pause_operation_id") if unresolved else None
+        self.capture_drain_error_operation_id = (
+            operation_id if isinstance(operation_id, str) else None
+        )
+
+    def _record_capture_drain_failure(self, source_name: str, error: BaseException) -> None:
+        with self.lock:
+            self.capture_drain_failures.append(
+                {
+                    "incident_id": uuid.uuid4().hex,
+                    "source_name": source_name,
+                    "pause_operation_id": self.control_operation_id,
+                    "state": "unresolved",
+                    "error_type": type(error).__name__,
+                    "occurred_at": _utc_now(),
+                }
+            )
+            self._refresh_capture_drain_error_operation_id()
+            try:
+                self.save_state()
+            except Exception as persist_exc:  # noqa: BLE001
+                # Every ordinary writer failure is fail-closed here: keep the
+                # in-memory pause refusal so the host guard resumes capture.
+                self.last_error = (
+                    "Capture drain failure evidence could not be persisted: "
+                    f"{type(persist_exc).__name__}"
+                )
+                log.error(self.last_error)
+
+    def _clear_capture_drain_failures_after_recovery(self, source_name: str) -> None:
+        with self.lock:
+            previous_failures = [dict(item) for item in self.capture_drain_failures]
+            previous_error_operation_id = self.capture_drain_error_operation_id
+            recovered_at = _utc_now()
+            changed = False
+            for item in self.capture_drain_failures:
+                if item.get("source_name") == source_name and item.get("state") == "unresolved":
+                    item.update(
+                        {
+                            "state": "recovered",
+                            "recovered_at": recovered_at,
+                            "recovered_by_operation_id": self.control_operation_id,
+                        }
+                    )
+                changed = True
+            if changed:
+                self._refresh_capture_drain_error_operation_id()
+                try:
+                    self.save_state()
+                except Exception:
+                    # The pause remains unproven until its recovered incident
+                    # state is durable too. Keep the in-memory refusal aligned
+                    # with the still-unresolved checkpoint on disk.
+                    self.capture_drain_failures = previous_failures
+                    self.capture_drain_error_operation_id = previous_error_operation_id
+                    raise
 
     def reconcile_checkpoint_aliases(self, sources: Mapping[str, str]) -> bool:
         """Keep sequence continuity when a source adopts its MTConnect UUID.
@@ -680,7 +760,6 @@ class RecorderRuntime:
             if operation_id != previous_operation_id:
                 self.pause_acknowledged_operation_id = None
                 self.pause_acknowledged_at = None
-                self.capture_drain_error_operation_id = None
             self.configuration_ready = configuration_ready
             self.poll_interval = poll_interval
             self.sources = sources
@@ -986,6 +1065,7 @@ class RecorderRuntime:
                         probe=archived_probe,
                         archive_source_names=archive_source_names,
                     )
+                    self._clear_capture_drain_failures_after_recovery(source_name)
                     checkpoint = self.checkpoints.get(source_name)
                     if checkpoint and checkpoint.agent_instance_id == current_header.instance_id:
                         self.probes[source_name] = archived_probe
@@ -1007,8 +1087,16 @@ class RecorderRuntime:
                     source_name=source_name,
                     instance_id=current_header.instance_id,
                 )
-                if archived:
-                    earliest = min(ref.first_sequence for ref in archived)
+                if archived or any(
+                    item.get("source_name") == source_name
+                    and item.get("state") == "unresolved"
+                    for item in self.capture_drain_failures
+                ):
+                    earliest = (
+                        min(ref.first_sequence for ref in archived)
+                        if archived
+                        else current_header.first_sequence
+                    )
                     self._recover_archived_batches(
                         source_name=source_name,
                         base_url=base_url,
@@ -1016,6 +1104,7 @@ class RecorderRuntime:
                         expected=earliest,
                         probe=current_probe,
                     )
+                    self._clear_capture_drain_failures_after_recovery(source_name)
                     checkpoint = self.checkpoints.get(source_name)
 
             plan = plan_sequence(checkpoint, current_header)
@@ -1237,12 +1326,6 @@ class RecorderRuntime:
                 ok = False
                 error = f"{type(exc).__name__}: {exc}"
                 with self.lock:
-                    if not self.enabled and self.control_operation_id:
-                        # A future escaping capture_source's recovery boundary
-                        # may have failed between durable writes. Keep this
-                        # pause unproven so a bounded-copy guard resumes rather
-                        # than accepting an uncertain storage frontier.
-                        self.capture_drain_error_operation_id = self.control_operation_id
                     if self.sources.get(source_name) == base_url:
                         delay = min(
                             self.backoff.get(source_name, BACKOFF_INITIAL) * 2,
@@ -1261,6 +1344,7 @@ class RecorderRuntime:
                                 "next_retry_seconds": delay,
                             }
                         )
+                self._record_capture_drain_failure(source_name, exc)
                 log.exception("[%s] recorder source task escaped its error boundary", source_name)
             outcomes.append((source_name, base_url, ok))
 
@@ -1352,7 +1436,7 @@ class RecorderRuntime:
                     f"{len(self._capture_futures)} capture task(s) to finish."
                 )
                 return
-            if self.capture_drain_error_operation_id == operation_id:
+            if self.capture_drain_error_operation_id is not None:
                 self.state = "draining"
                 self.message = (
                     "A capture task escaped its error boundary; "
@@ -1412,6 +1496,10 @@ class RecorderRuntime:
                     ),
                     "inflight_capture_tasks": len(self._capture_futures),
                     "drain_error_operation_id": self.capture_drain_error_operation_id,
+                    "unresolved_drain_failures": sum(
+                        item.get("state") == "unresolved"
+                        for item in self.capture_drain_failures
+                    ),
                     "acknowledged_operation_id": self.pause_acknowledged_operation_id,
                     "acknowledged_at": self.pause_acknowledged_at,
                     "durable_boundary": bool(
@@ -1420,8 +1508,7 @@ class RecorderRuntime:
                         and self.pause_acknowledged_operation_id
                         == self.control_operation_id
                         and not self._capture_futures
-                        and self.capture_drain_error_operation_id
-                        != self.control_operation_id
+                        and self.capture_drain_error_operation_id is None
                     ),
                 },
                 "last_error": self.last_error,
