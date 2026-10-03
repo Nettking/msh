@@ -424,6 +424,18 @@ def test_pause_does_not_claim_durable_boundary_after_unhandled_capture_future_er
             assert restored.capture_drain_error_operation_id == operation_id
             assert restored.capture_drain_failures[0]["state"] == "unresolved"
 
+            class ResourcePauseSignal(BaseException):
+                pass
+
+            def refuse_inside_admitted_capture() -> None:
+                raise ResourcePauseSignal()
+
+            monkeypatch.setattr(restored, "save_state", refuse_inside_admitted_capture)
+            with pytest.raises(ResourcePauseSignal):
+                restored._clear_capture_drain_failures_after_recovery(SOURCE)
+            assert restored.capture_drain_error_operation_id == operation_id
+            assert restored.capture_drain_failures[0]["state"] == "unresolved"
+
             monkeypatch.setattr(restored, "save_state", original_save_state)
             # Only the successful recovery path calls this completion method.
             restored._clear_capture_drain_failures_after_recovery(SOURCE)
@@ -434,6 +446,120 @@ def test_pause_does_not_claim_durable_boundary_after_unhandled_capture_future_er
         finally:
             restored.executor.shutdown(wait=True, cancel_futures=False)
             rt.unregister_stop_target(restored)
+    finally:
+        service.executor.shutdown(wait=True, cancel_futures=False)
+        rt.unregister_stop_target(service)
+
+
+def test_checkpoint_alias_reconciliation_moves_pause_incident_with_its_source(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(rt, "STATE_FILE", tmp_path / "state.json")
+    service = rt.RecorderRuntime()
+    new_name = "MACHINE-ALPHA-0001"
+    service.checkpoints[SOURCE] = rt.SourceCheckpoint(
+        source_name=SOURCE,
+        base_url=BASE_URL,
+        machine_id="MachineAlpha",
+        agent_instance_id=INSTANCE_ID,
+        next_sequence=4,
+        probe_sha256="a" * 64,
+    )
+    service.capture_drain_failures = [
+        {
+            "incident_id": "incident-1",
+            "source_name": SOURCE,
+            "pause_operation_id": "pause-operation-alias",
+            "state": "unresolved",
+        }
+    ]
+    service._refresh_capture_drain_error_operation_id()
+
+    try:
+        assert service.reconcile_checkpoint_aliases({new_name: BASE_URL}) is True
+        assert SOURCE not in service.checkpoints
+        assert service.checkpoints[new_name].storage_aliases == [SOURCE]
+        incident = service.capture_drain_failures[0]
+        assert incident["source_name"] == new_name
+        assert incident["original_source_name"] == SOURCE
+        assert service.capture_drain_error_operation_id == "pause-operation-alias"
+
+        service.save_state()
+        restored = rt.RecorderRuntime()
+        try:
+            restored.load_state()
+            assert restored.capture_drain_failures[0]["source_name"] == new_name
+            restored._clear_capture_drain_failures_after_recovery(new_name)
+            assert restored.capture_drain_error_operation_id is None
+        finally:
+            restored.executor.shutdown(wait=True, cancel_futures=False)
+            rt.unregister_stop_target(restored)
+    finally:
+        service.executor.shutdown(wait=True, cancel_futures=False)
+        rt.unregister_stop_target(service)
+
+
+def test_drain_recovery_does_not_rewrite_state_when_no_incident_matches(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = rt.RecorderRuntime()
+    service.capture_drain_failures = [
+        {
+            "incident_id": "recovered-incident",
+            "source_name": SOURCE,
+            "pause_operation_id": "pause-old",
+            "state": "recovered",
+        },
+        {
+            "incident_id": "other-source-incident",
+            "source_name": "other-machine",
+            "pause_operation_id": "pause-other",
+            "state": "unresolved",
+        },
+    ]
+    service._refresh_capture_drain_error_operation_id()
+    writes: list[bool] = []
+    monkeypatch.setattr(service, "save_state", lambda: writes.append(True))
+
+    try:
+        service._clear_capture_drain_failures_after_recovery(SOURCE)
+
+        assert writes == []
+        assert service.capture_drain_error_operation_id == "pause-other"
+    finally:
+        service.executor.shutdown(wait=True, cancel_futures=False)
+        rt.unregister_stop_target(service)
+
+
+def test_pause_stays_unproven_when_drain_failure_has_no_operation_id(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = rt.RecorderRuntime()
+    service.enabled = False
+    service.configuration_ready = True
+    service.control_operation_id = "pause-operation-current"
+    service.capture_drain_failures = [
+        {
+            "incident_id": "incident-without-owner",
+            "source_name": SOURCE,
+            "pause_operation_id": None,
+            "state": "unresolved",
+        }
+    ]
+    service._refresh_capture_drain_error_operation_id()
+    monkeypatch.setattr(rt, "STATUS_FILE", tmp_path / "status.json")
+
+    try:
+        service.acknowledge_capture_pause()
+        service.publish_status(force=True)
+        status = json.loads((tmp_path / "status.json").read_text(encoding="utf-8"))
+
+        assert service.capture_drain_error_operation_id is None
+        assert service.pause_acknowledged_operation_id is None
+        assert status["capture_control"]["unresolved_drain_failures"] == 1
+        assert status["capture_control"]["durable_boundary"] is False
     finally:
         service.executor.shutdown(wait=True, cancel_futures=False)
         rt.unregister_stop_target(service)

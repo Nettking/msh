@@ -616,6 +616,12 @@ class RecorderRuntime:
             operation_id if isinstance(operation_id, str) else None
         )
 
+    def _has_unresolved_capture_drain_failures(self) -> bool:
+        return any(
+            item.get("state") == "unresolved"
+            for item in self.capture_drain_failures
+        )
+
     def _record_capture_drain_failure(self, source_name: str, error: BaseException) -> None:
         with self.lock:
             self.capture_drain_failures.append(
@@ -655,15 +661,16 @@ class RecorderRuntime:
                             "recovered_by_operation_id": self.control_operation_id,
                         }
                     )
-                changed = True
+                    changed = True
             if changed:
                 self._refresh_capture_drain_error_operation_id()
                 try:
                     self.save_state()
-                except Exception:
+                except BaseException:
                     # The pause remains unproven until its recovered incident
-                    # state is durable too. Keep the in-memory refusal aligned
-                    # with the still-unresolved checkpoint on disk.
+                    # state is durable too. This also rolls back the resource
+                    # guard's internal BaseException pause signal. Keep the
+                    # in-memory refusal aligned with the checkpoint on disk.
                     self.capture_drain_failures = previous_failures
                     self.capture_drain_error_operation_id = previous_error_operation_id
                     raise
@@ -705,6 +712,10 @@ class RecorderRuntime:
                     base_url=normalize_agent_base_url(base_url),
                     storage_aliases=storage_aliases,
                 )
+                for incident in self.capture_drain_failures:
+                    if incident.get("source_name") == old_name:
+                        incident.setdefault("original_source_name", old_name)
+                        incident["source_name"] = source_name
                 del self.checkpoints[old_name]
                 changed = True
                 log.info(
@@ -1436,7 +1447,7 @@ class RecorderRuntime:
                     f"{len(self._capture_futures)} capture task(s) to finish."
                 )
                 return
-            if self.capture_drain_error_operation_id is not None:
+            if self._has_unresolved_capture_drain_failures():
                 self.state = "draining"
                 self.message = (
                     "A capture task escaped its error boundary; "
@@ -1508,7 +1519,7 @@ class RecorderRuntime:
                         and self.pause_acknowledged_operation_id
                         == self.control_operation_id
                         and not self._capture_futures
-                        and self.capture_drain_error_operation_id is None
+                        and not self._has_unresolved_capture_drain_failures()
                     ),
                 },
                 "last_error": self.last_error,
