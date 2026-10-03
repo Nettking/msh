@@ -30,7 +30,9 @@ class PauseGuardObservation:
     runtime_binding_matches: bool | None
     control_operation_id: str | None
     control_enabled: bool | None
+    runtime_restart_detected: bool = False
     pause_acknowledged_operation_id: str | None = None
+    pause_acknowledged_at: datetime | None = None
     capture_scheduling: bool | None = None
     inflight_capture_tasks: int | None = None
     durable_boundary: bool | None = None
@@ -134,9 +136,18 @@ class BoundedPauseResumeGuard:
         if observation.control_enabled is not False:
             return PauseGuardAction.SUPERSEDED
 
+        # A new Recorder process incarnation is acceptable only after the
+        # host supervisor has independently matched the same container, image,
+        # candidate, config bytes, and data mount. The old pause acknowledgement
+        # cannot survive that restart, so cancel any copy and request Start.
+        if observation.runtime_restart_detected:
+            return PauseGuardAction.REQUEST_RESUME
+
         self.note_pause_observed(now)
         pause_acknowledged = bool(
             observation.pause_acknowledged_operation_id == self.operation_id
+            and isinstance(observation.pause_acknowledged_at, datetime)
+            and observation.pause_acknowledged_at.tzinfo is not None
             and observation.capture_scheduling is False
             and type(observation.inflight_capture_tasks) is int
             and observation.inflight_capture_tasks == 0

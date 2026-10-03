@@ -358,6 +358,23 @@ def test_control_pause_ack_waits_for_capture_store_and_checkpoint_future(
         rt.unregister_stop_target(service)
 
 
+def test_legacy_last_flush_status_alias_preserves_last_durable_commit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = rt.RecorderRuntime()
+    service.last_commit_at = "2026-10-03T20:00:00Z"
+    monkeypatch.setattr(rt, "STATUS_FILE", tmp_path / "status.json")
+    try:
+        service.publish_status(force=True)
+        status = json.loads((tmp_path / "status.json").read_text(encoding="utf-8"))
+        assert status["last_flush_at"] == "2026-10-03T20:00:00Z"
+        assert status["last_commit_at"] == "2026-10-03T20:00:00Z"
+    finally:
+        service.executor.shutdown(wait=True, cancel_futures=False)
+        rt.unregister_stop_target(service)
+
+
 def test_pause_does_not_claim_durable_boundary_after_unhandled_capture_future_error(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

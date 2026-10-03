@@ -814,7 +814,8 @@ def test_ps_registration_script_passes_its_operation_id_validator() -> None:
     assert "-UserId 'SYSTEM'" in text
     assert "-LogonType ServiceAccount" in text
     assert "-StartWhenAvailable" in text
-    assert "-RestartCount 3" in text
+    assert "-RestartCount 240" in text
+    assert "-RestartInterval (New-TimeSpan -Seconds 5)" in text
     assert "-ExecutionTimeLimit (New-TimeSpan -Minutes 30)" in text
     assert "Start-ScheduledTask -TaskName $taskName" in text
 
@@ -848,6 +849,9 @@ def test_prepare_keeps_secret_config_under_system_protected_programdata(
         "run",
         lambda *_args, **_kwargs: SimpleNamespace(returncode=0, stdout="", stderr=""),
     )
+    monkeypatch.setattr(
+        guard, "_current_windows_sid", lambda: "S-1-5-21-1-2-3-1001"
+    )
     spec_path = tmp_path / "spec.json"
     spec_path.write_text(
         json.dumps(
@@ -858,6 +862,7 @@ def test_prepare_keeps_secret_config_under_system_protected_programdata(
                     "repo_root": r"C:\msh\git",
                     "data_root": r"C:\msh\git\data",
                     "config_path": r"C:\msh\git\data\capabilities\config.json",
+                    "config_sha256": "f" * 64,
                     "control_path": r"C:\msh\git\data\source_state\mtconnect_recorder_control.json",
                     "status_path": r"C:\msh\git\data\source_state\mtconnect_recorder_status.json",
                     "container_id": "a" * 64,
@@ -878,6 +883,9 @@ def test_prepare_keeps_secret_config_under_system_protected_programdata(
                 "controller_heartbeat_path": str(tmp_path / "controller.json"),
                 "copy_outcome_path": str(tmp_path / "copy.json"),
                 "copy_processes_path": str(tmp_path / "copy-processes.json"),
+                "final_sync_command_sha256": hashlib.sha256(
+                    guard._canonical_bytes([sys.executable, "copy-final-delta.py"])
+                ).hexdigest(),
                 "baseline_capture_schedule_count": 42,
                 "flask_url": "http://127.0.0.1:55000",
             }
@@ -894,7 +902,13 @@ def test_prepare_keeps_secret_config_under_system_protected_programdata(
     assert "resume_token" not in prepared
     assert "resume_token_sha256" in prepared
     assert Path(config["guard_logic"]).exists()
+    assert Path(config["job_script"]).exists()
     assert Path(config["register_script"]).exists()
+    assert config["final_sync_process_supervision"] == "windows-job-object.v1"
+    assert config["copy_controller_sid"] == "S-1-5-21-1-2-3-1001"
+    assert Path(config["copy_processes_path"]).parent == (
+        expected_root / prepared["operation_id"] / "evidence"
+    )
     loaded = guard._load_config(config_path)
     assert loaded["runtime_binding"]["runtime_generation"] == "e" * 32
 
@@ -935,6 +949,109 @@ def test_runtime_binding_requires_candidate_and_process_generation_match() -> No
     changed_candidate = json.loads(json.dumps(status))
     changed_candidate["acceptance_observability"]["provenance"]["candidate_sha"] = "d" * 40
     assert guard._status_process_binding_matches(changed_candidate, runtime) is False
+
+    restarted_native = {
+        **native,
+        "pid": 2,
+        "process_nonce": "a" * 32,
+    }
+    restarted = {
+        "native_runtime": restarted_native,
+        "acceptance_observability": {
+            "provenance": {
+                "pid": 2,
+                "runtime_generation": "f" * 32,
+                "candidate_sha": "c" * 40,
+            }
+        },
+    }
+    assert guard._status_process_binding_matches(restarted, runtime) is True
+
+
+def test_runtime_binding_accepts_only_a_fresh_same_deployment_process_restart(
+    tmp_path: Path, monkeypatch
+) -> None:
+    data_root = tmp_path / "data"
+    data_root.mkdir()
+    config_path = data_root / "config.json"
+    config_path.write_text("{}", encoding="utf-8")
+    status_path = data_root / "status.json"
+    candidate = "c" * 40
+    old_native = {
+        "schema": "fcp.recorder-native-runtime.v1",
+        "runtime_type": "native-python",
+        "pid": 101,
+        "process_nonce": "a" * 32,
+        "supervisor_session": None,
+        "build_commit": candidate,
+    }
+    new_native = {**old_native, "pid": 202, "process_nonce": "b" * 32}
+    runtime = {
+        "repo_root": str(tmp_path),
+        "data_root": str(data_root),
+        "config_path": str(config_path),
+        "config_sha256": hashlib.sha256(b"{}").hexdigest(),
+        "control_path": str(data_root / "control.json"),
+        "status_path": str(status_path),
+        "container_id": "a" * 64,
+        "image_id": "sha256:" + "b" * 64,
+        "candidate_commit": candidate,
+        "native_runtime": old_native,
+        "runtime_generation": "e" * 32,
+        "mount_destination": "/app/data",
+        "docker_exe": "docker.exe",
+    }
+    status = {
+        "heartbeat_at": guard._iso(guard._utc_now()),
+        "native_runtime": new_native,
+        "capture_control": {
+            "acknowledged_operation_id": None,
+            "capture_scheduling": False,
+            "inflight_capture_tasks": 0,
+            "durable_boundary": False,
+        },
+        "capture_schedule_count": 5,
+        "acceptance_observability": {
+            "provenance": {
+                "pid": 202,
+                "runtime_generation": "f" * 32,
+                "candidate_sha": candidate,
+                "supervisor_generation": None,
+            }
+        },
+    }
+    container = {
+        "Id": runtime["container_id"],
+        "Image": runtime["image_id"],
+        "State": {"Running": True},
+        "Config": {"Labels": {"no.fcp.build_commit": candidate}},
+        "Mounts": [
+            {"Source": str(data_root), "Destination": "/app/data"}
+        ],
+    }
+    status_path.write_text(json.dumps(status), encoding="utf-8")
+    monkeypatch.setattr(guard, "_docker_observation", lambda _runtime: container)
+    matches, observed = guard._runtime_binding_match({"runtime_binding": runtime})
+    assert matches is True
+    assert observed == status
+
+    control_path = Path(runtime["control_path"])
+    control_path.write_text(
+        json.dumps({"enabled": False, "operation_id": "a" * 32}),
+        encoding="utf-8",
+    )
+    config = {
+        "runtime_binding": runtime,
+        "operation_id": "a" * 32,
+        "controller_heartbeat_path": str(tmp_path / "heartbeat.json"),
+        "copy_outcome_path": str(tmp_path / "copy.json"),
+    }
+    observation, _ = guard._observation(config)
+    assert observation.runtime_binding_matches is True
+    assert observation.runtime_restart_detected is True
+
+    container["Mounts"] = [{"Source": str(tmp_path), "Destination": "/app/data"}]
+    assert guard._runtime_binding_match({"runtime_binding": runtime})[0] is False
 
 
 def _watch_config(tmp_path: Path) -> dict:
@@ -1088,6 +1205,9 @@ def _watch_observation(
             control_operation_id=operation_id,
             control_enabled=enabled,
             pause_acknowledged_operation_id=acknowledged,
+            pause_acknowledged_at=(
+                guard._utc_now() if acknowledged is not None else None
+            ),
             capture_scheduling=scheduling,
             inflight_capture_tasks=inflight,
             durable_boundary=durable,

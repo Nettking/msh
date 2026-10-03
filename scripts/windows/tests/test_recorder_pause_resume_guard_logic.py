@@ -28,6 +28,7 @@ def _paused(**changes) -> PauseGuardObservation:
         "control_operation_id": "a" * 32,
         "control_enabled": False,
         "pause_acknowledged_operation_id": "a" * 32,
+        "pause_acknowledged_at": NOW,
         "capture_scheduling": False,
         "inflight_capture_tasks": 0,
         "durable_boundary": True,
@@ -52,6 +53,11 @@ def test_guard_does_not_allow_copy_while_capture_future_is_in_flight() -> None:
     assert action is PauseGuardAction.WAIT_FOR_DRAIN
 
 
+def test_guard_requires_a_parseable_correlated_pause_acknowledgement_time() -> None:
+    observation = _paused(pause_acknowledged_at=None)
+    assert _guard().decide(observation, now=NOW) is PauseGuardAction.WAIT_FOR_DRAIN
+
+
 def test_guard_resumes_at_hard_deadline_even_if_drain_ack_is_missing() -> None:
     guard = _guard()
     action = guard.decide(
@@ -71,6 +77,11 @@ def test_guard_resumes_on_copy_failure_or_controller_loss() -> None:
         {"controller_heartbeat_age_seconds": 11.0},
     ):
         assert _guard().decide(_paused(**changes), now=NOW) is PauseGuardAction.REQUEST_RESUME
+
+
+def test_verified_deployment_restart_cancels_copy_and_requests_start() -> None:
+    observation = _paused(runtime_restart_detected=True)
+    assert _guard().decide(observation, now=NOW) is PauseGuardAction.REQUEST_RESUME
 
 
 def test_guard_requires_runtime_identity_before_any_restoration() -> None:

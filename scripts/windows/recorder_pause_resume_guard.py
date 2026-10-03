@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import argparse
 import base64
+import contextlib
+import csv
 import ctypes
 import hashlib
 import json
@@ -30,6 +32,7 @@ GUARD_DIR = Path(__file__).resolve().parent
 if str(GUARD_DIR) not in sys.path:
     sys.path.insert(0, str(GUARD_DIR))
 
+from recorder_pause_job import JobObjectError, OperationJob
 from recorder_pause_resume_guard_logic import (
     BoundedPauseResumeGuard,
     PauseGuardAction,
@@ -65,6 +68,28 @@ def _iso(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def _current_windows_sid() -> str:
+    if os.name != "nt":
+        raise RuntimeError("Windows identity is unavailable")
+    result = subprocess.run(
+        ["whoami.exe", "/user", "/fo", "csv", "/nh"],
+        capture_output=True,
+        text=True,
+        timeout=5,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise RuntimeError("could not determine the copy-controller Windows identity")
+    try:
+        fields = next(csv.reader([result.stdout.strip()]))
+    except (StopIteration, csv.Error) as exc:
+        raise RuntimeError("copy-controller Windows identity output is invalid") from exc
+    sid = fields[-1].strip() if fields else ""
+    if not re.fullmatch(r"S-1-(?:[0-9]+-){1,14}[0-9]+", sid):
+        raise RuntimeError("copy-controller SID is invalid")
+    return sid
+
+
 def _canonical_bytes(value: object) -> bytes:
     return json.dumps(
         value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
@@ -81,6 +106,40 @@ def _read_json(path: Path) -> dict[str, Any] | None:
     except (OSError, json.JSONDecodeError):
         return None
     return value if isinstance(value, dict) else None
+
+
+@contextlib.contextmanager
+def _control_file_lock(control_path: Path, timeout_seconds: float = 5.0):
+    """Share Recorder's byte-range lock while starting or canceling a copy."""
+
+    if os.name != "nt":
+        raise RuntimeError("Recorder control locking is only implemented for Windows")
+    import msvcrt
+
+    lock_path = control_path.with_name(control_path.name + ".lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a+b") as stream:
+        stream.seek(0, os.SEEK_END)
+        if stream.tell() == 0:
+            stream.write(b"\0")
+            stream.flush()
+        deadline = time.monotonic() + timeout_seconds
+        acquired = False
+        while time.monotonic() < deadline:
+            try:
+                stream.seek(0)
+                msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
+                acquired = True
+                break
+            except OSError:
+                time.sleep(0.05)
+        if not acquired:
+            raise TimeoutError("Recorder control ownership lock is busy")
+        try:
+            yield
+        finally:
+            stream.seek(0)
+            msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
 
 
 def _write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
@@ -111,6 +170,7 @@ def validate_spec(
         "repo_root",
         "data_root",
         "config_path",
+        "config_sha256",
         "control_path",
         "status_path",
         "container_id",
@@ -127,6 +187,8 @@ def validate_spec(
         raise ValueError("prior_control_operation_id is invalid")
     if not _COMMIT.fullmatch(str(runtime["candidate_commit"])):
         raise ValueError("candidate_commit must be a full Git SHA")
+    if not _SHA256.fullmatch(str(runtime["config_sha256"])):
+        raise ValueError("config_sha256 must identify the bound Recorder config bytes")
     native_runtime = runtime.get("native_runtime")
     if (
         not isinstance(native_runtime, dict)
@@ -164,6 +226,8 @@ def validate_spec(
     for name in ("controller_heartbeat_path", "copy_outcome_path", "copy_processes_path"):
         if not isinstance(spec.get(name), str) or not spec[name]:
             raise ValueError(f"{name} is required")
+    if not _SHA256.fullmatch(str(spec.get("final_sync_command_sha256", ""))):
+        raise ValueError("final_sync_command_sha256 must bind the approved argv")
     if not isinstance(spec.get("baseline_capture_schedule_count"), int) or isinstance(
         spec["baseline_capture_schedule_count"], bool
     ):
@@ -194,12 +258,26 @@ def prepare_config(spec_path: Path, config_root: Path) -> dict[str, Any]:
     prepared_at = _utc_now()
     token = secrets.token_urlsafe(32)
     binding_sha256 = _sha256(_canonical_bytes(runtime))
-    script_path = Path(__file__).resolve()
-    logic_path = GUARD_DIR / "recorder_pause_resume_guard_logic.py"
-    register_path = GUARD_DIR / "register_recorder_pause_resume_guard.ps1"
-    script_sha256 = _sha256(script_path.read_bytes())
-    logic_sha256 = _sha256(logic_path.read_bytes())
-    register_sha256 = _sha256(register_path.read_bytes())
+    bundle_dir = private_dir / "code"
+    bundle_dir.mkdir()
+    sources = {
+        "guard_script": Path(__file__).resolve(),
+        "guard_logic": GUARD_DIR / "recorder_pause_resume_guard_logic.py",
+        "job_script": GUARD_DIR / "recorder_pause_job.py",
+        "register_script": GUARD_DIR / "register_recorder_pause_resume_guard.ps1",
+    }
+    bundled: dict[str, tuple[str, str]] = {}
+    for key, source in sources.items():
+        contents = source.read_bytes()
+        destination = bundle_dir / source.name
+        with destination.open("xb") as output:
+            output.write(contents)
+            output.flush()
+            os.fsync(output.fileno())
+        if _sha256(destination.read_bytes()) != _sha256(contents):
+            raise RuntimeError(f"protected guard bundle verification failed for {key}")
+        bundled[key] = (str(destination), _sha256(contents))
+    copy_controller_sid = _current_windows_sid()
     payload = {
         "schema": "fcp.recorder.pause-resume-guard.host.v1",
         **spec,
@@ -208,12 +286,19 @@ def prepare_config(spec_path: Path, config_root: Path) -> dict[str, Any]:
         "resume_token": token,
         "resume_token_sha256": _sha256(token.encode("utf-8")),
         "runtime_binding_sha256": binding_sha256,
-        "guard_script": str(script_path),
-        "guard_script_sha256": script_sha256,
-        "guard_logic": str(logic_path.resolve()),
-        "guard_logic_sha256": logic_sha256,
-        "register_script": str(register_path.resolve()),
-        "register_script_sha256": register_sha256,
+        "copy_controller_sid": copy_controller_sid,
+        "final_sync_process_supervision": "windows-job-object.v1",
+        "guard_script": bundled["guard_script"][0],
+        "guard_script_sha256": bundled["guard_script"][1],
+        "guard_logic": bundled["guard_logic"][0],
+        "guard_logic_sha256": bundled["guard_logic"][1],
+        "job_script": bundled["job_script"][0],
+        "job_script_sha256": bundled["job_script"][1],
+        "register_script": bundled["register_script"][0],
+        "register_script_sha256": bundled["register_script"][1],
+        "controller_heartbeat_path": str(evidence_dir / "controller-heartbeat.json"),
+        "copy_outcome_path": str(evidence_dir / "copy-outcome.json"),
+        "copy_processes_path": str(evidence_dir / "copy-processes.json"),
         "task_name": f"FCP-Recorder-PauseResume-{operation_id}",
         "guard_state_path": str(evidence_dir / "guard-state.json"),
         "guard_events_path": str(evidence_dir / "guard-events.jsonl"),
@@ -226,6 +311,7 @@ def prepare_config(spec_path: Path, config_root: Path) -> dict[str, Any]:
         "runtime_binding_sha256": binding_sha256,
         "hard_deadline_utc": payload["hard_deadline_utc"],
         "task_name": payload["task_name"],
+        "evidence_dir": str(evidence_dir),
         "config_path": str(config_path),
         "stop_form_fields": {
             "operation_id": operation_id,
@@ -297,12 +383,17 @@ def _load_config(path: Path) -> dict[str, Any]:
     )
     if path.resolve(strict=False) != expected_config.resolve(strict=False):
         raise ValueError("pause guard config is outside its protected operation directory")
+    protected_code = path.parent / "code"
     for path_key, hash_key, description in (
         ("guard_script", "guard_script_sha256", "supervisor script"),
         ("guard_logic", "guard_logic_sha256", "guard decision logic"),
+        ("job_script", "job_script_sha256", "Job Object helper"),
         ("register_script", "register_script_sha256", "task registration script"),
     ):
-        if _sha256(Path(str(config[path_key])).read_bytes()) != config.get(hash_key):
+        code_path = Path(str(config[path_key]))
+        if not _path_within(code_path, protected_code):
+            raise ValueError(f"protected guard {description} is outside its code bundle")
+        if _sha256(code_path.read_bytes()) != config.get(hash_key):
             raise ValueError(f"pause guard {description} hash changed after preparation")
     token = config.get("resume_token")
     if not isinstance(token, str) or _sha256(token.encode()) != config.get(
@@ -310,6 +401,10 @@ def _load_config(path: Path) -> dict[str, Any]:
     ):
         raise ValueError("pause guard secret file failed its integrity check")
     validate_spec(config, allow_expired=True)
+    if not re.fullmatch(r"S-1-(?:[0-9]+-){1,14}[0-9]+", str(config.get("copy_controller_sid", ""))):
+        raise ValueError("protected guard config has an invalid copy-controller SID")
+    if config.get("final_sync_process_supervision") != "windows-job-object.v1":
+        raise ValueError("protected guard config has no supported final-sync supervisor")
     runtime = config["runtime_binding"]
     if _sha256(_canonical_bytes(runtime)) != config.get("runtime_binding_sha256"):
         raise ValueError("runtime binding hash does not match the protected config")
@@ -373,15 +468,40 @@ def _status_process_binding_matches(
     candidate = provenance.get("candidate_sha")
     if (
         type(pid) is not int
+        or pid <= 0
         or not isinstance(generation, str)
+        or not _RUNTIME_GENERATION.fullmatch(generation)
         or not isinstance(candidate, str)
     ):
         return None
+    if (
+        not isinstance(native, dict)
+        or native.get("schema") != "fcp.recorder-native-runtime.v1"
+        or native.get("runtime_type") != "native-python"
+        or type(native.get("pid")) is not int
+        or native.get("pid") != pid
+        or candidate != runtime.get("candidate_commit")
+    ):
+        return False
+    same_process = native == runtime.get("native_runtime")
+    expected_generation = runtime.get("runtime_generation")
+    if same_process and generation != expected_generation:
+        return False
+    if not same_process and generation == expected_generation:
+        return False
+    build_commit = native.get("build_commit")
+    if build_commit is not None and str(build_commit).casefold() != str(
+        runtime.get("candidate_commit")
+    ).casefold():
+        return False
+    supervisor = native.get("supervisor_session")
+    supervisor_generation = provenance.get("supervisor_generation")
+    if supervisor is None:
+        return supervisor_generation is None
     return bool(
-        native == runtime.get("native_runtime")
-        and pid == native.get("pid")
-        and generation == runtime.get("runtime_generation")
-        and candidate == runtime.get("candidate_commit")
+        isinstance(supervisor, str)
+        and _RUNTIME_GENERATION.fullmatch(supervisor)
+        and supervisor_generation == supervisor
     )
 
 
@@ -428,8 +548,6 @@ def _runtime_binding_match(config: dict[str, Any]) -> tuple[bool | None, dict[st
     age = max(0.0, (_utc_now() - heartbeat).total_seconds())
     if age > _HEARTBEAT_MAX_AGE_SECONDS:
         return None, status
-    if status.get("native_runtime") != runtime.get("native_runtime"):
-        return False, status
     process_match = _status_process_binding_matches(status, runtime)
     if process_match is not True:
         return process_match, status
@@ -454,6 +572,177 @@ def _copy_outcome(config: dict[str, Any]) -> str | None:
     return outcome if outcome in {"complete", "failed"} else None
 
 
+def _write_copy_heartbeat(config: dict[str, Any]) -> None:
+    _write_json_atomic(
+        Path(str(config["controller_heartbeat_path"])),
+        {
+            "schema": "fcp.recorder.pause-copy-controller-heartbeat.v1",
+            "operation_id": config["operation_id"],
+            "pid": os.getpid(),
+            "observed_at_utc": _iso(_utc_now()),
+        },
+    )
+
+
+def _write_copy_result(
+    config: dict[str, Any], *, outcome: str, result: dict[str, Any]
+) -> None:
+    existing = _read_json(Path(str(config["copy_processes_path"]))) or {}
+    process_payload = dict(existing)
+    process_payload.update(
+        {
+        "schema": "fcp.recorder.pause-copy-processes.v1",
+        "operation_id": config["operation_id"],
+        "state": outcome,
+        "outcome": outcome,
+        "observed_at_utc": _iso(_utc_now()),
+        **result,
+        }
+    )
+    _write_json_atomic(Path(str(config["copy_processes_path"])), process_payload)
+    payload = {
+        "schema": "fcp.recorder.pause-copy-outcome.v1",
+        "operation_id": config["operation_id"],
+        "outcome": outcome,
+        "observed_at_utc": process_payload["observed_at_utc"],
+        **result,
+    }
+    _write_json_atomic(Path(str(config["copy_outcome_path"])), payload)
+
+
+def run_copy(config_path: Path, command: list[str]) -> dict[str, Any]:
+    """Run one bounded final-sync command inside the independent guard's job."""
+
+    config = _load_config(config_path)
+    if config.get("final_sync_process_supervision") != "windows-job-object.v1":
+        raise RuntimeError("copy operation is not bound to Windows Job Object supervision")
+    if _current_windows_sid() != config.get("copy_controller_sid"):
+        raise RuntimeError("copy controller does not match the protected Windows SID")
+    if not command or any(not isinstance(part, str) or "\0" in part for part in command):
+        raise ValueError("final-sync command must be a nonempty argument list")
+    command_hash = _sha256(_canonical_bytes(command))
+    if command_hash != config.get("final_sync_command_sha256"):
+        raise RuntimeError("final-sync argv differs from the protected operation binding")
+    deadline = _parse_utc(config.get("hard_deadline_utc"))
+    if deadline is None or (_utc_now() >= deadline):
+        raise RuntimeError("final-sync hard deadline has elapsed")
+    control_path = Path(str(config["runtime_binding"]["control_path"]))
+    processes_path = Path(str(config["copy_processes_path"]))
+    outcome_path = Path(str(config["copy_outcome_path"]))
+    child = None
+    job: OperationJob | None = None
+    pid: int | None = None
+    process_creation_utc: str | None = None
+    try:
+        _write_copy_heartbeat(config)
+        with _control_file_lock(control_path):
+            observation, control = _observation(config)
+            if observation.runtime_binding_matches is not True:
+                raise RuntimeError("runtime binding is not verified for final sync")
+            if not _control_has_owned_pause(control, config):
+                raise RuntimeError("this operation does not own the paused Recorder")
+            if not (
+                observation.pause_acknowledged_operation_id == config["operation_id"]
+                and observation.pause_acknowledged_at is not None
+                and observation.capture_scheduling is False
+                and observation.inflight_capture_tasks == 0
+                and observation.durable_boundary is True
+            ):
+                raise RuntimeError("Recorder has not acknowledged a durable drained pause")
+            if _utc_now() >= deadline:
+                raise RuntimeError("final-sync hard deadline elapsed before process launch")
+            if processes_path.exists() or outcome_path.exists():
+                raise RuntimeError("final-sync evidence already exists for this operation")
+            job = OperationJob.open_existing(str(config["operation_id"]))
+            if job.active_process_count() != 0:
+                raise RuntimeError("operation already has an active final-sync process")
+            child = job.create_suspended(command, cwd=str(config["runtime_binding"]["repo_root"]))
+            pid = child.pid
+            process_creation_utc = child.creation_time_utc()
+            receipt = {
+                "schema": "fcp.recorder.pause-copy-processes.v1",
+                "operation_id": config["operation_id"],
+                "job_object_name": job.name,
+                "state": "starting",
+                "command_line_sha256": command_hash,
+                "processes": [
+                    {"pid": pid, "creation_utc": process_creation_utc}
+                ],
+                "started_at_utc": _iso(_utc_now()),
+            }
+            _write_json_atomic(processes_path, receipt)
+            child.resume()
+            receipt["state"] = "running"
+            receipt["resumed_at_utc"] = _iso(_utc_now())
+            _write_json_atomic(processes_path, receipt)
+            # The independent Scheduled Task is the durable owner. Closing this
+            # handle means its unexpected exit kills the whole process tree.
+            job.close()
+            job = None
+
+        root_exit_code: int | None = None
+        while True:
+            _write_copy_heartbeat(config)
+            if child is not None and root_exit_code is None:
+                root_exit_code = child.wait(0.5)
+            try:
+                with OperationJob.open_existing(str(config["operation_id"])) as probe_job:
+                    active_count = probe_job.active_process_count()
+            except JobObjectError:
+                active_count = -1
+            if root_exit_code is not None and root_exit_code != 0:
+                outcome = "failed"
+                result = {"return_code": root_exit_code, "failure": "copy-command-failed"}
+                break
+            if root_exit_code == 0 and active_count == 0:
+                outcome = "complete"
+                result = {"return_code": 0, "process_tree_empty": True}
+                break
+            if _utc_now() >= deadline:
+                outcome = "failed"
+                result = {
+                    "failure": "hard-deadline-reached",
+                    "root_return_code": root_exit_code,
+                    "active_processes": active_count,
+                }
+                break
+            time.sleep(0.5)
+        _write_copy_result(config, outcome=outcome, result=result)
+        return {
+            "operation_id": config["operation_id"],
+            "outcome": outcome,
+            **result,
+        }
+    except Exception as exc:
+        if child is not None:
+            try:
+                child.close()
+            except (OSError, JobObjectError):
+                pass
+        if not outcome_path.exists():
+            try:
+                failure_result = {
+                    "failure": "copy-controller-error",
+                    "error_type": type(exc).__name__,
+                    "command_line_sha256": command_hash,
+                }
+                if pid is not None:
+                    failure_result["pid"] = pid
+                _write_copy_result(
+                    config,
+                    outcome="failed",
+                    result=failure_result,
+                )
+            except OSError:
+                pass
+        raise
+    finally:
+        if child is not None:
+            child.close()
+        if job is not None:
+            job.close()
+
+
 def _observation(config: dict[str, Any]) -> tuple[PauseGuardObservation, dict[str, Any] | None]:
     matches, status = _runtime_binding_match(config)
     control = _read_json(Path(str(config["runtime_binding"]["control_path"])))
@@ -462,6 +751,11 @@ def _observation(config: dict[str, Any]) -> tuple[PauseGuardObservation, dict[st
         capture = {}
     observation = PauseGuardObservation(
         runtime_binding_matches=matches,
+        runtime_restart_detected=bool(
+            matches is True
+            and isinstance(status, dict)
+            and status.get("native_runtime") != config["runtime_binding"].get("native_runtime")
+        ),
         control_operation_id=(
             str(control.get("operation_id")) if control and isinstance(control.get("operation_id"), str) else None
         ),
@@ -473,6 +767,7 @@ def _observation(config: dict[str, Any]) -> tuple[PauseGuardObservation, dict[st
             if isinstance(capture.get("acknowledged_operation_id"), str)
             else None
         ),
+        pause_acknowledged_at=_parse_utc(capture.get("acknowledged_at")),
         capture_scheduling=(
             capture.get("capture_scheduling")
             if type(capture.get("capture_scheduling")) is bool
@@ -588,6 +883,49 @@ def _request_resume(
 
 def _cancel_final_sync(config: dict[str, Any]) -> list[dict[str, Any]]:
     control_path = str(config["runtime_binding"]["control_path"])
+    if config.get("final_sync_process_supervision") == "windows-job-object.v1":
+        operation_id = str(config["operation_id"])
+        try:
+            with _control_file_lock(Path(control_path)):
+                if not _control_has_owned_pause(
+                    _read_json(Path(control_path)), config
+                ):
+                    return [{"result": "control-owner-changed"}]
+                with OperationJob.open_existing(operation_id) as job:
+                    active_before = job.active_process_count()
+                    if active_before == 0:
+                        return [
+                            {
+                                "result": "absent",
+                                "exit_code": 0,
+                                "job_object_name": job.name,
+                                "active_processes_before": 0,
+                                "active_processes_after": 0,
+                            }
+                        ]
+                    terminated = job.terminate_and_wait(10.0)
+                    active_after = job.active_process_count()
+                    return [
+                        {
+                            "result": (
+                                "terminated-operation-job"
+                                if terminated and active_after == 0
+                                else "operation-job-cancellation-unconfirmed"
+                            ),
+                            "exit_code": 0 if terminated and active_after == 0 else 1,
+                            "job_object_name": job.name,
+                            "active_processes_before": active_before,
+                            "active_processes_after": active_after,
+                        }
+                    ]
+        except (JobObjectError, OSError, TimeoutError, RuntimeError) as exc:
+            return [
+                {
+                    "result": "operation-job-cancellation-failed",
+                    "error_type": type(exc).__name__,
+                    "error": str(exc)[:240],
+                }
+            ]
     if not _control_has_owned_pause(_read_json(Path(control_path)), config):
         return [{"result": "control-owner-changed"}]
     payload = _read_json(Path(str(config["copy_processes_path"])))
@@ -1105,6 +1443,11 @@ def _final_sync_cancellation_confirmed(results: list[dict[str, Any]]) -> bool:
     return all(
         (result.get("result") == "absent" and result.get("exit_code") == 0)
         or (
+            result.get("result") == "terminated-operation-job"
+            and result.get("exit_code") == 0
+            and result.get("active_processes_after") == 0
+        )
+        or (
             result.get("result") == "terminated-bound-final-sync-process-tree"
             and result.get("exit_code") == 0
         )
@@ -1115,7 +1458,16 @@ def _final_sync_cancellation_confirmed(results: list[dict[str, Any]]) -> bool:
 def watch(config_path: Path) -> int:
     config = _load_config(config_path)
     kernel32, mutex = _host_mutex(config)
+    final_sync_job: OperationJob | None = None
     try:
+        if config.get("final_sync_process_supervision") == "windows-job-object.v1":
+            # This independent Scheduled Task holds one Job Object handle for
+            # the entire pause operation. If the task dies, KILL_ON_JOB_CLOSE
+            # terminates every assigned copy process and descendant.
+            final_sync_job = OperationJob.open_or_create(
+                str(config["operation_id"]),
+                copy_controller_sid=str(config["copy_controller_sid"]),
+            )
         observation, control = _observation(config)
         if observation.runtime_binding_matches is not True:
             owned_pause = _control_has_owned_pause(control, config)
@@ -1212,6 +1564,9 @@ def watch(config_path: Path) -> int:
                             "resume-requested",
                             canceled_final_sync=canceled,
                             recovery_triggered=True,
+                            runtime_restart_detected=(
+                                observation.runtime_restart_detected
+                            ),
                         )
                     else:
                         _event(
@@ -1270,11 +1625,16 @@ def watch(config_path: Path) -> int:
                 return 0
             time.sleep(_POLL_SECONDS)
     finally:
-        _release_mutex(kernel32, mutex)
+        try:
+            if final_sync_job is not None:
+                final_sync_job.close()
+        finally:
+            _release_mutex(kernel32, mutex)
 
 
-def arm(config_path: Path, register_script: Path) -> dict[str, Any]:
+def arm(config_path: Path, register_script: Path | None = None) -> dict[str, Any]:
     config = _load_config(config_path)
+    register_script = register_script or Path(str(config["register_script"]))
     if register_script.resolve() != Path(str(config["register_script"])).resolve():
         raise RuntimeError("task registration script differs from the prepared binding")
     deadline = _parse_utc(config.get("hard_deadline_utc"))
@@ -1366,10 +1726,15 @@ def main() -> int:
     arm_parser.add_argument(
         "--register-script",
         type=Path,
-        default=GUARD_DIR / "register_recorder_pause_resume_guard.ps1",
+        default=None,
     )
     watch_parser = commands.add_parser("watch")
     watch_parser.add_argument("--config", type=Path, required=True)
+    copy_parser = commands.add_parser("run-copy")
+    copy_parser.add_argument("--config", type=Path, required=True)
+    copy_parser.add_argument("argv", nargs=argparse.REMAINDER)
+    hash_parser = commands.add_parser("hash-command")
+    hash_parser.add_argument("argv", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     try:
         if args.command == "prepare":
@@ -1380,6 +1745,17 @@ def main() -> int:
             return 0
         if args.command == "watch":
             return watch(args.config)
+        if args.command == "run-copy":
+            command = list(args.argv[1:] if args.argv[:1] == ["--"] else args.argv)
+            result = run_copy(args.config, command)
+            print(json.dumps(result, sort_keys=True))
+            return 0 if result.get("outcome") == "complete" else 1
+        if args.command == "hash-command":
+            command = list(args.argv[1:] if args.argv[:1] == ["--"] else args.argv)
+            if not command or any(not isinstance(part, str) or "\0" in part for part in command):
+                raise ValueError("final-sync command must be a nonempty argument list")
+            print(_sha256(_canonical_bytes(command)))
+            return 0
     except Exception as exc:  # noqa: BLE001 - outer task records only redacted errors
         if args.command == "watch":
             try:

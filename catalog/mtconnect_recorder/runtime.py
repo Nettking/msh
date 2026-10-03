@@ -1714,9 +1714,10 @@ class RecorderRuntime:
                 "gaps_detected": self.gaps_detected,
                 "capture_schedule_count": self.capture_schedule_count,
                 "last_capture_scheduled_at": self.last_capture_scheduled_at,
-                # Capture writes are already committed synchronously. A
-                # commit timestamp is not a separate flush event.
-                "last_flush_at": None,
+                # Compatibility field: older status clients use this name for
+                # the latest durable Recorder commit. Preserve its original
+                # alias without manufacturing a timestamp for empty pauses.
+                "last_flush_at": self.last_commit_at,
                 "last_commit_at": self.last_commit_at,
                 "capture_control": {
                     "operation_id": self.control_operation_id,

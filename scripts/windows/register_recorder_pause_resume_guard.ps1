@@ -34,8 +34,8 @@ $principal = New-ScheduledTaskPrincipal `
     -RunLevel Highest
 $settings = New-ScheduledTaskSettingsSet `
     -StartWhenAvailable `
-    -RestartCount 3 `
-    -RestartInterval (New-TimeSpan -Seconds 20) `
+    -RestartCount 240 `
+    -RestartInterval (New-TimeSpan -Seconds 5) `
     -ExecutionTimeLimit (New-TimeSpan -Minutes 30) `
     -MultipleInstances IgnoreNew
 
