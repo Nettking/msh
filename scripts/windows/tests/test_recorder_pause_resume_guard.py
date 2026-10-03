@@ -7,7 +7,6 @@ import json
 import os
 import subprocess
 import sys
-import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -36,6 +35,13 @@ class _FakeKernel32:
         self.WaitForSingleObject = _FakeWinApiFunction(0)
         self.ReleaseMutex = _FakeWinApiFunction(True)
         self.CloseHandle = _FakeWinApiFunction(True)
+
+
+def _protected_script_path(args: list[str]) -> Path:
+    assert args[-2] == "-EncodedCommand"
+    bootstrap = base64.b64decode(args[-1]).decode("utf-16-le")
+    encoded_path = bootstrap.split("FromBase64String('")[1].split("')")[0]
+    return Path(base64.b64decode(encoded_path).decode("utf-16-le"))
 
 
 def test_final_sync_termination_command_binds_payload_to_protected_script(
@@ -84,7 +90,7 @@ def test_final_sync_termination_command_binds_payload_to_protected_script(
     def fake_run(args, **kwargs):
         calls.append(args)
         call_kwargs.append(kwargs)
-        scripts.append(Path(args[-1]).read_text(encoding="utf-8"))
+        scripts.append(_protected_script_path(args).read_text(encoding="utf-8"))
         return SimpleNamespace(returncode=0, stdout="terminated-bound-final-sync-process-tree\n")
 
     monkeypatch.setattr(guard.subprocess, "run", fake_run)
@@ -99,15 +105,12 @@ def test_final_sync_termination_command_binds_payload_to_protected_script(
     ]
     assert len(calls) == 1
     assert call_kwargs[0]["timeout"] == 25
-    assert calls[0][-2] == "-File"
-    assert calls[0][1:6] == [
-        "-NoProfile",
-        "-NonInteractive",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-    ]
-    assert len(calls[0]) == 7
+    assert calls[0][1:4] == ["-NoProfile", "-NonInteractive", "-EncodedCommand"]
+    assert len(calls[0]) == 5
+    bootstrap = base64.b64decode(calls[0][-1]).decode("utf-16-le")
+    assert "[IO.File]::ReadAllText($p)" in bootstrap
+    assert "[ScriptBlock]::Create($body)" in bootstrap
+    assert "-ExecutionPolicy" not in calls[0]
     script = scripts[0]
     encoded_payload = script.split("FromBase64String('")[1].split("')")[0]
     payload = json.loads(base64.b64decode(encoded_payload).decode("utf-8"))
@@ -139,8 +142,16 @@ def test_final_sync_termination_command_binds_payload_to_protected_script(
     assert script.index("Test-OwnedPause)){ Write-Output 'control-owner-changed'") < script.index(
         'Get-CimInstance Win32_Process -Filter "ProcessId=$pidValue"'
     )
-    assert "[Diagnostics.Process]::GetProcessById($memberPid)" in script
-    assert script.index("$bound.StartTime.ToUniversalTime()") < script.index("$bound.Kill()")
+    assert "[FcpPauseProcessNative]::OpenBoundHandle($memberPid)" in script
+    assert script.index("GetCreationFileTimeUtc($safeHandle)") < script.index(
+        "TerminateBoundHandle($entry.handle)"
+    )
+    assert "exit_filetime_utc" in script
+    assert "process-tree.v3" in script
+    assert "image_name" in script
+    assert "-ieq 'conhost.exe'" in script
+    assert "candidateTicks -gt $parentStart -and $candidateTicks -lt $parentExit" in script
+    assert "Get-CreationTicks $expectedCreated" in script
     assert "taskkill.exe" not in script
     assert "$script:controlLockHandle.Lock(0,1)" in script
     assert "$attempt -lt 100" in script
@@ -327,14 +338,14 @@ def test_termination_script_rechecks_owner_after_initial_guard_observation(
     original_run = guard.subprocess.run
 
     def change_owner_then_run_script(args, **kwargs):
-        script_path = Path(args[-1])
+        script_path = _protected_script_path(args)
         script = script_path.read_text(encoding="utf-8")
         script = script.replace(
             '$item=Get-CimInstance Win32_Process -Filter "ProcessId=$pidValue"',
             f"$item=[pscustomobject]@{{CommandLine='{command_line}';CreationDate=[datetime]::Parse('{creation_utc}')}}",
         )
         script = script.replace(
-            "taskkill.exe /PID $pidValue /T /F | Out-Null",
+            "[FcpPauseProcessNative]::TerminateBoundHandle($entry.handle)",
             "Write-Output 'unexpected-termination'; exit 99",
         )
         control_path.write_text(
@@ -353,29 +364,40 @@ def test_termination_script_rechecks_owner_after_initial_guard_observation(
 
 
 @pytest.mark.skipif(os.name != "nt", reason="exercise generated termination against a disposable process")
-def test_termination_script_stops_only_the_bound_disposable_copy_process(
-    tmp_path: Path, monkeypatch
+@pytest.mark.parametrize(
+    "root_creationflags",
+    [
+        getattr(subprocess, "DETACHED_PROCESS", 0),
+        getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    ],
+    ids=["detached-root", "console-root"],
+)
+@pytest.mark.parametrize("second_attempt_fails", [False, True], ids=["recovered", "stale-retry-fails"])
+def test_termination_script_recovers_and_cancels_a_late_descendant(
+    tmp_path: Path, monkeypatch, root_creationflags: int, second_attempt_fails: bool
 ) -> None:
     config = _watch_config(tmp_path)
     operation_id = config["operation_id"]
     child_pid_path = tmp_path / "copy-child.pid"
+    late_child_signal_path = tmp_path / "start-copy-child"
     process = subprocess.Popen(
         [
             sys.executable,
             "-c",
-            "import subprocess,sys,time; child=subprocess.Popen([sys.executable,'-c','import time; time.sleep(60)']); open(sys.argv[1],'w').write(str(child.pid)); time.sleep(60)",
+            (
+                "import os,subprocess,sys,time; signal_path=sys.argv[1]; pid_path=sys.argv[2];\n"
+                "while not os.path.exists(signal_path): time.sleep(0.02)\n"
+                "child=subprocess.Popen([sys.executable,'-c','import time; time.sleep(60)'],creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_BREAKAWAY_FROM_JOB);\n"
+                "open(pid_path,'w').write(str(child.pid)); time.sleep(60)"
+            ),
+            str(late_child_signal_path),
             str(child_pid_path),
             "--operation",
             operation_id,
         ],
-        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            creationflags=root_creationflags,
     )
     try:
-        child_deadline = time.monotonic() + 5
-        while not child_pid_path.exists() and time.monotonic() < child_deadline:
-            time.sleep(0.05)
-        assert child_pid_path.exists(), "disposable copy child did not start"
-        child_pid = int(child_pid_path.read_text(encoding="utf-8"))
         metadata_script = (
             "$ProgressPreference='SilentlyContinue';"
             f"$p=Get-CimInstance Win32_Process -Filter 'ProcessId={process.pid}';"
@@ -439,11 +461,32 @@ def test_termination_script_stops_only_the_bound_disposable_copy_process(
         original_run = guard.subprocess.run
 
         def kill_root_without_tree(args, **kwargs):
-            script_path = Path(args[-1])
+            script_path = _protected_script_path(args)
             script = script_path.read_text(encoding="utf-8")
             script = script.replace(
                 "$ordered=@($members.ToArray())\n    [array]::Reverse($ordered)",
                 "$ordered=@($members.ToArray() | Where-Object { [int]$_.pid -eq $pidValue })\n    [array]::Reverse($ordered)",
+            )
+            signal_path_b64 = base64.b64encode(
+                str(late_child_signal_path).encode("utf-16-le")
+            ).decode("ascii")
+            child_path_b64 = base64.b64encode(str(child_pid_path).encode("utf-16-le")).decode(
+                "ascii"
+            )
+            spawn_after_snapshot = (
+                "  $signalPath=[Text.Encoding]::Unicode.GetString([Convert]::FromBase64String('"
+                + signal_path_b64
+                + "'));$childPath=[Text.Encoding]::Unicode.GetString([Convert]::FromBase64String('"
+                + child_path_b64
+                + "'));[IO.File]::WriteAllText($signalPath,'go');"
+                + "for($testWait=0;$testWait -lt 30 -and -not (Test-Path -LiteralPath $childPath);$testWait++){Start-Sleep -Milliseconds 100};"
+                + "if(-not (Test-Path -LiteralPath $childPath)){Write-Output 'test-late-child-not-started';exit 99}\n"
+                + "  # The native process handle is identity-bound; PID reuse cannot redirect\n  # TerminateProcess after creation identity is verified."
+            )
+            script = script.replace(
+                "  # The native process handle is identity-bound; PID reuse cannot redirect\n  # TerminateProcess after creation identity is verified.",
+                spawn_after_snapshot,
+                1,
             )
             script_path.write_text(script, encoding="utf-8")
             return original_run(args, **kwargs)
@@ -451,6 +494,8 @@ def test_termination_script_stops_only_the_bound_disposable_copy_process(
         monkeypatch.setattr(guard.subprocess, "run", kill_root_without_tree)
         first_result = guard._cancel_final_sync(config)
 
+        assert child_pid_path.exists(), "the copy process did not create its late child"
+        child_pid = int(child_pid_path.read_text(encoding="utf-8"))
         assert first_result == [
             {"pid": process.pid, "result": "bound-process-tree-still-running", "exit_code": 8}
         ]
@@ -472,9 +517,54 @@ def test_termination_script_stops_only_the_bound_disposable_copy_process(
             check=False,
         )
         assert child_still_running.returncode == 0, child_still_running.stderr
+        snapshot_path = Path(config["guard_state_path"]).with_name(
+            f"final-sync-tree-{process.pid}.json"
+        )
+        before_retry_snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+        child_before_retry = next(
+            member for member in before_retry_snapshot["processes"] if member["pid"] == child_pid
+        )
+        assert child_before_retry["exit_filetime_utc"] is None
+
+        if second_attempt_fails:
+            def fail_second_termination(args, **kwargs):
+                script_path = _protected_script_path(args)
+                script = script_path.read_text(encoding="utf-8")
+                script = script.replace(
+                    "[FcpPauseProcessNative]::TerminateBoundHandle($entry.handle)",
+                    "throw [InvalidOperationException]::new('simulated stale-tree cancellation failure')",
+                )
+                script_path.write_text(script, encoding="utf-8")
+                return original_run(args, **kwargs)
+
+            monkeypatch.setattr(guard.subprocess, "run", fail_second_termination)
+            result = guard._cancel_final_sync(config)
+            monkeypatch.setattr(guard.subprocess, "run", original_run)
+            assert len(result) == 1
+            assert result[0]["pid"] == process.pid
+            assert result[0]["result"] == (
+                f"process-termination-failed-terminate-pid-{child_pid}-InvalidOperationException"
+            )
+            assert result[0]["exit_code"] == 9
+            assert guard._final_sync_cancellation_confirmed(result) is False
+            child_still_running = subprocess.run(
+                [
+                    "powershell.exe",
+                    "-NoLogo",
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-Command",
+                    f"$p=Get-CimInstance Win32_Process -Filter 'ProcessId={child_pid}'; if($null -ne $p){{exit 0}}else{{exit 1}}",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+            )
+            assert child_still_running.returncode == 0, child_still_running.stderr
+            return
 
         result = guard._cancel_final_sync(config)
-
         assert result == [
             {
                 "pid": process.pid,
@@ -483,9 +573,6 @@ def test_termination_script_stops_only_the_bound_disposable_copy_process(
             }
         ]
         assert guard._final_sync_cancellation_confirmed(result) is True
-        snapshot_path = Path(config["guard_state_path"]).with_name(
-            f"final-sync-tree-{process.pid}.json"
-        )
         snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
         assert {
             process.pid,
@@ -526,8 +613,9 @@ def test_termination_script_stops_only_the_bound_disposable_copy_process(
 
 
 @pytest.mark.skipif(os.name != "nt", reason="exercise PID reuse guard against a disposable process")
+@pytest.mark.parametrize("execution_policy", ["Restricted", "AllSigned"])
 def test_guard_refuses_pid_reuse_between_snapshot_and_handle_open(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch, execution_policy: str
 ) -> None:
     config = _watch_config(tmp_path)
     operation_id = config["operation_id"]
@@ -590,14 +678,16 @@ def test_guard_refuses_pid_reuse_between_snapshot_and_handle_open(
         )
 
         def replace_bound_creation_before_cancel(args, **kwargs):
-            script_path = Path(args[-1])
+            script_path = _protected_script_path(args)
             script = script_path.read_text(encoding="utf-8")
             script = script.replace(
                 "$cancelResult=Stop-BoundProcessTree -members $script:processTree -deadline $cancellationDeadline -RequireRoot",
-                "foreach($member in $script:processTree){if([int]$member.pid -eq $pidValue){$member.creation_utc='2000-01-01T00:00:00Z'}}\n"
+                "foreach($member in $script:processTree){if([int]$member.pid -eq $pidValue){$member.creation_utc=[DateTime]::Parse([string]$member.creation_utc).AddSeconds(1).ToString('o')}}\n"
                 "$cancelResult=Stop-BoundProcessTree -members $script:processTree -deadline $cancellationDeadline -RequireRoot",
             )
             script_path.write_text(script, encoding="utf-8")
+            args.insert(1, "-ExecutionPolicy")
+            args.insert(2, execution_policy)
             return original_run(args, **kwargs)
 
         monkeypatch.setattr(guard.subprocess, "run", replace_bound_creation_before_cancel)
@@ -683,10 +773,10 @@ def test_termination_script_fails_closed_when_bound_process_termination_fails(
         )
 
         def run_with_failing_termination(args, **kwargs):
-            script_path = Path(args[-1])
+            script_path = _protected_script_path(args)
             script = script_path.read_text(encoding="utf-8")
             script = script.replace(
-                "$bound.Kill()",
+                "[FcpPauseProcessNative]::TerminateBoundHandle($entry.handle)",
                 "throw [InvalidOperationException]::new('simulated process termination failure')",
             )
             script_path.write_text(script, encoding="utf-8")
@@ -695,13 +785,11 @@ def test_termination_script_fails_closed_when_bound_process_termination_fails(
         monkeypatch.setattr(guard.subprocess, "run", run_with_failing_termination)
         result = guard._cancel_final_sync(config)
 
-        assert result == [
-            {
-                "pid": process.pid,
-                "result": "process-termination-failed-InvalidOperationException",
-                "exit_code": 9,
-            }
-        ]
+        assert len(result) == 1
+        assert result[0]["pid"] == process.pid
+        assert result[0]["result"].startswith("process-termination-failed-terminate-pid-")
+        assert result[0]["result"].endswith("-InvalidOperationException")
+        assert result[0]["exit_code"] == 9
         assert guard._final_sync_cancellation_confirmed(result) is False
         assert process.poll() is None
     finally:

@@ -635,6 +635,51 @@ def _cancel_final_sync(config: dict[str, Any]) -> list[dict[str, Any]]:
         encoded_payload = base64.b64encode(payload).decode("ascii")
         script = r'''
 $ErrorActionPreference='Stop'
+$nativeSource=@'
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
+public static class FcpPauseProcessNative {
+  [StructLayout(LayoutKind.Sequential)] private struct NativeFileTime { public uint Low; public uint High; }
+  private const uint PROCESS_TERMINATE=0x0001;
+  private const uint PROCESS_QUERY_LIMITED_INFORMATION=0x1000;
+  private const uint SYNCHRONIZE=0x00100000;
+  private const uint WAIT_OBJECT_0=0x00000000;
+  private const uint WAIT_TIMEOUT=0x00000102;
+  [DllImport("kernel32.dll", SetLastError=true)] private static extern SafeProcessHandle OpenProcess(uint access,bool inherit,int processId);
+  [DllImport("kernel32.dll", SetLastError=true)] private static extern bool GetProcessTimes(SafeProcessHandle process,out NativeFileTime creation,out NativeFileTime exit,out NativeFileTime kernel,out NativeFileTime user);
+  [DllImport("kernel32.dll", SetLastError=true)] private static extern bool TerminateProcess(SafeProcessHandle process,uint exitCode);
+  [DllImport("kernel32.dll", SetLastError=true)] private static extern uint WaitForSingleObject(SafeProcessHandle process,uint milliseconds);
+  private static long ToFileTime(NativeFileTime value) { return unchecked((long)(((ulong)value.High << 32) | value.Low)); }
+  public static SafeProcessHandle OpenBoundHandle(int processId) {
+    SafeProcessHandle handle=OpenProcess(PROCESS_TERMINATE|PROCESS_QUERY_LIMITED_INFORMATION|SYNCHRONIZE,false,processId);
+    if(handle==null || handle.IsInvalid) { int error=Marshal.GetLastWin32Error(); if(handle!=null) handle.Dispose(); throw new Win32Exception(error); }
+    return handle;
+  }
+  public static long GetCreationFileTimeUtc(SafeProcessHandle process) {
+    NativeFileTime creation,exit,kernel,user;
+    if(!GetProcessTimes(process,out creation,out exit,out kernel,out user)) throw new Win32Exception(Marshal.GetLastWin32Error());
+    return ToFileTime(creation);
+  }
+  public static long GetExitFileTimeUtc(SafeProcessHandle process) {
+    NativeFileTime creation,exit,kernel,user;
+    if(!GetProcessTimes(process,out creation,out exit,out kernel,out user)) throw new Win32Exception(Marshal.GetLastWin32Error());
+    return ToFileTime(exit);
+  }
+  public static void TerminateBoundHandle(SafeProcessHandle process) {
+    if(!TerminateProcess(process,0)) throw new Win32Exception(Marshal.GetLastWin32Error());
+  }
+  public static bool WaitBoundHandle(SafeProcessHandle process,uint milliseconds) {
+    uint result=WaitForSingleObject(process,milliseconds);
+    if(result==WAIT_OBJECT_0) return true;
+    if(result==WAIT_TIMEOUT) return false;
+    throw new Win32Exception(Marshal.GetLastWin32Error());
+  }
+}
+'@
+try { Add-Type -TypeDefinition $nativeSource -ErrorAction Stop }
+catch { Write-Output ('native-process-helper-load-failed-'+$_.Exception.GetType().Name); exit 11 }
 $payload=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('__PAYLOAD_BASE64__')) | ConvertFrom-Json
 $pidValue=[int]$payload.pid
 $expectedHash=[string]$payload.command_line_sha256
@@ -683,13 +728,25 @@ function Release-ControlOwnership {
     $script:controlLockHandle.Dispose(); $script:controlLockHandle=$null
   }
 }
-function Add-TreeProcess([int]$processId,[string]$createdUtc) {
-  $identity=[string]$processId+'|'+$createdUtc
+function Normalize-CreationTicks([long]$ticks) { return ($ticks-($ticks % 10)) }
+function Get-CreationTicks([string]$createdUtc) {
+  return (Normalize-CreationTicks ([DateTime]::Parse($createdUtc).ToUniversalTime().ToFileTimeUtc()))
+}
+function Add-TreeProcess([int]$processId,[string]$createdUtc,[string]$imageName) {
+  $identity=[string]$processId+'|'+[string](Get-CreationTicks $createdUtc)
   if(-not $script:treeIdentitySet.ContainsKey($identity)){
-    [void]$script:processTree.Add([pscustomobject]@{pid=$processId;creation_utc=$createdUtc})
+    [void]$script:processTree.Add([pscustomobject]@{pid=$processId;creation_utc=$createdUtc;exit_filetime_utc=$null;image_name=$imageName})
     $script:treeIdentitySet[$identity]=$true
     $script:treePidSet[[string]$processId]=$true
     return $true
+  }
+  foreach($member in $script:processTree){
+    if([int]$member.pid -eq $processId -and
+       (Get-CreationTicks ([string]$member.creation_utc)) -eq (Get-CreationTicks $createdUtc) -and
+       [string]::IsNullOrWhiteSpace([string]$member.image_name)){
+      $member.image_name=$imageName
+      break
+    }
   }
   return $false
 }
@@ -704,21 +761,34 @@ function Add-ObservedDescendants($processes) {
         $candidatePid=[int]$candidate.ProcessId
         $candidateCreated=$candidate.CreationDate.ToUniversalTime().ToString('o')
         if([string]::IsNullOrWhiteSpace($candidateCreated)){ throw 'descendant identity missing' }
-        $candidateIdentity=[string]$candidatePid+'|'+$candidateCreated
+        $candidateTicks=Get-CreationTicks $candidateCreated
+        $candidateIdentity=[string]$candidatePid+'|'+[string]$candidateTicks
         $parent=$currentByPid[$parentKey]
         $parentIdentity=''
         if($null -ne $parent){
-          $parentIdentity=$parentKey+'|'+$parent.CreationDate.ToUniversalTime().ToString('o')
+          $parentIdentity=$parentKey+'|'+[string](Get-CreationTicks ($parent.CreationDate.ToUniversalTime().ToString('o')))
         }
         if($script:treeIdentitySet.ContainsKey($candidateIdentity)){
           continue
         }
         if($script:treeIdentitySet.ContainsKey($parentIdentity)){
-          if(Add-TreeProcess -processId $candidatePid -createdUtc $candidateCreated){ $changed=$true }
+          if(Add-TreeProcess -processId $candidatePid -createdUtc $candidateCreated -imageName ([string]$candidate.Name)){ $changed=$true }
         } else {
-          # The parent PID is reused or has exited. Do not adopt or terminate an
-          # unbound process merely because Windows reports the same parent PID.
-          $script:unknownDescendant=$true
+          # Adopt a late child only when it was created inside the exact lifetime
+          # of a previously bound parent. A reused parent PID's later children
+          # remain unbound and cannot be terminated by this operation.
+          $boundToExitedParent=$false
+          foreach($knownParent in $script:processTree.ToArray()){
+            if([int]$knownParent.pid -ne [int]$parentKey -or $null -eq $knownParent.exit_filetime_utc){ continue }
+            $parentStart=Get-CreationTicks ([string]$knownParent.creation_utc)
+            $parentExit=Normalize-CreationTicks ([long]$knownParent.exit_filetime_utc)
+            if($candidateTicks -gt $parentStart -and $candidateTicks -lt $parentExit){
+              if(Add-TreeProcess -processId $candidatePid -createdUtc $candidateCreated -imageName ([string]$candidate.Name)){ $changed=$true }
+              $boundToExitedParent=$true
+              break
+            }
+          }
+          if(-not $boundToExitedParent){ $script:unknownDescendant=$true }
         }
       }
     }
@@ -728,7 +798,7 @@ function Save-TreeSnapshot {
   $tempPath=$treeSnapshotPath+'.'+[guid]::NewGuid().ToString('N')+'.tmp'
   try {
     $snapshot=[ordered]@{
-      schema='fcp.recorder.pause-guard.process-tree.v1'
+      schema='fcp.recorder.pause-guard.process-tree.v3'
       operation_id=$operation
       root_pid=$pidValue
       root_creation_utc=$expectedCreated
@@ -754,74 +824,122 @@ function Test-TreeHasLiveMember($processes) {
     $memberPid=[int]$member.pid
     $memberCreated=[string]$member.creation_utc
     $remaining=$processes | Where-Object { [int]$_.ProcessId -eq $memberPid } | Select-Object -First 1
-    if($null -ne $remaining -and $remaining.CreationDate.ToUniversalTime().ToString('o') -ceq $memberCreated){
+    if($null -ne $remaining -and (Get-CreationTicks ($remaining.CreationDate.ToUniversalTime().ToString('o'))) -eq (Get-CreationTicks $memberCreated)){
       return $true
     }
   }
   return $false
 }
 function Stop-BoundProcessTree($members,[datetime]$deadline,[switch]$RequireRoot) {
-  # Open every recorded identity before terminating anything. Process.StartTime
-  # forces System.Diagnostics.Process to retain a handle to that exact process
-  # object; Kill() then uses the handle instead of resolving a numeric PID again.
+  # Retain a native process handle and compare its normalized creation FILETIME
+  # before TerminateProcess uses that same handle. PID reuse cannot redirect it.
   $handles=New-Object 'System.Collections.Generic.List[object]'
   $rootHandleSeen=$false
+  $terminatedAny=$false
   try {
     $ordered=@($members.ToArray())
     [array]::Reverse($ordered)
     foreach($member in $ordered){
       $memberPid=[int]$member.pid
       $memberCreated=[string]$member.creation_utc
-      $bound=$null
-      try { $bound=[Diagnostics.Process]::GetProcessById($memberPid) }
-      catch [ArgumentException] { continue }
+      if($memberPid -ne $pidValue -and [string]$member.image_name -ieq 'conhost.exe'){
+        # Windows owns console hosts and may deny PROCESS_TERMINATE. The host
+        # exits with its bound console process; verify that through the later tree scan.
+        continue
+      }
+      $safeHandle=$null
+      try { $safeHandle=[FcpPauseProcessNative]::OpenBoundHandle($memberPid) }
+      catch [ComponentModel.Win32Exception] {
+        if($_.Exception.NativeErrorCode -eq 87){ continue }
+        return ('process-termination-failed-open-win32-'+[string]$_.Exception.NativeErrorCode)
+      }
+      catch {
+        $cause=$_.Exception.GetBaseException()
+        if($cause -is [ComponentModel.Win32Exception]){ return ('process-termination-failed-open-win32-'+[string]$cause.NativeErrorCode) }
+        return ('process-termination-failed-open-'+$cause.GetType().Name)
+      }
       try {
-        $actualCreated=$bound.StartTime.ToUniversalTime()
-        if([Math]::Abs(($actualCreated-[DateTime]::Parse($memberCreated).ToUniversalTime()).TotalSeconds) -gt 2){
-          $bound.Dispose(); $bound=$null
+        $actualCreated=[FcpPauseProcessNative]::GetCreationFileTimeUtc($safeHandle)
+        if((Normalize-CreationTicks $actualCreated) -ne (Get-CreationTicks $memberCreated)){
+          $safeHandle.Dispose(); $safeHandle=$null
           if($memberPid -eq $pidValue -and $RequireRoot){ return 'root-identity-changed-before-cancel' }
           continue
         }
         if($memberPid -eq $pidValue){ $rootHandleSeen=$true }
-        $handles.Add($bound)
-        $bound=$null
-      } finally { if($null -ne $bound){ $bound.Dispose() } }
+        $handles.Add([pscustomobject]@{member=$member;handle=$safeHandle})
+        $safeHandle=$null
+      } catch {
+        $cause=$_.Exception.GetBaseException()
+        if($cause -is [ComponentModel.Win32Exception]){ return ('process-termination-failed-identity-check-win32-'+[string]$cause.NativeErrorCode) }
+        return ('process-termination-failed-identity-check-'+$cause.GetType().Name)
+      }
+      finally { if($null -ne $safeHandle){ $safeHandle.Dispose() } }
     }
     if($RequireRoot -and -not $rootHandleSeen){ return 'root-identity-absent-before-cancel' }
-    foreach($bound in $handles){
+    foreach($entry in $handles){
       $remaining=[int]([Math]::Max(0,($deadline-[DateTime]::UtcNow).TotalMilliseconds))
       if($remaining -le 0){ return 'process-tree-cancellation-timeout' }
+      $terminationStage='terminate'
       try {
-        if(-not $bound.HasExited){ $bound.Kill() }
-        if(-not $bound.WaitForExit($remaining)){ return 'process-tree-cancellation-timeout' }
+        $exitTicks=[FcpPauseProcessNative]::GetExitFileTimeUtc($entry.handle)
+        if($exitTicks -gt 0){
+          if($exitTicks -le (Get-CreationTicks ([string]$entry.member.creation_utc))){ return 'process-exit-identity-invalid' }
+          $entry.member.exit_filetime_utc=$exitTicks
+          $saveResult=Save-TreeSnapshot
+          if($saveResult -ne $true){ return ('process-tree-snapshot-write-failed-'+[string]$saveResult) }
+          continue
+        }
+        [FcpPauseProcessNative]::TerminateBoundHandle($entry.handle)
+        $terminatedAny=$true
+        $terminationStage='wait'
+        if(-not [FcpPauseProcessNative]::WaitBoundHandle($entry.handle,[uint32]$remaining)){ return 'process-tree-cancellation-timeout' }
+        $terminationStage='read-exit-time'
+        $exitTicks=[FcpPauseProcessNative]::GetExitFileTimeUtc($entry.handle)
+        if($exitTicks -le (Get-CreationTicks ([string]$entry.member.creation_utc))){ return 'process-exit-identity-invalid' }
+        $entry.member.exit_filetime_utc=$exitTicks
+        $terminationStage='save-tree-snapshot'
+        $saveResult=Save-TreeSnapshot
+        if($saveResult -ne $true){ return ('process-tree-snapshot-write-failed-'+[string]$saveResult) }
       } catch {
-        try { if($bound.HasExited){ continue } } catch {}
-        return ('process-termination-failed-'+$_.Exception.GetType().Name)
+        $cause=$_.Exception.GetBaseException()
+        if($cause -is [ComponentModel.Win32Exception]){ return ('process-termination-failed-'+$terminationStage+'-pid-'+[string]$entry.member.pid+'-win32-'+[string]$cause.NativeErrorCode) }
+        return ('process-termination-failed-'+$terminationStage+'-pid-'+[string]$entry.member.pid+'-'+$cause.GetType().Name)
       }
     }
-    if($handles.Count -gt 0){ return 'terminated' }
+    if($terminatedAny){ return 'terminated' }
     return 'absent'
-  } finally { foreach($bound in $handles){ $bound.Dispose() } }
+  } finally { foreach($entry in $handles){ $entry.handle.Dispose() } }
 }
 function Load-TreeSnapshot {
   if(-not (Test-Path -LiteralPath $treeSnapshotPath)){ return $false }
   try {
     $snapshot=ConvertFrom-Json -InputObject ([IO.File]::ReadAllText($treeSnapshotPath))
-    if($snapshot.schema -cne 'fcp.recorder.pause-guard.process-tree.v1' -or
+    if($snapshot.schema -cne 'fcp.recorder.pause-guard.process-tree.v3' -or
        [string]$snapshot.operation_id -cne $operation -or
        [int]$snapshot.root_pid -ne $pidValue -or
-       [Math]::Abs(([DateTime]::Parse([string]$snapshot.root_creation_utc)-[DateTime]::Parse($expectedCreated)).TotalSeconds) -gt 2){
+       (Get-CreationTicks ([string]$snapshot.root_creation_utc)) -ne (Get-CreationTicks $expectedCreated)){
       return $false
     }
     foreach($member in @($snapshot.processes)){
-      if($null -eq $member -or [int]$member.pid -le 0 -or [string]::IsNullOrWhiteSpace([string]$member.creation_utc)){
+      if($null -eq $member -or [int]$member.pid -le 0 -or [string]::IsNullOrWhiteSpace([string]$member.creation_utc) -or [string]::IsNullOrWhiteSpace([string]$member.image_name)){
         return $false
       }
-      $null=Add-TreeProcess -processId ([int]$member.pid) -createdUtc ([string]$member.creation_utc)
+      $exitFiletime=$null
+      if($null -ne $member.exit_filetime_utc){
+        $exitFiletime=[long]$member.exit_filetime_utc
+        if((Normalize-CreationTicks $exitFiletime) -le (Get-CreationTicks ([string]$member.creation_utc))){ return $false }
+      }
+      $null=Add-TreeProcess -processId ([int]$member.pid) -createdUtc ([string]$member.creation_utc) -imageName ([string]$member.image_name)
+      foreach($savedMember in $script:processTree){
+        if([int]$savedMember.pid -eq [int]$member.pid -and (Get-CreationTicks ([string]$savedMember.creation_utc)) -eq (Get-CreationTicks ([string]$member.creation_utc))){
+          $savedMember.exit_filetime_utc=$exitFiletime
+          break
+        }
+      }
     }
     foreach($member in $script:processTree){
       if([int]$member.pid -eq $pidValue -and
-         [Math]::Abs(([DateTime]::Parse([string]$member.creation_utc)-[DateTime]::Parse($expectedCreated)).TotalSeconds) -le 2){ return $true }
+         (Get-CreationTicks ([string]$member.creation_utc)) -eq (Get-CreationTicks $expectedCreated)){ return $true }
     }
     return $false
   } catch { return $false }
@@ -870,22 +988,22 @@ try { $sha=[BitConverter]::ToString($hasher.ComputeHash($bytes)).Replace('-','')
 finally { $hasher.Dispose() }
 if($sha -ne $expectedHash){ Write-Output 'command-hash-mismatch'; exit 3 }
 $created=$item.CreationDate.ToUniversalTime().ToString('o')
-if([Math]::Abs(([DateTime]::Parse($created)-[DateTime]::Parse($expectedCreated)).TotalSeconds) -gt 2){ Write-Output 'creation-time-mismatch'; exit 4 }
+if((Get-CreationTicks $created) -ne (Get-CreationTicks $expectedCreated)){ Write-Output 'creation-time-mismatch'; exit 4 }
 try {
   # Snapshot the bound process and its current descendants before termination.
   # A successful root-PID lookup alone cannot prove taskkill /T drained the tree.
   try { $treeProcesses=@(Get-CimInstance Win32_Process) }
   catch { Write-Output 'process-tree-snapshot-failed'; exit 9 }
-  if($hasSnapshot -and -not $script:treeIdentitySet.ContainsKey([string]$pidValue+'|'+$created)){
+  if($hasSnapshot -and -not $script:treeIdentitySet.ContainsKey([string]$pidValue+'|'+[string](Get-CreationTicks $created))){
     Write-Output 'process-tree-root-identity-mismatch'; exit 9
   }
-  $null=Add-TreeProcess -processId $pidValue -createdUtc $created
+  $null=Add-TreeProcess -processId $pidValue -createdUtc $created -imageName ([string]$item.Name)
   try { Add-ObservedDescendants $treeProcesses }
   catch { Write-Output 'process-tree-identity-incomplete'; exit 9 }
   $saveResult=Save-TreeSnapshot
   if($saveResult -ne $true){ Write-Output ('process-tree-snapshot-write-failed-'+[string]$saveResult); exit 9 }
-  # Process handles are identity-bound: PID reuse cannot redirect Kill() to a
-  # different process after the creation-time check.
+  # The native process handle is identity-bound; PID reuse cannot redirect
+  # TerminateProcess after creation identity is verified.
   $cancellationDeadline=[DateTime]::UtcNow.AddSeconds(10)
   $cancelResult=Stop-BoundProcessTree -members $script:processTree -deadline $cancellationDeadline -RequireRoot
   if($cancelResult -ne 'terminated'){
@@ -912,21 +1030,35 @@ try {
                 script_file.write(script)
                 script_file.flush()
                 os.fsync(script_file.fileno())
+            encoded_path = base64.b64encode(str(script_path).encode("utf-16-le")).decode(
+                "ascii"
+            )
+            bootstrap = (
+                "$ErrorActionPreference='Stop';"
+                "$p=[Text.Encoding]::Unicode.GetString([Convert]::FromBase64String('"
+                + encoded_path
+                + "'));$body=[IO.File]::ReadAllText($p);"
+                "& ([ScriptBlock]::Create($body))"
+            )
+            encoded_bootstrap = base64.b64encode(bootstrap.encode("utf-16-le")).decode(
+                "ascii"
+            )
             completed = subprocess.run(
                 [
                     "powershell.exe",
                     "-NoProfile",
                     "-NonInteractive",
-                    "-ExecutionPolicy",
-                    "Bypass",
-                    "-File",
-                    str(script_path),
+                    "-EncodedCommand",
+                    encoded_bootstrap,
                 ],
                 capture_output=True,
                 text=True,
                 # The PowerShell side has a 5s lock budget and a separate 10s
-                # termination budget (plus bounded helper cleanup). Run the
-                # generated script from a protected temp file to avoid command-line limits.
+                # termination budget (plus bounded helper cleanup). Keep the
+                # full generated script in a protected file and use a short
+                # encoded command to evaluate its contents. Execution policy
+                # applies to script files, not command input; this remains
+                # usable when Group Policy enforces AllSigned or Restricted.
                 timeout=25,
                 check=False,
             )
