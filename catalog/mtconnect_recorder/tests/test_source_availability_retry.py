@@ -393,6 +393,7 @@ def test_pause_does_not_claim_durable_boundary_after_unhandled_capture_future_er
         persisted = json.loads((tmp_path / "state.json").read_text(encoding="utf-8"))
         assert persisted["capture_drain_failures"][0]["state"] == "unresolved"
         assert persisted["capture_drain_failures"][0]["pause_operation_id"] == operation_id
+        assert persisted["capture_drain_failures"][0]["endpoint_sha256"] == service._capture_endpoint_identity(BASE_URL)
 
         # A later Stop operation cannot erase an unresolved write-boundary
         # failure, and a Recorder process restart must retain that refusal.
@@ -420,7 +421,10 @@ def test_pause_does_not_claim_durable_boundary_after_unhandled_capture_future_er
 
             monkeypatch.setattr(restored, "save_state", fail_state_write)
             with pytest.raises(OSError, match="state write refused"):
-                restored._clear_capture_drain_failures_after_recovery(SOURCE)
+                restored._clear_capture_drain_failures_after_recovery(
+                    SOURCE,
+                    base_url=BASE_URL,
+                )
             assert restored.capture_drain_error_operation_id == operation_id
             assert restored.capture_drain_failures[0]["state"] == "unresolved"
 
@@ -432,13 +436,19 @@ def test_pause_does_not_claim_durable_boundary_after_unhandled_capture_future_er
 
             monkeypatch.setattr(restored, "save_state", refuse_inside_admitted_capture)
             with pytest.raises(ResourcePauseSignal):
-                restored._clear_capture_drain_failures_after_recovery(SOURCE)
+                restored._clear_capture_drain_failures_after_recovery(
+                    SOURCE,
+                    base_url=BASE_URL,
+                )
             assert restored.capture_drain_error_operation_id == operation_id
             assert restored.capture_drain_failures[0]["state"] == "unresolved"
 
             monkeypatch.setattr(restored, "save_state", original_save_state)
             # Only the successful recovery path calls this completion method.
-            restored._clear_capture_drain_failures_after_recovery(SOURCE)
+            restored._clear_capture_drain_failures_after_recovery(
+                SOURCE,
+                base_url=BASE_URL,
+            )
             assert restored.capture_drain_error_operation_id is None
             assert restored.capture_drain_failures[0]["state"] == "recovered"
             persisted = json.loads((tmp_path / "state.json").read_text(encoding="utf-8"))
@@ -470,6 +480,7 @@ def test_checkpoint_alias_reconciliation_moves_pause_incident_with_its_source(
         {
             "incident_id": "incident-1",
             "source_name": SOURCE,
+            "endpoint_sha256": service._capture_endpoint_identity(BASE_URL),
             "pause_operation_id": "pause-operation-alias",
             "state": "unresolved",
         }
@@ -490,7 +501,10 @@ def test_checkpoint_alias_reconciliation_moves_pause_incident_with_its_source(
         try:
             restored.load_state()
             assert restored.capture_drain_failures[0]["source_name"] == new_name
-            restored._clear_capture_drain_failures_after_recovery(new_name)
+            restored._clear_capture_drain_failures_after_recovery(
+                new_name,
+                base_url=BASE_URL,
+            )
             assert restored.capture_drain_error_operation_id is None
         finally:
             restored.executor.shutdown(wait=True, cancel_futures=False)
@@ -805,6 +819,131 @@ def test_recovery_completion_credits_checkpoint_alias_after_source_rename(
         rt.unregister_stop_target(service)
 
 
+def test_recovery_completion_credits_old_endpoint_after_alias_is_repointed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(rt, "STATE_FILE", tmp_path / "state.json")
+    service = rt.RecorderRuntime()
+    new_name = "MACHINE-ALPHA-0001"
+    replacement_endpoint = "http://replacement.example:5000"
+    old_endpoint = rt.normalize_agent_base_url(BASE_URL)
+    service.sources = {new_name: replacement_endpoint}
+    service.checkpoints[new_name] = rt.SourceCheckpoint(
+        source_name=new_name,
+        base_url=replacement_endpoint,
+        machine_id="MachineAlpha",
+        agent_instance_id=INSTANCE_ID,
+        next_sequence=4,
+        probe_sha256="a" * 64,
+        storage_aliases=[SOURCE],
+    )
+    service.restart_pause_recovery_required = True
+    service.restart_pause_recovery_sources = {(new_name, old_endpoint)}
+    pending: Future[rt.CaptureResult] = Future()
+    service._capture_futures[SOURCE] = (BASE_URL, pending)
+
+    try:
+        pending.set_result(
+            rt.CaptureResult(SOURCE, True, "", transaction_complete=True)
+        )
+        service._harvest_capture_results()
+
+        assert service.restart_pause_recovery_sources == set()
+        assert service.restart_pause_recovery_required is False
+        assert service._capture_outcomes.get(new_name) is None
+        assert service.source_status.get(new_name, {}).get("last_success_at") is None
+    finally:
+        service.executor.shutdown(wait=True, cancel_futures=False)
+        rt.unregister_stop_target(service)
+
+
+def test_new_endpoint_completion_cannot_clear_old_alias_recovery_frontier(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(rt, "STATE_FILE", tmp_path / "state.json")
+    service = rt.RecorderRuntime()
+    new_name = "MACHINE-ALPHA-0001"
+    replacement_endpoint = "http://replacement.example:5000"
+    old_endpoint = rt.normalize_agent_base_url(BASE_URL)
+    service.sources = {new_name: replacement_endpoint}
+    service.checkpoints[new_name] = rt.SourceCheckpoint(
+        source_name=new_name,
+        base_url=replacement_endpoint,
+        machine_id="MachineAlpha",
+        agent_instance_id=INSTANCE_ID,
+        next_sequence=4,
+        probe_sha256="a" * 64,
+        storage_aliases=[SOURCE],
+    )
+    service.restart_pause_recovery_required = True
+    service.restart_pause_recovery_sources = {(new_name, old_endpoint)}
+    pending: Future[rt.CaptureResult] = Future()
+    service._capture_futures[new_name] = (replacement_endpoint, pending)
+
+    try:
+        pending.set_result(
+            rt.CaptureResult(new_name, True, "", transaction_complete=True)
+        )
+        service._harvest_capture_results()
+
+        assert service.restart_pause_recovery_sources == {(new_name, old_endpoint)}
+        assert service.restart_pause_recovery_required is True
+        assert service._capture_outcomes[new_name] is True
+    finally:
+        service.executor.shutdown(wait=True, cancel_futures=False)
+        rt.unregister_stop_target(service)
+
+
+def test_drain_incident_requires_same_endpoint_and_legacy_identity_stays_unresolved(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(rt, "STATE_FILE", tmp_path / "state.json")
+    service = rt.RecorderRuntime()
+    service.capture_drain_failures = [
+        {
+            "incident_id": "endpoint-bound-incident",
+            "source_name": SOURCE,
+            "endpoint_sha256": service._capture_endpoint_identity(BASE_URL),
+            "pause_operation_id": "pause-old-endpoint",
+            "state": "unresolved",
+        },
+        {
+            "incident_id": "legacy-unbound-incident",
+            "source_name": SOURCE,
+            "pause_operation_id": "pause-legacy",
+            "state": "unresolved",
+        },
+    ]
+    service._refresh_capture_drain_error_operation_id()
+    replacement_endpoint = "http://replacement.example:5000"
+
+    try:
+        service._clear_capture_drain_failures_after_recovery(
+            SOURCE,
+            base_url=replacement_endpoint,
+        )
+        assert [item["state"] for item in service.capture_drain_failures] == [
+            "unresolved",
+            "unresolved",
+        ]
+
+        service._clear_capture_drain_failures_after_recovery(
+            SOURCE,
+            base_url=BASE_URL,
+        )
+        assert [item["state"] for item in service.capture_drain_failures] == [
+            "recovered",
+            "unresolved",
+        ]
+        assert service.capture_drain_error_operation_id == "pause-legacy"
+    finally:
+        service.executor.shutdown(wait=True, cancel_futures=False)
+        rt.unregister_stop_target(service)
+
+
 def test_drain_recovery_does_not_rewrite_state_when_no_incident_matches(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -828,7 +967,10 @@ def test_drain_recovery_does_not_rewrite_state_when_no_incident_matches(
     monkeypatch.setattr(service, "save_state", lambda: writes.append(True))
 
     try:
-        service._clear_capture_drain_failures_after_recovery(SOURCE)
+        service._clear_capture_drain_failures_after_recovery(
+            SOURCE,
+            base_url=BASE_URL,
+        )
 
         assert writes == []
         assert service.capture_drain_error_operation_id == "pause-other"

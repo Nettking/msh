@@ -1,6 +1,7 @@
 """HTTP client and runtime loop for the sequence-based MTConnect recorder."""
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import math
@@ -643,6 +644,37 @@ class RecorderRuntime:
             for item in self.capture_drain_failures
         )
 
+    @staticmethod
+    def _capture_endpoint_identity(base_url: str | None) -> str | None:
+        """Return a non-secret identity for the normalized capture endpoint."""
+
+        if not base_url:
+            return None
+        try:
+            normalized = normalize_agent_base_url(base_url)
+        except (TypeError, ValueError):
+            return None
+        return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+    def _capture_alias_owner(
+        self,
+        source_name: str,
+        endpoint: str,
+    ) -> str | None:
+        """Find one checkpoint alias owner for an old in-flight endpoint."""
+
+        matches = [
+            name
+            for name, checkpoint in self.checkpoints.items()
+            if source_name in checkpoint.storage_aliases
+            and (
+                (name, endpoint) in self.restart_pause_recovery_sources
+                or self._capture_endpoint_identity(checkpoint.base_url) == self._capture_endpoint_identity(endpoint)
+                or self._capture_endpoint_identity(self.sources.get(name)) == self._capture_endpoint_identity(endpoint)
+            )
+        ]
+        return matches[0] if len(matches) == 1 else None
+
     def _record_capture_drain_failure(
         self,
         source_name: str,
@@ -652,22 +684,26 @@ class RecorderRuntime:
     ) -> None:
         with self.lock:
             canonical_source_name = source_name
-            if source_name not in self.sources and scheduled_base_url:
+            endpoint_identity = self._capture_endpoint_identity(scheduled_base_url)
+            if scheduled_base_url:
                 try:
                     scheduled_url = normalize_agent_base_url(scheduled_base_url)
-                    matches = [
-                        current_name
-                        for current_name, current_url in self.sources.items()
-                        if normalize_agent_base_url(current_url) == scheduled_url
-                    ]
                 except ValueError:
-                    matches = []
-                if len(matches) == 1:
-                    canonical_source_name = matches[0]
+                    scheduled_url = ""
+                current_url = self.sources.get(source_name)
+                if not current_url or self._capture_endpoint_identity(current_url) != endpoint_identity:
+                    alias_owner = self._capture_alias_owner(source_name, scheduled_url)
+                    if alias_owner:
+                        canonical_source_name = alias_owner
             self.capture_drain_failures.append(
                 {
                     "incident_id": uuid.uuid4().hex,
                     "source_name": canonical_source_name,
+                    **(
+                        {"endpoint_sha256": endpoint_identity}
+                        if endpoint_identity
+                        else {}
+                    ),
                     **(
                         {"original_source_name": source_name}
                         if canonical_source_name != source_name
@@ -691,14 +727,39 @@ class RecorderRuntime:
                 )
                 log.error(self.last_error)
 
-    def _clear_capture_drain_failures_after_recovery(self, source_name: str) -> None:
+    def _clear_capture_drain_failures_after_recovery(
+        self,
+        source_name: str,
+        *,
+        base_url: str | None = None,
+    ) -> None:
         with self.lock:
+            endpoint_identity = self._capture_endpoint_identity(base_url)
+            if endpoint_identity is None:
+                # Old incidents without endpoint identity, and callers without
+                # the endpoint they actually recovered, must remain unresolved.
+                return
             previous_failures = [dict(item) for item in self.capture_drain_failures]
             previous_error_operation_id = self.capture_drain_error_operation_id
             recovered_at = _utc_now()
             changed = False
             for item in self.capture_drain_failures:
-                if item.get("source_name") == source_name and item.get("state") == "unresolved":
+                source_matches = item.get("source_name") == source_name
+                if not source_matches:
+                    checkpoint = self.checkpoints.get(source_name)
+                    aliases = set(getattr(checkpoint, "storage_aliases", ()))
+                    source_matches = bool(
+                        aliases
+                        & {
+                            str(item.get("source_name", "")),
+                            str(item.get("original_source_name", "")),
+                        }
+                    )
+                if (
+                    source_matches
+                    and item.get("endpoint_sha256") == endpoint_identity
+                    and item.get("state") == "unresolved"
+                ):
                     item.update(
                         {
                             "state": "recovered",
@@ -832,8 +893,7 @@ class RecorderRuntime:
                     alias_matches = [
                         new_name
                         for new_name, new_url in sources.items()
-                        if old_name not in sources
-                        and normalize_agent_base_url(new_url) == old_url
+                        if normalize_agent_base_url(new_url) == old_url
                         and old_name
                         in getattr(
                             self.checkpoints.get(new_name),
@@ -1178,7 +1238,10 @@ class RecorderRuntime:
                         probe=archived_probe,
                         archive_source_names=archive_source_names,
                     )
-                    self._clear_capture_drain_failures_after_recovery(source_name)
+                    self._clear_capture_drain_failures_after_recovery(
+                        source_name,
+                        base_url=base_url,
+                    )
                     checkpoint = self.checkpoints.get(source_name)
                     if checkpoint and checkpoint.agent_instance_id == current_header.instance_id:
                         self.probes[source_name] = archived_probe
@@ -1217,7 +1280,10 @@ class RecorderRuntime:
                         expected=earliest,
                         probe=current_probe,
                     )
-                    self._clear_capture_drain_failures_after_recovery(source_name)
+                    self._clear_capture_drain_failures_after_recovery(
+                        source_name,
+                        base_url=base_url,
+                    )
                     checkpoint = self.checkpoints.get(source_name)
 
             plan = plan_sequence(checkpoint, current_header)
@@ -1486,34 +1552,22 @@ class RecorderRuntime:
 
         with self.lock:
             for source_name, scheduled_url, ok, transaction_complete in outcomes:
-                if transaction_complete and self.restart_pause_recovery_required:
+                if ok and transaction_complete and self.restart_pause_recovery_required:
                     # Recovery is credited to the endpoint the worker actually
                     # completed against, even if a refresh has since repointed
                     # the logical source. The stale result must not update the
                     # replacement endpoint's health below.
-                    recovery_source_name = source_name
-                    if source_name not in self.sources:
-                        alias_matches = [
-                            new_name
-                            for new_name, new_url in self.sources.items()
-                            if normalize_agent_base_url(new_url)
-                            == normalize_agent_base_url(scheduled_url)
-                            and source_name
-                            in getattr(
-                                self.checkpoints.get(new_name),
-                                "storage_aliases",
-                                (),
-                            )
-                        ]
-                        if len(alias_matches) == 1:
-                            recovery_source_name = alias_matches[0]
-                    self.restart_pause_recovery_sources.discard(
-                        (
-                            recovery_source_name,
-                            normalize_agent_base_url(scheduled_url),
-                        )
-                    )
-                    if not self.restart_pause_recovery_sources and self.sources:
+                    endpoint = normalize_agent_base_url(scheduled_url)
+                    recovery_requirement = (source_name, endpoint)
+                    recovery_matched = recovery_requirement in self.restart_pause_recovery_sources
+                    if not recovery_matched:
+                        alias_owner = self._capture_alias_owner(source_name, endpoint)
+                        if alias_owner:
+                            recovery_requirement = (alias_owner, endpoint)
+                            recovery_matched = recovery_requirement in self.restart_pause_recovery_sources
+                    if recovery_matched:
+                        self.restart_pause_recovery_sources.discard(recovery_requirement)
+                    if recovery_matched and not self.restart_pause_recovery_sources and self.sources:
                         self.restart_pause_recovery_required = False
                 current_url = self.sources.get(source_name)
                 if current_url is None:

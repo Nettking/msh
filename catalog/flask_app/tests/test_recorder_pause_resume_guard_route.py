@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import secrets
+import threading
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
@@ -9,6 +10,7 @@ from flask import Flask
 
 from catalog.flask_app import server_setup_routes as routes
 from catalog.flask_app.services.recorder_control_service import RecorderControlService
+from catalog.mtconnect_recorder import runtime as recorder_runtime
 
 
 def _armed_service(tmp_path) -> tuple[RecorderControlService, dict[str, str]]:
@@ -194,3 +196,100 @@ def test_supported_start_route_keeps_current_authority_check(
     control = __import__("json").loads(service.control_path.read_text(encoding="utf-8"))
     assert control["enabled"] is False
     assert control["operation_id"] == "a" * 32
+
+
+def test_supported_stop_and_guarded_start_drive_recorder_worker(
+    tmp_path, monkeypatch
+) -> None:
+    control_path = tmp_path / "control.json"
+    status_path = tmp_path / "status.json"
+    service = RecorderControlService(
+        control_path=control_path,
+        status_path=status_path,
+        log_path=tmp_path / "recorder.log",
+    )
+    config = SimpleNamespace(recorder_sources="MACHINE-ALPHA=http://agent.invalid:5000")
+    prior_operation_id = "b" * 32
+    pause_operation_id = "a" * 32
+    runtime_binding_sha256 = "c" * 64
+    resume_token = secrets.token_urlsafe(32)
+    guard_deadline = (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat()
+    service.set_enabled(True, config, operation_id=prior_operation_id)
+
+    monkeypatch.setattr(routes, "get_recorder_control_service", lambda: service)
+    monkeypatch.setattr(routes, "load_capability_config", lambda: config)
+    monkeypatch.setattr(routes, "_recorder_authorized", lambda: True)
+    monkeypatch.setattr(routes, "_require_setup_csrf", lambda: None)
+    monkeypatch.setattr(recorder_runtime, "MANAGED_MODE", True)
+    monkeypatch.setattr(recorder_runtime, "CONTROL_FILE", control_path)
+    monkeypatch.setattr(recorder_runtime, "CONFIG_FILE", tmp_path / "config.json")
+    monkeypatch.setattr(recorder_runtime, "STATUS_FILE", status_path)
+    monkeypatch.setattr(recorder_runtime, "STATE_FILE", tmp_path / "state.json")
+    monkeypatch.setattr(
+        recorder_runtime,
+        "_managed_configuration",
+        lambda _payload: ({"MACHINE-ALPHA": "http://agent.invalid:5000"}, 0.2),
+    )
+
+    recorder = recorder_runtime.RecorderRuntime()
+    capture_started = threading.Event()
+    monkeypatch.setattr(
+        recorder,
+        "capture_source",
+        lambda source, _url: capture_started.set()
+        or recorder_runtime.CaptureResult(source, True, "", transaction_complete=True),
+    )
+    app = Flask(__name__)
+    app.register_blueprint(routes.server_setup_web)
+    client = app.test_client()
+
+    try:
+        recorder.refresh_configuration(force=True)
+        stop_response = client.post(
+            "/server-setup/recording/stop",
+            data={
+                "next": "/",
+                "operation_id": pause_operation_id,
+                "expected_control_operation_id": prior_operation_id,
+                "resume_guard_token_sha256": hashlib.sha256(
+                    resume_token.encode()
+                ).hexdigest(),
+                "resume_guard_runtime_binding_sha256": runtime_binding_sha256,
+                "resume_guard_deadline_utc": guard_deadline,
+            },
+            headers={"Accept": "application/json"},
+        )
+        assert stop_response.status_code == 200
+        recorder.refresh_configuration(force=True)
+        recorder.acknowledge_capture_pause()
+        recorder.publish_status(force=True)
+        paused = __import__("json").loads(status_path.read_text(encoding="utf-8"))
+        assert paused["capture_control"]["acknowledged_operation_id"] == pause_operation_id
+        assert paused["capture_control"]["durable_boundary"] is True
+        assert recorder.capture_schedule_count == 0
+
+        start_response = client.post(
+            "/server-setup/recording/start",
+            data={"next": "/"},
+            headers={
+                "Accept": "application/json",
+                "X-FCP-Recorder-Resume-Token": resume_token,
+                "X-FCP-Recorder-Resume-Operation": pause_operation_id,
+                "X-FCP-Recorder-Runtime-Binding-SHA256": runtime_binding_sha256,
+            },
+            environ_base={"REMOTE_ADDR": "127.0.0.1"},
+        )
+        assert start_response.status_code == 200
+        assert start_response.json["ok"] is True
+
+        recorder.refresh_configuration(force=True)
+        recorder.run_fetch_cycle()
+        assert capture_started.wait(timeout=2)
+        assert recorder.capture_schedule_count == 1
+        for _base_url, future in list(recorder._capture_futures.values()):
+            future.result(timeout=2)
+        recorder._harvest_capture_results()
+        assert recorder._capture_outcomes["MACHINE-ALPHA"] is True
+    finally:
+        recorder.executor.shutdown(wait=True, cancel_futures=False)
+        recorder_runtime.unregister_stop_target(recorder)
