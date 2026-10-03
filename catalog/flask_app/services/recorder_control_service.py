@@ -1,11 +1,17 @@
 from __future__ import annotations
 
 import json
+import hashlib
+import hmac
 import os
+import re
+import time
 from collections.abc import Mapping
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from .capability_config_service import (
     CapabilityConfig,
@@ -17,6 +23,9 @@ CONTROL_PATH = Path("data") / "source_state" / "mtconnect_recorder_control.json"
 STATUS_PATH = Path("data") / "source_state" / "mtconnect_recorder_status.json"
 LOG_PATH = Path("data") / "source_state" / "mtconnect_recorder.log"
 HEARTBEAT_TIMEOUT_SECONDS = 10
+PAUSE_GUARD_MAX_SECONDS = 20 * 60
+_OPERATION_ID_PATTERN = re.compile(r"\A[a-f0-9]{32}\Z")
+_SHA256_PATTERN = re.compile(r"\A[a-f0-9]{64}\Z")
 
 
 class RecorderControlError(RuntimeError):
@@ -45,11 +54,54 @@ def _read_json(path: Path) -> dict[str, Any]:
 def _write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(path.name + ".tmp")
-    temporary.write_text(
-        json.dumps(payload, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    with temporary.open("w", encoding="utf-8", newline="\n") as stream:
+        stream.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+        stream.flush()
+        os.fsync(stream.fileno())
     os.replace(temporary, path)
+
+
+@contextmanager
+def _control_file_lock(path: Path):
+    """Serialize supported control mutations across Flask worker processes."""
+
+    lock_path = path.with_name(path.name + ".lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a+b") as stream:
+        if os.name == "nt" and lock_path.stat().st_size == 0:
+            stream.write(b"\0")
+            stream.flush()
+        deadline = time.monotonic() + 5.0
+        while True:
+            stream.seek(0)
+            try:
+                if os.name == "nt":
+                    import msvcrt
+
+                    msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
+                else:
+                    import fcntl
+
+                    fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except OSError as exc:
+                if time.monotonic() >= deadline:
+                    raise RecorderControlError(
+                        "Recorder control is busy; no state change was made."
+                    ) from exc
+                time.sleep(0.05)
+        try:
+            yield
+        finally:
+            stream.seek(0)
+            if os.name == "nt":
+                import msvcrt
+
+                msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
 
 
 def _parse_utc(value: object) -> datetime | None:
@@ -96,6 +148,32 @@ def _text(value: object) -> str:
     return str(value or "").strip()
 
 
+def _capture_pause_proven(
+    control: Mapping[str, Any], runtime: Mapping[str, Any]
+) -> bool:
+    """Require a worker acknowledgement for this exact control operation."""
+
+    operation_id = control.get("operation_id")
+    capture = runtime.get("capture_control")
+    if (
+        control.get("enabled") is not False
+        or not isinstance(operation_id, str)
+        or not operation_id.strip()
+        or not isinstance(capture, Mapping)
+    ):
+        return False
+    return bool(
+        capture.get("operation_id") == operation_id
+        and capture.get("requested_enabled") is False
+        and capture.get("capture_scheduling") is False
+        and type(capture.get("inflight_capture_tasks")) is int
+        and capture.get("inflight_capture_tasks") == 0
+        and capture.get("acknowledged_operation_id") == operation_id
+        and _parse_utc(capture.get("acknowledged_at")) is not None
+        and capture.get("durable_boundary") is True
+    )
+
+
 def _configured_sources(
     config: CapabilityConfig | None,
 ) -> dict[str, str]:
@@ -140,28 +218,145 @@ class RecorderControlService:
         self,
         enabled: bool,
         config: CapabilityConfig,
+        *,
+        operation_id: str | None = None,
+        expected_current_operation_id: str | None = None,
+        expected_pause_operation_id: str | None = None,
+        resume_guard: Mapping[str, Any] | None = None,
+        resume_guard_token: str | None = None,
+        runtime_binding_sha256: str | None = None,
     ) -> tuple[bool, str]:
         if enabled and not self.ready(config):
             raise RecorderControlError(
                 "Add at least one MTConnect source before starting recording."
             )
 
+        if expected_pause_operation_id is not None:
+            if not enabled or not _OPERATION_ID_PATTERN.fullmatch(
+                expected_pause_operation_id
+            ):
+                raise RecorderControlError("Invalid expected pause operation identity.")
+            if not isinstance(resume_guard_token, str) or not resume_guard_token:
+                raise RecorderControlError("Automatic resume authorization is missing.")
+            if not isinstance(runtime_binding_sha256, str) or not _SHA256_PATTERN.fullmatch(
+                runtime_binding_sha256
+            ):
+                raise RecorderControlError("Runtime binding identity is invalid.")
+
+        if expected_current_operation_id is not None:
+            if enabled or not _OPERATION_ID_PATTERN.fullmatch(
+                expected_current_operation_id
+            ):
+                raise RecorderControlError("Invalid current control operation identity.")
+
+        new_operation_id = operation_id or uuid4().hex
+        if not _OPERATION_ID_PATTERN.fullmatch(new_operation_id):
+            raise RecorderControlError("Invalid recorder control operation identity.")
+        if resume_guard is not None:
+            if enabled or not isinstance(resume_guard, Mapping):
+                raise RecorderControlError("Resume guard may only accompany a stop request.")
+            deadline = _parse_utc(resume_guard.get("deadline_utc"))
+            now = datetime.now(timezone.utc)
+            if (
+                resume_guard.get("operation_id") != new_operation_id
+                or resume_guard.get("prior_control_operation_id")
+                != expected_current_operation_id
+                or expected_current_operation_id is None
+                or not isinstance(resume_guard.get("token_sha256"), str)
+                or not _SHA256_PATTERN.fullmatch(resume_guard["token_sha256"])
+                or not isinstance(resume_guard.get("runtime_binding_sha256"), str)
+                or not _SHA256_PATTERN.fullmatch(
+                    resume_guard["runtime_binding_sha256"]
+                )
+                or deadline is None
+                or deadline <= now
+                or (deadline - now).total_seconds() > PAUSE_GUARD_MAX_SECONDS
+            ):
+                raise RecorderControlError("Resume guard binding or deadline is invalid.")
+
         payload = {
             "schema": "fcp.mtconnect_recorder.control.v1",
             "enabled": bool(enabled),
+            "operation_id": new_operation_id,
             "updated_at": _utc_now(),
-            "requested_by": "web",
+            "requested_by": (
+                "automatic-resume-guard"
+                if expected_pause_operation_id is not None
+                else "web"
+            ),
         }
-        _write_json_atomic(self.control_path, payload)
+        if resume_guard is not None:
+            payload["resume_guard"] = dict(resume_guard)
+
+        with _control_file_lock(self.control_path):
+            current = _read_json(self.control_path)
+            if current.get("operation_id") == new_operation_id:
+                raise RecorderControlError(
+                    "Recorder control operation identities must be unique."
+                )
+            if expected_current_operation_id is not None and (
+                current.get("enabled") is not True
+                or current.get("operation_id") != expected_current_operation_id
+            ):
+                raise RecorderControlError(
+                    "Control ownership changed; refusing stale pause request."
+                )
+            if expected_pause_operation_id is not None:
+                guard = current.get("resume_guard")
+                token_digest = hashlib.sha256(
+                    str(resume_guard_token).encode("utf-8")
+                ).hexdigest()
+                if (
+                    current.get("enabled") is not False
+                    or current.get("operation_id") != expected_pause_operation_id
+                    or not isinstance(guard, Mapping)
+                    or guard.get("operation_id") != expected_pause_operation_id
+                    or guard.get("runtime_binding_sha256") != runtime_binding_sha256
+                    or not isinstance(guard.get("token_sha256"), str)
+                    or not hmac.compare_digest(guard["token_sha256"], token_digest)
+                ):
+                    raise RecorderControlError(
+                        "Pause ownership changed; refusing stale automatic resume."
+                    )
+            _write_json_atomic(self.control_path, payload)
         if enabled:
             return True, (
                 "Recording requested. The recorder service will start polling "
                 "within a few seconds."
             )
         return True, (
-            "Recording stopped. The recorder service will flush buffered rows "
-            "and remain on standby."
+            "Recording stop requested. The recorder service will stop scheduling "
+            "capture work, drain in-flight work, and remain on standby."
         )
+
+    def validate_resume_guard(
+        self,
+        *,
+        token: str,
+        operation_id: str,
+        runtime_binding_sha256: str,
+    ) -> bool:
+        """Validate a scoped local auto-resume credential without consuming it."""
+
+        if (
+            not _OPERATION_ID_PATTERN.fullmatch(operation_id)
+            or not _SHA256_PATTERN.fullmatch(runtime_binding_sha256)
+            or not token
+        ):
+            return False
+        control = _read_json(self.control_path)
+        guard = control.get("resume_guard")
+        if (
+            control.get("enabled") is not False
+            or control.get("operation_id") != operation_id
+            or not isinstance(guard, Mapping)
+            or guard.get("operation_id") != operation_id
+            or guard.get("runtime_binding_sha256") != runtime_binding_sha256
+            or not isinstance(guard.get("token_sha256"), str)
+        ):
+            return False
+        digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        return hmac.compare_digest(guard["token_sha256"], digest)
 
     def status(
         self,
@@ -171,7 +366,12 @@ class RecorderControlService:
     ) -> dict[str, Any]:
         control = _read_json(self.control_path)
         runtime = _read_json(self.status_path)
-        requested_enabled = bool(control.get("enabled", False))
+        requested_enabled = control.get("enabled") is True
+        control_operation_id = _text(control.get("operation_id"))
+        pause_proven = _capture_pause_proven(control, runtime)
+        runtime_capture_control = runtime.get("capture_control")
+        if not isinstance(runtime_capture_control, Mapping):
+            runtime_capture_control = {}
 
         heartbeat = _parse_utc(runtime.get("heartbeat_at"))
         heartbeat_age = None
@@ -202,8 +402,15 @@ class RecorderControlService:
                 "services, then try again."
             )
         elif not requested_enabled:
-            state = "stopped"
-            message = "Recorder service is healthy and waiting. Recording is off."
+            if pause_proven:
+                state = "stopped"
+                message = "Recorder acknowledged this pause after capture work drained."
+            else:
+                state = "draining"
+                message = (
+                    "Recording is disabled; the worker has not yet proven that "
+                    "this pause is fully drained."
+                )
         elif runtime_state == "recording":
             state = "recording"
             message = str(
@@ -287,11 +494,22 @@ class RecorderControlService:
                 0,
                 _safe_int(runtime.get("records_written")),
             ),
-            "records_buffered": max(
-                0,
-                _safe_int(runtime.get("records_buffered")),
+            "capture_schedule_count": _safe_optional_int(
+                runtime.get("capture_schedule_count")
             ),
+            "last_capture_scheduled_at": (
+                runtime.get("last_capture_scheduled_at")
+                if isinstance(runtime.get("last_capture_scheduled_at"), str)
+                else None
+            ),
+            # Preserve unknown: the Recorder can have an active capture/store
+            # future without knowing its eventual observation count yet.
+            "records_buffered": _safe_optional_int(runtime.get("records_buffered")),
             "last_flush_at": runtime.get("last_flush_at"),
+            "last_commit_at": runtime.get("last_commit_at"),
+            "control_operation_id": control_operation_id,
+            "pause_proven": pause_proven,
+            "capture_control": dict(runtime_capture_control),
             "last_error": runtime.get("last_error") or "",
         }
         if include_diagnostics:
@@ -338,8 +556,14 @@ class RecorderControlService:
             "message": status["message"],
             "heartbeat_at": status["heartbeat_at"],
             "records_written": status["records_written"],
+            "capture_schedule_count": status["capture_schedule_count"],
+            "last_capture_scheduled_at": status["last_capture_scheduled_at"],
             "records_buffered": status["records_buffered"],
             "last_flush_at": status["last_flush_at"],
+            "last_commit_at": status["last_commit_at"],
+            "control_operation_id": status["control_operation_id"],
+            "pause_proven": status["pause_proven"],
+            "capture_control": status["capture_control"],
             "sources": sources,
         }
 

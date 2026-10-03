@@ -525,8 +525,13 @@ class RecorderRuntime:
         self.observations_written = 0
         self.raw_batches_written = 0
         self.gaps_detected = 0
+        self.capture_schedule_count = 0
+        self.last_capture_scheduled_at: str | None = None
         self.recording_started_at: str | None = None
         self.last_commit_at: str | None = None
+        self.control_operation_id: str | None = None
+        self.pause_acknowledged_operation_id: str | None = None
+        self.pause_acknowledged_at: str | None = None
         self.last_error = ""
         self.message = "Recorder service is starting."
         self.state = "starting"
@@ -639,11 +644,18 @@ class RecorderRuntime:
             if MANAGED_MODE:
                 control = _read_json(CONTROL_FILE)
                 config = _read_json(CONFIG_FILE)
-                enabled = bool(control.get("enabled", False))
+                enabled = control.get("enabled") is True
+                raw_operation_id = control.get("operation_id")
+                operation_id = (
+                    raw_operation_id.strip()
+                    if isinstance(raw_operation_id, str) and raw_operation_id.strip()
+                    else None
+                )
                 sources, poll_interval = _managed_configuration(config)
                 configuration_ready = bool(sources)
             else:
                 enabled = True
+                operation_id = None
                 sources = _sources_from_environment()
                 configuration_ready = bool(sources)
                 poll_interval = _float_from_env("FCP_RECORDER_POLL_INTERVAL", 0.2)
@@ -660,8 +672,13 @@ class RecorderRuntime:
         checkpoint_aliases_changed = self.reconcile_checkpoint_aliases(sources)
         with self.lock:
             previous_enabled = self.enabled
+            previous_operation_id = self.control_operation_id
             previous_sources = dict(self.sources)
             self.enabled = enabled
+            self.control_operation_id = operation_id
+            if operation_id != previous_operation_id:
+                self.pause_acknowledged_operation_id = None
+                self.pause_acknowledged_at = None
             self.configuration_ready = configuration_ready
             self.poll_interval = poll_interval
             self.sources = sources
@@ -695,8 +712,8 @@ class RecorderRuntime:
                 log.info("Recorder sources updated: %s", ", ".join(sorted(sources)) or "none")
 
             if not self.enabled:
-                self.state = "stopped"
-                self.message = "Recorder service is healthy and waiting. Recording is off."
+                self.state = "draining"
+                self.message = "Recording is disabled; waiting for capture work to drain."
             elif not self.configuration_ready:
                 self.state = "error"
                 self.message = "Recording is enabled, but recorder sources are not configured."
@@ -1299,10 +1316,39 @@ class RecorderRuntime:
                     url,
                     self.executor.submit(self.capture_source, name, url),
                 )
+            if due_sources:
+                self.capture_schedule_count += len(due_sources)
+                self.last_capture_scheduled_at = _utc_now()
 
         # Fast sources may already have completed. Harvest them opportunistically,
         # but never wait for another source before returning to status publication.
         self._harvest_capture_results()
+
+    def acknowledge_capture_pause(self) -> None:
+        """Acknowledge one disabled control operation after all capture work drains.
+
+        Capture futures include source reads, raw and derived store writes, and
+        checkpoint commits. The acknowledgement is published only by the
+        single runtime loop after it has harvested every finished future, so a
+        status heartbeat cannot claim a boundary while capture work is active.
+        """
+
+        with self.lock:
+            operation_id = self.control_operation_id
+            if self.enabled or not operation_id:
+                return
+            if self._capture_futures:
+                self.state = "draining"
+                self.message = (
+                    "Recording is disabled; waiting for "
+                    f"{len(self._capture_futures)} capture task(s) to finish."
+                )
+                return
+            if self.pause_acknowledged_operation_id != operation_id:
+                self.pause_acknowledged_operation_id = operation_id
+                self.pause_acknowledged_at = _utc_now()
+            self.state = "stopped"
+            self.message = "Capture is paused; all scheduled capture work has drained."
 
     def publish_status(self, *, force: bool = False) -> None:
         now = time.monotonic()
@@ -1325,13 +1371,41 @@ class RecorderRuntime:
                 "recording_started_at": self.recording_started_at,
                 "sources": sorted(self.sources),
                 "source_status": dict(self.source_status),
-                "records_buffered": 0,
+                # The capture transaction's observations are held in a worker
+                # future until its raw store/checkpoint path returns. We do not
+                # have an exact row count while one is still running, so keep
+                # the legacy count unknown instead of publishing a false zero.
+                "records_buffered": 0 if not self._capture_futures else None,
                 "records_written": self.observations_written,
                 "observations_written": self.observations_written,
                 "raw_batches_written": self.raw_batches_written,
                 "gaps_detected": self.gaps_detected,
-                "last_flush_at": self.last_commit_at,
+                "capture_schedule_count": self.capture_schedule_count,
+                "last_capture_scheduled_at": self.last_capture_scheduled_at,
+                # Capture writes are already committed synchronously. A
+                # commit timestamp is not a separate flush event.
+                "last_flush_at": None,
                 "last_commit_at": self.last_commit_at,
+                "capture_control": {
+                    "operation_id": self.control_operation_id,
+                    "requested_enabled": self.enabled,
+                    "capture_scheduling": bool(
+                        self.enabled
+                        and self.configuration_ready
+                        and self.sources
+                        and not self.stop_event.is_set()
+                    ),
+                    "inflight_capture_tasks": len(self._capture_futures),
+                    "acknowledged_operation_id": self.pause_acknowledged_operation_id,
+                    "acknowledged_at": self.pause_acknowledged_at,
+                    "durable_boundary": bool(
+                        not self.enabled
+                        and self.control_operation_id
+                        and self.pause_acknowledged_operation_id
+                        == self.control_operation_id
+                        and not self._capture_futures
+                    ),
+                },
                 "last_error": self.last_error,
                 "poll_interval_seconds": self.poll_interval,
                 "request_timeout_seconds": REQUEST_TIMEOUT,
@@ -1413,6 +1487,7 @@ class RecorderRuntime:
                 cycle_started = time.monotonic()
                 self.refresh_configuration()
                 self.run_fetch_cycle()
+                self.acknowledge_capture_pause()
                 self.publish_status()
 
                 if RUN_ONCE:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hmac
 import secrets
+from urllib.parse import urlsplit
 
 from flask import (
     Blueprint,
@@ -90,7 +91,39 @@ def inject_mtconnect_csrf_token():
     return {"mtconnect_discovery_csrf_token": _mtconnect_csrf_token()}
 
 
+def _is_local_resume_guard_request() -> bool:
+    """Accept the one-time guarded resume credential on the loopback URL.
+
+    Docker's published host port may present a bridge address in
+    ``request.remote_addr`` even when the host client connected to 127.0.0.1.
+    The guard therefore binds the request to the loopback Host it targets and
+    relies on the secret runtime-bound capability plus live authority checks;
+    it does not trust forwarded-address headers.
+    """
+
+    if (
+        request.method != "POST"
+        or request.path != "/server-setup/recording/start"
+    ):
+        return False
+    try:
+        host = urlsplit(f"//{request.host}").hostname
+    except ValueError:
+        return False
+    if host not in {"localhost", "127.0.0.1", "::1"}:
+        return False
+    return get_recorder_control_service().validate_resume_guard(
+        token=request.headers.get("X-FCP-Recorder-Resume-Token", ""),
+        operation_id=request.headers.get("X-FCP-Recorder-Resume-Operation", ""),
+        runtime_binding_sha256=request.headers.get(
+            "X-FCP-Recorder-Runtime-Binding-SHA256", ""
+        ),
+    )
+
+
 def _require_setup_csrf(*, local_only: bool = False) -> None:
+    if _is_local_resume_guard_request():
+        return
     if local_only:
         request_host = request.host.casefold()
         local_host = request_host in {"localhost", "127.0.0.1", "[::1]"} or (
@@ -329,14 +362,76 @@ def _set_recording_from_request(enabled: bool):
                 "Recorder capability is not enabled by current contribution authority."
             )
         config = load_capability_config()
-        ok, message = get_recorder_control_service().set_enabled(enabled, config)
+        service = get_recorder_control_service()
+        if enabled and _is_local_resume_guard_request():
+            ok, message = service.set_enabled(
+                True,
+                config,
+                expected_pause_operation_id=request.headers.get(
+                    "X-FCP-Recorder-Resume-Operation", ""
+                ),
+                resume_guard_token=request.headers.get(
+                    "X-FCP-Recorder-Resume-Token", ""
+                ),
+                runtime_binding_sha256=request.headers.get(
+                    "X-FCP-Recorder-Runtime-Binding-SHA256", ""
+                ),
+            )
+        else:
+            operation_id = request.form.get("operation_id") or None
+            guard_fields = {
+                "prior_control_operation_id": request.form.get(
+                    "expected_control_operation_id"
+                ),
+                "token_sha256": request.form.get("resume_guard_token_sha256"),
+                "runtime_binding_sha256": request.form.get(
+                    "resume_guard_runtime_binding_sha256"
+                ),
+                "deadline_utc": request.form.get("resume_guard_deadline_utc"),
+            }
+            resume_guard = None
+            if any(value is not None for value in guard_fields.values()):
+                if enabled or not all(
+                    isinstance(value, str) and value.strip()
+                    for value in guard_fields.values()
+                ) or not operation_id:
+                    raise RecorderControlError(
+                        "The bounded resume guard binding is incomplete."
+                    )
+                resume_guard = {
+                    "operation_id": operation_id,
+                    **guard_fields,
+                }
+            ok, message = service.set_enabled(
+                enabled,
+                config,
+                operation_id=operation_id,
+                expected_current_operation_id=(
+                    request.form.get("expected_control_operation_id") or None
+                ),
+                resume_guard=resume_guard,
+            )
     except (
         MtconnectDiscoveryError,
         CapabilityConfigError,
         RecorderControlError,
     ) as exc:
+        if _wants_json():
+            status_code = 409 if "ownership changed" in str(exc).casefold() else 400
+            return jsonify({"ok": False, "message": str(exc)}), status_code
         flash(str(exc), "error")
         return redirect(destination, code=303)
+
+    if _wants_json():
+        status = service.status(config)
+        return jsonify(
+            {
+                "ok": bool(ok),
+                "message": message,
+                "operation_id": status["control_operation_id"],
+                "requested_enabled": status["requested_enabled"],
+            }
+        )
 
     flash(message, "success" if ok else "error")
     return redirect(destination, code=303)

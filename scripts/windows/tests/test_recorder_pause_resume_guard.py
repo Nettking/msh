@@ -1,0 +1,405 @@
+from __future__ import annotations
+
+import base64
+import ctypes
+import hashlib
+import json
+import os
+from pathlib import Path
+from types import SimpleNamespace
+from datetime import datetime, timedelta, timezone
+
+import pytest
+
+from scripts.windows import recorder_pause_resume_guard as guard
+from scripts.windows.recorder_pause_resume_guard_logic import PauseGuardObservation
+
+
+class _FakeWinApiFunction:
+    def __init__(self, result):
+        self.result = result
+        self.argtypes = None
+        self.restype = None
+        self.calls = []
+
+    def __call__(self, *args):
+        self.calls.append(args)
+        return self.result
+
+
+class _FakeKernel32:
+    def __init__(self):
+        self.CreateMutexW = _FakeWinApiFunction(1234)
+        self.WaitForSingleObject = _FakeWinApiFunction(0)
+        self.ReleaseMutex = _FakeWinApiFunction(True)
+        self.CloseHandle = _FakeWinApiFunction(True)
+
+
+def test_final_sync_termination_command_binds_payload_inside_encoded_script(
+    tmp_path: Path, monkeypatch
+) -> None:
+    operation_id = "a" * 32
+    command_hash = hashlib.sha256(b"python copy.py --operation " + operation_id.encode()).hexdigest()
+    creation_utc = "2026-10-03T06:00:00Z"
+    process_path = tmp_path / "copy-processes.json"
+    process_path.write_text(
+        json.dumps(
+            {
+                "operation_id": operation_id,
+                "processes": [
+                    {
+                        "pid": 1234,
+                        "command_line_sha256": command_hash,
+                        "creation_utc": creation_utc,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    calls: list[list[str]] = []
+
+    def fake_run(args, **kwargs):
+        calls.append(args)
+        return SimpleNamespace(returncode=0, stdout="terminated-bound-final-sync-process-tree\n")
+
+    monkeypatch.setattr(guard.subprocess, "run", fake_run)
+    result = guard._cancel_final_sync(
+        {"copy_processes_path": str(process_path), "operation_id": operation_id}
+    )
+
+    assert result == [
+        {
+            "pid": 1234,
+            "result": "terminated-bound-final-sync-process-tree",
+            "exit_code": 0,
+        }
+    ]
+    assert len(calls) == 1
+    assert calls[0][-2] == "-EncodedCommand"
+    assert len(calls[0]) == 5
+    script = base64.b64decode(calls[0][-1]).decode("utf-16le")
+    encoded_payload = script.split("FromBase64String('")[1].split("')")[0]
+    payload = json.loads(base64.b64decode(encoded_payload).decode("utf-8"))
+    assert payload == {
+        "pid": 1234,
+        "command_line_sha256": command_hash,
+        "creation_utc": creation_utc,
+        "operation_id": operation_id,
+    }
+    assert operation_id not in script
+    assert "[Convert]::ToHexString" not in script
+    assert "[Security.Cryptography.SHA256]::Create()" in script
+
+
+def test_final_sync_termination_does_not_run_for_another_operation(
+    tmp_path: Path, monkeypatch
+) -> None:
+    process_path = tmp_path / "copy-processes.json"
+    process_path.write_text(
+        json.dumps({"operation_id": "b" * 32, "processes": []}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        guard.subprocess,
+        "run",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("must not run")),
+    )
+    assert guard._cancel_final_sync(
+        {"copy_processes_path": str(process_path), "operation_id": "a" * 32}
+    ) == [{"result": "no-verified-final-sync-process-record"}]
+
+
+def test_ps_registration_script_passes_its_operation_id_validator() -> None:
+    script = Path(guard.__file__).with_name("register_recorder_pause_resume_guard.ps1")
+    text = script.read_text(encoding="utf-8")
+    assert "[ValidatePattern('\\A[a-f0-9]{32}\\z')]" in text
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows named mutex API")
+def test_host_mutex_uses_pointer_sized_windows_signatures(monkeypatch) -> None:
+    fake = _FakeKernel32()
+    monkeypatch.setattr(guard.ctypes, "WinDLL", lambda *_args, **_kwargs: fake)
+    kernel32, handle = guard._host_mutex(
+        {"runtime_binding": {"repo_root": str(Path.cwd())}},
+        timeout_seconds=0,
+    )
+    try:
+        assert handle == 1234
+        assert fake.CreateMutexW.calls[0][2].startswith("Global\\FCPHostMutation-")
+        assert fake.WaitForSingleObject.calls == [(1234, 0)]
+        assert fake.WaitForSingleObject.argtypes == [ctypes.wintypes.HANDLE, ctypes.wintypes.DWORD]
+    finally:
+        guard._release_mutex(kernel32, handle)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows ProgramData ACLs")
+def test_prepare_keeps_secret_config_under_system_protected_programdata(
+    tmp_path: Path, monkeypatch
+) -> None:
+    program_data = tmp_path / "ProgramData"
+    expected_root = program_data / "FCP" / "RecorderPauseGuards"
+    monkeypatch.setenv("ProgramData", str(program_data))
+    monkeypatch.setattr(
+        guard.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(returncode=0, stdout="", stderr=""),
+    )
+    spec_path = tmp_path / "spec.json"
+    spec_path.write_text(
+        json.dumps(
+            {
+                "prior_control_operation_id": "d" * 32,
+                "hard_deadline_utc": guard._iso(guard._utc_now() + timedelta(minutes=10)),
+                "runtime_binding": {
+                    "repo_root": r"C:\msh\git",
+                    "data_root": r"C:\msh\git\data",
+                    "config_path": r"C:\msh\git\data\capabilities\config.json",
+                    "control_path": r"C:\msh\git\data\source_state\mtconnect_recorder_control.json",
+                    "status_path": r"C:\msh\git\data\source_state\mtconnect_recorder_status.json",
+                    "container_id": "a" * 64,
+                    "image_id": "sha256:" + "b" * 64,
+                    "candidate_commit": "c" * 40,
+                    "native_runtime": {
+                        "schema": "fcp.recorder-native-runtime.v1",
+                        "runtime_type": "native-python",
+                        "pid": 1,
+                        "process_nonce": None,
+                        "supervisor_session": None,
+                        "build_commit": None,
+                    },
+                    "runtime_generation": "e" * 32,
+                    "mount_destination": "/app/data",
+                    "docker_exe": r"C:\Program Files\Docker\Docker\resources\bin\docker.exe",
+                },
+                "controller_heartbeat_path": str(tmp_path / "controller.json"),
+                "copy_outcome_path": str(tmp_path / "copy.json"),
+                "copy_processes_path": str(tmp_path / "copy-processes.json"),
+                "baseline_capture_schedule_count": 42,
+                "flask_url": "http://127.0.0.1:55000",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    prepared = guard.prepare_config(spec_path, expected_root)
+    config_path = Path(prepared["config_path"])
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+
+    assert config_path == expected_root / prepared["operation_id"] / "guard.json"
+    assert config["guard_state_path"].startswith(str(config_path.parent / "evidence"))
+    assert "resume_token" not in prepared
+    assert "resume_token_sha256" in prepared
+    assert Path(config["guard_logic"]).exists()
+    assert Path(config["register_script"]).exists()
+    loaded = guard._load_config(config_path)
+    assert loaded["runtime_binding"]["runtime_generation"] == "e" * 32
+
+
+def test_runtime_binding_requires_candidate_and_process_generation_match() -> None:
+    native = {
+        "schema": "fcp.recorder-native-runtime.v1",
+        "runtime_type": "native-python",
+        "pid": 1,
+        "process_nonce": None,
+        "supervisor_session": None,
+        "build_commit": None,
+    }
+    runtime = {
+        "candidate_commit": "c" * 40,
+        "native_runtime": native,
+        "runtime_generation": "e" * 32,
+    }
+    status = {
+        "native_runtime": native,
+        "acceptance_observability": {
+            "provenance": {
+                "pid": 1,
+                "runtime_generation": "e" * 32,
+                "candidate_sha": "c" * 40,
+            }
+        },
+    }
+    assert guard._status_process_binding_matches(status, runtime) is True
+
+    changed_process = json.loads(json.dumps(status))
+    changed_process["acceptance_observability"]["provenance"]["runtime_generation"] = "f" * 32
+    assert guard._status_process_binding_matches(changed_process, runtime) is False
+
+    missing_provenance = {"native_runtime": native}
+    assert guard._status_process_binding_matches(missing_provenance, runtime) is None
+
+    changed_candidate = json.loads(json.dumps(status))
+    changed_candidate["acceptance_observability"]["provenance"]["candidate_sha"] = "d" * 40
+    assert guard._status_process_binding_matches(changed_candidate, runtime) is False
+
+
+def _watch_config(tmp_path: Path) -> dict:
+    operation_id = "a" * 32
+    token = "guard-token-for-test"
+    deadline = datetime.now(timezone.utc) + timedelta(minutes=10)
+    return {
+        "operation_id": operation_id,
+        "prior_control_operation_id": "b" * 32,
+        "hard_deadline_utc": guard._iso(deadline),
+        "drain_timeout_seconds": 30,
+        "controller_stale_after_seconds": 10,
+        "baseline_capture_schedule_count": 100,
+        "resume_token": token,
+        "resume_token_sha256": hashlib.sha256(token.encode()).hexdigest(),
+        "runtime_binding_sha256": "c" * 64,
+        "guard_state_path": str(tmp_path / "guard-state.json"),
+        "guard_events_path": str(tmp_path / "guard-events.jsonl"),
+        "controller_heartbeat_path": str(tmp_path / "controller.json"),
+        "copy_outcome_path": str(tmp_path / "copy.json"),
+        "copy_processes_path": str(tmp_path / "copy-processes.json"),
+        "runtime_binding": {"repo_root": str(tmp_path)},
+    }
+
+
+def _watch_observation(
+    *,
+    runtime_matches: bool = True,
+    operation_id: str | None = "a" * 32,
+    enabled: bool | None = False,
+    acknowledged: str | None = "a" * 32,
+    scheduling: bool | None = False,
+    inflight: int | None = 0,
+    durable: bool | None = True,
+    heartbeat_age: float | None = 1.0,
+    schedule_count: int | None = 100,
+) -> tuple[PauseGuardObservation, dict | None]:
+    control = (
+        {
+            "enabled": enabled,
+            "operation_id": operation_id,
+            "resume_guard": {
+                "operation_id": "a" * 32,
+                "prior_control_operation_id": "b" * 32,
+                "runtime_binding_sha256": "c" * 64,
+                "token_sha256": hashlib.sha256(
+                    b"guard-token-for-test"
+                ).hexdigest(),
+                "deadline_utc": None,
+            },
+        }
+        if operation_id == "a" * 32 and enabled is False
+        else {"enabled": enabled, "operation_id": operation_id}
+    )
+    return (
+        PauseGuardObservation(
+            runtime_binding_matches=runtime_matches,
+            control_operation_id=operation_id,
+            control_enabled=enabled,
+            pause_acknowledged_operation_id=acknowledged,
+            capture_scheduling=scheduling,
+            inflight_capture_tasks=inflight,
+            durable_boundary=durable,
+            controller_heartbeat_age_seconds=heartbeat_age,
+            copy_outcome=None,
+            capture_schedule_count=schedule_count,
+        ),
+        control,
+    )
+
+
+def test_watch_cancels_final_sync_then_resumes_and_verifies_capture(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = _watch_config(tmp_path)
+    resume_operation_id = "d" * 32
+    pause_control = _watch_observation(heartbeat_age=11.0)[1]
+    pause_control["resume_guard"]["deadline_utc"] = config["hard_deadline_utc"]
+    observations = iter(
+        [
+            _watch_observation(
+                operation_id="b" * 32,
+                enabled=True,
+                acknowledged=None,
+                scheduling=True,
+                durable=None,
+            ),
+            (_watch_observation(heartbeat_age=11.0)[0], pause_control),
+            _watch_observation(
+                operation_id=resume_operation_id,
+                enabled=True,
+                acknowledged=None,
+                scheduling=False,
+                durable=False,
+            ),
+            _watch_observation(
+                operation_id=resume_operation_id,
+                enabled=True,
+                acknowledged=None,
+                scheduling=True,
+                schedule_count=101,
+                durable=False,
+            ),
+        ]
+    )
+    actions: list[str] = []
+    events: list[dict] = []
+
+    monkeypatch.setattr(guard, "_load_config", lambda _path: config)
+    monkeypatch.setattr(guard, "_host_mutex", lambda _config: (object(), 1234))
+    monkeypatch.setattr(guard, "_release_mutex", lambda *_args: None)
+    monkeypatch.setattr(guard, "_observation", lambda _config: next(observations))
+    monkeypatch.setattr(guard, "_read_json", lambda _path: None)
+    monkeypatch.setattr(
+        guard,
+        "_cancel_final_sync",
+        lambda _config: actions.append("cancel") or [{"result": "terminated"}],
+    )
+    monkeypatch.setattr(
+        guard,
+        "_request_resume",
+        lambda _config: actions.append("resume")
+        or (resume_operation_id, {"result": "accepted"}),
+    )
+    monkeypatch.setattr(guard, "_event", lambda _config, state, **kw: events.append({"state": state, **kw}))
+    monkeypatch.setattr(guard.time, "sleep", lambda _seconds: None)
+
+    assert guard.watch(tmp_path / "guard.json") == 0
+    assert actions == ["cancel", "resume"]
+    assert [event["state"] for event in events][-2:] == [
+        "verify-resume",
+        "resume-verified",
+    ]
+    resume_event = next(event for event in events if event["state"] == "resume-requested")
+    assert resume_event["canceled_final_sync"] == [{"result": "terminated"}]
+
+
+def test_watch_records_runtime_identity_mismatch_without_stale_resume(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = _watch_config(tmp_path)
+    pause_control = _watch_observation()[1]
+    pause_control["resume_guard"]["deadline_utc"] = config["hard_deadline_utc"]
+    observations = iter(
+        [
+                _watch_observation(
+                    operation_id="b" * 32,
+                    enabled=True,
+                    acknowledged=None,
+                    scheduling=True,
+                    durable=None,
+                ),
+                (_watch_observation(runtime_matches=False)[0], pause_control),
+            ]
+        )
+    actions: list[str] = []
+    events: list[dict] = []
+
+    monkeypatch.setattr(guard, "_load_config", lambda _path: config)
+    monkeypatch.setattr(guard, "_host_mutex", lambda _config: (object(), 1234))
+    monkeypatch.setattr(guard, "_release_mutex", lambda *_args: None)
+    monkeypatch.setattr(guard, "_observation", lambda _config: next(observations))
+    monkeypatch.setattr(guard, "_read_json", lambda _path: None)
+    monkeypatch.setattr(guard, "_request_resume", lambda _config: actions.append("resume"))
+    monkeypatch.setattr(guard, "_cancel_final_sync", lambda _config: actions.append("cancel"))
+    monkeypatch.setattr(guard, "_event", lambda _config, state, **kw: events.append({"state": state, **kw}))
+
+    assert guard.watch(tmp_path / "guard.json") == 3
+    assert actions == []
+    assert events[-1]["state"] == "identity-unverified"
+    assert events[-1]["capture_was_paused"] is True
