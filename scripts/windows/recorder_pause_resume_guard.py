@@ -887,9 +887,17 @@ def _cancel_final_sync(config: dict[str, Any]) -> list[dict[str, Any]]:
         operation_id = str(config["operation_id"])
         try:
             with _control_file_lock(Path(control_path)):
-                if not _control_has_owned_pause(
-                    _read_json(Path(control_path)), config
-                ):
+                control = _read_json(Path(control_path))
+                control_operation_id = (
+                    control.get("operation_id") if isinstance(control, dict) else None
+                )
+                still_owns_pause = _control_has_owned_pause(control, config)
+                superseded_control = bool(
+                    isinstance(control_operation_id, str)
+                    and _OPERATION_ID.fullmatch(control_operation_id)
+                    and control_operation_id != operation_id
+                )
+                if not still_owns_pause and not superseded_control:
                     return [{"result": "control-owner-changed"}]
                 with OperationJob.open_existing(operation_id) as job:
                     active_before = job.active_process_count()
@@ -1597,9 +1605,20 @@ def watch(config_path: Path) -> int:
                             **resume_result,
                         )
             elif action is PauseGuardAction.VERIFY_RESUME:
+                canceled = _cancel_final_sync(config)
+                if not _final_sync_cancellation_confirmed(canceled):
+                    _event(
+                        config,
+                        "final-sync-cancellation-unconfirmed-before-resume-verification",
+                        canceled_final_sync=canceled,
+                        control_operation_id=observation.control_operation_id,
+                    )
+                    time.sleep(_POLL_SECONDS)
+                    continue
                 _event(
                     config,
                     action.value,
+                    canceled_final_sync=canceled,
                     capture_schedule_count=observation.capture_schedule_count,
                 )
                 if (
@@ -1618,8 +1637,21 @@ def watch(config_path: Path) -> int:
                 )
                 return 0
             elif action is PauseGuardAction.SUPERSEDED:
-                _event(config, action.value, control_operation_id=observation.control_operation_id)
-                return 0
+                canceled = _cancel_final_sync(config)
+                if _final_sync_cancellation_confirmed(canceled):
+                    _event(
+                        config,
+                        action.value,
+                        control_operation_id=observation.control_operation_id,
+                        canceled_final_sync=canceled,
+                    )
+                    return 0
+                _event(
+                    config,
+                    "final-sync-cancellation-unconfirmed-after-supersession",
+                    control_operation_id=observation.control_operation_id,
+                    canceled_final_sync=canceled,
+                )
             elif action is PauseGuardAction.PAUSE_NEVER_STARTED:
                 _event(config, action.value)
                 return 0

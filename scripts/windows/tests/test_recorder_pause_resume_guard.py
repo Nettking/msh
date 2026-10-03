@@ -1282,7 +1282,7 @@ def test_watch_cancels_final_sync_then_resumes_and_verifies_capture(
     monkeypatch.setattr(guard.time, "sleep", lambda _seconds: None)
 
     assert guard.watch(tmp_path / "guard.json") == 0
-    assert actions == ["cancel", "resume"]
+    assert actions == ["cancel", "resume", "cancel"]
     assert [event["state"] for event in events][-2:] == [
         "verify-resume",
         "resume-verified",
@@ -1291,6 +1291,101 @@ def test_watch_cancels_final_sync_then_resumes_and_verifies_capture(
     assert resume_event["canceled_final_sync"] == [
         {"result": "terminated-bound-final-sync-process-tree", "exit_code": 0}
     ]
+
+
+def test_watch_cancels_final_sync_before_verifying_superseding_start(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = _watch_config(tmp_path)
+    config["final_sync_process_supervision"] = "windows-job-object.v1"
+    config["copy_controller_sid"] = "S-1-5-21-1000"
+    pause_observation, pause_control = _watch_observation(heartbeat_age=11.0)
+    assert pause_control is not None
+    pause_control["resume_guard"]["deadline_utc"] = config["hard_deadline_utc"]
+    superseding_start = "e" * 32
+    observations = iter(
+        [
+            (pause_observation, pause_control),
+            _watch_observation(
+                operation_id=superseding_start,
+                enabled=True,
+                acknowledged=None,
+                scheduling=False,
+                durable=False,
+                schedule_count=100,
+            ),
+            _watch_observation(
+                operation_id=superseding_start,
+                enabled=True,
+                acknowledged=None,
+                scheduling=False,
+                durable=False,
+                schedule_count=100,
+            ),
+            _watch_observation(
+                operation_id=superseding_start,
+                enabled=True,
+                acknowledged=None,
+                scheduling=True,
+                durable=False,
+                schedule_count=101,
+            ),
+        ]
+    )
+    actions: list[str] = []
+    events: list[dict] = []
+    cancellation_results = iter(
+        [
+            [{"result": "operation-job-cancellation-unconfirmed", "exit_code": 1}],
+            [
+                {
+                    "result": "terminated-operation-job",
+                    "exit_code": 0,
+                    "active_processes_after": 0,
+                }
+            ],
+        ]
+    )
+
+    class FakeOperationJob:
+        def close(self) -> None:
+            return None
+
+    monkeypatch.setattr(guard, "_load_config", lambda _path: config)
+    monkeypatch.setattr(guard, "_host_mutex", lambda _config: (object(), 1234))
+    monkeypatch.setattr(guard, "_release_mutex", lambda *_args: None)
+    monkeypatch.setattr(guard, "_observation", lambda _config: next(observations))
+    monkeypatch.setattr(guard, "_read_json", lambda _path: None)
+    monkeypatch.setattr(
+        guard.OperationJob,
+        "open_or_create",
+        lambda *_args, **_kwargs: FakeOperationJob(),
+    )
+    monkeypatch.setattr(
+        guard,
+        "_cancel_final_sync",
+        lambda _config: actions.append("cancel") or next(cancellation_results),
+    )
+    monkeypatch.setattr(
+        guard,
+        "_request_resume",
+        lambda _config: pytest.fail("a newer operator Start must not be replaced"),
+    )
+    monkeypatch.setattr(
+        guard, "_event", lambda _config, state, **kw: events.append({"state": state, **kw})
+    )
+    monkeypatch.setattr(guard.time, "sleep", lambda _seconds: None)
+
+    assert guard.watch(tmp_path / "guard.json") == 0
+    assert actions == ["cancel", "cancel"]
+    states = [event["state"] for event in events]
+    assert states.index("final-sync-cancellation-unconfirmed-before-resume-verification") < states.index(
+        "verify-resume"
+    )
+    assert states.index("verify-resume") < states.index("resume-verified")
+    verify_event = next(event for event in events if event["state"] == "verify-resume")
+    assert verify_event["canceled_final_sync"][0]["result"] == "terminated-operation-job"
+    assert verify_event["canceled_final_sync"][0]["active_processes_after"] == 0
 
 
 def test_watch_retries_unconfirmed_cancellation_before_requesting_resume(
@@ -1333,6 +1428,7 @@ def test_watch_retries_unconfirmed_cancellation_before_requesting_resume(
                     "exit_code": 0,
                 }
             ],
+            [{"result": "absent", "exit_code": 0}],
         ]
     )
 
@@ -1358,7 +1454,7 @@ def test_watch_retries_unconfirmed_cancellation_before_requesting_resume(
     monkeypatch.setattr(guard.time, "sleep", lambda _seconds: None)
 
     assert guard.watch(tmp_path / "guard.json") == 0
-    assert actions == ["cancel", "cancel", "resume"]
+    assert actions == ["cancel", "cancel", "resume", "cancel"]
     assert [event["state"] for event in events].count(
         "final-sync-cancellation-unconfirmed"
     ) == 1
@@ -1442,7 +1538,7 @@ def test_restarted_watch_revalidates_copy_before_resume(
     monkeypatch.setattr(guard.time, "sleep", lambda _seconds: None)
 
     assert guard.watch(tmp_path / "guard.json") == 0
-    assert actions == ["cancel", "resume"]
+    assert actions == ["cancel", "resume", "cancel"]
     assert events[0]["state"] == "guard-restarted-for-owned-pause"
     assert events[-1]["state"] == "resume-verified"
 

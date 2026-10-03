@@ -142,9 +142,26 @@ def test_cancel_operation_job_rechecks_pause_owner_and_verifies_empty_job(
         control = json.loads(control_path.read_text(encoding="utf-8"))
         control["operation_id"] = "e" * 32
         control["enabled"] = True
+        control.pop("resume_guard", None)
         control_path.write_text(json.dumps(control), encoding="utf-8")
-        still_empty = guard._cancel_final_sync(config)
-        assert still_empty == [{"result": "control-owner-changed"}]
+
+        # A newer operator Start supersedes the pause but does not transfer
+        # ownership of this operation's Job Object. The old copy must still
+        # be stopped before the caller verifies resumed capture.
+        next_launcher = OperationJob.open_existing(operation_id)
+        next_process = next_launcher.create_suspended(
+            _copy_child_command(tmp_path / "newer-start-child.pid")
+        )
+        next_process.resume()
+        next_launcher.close()
+        _wait_for_path(tmp_path / "newer-start-child.pid")
+        superseded = guard._cancel_final_sync(config)
+        assert len(superseded) == 1
+        assert superseded[0]["result"] == "terminated-operation-job"
+        assert superseded[0]["exit_code"] == 0
+        assert superseded[0]["active_processes_after"] == 0
+        assert guard._final_sync_cancellation_confirmed(superseded)
+        next_process.close()
     finally:
         guardian.close()
         process.close()
