@@ -531,6 +531,8 @@ class RecorderRuntime:
         self.recording_started_at: str | None = None
         self.last_commit_at: str | None = None
         self.control_operation_id: str | None = None
+        self.control_initialized = False
+        self.pause_request_predates_runtime_id: str | None = None
         self.pause_acknowledged_operation_id: str | None = None
         self.pause_acknowledged_at: str | None = None
         self.capture_drain_error_operation_id: str | None = None
@@ -622,12 +624,36 @@ class RecorderRuntime:
             for item in self.capture_drain_failures
         )
 
-    def _record_capture_drain_failure(self, source_name: str, error: BaseException) -> None:
+    def _record_capture_drain_failure(
+        self,
+        source_name: str,
+        error: BaseException,
+        *,
+        scheduled_base_url: str | None = None,
+    ) -> None:
         with self.lock:
+            canonical_source_name = source_name
+            if source_name not in self.sources and scheduled_base_url:
+                try:
+                    scheduled_url = normalize_agent_base_url(scheduled_base_url)
+                    matches = [
+                        current_name
+                        for current_name, current_url in self.sources.items()
+                        if normalize_agent_base_url(current_url) == scheduled_url
+                    ]
+                except ValueError:
+                    matches = []
+                if len(matches) == 1:
+                    canonical_source_name = matches[0]
             self.capture_drain_failures.append(
                 {
                     "incident_id": uuid.uuid4().hex,
-                    "source_name": source_name,
+                    "source_name": canonical_source_name,
+                    **(
+                        {"original_source_name": source_name}
+                        if canonical_source_name != source_name
+                        else {}
+                    ),
                     "pause_operation_id": self.control_operation_id,
                     "state": "unresolved",
                     "error_type": type(error).__name__,
@@ -766,6 +792,14 @@ class RecorderRuntime:
             previous_enabled = self.enabled
             previous_operation_id = self.control_operation_id
             previous_sources = dict(self.sources)
+            if not self.control_initialized:
+                self.control_initialized = True
+                if not enabled and operation_id:
+                    # A disabled request present at process startup may belong
+                    # to a prior incarnation whose final capture failure could
+                    # not be persisted. It cannot be acknowledged as a fresh
+                    # durable boundary by this process.
+                    self.pause_request_predates_runtime_id = operation_id
             self.enabled = enabled
             self.control_operation_id = operation_id
             if operation_id != previous_operation_id:
@@ -805,7 +839,13 @@ class RecorderRuntime:
 
             if not self.enabled:
                 self.state = "draining"
-                self.message = "Recording is disabled; waiting for capture work to drain."
+                if self.pause_request_predates_runtime_id == operation_id:
+                    self.message = (
+                        "The disabled control request predates this Recorder process; "
+                        "a new Start/Stop operation is required to prove a boundary."
+                    )
+                else:
+                    self.message = "Recording is disabled; waiting for capture work to drain."
             elif not self.configuration_ready:
                 self.state = "error"
                 self.message = "Recording is enabled, but recorder sources are not configured."
@@ -1355,7 +1395,11 @@ class RecorderRuntime:
                                 "next_retry_seconds": delay,
                             }
                         )
-                self._record_capture_drain_failure(source_name, exc)
+                self._record_capture_drain_failure(
+                    source_name,
+                    exc,
+                    scheduled_base_url=base_url,
+                )
                 log.exception("[%s] recorder source task escaped its error boundary", source_name)
             outcomes.append((source_name, base_url, ok))
 
@@ -1440,6 +1484,13 @@ class RecorderRuntime:
             operation_id = self.control_operation_id
             if self.enabled or not operation_id:
                 return
+            if self.pause_request_predates_runtime_id == operation_id:
+                self.state = "draining"
+                self.message = (
+                    "The disabled control request predates this Recorder process; "
+                    "a new Start/Stop operation is required to prove a boundary."
+                )
+                return
             if self._capture_futures:
                 self.state = "draining"
                 self.message = (
@@ -1513,6 +1564,11 @@ class RecorderRuntime:
                     ),
                     "acknowledged_operation_id": self.pause_acknowledged_operation_id,
                     "acknowledged_at": self.pause_acknowledged_at,
+                    "pause_request_predates_runtime": bool(
+                        self.control_operation_id
+                        and self.pause_request_predates_runtime_id
+                        == self.control_operation_id
+                    ),
                     "durable_boundary": bool(
                         not self.enabled
                         and self.control_operation_id

@@ -500,6 +500,113 @@ def test_checkpoint_alias_reconciliation_moves_pause_incident_with_its_source(
         rt.unregister_stop_target(service)
 
 
+def test_late_drain_failure_uses_reconciled_checkpoint_alias(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(rt, "STATE_FILE", tmp_path / "state.json")
+    service = rt.RecorderRuntime()
+    new_name = "MACHINE-ALPHA-0001"
+    service.checkpoints[SOURCE] = rt.SourceCheckpoint(
+        source_name=SOURCE,
+        base_url=BASE_URL,
+        machine_id="MachineAlpha",
+        agent_instance_id=INSTANCE_ID,
+        next_sequence=4,
+        probe_sha256="a" * 64,
+    )
+
+    try:
+        # This is the ordering in refresh_configuration: the alias moves before
+        # an older capture future reports its escaped exception.
+        assert service.reconcile_checkpoint_aliases({new_name: BASE_URL}) is True
+        service.sources = {new_name: BASE_URL}
+        service.control_operation_id = "pause-operation-late-alias"
+        pending: Future[tuple[str, bool, str]] = Future()
+        service._capture_futures[SOURCE] = (BASE_URL, pending)
+        pending.set_exception(RuntimeError("late future failure"))
+        service._harvest_capture_results()
+
+        incident = service.capture_drain_failures[0]
+        assert incident["source_name"] == new_name
+        assert incident["original_source_name"] == SOURCE
+        assert service.capture_drain_error_operation_id == "pause-operation-late-alias"
+        persisted = json.loads((tmp_path / "state.json").read_text(encoding="utf-8"))
+        assert persisted["capture_drain_failures"][0]["source_name"] == new_name
+    finally:
+        service.executor.shutdown(wait=True, cancel_futures=False)
+        rt.unregister_stop_target(service)
+
+
+def test_startup_does_not_acknowledge_pause_request_from_previous_runtime(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    control = {"enabled": False, "operation_id": "pause-from-prior-runtime"}
+    monkeypatch.setattr(rt, "MANAGED_MODE", True)
+    monkeypatch.setattr(
+        rt,
+        "_read_json",
+        lambda path: control if path == rt.CONTROL_FILE else {"sources": []},
+    )
+    monkeypatch.setattr(
+        rt,
+        "_managed_configuration",
+        lambda _config: ({SOURCE: BASE_URL}, 0.2),
+    )
+    monkeypatch.setattr(rt, "STATUS_FILE", tmp_path / "status.json")
+    # No incident reached disk before the prior process exited. Startup still
+    # sees the old disabled operation and must fail closed without inventing
+    # its acknowledgement.
+    monkeypatch.setattr(rt, "STATE_FILE", tmp_path / "empty-state.json")
+    predecessor = rt.RecorderRuntime()
+    predecessor.control_operation_id = control["operation_id"]
+
+    def fail_incident_write() -> None:
+        raise OSError("state volume unavailable")
+
+    monkeypatch.setattr(predecessor, "save_state", fail_incident_write)
+    predecessor._record_capture_drain_failure(
+        SOURCE,
+        RuntimeError("capture worker escaped before pause"),
+    )
+    assert predecessor.capture_drain_failures[0]["state"] == "unresolved"
+    assert "could not be persisted" in predecessor.last_error
+    predecessor.executor.shutdown(wait=True, cancel_futures=False)
+    rt.unregister_stop_target(predecessor)
+
+    service = rt.RecorderRuntime()
+
+    try:
+        service.load_state()
+        service.refresh_configuration(force=True)
+        service.acknowledge_capture_pause()
+        service.publish_status(force=True)
+        status = json.loads((tmp_path / "status.json").read_text(encoding="utf-8"))
+
+        assert service.capture_drain_failures == []
+        assert service.pause_acknowledged_operation_id is None
+        assert service.state == "draining"
+        assert status["capture_control"]["pause_request_predates_runtime"] is True
+        assert status["capture_control"]["durable_boundary"] is False
+
+        # A newer supported Start followed by a newer Stop is eligible for a
+        # new acknowledgement in this process.
+        control.update(enabled=True, operation_id="new-start-operation")
+        service.refresh_configuration(force=True)
+        control.update(enabled=False, operation_id="new-stop-operation")
+        service.refresh_configuration(force=True)
+        service.acknowledge_capture_pause()
+        service.publish_status(force=True)
+        status = json.loads((tmp_path / "status.json").read_text(encoding="utf-8"))
+        assert service.pause_acknowledged_operation_id == "new-stop-operation"
+        assert status["capture_control"]["pause_request_predates_runtime"] is False
+        assert status["capture_control"]["durable_boundary"] is True
+    finally:
+        service.executor.shutdown(wait=True, cancel_futures=False)
+        rt.unregister_stop_target(service)
+
+
 def test_drain_recovery_does_not_rewrite_state_when_no_incident_matches(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
