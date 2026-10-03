@@ -114,6 +114,12 @@ def test_ps_registration_script_passes_its_operation_id_validator() -> None:
     script = Path(guard.__file__).with_name("register_recorder_pause_resume_guard.ps1")
     text = script.read_text(encoding="utf-8")
     assert "[ValidatePattern('\\A[a-f0-9]{32}\\z')]" in text
+    assert "-UserId 'SYSTEM'" in text
+    assert "-LogonType ServiceAccount" in text
+    assert "-StartWhenAvailable" in text
+    assert "-RestartCount 3" in text
+    assert "-ExecutionTimeLimit (New-TimeSpan -Minutes 30)" in text
+    assert "Start-ScheduledTask -TaskName $taskName" in text
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows named mutex API")
@@ -255,6 +261,96 @@ def _watch_config(tmp_path: Path) -> dict:
         "copy_processes_path": str(tmp_path / "copy-processes.json"),
         "runtime_binding": {"repo_root": str(tmp_path)},
     }
+
+
+def _arm_test_config(tmp_path: Path) -> dict:
+    config = _watch_config(tmp_path)
+    config.update(
+        {
+            "register_script": str(
+                Path(guard.__file__).with_name("register_recorder_pause_resume_guard.ps1")
+            ),
+            "task_name": "FCP-Recorder-PauseResume-" + "a" * 32,
+        }
+    )
+    return config
+
+
+def test_arm_requires_guard_heartbeat_and_running_host_task(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = _arm_test_config(tmp_path)
+    observation, control = _watch_observation(
+        operation_id="b" * 32,
+        enabled=True,
+        acknowledged=None,
+        scheduling=True,
+        durable=None,
+    )
+    calls: list[list[str]] = []
+
+    def fake_run(command, **_kwargs):
+        calls.append(command)
+        if "-File" in command:
+            Path(config["guard_state_path"]).write_text(
+                json.dumps(
+                    {"operation_id": config["operation_id"], "state": "wait-for-pause"}
+                ),
+                encoding="utf-8",
+            )
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        return SimpleNamespace(returncode=0, stdout="Running\n", stderr="")
+
+    monkeypatch.setattr(guard, "_load_config", lambda _path: config)
+    monkeypatch.setattr(guard, "_observation", lambda _config: (observation, control))
+    monkeypatch.setattr(guard.subprocess, "run", fake_run)
+
+    armed = guard.arm(
+        tmp_path / "guard.json",
+        Path(config["register_script"]),
+    )
+
+    assert armed["armed"] is True
+    assert armed["operation_id"] == config["operation_id"]
+    assert armed["task_name"] == config["task_name"]
+    assert len(calls) == 2
+    assert calls[1][-1] == (
+        f"(Get-ScheduledTask -TaskName '{config['task_name']}').State"
+    )
+
+
+def test_arm_refuses_task_that_is_registered_but_not_running(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = _arm_test_config(tmp_path)
+    observation, control = _watch_observation(
+        operation_id="b" * 32,
+        enabled=True,
+        acknowledged=None,
+        scheduling=True,
+        durable=None,
+    )
+
+    def fake_run(command, **_kwargs):
+        if "-File" in command:
+            Path(config["guard_state_path"]).write_text(
+                json.dumps(
+                    {"operation_id": config["operation_id"], "state": "wait-for-pause"}
+                ),
+                encoding="utf-8",
+            )
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        return SimpleNamespace(returncode=0, stdout="Ready\n", stderr="")
+
+    monkeypatch.setattr(guard, "_load_config", lambda _path: config)
+    monkeypatch.setattr(guard, "_observation", lambda _config: (observation, control))
+    monkeypatch.setattr(guard.subprocess, "run", fake_run)
+
+    with pytest.raises(RuntimeError, match="not actively running"):
+        guard.arm(
+            tmp_path / "guard.json",
+            Path(config["register_script"]),
+        )
 
 
 def _watch_observation(
