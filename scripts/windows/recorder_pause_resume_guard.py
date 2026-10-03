@@ -881,8 +881,12 @@ function Stop-BoundProcessTree($members,[datetime]$deadline,[switch]$RequireRoot
       if($remaining -le 0){ return 'process-tree-cancellation-timeout' }
       $terminationStage='terminate'
       try {
-        $exitTicks=[FcpPauseProcessNative]::GetExitFileTimeUtc($entry.handle)
-        if($exitTicks -gt 0){
+        # GetProcessTimes leaves lpExitTime undefined for a live process. Test
+        # the retained handle's signaled state first; only read its exit time
+        # after Windows confirms that this exact process has exited.
+        $alreadyExited=[FcpPauseProcessNative]::WaitBoundHandle($entry.handle,0)
+        if($alreadyExited){
+          $exitTicks=[FcpPauseProcessNative]::GetExitFileTimeUtc($entry.handle)
           if($exitTicks -le (Get-CreationTicks ([string]$entry.member.creation_utc))){ return 'process-exit-identity-invalid' }
           $entry.member.exit_filetime_utc=$exitTicks
           $saveResult=Save-TreeSnapshot

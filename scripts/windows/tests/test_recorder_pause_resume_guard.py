@@ -143,6 +143,15 @@ def test_final_sync_termination_command_binds_payload_to_protected_script(
         'Get-CimInstance Win32_Process -Filter "ProcessId=$pidValue"'
     )
     assert "[FcpPauseProcessNative]::OpenBoundHandle($memberPid)" in script
+    assert "WaitForSingleObject(SafeProcessHandle process,uint milliseconds)" in script
+    assert "if(result==WAIT_OBJECT_0) return true;" in script
+    assert "if(result==WAIT_TIMEOUT) return false;" in script
+    assert script.index(
+        "$alreadyExited=[FcpPauseProcessNative]::WaitBoundHandle($entry.handle,0)"
+    ) < script.index(
+        "$exitTicks=[FcpPauseProcessNative]::GetExitFileTimeUtc($entry.handle)"
+    )
+    assert "if($alreadyExited){" in script
     assert script.index("GetCreationFileTimeUtc($safeHandle)") < script.index(
         "TerminateBoundHandle($entry.handle)"
     )
