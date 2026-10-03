@@ -38,7 +38,7 @@ class _FakeKernel32:
         self.CloseHandle = _FakeWinApiFunction(True)
 
 
-def test_final_sync_termination_command_binds_payload_inside_encoded_script(
+def test_final_sync_termination_command_binds_payload_to_protected_script(
     tmp_path: Path, monkeypatch
 ) -> None:
     config = _watch_config(tmp_path)
@@ -100,7 +100,14 @@ def test_final_sync_termination_command_binds_payload_inside_encoded_script(
     assert len(calls) == 1
     assert call_kwargs[0]["timeout"] == 25
     assert calls[0][-2] == "-File"
-    assert len(calls[0]) == 5
+    assert calls[0][1:6] == [
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+    ]
+    assert len(calls[0]) == 7
     script = scripts[0]
     encoded_payload = script.split("FromBase64String('")[1].split("')")[0]
     payload = json.loads(base64.b64decode(encoded_payload).decode("utf-8"))
@@ -132,20 +139,14 @@ def test_final_sync_termination_command_binds_payload_inside_encoded_script(
     assert script.index("Test-OwnedPause)){ Write-Output 'control-owner-changed'") < script.index(
         'Get-CimInstance Win32_Process -Filter "ProcessId=$pidValue"'
     )
-    assert script.index("$script:controlLockHandle.Lock(0,1)") < script.index(
-        "$killerInfo.Arguments='/PID '+[string]$pidValue+' /T /F'"
-    )
-    assert script.index("$killerInfo.Arguments='/PID '+[string]$pidValue+' /T /F'") < script.rindex(
-        "Release-ControlOwnership"
-    )
+    assert "[Diagnostics.Process]::GetProcessById($memberPid)" in script
+    assert script.index("$bound.StartTime.ToUniversalTime()") < script.index("$bound.Kill()")
+    assert "taskkill.exe" not in script
+    assert "$script:controlLockHandle.Lock(0,1)" in script
     assert "$attempt -lt 100" in script
-    assert "$killer.WaitForExit(10000)" in script
-    assert "$killer.WaitForExit(2000)" in script
     assert "$treeProcesses=@(Get-CimInstance Win32_Process)" in script
-    assert "$taskkillExitCode -ne 0" in script
-    assert script.index("$taskkillExitCode -ne 0") < script.rindex(
-        "terminated-bound-final-sync-process-tree"
-    )
+    assert "root-identity-changed-before-cancel" in script
+    assert "process-termination-failed-" in script
     assert "$remainingProcesses=@(Get-CimInstance Win32_Process)" in script
     assert "bound-process-tree-still-running" in script
     assert "process-absent-without-tree-snapshot" in script
@@ -441,8 +442,8 @@ def test_termination_script_stops_only_the_bound_disposable_copy_process(
             script_path = Path(args[-1])
             script = script_path.read_text(encoding="utf-8")
             script = script.replace(
-                "$killerInfo.Arguments='/PID '+[string]$pidValue+' /T /F'",
-                "$killerInfo.Arguments='/PID '+[string]$pidValue+' /F'",
+                "$ordered=@($members.ToArray())\n    [array]::Reverse($ordered)",
+                "$ordered=@($members.ToArray() | Where-Object { [int]$_.pid -eq $pidValue })\n    [array]::Reverse($ordered)",
             )
             script_path.write_text(script, encoding="utf-8")
             return original_run(args, **kwargs)
@@ -524,8 +525,8 @@ def test_termination_script_stops_only_the_bound_disposable_copy_process(
                 pass
 
 
-@pytest.mark.skipif(os.name != "nt", reason="exercise generated termination against a disposable process")
-def test_termination_script_fails_closed_when_taskkill_reports_a_tree_error(
+@pytest.mark.skipif(os.name != "nt", reason="exercise PID reuse guard against a disposable process")
+def test_guard_refuses_pid_reuse_between_snapshot_and_handle_open(
     tmp_path: Path, monkeypatch
 ) -> None:
     config = _watch_config(tmp_path)
@@ -588,24 +589,118 @@ def test_termination_script_fails_closed_when_taskkill_reports_a_tree_error(
             encoding="utf-8",
         )
 
-        def run_with_failing_taskkill(args, **kwargs):
+        def replace_bound_creation_before_cancel(args, **kwargs):
             script_path = Path(args[-1])
             script = script_path.read_text(encoding="utf-8")
             script = script.replace(
-                "$killerInfo.FileName=Join-Path $env:SystemRoot 'System32\\taskkill.exe'",
-                "$killerInfo.FileName=Join-Path $env:SystemRoot 'System32\\cmd.exe'",
-            ).replace(
-                "$killerInfo.Arguments='/PID '+[string]$pidValue+' /T /F'",
-                "$killerInfo.Arguments='/c exit 5'",
+                "$cancelResult=Stop-BoundProcessTree -members $script:processTree -deadline $cancellationDeadline -RequireRoot",
+                "foreach($member in $script:processTree){if([int]$member.pid -eq $pidValue){$member.creation_utc='2000-01-01T00:00:00Z'}}\n"
+                "$cancelResult=Stop-BoundProcessTree -members $script:processTree -deadline $cancellationDeadline -RequireRoot",
             )
             script_path.write_text(script, encoding="utf-8")
             return original_run(args, **kwargs)
 
-        monkeypatch.setattr(guard.subprocess, "run", run_with_failing_taskkill)
+        monkeypatch.setattr(guard.subprocess, "run", replace_bound_creation_before_cancel)
         result = guard._cancel_final_sync(config)
 
         assert result == [
-            {"pid": process.pid, "result": "taskkill-failed-exit-5", "exit_code": 9}
+            {
+                "pid": process.pid,
+                "result": "root-identity-changed-before-cancel",
+                "exit_code": 9,
+            }
+        ]
+        assert process.poll() is None
+    finally:
+        monkeypatch.setattr(guard.subprocess, "run", original_run)
+        if process.poll() is None:
+            process.terminate()
+            process.wait(timeout=5)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="exercise generated termination against a disposable process")
+def test_termination_script_fails_closed_when_bound_process_termination_fails(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = _watch_config(tmp_path)
+    operation_id = config["operation_id"]
+    process = subprocess.Popen(
+        [sys.executable, "-c", "import time; time.sleep(60)", "--operation", operation_id],
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
+    original_run = guard.subprocess.run
+    try:
+        metadata_script = (
+            "$ProgressPreference='SilentlyContinue';"
+            f"$p=Get-CimInstance Win32_Process -Filter 'ProcessId={process.pid}';"
+            "$o=[ordered]@{command_line=[string]$p.CommandLine;"
+            "creation_utc=$p.CreationDate.ToUniversalTime().ToString('o')};"
+            "$o|ConvertTo-Json -Compress"
+        )
+        metadata_result = subprocess.run(
+            ["powershell.exe", "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", metadata_script],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=True,
+        )
+        metadata_line = next(
+            line for line in reversed(metadata_result.stdout.splitlines()) if line.startswith("{")
+        )
+        metadata = json.loads(metadata_line)
+        Path(config["copy_processes_path"]).write_text(
+            json.dumps(
+                {
+                    "operation_id": operation_id,
+                    "processes": [
+                        {
+                            "pid": process.pid,
+                            "command_line_sha256": hashlib.sha256(
+                                metadata["command_line"].encode("utf-8")
+                            ).hexdigest(),
+                            "creation_utc": metadata["creation_utc"],
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        Path(config["runtime_binding"]["control_path"]).write_text(
+            json.dumps(
+                {
+                    "enabled": False,
+                    "operation_id": operation_id,
+                    "resume_guard": {
+                        "operation_id": operation_id,
+                        "prior_control_operation_id": config["prior_control_operation_id"],
+                        "runtime_binding_sha256": config["runtime_binding_sha256"],
+                        "token_sha256": config["resume_token_sha256"],
+                        "deadline_utc": config["hard_deadline_utc"],
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        def run_with_failing_termination(args, **kwargs):
+            script_path = Path(args[-1])
+            script = script_path.read_text(encoding="utf-8")
+            script = script.replace(
+                "$bound.Kill()",
+                "throw [InvalidOperationException]::new('simulated process termination failure')",
+            )
+            script_path.write_text(script, encoding="utf-8")
+            return original_run(args, **kwargs)
+
+        monkeypatch.setattr(guard.subprocess, "run", run_with_failing_termination)
+        result = guard._cancel_final_sync(config)
+
+        assert result == [
+            {
+                "pid": process.pid,
+                "result": "process-termination-failed-InvalidOperationException",
+                "exit_code": 9,
+            }
         ]
         assert guard._final_sync_cancellation_confirmed(result) is False
         assert process.poll() is None

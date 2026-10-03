@@ -760,6 +760,49 @@ function Test-TreeHasLiveMember($processes) {
   }
   return $false
 }
+function Stop-BoundProcessTree($members,[datetime]$deadline,[switch]$RequireRoot) {
+  # Open every recorded identity before terminating anything. Process.StartTime
+  # forces System.Diagnostics.Process to retain a handle to that exact process
+  # object; Kill() then uses the handle instead of resolving a numeric PID again.
+  $handles=New-Object 'System.Collections.Generic.List[object]'
+  $rootHandleSeen=$false
+  try {
+    $ordered=@($members.ToArray())
+    [array]::Reverse($ordered)
+    foreach($member in $ordered){
+      $memberPid=[int]$member.pid
+      $memberCreated=[string]$member.creation_utc
+      $bound=$null
+      try { $bound=[Diagnostics.Process]::GetProcessById($memberPid) }
+      catch [ArgumentException] { continue }
+      try {
+        $actualCreated=$bound.StartTime.ToUniversalTime()
+        if([Math]::Abs(($actualCreated-[DateTime]::Parse($memberCreated).ToUniversalTime()).TotalSeconds) -gt 2){
+          $bound.Dispose(); $bound=$null
+          if($memberPid -eq $pidValue -and $RequireRoot){ return 'root-identity-changed-before-cancel' }
+          continue
+        }
+        if($memberPid -eq $pidValue){ $rootHandleSeen=$true }
+        $handles.Add($bound)
+        $bound=$null
+      } finally { if($null -ne $bound){ $bound.Dispose() } }
+    }
+    if($RequireRoot -and -not $rootHandleSeen){ return 'root-identity-absent-before-cancel' }
+    foreach($bound in $handles){
+      $remaining=[int]([Math]::Max(0,($deadline-[DateTime]::UtcNow).TotalMilliseconds))
+      if($remaining -le 0){ return 'process-tree-cancellation-timeout' }
+      try {
+        if(-not $bound.HasExited){ $bound.Kill() }
+        if(-not $bound.WaitForExit($remaining)){ return 'process-tree-cancellation-timeout' }
+      } catch {
+        try { if($bound.HasExited){ continue } } catch {}
+        return ('process-termination-failed-'+$_.Exception.GetType().Name)
+      }
+    }
+    if($handles.Count -gt 0){ return 'terminated' }
+    return 'absent'
+  } finally { foreach($bound in $handles){ $bound.Dispose() } }
+}
 function Load-TreeSnapshot {
   if(-not (Test-Path -LiteralPath $treeSnapshotPath)){ return $false }
   try {
@@ -801,42 +844,21 @@ if($null -eq $item){
   if($saveResult -ne $true){ Write-Output ('process-tree-snapshot-write-failed-'+[string]$saveResult); exit 9 }
   if($script:unknownDescendant){ Write-Output 'unbound-descendant-under-stale-parent-pid'; exit 10 }
   $cancellationDeadline=[DateTime]::UtcNow.AddSeconds(8)
-  $terminatedResidual=$false
-  foreach($member in @($script:processTree.ToArray())){
-    $memberPid=[int]$member.pid
-    $memberCreated=[string]$member.creation_utc
-    $candidate=$remainingProcesses | Where-Object { [int]$_.ProcessId -eq $memberPid } | Select-Object -First 1
-    if($null -eq $candidate -or $candidate.CreationDate.ToUniversalTime().ToString('o') -cne $memberCreated){ continue }
-    $budget=[int]([Math]::Max(0,($cancellationDeadline-[DateTime]::UtcNow).TotalMilliseconds))
-    if($budget -le 0){ Write-Output 'residual-tree-cancellation-timeout'; exit 6 }
-    $killerInfo=New-Object System.Diagnostics.ProcessStartInfo
-    $killerInfo.FileName=Join-Path $env:SystemRoot 'System32\taskkill.exe'
-    $killerInfo.Arguments='/PID '+[string]$memberPid+' /T /F'
-    $killerInfo.UseShellExecute=$false
-    $killerInfo.CreateNoWindow=$true
-    $killer=[Diagnostics.Process]::Start($killerInfo)
-    if($null -eq $killer){ Write-Output 'residual-taskkill-helper-did-not-start'; exit 7 }
-    if(-not $killer.WaitForExit($budget)){
-      try { $killer.Kill() } catch {}
-      if(-not $killer.WaitForExit(1000)){ Write-Output 'residual-taskkill-helper-did-not-stop'; exit 7 }
-      Write-Output 'residual-taskkill-timeout'; exit 6
-    }
-    $killer.Refresh()
-    if($null -eq $killer.ExitCode -or $killer.ExitCode -ne 0){ Write-Output ('residual-taskkill-failed-exit-'+[string]$killer.ExitCode); exit 9 }
-    $terminatedResidual=$true
-    try { $remainingProcesses=@(Get-CimInstance Win32_Process); Add-ObservedDescendants $remainingProcesses }
-    catch { Write-Output 'process-tree-verification-failed'; exit 9 }
+  $cancelResult=Stop-BoundProcessTree -members $script:processTree -deadline $cancellationDeadline
+  if($cancelResult -like 'process-tree-cancellation-timeout'){ Write-Output $cancelResult; exit 6 }
+  if($cancelResult -like 'process-termination-failed-*'){ Write-Output $cancelResult; exit 9 }
+  try { $remainingProcesses=@(Get-CimInstance Win32_Process); Add-ObservedDescendants $remainingProcesses }
+  catch { Write-Output 'process-tree-verification-failed'; exit 9 }
   $saveResult=Save-TreeSnapshot
   if($saveResult -ne $true){ Write-Output ('process-tree-snapshot-write-failed-'+[string]$saveResult); exit 9 }
-    if($script:unknownDescendant){ Write-Output 'unbound-descendant-under-stale-parent-pid'; exit 10 }
-  }
+  if($script:unknownDescendant){ Write-Output 'unbound-descendant-under-stale-parent-pid'; exit 10 }
   try { $remainingProcesses=@(Get-CimInstance Win32_Process); Add-ObservedDescendants $remainingProcesses }
   catch { Write-Output 'process-tree-verification-failed'; exit 9 }
     $saveResult=Save-TreeSnapshot
     if($saveResult -ne $true){ Write-Output ('process-tree-snapshot-write-failed-'+[string]$saveResult); exit 9 }
   if($script:unknownDescendant){ Write-Output 'unbound-descendant-under-stale-parent-pid'; exit 10 }
   if(Test-TreeHasLiveMember $remainingProcesses){ Write-Output 'bound-process-tree-still-running'; exit 8 }
-  if($terminatedResidual){ Write-Output 'terminated-bound-final-sync-process-tree' }
+  if($cancelResult -eq 'terminated'){ Write-Output 'terminated-bound-final-sync-process-tree' }
   else { Write-Output 'absent' }
   exit 0
 }
@@ -862,22 +884,14 @@ try {
   catch { Write-Output 'process-tree-identity-incomplete'; exit 9 }
   $saveResult=Save-TreeSnapshot
   if($saveResult -ne $true){ Write-Output ('process-tree-snapshot-write-failed-'+[string]$saveResult); exit 9 }
-  # Keep helper termination bounded separately from lock acquisition. If taskkill
-  # reports any failure or a snapshotted tree member survives, resume is denied.
-  $killerInfo=New-Object System.Diagnostics.ProcessStartInfo
-  $killerInfo.FileName=Join-Path $env:SystemRoot 'System32\taskkill.exe'
-  $killerInfo.Arguments='/PID '+[string]$pidValue+' /T /F'
-  $killerInfo.UseShellExecute=$false
-  $killerInfo.CreateNoWindow=$true
-  $killer=[Diagnostics.Process]::Start($killerInfo)
-  if($null -eq $killer){ Write-Output 'taskkill-helper-did-not-start'; exit 7 }
-  if(-not $killer.WaitForExit(10000)){
-    try { $killer.Kill() } catch {}
-    if(-not $killer.WaitForExit(2000)){ Write-Output 'taskkill-helper-did-not-stop'; exit 7 }
-    Write-Output 'taskkill-timeout'; exit 6
+  # Process handles are identity-bound: PID reuse cannot redirect Kill() to a
+  # different process after the creation-time check.
+  $cancellationDeadline=[DateTime]::UtcNow.AddSeconds(10)
+  $cancelResult=Stop-BoundProcessTree -members $script:processTree -deadline $cancellationDeadline -RequireRoot
+  if($cancelResult -ne 'terminated'){
+    if($cancelResult -eq 'process-tree-cancellation-timeout'){ Write-Output $cancelResult; exit 6 }
+    Write-Output $cancelResult; exit 9
   }
-  $killer.Refresh()
-  $taskkillExitCode=$killer.ExitCode
   try { $remainingProcesses=@(Get-CimInstance Win32_Process) }
   catch { Write-Output 'process-tree-verification-failed'; exit 9 }
   try { Add-ObservedDescendants $remainingProcesses }
@@ -885,7 +899,6 @@ try {
   $saveResult=Save-TreeSnapshot
   if($saveResult -ne $true){ Write-Output ('process-tree-snapshot-write-failed-'+[string]$saveResult); exit 9 }
   if($script:unknownDescendant){ Write-Output 'unbound-descendant-under-stale-parent-pid'; exit 10 }
-  if($null -eq $taskkillExitCode -or $taskkillExitCode -ne 0){ Write-Output ('taskkill-failed-exit-'+[string]$taskkillExitCode); exit 9 }
   if(Test-TreeHasLiveMember $remainingProcesses){ Write-Output 'bound-process-tree-still-running'; exit 8 }
   Write-Output 'terminated-bound-final-sync-process-tree'
 } finally { Release-ControlOwnership }
@@ -904,6 +917,8 @@ try {
                     "powershell.exe",
                     "-NoProfile",
                     "-NonInteractive",
+                    "-ExecutionPolicy",
+                    "Bypass",
                     "-File",
                     str(script_path),
                 ],
