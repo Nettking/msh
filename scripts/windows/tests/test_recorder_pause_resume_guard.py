@@ -516,6 +516,49 @@ def test_watch_records_runtime_identity_mismatch_without_stale_resume(
     monkeypatch.setattr(guard, "_event", lambda _config, state, **kw: events.append({"state": state, **kw}))
 
     assert guard.watch(tmp_path / "guard.json") == 3
-    assert actions == []
+    assert actions == ["cancel"]
     assert events[-1]["state"] == "identity-unverified"
     assert events[-1]["capture_was_paused"] is True
+    assert events[-1]["canceled_final_sync"] is None
+
+
+def test_restarted_guard_cancels_owned_copy_but_never_resumes_on_identity_mismatch(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = _watch_config(tmp_path)
+    observation, control = _watch_observation(runtime_matches=False)
+    assert control is not None
+    control["resume_guard"]["deadline_utc"] = config["hard_deadline_utc"]
+    actions: list[str] = []
+    events: list[dict] = []
+
+    monkeypatch.setattr(guard, "_load_config", lambda _path: config)
+    monkeypatch.setattr(guard, "_host_mutex", lambda _config: (object(), 1234))
+    monkeypatch.setattr(guard, "_release_mutex", lambda *_args: None)
+    monkeypatch.setattr(guard, "_observation", lambda _config: (observation, control))
+    monkeypatch.setattr(
+        guard,
+        "_cancel_final_sync",
+        lambda _config: actions.append("cancel") or [{"result": "terminated"}],
+    )
+    monkeypatch.setattr(
+        guard,
+        "_request_resume",
+        lambda _config: actions.append("resume") or ("d" * 32, {"result": "accepted"}),
+    )
+    monkeypatch.setattr(
+        guard,
+        "_event",
+        lambda _config, state, **values: events.append({"state": state, **values}),
+    )
+
+    assert guard.watch(tmp_path / "guard.json") == 2
+    assert actions == ["cancel"]
+    assert events == [
+        {
+            "state": "identity-unverified-before-pause",
+            "binding": False,
+            "capture_was_paused": True,
+            "canceled_final_sync": [{"result": "terminated"}],
+        }
+    ]

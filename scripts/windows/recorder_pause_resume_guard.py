@@ -30,7 +30,7 @@ GUARD_DIR = Path(__file__).resolve().parent
 if str(GUARD_DIR) not in sys.path:
     sys.path.insert(0, str(GUARD_DIR))
 
-from recorder_pause_resume_guard_logic import (
+from recorder_pause_resume_guard_logic import (  # noqa: E402
     BoundedPauseResumeGuard,
     PauseGuardAction,
     PauseGuardObservation,
@@ -670,7 +670,15 @@ def watch(config_path: Path) -> int:
     try:
         observation, control = _observation(config)
         if observation.runtime_binding_matches is not True:
-            _event(config, "identity-unverified-before-pause", binding=observation.runtime_binding_matches)
+            owned_pause = _control_has_owned_pause(control, config)
+            canceled = _cancel_final_sync(config) if owned_pause else None
+            _event(
+                config,
+                "identity-unverified-before-pause",
+                binding=observation.runtime_binding_matches,
+                capture_was_paused=owned_pause,
+                canceled_final_sync=canceled,
+            )
             return 2
         fresh_owner = bool(
             control is not None
@@ -723,15 +731,14 @@ def watch(config_path: Path) -> int:
                 return 4
             action = machine.decide(observation, now=now)
             if action is PauseGuardAction.IDENTITY_UNVERIFIED:
+                owned_pause = _control_has_owned_pause(control, config)
+                canceled = _cancel_final_sync(config) if owned_pause else None
                 _event(
                     config,
                     action.value,
                     binding=observation.runtime_binding_matches,
-                    capture_was_paused=(
-                        control is not None
-                        and control.get("enabled") is False
-                        and control.get("operation_id") == config["operation_id"]
-                    ),
+                    capture_was_paused=owned_pause,
+                    canceled_final_sync=canceled,
                 )
                 return 3
             if action is PauseGuardAction.WAIT_FOR_PAUSE:
