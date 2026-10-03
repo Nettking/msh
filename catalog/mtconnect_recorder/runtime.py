@@ -532,6 +532,7 @@ class RecorderRuntime:
         self.control_operation_id: str | None = None
         self.pause_acknowledged_operation_id: str | None = None
         self.pause_acknowledged_at: str | None = None
+        self.capture_drain_error_operation_id: str | None = None
         self.last_error = ""
         self.message = "Recorder service is starting."
         self.state = "starting"
@@ -679,6 +680,7 @@ class RecorderRuntime:
             if operation_id != previous_operation_id:
                 self.pause_acknowledged_operation_id = None
                 self.pause_acknowledged_at = None
+                self.capture_drain_error_operation_id = None
             self.configuration_ready = configuration_ready
             self.poll_interval = poll_interval
             self.sources = sources
@@ -1235,6 +1237,12 @@ class RecorderRuntime:
                 ok = False
                 error = f"{type(exc).__name__}: {exc}"
                 with self.lock:
+                    if not self.enabled and self.control_operation_id:
+                        # A future escaping capture_source's recovery boundary
+                        # may have failed between durable writes. Keep this
+                        # pause unproven so a bounded-copy guard resumes rather
+                        # than accepting an uncertain storage frontier.
+                        self.capture_drain_error_operation_id = self.control_operation_id
                     if self.sources.get(source_name) == base_url:
                         delay = min(
                             self.backoff.get(source_name, BACKOFF_INITIAL) * 2,
@@ -1344,6 +1352,13 @@ class RecorderRuntime:
                     f"{len(self._capture_futures)} capture task(s) to finish."
                 )
                 return
+            if self.capture_drain_error_operation_id == operation_id:
+                self.state = "draining"
+                self.message = (
+                    "A capture task escaped its error boundary; "
+                    "the durable pause boundary is unproven."
+                )
+                return
             if self.pause_acknowledged_operation_id != operation_id:
                 self.pause_acknowledged_operation_id = operation_id
                 self.pause_acknowledged_at = _utc_now()
@@ -1396,6 +1411,7 @@ class RecorderRuntime:
                         and not self.stop_event.is_set()
                     ),
                     "inflight_capture_tasks": len(self._capture_futures),
+                    "drain_error_operation_id": self.capture_drain_error_operation_id,
                     "acknowledged_operation_id": self.pause_acknowledged_operation_id,
                     "acknowledged_at": self.pause_acknowledged_at,
                     "durable_boundary": bool(
@@ -1404,6 +1420,8 @@ class RecorderRuntime:
                         and self.pause_acknowledged_operation_id
                         == self.control_operation_id
                         and not self._capture_futures
+                        and self.capture_drain_error_operation_id
+                        != self.control_operation_id
                     ),
                 },
                 "last_error": self.last_error,

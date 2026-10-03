@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import json
 import threading
-from concurrent.futures import Future
 from collections import Counter
+from concurrent.futures import Future
 from pathlib import Path
 from time import perf_counter, sleep
 
@@ -350,6 +350,42 @@ def test_control_pause_ack_waits_for_capture_store_and_checkpoint_future(
         assert status["capture_control"]["acknowledged_at"]
         assert status["capture_control"]["durable_boundary"] is True
         assert status["records_buffered"] == 0
+        assert status["last_flush_at"] is None
+        assert status["last_commit_at"] is None
+    finally:
+        service.executor.shutdown(wait=True, cancel_futures=False)
+        rt.unregister_stop_target(service)
+
+
+def test_pause_does_not_claim_durable_boundary_after_unhandled_capture_future_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = rt.RecorderRuntime()
+    operation_id = "pause-operation-002"
+    pending: Future[tuple[str, bool, str]] = Future()
+    service.enabled = False
+    service.configuration_ready = True
+    service.control_operation_id = operation_id
+    service.sources = {SOURCE: BASE_URL}
+    service._capture_futures[SOURCE] = (BASE_URL, pending)
+    service.last_commit_at = None
+    monkeypatch.setattr(rt, "STATUS_FILE", tmp_path / "status.json")
+
+    try:
+        service.acknowledge_capture_pause()
+        pending.set_exception(RuntimeError("unexpected capture worker failure"))
+        service.run_fetch_cycle()
+        service.acknowledge_capture_pause()
+        service.publish_status(force=True)
+        status = json.loads((tmp_path / "status.json").read_text(encoding="utf-8"))
+
+        assert service.state == "draining"
+        assert service.pause_acknowledged_operation_id is None
+        assert status["source_status"][SOURCE]["last_error"].startswith("RuntimeError:")
+        assert status["capture_control"]["drain_error_operation_id"] == operation_id
+        assert status["capture_control"]["inflight_capture_tasks"] == 0
+        assert status["capture_control"]["durable_boundary"] is False
         assert status["last_flush_at"] is None
         assert status["last_commit_at"] is None
     finally:
