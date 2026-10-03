@@ -624,6 +624,11 @@ def _cancel_final_sync(config: dict[str, Any]) -> list[dict[str, Any]]:
                 "runtime_binding_sha256": config["runtime_binding_sha256"],
                 "resume_token_sha256": config["resume_token_sha256"],
                 "hard_deadline_utc": config["hard_deadline_utc"],
+                "tree_snapshot_path": str(
+                    Path(str(config["guard_state_path"])).with_name(
+                        f"final-sync-tree-{pid}.json"
+                    )
+                ),
             },
             separators=(",", ":"),
         ).encode("utf-8")
@@ -640,6 +645,7 @@ $priorOperation=[string]$payload.prior_control_operation_id
 $runtimeBinding=[string]$payload.runtime_binding_sha256
 $tokenHash=[string]$payload.resume_token_sha256
 $deadline=[string]$payload.hard_deadline_utc
+$treeSnapshotPath=[string]$payload.tree_snapshot_path
 function Test-OwnedPause {
   try {
     # Match RecorderControlService's byte-range lock while checking and terminating.
@@ -677,11 +683,163 @@ function Release-ControlOwnership {
     $script:controlLockHandle.Dispose(); $script:controlLockHandle=$null
   }
 }
+function Add-TreeProcess([int]$processId,[string]$createdUtc) {
+  $identity=[string]$processId+'|'+$createdUtc
+  if(-not $script:treeIdentitySet.ContainsKey($identity)){
+    [void]$script:processTree.Add([pscustomobject]@{pid=$processId;creation_utc=$createdUtc})
+    $script:treeIdentitySet[$identity]=$true
+    $script:treePidSet[[string]$processId]=$true
+    return $true
+  }
+  return $false
+}
+function Add-ObservedDescendants($processes) {
+  $currentByPid=@{}
+  foreach($candidate in $processes){ $currentByPid[[string][int]$candidate.ProcessId]=$candidate }
+  do {
+    $changed=$false
+    foreach($candidate in $processes){
+      $parentKey=[string][int]$candidate.ParentProcessId
+      if($script:treePidSet.ContainsKey($parentKey)){
+        $candidatePid=[int]$candidate.ProcessId
+        $candidateCreated=$candidate.CreationDate.ToUniversalTime().ToString('o')
+        if([string]::IsNullOrWhiteSpace($candidateCreated)){ throw 'descendant identity missing' }
+        $candidateIdentity=[string]$candidatePid+'|'+$candidateCreated
+        $parent=$currentByPid[$parentKey]
+        $parentIdentity=''
+        if($null -ne $parent){
+          $parentIdentity=$parentKey+'|'+$parent.CreationDate.ToUniversalTime().ToString('o')
+        }
+        if($script:treeIdentitySet.ContainsKey($candidateIdentity)){
+          continue
+        }
+        if($script:treeIdentitySet.ContainsKey($parentIdentity)){
+          if(Add-TreeProcess -processId $candidatePid -createdUtc $candidateCreated){ $changed=$true }
+        } else {
+          # The parent PID is reused or has exited. Do not adopt or terminate an
+          # unbound process merely because Windows reports the same parent PID.
+          $script:unknownDescendant=$true
+        }
+      }
+    }
+  } while($changed)
+}
+function Save-TreeSnapshot {
+  $tempPath=$treeSnapshotPath+'.'+[guid]::NewGuid().ToString('N')+'.tmp'
+  try {
+    $snapshot=[ordered]@{
+      schema='fcp.recorder.pause-guard.process-tree.v1'
+      operation_id=$operation
+      root_pid=$pidValue
+      root_creation_utc=$expectedCreated
+      processes=@($script:processTree.ToArray())
+    }
+    $json=ConvertTo-Json -InputObject $snapshot -Depth 5 -Compress
+    [IO.File]::WriteAllText($tempPath,$json,[Text.UTF8Encoding]::new($false))
+    if(Test-Path -LiteralPath $treeSnapshotPath){
+      $backupPath=$tempPath+'.previous'
+      [IO.File]::Replace($tempPath,$treeSnapshotPath,$backupPath)
+      try { [IO.File]::Delete($backupPath) } catch {}
+    } else {
+      [IO.File]::Move($tempPath,$treeSnapshotPath)
+    }
+    return $true
+  } catch {
+    try { if(Test-Path -LiteralPath $tempPath){ [IO.File]::Delete($tempPath) } } catch {}
+    return ($_.Exception.GetType().Name+':'+$_.Exception.Message)
+  }
+}
+function Test-TreeHasLiveMember($processes) {
+  foreach($member in @($script:processTree.ToArray())){
+    $memberPid=[int]$member.pid
+    $memberCreated=[string]$member.creation_utc
+    $remaining=$processes | Where-Object { [int]$_.ProcessId -eq $memberPid } | Select-Object -First 1
+    if($null -ne $remaining -and $remaining.CreationDate.ToUniversalTime().ToString('o') -ceq $memberCreated){
+      return $true
+    }
+  }
+  return $false
+}
+function Load-TreeSnapshot {
+  if(-not (Test-Path -LiteralPath $treeSnapshotPath)){ return $false }
+  try {
+    $snapshot=ConvertFrom-Json -InputObject ([IO.File]::ReadAllText($treeSnapshotPath))
+    if($snapshot.schema -cne 'fcp.recorder.pause-guard.process-tree.v1' -or
+       [string]$snapshot.operation_id -cne $operation -or
+       [int]$snapshot.root_pid -ne $pidValue -or
+       [Math]::Abs(([DateTime]::Parse([string]$snapshot.root_creation_utc)-[DateTime]::Parse($expectedCreated)).TotalSeconds) -gt 2){
+      return $false
+    }
+    foreach($member in @($snapshot.processes)){
+      if($null -eq $member -or [int]$member.pid -le 0 -or [string]::IsNullOrWhiteSpace([string]$member.creation_utc)){
+        return $false
+      }
+      $null=Add-TreeProcess -processId ([int]$member.pid) -createdUtc ([string]$member.creation_utc)
+    }
+    foreach($member in $script:processTree){
+      if([int]$member.pid -eq $pidValue -and
+         [Math]::Abs(([DateTime]::Parse([string]$member.creation_utc)-[DateTime]::Parse($expectedCreated)).TotalSeconds) -le 2){ return $true }
+    }
+    return $false
+  } catch { return $false }
+}
 if(-not (Test-OwnedPause)){ Write-Output 'control-owner-changed'; exit 5 }
 # Look up and validate the PID only after acquiring the same lock Recorder uses
 # for control changes. This closes the PID-reuse window while lock acquisition waits.
+$script:processTree=New-Object 'System.Collections.Generic.List[object]'
+$script:treePidSet=@{}
+$script:treeIdentitySet=@{}
+$script:unknownDescendant=$false
+$hasSnapshot=Load-TreeSnapshot
+if((Test-Path -LiteralPath $treeSnapshotPath) -and -not $hasSnapshot){ Write-Output 'process-tree-snapshot-invalid'; exit 9 }
 $item=Get-CimInstance Win32_Process -Filter "ProcessId=$pidValue"
-if($null -eq $item){ Write-Output 'absent'; exit 0 }
+if($null -eq $item){
+  if(-not $hasSnapshot){ Write-Output 'process-absent-without-tree-snapshot'; exit 10 }
+  try { $remainingProcesses=@(Get-CimInstance Win32_Process); Add-ObservedDescendants $remainingProcesses }
+  catch { Write-Output 'process-tree-verification-failed'; exit 9 }
+  $saveResult=Save-TreeSnapshot
+  if($saveResult -ne $true){ Write-Output ('process-tree-snapshot-write-failed-'+[string]$saveResult); exit 9 }
+  if($script:unknownDescendant){ Write-Output 'unbound-descendant-under-stale-parent-pid'; exit 10 }
+  $cancellationDeadline=[DateTime]::UtcNow.AddSeconds(8)
+  $terminatedResidual=$false
+  foreach($member in @($script:processTree.ToArray())){
+    $memberPid=[int]$member.pid
+    $memberCreated=[string]$member.creation_utc
+    $candidate=$remainingProcesses | Where-Object { [int]$_.ProcessId -eq $memberPid } | Select-Object -First 1
+    if($null -eq $candidate -or $candidate.CreationDate.ToUniversalTime().ToString('o') -cne $memberCreated){ continue }
+    $budget=[int]([Math]::Max(0,($cancellationDeadline-[DateTime]::UtcNow).TotalMilliseconds))
+    if($budget -le 0){ Write-Output 'residual-tree-cancellation-timeout'; exit 6 }
+    $killerInfo=New-Object System.Diagnostics.ProcessStartInfo
+    $killerInfo.FileName=Join-Path $env:SystemRoot 'System32\taskkill.exe'
+    $killerInfo.Arguments='/PID '+[string]$memberPid+' /T /F'
+    $killerInfo.UseShellExecute=$false
+    $killerInfo.CreateNoWindow=$true
+    $killer=[Diagnostics.Process]::Start($killerInfo)
+    if($null -eq $killer){ Write-Output 'residual-taskkill-helper-did-not-start'; exit 7 }
+    if(-not $killer.WaitForExit($budget)){
+      try { $killer.Kill() } catch {}
+      if(-not $killer.WaitForExit(1000)){ Write-Output 'residual-taskkill-helper-did-not-stop'; exit 7 }
+      Write-Output 'residual-taskkill-timeout'; exit 6
+    }
+    $killer.Refresh()
+    if($null -eq $killer.ExitCode -or $killer.ExitCode -ne 0){ Write-Output ('residual-taskkill-failed-exit-'+[string]$killer.ExitCode); exit 9 }
+    $terminatedResidual=$true
+    try { $remainingProcesses=@(Get-CimInstance Win32_Process); Add-ObservedDescendants $remainingProcesses }
+    catch { Write-Output 'process-tree-verification-failed'; exit 9 }
+  $saveResult=Save-TreeSnapshot
+  if($saveResult -ne $true){ Write-Output ('process-tree-snapshot-write-failed-'+[string]$saveResult); exit 9 }
+    if($script:unknownDescendant){ Write-Output 'unbound-descendant-under-stale-parent-pid'; exit 10 }
+  }
+  try { $remainingProcesses=@(Get-CimInstance Win32_Process); Add-ObservedDescendants $remainingProcesses }
+  catch { Write-Output 'process-tree-verification-failed'; exit 9 }
+    $saveResult=Save-TreeSnapshot
+    if($saveResult -ne $true){ Write-Output ('process-tree-snapshot-write-failed-'+[string]$saveResult); exit 9 }
+  if($script:unknownDescendant){ Write-Output 'unbound-descendant-under-stale-parent-pid'; exit 10 }
+  if(Test-TreeHasLiveMember $remainingProcesses){ Write-Output 'bound-process-tree-still-running'; exit 8 }
+  if($terminatedResidual){ Write-Output 'terminated-bound-final-sync-process-tree' }
+  else { Write-Output 'absent' }
+  exit 0
+}
 $commandLine=[string]$item.CommandLine
 if([string]::IsNullOrWhiteSpace($commandLine) -or -not $commandLine.Contains($operation)){ Write-Output 'tag-mismatch'; exit 2 }
 $bytes=[Text.Encoding]::UTF8.GetBytes($commandLine)
@@ -692,60 +850,109 @@ if($sha -ne $expectedHash){ Write-Output 'command-hash-mismatch'; exit 3 }
 $created=$item.CreationDate.ToUniversalTime().ToString('o')
 if([Math]::Abs(([DateTime]::Parse($created)-[DateTime]::Parse($expectedCreated)).TotalSeconds) -gt 2){ Write-Output 'creation-time-mismatch'; exit 4 }
 try {
-  # Keep helper termination bounded separately from lock acquisition. If the
-  # copy still exists afterward, the caller records an unconfirmed cancellation
-  # and must not request Recorder resume until a later check proves it is gone.
-  $killer=Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\taskkill.exe') -ArgumentList @('/PID',[string]$pidValue,'/T','/F') -PassThru -NoNewWindow
+  # Snapshot the bound process and its current descendants before termination.
+  # A successful root-PID lookup alone cannot prove taskkill /T drained the tree.
+  try { $treeProcesses=@(Get-CimInstance Win32_Process) }
+  catch { Write-Output 'process-tree-snapshot-failed'; exit 9 }
+  if($hasSnapshot -and -not $script:treeIdentitySet.ContainsKey([string]$pidValue+'|'+$created)){
+    Write-Output 'process-tree-root-identity-mismatch'; exit 9
+  }
+  $null=Add-TreeProcess -processId $pidValue -createdUtc $created
+  try { Add-ObservedDescendants $treeProcesses }
+  catch { Write-Output 'process-tree-identity-incomplete'; exit 9 }
+  $saveResult=Save-TreeSnapshot
+  if($saveResult -ne $true){ Write-Output ('process-tree-snapshot-write-failed-'+[string]$saveResult); exit 9 }
+  # Keep helper termination bounded separately from lock acquisition. If taskkill
+  # reports any failure or a snapshotted tree member survives, resume is denied.
+  $killerInfo=New-Object System.Diagnostics.ProcessStartInfo
+  $killerInfo.FileName=Join-Path $env:SystemRoot 'System32\taskkill.exe'
+  $killerInfo.Arguments='/PID '+[string]$pidValue+' /T /F'
+  $killerInfo.UseShellExecute=$false
+  $killerInfo.CreateNoWindow=$true
+  $killer=[Diagnostics.Process]::Start($killerInfo)
+  if($null -eq $killer){ Write-Output 'taskkill-helper-did-not-start'; exit 7 }
   if(-not $killer.WaitForExit(10000)){
     try { $killer.Kill() } catch {}
     if(-not $killer.WaitForExit(2000)){ Write-Output 'taskkill-helper-did-not-stop'; exit 7 }
     Write-Output 'taskkill-timeout'; exit 6
   }
   $killer.Refresh()
-  $remaining=Get-CimInstance Win32_Process -Filter "ProcessId=$pidValue"
-  if($null -ne $remaining){
-    $remainingCommand=[string]$remaining.CommandLine
-    $remainingBytes=[Text.Encoding]::UTF8.GetBytes($remainingCommand)
-    $remainingHasher=[Security.Cryptography.SHA256]::Create()
-    try { $remainingHash=([BitConverter]::ToString($remainingHasher.ComputeHash($remainingBytes))).Replace('-','').ToLowerInvariant() }
-    finally { $remainingHasher.Dispose() }
-    $remainingCreated=$remaining.CreationDate.ToUniversalTime().ToString('o')
-    if($remainingHash -eq $expectedHash -and [Math]::Abs(([DateTime]::Parse($remainingCreated)-[DateTime]::Parse($expectedCreated)).TotalSeconds) -le 2){
-      Write-Output 'bound-process-still-running'; exit 8
-    }
-  }
+  $taskkillExitCode=$killer.ExitCode
+  try { $remainingProcesses=@(Get-CimInstance Win32_Process) }
+  catch { Write-Output 'process-tree-verification-failed'; exit 9 }
+  try { Add-ObservedDescendants $remainingProcesses }
+  catch { Write-Output 'process-tree-identity-incomplete'; exit 9 }
+  $saveResult=Save-TreeSnapshot
+  if($saveResult -ne $true){ Write-Output ('process-tree-snapshot-write-failed-'+[string]$saveResult); exit 9 }
+  if($script:unknownDescendant){ Write-Output 'unbound-descendant-under-stale-parent-pid'; exit 10 }
+  if($null -eq $taskkillExitCode -or $taskkillExitCode -ne 0){ Write-Output ('taskkill-failed-exit-'+[string]$taskkillExitCode); exit 9 }
+  if(Test-TreeHasLiveMember $remainingProcesses){ Write-Output 'bound-process-tree-still-running'; exit 8 }
   Write-Output 'terminated-bound-final-sync-process-tree'
 } finally { Release-ControlOwnership }
 '''
         script = script.replace("__PAYLOAD_BASE64__", encoded_payload)
-        encoded = base64.b64encode(script.encode("utf-16le")).decode("ascii")
+        script_path = Path(str(config["guard_state_path"])).with_name(
+            f"final-sync-cancel-{pid}-{uuid.uuid4().hex}.ps1"
+        )
         try:
+            with script_path.open("x", encoding="utf-8", newline="\n") as script_file:
+                script_file.write(script)
+                script_file.flush()
+                os.fsync(script_file.fileno())
             completed = subprocess.run(
                 [
                     "powershell.exe",
                     "-NoProfile",
                     "-NonInteractive",
-                    "-EncodedCommand",
-                    encoded,
+                    "-File",
+                    str(script_path),
                 ],
                 capture_output=True,
                 text=True,
                 # The PowerShell side has a 5s lock budget and a separate 10s
-                # termination budget (plus bounded helper cleanup).
+                # termination budget (plus bounded helper cleanup). Run the
+                # generated script from a protected temp file to avoid command-line limits.
                 timeout=25,
                 check=False,
             )
-            result = completed.stdout.strip().splitlines()[-1] if completed.stdout.strip() else "no-result"
-            results.append({"pid": pid, "result": result, "exit_code": completed.returncode})
-        except (OSError, subprocess.TimeoutExpired):
-            results.append({"pid": pid, "result": "process-check-failed"})
+            output_lines = completed.stdout.strip().splitlines()
+            result = output_lines[-1] if output_lines else "no-result"
+            result_record = {"pid": pid, "result": result, "exit_code": completed.returncode}
+            if not output_lines and completed.stderr.strip():
+                result_record["stderr_excerpt"] = completed.stderr.strip()[-500:]
+            results.append(result_record)
+        except subprocess.TimeoutExpired as exc:
+            results.append(
+                {
+                    "pid": pid,
+                    "result": "process-check-timeout",
+                    "timeout_seconds": exc.timeout,
+                    "stdout_excerpt": str(exc.stdout or "")[-500:],
+                    "stderr_excerpt": str(exc.stderr or "")[-500:],
+                }
+            )
+        except OSError as exc:
+            results.append(
+                {
+                    "pid": pid,
+                    "result": "process-launch-failed",
+                    "error_type": type(exc).__name__,
+                    "errno": exc.errno,
+                    "error": str(exc)[:240],
+                }
+            )
+        finally:
+            try:
+                script_path.unlink(missing_ok=True)
+            except OSError:
+                pass
     return results
 
 
 def _final_sync_cancellation_confirmed(results: list[dict[str, Any]]) -> bool:
     """Return true only when every operation-bound copy is proven absent."""
     return all(
-        result.get("result") == "absent"
+        (result.get("result") == "absent" and result.get("exit_code") == 0)
         or (
             result.get("result") == "terminated-bound-final-sync-process-tree"
             and result.get("exit_code") == 0

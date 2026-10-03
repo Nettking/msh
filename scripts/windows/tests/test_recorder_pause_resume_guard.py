@@ -7,6 +7,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -78,10 +79,12 @@ def test_final_sync_termination_command_binds_payload_inside_encoded_script(
     )
     calls: list[list[str]] = []
     call_kwargs: list[dict] = []
+    scripts: list[str] = []
 
     def fake_run(args, **kwargs):
         calls.append(args)
         call_kwargs.append(kwargs)
+        scripts.append(Path(args[-1]).read_text(encoding="utf-8"))
         return SimpleNamespace(returncode=0, stdout="terminated-bound-final-sync-process-tree\n")
 
     monkeypatch.setattr(guard.subprocess, "run", fake_run)
@@ -96,9 +99,9 @@ def test_final_sync_termination_command_binds_payload_inside_encoded_script(
     ]
     assert len(calls) == 1
     assert call_kwargs[0]["timeout"] == 25
-    assert calls[0][-2] == "-EncodedCommand"
+    assert calls[0][-2] == "-File"
     assert len(calls[0]) == 5
-    script = base64.b64decode(calls[0][-1]).decode("utf-16le")
+    script = scripts[0]
     encoded_payload = script.split("FromBase64String('")[1].split("')")[0]
     payload = json.loads(base64.b64decode(encoded_payload).decode("utf-8"))
     assert payload == {
@@ -111,6 +114,11 @@ def test_final_sync_termination_command_binds_payload_inside_encoded_script(
         "runtime_binding_sha256": config["runtime_binding_sha256"],
         "resume_token_sha256": config["resume_token_sha256"],
         "hard_deadline_utc": config["hard_deadline_utc"],
+        "tree_snapshot_path": str(
+            Path(config["guard_state_path"]).with_name(
+                f"final-sync-tree-{1234}.json"
+            )
+        ),
     }
     assert operation_id not in script
     assert "[Convert]::ToHexString" not in script
@@ -125,14 +133,23 @@ def test_final_sync_termination_command_binds_payload_inside_encoded_script(
         'Get-CimInstance Win32_Process -Filter "ProcessId=$pidValue"'
     )
     assert script.index("$script:controlLockHandle.Lock(0,1)") < script.index(
-        "@('/PID',[string]$pidValue,'/T','/F')"
+        "$killerInfo.Arguments='/PID '+[string]$pidValue+' /T /F'"
     )
-    assert script.index("@('/PID',[string]$pidValue,'/T','/F')") < script.rindex(
+    assert script.index("$killerInfo.Arguments='/PID '+[string]$pidValue+' /T /F'") < script.rindex(
         "Release-ControlOwnership"
     )
     assert "$attempt -lt 100" in script
     assert "$killer.WaitForExit(10000)" in script
     assert "$killer.WaitForExit(2000)" in script
+    assert "$treeProcesses=@(Get-CimInstance Win32_Process)" in script
+    assert "$taskkillExitCode -ne 0" in script
+    assert script.index("$taskkillExitCode -ne 0") < script.rindex(
+        "terminated-bound-final-sync-process-tree"
+    )
+    assert "$remainingProcesses=@(Get-CimInstance Win32_Process)" in script
+    assert "bound-process-tree-still-running" in script
+    assert "process-absent-without-tree-snapshot" in script
+    assert "unbound-descendant-under-stale-parent-pid" in script
 
 
 def test_final_sync_cancellation_rejects_malformed_process_entry(
@@ -176,6 +193,7 @@ def test_final_sync_cancellation_rejects_malformed_process_entry(
     [
         ([], True),
         ([{"result": "absent", "exit_code": 0}], True),
+        ([{"result": "absent"}], False),
         (
             [
                 {
@@ -308,8 +326,8 @@ def test_termination_script_rechecks_owner_after_initial_guard_observation(
     original_run = guard.subprocess.run
 
     def change_owner_then_run_script(args, **kwargs):
-        encoded_script = args[-1]
-        script = base64.b64decode(encoded_script).decode("utf-16le")
+        script_path = Path(args[-1])
+        script = script_path.read_text(encoding="utf-8")
         script = script.replace(
             '$item=Get-CimInstance Win32_Process -Filter "ProcessId=$pidValue"',
             f"$item=[pscustomobject]@{{CommandLine='{command_line}';CreationDate=[datetime]::Parse('{creation_utc}')}}",
@@ -322,25 +340,9 @@ def test_termination_script_rechecks_owner_after_initial_guard_observation(
             json.dumps({"enabled": True, "operation_id": "e" * 32}),
             encoding="utf-8",
         )
-        changed_encoding = base64.b64encode(script.encode("utf-16le")).decode("ascii")
-        completed = original_run(
-            [
-                "powershell.exe",
-                "-NoProfile",
-                "-NonInteractive",
-                "-EncodedCommand",
-                changed_encoding,
-            ],
-            capture_output=True,
-            text=True,
-            timeout=10,
-            check=False,
-        )
-        return SimpleNamespace(
-            returncode=completed.returncode,
-            stdout=completed.stdout,
-            stderr=completed.stderr,
-        )
+        script_path.write_text(script, encoding="utf-8")
+        kwargs["timeout"] = 10
+        return original_run(args, **kwargs)
 
     monkeypatch.setattr(guard.subprocess, "run", change_owner_then_run_script)
 
@@ -351,21 +353,28 @@ def test_termination_script_rechecks_owner_after_initial_guard_observation(
 
 @pytest.mark.skipif(os.name != "nt", reason="exercise generated termination against a disposable process")
 def test_termination_script_stops_only_the_bound_disposable_copy_process(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch
 ) -> None:
     config = _watch_config(tmp_path)
     operation_id = config["operation_id"]
+    child_pid_path = tmp_path / "copy-child.pid"
     process = subprocess.Popen(
         [
             sys.executable,
             "-c",
-            "import time; time.sleep(60)",
+            "import subprocess,sys,time; child=subprocess.Popen([sys.executable,'-c','import time; time.sleep(60)']); open(sys.argv[1],'w').write(str(child.pid)); time.sleep(60)",
+            str(child_pid_path),
             "--operation",
             operation_id,
         ],
         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
     )
     try:
+        child_deadline = time.monotonic() + 5
+        while not child_pid_path.exists() and time.monotonic() < child_deadline:
+            time.sleep(0.05)
+        assert child_pid_path.exists(), "disposable copy child did not start"
+        child_pid = int(child_pid_path.read_text(encoding="utf-8"))
         metadata_script = (
             "$ProgressPreference='SilentlyContinue';"
             f"$p=Get-CimInstance Win32_Process -Filter 'ProcessId={process.pid}';"
@@ -426,6 +435,43 @@ def test_termination_script_stops_only_the_bound_disposable_copy_process(
             encoding="utf-8",
         )
 
+        original_run = guard.subprocess.run
+
+        def kill_root_without_tree(args, **kwargs):
+            script_path = Path(args[-1])
+            script = script_path.read_text(encoding="utf-8")
+            script = script.replace(
+                "$killerInfo.Arguments='/PID '+[string]$pidValue+' /T /F'",
+                "$killerInfo.Arguments='/PID '+[string]$pidValue+' /F'",
+            )
+            script_path.write_text(script, encoding="utf-8")
+            return original_run(args, **kwargs)
+
+        monkeypatch.setattr(guard.subprocess, "run", kill_root_without_tree)
+        first_result = guard._cancel_final_sync(config)
+
+        assert first_result == [
+            {"pid": process.pid, "result": "bound-process-tree-still-running", "exit_code": 8}
+        ]
+        assert guard._final_sync_cancellation_confirmed(first_result) is False
+        assert process.wait(timeout=5) is not None
+        monkeypatch.setattr(guard.subprocess, "run", original_run)
+        child_still_running = subprocess.run(
+            [
+                "powershell.exe",
+                "-NoLogo",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                f"$p=Get-CimInstance Win32_Process -Filter 'ProcessId={child_pid}'; if($null -ne $p){{exit 0}}else{{exit 1}}",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        assert child_still_running.returncode == 0, child_still_running.stderr
+
         result = guard._cancel_final_sync(config)
 
         assert result == [
@@ -435,7 +481,134 @@ def test_termination_script_stops_only_the_bound_disposable_copy_process(
                 "exit_code": 0,
             }
         ]
-        assert process.wait(timeout=5) is not None
+        assert guard._final_sync_cancellation_confirmed(result) is True
+        snapshot_path = Path(config["guard_state_path"]).with_name(
+            f"final-sync-tree-{process.pid}.json"
+        )
+        snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+        assert {
+            process.pid,
+            child_pid,
+        }.issubset({entry["pid"] for entry in snapshot["processes"]})
+        child_absent = subprocess.run(
+            [
+                "powershell.exe",
+                "-NoLogo",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                f"$p=Get-CimInstance Win32_Process -Filter 'ProcessId={child_pid}'; if($null -eq $p){{exit 0}}else{{exit 1}}",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        assert child_absent.returncode == 0, child_absent.stderr
+    finally:
+        monkeypatch.setattr(guard.subprocess, "run", original_run)
+        if process.poll() is None:
+            process.terminate()
+            process.wait(timeout=5)
+        if child_pid_path.exists():
+            try:
+                child_pid = int(child_pid_path.read_text(encoding="utf-8"))
+                subprocess.run(
+                    ["taskkill.exe", "/PID", str(child_pid), "/T", "/F"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                    check=False,
+                )
+            except (OSError, subprocess.TimeoutExpired, ValueError):
+                pass
+
+
+@pytest.mark.skipif(os.name != "nt", reason="exercise generated termination against a disposable process")
+def test_termination_script_fails_closed_when_taskkill_reports_a_tree_error(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = _watch_config(tmp_path)
+    operation_id = config["operation_id"]
+    process = subprocess.Popen(
+        [sys.executable, "-c", "import time; time.sleep(60)", "--operation", operation_id],
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
+    original_run = guard.subprocess.run
+    try:
+        metadata_script = (
+            "$ProgressPreference='SilentlyContinue';"
+            f"$p=Get-CimInstance Win32_Process -Filter 'ProcessId={process.pid}';"
+            "$o=[ordered]@{command_line=[string]$p.CommandLine;"
+            "creation_utc=$p.CreationDate.ToUniversalTime().ToString('o')};"
+            "$o|ConvertTo-Json -Compress"
+        )
+        metadata_result = subprocess.run(
+            ["powershell.exe", "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", metadata_script],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=True,
+        )
+        metadata_line = next(
+            line for line in reversed(metadata_result.stdout.splitlines()) if line.startswith("{")
+        )
+        metadata = json.loads(metadata_line)
+        Path(config["copy_processes_path"]).write_text(
+            json.dumps(
+                {
+                    "operation_id": operation_id,
+                    "processes": [
+                        {
+                            "pid": process.pid,
+                            "command_line_sha256": hashlib.sha256(
+                                metadata["command_line"].encode("utf-8")
+                            ).hexdigest(),
+                            "creation_utc": metadata["creation_utc"],
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        Path(config["runtime_binding"]["control_path"]).write_text(
+            json.dumps(
+                {
+                    "enabled": False,
+                    "operation_id": operation_id,
+                    "resume_guard": {
+                        "operation_id": operation_id,
+                        "prior_control_operation_id": config["prior_control_operation_id"],
+                        "runtime_binding_sha256": config["runtime_binding_sha256"],
+                        "token_sha256": config["resume_token_sha256"],
+                        "deadline_utc": config["hard_deadline_utc"],
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        def run_with_failing_taskkill(args, **kwargs):
+            script_path = Path(args[-1])
+            script = script_path.read_text(encoding="utf-8")
+            script = script.replace(
+                "$killerInfo.FileName=Join-Path $env:SystemRoot 'System32\\taskkill.exe'",
+                "$killerInfo.FileName=Join-Path $env:SystemRoot 'System32\\cmd.exe'",
+            ).replace(
+                "$killerInfo.Arguments='/PID '+[string]$pidValue+' /T /F'",
+                "$killerInfo.Arguments='/c exit 5'",
+            )
+            script_path.write_text(script, encoding="utf-8")
+            return original_run(args, **kwargs)
+
+        monkeypatch.setattr(guard.subprocess, "run", run_with_failing_taskkill)
+        result = guard._cancel_final_sync(config)
+
+        assert result == [
+            {"pid": process.pid, "result": "taskkill-failed-exit-5", "exit_code": 9}
+        ]
+        assert guard._final_sync_cancellation_confirmed(result) is False
+        assert process.poll() is None
     finally:
         if process.poll() is None:
             process.terminate()
