@@ -748,6 +748,63 @@ def test_new_endpoint_cannot_satisfy_previous_runtime_recovery_frontier(
         rt.unregister_stop_target(service)
 
 
+def test_recovery_completion_credits_checkpoint_alias_after_source_rename(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    control = {"enabled": False, "operation_id": "pause-from-prior-runtime"}
+    configured_sources = {SOURCE: BASE_URL}
+    new_name = "MACHINE-ALPHA-0001"
+    monkeypatch.setattr(rt, "MANAGED_MODE", True)
+    monkeypatch.setattr(
+        rt,
+        "_read_json",
+        lambda path: control if path == rt.CONTROL_FILE else {"sources": []},
+    )
+    monkeypatch.setattr(
+        rt,
+        "_managed_configuration",
+        lambda _config: (configured_sources, 0.2),
+    )
+    monkeypatch.setattr(rt, "STATUS_FILE", tmp_path / "status.json")
+    monkeypatch.setattr(rt, "STATE_FILE", tmp_path / "state.json")
+    service = rt.RecorderRuntime()
+    service.checkpoints[SOURCE] = rt.SourceCheckpoint(
+        source_name=SOURCE,
+        base_url=BASE_URL,
+        machine_id="MachineAlpha",
+        agent_instance_id=INSTANCE_ID,
+        next_sequence=4,
+        probe_sha256="a" * 64,
+    )
+    pending: Future[rt.CaptureResult] = Future()
+
+    try:
+        service.refresh_configuration(force=True)
+        service._capture_futures[SOURCE] = (BASE_URL, pending)
+
+        # The future was scheduled under the old alias; configuration refresh
+        # maps both the checkpoint and inherited frontier to the stable alias.
+        control.update(enabled=True, operation_id="new-start")
+        configured_sources.clear()
+        configured_sources[new_name] = BASE_URL
+        service.refresh_configuration(force=True)
+        normalized_url = rt.normalize_agent_base_url(BASE_URL)
+        assert service.restart_pause_recovery_sources == {(new_name, normalized_url)}
+
+        pending.set_result(
+            rt.CaptureResult(SOURCE, True, "", transaction_complete=True)
+        )
+        service._harvest_capture_results()
+
+        assert service.restart_pause_recovery_required is False
+        assert service.restart_pause_recovery_sources == set()
+        assert new_name in service.checkpoints
+    finally:
+        service.executor.shutdown(wait=True, cancel_futures=False)
+        rt.unregister_stop_target(service)
+
+
 def test_drain_recovery_does_not_rewrite_state_when_no_incident_matches(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

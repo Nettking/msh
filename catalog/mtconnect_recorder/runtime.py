@@ -1491,8 +1491,27 @@ class RecorderRuntime:
                     # completed against, even if a refresh has since repointed
                     # the logical source. The stale result must not update the
                     # replacement endpoint's health below.
+                    recovery_source_name = source_name
+                    if source_name not in self.sources:
+                        alias_matches = [
+                            new_name
+                            for new_name, new_url in self.sources.items()
+                            if normalize_agent_base_url(new_url)
+                            == normalize_agent_base_url(scheduled_url)
+                            and source_name
+                            in getattr(
+                                self.checkpoints.get(new_name),
+                                "storage_aliases",
+                                (),
+                            )
+                        ]
+                        if len(alias_matches) == 1:
+                            recovery_source_name = alias_matches[0]
                     self.restart_pause_recovery_sources.discard(
-                        (source_name, normalize_agent_base_url(scheduled_url))
+                        (
+                            recovery_source_name,
+                            normalize_agent_base_url(scheduled_url),
+                        )
                     )
                     if not self.restart_pause_recovery_sources and self.sources:
                         self.restart_pause_recovery_required = False
