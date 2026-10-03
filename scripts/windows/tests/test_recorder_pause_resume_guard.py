@@ -1088,6 +1088,29 @@ def test_controller_age_distinguishes_unstarted_from_lost_controller(
     assert guard._controller_age(config) is None
 
     heartbeat = Path(config["controller_heartbeat_path"])
+    valid_payload = {
+        "schema": "fcp.recorder.pause-copy-controller-heartbeat.v1",
+        "operation_id": config["operation_id"],
+        "pid": 1234,
+        "observed_at_utc": guard._iso(guard._utc_now()),
+    }
+    heartbeat.write_text(json.dumps(valid_payload), encoding="utf-8")
+    assert guard._controller_age(config) is not None
+
+    malformed_payloads = [
+        {**valid_payload, "schema": "fcp.recorder.other.v1"},
+        {key: value for key, value in valid_payload.items() if key != "schema"},
+        {key: value for key, value in valid_payload.items() if key != "pid"},
+        {**valid_payload, "pid": True},
+        {**valid_payload, "pid": 0},
+        {**valid_payload, "pid": "1234"},
+        {**valid_payload, "operation_id": "e" * 32},
+        {**valid_payload, "observed_at_utc": None},
+    ]
+    for payload in malformed_payloads:
+        heartbeat.write_text(json.dumps(payload), encoding="utf-8")
+        assert guard._controller_age(config) == float("inf")
+
     heartbeat.write_text("{broken", encoding="utf-8")
     assert guard._controller_age(config) == float("inf")
 

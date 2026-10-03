@@ -43,6 +43,7 @@ _OPERATION_ID = re.compile(r"\A[a-f0-9]{32}\Z")
 _SHA256 = re.compile(r"\A[a-f0-9]{64}\Z")
 _COMMIT = re.compile(r"\A[a-f0-9]{40}\Z")
 _RUNTIME_GENERATION = re.compile(r"\A[a-f0-9]{32}\Z")
+_COPY_HEARTBEAT_SCHEMA = "fcp.recorder.pause-copy-controller-heartbeat.v1"
 _MAX_PAUSE_SECONDS = 20 * 60
 _HEARTBEAT_MAX_AGE_SECONDS = 10.0
 _POLL_SECONDS = 1.0
@@ -575,7 +576,13 @@ def _controller_age(config: dict[str, Any]) -> float | None:
     except OSError:
         return float("inf")
     payload = _read_json(heartbeat_path)
-    if payload is None or payload.get("operation_id") != config["operation_id"]:
+    if (
+        payload is None
+        or payload.get("schema") != _COPY_HEARTBEAT_SCHEMA
+        or payload.get("operation_id") != config["operation_id"]
+        or type(payload.get("pid")) is not int
+        or payload["pid"] <= 0
+    ):
         return float("inf")
     observed = _parse_utc(payload.get("observed_at_utc"))
     if observed is None:
@@ -595,7 +602,7 @@ def _write_copy_heartbeat(config: dict[str, Any]) -> None:
     _write_json_atomic(
         Path(str(config["controller_heartbeat_path"])),
         {
-            "schema": "fcp.recorder.pause-copy-controller-heartbeat.v1",
+            "schema": _COPY_HEARTBEAT_SCHEMA,
             "operation_id": config["operation_id"],
             "pid": os.getpid(),
             "observed_at_utc": _iso(_utc_now()),
