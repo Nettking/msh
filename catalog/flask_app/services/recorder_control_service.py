@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import json
 import hashlib
 import hmac
+import json
 import os
 import re
 import time
@@ -243,11 +243,11 @@ class RecorderControlService:
             ):
                 raise RecorderControlError("Runtime binding identity is invalid.")
 
-        if expected_current_operation_id is not None:
-            if enabled or not _OPERATION_ID_PATTERN.fullmatch(
-                expected_current_operation_id
-            ):
-                raise RecorderControlError("Invalid current control operation identity.")
+        if expected_current_operation_id is not None and (
+            enabled
+            or not _OPERATION_ID_PATTERN.fullmatch(expected_current_operation_id)
+        ):
+            raise RecorderControlError("Invalid current control operation identity.")
 
         new_operation_id = operation_id or uuid4().hex
         if not _OPERATION_ID_PATTERN.fullmatch(new_operation_id):
