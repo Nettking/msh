@@ -727,6 +727,22 @@ def test_new_endpoint_cannot_satisfy_previous_runtime_recovery_frontier(
 
         assert service.restart_pause_recovery_required is True
         assert service.restart_pause_recovery_sources == {(SOURCE, previous_endpoint)}
+
+        # The exact old-endpoint transaction may still finish after the
+        # repoint. It satisfies recovery, but its result must not mark the new
+        # endpoint healthy.
+        old_endpoint_result: Future[rt.CaptureResult] = Future()
+        service._capture_futures[SOURCE] = (BASE_URL, old_endpoint_result)
+        old_endpoint_result.set_result(
+            rt.CaptureResult(SOURCE, True, "", transaction_complete=True)
+        )
+        service._harvest_capture_results()
+
+        assert service.restart_pause_recovery_required is False
+        assert service.restart_pause_recovery_sources == set()
+        assert service._capture_outcomes.get(SOURCE) is None
+        assert service.source_status[SOURCE]["base_url"] == replacement_endpoint
+        assert service.source_status[SOURCE]["last_success_at"] is None
     finally:
         service.executor.shutdown(wait=True, cancel_futures=False)
         rt.unregister_stop_target(service)

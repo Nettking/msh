@@ -1486,6 +1486,16 @@ class RecorderRuntime:
 
         with self.lock:
             for source_name, scheduled_url, ok, transaction_complete in outcomes:
+                if transaction_complete and self.restart_pause_recovery_required:
+                    # Recovery is credited to the endpoint the worker actually
+                    # completed against, even if a refresh has since repointed
+                    # the logical source. The stale result must not update the
+                    # replacement endpoint's health below.
+                    self.restart_pause_recovery_sources.discard(
+                        (source_name, normalize_agent_base_url(scheduled_url))
+                    )
+                    if not self.restart_pause_recovery_sources and self.sources:
+                        self.restart_pause_recovery_required = False
                 current_url = self.sources.get(source_name)
                 if current_url is None:
                     self._capture_outcomes.pop(source_name, None)
@@ -1510,15 +1520,6 @@ class RecorderRuntime:
                     self.backoff[source_name] = BACKOFF_INITIAL
                     self.next_attempt_at[source_name] = 0.0
                     continue
-                if transaction_complete and self.restart_pause_recovery_required:
-                    try:
-                        self.restart_pause_recovery_sources.discard(
-                            (source_name, normalize_agent_base_url(scheduled_url))
-                        )
-                    except ValueError:
-                        pass
-                    if not self.restart_pause_recovery_sources and self.sources:
-                        self.restart_pause_recovery_required = False
                 self._capture_outcomes[source_name] = ok
 
             if not (self.enabled and self.configuration_ready and self.sources):
