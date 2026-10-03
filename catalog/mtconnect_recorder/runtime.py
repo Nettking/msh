@@ -9,9 +9,9 @@ import signal
 import threading
 import time
 import uuid
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from concurrent.futures import Future, ThreadPoolExecutor
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Any
@@ -67,6 +67,22 @@ RESPONSE_BYTE_LIMITS = {
 }
 _RESPONSE_READ_CHUNK_BYTES = 64 * 1024
 _MAX_HTTP_REDIRECTS = 3
+
+
+@dataclass(frozen=True)
+class CaptureResult:
+    """Return worker status separately from proof that capture work completed."""
+
+    source_name: str
+    success: bool
+    error: str
+    transaction_complete: bool
+
+    def __iter__(self) -> Iterator[str | bool]:
+        # Keep the existing three-value unpacking surface for internal callers.
+        yield self.source_name
+        yield self.success
+        yield self.error
 
 
 def _remaining_request_seconds(*, deadline: float, endpoint: str) -> float:
@@ -534,7 +550,7 @@ class RecorderRuntime:
         self.control_initialized = False
         self.pause_request_predates_runtime_id: str | None = None
         self.restart_pause_recovery_required = False
-        self.restart_pause_recovery_urls: set[str] = set()
+        self.restart_pause_recovery_sources: set[tuple[str, str]] = set()
         self.pause_acknowledged_operation_id: str | None = None
         self.pause_acknowledged_at: str | None = None
         self.capture_drain_error_operation_id: str | None = None
@@ -550,7 +566,7 @@ class RecorderRuntime:
         self.store = DurableRecorderStore(DATA_DIR)
         self.executor = ThreadPoolExecutor(max_workers=8, thread_name_prefix="mtconnect")
         self._capture_futures: dict[
-            str, tuple[str, Future[tuple[str, bool, str]]]
+            str, tuple[str, Future[CaptureResult]]
         ] = {}
         self._capture_outcomes: dict[str, bool] = {}
         register_stop_target(self)
@@ -804,10 +820,33 @@ class RecorderRuntime:
                     self.pause_request_predates_runtime_id = operation_id
                     self.restart_pause_recovery_required = True
             if self.restart_pause_recovery_required:
-                for source_url in sources.values():
-                    self.restart_pause_recovery_urls.add(
-                        normalize_agent_base_url(source_url)
-                    )
+                remapped_requirements: set[tuple[str, str]] = set()
+                for old_name, old_url in self.restart_pause_recovery_sources:
+                    if old_name in sources:
+                        remapped_requirements.add(
+                            (old_name, normalize_agent_base_url(sources[old_name]))
+                        )
+                        continue
+                    alias_matches = [
+                        new_name
+                        for new_name, new_url in sources.items()
+                        if normalize_agent_base_url(new_url) == old_url
+                        and old_name
+                        in getattr(
+                            self.checkpoints.get(new_name),
+                            "storage_aliases",
+                            (),
+                        )
+                    ]
+                    if checkpoint_aliases_changed and len(alias_matches) == 1:
+                        remapped_requirements.add((alias_matches[0], old_url))
+                    else:
+                        remapped_requirements.add((old_name, old_url))
+                self.restart_pause_recovery_sources = remapped_requirements
+                self.restart_pause_recovery_sources.update(
+                    (name, normalize_agent_base_url(source_url))
+                    for name, source_url in sources.items()
+                )
             self.enabled = enabled
             self.control_operation_id = operation_id
             if operation_id != previous_operation_id:
@@ -1099,7 +1138,7 @@ class RecorderRuntime:
                 batch.last_observation_sequence,
             )
 
-    def capture_source(self, source_name: str, base_url: str) -> tuple[str, bool, str]:
+    def capture_source(self, source_name: str, base_url: str) -> CaptureResult:
         try:
             client = MtconnectClient(base_url, timeout=REQUEST_TIMEOUT)
             current_xml = client.fetch_current()
@@ -1348,7 +1387,7 @@ class RecorderRuntime:
                 )
                 self.backoff[source_name] = BACKOFF_INITIAL
                 self.next_attempt_at[source_name] = 0.0
-            return source_name, True, ""
+            return CaptureResult(source_name, True, "", transaction_complete=True)
         except Exception as exc:  # noqa: BLE001 - recorder must continue other sources
             error = f"{type(exc).__name__}: {exc}"
             with self.lock:
@@ -1364,13 +1403,13 @@ class RecorderRuntime:
                     }
                 )
             log.warning("[%s] recorder error: %s; retrying in %.1fs", source_name, error, delay)
-            return source_name, False, error
+            return CaptureResult(source_name, False, error, transaction_complete=False)
 
     def _harvest_capture_results(self) -> None:
         """Collect finished source work without waiting for a slower peer."""
 
         completed: list[
-            tuple[str, str, Future[tuple[str, bool, str]]]
+            tuple[str, str, Future[CaptureResult]]
         ] = []
         with self.lock:
             for source_name, (base_url, future) in list(self._capture_futures.items()):
@@ -1382,13 +1421,32 @@ class RecorderRuntime:
         if not completed:
             return
 
-        outcomes: list[tuple[str, str, bool]] = []
+        outcomes: list[tuple[str, str, bool, bool]] = []
         for source_name, base_url, future in completed:
             try:
-                _reported_source, ok, error = future.result()
+                result = future.result()
+                if isinstance(result, CaptureResult):
+                    if result.source_name != source_name:
+                        raise RuntimeError(
+                            "Capture result source identity does not match its worker."
+                        )
+                    ok = result.success
+                    error = result.error
+                    transaction_complete = result.transaction_complete
+                else:
+                    # Old in-process callers may still hand the worker a
+                    # three-tuple. It remains health data, but it is not
+                    # explicit proof of a completed restart-recovery cycle.
+                    reported_source, ok, error = result
+                    if reported_source != source_name:
+                        raise RuntimeError(
+                            "Capture result source identity does not match its worker."
+                        )
+                    transaction_complete = False
             except Exception as exc:
                 ok = False
                 error = f"{type(exc).__name__}: {exc}"
+                transaction_complete = False
                 with self.lock:
                     if self.sources.get(source_name) == base_url:
                         delay = min(
@@ -1414,10 +1472,10 @@ class RecorderRuntime:
                     scheduled_base_url=base_url,
                 )
                 log.exception("[%s] recorder source task escaped its error boundary", source_name)
-            outcomes.append((source_name, base_url, ok))
+            outcomes.append((source_name, base_url, ok, transaction_complete))
 
         with self.lock:
-            for source_name, scheduled_url, ok in outcomes:
+            for source_name, scheduled_url, ok, transaction_complete in outcomes:
                 current_url = self.sources.get(source_name)
                 if current_url is None:
                     self._capture_outcomes.pop(source_name, None)
@@ -1442,14 +1500,14 @@ class RecorderRuntime:
                     self.backoff[source_name] = BACKOFF_INITIAL
                     self.next_attempt_at[source_name] = 0.0
                     continue
-                if ok and self.restart_pause_recovery_required:
+                if transaction_complete and self.restart_pause_recovery_required:
                     try:
-                        self.restart_pause_recovery_urls.discard(
-                            normalize_agent_base_url(scheduled_url)
+                        self.restart_pause_recovery_sources.discard(
+                            (source_name, normalize_agent_base_url(scheduled_url))
                         )
                     except ValueError:
                         pass
-                    if not self.restart_pause_recovery_urls and self.sources:
+                    if not self.restart_pause_recovery_sources and self.sources:
                         self.restart_pause_recovery_required = False
                 self._capture_outcomes[source_name] = ok
 
@@ -1600,7 +1658,7 @@ class RecorderRuntime:
                     ),
                     "restart_recovery_required": self.restart_pause_recovery_required,
                     "restart_recovery_pending_sources": len(
-                        self.restart_pause_recovery_urls
+                        self.restart_pause_recovery_sources
                     ),
                     "durable_boundary": bool(
                         not self.enabled

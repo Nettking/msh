@@ -278,6 +278,38 @@ def test_capture_publishes_pending_frontier_before_first_raw_write(
         _close(runtime)
 
 
+def test_successful_capture_result_marks_its_transaction_complete(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime = _runtime(tmp_path, monkeypatch)
+    probe = _probe()
+    sample_xml = _streams_xml([1])
+
+    class Client:
+        def __init__(self, base_url: str, *, timeout: float) -> None:
+            del base_url, timeout
+
+        def fetch_current(self) -> str:
+            return sample_xml
+
+        def fetch_sample(self, *, from_sequence: int, count: int) -> str:
+            del count
+            assert from_sequence == 1
+            return sample_xml
+
+    try:
+        monkeypatch.setattr(recorder_runtime, "MtconnectClient", Client)
+        monkeypatch.setattr(runtime, "_load_probe", lambda **_kwargs: probe)
+        result = runtime.capture_source("machine", "http://agent:5000")
+
+        assert tuple(result) == ("machine", True, "")
+        assert result.transaction_complete is True
+        assert runtime.checkpoints["machine"].next_sequence == 2
+    finally:
+        _close(runtime)
+
+
 def test_state_loss_rebuild_keeps_explicit_full_archive_recovery(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

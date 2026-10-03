@@ -538,11 +538,44 @@ def test_late_drain_failure_uses_reconciled_checkpoint_alias(
         rt.unregister_stop_target(service)
 
 
+def test_capture_result_from_another_source_cannot_satisfy_restart_recovery(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(rt, "STATE_FILE", tmp_path / "state.json")
+    service = rt.RecorderRuntime()
+    service.sources = {SOURCE: BASE_URL, "SECOND-MACHINE": BASE_URL}
+    service.control_operation_id = "pause-from-prior-runtime"
+    service.restart_pause_recovery_required = True
+    service.restart_pause_recovery_sources = {
+        (SOURCE, rt.normalize_agent_base_url(BASE_URL)),
+        ("SECOND-MACHINE", rt.normalize_agent_base_url(BASE_URL)),
+    }
+    pending: Future[rt.CaptureResult] = Future()
+    service._capture_futures[SOURCE] = (BASE_URL, pending)
+
+    try:
+        pending.set_result(
+            rt.CaptureResult("SECOND-MACHINE", True, "", transaction_complete=True)
+        )
+        service._harvest_capture_results()
+
+        assert len(service.restart_pause_recovery_sources) == 2
+        assert service.restart_pause_recovery_required is True
+        assert service._capture_outcomes[SOURCE] is False
+        assert service.capture_drain_failures[0]["source_name"] == SOURCE
+        assert service.capture_drain_failures[0]["state"] == "unresolved"
+    finally:
+        service.executor.shutdown(wait=True, cancel_futures=False)
+        rt.unregister_stop_target(service)
+
+
 def test_startup_does_not_acknowledge_pause_request_from_previous_runtime(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     control = {"enabled": False, "operation_id": "pause-from-prior-runtime"}
+    configured_sources = {SOURCE: BASE_URL, "SECOND-MACHINE": BASE_URL}
     monkeypatch.setattr(rt, "MANAGED_MODE", True)
     monkeypatch.setattr(
         rt,
@@ -552,7 +585,7 @@ def test_startup_does_not_acknowledge_pause_request_from_previous_runtime(
     monkeypatch.setattr(
         rt,
         "_managed_configuration",
-        lambda _config: ({SOURCE: BASE_URL}, 0.2),
+        lambda _config: (configured_sources, 0.2),
     )
     monkeypatch.setattr(rt, "STATUS_FILE", tmp_path / "status.json")
     # No incident reached disk before the prior process exited. Startup still
@@ -601,18 +634,36 @@ def test_startup_does_not_acknowledge_pause_request_from_previous_runtime(
         service.publish_status(force=True)
         status = json.loads((tmp_path / "status.json").read_text(encoding="utf-8"))
         assert service.pause_acknowledged_operation_id is None
-        assert status["capture_control"]["restart_recovery_pending_sources"] == 1
+        assert status["capture_control"]["restart_recovery_pending_sources"] == 2
         assert status["capture_control"]["durable_boundary"] is False
 
         # The worker's successful post-restart source result clears this
         # startup-only recovery latch; a later fresh Stop can then be proven.
         control.update(enabled=True, operation_id="recovery-start-operation")
         service.refresh_configuration(force=True)
-        recovery: Future[tuple[str, bool, str]] = service.executor.submit(
-            lambda: (SOURCE, True, "")
+        resource_paused: Future[rt.CaptureResult] = Future()
+        service._capture_futures[SOURCE] = (BASE_URL, resource_paused)
+        resource_paused.set_result(
+            rt.CaptureResult(SOURCE, True, "", transaction_complete=False)
         )
-        service._capture_futures[SOURCE] = (BASE_URL, recovery)
-        recovery.result(timeout=1.0)
+        service._harvest_capture_results()
+        assert service.restart_pause_recovery_required is True
+        assert len(service.restart_pause_recovery_sources) == 2
+
+        first_recovery: Future[rt.CaptureResult] = Future()
+        service._capture_futures[SOURCE] = (BASE_URL, first_recovery)
+        first_recovery.set_result(
+            rt.CaptureResult(SOURCE, True, "", transaction_complete=True)
+        )
+        service._harvest_capture_results()
+        assert len(service.restart_pause_recovery_sources) == 1
+        assert service.restart_pause_recovery_required is True
+
+        second_recovery: Future[rt.CaptureResult] = Future()
+        service._capture_futures["SECOND-MACHINE"] = (BASE_URL, second_recovery)
+        second_recovery.set_result(
+            rt.CaptureResult("SECOND-MACHINE", True, "", transaction_complete=True)
+        )
         service._harvest_capture_results()
         assert service.restart_pause_recovery_required is False
         control.update(enabled=False, operation_id="new-stop-after-recovery")
