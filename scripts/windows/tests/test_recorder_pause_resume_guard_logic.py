@@ -79,6 +79,35 @@ def test_guard_resumes_on_copy_failure_or_controller_loss() -> None:
         assert _guard().decide(_paused(**changes), now=NOW) is PauseGuardAction.REQUEST_RESUME
 
 
+def test_guard_allows_bounded_controller_start_after_pause_ack() -> None:
+    guard = _guard()
+    no_controller = _paused(controller_heartbeat_age_seconds=None)
+
+    assert guard.decide(no_controller, now=NOW) is PauseGuardAction.WAIT_FOR_CONTROLLER
+    assert guard.decide(
+        no_controller, now=NOW + timedelta(seconds=10)
+    ) is PauseGuardAction.WAIT_FOR_CONTROLLER
+    assert guard.decide(
+        no_controller, now=NOW + timedelta(seconds=11)
+    ) is PauseGuardAction.REQUEST_RESUME
+
+
+def test_guard_drain_timeout_still_bounds_missing_controller_before_ack() -> None:
+    guard = _guard()
+    draining = _paused(
+        pause_acknowledged_operation_id=None,
+        pause_acknowledged_at=None,
+        inflight_capture_tasks=1,
+        durable_boundary=False,
+        controller_heartbeat_age_seconds=None,
+    )
+
+    assert guard.decide(draining, now=NOW) is PauseGuardAction.WAIT_FOR_DRAIN
+    assert guard.decide(
+        draining, now=NOW + timedelta(seconds=30)
+    ) is PauseGuardAction.REQUEST_RESUME
+
+
 def test_verified_deployment_restart_cancels_copy_and_requests_start() -> None:
     observation = _paused(runtime_restart_detected=True)
     assert _guard().decide(observation, now=NOW) is PauseGuardAction.REQUEST_RESUME

@@ -16,6 +16,7 @@ from enum import StrEnum
 class PauseGuardAction(StrEnum):
     WAIT_FOR_PAUSE = "wait-for-pause"
     WAIT_FOR_DRAIN = "wait-for-drain"
+    WAIT_FOR_CONTROLLER = "wait-for-controller"
     COPY_MAY_CONTINUE = "copy-may-continue"
     REQUEST_RESUME = "request-resume"
     VERIFY_RESUME = "verify-resume"
@@ -153,9 +154,17 @@ class BoundedPauseResumeGuard:
             and observation.inflight_capture_tasks == 0
             and observation.durable_boundary is True
         )
+        controller_heartbeat_age = observation.controller_heartbeat_age_seconds
         controller_lost = bool(
-            observation.controller_heartbeat_age_seconds is not None
-            and observation.controller_heartbeat_age_seconds
+            controller_heartbeat_age is not None
+            and controller_heartbeat_age > self.controller_stale_after_seconds
+        )
+        controller_start_timed_out = bool(
+            controller_heartbeat_age is None
+            and pause_acknowledged
+            and isinstance(observation.pause_acknowledged_at, datetime)
+            and observation.pause_acknowledged_at.tzinfo is not None
+            and (now - observation.pause_acknowledged_at).total_seconds()
             > self.controller_stale_after_seconds
         )
         copy_ended = observation.copy_outcome in {"complete", "failed"}
@@ -166,8 +175,16 @@ class BoundedPauseResumeGuard:
             and (now - self.pause_observed_at).total_seconds()
             >= self.drain_timeout_seconds
         )
-        if deadline_reached or controller_lost or copy_ended or drain_timeout:
+        if (
+            deadline_reached
+            or controller_lost
+            or controller_start_timed_out
+            or copy_ended
+            or drain_timeout
+        ):
             return PauseGuardAction.REQUEST_RESUME
         if not pause_acknowledged:
             return PauseGuardAction.WAIT_FOR_DRAIN
+        if controller_heartbeat_age is None:
+            return PauseGuardAction.WAIT_FOR_CONTROLLER
         return PauseGuardAction.COPY_MAY_CONTINUE

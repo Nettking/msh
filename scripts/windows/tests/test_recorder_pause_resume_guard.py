@@ -1080,6 +1080,22 @@ def _watch_config(tmp_path: Path) -> dict:
     }
 
 
+def test_controller_age_distinguishes_unstarted_from_lost_controller(
+    tmp_path: Path,
+) -> None:
+    config = _watch_config(tmp_path)
+
+    assert guard._controller_age(config) is None
+
+    heartbeat = Path(config["controller_heartbeat_path"])
+    heartbeat.write_text("{broken", encoding="utf-8")
+    assert guard._controller_age(config) == float("inf")
+
+    heartbeat.unlink()
+    Path(config["copy_processes_path"]).write_text("{}", encoding="utf-8")
+    assert guard._controller_age(config) == float("inf")
+
+
 def _arm_test_config(tmp_path: Path) -> dict:
     config = _watch_config(tmp_path)
     config.update(
@@ -1291,6 +1307,87 @@ def test_watch_cancels_final_sync_then_resumes_and_verifies_capture(
     assert resume_event["canceled_final_sync"] == [
         {"result": "terminated-bound-final-sync-process-tree", "exit_code": 0}
     ]
+
+
+def test_watch_allows_copy_controller_to_start_after_pause_ack(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = _watch_config(tmp_path)
+    config["final_sync_process_supervision"] = "windows-job-object.v1"
+    config["copy_controller_sid"] = "S-1-5-21-1000"
+    resume_operation_id = "d" * 32
+    pause_observation, pause_control = _watch_observation(heartbeat_age=None)
+    assert pause_control is not None
+    pause_control["resume_guard"]["deadline_utc"] = config["hard_deadline_utc"]
+    observations = iter(
+        [
+            _watch_observation(operation_id="b" * 32, enabled=True),
+            (pause_observation, pause_control),
+            (_watch_observation(heartbeat_age=1.0)[0], pause_control),
+            (_watch_observation(heartbeat_age=11.0)[0], pause_control),
+            _watch_observation(
+                operation_id=resume_operation_id,
+                enabled=True,
+                acknowledged=None,
+                scheduling=False,
+                durable=False,
+            ),
+            _watch_observation(
+                operation_id=resume_operation_id,
+                enabled=True,
+                acknowledged=None,
+                scheduling=True,
+                durable=False,
+                schedule_count=101,
+            ),
+        ]
+    )
+    actions: list[str] = []
+    events: list[dict] = []
+    cancellation_results = iter(
+        [
+            [{"result": "absent", "exit_code": 0}],
+            [{"result": "absent", "exit_code": 0}],
+        ]
+    )
+
+    class FakeOperationJob:
+        def close(self) -> None:
+            return None
+
+    monkeypatch.setattr(guard, "_load_config", lambda _path: config)
+    monkeypatch.setattr(guard, "_host_mutex", lambda _config: (object(), 1234))
+    monkeypatch.setattr(guard, "_release_mutex", lambda *_args: None)
+    monkeypatch.setattr(guard, "_observation", lambda _config: next(observations))
+    monkeypatch.setattr(guard, "_read_json", lambda _path: None)
+    monkeypatch.setattr(
+        guard.OperationJob,
+        "open_or_create",
+        lambda *_args, **_kwargs: FakeOperationJob(),
+    )
+    monkeypatch.setattr(
+        guard,
+        "_cancel_final_sync",
+        lambda _config: actions.append("cancel") or next(cancellation_results),
+    )
+    monkeypatch.setattr(
+        guard,
+        "_request_resume",
+        lambda _config: actions.append("resume")
+        or (resume_operation_id, {"http_status": 200}),
+    )
+    monkeypatch.setattr(
+        guard, "_event", lambda _config, state, **kw: events.append({"state": state, **kw})
+    )
+    monkeypatch.setattr(guard.time, "sleep", lambda _seconds: None)
+
+    result = guard.watch(tmp_path / "guard.json")
+    assert result == 0, {"events": events, "actions": actions}
+    states = [event["state"] for event in events]
+    assert states.index("wait-for-controller") < states.index("copy-may-continue")
+    assert states.index("copy-may-continue") < states.index("resume-requested")
+    assert states[-2:] == ["verify-resume", "resume-verified"]
+    assert actions == ["cancel", "resume", "cancel"]
 
 
 def test_watch_cancels_final_sync_before_verifying_superseding_start(

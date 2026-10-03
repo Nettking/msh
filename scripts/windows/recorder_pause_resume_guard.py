@@ -554,8 +554,27 @@ def _runtime_binding_match(config: dict[str, Any]) -> tuple[bool | None, dict[st
     return True, status
 
 
-def _controller_age(config: dict[str, Any]) -> float:
-    payload = _read_json(Path(str(config["controller_heartbeat_path"])))
+def _controller_age(config: dict[str, Any]) -> float | None:
+    heartbeat_path = Path(str(config["controller_heartbeat_path"]))
+    try:
+        heartbeat_path.stat()
+    except FileNotFoundError:
+        # Before run_final_sync starts, the host guard is expected to see no
+        # controller heartbeat. A process receipt means startup did begin and
+        # then lost its heartbeat, which is a failure rather than a grace state.
+        process_receipt = config.get("copy_processes_path")
+        if not isinstance(process_receipt, str) or not process_receipt:
+            return float("inf")
+        try:
+            Path(process_receipt).stat()
+        except FileNotFoundError:
+            return None
+        except OSError:
+            return float("inf")
+        return float("inf")
+    except OSError:
+        return float("inf")
+    payload = _read_json(heartbeat_path)
     if payload is None or payload.get("operation_id") != config["operation_id"]:
         return float("inf")
     observed = _parse_utc(payload.get("observed_at_utc"))
@@ -1559,6 +1578,17 @@ def watch(config_path: Path) -> int:
                     config,
                     action.value,
                     inflight_capture_tasks=observation.inflight_capture_tasks,
+                )
+            elif action is PauseGuardAction.WAIT_FOR_CONTROLLER:
+                _event(
+                    config,
+                    action.value,
+                    pause_acknowledged_at_utc=_iso(
+                        observation.pause_acknowledged_at
+                    ),
+                    controller_start_timeout_seconds=config.get(
+                        "controller_stale_after_seconds", 10
+                    ),
                 )
             elif action is PauseGuardAction.COPY_MAY_CONTINUE:
                 _event(config, action.value)
