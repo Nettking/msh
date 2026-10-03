@@ -200,8 +200,11 @@ def enforce_human_authorization():
 
             if _is_local_resume_guard_request():
                 return None
-        except Exception:  # noqa: BLE001 - invalid guard credentials fail closed
-            pass
+        except ImportError as exc:
+            current_app.logger.warning(
+                "Recorder resume guard policy could not load its route validator: %s",
+                exc,
+            )
     if pre_auth_federation_bootstrap_allowed(endpoint):
         return None
     if not current_user.is_authenticated or not current_user.is_active:
