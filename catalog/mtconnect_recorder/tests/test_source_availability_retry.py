@@ -658,6 +658,10 @@ def test_startup_does_not_acknowledge_pause_request_from_previous_runtime(
         service._harvest_capture_results()
         assert len(service.restart_pause_recovery_sources) == 1
         assert service.restart_pause_recovery_required is True
+        # A config refresh while another source is recovering must not put an
+        # already completed source back into the inherited recovery frontier.
+        service.refresh_configuration(force=True)
+        assert len(service.restart_pause_recovery_sources) == 1
 
         second_recovery: Future[rt.CaptureResult] = Future()
         service._capture_futures["SECOND-MACHINE"] = (BASE_URL, second_recovery)
@@ -675,6 +679,54 @@ def test_startup_does_not_acknowledge_pause_request_from_previous_runtime(
         assert status["capture_control"]["pause_request_predates_runtime"] is False
         assert status["capture_control"]["restart_recovery_required"] is False
         assert status["capture_control"]["durable_boundary"] is True
+    finally:
+        service.executor.shutdown(wait=True, cancel_futures=False)
+        rt.unregister_stop_target(service)
+
+
+def test_new_endpoint_cannot_satisfy_previous_runtime_recovery_frontier(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    control = {"enabled": False, "operation_id": "pause-from-prior-runtime"}
+    configured_sources = {SOURCE: BASE_URL}
+    monkeypatch.setattr(rt, "MANAGED_MODE", True)
+    monkeypatch.setattr(
+        rt,
+        "_read_json",
+        lambda path: control if path == rt.CONTROL_FILE else {"sources": []},
+    )
+    monkeypatch.setattr(
+        rt,
+        "_managed_configuration",
+        lambda _config: (configured_sources, 0.2),
+    )
+    monkeypatch.setattr(rt, "STATUS_FILE", tmp_path / "status.json")
+    monkeypatch.setattr(rt, "STATE_FILE", tmp_path / "state.json")
+    service = rt.RecorderRuntime()
+    previous_endpoint = rt.normalize_agent_base_url(BASE_URL)
+    replacement_endpoint = "http://replacement.example:5000"
+
+    try:
+        service.refresh_configuration(force=True)
+        assert service.restart_pause_recovery_sources == {(SOURCE, previous_endpoint)}
+
+        # Repointing the same logical source does not rewrite the uncertain
+        # prior-runtime frontier to the new endpoint.
+        control.update(enabled=True, operation_id="new-start")
+        configured_sources[SOURCE] = replacement_endpoint
+        service.refresh_configuration(force=True)
+        assert service.restart_pause_recovery_sources == {(SOURCE, previous_endpoint)}
+
+        pending: Future[rt.CaptureResult] = Future()
+        service._capture_futures[SOURCE] = (replacement_endpoint, pending)
+        pending.set_result(
+            rt.CaptureResult(SOURCE, True, "", transaction_complete=True)
+        )
+        service._harvest_capture_results()
+
+        assert service.restart_pause_recovery_required is True
+        assert service.restart_pause_recovery_sources == {(SOURCE, previous_endpoint)}
     finally:
         service.executor.shutdown(wait=True, cancel_futures=False)
         rt.unregister_stop_target(service)

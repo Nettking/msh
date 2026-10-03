@@ -551,6 +551,7 @@ class RecorderRuntime:
         self.pause_request_predates_runtime_id: str | None = None
         self.restart_pause_recovery_required = False
         self.restart_pause_recovery_sources: set[tuple[str, str]] = set()
+        self.restart_pause_recovery_sources_initialized = False
         self.pause_acknowledged_operation_id: str | None = None
         self.pause_acknowledged_at: str | None = None
         self.capture_drain_error_operation_id: str | None = None
@@ -822,15 +823,17 @@ class RecorderRuntime:
             if self.restart_pause_recovery_required:
                 remapped_requirements: set[tuple[str, str]] = set()
                 for old_name, old_url in self.restart_pause_recovery_sources:
-                    if old_name in sources:
-                        remapped_requirements.add(
-                            (old_name, normalize_agent_base_url(sources[old_name]))
-                        )
+                    if (
+                        old_name in sources
+                        and normalize_agent_base_url(sources[old_name]) == old_url
+                    ):
+                        remapped_requirements.add((old_name, old_url))
                         continue
                     alias_matches = [
                         new_name
                         for new_name, new_url in sources.items()
-                        if normalize_agent_base_url(new_url) == old_url
+                        if old_name not in sources
+                        and normalize_agent_base_url(new_url) == old_url
                         and old_name
                         in getattr(
                             self.checkpoints.get(new_name),
@@ -843,10 +846,17 @@ class RecorderRuntime:
                     else:
                         remapped_requirements.add((old_name, old_url))
                 self.restart_pause_recovery_sources = remapped_requirements
-                self.restart_pause_recovery_sources.update(
-                    (name, normalize_agent_base_url(source_url))
-                    for name, source_url in sources.items()
-                )
+                # This set is the recovery frontier inherited from the prior
+                # runtime. Do not replace an old endpoint with a newly
+                # configured one, and do not re-add a source whose successful
+                # recovery was already observed. A changed endpoint cannot
+                # prove completion of the old transaction frontier.
+                if not self.restart_pause_recovery_sources_initialized and sources:
+                    self.restart_pause_recovery_sources.update(
+                        (name, normalize_agent_base_url(source_url))
+                        for name, source_url in sources.items()
+                    )
+                    self.restart_pause_recovery_sources_initialized = True
             self.enabled = enabled
             self.control_operation_id = operation_id
             if operation_id != previous_operation_id:
