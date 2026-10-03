@@ -599,6 +599,7 @@ def _cancel_final_sync(config: dict[str, Any]) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
     for item in processes:
         if not isinstance(item, dict):
+            results.append({"result": "invalid-final-sync-process-entry"})
             continue
         pid = item.get("pid")
         command_hash = item.get("command_line_sha256")
@@ -676,21 +677,43 @@ function Release-ControlOwnership {
     $script:controlLockHandle.Dispose(); $script:controlLockHandle=$null
   }
 }
+if(-not (Test-OwnedPause)){ Write-Output 'control-owner-changed'; exit 5 }
+# Look up and validate the PID only after acquiring the same lock Recorder uses
+# for control changes. This closes the PID-reuse window while lock acquisition waits.
 $item=Get-CimInstance Win32_Process -Filter "ProcessId=$pidValue"
 if($null -eq $item){ Write-Output 'absent'; exit 0 }
 $commandLine=[string]$item.CommandLine
 if([string]::IsNullOrWhiteSpace($commandLine) -or -not $commandLine.Contains($operation)){ Write-Output 'tag-mismatch'; exit 2 }
 $bytes=[Text.Encoding]::UTF8.GetBytes($commandLine)
-$hash=([Security.Cryptography.SHA256]::Create())
-try { $sha=[BitConverter]::ToString($hash.ComputeHash($bytes)).Replace('-','').ToLowerInvariant() }
-finally { $hash.Dispose() }
+$hasher=[Security.Cryptography.SHA256]::Create()
+try { $sha=[BitConverter]::ToString($hasher.ComputeHash($bytes)).Replace('-','').ToLowerInvariant() }
+finally { $hasher.Dispose() }
 if($sha -ne $expectedHash){ Write-Output 'command-hash-mismatch'; exit 3 }
 $created=$item.CreationDate.ToUniversalTime().ToString('o')
 if([Math]::Abs(([DateTime]::Parse($created)-[DateTime]::Parse($expectedCreated)).TotalSeconds) -gt 2){ Write-Output 'creation-time-mismatch'; exit 4 }
-if(-not (Test-OwnedPause)){ Write-Output 'control-owner-changed'; exit 5 }
 try {
-  taskkill.exe /PID $pidValue /T /F | Out-Null
-  if($LASTEXITCODE -ne 0){ Write-Output 'taskkill-failed'; exit $LASTEXITCODE }
+  # Keep helper termination bounded separately from lock acquisition. If the
+  # copy still exists afterward, the caller records an unconfirmed cancellation
+  # and must not request Recorder resume until a later check proves it is gone.
+  $killer=Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\taskkill.exe') -ArgumentList @('/PID',[string]$pidValue,'/T','/F') -PassThru -NoNewWindow
+  if(-not $killer.WaitForExit(10000)){
+    try { $killer.Kill() } catch {}
+    if(-not $killer.WaitForExit(2000)){ Write-Output 'taskkill-helper-did-not-stop'; exit 7 }
+    Write-Output 'taskkill-timeout'; exit 6
+  }
+  $killer.Refresh()
+  $remaining=Get-CimInstance Win32_Process -Filter "ProcessId=$pidValue"
+  if($null -ne $remaining){
+    $remainingCommand=[string]$remaining.CommandLine
+    $remainingBytes=[Text.Encoding]::UTF8.GetBytes($remainingCommand)
+    $remainingHasher=[Security.Cryptography.SHA256]::Create()
+    try { $remainingHash=([BitConverter]::ToString($remainingHasher.ComputeHash($remainingBytes))).Replace('-','').ToLowerInvariant() }
+    finally { $remainingHasher.Dispose() }
+    $remainingCreated=$remaining.CreationDate.ToUniversalTime().ToString('o')
+    if($remainingHash -eq $expectedHash -and [Math]::Abs(([DateTime]::Parse($remainingCreated)-[DateTime]::Parse($expectedCreated)).TotalSeconds) -le 2){
+      Write-Output 'bound-process-still-running'; exit 8
+    }
+  }
   Write-Output 'terminated-bound-final-sync-process-tree'
 } finally { Release-ControlOwnership }
 '''
@@ -707,7 +730,9 @@ try {
                 ],
                 capture_output=True,
                 text=True,
-                timeout=10,
+                # The PowerShell side has a 5s lock budget and a separate 10s
+                # termination budget (plus bounded helper cleanup).
+                timeout=25,
                 check=False,
             )
             result = completed.stdout.strip().splitlines()[-1] if completed.stdout.strip() else "no-result"
@@ -715,6 +740,18 @@ try {
         except (OSError, subprocess.TimeoutExpired):
             results.append({"pid": pid, "result": "process-check-failed"})
     return results
+
+
+def _final_sync_cancellation_confirmed(results: list[dict[str, Any]]) -> bool:
+    """Return true only when every operation-bound copy is proven absent."""
+    return all(
+        result.get("result") == "absent"
+        or (
+            result.get("result") == "terminated-bound-final-sync-process-tree"
+            and result.get("exit_code") == 0
+        )
+        for result in results
+    )
 
 
 def watch(config_path: Path) -> int:
@@ -769,7 +806,10 @@ def watch(config_path: Path) -> int:
             resume_operation_id
         ):
             machine.note_resume_requested(resume_operation_id)
-        recovery_triggered = prior_state.get("recovery_triggered") is True
+        # A restarted controller must revalidate cancellation from the current
+        # process binding. Older guard state may have recorded this flag before
+        # cancellation was positively confirmed.
+        recovery_triggered = False
         next_resume_attempt_at = 0.0
         while True:
             now = _utc_now()
@@ -807,14 +847,22 @@ def watch(config_path: Path) -> int:
             elif action is PauseGuardAction.REQUEST_RESUME:
                 if not recovery_triggered:
                     canceled = _cancel_final_sync(config)
-                    recovery_triggered = True
-                    _event(
-                        config,
-                        "resume-requested",
-                        canceled_final_sync=canceled,
-                        recovery_triggered=True,
-                    )
-                if time.monotonic() >= next_resume_attempt_at:
+                    if _final_sync_cancellation_confirmed(canceled):
+                        recovery_triggered = True
+                        _event(
+                            config,
+                            "resume-requested",
+                            canceled_final_sync=canceled,
+                            recovery_triggered=True,
+                        )
+                    else:
+                        _event(
+                            config,
+                            "final-sync-cancellation-unconfirmed",
+                            canceled_final_sync=canceled,
+                            recovery_triggered=False,
+                        )
+                if recovery_triggered and time.monotonic() >= next_resume_attempt_at:
                     resume_id, resume_result = _request_resume(config)
                     if resume_id:
                         machine.note_resume_requested(resume_id)

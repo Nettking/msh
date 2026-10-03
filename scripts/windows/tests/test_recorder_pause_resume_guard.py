@@ -5,6 +5,8 @@ import ctypes
 import hashlib
 import json
 import os
+import subprocess
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -75,9 +77,11 @@ def test_final_sync_termination_command_binds_payload_inside_encoded_script(
         encoding="utf-8",
     )
     calls: list[list[str]] = []
+    call_kwargs: list[dict] = []
 
     def fake_run(args, **kwargs):
         calls.append(args)
+        call_kwargs.append(kwargs)
         return SimpleNamespace(returncode=0, stdout="terminated-bound-final-sync-process-tree\n")
 
     monkeypatch.setattr(guard.subprocess, "run", fake_run)
@@ -91,6 +95,7 @@ def test_final_sync_termination_command_binds_payload_inside_encoded_script(
         }
     ]
     assert len(calls) == 1
+    assert call_kwargs[0]["timeout"] == 25
     assert calls[0][-2] == "-EncodedCommand"
     assert len(calls[0]) == 5
     script = base64.b64decode(calls[0][-1]).decode("utf-16le")
@@ -116,8 +121,78 @@ def test_final_sync_termination_command_binds_payload_inside_encoded_script(
     assert "$script:controlLockHandle.Lock(0,1)" in script
     assert "$script:controlLockHandle.Unlock(0,1)" in script
     assert "if(-not (Test-OwnedPause)){ Write-Output 'control-owner-changed'; exit 5 }" in script
-    assert script.index("$script:controlLockHandle.Lock(0,1)") < script.index("taskkill.exe /PID")
-    assert script.index("taskkill.exe /PID") < script.rindex("Release-ControlOwnership")
+    assert script.index("Test-OwnedPause)){ Write-Output 'control-owner-changed'") < script.index(
+        'Get-CimInstance Win32_Process -Filter "ProcessId=$pidValue"'
+    )
+    assert script.index("$script:controlLockHandle.Lock(0,1)") < script.index(
+        "@('/PID',[string]$pidValue,'/T','/F')"
+    )
+    assert script.index("@('/PID',[string]$pidValue,'/T','/F')") < script.rindex(
+        "Release-ControlOwnership"
+    )
+    assert "$attempt -lt 100" in script
+    assert "$killer.WaitForExit(10000)" in script
+    assert "$killer.WaitForExit(2000)" in script
+
+
+def test_final_sync_cancellation_rejects_malformed_process_entry(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = _watch_config(tmp_path)
+    operation_id = config["operation_id"]
+    Path(config["copy_processes_path"]).write_text(
+        json.dumps({"operation_id": operation_id, "processes": [None]}),
+        encoding="utf-8",
+    )
+    Path(config["runtime_binding"]["control_path"]).write_text(
+        json.dumps(
+            {
+                "enabled": False,
+                "operation_id": operation_id,
+                "resume_guard": {
+                    "operation_id": operation_id,
+                    "prior_control_operation_id": config["prior_control_operation_id"],
+                    "runtime_binding_sha256": config["runtime_binding_sha256"],
+                    "token_sha256": config["resume_token_sha256"],
+                    "deadline_utc": config["hard_deadline_utc"],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        guard.subprocess,
+        "run",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("must not run")),
+    )
+
+    assert guard._cancel_final_sync(config) == [
+        {"result": "invalid-final-sync-process-entry"}
+    ]
+
+
+@pytest.mark.parametrize(
+    ("results", "confirmed"),
+    [
+        ([], True),
+        ([{"result": "absent", "exit_code": 0}], True),
+        (
+            [
+                {
+                    "result": "terminated-bound-final-sync-process-tree",
+                    "exit_code": 0,
+                }
+            ],
+            True,
+        ),
+        ([{"result": "process-check-failed"}], False),
+        ([{"result": "taskkill-timeout", "exit_code": 6}], False),
+        ([{"result": "terminated-bound-final-sync-process-tree"}], False),
+        ([{"result": "absent"}, {"result": "bound-process-still-running"}], False),
+    ],
+)
+def test_final_sync_cancellation_requires_positive_confirmation(results, confirmed) -> None:
+    assert guard._final_sync_cancellation_confirmed(results) is confirmed
 
 
 def test_final_sync_termination_does_not_run_for_another_operation(
@@ -272,6 +347,99 @@ def test_termination_script_rechecks_owner_after_initial_guard_observation(
     assert guard._cancel_final_sync(config) == [
         {"pid": 1234, "result": "control-owner-changed", "exit_code": 5}
     ]
+
+
+@pytest.mark.skipif(os.name != "nt", reason="exercise generated termination against a disposable process")
+def test_termination_script_stops_only_the_bound_disposable_copy_process(
+    tmp_path: Path,
+) -> None:
+    config = _watch_config(tmp_path)
+    operation_id = config["operation_id"]
+    process = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            "import time; time.sleep(60)",
+            "--operation",
+            operation_id,
+        ],
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
+    try:
+        metadata_script = (
+            "$ProgressPreference='SilentlyContinue';"
+            f"$p=Get-CimInstance Win32_Process -Filter 'ProcessId={process.pid}';"
+            "$o=[ordered]@{command_line=[string]$p.CommandLine;"
+            "creation_utc=$p.CreationDate.ToUniversalTime().ToString('o')};"
+            "$o|ConvertTo-Json -Compress"
+        )
+        metadata_result = subprocess.run(
+            [
+                "powershell.exe",
+                "-NoLogo",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                metadata_script,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=True,
+        )
+        metadata_line = next(
+            line for line in reversed(metadata_result.stdout.splitlines()) if line.startswith("{")
+        )
+        metadata = json.loads(metadata_line)
+        process_path = Path(config["copy_processes_path"])
+        process_path.write_text(
+            json.dumps(
+                {
+                    "operation_id": operation_id,
+                    "processes": [
+                        {
+                            "pid": process.pid,
+                            "command_line_sha256": hashlib.sha256(
+                                metadata["command_line"].encode("utf-8")
+                            ).hexdigest(),
+                            "creation_utc": metadata["creation_utc"],
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        Path(config["runtime_binding"]["control_path"]).write_text(
+            json.dumps(
+                {
+                    "enabled": False,
+                    "operation_id": operation_id,
+                    "resume_guard": {
+                        "operation_id": operation_id,
+                        "prior_control_operation_id": config["prior_control_operation_id"],
+                        "runtime_binding_sha256": config["runtime_binding_sha256"],
+                        "token_sha256": config["resume_token_sha256"],
+                        "deadline_utc": config["hard_deadline_utc"],
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        result = guard._cancel_final_sync(config)
+
+        assert result == [
+            {
+                "pid": process.pid,
+                "result": "terminated-bound-final-sync-process-tree",
+                "exit_code": 0,
+            }
+        ]
+        assert process.wait(timeout=5) is not None
+    finally:
+        if process.poll() is None:
+            process.terminate()
+            process.wait(timeout=5)
 
 
 def test_ps_registration_script_passes_its_operation_id_validator() -> None:
@@ -611,7 +779,13 @@ def test_watch_cancels_final_sync_then_resumes_and_verifies_capture(
     monkeypatch.setattr(
         guard,
         "_cancel_final_sync",
-        lambda _config: actions.append("cancel") or [{"result": "terminated"}],
+        lambda _config: actions.append("cancel")
+        or [
+            {
+                "result": "terminated-bound-final-sync-process-tree",
+                "exit_code": 0,
+            }
+        ],
     )
     monkeypatch.setattr(
         guard,
@@ -629,10 +803,91 @@ def test_watch_cancels_final_sync_then_resumes_and_verifies_capture(
         "resume-verified",
     ]
     resume_event = next(event for event in events if event["state"] == "resume-requested")
-    assert resume_event["canceled_final_sync"] == [{"result": "terminated"}]
+    assert resume_event["canceled_final_sync"] == [
+        {"result": "terminated-bound-final-sync-process-tree", "exit_code": 0}
+    ]
 
 
-def test_restarted_watch_recovers_exact_guard_owned_pause(
+def test_watch_retries_unconfirmed_cancellation_before_requesting_resume(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = _watch_config(tmp_path)
+    resume_operation_id = "d" * 32
+    pause_control = _watch_observation(heartbeat_age=11.0)[1]
+    pause_control["resume_guard"]["deadline_utc"] = config["hard_deadline_utc"]
+    observations = iter(
+        [
+            _watch_observation(operation_id="b" * 32, enabled=True),
+            (_watch_observation(heartbeat_age=11.0)[0], pause_control),
+            (_watch_observation(heartbeat_age=11.0)[0], pause_control),
+            _watch_observation(
+                operation_id=resume_operation_id,
+                enabled=True,
+                acknowledged=None,
+                scheduling=False,
+                durable=False,
+            ),
+            _watch_observation(
+                operation_id=resume_operation_id,
+                enabled=True,
+                acknowledged=None,
+                scheduling=True,
+                schedule_count=101,
+                durable=False,
+            ),
+        ]
+    )
+    actions: list[str] = []
+    events: list[dict] = []
+    cancellation_results = iter(
+        [
+            [{"result": "process-check-failed"}],
+            [
+                {
+                    "result": "terminated-bound-final-sync-process-tree",
+                    "exit_code": 0,
+                }
+            ],
+        ]
+    )
+
+    monkeypatch.setattr(guard, "_load_config", lambda _path: config)
+    monkeypatch.setattr(guard, "_host_mutex", lambda _config: (object(), 1234))
+    monkeypatch.setattr(guard, "_release_mutex", lambda *_args: None)
+    monkeypatch.setattr(guard, "_observation", lambda _config: next(observations))
+    monkeypatch.setattr(guard, "_read_json", lambda _path: None)
+    monkeypatch.setattr(
+        guard,
+        "_cancel_final_sync",
+        lambda _config: actions.append("cancel") or next(cancellation_results),
+    )
+    monkeypatch.setattr(
+        guard,
+        "_request_resume",
+        lambda _config: actions.append("resume")
+        or (resume_operation_id, {"result": "accepted"}),
+    )
+    monkeypatch.setattr(
+        guard, "_event", lambda _config, state, **kw: events.append({"state": state, **kw})
+    )
+    monkeypatch.setattr(guard.time, "sleep", lambda _seconds: None)
+
+    assert guard.watch(tmp_path / "guard.json") == 0
+    assert actions == ["cancel", "cancel", "resume"]
+    assert [event["state"] for event in events].count(
+        "final-sync-cancellation-unconfirmed"
+    ) == 1
+    assert events[0]["state"] == "armed"
+    assert next(
+        index for index, event in enumerate(events) if event["state"] == "resume-requested"
+    ) > next(
+        index
+        for index, event in enumerate(events)
+        if event["state"] == "final-sync-cancellation-unconfirmed"
+    )
+
+
+def test_restarted_watch_revalidates_copy_before_resume(
     tmp_path: Path, monkeypatch
 ) -> None:
     config = _watch_config(tmp_path)
@@ -668,11 +923,25 @@ def test_restarted_watch_recovers_exact_guard_owned_pause(
     monkeypatch.setattr(guard, "_host_mutex", lambda _config: (object(), 1234))
     monkeypatch.setattr(guard, "_release_mutex", lambda *_args: None)
     monkeypatch.setattr(guard, "_observation", lambda _config: next(observations))
-    monkeypatch.setattr(guard, "_read_json", lambda _path: None)
+    monkeypatch.setattr(
+        guard,
+        "_read_json",
+        lambda path: (
+            {"recovery_triggered": True}
+            if Path(path) == Path(config["guard_state_path"])
+            else None
+        ),
+    )
     monkeypatch.setattr(
         guard,
         "_cancel_final_sync",
-        lambda _config: actions.append("cancel") or [{"result": "terminated"}],
+        lambda _config: actions.append("cancel")
+        or [
+            {
+                "result": "terminated-bound-final-sync-process-tree",
+                "exit_code": 0,
+            }
+        ],
     )
     monkeypatch.setattr(
         guard,
