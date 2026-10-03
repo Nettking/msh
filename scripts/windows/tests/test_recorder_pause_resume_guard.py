@@ -38,10 +38,11 @@ class _FakeKernel32:
 def test_final_sync_termination_command_binds_payload_inside_encoded_script(
     tmp_path: Path, monkeypatch
 ) -> None:
-    operation_id = "a" * 32
+    config = _watch_config(tmp_path)
+    operation_id = config["operation_id"]
     command_hash = hashlib.sha256(b"python copy.py --operation " + operation_id.encode()).hexdigest()
     creation_utc = "2026-10-03T06:00:00Z"
-    process_path = tmp_path / "copy-processes.json"
+    process_path = Path(config["copy_processes_path"])
     process_path.write_text(
         json.dumps(
             {
@@ -57,6 +58,22 @@ def test_final_sync_termination_command_binds_payload_inside_encoded_script(
         ),
         encoding="utf-8",
     )
+    Path(config["runtime_binding"]["control_path"]).write_text(
+        json.dumps(
+            {
+                "enabled": False,
+                "operation_id": operation_id,
+                "resume_guard": {
+                    "operation_id": operation_id,
+                    "prior_control_operation_id": config["prior_control_operation_id"],
+                    "runtime_binding_sha256": config["runtime_binding_sha256"],
+                    "token_sha256": config["resume_token_sha256"],
+                    "deadline_utc": config["hard_deadline_utc"],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
     calls: list[list[str]] = []
 
     def fake_run(args, **kwargs):
@@ -64,9 +81,7 @@ def test_final_sync_termination_command_binds_payload_inside_encoded_script(
         return SimpleNamespace(returncode=0, stdout="terminated-bound-final-sync-process-tree\n")
 
     monkeypatch.setattr(guard.subprocess, "run", fake_run)
-    result = guard._cancel_final_sync(
-        {"copy_processes_path": str(process_path), "operation_id": operation_id}
-    )
+    result = guard._cancel_final_sync(config)
 
     assert result == [
         {
@@ -86,18 +101,48 @@ def test_final_sync_termination_command_binds_payload_inside_encoded_script(
         "command_line_sha256": command_hash,
         "creation_utc": creation_utc,
         "operation_id": operation_id,
+        "control_path": str(Path(config["runtime_binding"]["control_path"])),
+        "prior_control_operation_id": config["prior_control_operation_id"],
+        "runtime_binding_sha256": config["runtime_binding_sha256"],
+        "resume_token_sha256": config["resume_token_sha256"],
+        "hard_deadline_utc": config["hard_deadline_utc"],
     }
     assert operation_id not in script
     assert "[Convert]::ToHexString" not in script
     assert "[Security.Cryptography.SHA256]::Create()" in script
+    assert "[IO.File]::Open($controlPath,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)" in script
+    assert "[IO.FileShare]::Read" in script
+    assert "($controlPath+'.lock')" in script
+    assert "$script:controlLockHandle.Lock(0,1)" in script
+    assert "$script:controlLockHandle.Unlock(0,1)" in script
+    assert "if(-not (Test-OwnedPause)){ Write-Output 'control-owner-changed'; exit 5 }" in script
+    assert script.index("$script:controlLockHandle.Lock(0,1)") < script.index("taskkill.exe /PID")
+    assert script.index("taskkill.exe /PID") < script.rindex("Release-ControlOwnership")
 
 
 def test_final_sync_termination_does_not_run_for_another_operation(
     tmp_path: Path, monkeypatch
 ) -> None:
-    process_path = tmp_path / "copy-processes.json"
+    config = _watch_config(tmp_path)
+    process_path = Path(config["copy_processes_path"])
     process_path.write_text(
         json.dumps({"operation_id": "b" * 32, "processes": []}),
+        encoding="utf-8",
+    )
+    Path(config["runtime_binding"]["control_path"]).write_text(
+        json.dumps(
+            {
+                "enabled": False,
+                "operation_id": config["operation_id"],
+                "resume_guard": {
+                    "operation_id": config["operation_id"],
+                    "prior_control_operation_id": config["prior_control_operation_id"],
+                    "runtime_binding_sha256": config["runtime_binding_sha256"],
+                    "token_sha256": config["resume_token_sha256"],
+                    "deadline_utc": config["hard_deadline_utc"],
+                },
+            }
+        ),
         encoding="utf-8",
     )
     monkeypatch.setattr(
@@ -105,9 +150,128 @@ def test_final_sync_termination_does_not_run_for_another_operation(
         "run",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("must not run")),
     )
-    assert guard._cancel_final_sync(
-        {"copy_processes_path": str(process_path), "operation_id": "a" * 32}
-    ) == [{"result": "no-verified-final-sync-process-record"}]
+    assert guard._cancel_final_sync(config) == [
+        {"result": "no-verified-final-sync-process-record"}
+    ]
+
+
+def test_final_sync_is_not_terminated_after_operator_changes_control_owner(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = _watch_config(tmp_path)
+    operation_id = config["operation_id"]
+    command_hash = hashlib.sha256(b"copy --operation " + operation_id.encode()).hexdigest()
+    Path(config["copy_processes_path"]).write_text(
+        json.dumps(
+            {
+                "operation_id": operation_id,
+                "processes": [
+                    {
+                        "pid": 1234,
+                        "command_line_sha256": command_hash,
+                        "creation_utc": "2026-10-03T06:00:00Z",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    Path(config["runtime_binding"]["control_path"]).write_text(
+        json.dumps({"enabled": True, "operation_id": "e" * 32}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        guard.subprocess,
+        "run",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("must not run")),
+    )
+
+    assert guard._cancel_final_sync(config) == [{"result": "control-owner-changed"}]
+
+
+@pytest.mark.skipif(os.name != "nt", reason="exercise the generated Windows termination script")
+def test_termination_script_rechecks_owner_after_initial_guard_observation(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = _watch_config(tmp_path)
+    operation_id = config["operation_id"]
+    command_line = "python copy.py --operation " + operation_id
+    command_hash = hashlib.sha256(command_line.encode("utf-8")).hexdigest()
+    creation_utc = "2026-10-03T06:00:00Z"
+    Path(config["copy_processes_path"]).write_text(
+        json.dumps(
+            {
+                "operation_id": operation_id,
+                "processes": [
+                    {
+                        "pid": 1234,
+                        "command_line_sha256": command_hash,
+                        "creation_utc": creation_utc,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    control_path = Path(config["runtime_binding"]["control_path"])
+    control_path.write_text(
+        json.dumps(
+            {
+                "enabled": False,
+                "operation_id": operation_id,
+                "resume_guard": {
+                    "operation_id": operation_id,
+                    "prior_control_operation_id": config["prior_control_operation_id"],
+                    "runtime_binding_sha256": config["runtime_binding_sha256"],
+                    "token_sha256": config["resume_token_sha256"],
+                    "deadline_utc": config["hard_deadline_utc"],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    original_run = guard.subprocess.run
+
+    def change_owner_then_run_script(args, **kwargs):
+        encoded_script = args[-1]
+        script = base64.b64decode(encoded_script).decode("utf-16le")
+        script = script.replace(
+            '$item=Get-CimInstance Win32_Process -Filter "ProcessId=$pidValue"',
+            f"$item=[pscustomobject]@{{CommandLine='{command_line}';CreationDate=[datetime]::Parse('{creation_utc}')}}",
+        )
+        script = script.replace(
+            "taskkill.exe /PID $pidValue /T /F | Out-Null",
+            "Write-Output 'unexpected-termination'; exit 99",
+        )
+        control_path.write_text(
+            json.dumps({"enabled": True, "operation_id": "e" * 32}),
+            encoding="utf-8",
+        )
+        changed_encoding = base64.b64encode(script.encode("utf-16le")).decode("ascii")
+        completed = original_run(
+            [
+                "powershell.exe",
+                "-NoProfile",
+                "-NonInteractive",
+                "-EncodedCommand",
+                changed_encoding,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        return SimpleNamespace(
+            returncode=completed.returncode,
+            stdout=completed.stdout,
+            stderr=completed.stderr,
+        )
+
+    monkeypatch.setattr(guard.subprocess, "run", change_owner_then_run_script)
+
+    assert guard._cancel_final_sync(config) == [
+        {"pid": 1234, "result": "control-owner-changed", "exit_code": 5}
+    ]
 
 
 def test_ps_registration_script_passes_its_operation_id_validator() -> None:
@@ -259,7 +423,10 @@ def _watch_config(tmp_path: Path) -> dict:
         "controller_heartbeat_path": str(tmp_path / "controller.json"),
         "copy_outcome_path": str(tmp_path / "copy.json"),
         "copy_processes_path": str(tmp_path / "copy-processes.json"),
-        "runtime_binding": {"repo_root": str(tmp_path)},
+        "runtime_binding": {
+            "repo_root": str(tmp_path),
+            "control_path": str(tmp_path / "control.json"),
+        },
     }
 
 

@@ -30,7 +30,7 @@ GUARD_DIR = Path(__file__).resolve().parent
 if str(GUARD_DIR) not in sys.path:
     sys.path.insert(0, str(GUARD_DIR))
 
-from recorder_pause_resume_guard_logic import (  # noqa: E402
+from recorder_pause_resume_guard_logic import (
     BoundedPauseResumeGuard,
     PauseGuardAction,
     PauseGuardObservation,
@@ -587,6 +587,9 @@ def _request_resume(
 
 
 def _cancel_final_sync(config: dict[str, Any]) -> list[dict[str, Any]]:
+    control_path = str(config["runtime_binding"]["control_path"])
+    if not _control_has_owned_pause(_read_json(Path(control_path)), config):
+        return [{"result": "control-owner-changed"}]
     payload = _read_json(Path(str(config["copy_processes_path"])))
     if payload is None or payload.get("operation_id") != config["operation_id"]:
         return [{"result": "no-verified-final-sync-process-record"}]
@@ -615,6 +618,11 @@ def _cancel_final_sync(config: dict[str, Any]) -> list[dict[str, Any]]:
                 "command_line_sha256": command_hash,
                 "creation_utc": creation_utc,
                 "operation_id": config["operation_id"],
+                "control_path": control_path,
+                "prior_control_operation_id": config["prior_control_operation_id"],
+                "runtime_binding_sha256": config["runtime_binding_sha256"],
+                "resume_token_sha256": config["resume_token_sha256"],
+                "hard_deadline_utc": config["hard_deadline_utc"],
             },
             separators=(",", ":"),
         ).encode("utf-8")
@@ -626,6 +634,48 @@ $pidValue=[int]$payload.pid
 $expectedHash=[string]$payload.command_line_sha256
 $expectedCreated=[string]$payload.creation_utc
 $operation=[string]$payload.operation_id
+$controlPath=[string]$payload.control_path
+$priorOperation=[string]$payload.prior_control_operation_id
+$runtimeBinding=[string]$payload.runtime_binding_sha256
+$tokenHash=[string]$payload.resume_token_sha256
+$deadline=[string]$payload.hard_deadline_utc
+function Test-OwnedPause {
+  try {
+    # Match RecorderControlService's byte-range lock while checking and terminating.
+    $script:controlLockHandle=[IO.File]::Open(($controlPath+'.lock'),[IO.FileMode]::OpenOrCreate,[IO.FileAccess]::ReadWrite,[IO.FileShare]::ReadWrite)
+    if($script:controlLockHandle.Length -eq 0){ $script:controlLockHandle.WriteByte(0); $script:controlLockHandle.Flush() }
+    $locked=$false
+    for($attempt=0;$attempt -lt 100;$attempt++){
+      try { $script:controlLockHandle.Lock(0,1); $locked=$true; break }
+      catch { Start-Sleep -Milliseconds 50 }
+    }
+    if(-not $locked){ Release-ControlOwnership; return $false }
+    $script:controlHandle=[IO.File]::Open($controlPath,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
+    $reader=[IO.StreamReader]::new($script:controlHandle,[Text.Encoding]::UTF8,$true,1024,$true)
+    try { $control=ConvertFrom-Json $reader.ReadToEnd() } finally { $reader.Dispose() }
+    $guard=$control.resume_guard
+    $matches=($control.enabled -eq $false -and
+      [string]$control.operation_id -ceq $operation -and
+      [string]$guard.operation_id -ceq $operation -and
+      [string]$guard.prior_control_operation_id -ceq $priorOperation -and
+      [string]$guard.runtime_binding_sha256 -ceq $runtimeBinding -and
+      [string]$guard.token_sha256 -ceq $tokenHash -and
+      [string]$guard.deadline_utc -ceq $deadline)
+    if($matches){ return $true }
+    Release-ControlOwnership
+    return $false
+  } catch {
+    Release-ControlOwnership
+    return $false
+  }
+}
+function Release-ControlOwnership {
+  if($script:controlHandle){ $script:controlHandle.Dispose(); $script:controlHandle=$null }
+  if($script:controlLockHandle){
+    try { $script:controlLockHandle.Unlock(0,1) } catch {}
+    $script:controlLockHandle.Dispose(); $script:controlLockHandle=$null
+  }
+}
 $item=Get-CimInstance Win32_Process -Filter "ProcessId=$pidValue"
 if($null -eq $item){ Write-Output 'absent'; exit 0 }
 $commandLine=[string]$item.CommandLine
@@ -637,9 +687,12 @@ finally { $hash.Dispose() }
 if($sha -ne $expectedHash){ Write-Output 'command-hash-mismatch'; exit 3 }
 $created=$item.CreationDate.ToUniversalTime().ToString('o')
 if([Math]::Abs(([DateTime]::Parse($created)-[DateTime]::Parse($expectedCreated)).TotalSeconds) -gt 2){ Write-Output 'creation-time-mismatch'; exit 4 }
-taskkill.exe /PID $pidValue /T /F | Out-Null
-if($LASTEXITCODE -ne 0){ Write-Output 'taskkill-failed'; exit $LASTEXITCODE }
-Write-Output 'terminated-bound-final-sync-process-tree'
+if(-not (Test-OwnedPause)){ Write-Output 'control-owner-changed'; exit 5 }
+try {
+  taskkill.exe /PID $pidValue /T /F | Out-Null
+  if($LASTEXITCODE -ne 0){ Write-Output 'taskkill-failed'; exit $LASTEXITCODE }
+  Write-Output 'terminated-bound-final-sync-process-tree'
+} finally { Release-ControlOwnership }
 '''
         script = script.replace("__PAYLOAD_BASE64__", encoded_payload)
         encoded = base64.b64encode(script.encode("utf-16le")).decode("ascii")
