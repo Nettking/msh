@@ -916,6 +916,13 @@ def install_runtime_resource_pressure(runtime_module: ModuleType) -> None:
                     name: checkpoint.to_dict()
                     for name, checkpoint in sorted(self.checkpoints.items())
                 },
+                # Pause/drain incidents are safety state, not optional
+                # diagnostics. Keep them in the resource-admitted writer too,
+                # so a restart cannot turn an unproven storage boundary into
+                # an acknowledged pause.
+                "capture_drain_failures": list(
+                    getattr(self, "capture_drain_failures", ())
+                ),
             }
             state_file = Path(runtime_module.STATE_FILE)
             with _admitted_storage_write(guard, state_file):
@@ -1046,7 +1053,7 @@ def install_runtime_resource_pressure(runtime_module: ModuleType) -> None:
         self: Any,
         source_name: str,
         base_url: str,
-    ) -> tuple[str, bool, str]:
+    ) -> Any:
         guard = getattr(self, "_recorder_resource_guard", None)
         if guard is None or not guard.attached_to(self.store):
             return original_capture(self, source_name, base_url)
@@ -1059,7 +1066,12 @@ def install_runtime_resource_pressure(runtime_module: ModuleType) -> None:
                 if pause is None:
                     raise RuntimeError("Recorder resource pause lost its assessment.")
                 _apply_pause_status(self, source_name, base_url, pause)
-                return source_name, True, ""
+                return runtime_module.CaptureResult(
+                    source_name,
+                    True,
+                    "",
+                    transaction_complete=False,
+                )
             with self.lock:
                 source = self.source_status.get(source_name)
                 if source is not None:

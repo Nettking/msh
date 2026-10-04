@@ -272,6 +272,8 @@ def _probe_peer(
         remaining = timeout_seconds if deadline is None else deadline - time.monotonic()
         if remaining <= 0:
             raise DiscoveryBudgetExceeded("Tailscale discovery scan budget exhausted")
+        request_timeout = min(timeout_seconds, remaining)
+        total_budget_limited_probe = deadline is not None and remaining <= timeout_seconds
         url = f"http://{address}:{port}/onboarding/federation/discovery.json"
         request = Request(
             url,
@@ -282,7 +284,7 @@ def _probe_peer(
             method="GET",
         )
         try:
-            with opener(request, timeout=min(timeout_seconds, remaining)) as response:
+            with opener(request, timeout=request_timeout) as response:
                 if getattr(response, "status", 200) != 200:
                     continue
                 content_type = str(response.headers.get("Content-Type", ""))
@@ -292,7 +294,14 @@ def _probe_peer(
         except (
             HTTPError, URLError, TimeoutError, OSError, ValueError,
             http.client.HTTPException,
-        ):
+        ) as exc:
+            timeout_failure = isinstance(exc, TimeoutError) or (
+                isinstance(exc, URLError) and isinstance(exc.reason, TimeoutError)
+            )
+            if total_budget_limited_probe and timeout_failure:
+                raise DiscoveryBudgetExceeded(
+                    "Tailscale discovery scan budget exhausted"
+                ) from exc
             continue
         if deadline is not None and time.monotonic() >= deadline:
             raise DiscoveryBudgetExceeded("Tailscale discovery scan budget exhausted")

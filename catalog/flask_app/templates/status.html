@@ -76,8 +76,8 @@
       <span>Last saved</span>
       <strong
         data-recorder-last-flush
-        data-timestamp="{{ recorder.last_flush_at or '' }}"
-      >{{ recorder.last_flush_at or 'Waiting for data' }}</strong>
+        data-timestamp="{{ recorder.last_commit_at or recorder.last_flush_at or '' }}"
+      >{{ recorder.last_commit_at or recorder.last_flush_at or 'Waiting for data' }}</strong>
     </article>
   </div>
 

@@ -523,9 +523,20 @@ def test_concurrent_submission_beside_the_running_driver_strands_nothing(
     stack = build_stack(tmp_path)
     stack.service.scheduler_poll_seconds = 0.05
     days = [f"2026-08-{day:02d}" for day in range(10, 20)]
+    source = stack.data_dir / "day.jsonl"
+    source.write_text(
+        '{"timestamp":"2026-08-13T10:00:00Z","machine":"A"}\n',
+        encoding="utf-8",
+    )
+    source_files = (source,)
 
     def _submit(day: str) -> str:
-        outcome = stack.submit(target_date=day)
+        work = work_slice(session_id=stack.session_id, target_date=day)
+        outcome = stack.service.submit_analysis_work(
+            work,
+            slice_files=source_files,
+            slice_root=stack.data_dir,
+        )
         stack.service.request_scheduling_pass()
         return outcome.job_id
 

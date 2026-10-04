@@ -1,6 +1,7 @@
 """HTTP client and runtime loop for the sequence-based MTConnect recorder."""
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import math
@@ -8,9 +9,10 @@ import os
 import signal
 import threading
 import time
-from collections.abc import Mapping
+import uuid
+from collections.abc import Iterator, Mapping
 from concurrent.futures import Future, ThreadPoolExecutor
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Any
@@ -66,6 +68,22 @@ RESPONSE_BYTE_LIMITS = {
 }
 _RESPONSE_READ_CHUNK_BYTES = 64 * 1024
 _MAX_HTTP_REDIRECTS = 3
+
+
+@dataclass(frozen=True)
+class CaptureResult:
+    """Return worker status separately from proof that capture work completed."""
+
+    source_name: str
+    success: bool
+    error: str
+    transaction_complete: bool
+
+    def __iter__(self) -> Iterator[str | bool]:
+        # Keep the existing three-value unpacking surface for internal callers.
+        yield self.source_name
+        yield self.success
+        yield self.error
 
 
 def _remaining_request_seconds(*, deadline: float, endpoint: str) -> float:
@@ -525,8 +543,20 @@ class RecorderRuntime:
         self.observations_written = 0
         self.raw_batches_written = 0
         self.gaps_detected = 0
+        self.capture_schedule_count = 0
+        self.last_capture_scheduled_at: str | None = None
         self.recording_started_at: str | None = None
         self.last_commit_at: str | None = None
+        self.control_operation_id: str | None = None
+        self.control_initialized = False
+        self.pause_request_predates_runtime_id: str | None = None
+        self.restart_pause_recovery_required = False
+        self.restart_pause_recovery_sources: set[tuple[str, str]] = set()
+        self.restart_pause_recovery_sources_initialized = False
+        self.pause_acknowledged_operation_id: str | None = None
+        self.pause_acknowledged_at: str | None = None
+        self.capture_drain_error_operation_id: str | None = None
+        self.capture_drain_failures: list[dict[str, Any]] = []
         self.last_error = ""
         self.message = "Recorder service is starting."
         self.state = "starting"
@@ -538,7 +568,7 @@ class RecorderRuntime:
         self.store = DurableRecorderStore(DATA_DIR)
         self.executor = ThreadPoolExecutor(max_workers=8, thread_name_prefix="mtconnect")
         self._capture_futures: dict[
-            str, tuple[str, Future[tuple[str, bool, str]]]
+            str, tuple[str, Future[CaptureResult]]
         ] = {}
         self._capture_outcomes: dict[str, bool] = {}
         register_stop_target(self)
@@ -553,6 +583,17 @@ class RecorderRuntime:
                     "start from the earliest sequence still retained by each Agent."
                 )
             return
+        failures = payload.get("capture_drain_failures")
+        if isinstance(failures, list):
+            self.capture_drain_failures = [
+                dict(item)
+                for item in failures
+                if isinstance(item, dict)
+                and isinstance(item.get("incident_id"), str)
+                and isinstance(item.get("source_name"), str)
+                and item.get("state") in {"unresolved", "recovered"}
+            ]
+            self._refresh_capture_drain_error_operation_id()
         sources = payload.get("sources")
         if not isinstance(sources, dict):
             return
@@ -579,8 +620,166 @@ class RecorderRuntime:
                     name: checkpoint.to_dict()
                     for name, checkpoint in sorted(self.checkpoints.items())
                 },
+                "capture_drain_failures": list(self.capture_drain_failures),
             }
             _write_json_atomic(STATE_FILE, payload)
+
+    def _refresh_capture_drain_error_operation_id(self) -> None:
+        unresolved = next(
+            (
+                item
+                for item in self.capture_drain_failures
+                if item.get("state") == "unresolved"
+            ),
+            None,
+        )
+        operation_id = unresolved.get("pause_operation_id") if unresolved else None
+        self.capture_drain_error_operation_id = (
+            operation_id if isinstance(operation_id, str) else None
+        )
+
+    def _has_unresolved_capture_drain_failures(self) -> bool:
+        return any(
+            item.get("state") == "unresolved"
+            for item in self.capture_drain_failures
+        )
+
+    @staticmethod
+    def _capture_endpoint_identity(base_url: str | None) -> str | None:
+        """Return a non-secret identity for the normalized capture endpoint."""
+
+        if not base_url:
+            return None
+        try:
+            normalized = normalize_agent_base_url(base_url)
+        except (TypeError, ValueError):
+            return None
+        return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+    def _capture_alias_owner(
+        self,
+        source_name: str,
+        endpoint: str,
+    ) -> str | None:
+        """Find one checkpoint alias owner for an old in-flight endpoint."""
+
+        matches = [
+            name
+            for name, checkpoint in self.checkpoints.items()
+            if source_name in checkpoint.storage_aliases
+            and (
+                (name, endpoint) in self.restart_pause_recovery_sources
+                or self._capture_endpoint_identity(checkpoint.base_url) == self._capture_endpoint_identity(endpoint)
+                or self._capture_endpoint_identity(self.sources.get(name)) == self._capture_endpoint_identity(endpoint)
+            )
+        ]
+        return matches[0] if len(matches) == 1 else None
+
+    def _record_capture_drain_failure(
+        self,
+        source_name: str,
+        error: BaseException,
+        *,
+        scheduled_base_url: str | None = None,
+    ) -> None:
+        with self.lock:
+            canonical_source_name = source_name
+            endpoint_identity = self._capture_endpoint_identity(scheduled_base_url)
+            if scheduled_base_url:
+                try:
+                    scheduled_url = normalize_agent_base_url(scheduled_base_url)
+                except ValueError:
+                    scheduled_url = ""
+                current_url = self.sources.get(source_name)
+                if not current_url or self._capture_endpoint_identity(current_url) != endpoint_identity:
+                    alias_owner = self._capture_alias_owner(source_name, scheduled_url)
+                    if alias_owner:
+                        canonical_source_name = alias_owner
+            self.capture_drain_failures.append(
+                {
+                    "incident_id": uuid.uuid4().hex,
+                    "source_name": canonical_source_name,
+                    **(
+                        {"endpoint_sha256": endpoint_identity}
+                        if endpoint_identity
+                        else {}
+                    ),
+                    **(
+                        {"original_source_name": source_name}
+                        if canonical_source_name != source_name
+                        else {}
+                    ),
+                    "pause_operation_id": self.control_operation_id,
+                    "state": "unresolved",
+                    "error_type": type(error).__name__,
+                    "occurred_at": _utc_now(),
+                }
+            )
+            self._refresh_capture_drain_error_operation_id()
+            try:
+                self.save_state()
+            except Exception as persist_exc:  # noqa: BLE001
+                # Every ordinary writer failure is fail-closed here: keep the
+                # in-memory pause refusal so the host guard resumes capture.
+                self.last_error = (
+                    "Capture drain failure evidence could not be persisted: "
+                    f"{type(persist_exc).__name__}"
+                )
+                log.error(self.last_error)
+
+    def _clear_capture_drain_failures_after_recovery(
+        self,
+        source_name: str,
+        *,
+        base_url: str | None = None,
+    ) -> None:
+        with self.lock:
+            endpoint_identity = self._capture_endpoint_identity(base_url)
+            if endpoint_identity is None:
+                # Old incidents without endpoint identity, and callers without
+                # the endpoint they actually recovered, must remain unresolved.
+                return
+            previous_failures = [dict(item) for item in self.capture_drain_failures]
+            previous_error_operation_id = self.capture_drain_error_operation_id
+            recovered_at = _utc_now()
+            changed = False
+            for item in self.capture_drain_failures:
+                source_matches = item.get("source_name") == source_name
+                if not source_matches:
+                    checkpoint = self.checkpoints.get(source_name)
+                    aliases = set(getattr(checkpoint, "storage_aliases", ()))
+                    source_matches = bool(
+                        aliases
+                        & {
+                            str(item.get("source_name", "")),
+                            str(item.get("original_source_name", "")),
+                        }
+                    )
+                if (
+                    source_matches
+                    and item.get("endpoint_sha256") == endpoint_identity
+                    and item.get("state") == "unresolved"
+                ):
+                    item.update(
+                        {
+                            "state": "recovered",
+                            "recovered_at": recovered_at,
+                            "recovered_by_operation_id": self.control_operation_id,
+                        }
+                    )
+                    changed = True
+            if changed:
+                self._refresh_capture_drain_error_operation_id()
+                try:
+                    self.save_state()
+                except BaseException:
+                    # The pause remains unproven until its recovered incident
+                    # state is durable too. This also rolls back the resource
+                    # guard's internal BaseException pause signal. Keep the
+                    # in-memory refusal aligned with the checkpoint on disk.
+                    self.capture_drain_failures = previous_failures
+                    self.capture_drain_error_operation_id = previous_error_operation_id
+                    raise
 
     def reconcile_checkpoint_aliases(self, sources: Mapping[str, str]) -> bool:
         """Keep sequence continuity when a source adopts its MTConnect UUID.
@@ -619,6 +818,10 @@ class RecorderRuntime:
                     base_url=normalize_agent_base_url(base_url),
                     storage_aliases=storage_aliases,
                 )
+                for incident in self.capture_drain_failures:
+                    if incident.get("source_name") == old_name:
+                        incident.setdefault("original_source_name", old_name)
+                        incident["source_name"] = source_name
                 del self.checkpoints[old_name]
                 changed = True
                 log.info(
@@ -639,11 +842,18 @@ class RecorderRuntime:
             if MANAGED_MODE:
                 control = _read_json(CONTROL_FILE)
                 config = _read_json(CONFIG_FILE)
-                enabled = bool(control.get("enabled", False))
+                enabled = control.get("enabled") is True
+                raw_operation_id = control.get("operation_id")
+                operation_id = (
+                    raw_operation_id.strip()
+                    if isinstance(raw_operation_id, str) and raw_operation_id.strip()
+                    else None
+                )
                 sources, poll_interval = _managed_configuration(config)
                 configuration_ready = bool(sources)
             else:
                 enabled = True
+                operation_id = None
                 sources = _sources_from_environment()
                 configuration_ready = bool(sources)
                 poll_interval = _float_from_env("FCP_RECORDER_POLL_INTERVAL", 0.2)
@@ -660,8 +870,58 @@ class RecorderRuntime:
         checkpoint_aliases_changed = self.reconcile_checkpoint_aliases(sources)
         with self.lock:
             previous_enabled = self.enabled
+            previous_operation_id = self.control_operation_id
             previous_sources = dict(self.sources)
+            if not self.control_initialized:
+                self.control_initialized = True
+                if not enabled and operation_id:
+                    # A disabled request present at process startup may belong
+                    # to a prior incarnation whose final capture failure could
+                    # not be persisted. It cannot be acknowledged as a fresh
+                    # durable boundary by this process.
+                    self.pause_request_predates_runtime_id = operation_id
+                    self.restart_pause_recovery_required = True
+            if self.restart_pause_recovery_required:
+                remapped_requirements: set[tuple[str, str]] = set()
+                for old_name, old_url in self.restart_pause_recovery_sources:
+                    if (
+                        old_name in sources
+                        and normalize_agent_base_url(sources[old_name]) == old_url
+                    ):
+                        remapped_requirements.add((old_name, old_url))
+                        continue
+                    alias_matches = [
+                        new_name
+                        for new_name, new_url in sources.items()
+                        if normalize_agent_base_url(new_url) == old_url
+                        and old_name
+                        in getattr(
+                            self.checkpoints.get(new_name),
+                            "storage_aliases",
+                            (),
+                        )
+                    ]
+                    if checkpoint_aliases_changed and len(alias_matches) == 1:
+                        remapped_requirements.add((alias_matches[0], old_url))
+                    else:
+                        remapped_requirements.add((old_name, old_url))
+                self.restart_pause_recovery_sources = remapped_requirements
+                # This set is the recovery frontier inherited from the prior
+                # runtime. Do not replace an old endpoint with a newly
+                # configured one, and do not re-add a source whose successful
+                # recovery was already observed. A changed endpoint cannot
+                # prove completion of the old transaction frontier.
+                if not self.restart_pause_recovery_sources_initialized and sources:
+                    self.restart_pause_recovery_sources.update(
+                        (name, normalize_agent_base_url(source_url))
+                        for name, source_url in sources.items()
+                    )
+                    self.restart_pause_recovery_sources_initialized = True
             self.enabled = enabled
+            self.control_operation_id = operation_id
+            if operation_id != previous_operation_id:
+                self.pause_acknowledged_operation_id = None
+                self.pause_acknowledged_at = None
             self.configuration_ready = configuration_ready
             self.poll_interval = poll_interval
             self.sources = sources
@@ -695,8 +955,19 @@ class RecorderRuntime:
                 log.info("Recorder sources updated: %s", ", ".join(sorted(sources)) or "none")
 
             if not self.enabled:
-                self.state = "stopped"
-                self.message = "Recorder service is healthy and waiting. Recording is off."
+                self.state = "draining"
+                if self.pause_request_predates_runtime_id == operation_id:
+                    self.message = (
+                        "The disabled control request predates this Recorder process; "
+                        "a new Start/Stop operation is required to prove a boundary."
+                    )
+                elif self.restart_pause_recovery_required:
+                    self.message = (
+                        "A prior-runtime pause requires successful source capture/recovery "
+                        "before a new durable boundary can be acknowledged."
+                    )
+                else:
+                    self.message = "Recording is disabled; waiting for capture work to drain."
             elif not self.configuration_ready:
                 self.state = "error"
                 self.message = "Recording is enabled, but recorder sources are not configured."
@@ -937,7 +1208,7 @@ class RecorderRuntime:
                 batch.last_observation_sequence,
             )
 
-    def capture_source(self, source_name: str, base_url: str) -> tuple[str, bool, str]:
+    def capture_source(self, source_name: str, base_url: str) -> CaptureResult:
         try:
             client = MtconnectClient(base_url, timeout=REQUEST_TIMEOUT)
             current_xml = client.fetch_current()
@@ -967,6 +1238,10 @@ class RecorderRuntime:
                         probe=archived_probe,
                         archive_source_names=archive_source_names,
                     )
+                    self._clear_capture_drain_failures_after_recovery(
+                        source_name,
+                        base_url=base_url,
+                    )
                     checkpoint = self.checkpoints.get(source_name)
                     if checkpoint and checkpoint.agent_instance_id == current_header.instance_id:
                         self.probes[source_name] = archived_probe
@@ -988,14 +1263,26 @@ class RecorderRuntime:
                     source_name=source_name,
                     instance_id=current_header.instance_id,
                 )
-                if archived:
-                    earliest = min(ref.first_sequence for ref in archived)
+                if archived or any(
+                    item.get("source_name") == source_name
+                    and item.get("state") == "unresolved"
+                    for item in self.capture_drain_failures
+                ):
+                    earliest = (
+                        min(ref.first_sequence for ref in archived)
+                        if archived
+                        else current_header.first_sequence
+                    )
                     self._recover_archived_batches(
                         source_name=source_name,
                         base_url=base_url,
                         instance_id=current_header.instance_id,
                         expected=earliest,
                         probe=current_probe,
+                    )
+                    self._clear_capture_drain_failures_after_recovery(
+                        source_name,
+                        base_url=base_url,
                     )
                     checkpoint = self.checkpoints.get(source_name)
 
@@ -1176,7 +1463,7 @@ class RecorderRuntime:
                 )
                 self.backoff[source_name] = BACKOFF_INITIAL
                 self.next_attempt_at[source_name] = 0.0
-            return source_name, True, ""
+            return CaptureResult(source_name, True, "", transaction_complete=True)
         except Exception as exc:  # noqa: BLE001 - recorder must continue other sources
             error = f"{type(exc).__name__}: {exc}"
             with self.lock:
@@ -1192,13 +1479,13 @@ class RecorderRuntime:
                     }
                 )
             log.warning("[%s] recorder error: %s; retrying in %.1fs", source_name, error, delay)
-            return source_name, False, error
+            return CaptureResult(source_name, False, error, transaction_complete=False)
 
     def _harvest_capture_results(self) -> None:
         """Collect finished source work without waiting for a slower peer."""
 
         completed: list[
-            tuple[str, str, Future[tuple[str, bool, str]]]
+            tuple[str, str, Future[CaptureResult]]
         ] = []
         with self.lock:
             for source_name, (base_url, future) in list(self._capture_futures.items()):
@@ -1210,13 +1497,32 @@ class RecorderRuntime:
         if not completed:
             return
 
-        outcomes: list[tuple[str, str, bool]] = []
+        outcomes: list[tuple[str, str, bool, bool]] = []
         for source_name, base_url, future in completed:
             try:
-                _reported_source, ok, error = future.result()
+                result = future.result()
+                if isinstance(result, CaptureResult):
+                    if result.source_name != source_name:
+                        raise RuntimeError(
+                            "Capture result source identity does not match its worker."
+                        )
+                    ok = result.success
+                    error = result.error
+                    transaction_complete = result.transaction_complete
+                else:
+                    # Old in-process callers may still hand the worker a
+                    # three-tuple. It remains health data, but it is not
+                    # explicit proof of a completed restart-recovery cycle.
+                    reported_source, ok, error = result
+                    if reported_source != source_name:
+                        raise RuntimeError(
+                            "Capture result source identity does not match its worker."
+                        )
+                    transaction_complete = False
             except Exception as exc:
                 ok = False
                 error = f"{type(exc).__name__}: {exc}"
+                transaction_complete = False
                 with self.lock:
                     if self.sources.get(source_name) == base_url:
                         delay = min(
@@ -1236,11 +1542,33 @@ class RecorderRuntime:
                                 "next_retry_seconds": delay,
                             }
                         )
+                self._record_capture_drain_failure(
+                    source_name,
+                    exc,
+                    scheduled_base_url=base_url,
+                )
                 log.exception("[%s] recorder source task escaped its error boundary", source_name)
-            outcomes.append((source_name, base_url, ok))
+            outcomes.append((source_name, base_url, ok, transaction_complete))
 
         with self.lock:
-            for source_name, scheduled_url, ok in outcomes:
+            for source_name, scheduled_url, ok, transaction_complete in outcomes:
+                if ok and transaction_complete and self.restart_pause_recovery_required:
+                    # Recovery is credited to the endpoint the worker actually
+                    # completed against, even if a refresh has since repointed
+                    # the logical source. The stale result must not update the
+                    # replacement endpoint's health below.
+                    endpoint = normalize_agent_base_url(scheduled_url)
+                    recovery_requirement = (source_name, endpoint)
+                    recovery_matched = recovery_requirement in self.restart_pause_recovery_sources
+                    if not recovery_matched:
+                        alias_owner = self._capture_alias_owner(source_name, endpoint)
+                        if alias_owner:
+                            recovery_requirement = (alias_owner, endpoint)
+                            recovery_matched = recovery_requirement in self.restart_pause_recovery_sources
+                    if recovery_matched:
+                        self.restart_pause_recovery_sources.discard(recovery_requirement)
+                    if recovery_matched and not self.restart_pause_recovery_sources and self.sources:
+                        self.restart_pause_recovery_required = False
                 current_url = self.sources.get(source_name)
                 if current_url is None:
                     self._capture_outcomes.pop(source_name, None)
@@ -1299,10 +1627,60 @@ class RecorderRuntime:
                     url,
                     self.executor.submit(self.capture_source, name, url),
                 )
+            if due_sources:
+                self.capture_schedule_count += len(due_sources)
+                self.last_capture_scheduled_at = _utc_now()
 
         # Fast sources may already have completed. Harvest them opportunistically,
         # but never wait for another source before returning to status publication.
         self._harvest_capture_results()
+
+    def acknowledge_capture_pause(self) -> None:
+        """Acknowledge one disabled control operation after all capture work drains.
+
+        Capture futures include source reads, raw and derived store writes, and
+        checkpoint commits. The acknowledgement is published only by the
+        single runtime loop after it has harvested every finished future, so a
+        status heartbeat cannot claim a boundary while capture work is active.
+        """
+
+        with self.lock:
+            operation_id = self.control_operation_id
+            if self.enabled or not operation_id:
+                return
+            if self.pause_request_predates_runtime_id == operation_id:
+                self.state = "draining"
+                self.message = (
+                    "The disabled control request predates this Recorder process; "
+                    "a new Start/Stop operation is required to prove a boundary."
+                )
+                return
+            if self.restart_pause_recovery_required:
+                self.state = "draining"
+                self.message = (
+                    "A prior-runtime pause requires successful source capture/recovery "
+                    "before a new durable boundary can be acknowledged."
+                )
+                return
+            if self._capture_futures:
+                self.state = "draining"
+                self.message = (
+                    "Recording is disabled; waiting for "
+                    f"{len(self._capture_futures)} capture task(s) to finish."
+                )
+                return
+            if self._has_unresolved_capture_drain_failures():
+                self.state = "draining"
+                self.message = (
+                    "A capture task escaped its error boundary; "
+                    "the durable pause boundary is unproven."
+                )
+                return
+            if self.pause_acknowledged_operation_id != operation_id:
+                self.pause_acknowledged_operation_id = operation_id
+                self.pause_acknowledged_at = _utc_now()
+            self.state = "stopped"
+            self.message = "Capture is paused; all scheduled capture work has drained."
 
     def publish_status(self, *, force: bool = False) -> None:
         now = time.monotonic()
@@ -1325,13 +1703,57 @@ class RecorderRuntime:
                 "recording_started_at": self.recording_started_at,
                 "sources": sorted(self.sources),
                 "source_status": dict(self.source_status),
-                "records_buffered": 0,
+                # The capture transaction's observations are held in a worker
+                # future until its raw store/checkpoint path returns. We do not
+                # have an exact row count while one is still running, so keep
+                # the legacy count unknown instead of publishing a false zero.
+                "records_buffered": 0 if not self._capture_futures else None,
                 "records_written": self.observations_written,
                 "observations_written": self.observations_written,
                 "raw_batches_written": self.raw_batches_written,
                 "gaps_detected": self.gaps_detected,
+                "capture_schedule_count": self.capture_schedule_count,
+                "last_capture_scheduled_at": self.last_capture_scheduled_at,
+                # Compatibility field: older status clients use this name for
+                # the latest durable Recorder commit. Preserve its original
+                # alias without manufacturing a timestamp for empty pauses.
                 "last_flush_at": self.last_commit_at,
                 "last_commit_at": self.last_commit_at,
+                "capture_control": {
+                    "operation_id": self.control_operation_id,
+                    "requested_enabled": self.enabled,
+                    "capture_scheduling": bool(
+                        self.enabled
+                        and self.configuration_ready
+                        and self.sources
+                        and not self.stop_event.is_set()
+                    ),
+                    "inflight_capture_tasks": len(self._capture_futures),
+                    "drain_error_operation_id": self.capture_drain_error_operation_id,
+                    "unresolved_drain_failures": sum(
+                        item.get("state") == "unresolved"
+                        for item in self.capture_drain_failures
+                    ),
+                    "acknowledged_operation_id": self.pause_acknowledged_operation_id,
+                    "acknowledged_at": self.pause_acknowledged_at,
+                    "pause_request_predates_runtime": bool(
+                        self.control_operation_id
+                        and self.pause_request_predates_runtime_id
+                        == self.control_operation_id
+                    ),
+                    "restart_recovery_required": self.restart_pause_recovery_required,
+                    "restart_recovery_pending_sources": len(
+                        self.restart_pause_recovery_sources
+                    ),
+                    "durable_boundary": bool(
+                        not self.enabled
+                        and self.control_operation_id
+                        and self.pause_acknowledged_operation_id
+                        == self.control_operation_id
+                        and not self._capture_futures
+                        and not self._has_unresolved_capture_drain_failures()
+                    ),
+                },
                 "last_error": self.last_error,
                 "poll_interval_seconds": self.poll_interval,
                 "request_timeout_seconds": REQUEST_TIMEOUT,
@@ -1413,6 +1835,7 @@ class RecorderRuntime:
                 cycle_started = time.monotonic()
                 self.refresh_configuration()
                 self.run_fetch_cycle()
+                self.acknowledge_capture_pause()
                 self.publish_status()
 
                 if RUN_ONCE:

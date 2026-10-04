@@ -1,0 +1,43 @@
+name: Pinned GitHub-hosted Python
+description: Create a fresh pinned Python environment on an ephemeral GitHub runner.
+inputs:
+  python-version:
+    description: Exact Python version for this workflow job.
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Install the exact Python version
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+    - name: Prepare Linux virtualenv and disk-backed test temp
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        set -euo pipefail
+        venv=$(mktemp -d "${RUNNER_TEMP}/fcp-python.XXXXXX")
+        python -m venv "$venv"
+        echo "$venv/bin" >> "$GITHUB_PATH"
+        mkdir -p "${RUNNER_TEMP}/fcp-test-tmp"
+        echo "TMPDIR=${RUNNER_TEMP}/fcp-test-tmp" >> "$GITHUB_ENV"
+    - name: Prepare Windows virtualenv, short temp, and Git Bash
+      if: runner.os == 'Windows'
+      shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+      run: |
+        $ErrorActionPreference = 'Stop'
+        $gitSource = (Get-Command git.exe -ErrorAction Stop).Source
+        $gitRoot = Split-Path (Split-Path $gitSource)
+        $gitBin = Join-Path $gitRoot 'bin'
+        if (-not (Test-Path (Join-Path $gitBin 'bash.exe'))) {
+          throw 'Git Bash is required by the release checks'
+        }
+        $gitBin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        New-Item -ItemType Directory -Force -Path C:\fcp-qtmp | Out-Null
+        $venv = Join-Path $env:RUNNER_TEMP ('fcp-python-' + [guid]::NewGuid().ToString('N'))
+        python -m venv $venv
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        (Join-Path $venv 'Scripts') | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        'TEMP=C:\fcp-qtmp' | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        'TMP=C:\fcp-qtmp' | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        'PSMODULEPATH=C:\Windows\System32\WindowsPowerShell\v1.0\Modules;C:\Program Files\WindowsPowerShell\Modules' | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append

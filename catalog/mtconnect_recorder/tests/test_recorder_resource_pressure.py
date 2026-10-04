@@ -247,11 +247,13 @@ def test_new_capture_pauses_before_frontier_or_raw_and_does_not_mark_source_fail
         monkeypatch.setattr(recorder_runtime, "MtconnectClient", Client)
         monkeypatch.setattr(runtime, "_load_probe", lambda **_kwargs: probe)
 
-        source, success, error = runtime.capture_source(SOURCE, BASE_URL)
+        result = runtime.capture_source(SOURCE, BASE_URL)
+        source, success, error = result
 
         assert source == SOURCE
         assert success is True
         assert error == ""
+        assert result.transaction_complete is False
         assert tuple(runtime.store.raw_root.rglob("*.xml.gz")) == ()
         assert tuple(runtime.store.raw_root.rglob("*.manifest.json")) == ()
         assert tuple(runtime.store.raw_root.rglob(".recovery-frontier.json")) == ()

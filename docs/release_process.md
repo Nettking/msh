@@ -55,6 +55,28 @@ rerun.
 10. Do not make a source-only commit merely to record that publication happened.
     Publication state and release date belong to Git/GitHub release metadata.
 
+## CI evidence storage and runner independence
+
+The Federation v1 software release gate, campaign-tooling checks, and immutable
+image metadata check run on GitHub-hosted Linux and Windows runners;
+qualification does not require Nitro, Beast, Nettking, or another fixed runner
+machine to be online. Test outputs use
+immutable GitHub Actions artifacts whose names include the workflow run and
+attempt. The verification job downloads the current run's shard evidence and
+checks exact coverage against the candidate SHA. Artifact API records provide
+the artifact ID, content digest, run link, and expiry; the shard manifest also
+records the exact checkout SHA and test coverage. The public repository's
+Actions artifacts and workflow logs have a maximum 90-day retention period, so
+final release closeout must include the accepted evidence bundle as a GitHub
+Release asset before that period expires. The asset is published only after
+physical acceptance, as required above; these temporary CI artifacts are not
+claimed as permanent archival storage.
+
+This removes a single-machine dependency from software qualification and
+evidence transfer. P07/P12 and the other physical acceptance scenarios still
+require their registered real Recorder/CNC test topology; simulated CI results
+do not satisfy those scenarios.
+
 ## Verification commands
 
 Set the accepted commit explicitly before tagging:

@@ -279,7 +279,11 @@
     if (recordsWritten) {
       recordsWritten.textContent = formattedNumber(payload.records_written, "0");
     }
-    setTimestamp(lastFlush, payload.last_flush_at, "Waiting for data");
+    setTimestamp(
+      lastFlush,
+      payload.last_commit_at || payload.last_flush_at,
+      "Waiting for data",
+    );
     renderSources(payload.sources);
 
     if (controlForm && controlButton) {

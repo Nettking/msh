@@ -11,6 +11,7 @@ from contextlib import contextmanager
 from functools import partial
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from types import SimpleNamespace
+from urllib.error import URLError
 from urllib.parse import urlsplit
 from urllib.request import Request
 
@@ -328,6 +329,43 @@ def test_normal_recorder_exhaustion_cannot_request_a_grant(tmp_path, monkeypatch
     assert not (tmp_path / launcher.PAIRING_STATE_RELATIVE).exists()
     assert not (tmp_path / "tailscale_discovery.json").exists()
     assert "FCP_RECORDER_FEDERATION_KEY" not in launcher.os.environ
+
+
+def test_timeout_limited_by_total_budget_fails_closed_for_direct_and_url_errors():
+    timeout_errors = (
+        TimeoutError("probe consumed remaining scan budget"),
+        URLError(TimeoutError("probe consumed remaining scan budget")),
+    )
+    for timeout_error in timeout_errors:
+
+        def opener(_request, *, timeout, timeout_error=timeout_error):
+            assert 0.05 <= timeout <= 0.15
+            time.sleep(max(0.0, timeout - 0.01))
+            raise timeout_error
+
+        with pytest.raises(discovery.DiscoveryBudgetExceeded):
+            discovery.discover(
+                runner=_runner(1),
+                opener=opener,
+                timeout_seconds=2.0,
+                total_timeout_seconds=0.15,
+            )
+
+
+def test_short_peer_timeout_before_total_budget_is_a_complete_negative_probe():
+    def opener(_request, *, timeout):
+        assert timeout == 0.05
+        time.sleep(timeout)
+        raise TimeoutError("peer-specific timeout")
+
+    result = discovery.discover(
+        runner=_runner(1),
+        opener=opener,
+        timeout_seconds=0.05,
+        total_timeout_seconds=1.0,
+    )
+
+    assert result["federations"] == []
 
 
 def test_peers_and_ports_share_a_bounded_worker_pool_and_scan_deadline():
