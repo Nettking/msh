@@ -94,6 +94,9 @@ def test_v1_ci_does_not_depend_on_a_named_runner_or_archive_device() -> None:
     path_compatibility = release.split(
         "- name: Windows path-sensitive startup and migration regressions", 1
     )[1].split("- name: Windows transport, storage, and failover regressions", 1)[0]
+    assert "if: ${{ !cancelled() && matrix.suite == 'capability-product' }}" in (
+        path_compatibility
+    )
     assert "TEMP: '${{ runner.temp }}\\fcp-windows-compat'" in path_compatibility
     assert "TMP: '${{ runner.temp }}\\fcp-windows-compat'" in path_compatibility
     assert "\\\\?\\" not in path_compatibility
