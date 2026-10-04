@@ -914,6 +914,8 @@ def _cancel_final_sync(config: dict[str, Any]) -> list[dict[str, Any]]:
     control_path = str(config["runtime_binding"]["control_path"])
     if config.get("final_sync_process_supervision") == "windows-job-object.v1":
         operation_id = str(config["operation_id"])
+        processes_path = Path(str(config["copy_processes_path"]))
+        outcome_path = Path(str(config["copy_outcome_path"]))
         try:
             with _control_file_lock(Path(control_path)):
                 control = _read_json(Path(control_path))
@@ -931,28 +933,59 @@ def _cancel_final_sync(config: dict[str, Any]) -> list[dict[str, Any]]:
                 with OperationJob.open_existing(operation_id) as job:
                     active_before = job.active_process_count()
                     if active_before == 0:
+                        # run_copy takes this same control lock and checks both
+                        # receipts before creating a child. If cancellation
+                        # wins that lock before the copy launch, persist a
+                        # terminal failed receipt so a later run_copy cannot
+                        # mistake the still-paused control for authorization.
+                        if not processes_path.exists() and not outcome_path.exists():
+                            _write_copy_result(
+                                config,
+                                outcome="failed",
+                                result={
+                                    "failure": "final-sync-cancelled-before-start",
+                                    "launch_blocked": True,
+                                },
+                            )
+                        launch_blocked = processes_path.exists() or outcome_path.exists()
                         return [
                             {
-                                "result": "absent",
-                                "exit_code": 0,
+                                "result": "absent" if launch_blocked else "operation-job-cancellation-unconfirmed",
+                                "exit_code": 0 if launch_blocked else 1,
                                 "job_object_name": job.name,
                                 "active_processes_before": 0,
                                 "active_processes_after": 0,
+                                "launch_blocked": launch_blocked,
                             }
                         ]
                     terminated = job.terminate_and_wait(10.0)
                     active_after = job.active_process_count()
+                    launch_blocked = processes_path.exists() or outcome_path.exists()
+                    if terminated and active_after == 0 and not launch_blocked:
+                        _write_copy_result(
+                            config,
+                            outcome="failed",
+                            result={
+                                "failure": "final-sync-cancelled-after-launch",
+                                "active_processes_before": active_before,
+                                "launch_blocked": True,
+                            },
+                        )
+                        launch_blocked = processes_path.exists() or outcome_path.exists()
                     return [
                         {
                             "result": (
                                 "terminated-operation-job"
-                                if terminated and active_after == 0
+                                if terminated and active_after == 0 and launch_blocked
                                 else "operation-job-cancellation-unconfirmed"
                             ),
-                            "exit_code": 0 if terminated and active_after == 0 else 1,
+                            "exit_code": (
+                                0 if terminated and active_after == 0 and launch_blocked else 1
+                            ),
                             "job_object_name": job.name,
                             "active_processes_before": active_before,
                             "active_processes_after": active_after,
+                            "launch_blocked": launch_blocked,
                         }
                     ]
         except (JobObjectError, OSError, TimeoutError, RuntimeError) as exc:
@@ -1477,12 +1510,17 @@ try {
 
 def _final_sync_cancellation_confirmed(results: list[dict[str, Any]]) -> bool:
     """Return true only when every operation-bound copy is proven absent."""
-    return all(
-        (result.get("result") == "absent" and result.get("exit_code") == 0)
+    return bool(results) and all(
+        (
+            result.get("result") == "absent"
+            and result.get("exit_code") == 0
+            and result.get("launch_blocked") is True
+        )
         or (
             result.get("result") == "terminated-operation-job"
             and result.get("exit_code") == 0
             and result.get("active_processes_after") == 0
+            and result.get("launch_blocked") is True
         )
         or (
             result.get("result") == "terminated-bound-final-sync-process-tree"

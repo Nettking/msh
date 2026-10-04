@@ -212,9 +212,20 @@ def test_final_sync_cancellation_rejects_malformed_process_entry(
 @pytest.mark.parametrize(
     ("results", "confirmed"),
     [
-        ([], True),
-        ([{"result": "absent", "exit_code": 0}], True),
+        ([], False),
+        ([{"result": "absent", "exit_code": 0, "launch_blocked": True}], True),
         ([{"result": "absent"}], False),
+        ([{"result": "absent", "exit_code": 0}], False),
+        (
+            [
+                {
+                    "result": "terminated-operation-job",
+                    "exit_code": 0,
+                    "active_processes_after": 0,
+                }
+            ],
+            False,
+        ),
         (
             [
                 {
@@ -1413,8 +1424,8 @@ def test_watch_allows_copy_controller_to_start_after_pause_ack(
     events: list[dict] = []
     cancellation_results = iter(
         [
-            [{"result": "absent", "exit_code": 0}],
-            [{"result": "absent", "exit_code": 0}],
+            [{"result": "absent", "exit_code": 0, "launch_blocked": True}],
+            [{"result": "absent", "exit_code": 0, "launch_blocked": True}],
         ]
     )
 
@@ -1506,6 +1517,7 @@ def test_watch_cancels_final_sync_before_verifying_superseding_start(
                     "result": "terminated-operation-job",
                     "exit_code": 0,
                     "active_processes_after": 0,
+                    "launch_blocked": True,
                 }
             ],
         ]
@@ -1592,7 +1604,7 @@ def test_watch_retries_unconfirmed_cancellation_before_requesting_resume(
                     "exit_code": 0,
                 }
             ],
-            [{"result": "absent", "exit_code": 0}],
+            [{"result": "absent", "exit_code": 0, "launch_blocked": True}],
         ]
     )
 

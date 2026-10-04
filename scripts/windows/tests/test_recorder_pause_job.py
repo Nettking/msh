@@ -105,6 +105,8 @@ def test_cancel_operation_job_rechecks_pause_owner_and_verifies_empty_job(
         "resume_token_sha256": "d" * 64,
         "copy_controller_sid": sid,
         "final_sync_process_supervision": "windows-job-object.v1",
+        "copy_processes_path": str(tmp_path / "processes.json"),
+        "copy_outcome_path": str(tmp_path / "outcome.json"),
         "runtime_binding": {"control_path": str(control_path)},
     }
     control_path.write_text(
@@ -137,7 +139,14 @@ def test_cancel_operation_job_rechecks_pause_owner_and_verifies_empty_job(
         assert result[0]["job_object_name"] == guardian.name
         assert result[0]["active_processes_before"] >= 2
         assert result[0]["active_processes_after"] == 0
+        assert result[0]["launch_blocked"] is True
         assert guard._final_sync_cancellation_confirmed(result)
+        cancelled_outcome = json.loads(
+            Path(config["copy_outcome_path"]).read_text(encoding="utf-8")
+        )
+        assert cancelled_outcome["outcome"] == "failed"
+        assert cancelled_outcome["failure"] == "final-sync-cancelled-after-launch"
+        assert cancelled_outcome["launch_blocked"] is True
 
         control = json.loads(control_path.read_text(encoding="utf-8"))
         control["operation_id"] = "e" * 32
@@ -247,6 +256,94 @@ def test_run_copy_uses_acknowledged_pause_and_preserves_receipt(tmp_path: Path, 
         assert receipt["processes"][0]["pid"] > 0
         assert receipt["outcome"] == "complete"
         assert json.loads((tmp_path / "outcome.json").read_text(encoding="utf-8"))["outcome"] == "complete"
+        assert guardian.active_process_count() == 0
+    finally:
+        guardian.close()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="exercise Windows Job Object cancellation latch")
+def test_empty_job_cancellation_latches_before_a_late_copy_launch(
+    tmp_path: Path, monkeypatch
+) -> None:
+    operation_id = uuid.uuid4().hex
+    sid = guard._current_windows_sid()
+    deadline = guard._iso(datetime.now(timezone.utc) + timedelta(minutes=2))
+    ran_path = tmp_path / "copy-command-ran.json"
+    command = [
+        sys.executable,
+        "-c",
+        "import pathlib,sys; pathlib.Path(sys.argv[1]).write_text('ran',encoding='utf-8')",
+        str(ran_path),
+    ]
+    control_path = tmp_path / "control.json"
+    config = {
+        "schema": "fcp.recorder.pause-resume-guard.host.v1",
+        "operation_id": operation_id,
+        "prior_control_operation_id": "b" * 32,
+        "hard_deadline_utc": deadline,
+        "copy_controller_sid": sid,
+        "final_sync_process_supervision": "windows-job-object.v1",
+        "runtime_binding_sha256": "c" * 64,
+        "resume_token_sha256": "d" * 64,
+        "final_sync_command_sha256": guard._sha256(guard._canonical_bytes(command)),
+        "runtime_binding": {"repo_root": str(tmp_path), "control_path": str(control_path)},
+        "controller_heartbeat_path": str(tmp_path / "heartbeat.json"),
+        "copy_outcome_path": str(tmp_path / "outcome.json"),
+        "copy_processes_path": str(tmp_path / "processes.json"),
+    }
+    control_path.write_text(
+        json.dumps(
+            {
+                "enabled": False,
+                "operation_id": operation_id,
+                "resume_guard": {
+                    "operation_id": operation_id,
+                    "prior_control_operation_id": config["prior_control_operation_id"],
+                    "runtime_binding_sha256": config["runtime_binding_sha256"],
+                    "token_sha256": config["resume_token_sha256"],
+                    "deadline_utc": deadline,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    guardian = OperationJob.open_or_create(operation_id, copy_controller_sid=sid)
+    monkeypatch.setattr(guard, "_load_config", lambda _path: config)
+    monkeypatch.setattr(guard, "_current_windows_sid", lambda: sid)
+    monkeypatch.setattr(
+        guard,
+        "_observation",
+        lambda _config: (
+            PauseGuardObservation(
+                runtime_binding_matches=True,
+                control_operation_id=operation_id,
+                control_enabled=False,
+                pause_acknowledged_operation_id=operation_id,
+                pause_acknowledged_at=datetime.now(timezone.utc),
+                capture_scheduling=False,
+                inflight_capture_tasks=0,
+                durable_boundary=True,
+            ),
+            json.loads(control_path.read_text(encoding="utf-8")),
+        ),
+    )
+    try:
+        cancellation = guard._cancel_final_sync(config)
+        assert guard._final_sync_cancellation_confirmed(cancellation)
+        with pytest.raises(RuntimeError, match="final-sync evidence already exists"):
+            guard.run_copy(tmp_path / "unused-config.json", command)
+
+        assert not ran_path.exists()
+        outcome = json.loads(Path(config["copy_outcome_path"]).read_text(encoding="utf-8"))
+        assert outcome["operation_id"] == operation_id
+        assert outcome["outcome"] == "failed"
+        assert outcome["failure"] == "final-sync-cancelled-before-start"
+        assert outcome["launch_blocked"] is True
+        process_receipt = json.loads(
+            Path(config["copy_processes_path"]).read_text(encoding="utf-8")
+        )
+        assert process_receipt["operation_id"] == operation_id
+        assert process_receipt["outcome"] == "failed"
         assert guardian.active_process_count() == 0
     finally:
         guardian.close()
