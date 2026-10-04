@@ -97,6 +97,7 @@ def test_v1_ci_does_not_depend_on_a_named_runner_or_archive_device() -> None:
         encoding="utf-8"
     )
     assert "actions/setup-python@v5" in hosted_python
+    assert "cache: false" not in hosted_python
     assert "python -m venv" in hosted_python
     assert "Git Bash is required" in hosted_python
     assert "TMPDIR=${RUNNER_TEMP}/fcp-test-tmp" in hosted_python
