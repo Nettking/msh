@@ -9,7 +9,11 @@ from pathlib import Path
 import pytest
 
 from catalog.federation.control_plane_replication import ControlPlaneError, ReplicaNode
-from catalog.federation.errors import AuthenticationError, FederationOperationError
+from catalog.federation.errors import (
+    AuthenticationError,
+    AuthorizationError,
+    FederationOperationError,
+)
 from catalog.federation.tests.test_control_plane_public_journal import (
     SESSION,
     _client_journal,
@@ -240,12 +244,20 @@ def test_consumed_grants_and_original_request_receipts_survive_automatic_failove
             retained = _client_journal(member)
             assert retained == _journal(original)
             assert _grant_uses(original, enrollment["token_id"], invitation["invitation_id"]) == ((1, 1), (1, 1))
+
+            def replica_has_prefix(runtime) -> bool:
+                try:
+                    journal_matches = _journal(runtime) == retained
+                except AuthorizationError as exc:
+                    if exc.code == "unknown-session":
+                        return False
+                    raise
+                return journal_matches and _grant_uses(
+                    runtime, enrollment["token_id"], invitation["invitation_id"]
+                ) == ((1, 1), (1, 1))
+
             await _wait(
-                lambda: all(
-                    _journal(runtime) == retained
-                    and _grant_uses(runtime, enrollment["token_id"], invitation["invitation_id"]) == ((1, 1), (1, 1))
-                    for runtime in cluster.runtimes[1:]
-                ),
+                lambda: all(replica_has_prefix(runtime) for runtime in cluster.runtimes[1:]),
                 "surviving voters did not materialize the consumed grants and complete public prefix",
             )
             previous_term = original.node.state["leaders"][SESSION]["term"]

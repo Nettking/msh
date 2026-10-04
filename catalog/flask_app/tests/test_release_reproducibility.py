@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[3]
 PYTHON_IMAGE = (
     "python:3.12.13-slim@"
@@ -88,10 +87,18 @@ def test_v1_ci_does_not_depend_on_a_named_runner_or_archive_device() -> None:
     assert "actions/hosted-python" in release
     assert "actions/upload-artifact@v4" in release
     assert "actions/download-artifact@v4" in release
-    assert release.count("retention-days: 90") == 3
+    assert release.count("retention-days: 90") == 4
     assert "${{ github.run_id }}" in release
     assert "${{ github.run_attempt }}" in release
     assert "scripts/ci_release_disk_preflight.py C:\\" in release
+    path_compatibility = release.split(
+        "- name: Windows path-sensitive startup and migration regressions", 1
+    )[1].split("- name: Windows transport, storage, and failover regressions", 1)[0]
+    assert "TEMP: '${{ runner.temp }}\\fcp-windows-compat'" in path_compatibility
+    assert "TMP: '${{ runner.temp }}\\fcp-windows-compat'" in path_compatibility
+    assert "\\\\?\\" not in path_compatibility
+    assert "windows-path-compat.xml" in path_compatibility
+    assert "windows-path-sensitive-compat" in release
     for windows_only_suite in (
         "catalog/federation/tests/test_host_mutation_activation.py",
         "catalog/federation/tests/test_windows_controlled_build_contract.py",
@@ -105,6 +112,7 @@ def test_v1_ci_does_not_depend_on_a_named_runner_or_archive_device() -> None:
         "catalog/flask_app/tests/test_windows_runtime_state_resolver.py",
     ):
         assert windows_only_suite in release
+        assert windows_only_suite in path_compatibility
 
     hosted_python = (ROOT / ".github/actions/hosted-python/action.yml").read_text(
         encoding="utf-8"
