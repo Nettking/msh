@@ -1035,6 +1035,17 @@ def test_runtime_binding_accepts_only_a_fresh_same_deployment_process_restart(
     assert matches is True
     assert observed == status
 
+    future_status = {
+        **status,
+        "heartbeat_at": guard._iso(guard._utc_now() + timedelta(minutes=5)),
+    }
+    status_path.write_text(json.dumps(future_status), encoding="utf-8")
+    matches, observed = guard._runtime_binding_match({"runtime_binding": runtime})
+    assert matches is None
+    assert observed == future_status
+
+    status_path.write_text(json.dumps(status), encoding="utf-8")
+
     control_path = Path(runtime["control_path"])
     control_path.write_text(
         json.dumps({"enabled": False, "operation_id": "a" * 32}),
@@ -1096,6 +1107,39 @@ def test_controller_age_distinguishes_unstarted_from_lost_controller(
     }
     heartbeat.write_text(json.dumps(valid_payload), encoding="utf-8")
     assert guard._controller_age(config) is not None
+
+    future_payload = {
+        **valid_payload,
+        "observed_at_utc": guard._iso(guard._utc_now() + timedelta(minutes=5)),
+    }
+    heartbeat.write_text(json.dumps(future_payload), encoding="utf-8")
+    future_age = guard._controller_age(config)
+    assert future_age == float("inf")
+
+    now = guard._utc_now()
+    gate = guard.BoundedPauseResumeGuard(
+        operation_id=config["operation_id"],
+        prior_control_operation_id="b" * 32,
+        hard_deadline=now + timedelta(minutes=10),
+        drain_timeout_seconds=30,
+        controller_stale_after_seconds=10,
+        baseline_capture_schedule_count=100,
+    )
+    decision = gate.decide(
+        guard.PauseGuardObservation(
+            runtime_binding_matches=True,
+            control_operation_id=config["operation_id"],
+            control_enabled=False,
+            pause_acknowledged_operation_id=config["operation_id"],
+            pause_acknowledged_at=now - timedelta(seconds=20),
+            capture_scheduling=False,
+            inflight_capture_tasks=0,
+            durable_boundary=True,
+            controller_heartbeat_age_seconds=future_age,
+        ),
+        now=now,
+    )
+    assert decision is guard.PauseGuardAction.REQUEST_RESUME
 
     malformed_payloads = [
         {**valid_payload, "schema": "fcp.recorder.other.v1"},

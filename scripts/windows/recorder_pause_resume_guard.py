@@ -546,8 +546,8 @@ def _runtime_binding_match(config: dict[str, Any]) -> tuple[bool | None, dict[st
     heartbeat = _parse_utc(status.get("heartbeat_at") if status else None)
     if status is None or heartbeat is None:
         return None, status
-    age = max(0.0, (_utc_now() - heartbeat).total_seconds())
-    if age > _HEARTBEAT_MAX_AGE_SECONDS:
+    age = (_utc_now() - heartbeat).total_seconds()
+    if age < 0 or age > _HEARTBEAT_MAX_AGE_SECONDS:
         return None, status
     process_match = _status_process_binding_matches(status, runtime)
     if process_match is not True:
@@ -587,7 +587,10 @@ def _controller_age(config: dict[str, Any]) -> float | None:
     observed = _parse_utc(payload.get("observed_at_utc"))
     if observed is None:
         return float("inf")
-    return max(0.0, (_utc_now() - observed).total_seconds())
+    age = (_utc_now() - observed).total_seconds()
+    if age < 0:
+        return float("inf")
+    return age
 
 
 def _copy_outcome(config: dict[str, Any]) -> str | None:
