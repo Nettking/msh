@@ -74,14 +74,14 @@ jobs:
       matrix:
         include:
           - os: Linux
-            runner: fcp-test-linux
+            runner: ubuntu-24.04
             shell: bash
             python: "3.12.13"
           - os: Windows
-            runner: fcp-test-windows
+            runner: windows-2025
             shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
             python: "3.12.10"
-    runs-on: [self-hosted, "${{ matrix.os }}", X64, "${{ matrix.runner }}"]
+    runs-on: ${{ matrix.runner }}
     defaults:
       run:
         shell: ${{ matrix.shell }}
@@ -92,7 +92,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: ./.github/actions/self-hosted-python
+      - uses: ./.github/actions/hosted-python
         with:
           python-version: ${{ matrix.python }}
 
@@ -110,6 +110,13 @@ jobs:
       - name: Ubuntu storage precondition
         if: runner.os == 'Linux'
         uses: ./.github/actions/ubuntu-storage-precondition
+
+      - name: Windows storage precondition
+        if: runner.os == 'Windows'
+        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+        run: |
+          python scripts/ci_release_disk_preflight.py C:\ $env:RUNNER_TEMP
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Compile maintained product packages
         run: python -m compileall -q catalog
@@ -239,7 +246,7 @@ jobs:
 
   linux-regressions:
     name: Linux regression shard (${{ matrix.shard }})
-    runs-on: [self-hosted, Linux, X64, fcp-test-linux]
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -250,7 +257,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: ./.github/actions/self-hosted-python
+      - uses: ./.github/actions/hosted-python
         with:
           python-version: 3.12.13
 
@@ -277,18 +284,14 @@ jobs:
           --junitxml="${{ runner.temp }}/release-shards/junit-${{ matrix.shard }}.xml"
       - name: Preserve shard coverage and timings
         if: always()
-        uses: ./.github/actions/nitro-artifact
+        uses: actions/upload-artifact@v4
         with:
-          operation: upload
-          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
-          host: ${{ vars.NITRO_ARTIFACT_HOST }}
-          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
-          matrix: ${{ toJSON(matrix) }}
-          job-status: ${{ job.status }}
-          name: linux-regression-shard-${{ matrix.shard }}
+          name: fcp-v1-${{ github.run_id }}-a${{ github.run_attempt }}-linux-regression-shard-${{ matrix.shard }}
           path: |
             ${{ runner.temp }}/release-shards/shard-${{ matrix.shard }}.json
             ${{ runner.temp }}/release-shards/junit-${{ matrix.shard }}.xml
+          if-no-files-found: error
+          retention-days: 90
       - name: Repository stays clean after the suite
         shell: bash
         run: |
@@ -304,10 +307,7 @@ jobs:
         if: ${{ always() }}
   windows-regressions:
     name: Windows regressions (${{ matrix.suite }})
-    # The shared pool can schedule these resource-admitted suites on Beast,
-    # whose current C: reserve is below the required CI evidence floor. Route
-    # them to the existing, approved Nettking Windows runner instead.
-    runs-on: [self-hosted, Windows, X64, nettking]
+    runs-on: windows-2025
     timeout-minutes: 30
     defaults:
       run:
@@ -321,9 +321,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: ./.github/actions/self-hosted-python
+      - uses: ./.github/actions/hosted-python
         with:
           python-version: 3.12.10
+
+      - name: Windows storage precondition
+        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+        run: |
+          python scripts/ci_release_disk_preflight.py C:\ $env:RUNNER_TEMP
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - uses: actions/setup-go@v5
         with:
@@ -362,34 +368,30 @@ jobs:
 
       - name: Preserve Windows regression timings
         if: always()
-        uses: ./.github/actions/nitro-artifact
+        uses: actions/upload-artifact@v4
         with:
-          operation: upload
-          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
-          host: ${{ vars.NITRO_ARTIFACT_HOST }}
-          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
-          matrix: ${{ toJSON(matrix) }}
-          job-status: ${{ job.status }}
-          name: windows-regression-${{ matrix.suite }}
+          name: fcp-v1-${{ github.run_id }}-a${{ github.run_attempt }}-windows-regression-${{ matrix.suite }}
           path: ${{ runner.temp }}/windows-${{ matrix.suite }}.xml
+          if-no-files-found: error
+          retention-days: 90
   postgres-storage:
     name: PostgreSQL storage release check
-    runs-on: [self-hosted, Linux, X64, fcp-docker-linux]
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Start disposable PostgreSQL 16
-        uses: ./.github/actions/self-hosted-postgres
-      - uses: ./.github/actions/self-hosted-python
+      - uses: ./.github/actions/hosted-python
         with:
           python-version: "3.12.13"
+      - name: Ubuntu storage precondition
+        uses: ./.github/actions/ubuntu-storage-precondition
+      - name: Start disposable PostgreSQL 16
+        uses: ./.github/actions/self-hosted-postgres
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip==26.2.1
           python -m pip install -r requirements.txt -c constraints-release.txt
           python -m pip install pytest==9.1.1 -c constraints-release.txt
-      - name: Ubuntu storage precondition
-        uses: ./.github/actions/ubuntu-storage-precondition
 
       - name: PostgreSQL storage authority regression
         run: >-
@@ -404,16 +406,12 @@ jobs:
 
   suite-order-runs:
     name: Full-suite order (${{ matrix.order }})
-    runs-on:
-      - self-hosted
-      - Linux
-      - X64
-      - fcp-test-linux
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
-      - uses: ./.github/actions/self-hosted-python
+      - uses: ./.github/actions/hosted-python
         with:
           python-version: "3.12.13"
 
@@ -441,16 +439,12 @@ jobs:
         if: ${{ always() }}
       - name: Preserve full-suite order timings
         if: always()
-        uses: ./.github/actions/nitro-artifact
+        uses: actions/upload-artifact@v4
         with:
-          operation: upload
-          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
-          host: ${{ vars.NITRO_ARTIFACT_HOST }}
-          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
-          matrix: ${{ toJSON(matrix) }}
-          job-status: ${{ job.status }}
-          name: full-suite-order-${{ matrix.order }}
+          name: fcp-v1-${{ github.run_id }}-a${{ github.run_attempt }}-full-suite-order-${{ matrix.order }}
           path: ${{ runner.temp }}/order-${{ matrix.order }}.xml
+          if-no-files-found: error
+          retention-days: 90
     strategy:
       fail-fast: false
       matrix:
@@ -467,7 +461,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [Linux, Windows]
-    runs-on: [self-hosted, Linux, X64, fcp-test-linux]
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Require release checks and every regression shard
@@ -480,27 +474,24 @@ jobs:
           test "$LINUX" = success
           test "$WINDOWS" = success
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/nitro-artifact
+      - uses: ./.github/actions/hosted-python
         with:
-          operation: download
-          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
-          host: ${{ vars.NITRO_ARTIFACT_HOST }}
-          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
-          matrix: ${{ toJSON(matrix) }}
-          job-status: ${{ job.status }}
-          pattern: linux-regression-shard-*
+          python-version: "3.12.13"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: fcp-v1-${{ github.run_id }}-a${{ github.run_attempt }}-linux-regression-shard-*
           merge-multiple: true
           path: ${{ runner.temp }}/verify-release-shards-${{ matrix.os }}
       - name: Require exact complete Linux test coverage
         run: >-
-          /opt/fcp-ci/python/3.12.13/bin/python3.12 -m scripts.ci_pytest_shards verify
+          python -m scripts.ci_pytest_shards verify
           --directory "${{ runner.temp }}/verify-release-shards-${{ matrix.os }}"
           --count 4 --source-sha "${{ github.sha }}"
   suite-order-independence:
     name: Clean-checkout suite order independence
     if: always()
     needs: [suite-order-runs]
-    runs-on: [self-hosted, Linux, X64, fcp-test-linux]
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Require both complete-suite order checks
@@ -511,11 +502,7 @@ jobs:
     name: Federation v1 automated release verdict
     if: always()
     needs: [release-matrix, postgres-storage, suite-order-independence]
-    runs-on:
-      - self-hosted
-      - Linux
-      - X64
-      - fcp-test-linux
+    runs-on: ubuntu-24.04
     steps:
       - name: Require every automated release job
         shell: bash

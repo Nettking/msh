@@ -1,5 +1,15 @@
 # Nitro artifact archive
 
+> **Scope update (2026-10-04):** This document records the Nitro SSH archive
+> implementation for workflows that still use it. The Federation v1 software
+> release gate and campaign-tooling checks no longer depend on Nitro or another
+> fixed runner: they use GitHub-hosted runners and immutable run/attempt-bound
+> Actions artifacts. Final v1 closeout carries accepted CI evidence into the
+> GitHub Release asset before the public 90-day artifact retention expires.
+> This does not change the separate MSH-to-Nitro Recorder backup or the physical
+> acceptance host requirements. Do not use this historical implementation to
+> reintroduce Nitro as a v1 software-qualification prerequisite.
+
 This is an infrastructure change, independent of the frozen Federation candidate.
 Introduce it through normal PR review and required checks. Infrastructure merge
 does not move the product freeze or authorize physical acceptance on a new SHA.
@@ -240,8 +250,8 @@ workflows because `.github/actions/**` is watched. The introduction audit matche
 runs without duplicate dispatches, preserving all required checks and zero-dollar
 Stop usage budgets. A failed job does not authorize another recovery attempt.
 
-After normal merge, record the actual resulting main SHA and verify the five
-migrated producers (`federation-v1-release`, `icse-tool-demo`, `phase2-federation`,
+After normal merge, record the actual resulting main SHA and verify the four
+remaining Nitro-backed producers (`icse-tool-demo`, `phase2-federation`,
 `phase-f7-closeout`, `cf8-role-retirement`) against their native checkout logs.
 Verify an ordinary download consumer and its immutable receipts, plus the run's
 empty GitHub artifact inventory. Transport smoke alone does not prove main adoption.

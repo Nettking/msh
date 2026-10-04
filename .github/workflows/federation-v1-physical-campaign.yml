@@ -1,9 +1,9 @@
 name: Federation v1 physical campaign tooling
 
-# The P01-P12 campaign harness is release tooling that runs on Beast, Nitro and
-# other physical hosts. It cannot be exercised for real in CI, but its contract,
-# classification, probes, runner and wrappers must stay valid on both operator
-# operating systems before a release operator depends on them.
+# The P01-P12 campaign harness is release tooling for physical acceptance. Its
+# contract, classification, probes, runner and wrappers are exercised on fresh
+# GitHub-hosted Windows/Linux VMs; actual physical scenarios still run only on
+# their registered acceptance hosts under the separate campaign procedure.
 
 on:
   pull_request:
@@ -53,12 +53,14 @@ jobs:
       matrix:
         include:
           - os: Linux
-            runner: fcp-linux-fast
+            runner: ubuntu-24.04
             shell: bash
+            python: "3.12.13"
           - os: Windows
-            runner: fcp-windows
+            runner: windows-2025
             shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
-    runs-on: [self-hosted, "${{ matrix.runner }}"]
+            python: "3.12.10"
+    runs-on: ${{ matrix.runner }}
     defaults:
       run:
         shell: ${{ matrix.shell }}
@@ -67,9 +69,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: ./.github/actions/self-hosted-python
+      - uses: ./.github/actions/hosted-python
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python }}
 
       - name: Install dependencies
         run: |

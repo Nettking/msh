@@ -1,8 +1,14 @@
-# Federation release runner prerequisites
+# Self-hosted workflow runner prerequisites
 
-The required release and acceptance workflows use `Beast` (`self-hosted`,
-`fcp-windows`) and `Beast-Linux-WSL` (`self-hosted`, `fcp-linux-fast`). Nitro is
-reserved for physical acceptance.
+The Federation v1 software release gate and physical-campaign tooling checks
+run on GitHub-hosted `ubuntu-24.04` and `windows-2025` runners. This page
+applies to the other workflows that still explicitly use self-hosted runners;
+it is not a prerequisite for v1 qualification. The physical acceptance
+campaign itself remains bound to its registered real test hosts.
+
+Those remaining workflows use their declared self-hosted labels (including
+Beast where specified). Their operational availability is independent of the
+v1 software qualification workflow.
 
 Windows requires Python 3.12.10 on the runner account's PATH, Windows PowerShell
 5.1, Git for Windows including Bash, and Docker CLI/Compose. Linux requires the

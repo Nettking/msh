@@ -75,6 +75,41 @@ def test_release_workflow_uses_locked_inputs_and_covers_build_files() -> None:
         assert text.count(required) >= 2
 
 
+def test_v1_ci_does_not_depend_on_a_named_runner_or_archive_device() -> None:
+    release = (ROOT / ".github/workflows/federation-v1-release.yml").read_text(
+        encoding="utf-8"
+    )
+    assert re.search(r"(?m)^\s*runs-on:.*self-hosted", release) is None
+    assert not re.search(r"(?m)^\s*-\s*self-hosted\s*$", release)
+    assert "NITRO_ARTIFACT_" not in release
+    assert ".github/actions/nitro-artifact" not in release
+    assert "runner: ubuntu-24.04" in release
+    assert "runner: windows-2025" in release
+    assert "actions/hosted-python" in release
+    assert "actions/upload-artifact@v4" in release
+    assert "actions/download-artifact@v4" in release
+    assert release.count("retention-days: 90") == 3
+    assert "${{ github.run_id }}" in release
+    assert "${{ github.run_attempt }}" in release
+    assert "scripts/ci_release_disk_preflight.py C:\\" in release
+
+    hosted_python = (ROOT / ".github/actions/hosted-python/action.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "actions/setup-python@v5" in hosted_python
+    assert "python -m venv" in hosted_python
+    assert "Git Bash is required" in hosted_python
+    assert "TMPDIR=${RUNNER_TEMP}/fcp-test-tmp" in hosted_python
+
+    tooling = (
+        ROOT / ".github/workflows/federation-v1-physical-campaign.yml"
+    ).read_text(encoding="utf-8")
+    assert "self-hosted" not in tooling
+    assert "runner: ubuntu-24.04" in tooling
+    assert "runner: windows-2025" in tooling
+    assert "actions/hosted-python" in tooling
+
+
 def test_release_image_metadata_gate_checks_exact_digests() -> None:
     text = (ROOT / ".github/workflows/release-image-metadata.yml").read_text(
         encoding="utf-8"

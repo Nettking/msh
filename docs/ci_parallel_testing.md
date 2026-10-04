@@ -1,42 +1,40 @@
 # Parallel release testing
 
-The release workflow divides work into jobs so separate machines can contribute.
-Each registered runner still executes one job at a time; Windows and WSL on the
-same host share that host's resources.
+The Federation v1 release gate is independent of any fixed runner device. It
+uses fresh GitHub-hosted VMs, with the candidate's Python version pinned per
+job. The separate `CI test sharding` workflow below remains a self-hosted pool
+validation tool; its availability does not gate the v1 release run.
 
 | Work | Independently scheduled jobs | Runner label |
 | --- | ---: | --- |
-| Linux regression suite | 4 disjoint shards | `fcp-test-linux` |
-| Windows release regressions | 3 existing test groups | `fcp-test-windows` |
-| Compile, Go, lint, manifest and Compose configuration | 1 per OS | `fcp-test-linux` / `fcp-test-windows` |
-| Full-suite order independence | 2 complete runs, fixed and rotating seed | `fcp-test-linux` |
-| PostgreSQL integration | 1 disposable database job | `fcp-docker-linux` |
+| Linux regression suite | 4 disjoint shards | `ubuntu-24.04` |
+| Windows release regressions | 3 existing test groups | `windows-2025` |
+| Compile, Go, lint, manifest and Compose configuration | 1 per OS | `ubuntu-24.04` / `windows-2025` |
+| Full-suite order independence | 2 complete runs, fixed and rotating seed | `ubuntu-24.04` |
+| PostgreSQL integration | 1 disposable database job | `ubuntu-24.04` |
 
-`fcp-test-linux` and `fcp-test-windows` are shared execution pools, not host names.
-They require the interpreter and shell contract in
-`.github/actions/self-hosted-python/action.yml`. The currently intended members
-are Nettking (22/27) and the release runners Beast (28) and Beast-Linux-WSL (29).
-The older Beast-Windows registration (25) is not admitted just because it is
-online or has the broad `beast-windows` label. Add a machine only after the `CI test sharding`
-workflow passes there and its release prerequisites are checked. Nitro is not
-automatically admitted: its existing `fcp-linux` label alone does not establish
-the pinned Python 3.12.13 contract. Do not create duplicate runners on a machine
-just to increase the job count.
+The release gate uses `.github/actions/hosted-python` to install the exact
+Python version in a fresh job virtualenv, preserve the short Windows temp path
+and Git Bash requirement, and put Linux test temporaries on runner disk. Before
+storage-heavy tests, the workflow checks the product's existing disk threshold;
+it does not lower product limits or depend on a host cleanup request. Test
+evidence is uploaded as immutable GitHub Actions artifacts named with the run,
+attempt and matrix item. The shard verifier checks exact candidate and coverage.
+Public Actions artifacts have a maximum 90-day retention, and final release
+closeout attaches the accepted evidence bundle to the GitHub Release asset.
 
-The automatic `CI test sharding` checks use the shared pools, so an offline
-machine does not block them while another admitted runner is available. To
-validate a specific machine before admission, dispatch that workflow manually
-on the candidate branch with `target` set to `Nettking` or `Beast`. The Beast
-probe selects registrations 28/29 using their existing release labels, excluding
-the legacy registrations. Normal pull requests do not require every machine to
-be online and do not duplicate the same checks on both push and pull request.
+The general-purpose `CI test sharding` workflow is separate and still uses the
+registered `fcp-test-linux`, `fcp-test-windows`, and `fcp-docker-linux` pools.
+Those pools require the interpreter and shell contract in
+`.github/actions/self-hosted-python/action.yml`. To validate a particular
+machine before admitting it to that workflow, dispatch it manually with
+`target` set to `Nettking` or `Beast`; do not create duplicate runners to increase
+parallelism. These shared pools do not run the Federation v1 release gate.
 
-Windows test jobs do not start Docker containers. Nettking keeps its
-NetworkService account; its Docker daemon access is not changed. Compose
-configuration validation only uses the installed CLI. `fcp-docker-linux` requires
-the same Linux contract plus successful Buildx and isolated PostgreSQL startup,
-query and cleanup in `CI test sharding`. Docker integration can then use either
-admitted Linux machine.
+The v1 PostgreSQL integration job starts only its own disposable Docker
+container on the GitHub-hosted Linux VM and verifies ownership before cleanup.
+Windows release checks do not start Docker; Compose configuration validation
+uses the installed CLI.
 
 ## Coverage and failure behavior
 
@@ -69,9 +67,11 @@ wait for both OS regression groups and release checks; a failure on either OS
 therefore fails both aggregate entries. No `continue-on-error`, test retries,
 test exclusions or relaxed assertions are introduced.
 
-Rerun failed jobs through GitHub Actions. Artifact names are stable within a run
-and overwritten for the retried shard; successful shards from the same candidate
-remain usable. Earlier run attempts still retain their job logs.
+Artifacts include the workflow run and attempt in their names, and are never
+overwritten. A partial retry would lack artifacts from successful jobs in its
+prior attempt, so rerun the full release workflow for a new attempt; it must
+recreate the complete evidence set for one candidate/run. Earlier attempts and
+their artifacts remain distinct until GitHub's retention deadline.
 
 ## Local checks
 

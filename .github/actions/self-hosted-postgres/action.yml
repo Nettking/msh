@@ -1,4 +1,4 @@
-name: Isolated self-hosted PostgreSQL 16
+name: Isolated CI PostgreSQL 16
 description: Start or remove only the disposable database owned by this job.
 inputs:
   operation:
