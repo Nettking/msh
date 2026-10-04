@@ -92,6 +92,19 @@ def test_v1_ci_does_not_depend_on_a_named_runner_or_archive_device() -> None:
     assert "${{ github.run_id }}" in release
     assert "${{ github.run_attempt }}" in release
     assert "scripts/ci_release_disk_preflight.py C:\\" in release
+    for windows_only_suite in (
+        "catalog/federation/tests/test_host_mutation_activation.py",
+        "catalog/federation/tests/test_windows_controlled_build_contract.py",
+        "catalog/flask_app/tests/test_first_federation_start.py",
+        "catalog/flask_app/tests/test_federated_jsonl_candidate_filter.py",
+        "catalog/flask_app/tests/test_model_resource_admission_paths.py",
+        "catalog/flask_app/tests/test_windows_fresh_shutdown.py",
+        "catalog/flask_app/tests/test_windows_fresh_url_output.py",
+        "catalog/flask_app/tests/test_windows_migration_script.py",
+        "catalog/flask_app/tests/test_windows_relay_volume_selector.py",
+        "catalog/flask_app/tests/test_windows_runtime_state_resolver.py",
+    ):
+        assert windows_only_suite in release
 
     hosted_python = (ROOT / ".github/actions/hosted-python/action.yml").read_text(
         encoding="utf-8"
@@ -112,14 +125,16 @@ def test_v1_ci_does_not_depend_on_a_named_runner_or_archive_device() -> None:
 
 
 def test_release_image_metadata_gate_checks_exact_digests() -> None:
-    text = (ROOT / ".github/workflows/release-image-metadata.yml").read_text(
+    workflow = (ROOT / ".github/workflows/release-image-metadata.yml").read_text(
         encoding="utf-8"
     )
-    assert "docker buildx imagetools inspect" in text
-    assert PYTHON_IMAGE in text
-    assert OLLAMA_IMAGE in text
-    assert "linux/amd64" in text
-    assert "linux/arm64" in text
+    assert "runs-on: ubuntu-24.04" in workflow
+    assert "self-hosted" not in workflow
+    assert "docker buildx imagetools inspect" in workflow
+    assert PYTHON_IMAGE in workflow
+    assert OLLAMA_IMAGE in workflow
+    assert "linux/amd64" in workflow
+    assert "linux/arm64" in workflow
 
 
 def test_v1_release_finalization_does_not_require_a_follow_up_source_commit() -> None:

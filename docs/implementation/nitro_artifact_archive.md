@@ -10,6 +10,12 @@
 > acceptance host requirements. Do not use this historical implementation to
 > reintroduce Nitro as a v1 software-qualification prerequisite.
 
+The implementation details below apply only to workflows that still invoke
+the Nitro archive action. Those workflows remain fail-closed and must not
+silently fall back to another store. The Federation v1 release gate explicitly
+uses GitHub Actions artifacts; this is a separate configured evidence path,
+not a fallback performed by the Nitro action.
+
 This is an infrastructure change, independent of the frozen Federation candidate.
 Introduce it through normal PR review and required checks. Infrastructure merge
 does not move the product freeze or authorize physical acceptance on a new SHA.

@@ -30,7 +30,7 @@ permissions:
 jobs:
   verify-release-images:
     name: Verify immutable release image metadata
-    runs-on: [self-hosted, fcp-linux-fast]
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4

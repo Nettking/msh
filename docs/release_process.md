@@ -57,9 +57,10 @@ rerun.
 
 ## CI evidence storage and runner independence
 
-The Federation v1 software release gate and campaign-tooling checks run on
-GitHub-hosted Linux and Windows runners; qualification does not require Nitro,
-Beast, Nettking, or another fixed runner machine to be online. Test outputs use
+The Federation v1 software release gate, campaign-tooling checks, and immutable
+image metadata check run on GitHub-hosted Linux and Windows runners;
+qualification does not require Nitro, Beast, Nettking, or another fixed runner
+machine to be online. Test outputs use
 immutable GitHub Actions artifacts whose names include the workflow run and
 attempt. The verification job downloads the current run's shard evidence and
 checks exact coverage against the candidate SHA. Artifact API records provide
