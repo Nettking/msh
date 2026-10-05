@@ -381,6 +381,23 @@ def _failover_scan_timeout(settings: StorageAuthoritySettings) -> float:
     )
 
 
+def _check_authority_readers(endpoint: Any, channel: Any, source: object | None) -> None:
+    """Fail into the existing bounded supervisor when a composed stage ends."""
+    endpoint.check_reader()
+    for owner, attribute, stage in (
+        (channel, "_receiver_task", "storage-control"),
+        (source, "_reader_task", "shared-upstream"),
+    ):
+        task = getattr(owner, attribute, None)
+        if isinstance(task, asyncio.Task) and task.done():
+            error = asyncio.CancelledError() if task.cancelled() else task.exception()
+            raise FederationOperationError(
+                "storage-authority-reader-stopped",
+                f"the {stage} relay reader ended before the authority stopped",
+                "connection",
+            ) from error
+
+
 async def _wait_scan_interval(
     stop: asyncio.Event | None,
     seconds: float,
@@ -432,6 +449,12 @@ async def run_trusted_storage_authority(
             request_timeout=settings.request_timeout,
             message_source=message_source,  # type: ignore[arg-type]
         )
+        # In shared mode the existing product endpoint still owns the raw
+        # client queue. Its explicit start is idempotent and may recover an
+        # ended upstream reader without replacing identity or draining queues.
+        start_source = getattr(message_source, "start", None)
+        if callable(start_source):
+            await start_source()
         await endpoint.start()
         control = PhaseDControlPlane(Path(settings.storage_control_database))
         coordinator = SessionCoordinator(Path(settings.relay_control_database))
@@ -542,6 +565,7 @@ async def run_trusted_storage_authority(
         )
 
         while stop is None or not stop.is_set():
+            _check_authority_readers(endpoint, channel, message_source)
             if announcement_task.done():
                 await announcement_task
                 if stop is not None and stop.is_set():
@@ -577,6 +601,8 @@ async def run_trusted_storage_authority(
 
             if announcement_task.done():
                 await announcement_task
+            if stop is None or not stop.is_set():
+                _check_authority_readers(endpoint, channel, message_source)
             await _wait_scan_interval(stop, settings.scan_interval)
     finally:
         if announcement_task is not None:

@@ -60,6 +60,12 @@ _LOGGER = logging.getLogger(__name__)
 _DIAGNOSTIC_OPERATIONS = frozenset(operation.value for operation in StorageOperation)
 
 
+def _log_failure(message: str, *, extra: dict[str, Any]) -> None:
+    # Include only the existing hashed identifiers and safe stage/type values;
+    # the normal container formatter otherwise drops LogRecord extra fields.
+    _LOGGER.error("%s %s", message, json.dumps(extra, sort_keys=True, separators=(",", ":"), allow_nan=False), extra=extra)
+
+
 def _diagnostic_identifier(value: Any) -> str:
     if (
         isinstance(value, str)
@@ -604,7 +610,7 @@ class RecorderLogicalStorageAuthority:
                 payload=response,
             )
         except Exception as exc:
-            _LOGGER.error(
+            _log_failure(
                 "recorder storage authority response delivery failed",
                 extra={
                     "storage_stage": "authority_response_delivery_failed",
@@ -617,7 +623,7 @@ class RecorderLogicalStorageAuthority:
             )
             raise
         if not isinstance(delivery, dict) or delivery.get("delivered") is not True:
-            _LOGGER.error(
+            _log_failure(
                 "recorder storage authority response was not confirmed delivered",
                 extra={
                     "storage_stage": "authority_response_delivery_failed",
@@ -715,7 +721,7 @@ class RecorderLogicalStorageAuthority:
                 dataset_schema_version=schema_version,
             )
         except TimeoutError as exc:
-            _LOGGER.error(
+            _log_failure(
                 "recorder storage authority ingest wait timed out",
                 extra={
                     "storage_stage": "authority_ingest_wait_timeout",
