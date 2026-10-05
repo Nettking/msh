@@ -883,6 +883,15 @@ class RecorderPublicationCycleReport:
         return self.state == "publishing"
 
 
+def observed_reconciliation(reconciler, *, observer=None, observation_failed=None) -> RecorderReconcileResult:
+    """Reuse one call-local diagnostic entry without altering reconciliation policy."""
+    if observer is not None:
+        observed = getattr(reconciler, "reconcile_with_diagnostics", None)
+        if callable(observed):
+            return observed(observer=observer, observation_failed=observation_failed)
+    return reconciler.reconcile()
+
+
 class RecorderFederationDeliveryWorker:
     """Near-live publisher driven by the recorder's atomic checkpoint.
 
@@ -939,6 +948,36 @@ class RecorderFederationDeliveryWorker:
         self._consecutive_failures = 0
         self._dropped_reports = 0
         self.last_cycle_stage: str | None = None
+        self.cycle_stage_observer: Callable[..., None] | None = None
+        self.cycle_stage_observation_failed: Callable[[], None] | None = None
+        self.reconciliation_observer: Callable[..., None] | None = None
+
+    def _set_cycle_stage(self, stage: str | None, *,
+                         observer: Callable[..., None] | None,
+                         observation_failed: Callable[[], None] | None,
+                         reconcile: RecorderReconcileResult | None = None,
+                         delivery: RecorderDeliveryRunResult | None = None) -> None:
+        self.last_cycle_stage = stage
+        if observer is not None:
+            try:
+                progress = {}
+                if reconcile is not None:
+                    progress.update({key: getattr(reconcile, key) for key in (
+                        "scanned_batches", "eligible_batches", "publication_chunks",
+                        "enqueued", "already_enqueued",
+                    )})
+                    progress["quarantined"] = reconcile.quarantine.total
+                if delivery is not None:
+                    progress.update({key: getattr(delivery, key) for key in (
+                        "committed", "attempted", "retired",
+                    )})
+                observer(stage, progress)
+            except Exception:  # noqa: BLE001 - diagnostics never change a cycle
+                try:
+                    if observation_failed is not None:
+                        observation_failed()
+                except Exception:  # noqa: BLE001, S110 - observer loss is not workload policy
+                    pass
 
     def _checkpoint_stamp(self) -> tuple[int, int] | None:
         try:
@@ -970,14 +1009,16 @@ class RecorderFederationDeliveryWorker:
         force_reconcile: bool = False,
         progress_observer: RecorderDeliveryProgressObserver | None = None,
     ) -> RecorderWorkerCycleResult:
-        self.last_cycle_stage = "validate"
+        observer, on_loss = self.cycle_stage_observer, self.cycle_stage_observation_failed
+        reconcile_observer = self.reconciliation_observer
+        self._set_cycle_stage("validate", observer=observer, observation_failed=on_loss)
         if progress_observer is not None and not callable(progress_observer):
             raise FederationValidationError(
                 "invalid-recorder-publication",
                 "progress_observer",
                 "must be callable when supplied",
             )
-        self.last_cycle_stage = "checkpoint"
+        self._set_cycle_stage("checkpoint", observer=observer, observation_failed=on_loss)
         stamp = self._checkpoint_stamp()
         changed = (
             force_reconcile
@@ -1002,7 +1043,7 @@ class RecorderFederationDeliveryWorker:
             # That proves a recovered route before the expensive archive scan.
             # Later checkpoint changes always reconcile; a due row can remain
             # visible forever behind a failed ordered head.
-            self.last_cycle_stage = "backlog-probe"
+            self._set_cycle_stage("backlog-probe", observer=observer, observation_failed=on_loss)
             has_pending = getattr(self.queue.outbox, "has_pending", None)
             if callable(has_pending):
                 current_backlog = await asyncio.to_thread(
@@ -1029,15 +1070,18 @@ class RecorderFederationDeliveryWorker:
             or not current_backlog
             or not startup_probe_pending
         ):
-            self.last_cycle_stage = "reconcile"
-            reconcile = await asyncio.to_thread(self.reconciler.reconcile)
+            self._set_cycle_stage("reconcile", observer=observer, observation_failed=on_loss)
+            reconcile = await asyncio.to_thread(
+                observed_reconciliation, self.reconciler,
+                observer=reconcile_observer, observation_failed=on_loss,
+            )
             # Record the stamp observed before reconciliation. If capture commits
             # again during the scan, the next cycle sees the newer stamp and
             # reconciles again rather than losing that wakeup.
             self._last_checkpoint_stamp = stamp
             self._reconciled_once = True
 
-        self.last_cycle_stage = "delivery"
+        self._set_cycle_stage("delivery", observer=observer, observation_failed=on_loss, reconcile=reconcile)
         if progress_observer is None:
             delivery = await self.queue.run_once(limit=self.delivery_limit)
         else:
@@ -1051,14 +1095,14 @@ class RecorderFederationDeliveryWorker:
         # the poisoned row was withdrawn days ago must still report degraded,
         # and a cycle that runs after an operator repaired one must stop
         # reporting it. Only durable truth answers both.
-        self.last_cycle_stage = "retirement"
+        self._set_cycle_stage("retirement", observer=observer, observation_failed=on_loss, delivery=delivery)
         retirement = await asyncio.to_thread(
             self.queue.outbox.retired_summary,
             session_id=self.queue.session_id,
             destination_id=self.queue.destination_id,
             schema_id=RECORDER_STORAGE_SCHEMA,
         )
-        self.last_cycle_stage = None
+        self._set_cycle_stage(None, observer=observer, observation_failed=on_loss)
         return RecorderWorkerCycleResult(
             checkpoint_changed=changed,
             reconcile=reconcile,

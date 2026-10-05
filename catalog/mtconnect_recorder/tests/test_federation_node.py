@@ -480,6 +480,7 @@ def test_publication_loop_proves_each_dataset_before_full_backlog_drain(
         node.runtime = _Runtime()
         node._lock = threading.RLock()
         node._stop = threading.Event()
+        node._publication_diagnostics = federation_node_module.PublicationCycleObservation()
         node._publication_future = Future()
         node._snapshot = RecorderFederationSnapshot(
             status="connected",

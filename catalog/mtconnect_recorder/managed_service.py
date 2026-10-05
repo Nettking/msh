@@ -20,6 +20,7 @@ prove the running commit before success is reported.
 from __future__ import annotations
 
 import os
+import re
 import sys
 import threading
 import time
@@ -239,16 +240,43 @@ class ManagedRecorderFederationRuntime:
                 ):
                     return {"status": "unavailable"}
                 node = self._node
+                publication = self._health_publication
+                publication_generation = self._health_publication_generation
             if node is None:
                 return {"status": "not-started"}
             snapshot = node.snapshot()
-            return {
+            value = {
                 key: self._public_identity(getattr(snapshot, key, None))
                 for key in (
                     "status", "node_id", "federation_id", "session_id",
                     "storage_state", "storage_group", "storage_authority_node_id",
                 )
             }
+            diagnostics = getattr(node, "publication_cycle_snapshot", None)
+            if callable(diagnostics):
+                missing = {"schema": "fcp.recorder.publication-cycle-diagnostics.v1",
+                           "available": False, "acceptance_completion_evidence": False}
+                try:
+                    observed = diagnostics(session_id=value["session_id"], node_id=value["node_id"])
+                    if (not isinstance(observed, dict) or observed.get("schema") != missing["schema"]
+                            or type(observed.get("available")) is not bool):
+                        observed = missing
+                    with self._health_lock:
+                        if (self._node is not node or self._health_generation_overlap
+                                or self._health_stop_requested or self._health_process != current
+                                or publication is None or self._health_publication is not publication
+                                or getattr(node, "_publication_future", None) is not publication
+                                or self._health_publication_generation != publication_generation
+                                or not isinstance(publication_generation, str)
+                                or re.fullmatch(r"[0-9a-f]{32}", publication_generation) is None
+                                or (observed.get("available") is True and observed.get("provenance") != current)):
+                            observed = missing
+                        elif observed.get("available") is True:
+                            observed["worker_generation"] = publication_generation
+                    value["publication_cycle"] = observed
+                except Exception:  # noqa: BLE001 - diagnostic failure cannot hide known Federation state
+                    value["publication_cycle"] = missing
+            return value
         except Exception:  # noqa: BLE001 - read-only status must never prevent capture
             return {"status": "unavailable"}
 
