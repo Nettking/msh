@@ -422,6 +422,13 @@ class RelayRemoteAIEndpoint:
     async def start(self) -> None:
         if self._closed:
             raise RuntimeError("remote AI relay endpoint is closed")
+        if self._reader_task is not None and self._reader_task.done():
+            # One explicit composition/reconnect pass may replace an ended
+            # reader. Keep its bounded downstream queue and failed pending
+            # requests intact; never create a second active raw relay reader.
+            if not self._reader_task.cancelled():
+                self._reader_task.exception()
+            self._reader_task = None
         if self._reader_task is None:
             self._reader_task = asyncio.create_task(
                 self._reader_loop(),
@@ -573,11 +580,24 @@ class RelayRemoteAIEndpoint:
                     self._handler_tasks.add(task)
                     task.add_done_callback(self._finish_handler)
         except asyncio.CancelledError:
+            if not self._closed:
+                error = FederationOperationError(
+                    "shared-relay-reader-cancelled",
+                    "the shared relay reader was interrupted",
+                    "connection",
+                )
+                for pending in tuple(self._pending.values()):
+                    if not pending.future.done():
+                        pending.future.set_exception(error)
+                _LOGGER.error("shared relay reader interrupted stage=shared_reader_cancelled pending=%d", len(self._pending))
             raise
-        except Exception as exc:  # noqa: BLE001 - isolate relay reader
+        except Exception as exc:
             for pending in tuple(self._pending.values()):
                 if not pending.future.done():
                     pending.future.set_exception(exc)
+            _LOGGER.error("shared relay reader failed stage=shared_reader_failed exception_type=%s pending=%d",
+                          type(exc).__name__, len(self._pending))
+            raise
 
     def _finish_handler(self, task: asyncio.Task[None]) -> None:
         self._handler_tasks.discard(task)

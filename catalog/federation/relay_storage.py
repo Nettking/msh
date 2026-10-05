@@ -12,7 +12,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from .errors import FederationValidationError
+from .errors import FederationOperationError, FederationValidationError
 from .storage_protocol import (
     STORAGE_PROTOCOL,
     STORAGE_PROTOCOL_VERSION,
@@ -24,6 +24,12 @@ from .storage_protocol import (
 
 RELAY_STORAGE_KIND = "fcp-storage-v1"
 _LOGGER = logging.getLogger(__name__)
+
+
+def _log_failure(message: str, *, extra: dict[str, Any]) -> None:
+    # Default container logging formats only the message. Keep the already
+    # redacted correlation fields visible without enabling all INFO.
+    _LOGGER.error("%s %s", message, json.dumps(extra, sort_keys=True, separators=(",", ":"), allow_nan=False), extra=extra)
 
 
 def _diagnostic_text(value: Any, *, maximum: int = 2048) -> str | None:
@@ -138,11 +144,29 @@ class RelayStorageEndpoint:
     async def start(self) -> None:
         if self._closed:
             raise RuntimeError("relay storage endpoint is closed")
+        self.check_reader()
         if self._reader_task is None:
             self._reader_task = asyncio.create_task(
                 self._reader_loop(),
                 name=f"fcp-storage-relay-{self.relay_client.node_id}",
             )
+
+    def check_reader(self) -> None:
+        """Let the owning authority recover an unexpectedly ended stage.
+
+        A completed task is still installed until close(). Reusing it would
+        send new work that cannot receive its response. Do not start another
+        reader here: the authority's bounded supervisor owns reconstruction.
+        """
+        task = self._reader_task
+        if self._closed or task is None or not task.done():
+            return
+        error = asyncio.CancelledError() if task.cancelled() else task.exception()
+        raise FederationOperationError(
+            "storage-relay-reader-stopped",
+            "the storage relay reader ended before the authority stopped",
+            "connection",
+        ) from error
 
     async def close(self) -> None:
         self._closed = True
@@ -206,7 +230,7 @@ class RelayStorageEndpoint:
                 },
             )
             if not isinstance(delivery, dict) or delivery.get("delivered") is not True:
-                _LOGGER.error("storage request delivery not confirmed", extra={
+                _log_failure("storage request delivery not confirmed", extra={
                     "storage_stage": "request_delivery", "storage_request_id": _diagnostic_text(envelope.request_id),
                     "storage_session_id": _diagnostic_text(envelope.session_id), "storage_target_node_id": _diagnostic_text(target_node_id),
                     "storage_provider_id": _diagnostic_text(provider_id), "storage_delivery_confirmed": False,
@@ -223,7 +247,7 @@ class RelayStorageEndpoint:
             try:
                 response = await asyncio.wait_for(future, timeout=self.request_timeout)
             except asyncio.TimeoutError:
-                _LOGGER.error("storage response wait timed out", extra={
+                _log_failure("storage response wait timed out", extra={
                     "storage_stage": "response_wait", "storage_request_id": _diagnostic_text(envelope.request_id),
                     "storage_session_id": _diagnostic_text(envelope.session_id), "storage_target_node_id": _diagnostic_text(target_node_id),
                     "storage_provider_id": _diagnostic_text(provider_id), "storage_elapsed_seconds": round(time.monotonic()-started, 6),
@@ -269,11 +293,26 @@ class RelayStorageEndpoint:
                     task.add_done_callback(self._finish_handler)
                     continue
         except asyncio.CancelledError:
+            if not self._closed:
+                error = FederationOperationError(
+                    "storage-relay-reader-cancelled",
+                    "the storage relay reader was interrupted",
+                    "connection",
+                )
+                for pending in tuple(self._pending.values()):
+                    if not pending.future.done():
+                        pending.future.set_exception(error)
+                _log_failure("storage relay reader interrupted", extra={
+                    "storage_stage": "storage_reader_cancelled", "storage_pending_requests": len(self._pending)})
             raise
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             for pending in tuple(self._pending.values()):
                 if not pending.future.done():
                     pending.future.set_exception(exc)
+            _log_failure("storage relay reader failed", extra={
+                "storage_stage": "storage_reader_failed", "storage_exception_type": type(exc).__name__,
+                "storage_pending_requests": len(self._pending)})
+            raise
 
     def _finish_handler(self, task: asyncio.Task[None]) -> None:
         self._handler_tasks.discard(task)
@@ -451,7 +490,7 @@ class RelayStorageEndpoint:
                 try:
                     response = await service.dispatch(request)
                 except TimeoutError as exc:
-                    _LOGGER.error("storage provider dispatch timed out", extra={
+                    _log_failure("storage provider dispatch timed out", extra={
                         "storage_stage": "provider_dispatch_timeout",
                         "storage_request_id": _diagnostic_text(request.request_id),
                         "storage_session_id": _diagnostic_text(request.session_id),
@@ -534,7 +573,7 @@ class RelayStorageEndpoint:
             })
             raise
         except Exception as exc:
-            _LOGGER.error("storage response relay delivery failed", extra={
+            _log_failure("storage response relay delivery failed", extra={
                 "storage_stage": "response_delivery_failed",
                 "storage_request_id": _diagnostic_text(response.request_id),
                 "storage_session_id": _diagnostic_text(session_id),

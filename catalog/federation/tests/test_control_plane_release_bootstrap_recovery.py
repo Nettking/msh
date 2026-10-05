@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import threading
 import time
 from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
+from catalog.federation.control_plane_journal import PRODUCT_JOURNAL_INITIALIZE
 from catalog.federation.control_plane_replication import ControlPlaneError, ReplicaNode
 from catalog.federation.federation_v1_release_runtime import FederationV1ReleaseRuntime
 from catalog.federation.tests.test_control_plane_physical_runtime import _deployments
@@ -42,9 +44,13 @@ def _events(runtime):
     ))
 
 
-@pytest.mark.parametrize("boundary", ["after-genesis", "after-journal-before-seal"])
+@pytest.mark.parametrize(("boundary", "delay_after_journal_sync"), [
+    pytest.param("after-genesis", False, id="after-genesis"),
+    pytest.param("after-journal-before-seal", False, id="after-journal-before-seal"),
+    pytest.param("after-journal-before-seal", True, id="delayed-journal-before-seal"),
+])
 def test_actual_release_voters_resume_interrupted_fresh_bootstrap(
-    tmp_path: Path, monkeypatch, boundary: str,
+    tmp_path: Path, monkeypatch, boundary: str, delay_after_journal_sync: bool,
 ) -> None:
     deployments = []
     for index, deployment in enumerate(_deployments(tmp_path)):
@@ -60,6 +66,56 @@ def test_actual_release_voters_resume_interrupted_fresh_bootstrap(
     started = []
     interrupted = {}
     original = runtimes[0]
+    recovery_allowed = threading.Event()
+    # The fixture owns one particular interruption boundary. A slow Windows
+    # durable write must not let another lifecycle pump finish bootstrap before
+    # that fault is injected. Real start(), authenticated RPC, election, quorum
+    # and term fencing remain active; only automatic recovery is scheduled after
+    # the original process has actually closed. Recovery timing is unchanged.
+    for runtime in runtimes:
+        drive = runtime._drive_lifecycle_round
+
+        def staged_lifecycle_round(drive=drive):
+            if recovery_allowed.is_set():
+                return drive()
+            return None
+
+        monkeypatch.setattr(runtime, "_drive_lifecycle_round", staged_lifecycle_round)
+
+    delayed = []
+    if delay_after_journal_sync:
+        propose = original._propose_bootstrap_command
+        synchronize = original.node.synchronize
+        active_command = None
+
+        def observe_proposal(command):
+            nonlocal active_command
+            previous, active_command = active_command, command
+            try:
+                return propose(command)
+            finally:
+                active_command = previous
+
+        def synchronize_then_delay(transport):
+            matched = synchronize(transport)
+            if (active_command is not None
+                    and active_command.command_type == PRODUCT_JOURNAL_INITIALIZE
+                    and not delayed):
+                term = original.node.store.current_term
+                # Reproduce the CI race window after synchronization, before
+                # the mandatory leader-term recheck. Keep the real configured
+                # election timeout; do not swallow a fencing exception.
+                time.sleep(original.election_timeout_seconds + original.heartbeat_seconds + 0.2)
+                assert all(time.monotonic() - item.node.last_leader_contact
+                           > item.election_timeout_seconds for item in runtimes[1:])
+                assert original.node.store.current_term == term
+                assert original.node.role == ReplicaNode.LEADER
+                assert not recovery_allowed.is_set()
+                delayed.append(active_command.command_id)
+            return matched
+
+        monkeypatch.setattr(original, "_propose_bootstrap_command", observe_proposal)
+        monkeypatch.setattr(original.node, "synchronize", synchronize_then_delay)
     arguments = {
         "federation_id": FEDERATION, "session_id": SESSION,
         "creator_node_id": original.node.voter_id,
@@ -94,6 +150,9 @@ def test_actual_release_voters_resume_interrupted_fresh_bootstrap(
                        if entry.command.command_type == "FEDERATION_GENESIS")
         original.close()
         started.remove(original)
+        if delay_after_journal_sync:
+            assert len(delayed) == 1
+        recovery_allowed.set()
         survivors = runtimes[1:]
 
         def recovered():
