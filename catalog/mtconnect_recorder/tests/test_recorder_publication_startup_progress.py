@@ -129,6 +129,7 @@ def test_startup_readiness_is_published_at_first_commit(tmp_path, monkeypatch) -
     node.runtime = _Runtime()
     node._lock = threading.RLock()
     node._stop = threading.Event()
+    node._publication_diagnostics = federation_node_module.PublicationCycleObservation()
     node._publication_future = Future()
     node._snapshot = RecorderFederationSnapshot(
         status="connected",

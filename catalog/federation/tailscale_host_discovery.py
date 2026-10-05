@@ -67,7 +67,7 @@ def _open_probe(request: Request, *, timeout: float):
     response = None
     try:
         connection.connect()
-        remaining = deadline - time.monotonic()
+        remaining = min(timeout, deadline - time.monotonic())
         if remaining <= 0:
             raise TimeoutError("discovery HTTP budget exhausted")
         peer_socket = connection.sock
@@ -266,10 +266,16 @@ def _probe_peer(
     timeout_seconds: float,
     opener: Callable[..., Any] = _open_probe,
     deadline: float | None = None,
+    total_timeout_seconds: float | None = None,
 ) -> dict[str, object] | None:
     address = peer["address"]
     for port in web_ports:
         remaining = timeout_seconds if deadline is None else deadline - time.monotonic()
+        if total_timeout_seconds is not None:
+            # Adding then subtracting a large monotonic reading can round the
+            # remainder above the original budget. Cap before deciding whether
+            # a probe timeout exhausts the scan or only this individual peer.
+            remaining = min(total_timeout_seconds, remaining)
         if remaining <= 0:
             raise DiscoveryBudgetExceeded("Tailscale discovery scan budget exhausted")
         request_timeout = min(timeout_seconds, remaining)
@@ -373,10 +379,12 @@ def discover(
             pool.submit(
                 _probe_peer, peer, web_ports=ports, timeout_seconds=timeout_seconds,
                 opener=opener, deadline=deadline,
+                total_timeout_seconds=total_timeout_seconds,
             )
             for peer in peers
         ]
-        for future in as_completed(futures, timeout=max(0.0, deadline - time.monotonic())):
+        remaining = min(total_timeout_seconds, deadline - time.monotonic())
+        for future in as_completed(futures, timeout=max(0.0, remaining)):
             advertisements[future] = future.result()
         if time.monotonic() >= deadline:
             raise DiscoveryBudgetExceeded("Tailscale discovery scan budget exhausted")

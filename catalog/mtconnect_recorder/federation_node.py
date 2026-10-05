@@ -45,6 +45,7 @@ from catalog.federation.recorder_delivery import (
 from catalog.federation.recorder_publication import (
     RecorderFederationDeliveryWorker,
     RecorderPublicationTarget,
+    observed_reconciliation,
 )
 from catalog.federation.recorder_storage_relay import (
     RECORDER_RELAY_SAFE_CONTENT_BYTES,
@@ -59,6 +60,9 @@ from catalog.flask_app.services.federation_pairing_service import (
     PairingAwareCapabilityOnboardingService,
     RemotePairingState,
     RemotePairingStore,
+)
+from catalog.mtconnect_recorder.acceptance_observability import (
+    PublicationCycleObservation,
 )
 from catalog.mtconnect_recorder.storage import DurableRecorderStore
 
@@ -431,6 +435,7 @@ class RecorderFederationNode:
         self._stop = threading.Event()
         self._publication_future = None
         self._snapshot = RecorderFederationSnapshot(status="not-started")
+        self._publication_diagnostics = PublicationCycleObservation()
 
     def _build_jsonl_publisher(self) -> object:
         # Import lazily because the full workbench bridge imports the shared
@@ -581,6 +586,33 @@ class RecorderFederationNode:
     def snapshot(self) -> RecorderFederationSnapshot:
         with self._lock:
             return self._snapshot
+
+    def publication_cycle_snapshot(self, *, session_id: str | None,
+                                   node_id: str | None) -> dict[str, object]:
+        observed = self._publication_diagnostics.snapshot(expected_session=session_id,
+                                                          expected_node=node_id)
+        with self._lock:
+            if self._snapshot.session_id != session_id or self._snapshot.node_id != node_id:
+                return {"schema": observed["schema"], "available": False,
+                        "acceptance_completion_evidence": False}
+        return observed
+
+    def _attach_cycle_diagnostics(self, worker: object, token: tuple[str, str] | None) -> None:
+        try:
+            worker.cycle_stage_observer = lambda stage, progress: (
+                self._publication_diagnostics.transition(token, "delivery", cycle_stage=stage,
+                                                        progress=progress)
+            )
+            worker.cycle_stage_observation_failed = lambda: self._publication_diagnostics.observation_failed(token)
+            worker.reconciliation_observer = self._reconciliation_observer(token, "delivery")
+        except Exception:  # noqa: BLE001 - injected/missing diagnostic sink cannot stop delivery
+            self._publication_diagnostics.observation_failed(token)
+
+    def _reconciliation_observer(self, token: tuple[str, str] | None, stage: str):
+        # Capture this call's current cycle, never a previous worker's mutable sink.
+        return lambda detail: self._publication_diagnostics.transition(
+            token, stage, cycle_stage="reconcile", reconciliation=detail,
+        )
 
     def wait_until_sharing_ready(
         self,
@@ -993,10 +1025,17 @@ class RecorderFederationNode:
         ] | None = None
         failures = 0
         last_selection_state: str | None = None
+        cycle_token = None
+        publication_loop_generation = self._publication_diagnostics.new_worker()
         try:
             while not self._stop.is_set():
                 retry_stage = "connect"
                 cycle_correlation_id = uuid.uuid4().hex
+                cycle_token = self._publication_diagnostics.begin(
+                    cycle_correlation_id, session_id=state.binding.internal_session_id,
+                    node_id=state.binding.device_id,
+                    worker_generation=publication_loop_generation,
+                )
                 selection_state: str | None = None
                 selected_authority_node_id: str | None = None
                 selected_group_id: str | None = None
@@ -1005,6 +1044,7 @@ class RecorderFederationNode:
                     client = self.runtime._connected_client()
                     if active_client_id != id(client):
                         retry_stage = "client-close"
+                        self._publication_diagnostics.transition(cycle_token, retry_stage)
                         if storage_client is not None:
                             await storage_client.close()
                         storage_client = None
@@ -1013,14 +1053,17 @@ class RecorderFederationNode:
                         authority_node_id = None
                         group_id = None
                         retry_stage = "announce"
+                        self._publication_diagnostics.transition(cycle_token, retry_stage)
                         await self._announce_connected(state)
                         # Mark success only after reconciliation completes, so
                         # a transient failure is retried before publication.
                         active_client_id = id(client)
 
                     retry_stage = "status"
+                    self._publication_diagnostics.transition(cycle_token, retry_stage)
                     status = await client.coordinator_status()
                     retry_stage = "selection"
+                    self._publication_diagnostics.transition(cycle_token, retry_stage)
                     previous_local_context = local_context
                     # A fresh response supersedes cached routing even when its
                     # selection raises. Restore only a proven ready same group.
@@ -1064,11 +1107,14 @@ class RecorderFederationNode:
                             last_error_code=None,
                         )
                         failures = 0
+                        self._publication_diagnostics.finish(cycle_token, outcome="waiting")
                         await asyncio.sleep(self.publication_poll_seconds)
                         continue
                     last_selection_state = None
 
                     retry_stage = "route-build"
+                    self._publication_diagnostics.transition(cycle_token, retry_stage,
+                        storage_group=selected.group_id, authority_node_id=selected.authority_node_id)
                     if (
                         storage_client is None
                         or authority_node_id != selected.authority_node_id
@@ -1127,17 +1173,21 @@ class RecorderFederationNode:
                             )
                         )
                     retry_stage = "delivery"
+                    self._publication_diagnostics.transition(cycle_token, retry_stage)
+                    self._attach_cycle_diagnostics(worker, cycle_token)
                     cycle = await worker.run_cycle(
                         progress_observer=startup_progress_observer
                     )
                     local_context = (worker.reconciler, outbox, group_id)
                     retry_stage = "jsonl"
+                    self._publication_diagnostics.transition(cycle_token, retry_stage)
                     jsonl_result = await self._publish_jsonl_once(
                         state,
                         authority_node_id=authority_node_id,
                         group_id=group_id,
                     )
                     retry_stage = "pending-read"
+                    self._publication_diagnostics.transition(cycle_token, retry_stage)
                     pending_snapshot = await asyncio.to_thread(outbox.pending)
                     storage_state, pending, delivery_error = (
                         _publication_cycle_status(
@@ -1162,8 +1212,12 @@ class RecorderFederationNode:
                         last_error_code=delivery_error,
                     )
                     failures = 0
+                    self._publication_diagnostics.transition(cycle_token, retry_stage,
+                                                             progress={"pending_batches": pending})
+                    self._publication_diagnostics.finish(cycle_token, outcome="completed")
                     await asyncio.sleep(self.publication_poll_seconds)
                 except PUBLICATION_RETRY_ERRORS as exc:
+                    self._publication_diagnostics.failure(cycle_token, exc)
                     failures += 1
                     _LOGGER.warning(
                         "recorder_federation_publication_retry",
@@ -1189,8 +1243,14 @@ class RecorderFederationNode:
                             # This is durable preparation only. A disconnected
                             # cycle must not call run_cycle/run_once or consume
                             # a new queue's one startup delivery probe.
-                            await asyncio.to_thread(local_context[0].reconcile)
+                            self._publication_diagnostics.transition(cycle_token, "local-reconcile")
+                            await asyncio.to_thread(
+                                observed_reconciliation, local_context[0],
+                                observer=self._reconciliation_observer(cycle_token, "local-reconcile"),
+                                observation_failed=lambda token=cycle_token: self._publication_diagnostics.observation_failed(token),
+                            )
                         except PUBLICATION_RETRY_ERRORS as local_error:
+                            self._publication_diagnostics.failure(cycle_token, local_error)
                             # Surface the actual local preparation failure;
                             # retry visibility must not imply it succeeded.
                             reported_error = local_error
@@ -1212,6 +1272,7 @@ class RecorderFederationNode:
                     pending_batches = self.snapshot().pending_batches
                     if pending_outbox is not None:
                         try:
+                            self._publication_diagnostics.transition(cycle_token, "retry-pending-read")
                             pending_snapshot = await asyncio.to_thread(
                                 pending_outbox.pending
                             )
@@ -1236,11 +1297,15 @@ class RecorderFederationNode:
                             getattr(reported_error, "code", type(reported_error).__name__)
                         ),
                     )
+                    self._publication_diagnostics.finish(cycle_token, outcome="failed", error=reported_error)
                     await asyncio.sleep(min(10.0, float(2 ** min(failures - 1, 3))))
         except asyncio.CancelledError:
             # Operator stop and process shutdown keep their existing meaning.
+            self._publication_diagnostics.finish(cycle_token, outcome="interrupted", error=asyncio.CancelledError())
             raise
         except Exception as exc:
+            self._publication_diagnostics.failure(cycle_token, exc)
+            self._publication_diagnostics.finish(cycle_token, outcome="failed", error=exc)
             # Nothing above reads this coroutine's future once the recorder is
             # running, so an unclassified fault used to end publication in
             # complete silence: no log, no snapshot change, no restart, and a

@@ -430,3 +430,117 @@ def test_cli_exhaustion_replaces_a_previous_snapshot_and_returns_failure(
     with pytest.raises(SystemExit, match="scan budget exhausted"):
         discovery.main(["--output", str(path)])
     assert discovery.load_snapshot(path)["federations"] == []
+
+
+@pytest.mark.parametrize("peer_timeout", [2.0, 0.15])
+@pytest.mark.parametrize("wrapped", [False, True])
+def test_repeated_clock_read_caps_total_probe_and_preserves_exhaustion(
+    monkeypatch, peer_timeout, wrapped
+):
+    # The deadline addition rounds up at this ordinary monotonic magnitude.
+    # Repeated readings must neither enlarge the configured cap nor classify
+    # an equal peer/scan timeout as a complete negative discovery result.
+    monkeypatch.setattr(discovery.time, "monotonic", lambda: 1024.0)
+    timeout_error = TimeoutError("remaining scan budget exhausted")
+    failure = URLError(timeout_error) if wrapped else timeout_error
+    seen = []
+
+    def opener(_request, *, timeout):
+        seen.append(timeout)
+        assert timeout == 0.15
+        raise failure
+
+    with pytest.raises(discovery.DiscoveryBudgetExceeded) as result:
+        discovery.discover(
+            runner=_runner(1), opener=opener,
+            timeout_seconds=peer_timeout, total_timeout_seconds=0.15,
+        )
+
+    assert seen == [0.15]
+    assert result.value.__cause__ is failure
+    assert not any(t.name.startswith("fcp-discovery") for t in threading.enumerate())
+
+
+@pytest.mark.parametrize("wrapped", [False, True])
+def test_repeated_clock_read_keeps_shorter_peer_timeout_a_complete_negative(
+    monkeypatch, wrapped
+):
+    monkeypatch.setattr(discovery.time, "monotonic", lambda: 1024.0)
+    timeout_error = TimeoutError("short peer-specific timeout")
+    failure = URLError(timeout_error) if wrapped else timeout_error
+    seen = []
+
+    def opener(_request, *, timeout):
+        seen.append(timeout)
+        assert timeout == 0.05
+        raise failure
+
+    result = discovery.discover(
+        runner=_runner(1), opener=opener,
+        timeout_seconds=0.05, total_timeout_seconds=0.15,
+    )
+
+    assert seen == [0.05]
+    assert result["federations"] == []
+
+
+def test_repeated_clock_read_caps_the_whole_scan_wait(monkeypatch):
+    monkeypatch.setattr(discovery.time, "monotonic", lambda: 1024.0)
+    waits = []
+
+    def completed(futures, *, timeout):
+        assert futures == []
+        waits.append(timeout)
+        return iter(())
+
+    monkeypatch.setattr(discovery, "as_completed", completed)
+    result = discovery.discover(runner=_runner(0), total_timeout_seconds=0.15)
+
+    assert waits == [0.15]
+    assert result["federations"] == []
+
+
+def test_repeated_clock_read_caps_http_interrupt_timer(monkeypatch):
+    monkeypatch.setattr(discovery.time, "monotonic", lambda: 1024.0)
+    waits = []
+    events = []
+    response = SimpleNamespace(close=lambda: events.append("response-closed"))
+
+    class Connection:
+        sock = SimpleNamespace(shutdown=lambda *_args: None)
+
+        def __init__(self, _host, _port, *, timeout):
+            assert timeout == 0.15
+
+        def connect(self):
+            pass
+
+        def request(self, *_args, **_kwargs):
+            pass
+
+        def getresponse(self):
+            return response
+
+        def close(self):
+            events.append("connection-closed")
+
+    class Timer:
+        def __init__(self, interval, _function):
+            waits.append(interval)
+
+        def start(self):
+            pass
+
+        def cancel(self):
+            events.append("timer-cancelled")
+
+        def join(self):
+            events.append("timer-joined")
+
+    monkeypatch.setattr(discovery.http.client, "HTTPConnection", Connection)
+    monkeypatch.setattr(discovery.threading, "Timer", Timer)
+    with discovery._open_probe(Request("http://100.64.0.1:5000/probe"), timeout=0.15) as value:
+        assert value is response
+
+    assert waits == [0.15]
+    assert events == ["timer-cancelled", "timer-joined", "response-closed", "connection-closed"]

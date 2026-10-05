@@ -9,12 +9,16 @@ has durably accepted the corresponding batch identity.
 from __future__ import annotations
 
 import json
+import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import replace
 from pathlib import Path
 
-from catalog.mtconnect_recorder.acceptance_observability import observe_operation
+from catalog.mtconnect_recorder.acceptance_observability import (
+    observe_operation,
+    source_alias,
+)
 from catalog.mtconnect_recorder.model import (
     MtconnectProtocolError,
     RawBatchRef,
@@ -70,6 +74,30 @@ class IncrementalRecorderArchiveReconciler(RecorderArchiveReconciler):
         super().__init__(*args, **kwargs)
         self.frontier = RecorderPublicationFrontier(self.store)
         self._blocked_migrations: dict[str, str] = {}
+        self._diagnostics = threading.local()
+
+    def reconcile_with_diagnostics(self, *, observer, observation_failed=None) -> RecorderReconcileResult:
+        """Optional call-local observations; the existing reconcile policy is unchanged."""
+        previous = getattr(self._diagnostics, "observer", None)
+        self._diagnostics.observer = (observer, observation_failed)
+        try:
+            return self.reconcile()
+        finally:
+            self._diagnostics.observer = previous
+
+    def _observe_stage(self, stage: str, source_name: str, **progress: int) -> None:
+        sinks = getattr(self._diagnostics, "observer", None)
+        if sinks is None:
+            return
+        observer, on_loss = sinks
+        try:
+            observer({"stage": stage, "source_alias": source_alias(source_name), "progress": progress})
+        except Exception:  # noqa: BLE001 - observer failures cannot change archive work
+            try:
+                if on_loss is not None:
+                    on_loss()
+            except Exception:  # noqa: BLE001, S110 - diagnostics cannot change workload policy
+                pass
 
     @observe_operation(
         "publication-reconcile",
@@ -136,6 +164,7 @@ class IncrementalRecorderArchiveReconciler(RecorderArchiveReconciler):
         # record write or the process crashes half-way through, the initialized
         # marker is not written. A later cycle repeats the scan and idempotently
         # overwrites the already-seeded records rather than skipping evidence.
+        self._observe_stage("legacy-scan", archive_source_name)
         scan = self.store.scan_raw_batches(
             source_name=archive_source_name,
             instance_id=instance_id,
@@ -144,7 +173,11 @@ class IncrementalRecorderArchiveReconciler(RecorderArchiveReconciler):
             (Path(issue.manifest_path), issue.detail)
             for issue in scan.issues
         ]
-        for ref in scan.refs:
+        writes_completed = 0
+        self._observe_stage("legacy-frontier-write", archive_source_name,
+                            refs_total=len(scan.refs), issues=len(migration_issues),
+                            write_attempts=0, writes_completed=0)
+        for index, ref in enumerate(scan.refs, 1):
             try:
                 with _admit_frontier_write(
                     self.store.data_dir,
@@ -157,12 +190,21 @@ class IncrementalRecorderArchiveReconciler(RecorderArchiveReconciler):
                         instance_id=instance_id,
                         ref=ref,
                     )
+                writes_completed += 1
             except MtconnectProtocolError as exc:
                 # A structurally readable manifest can still fail the stricter
                 # frontier identity/path contract. Treat that as a completed
                 # migration issue too, so it cannot force the same lifetime
                 # scan forever while remaining operator-visible.
                 migration_issues.append((ref.manifest_path, str(exc)))
+            if index % 64 == 0 or index == len(scan.refs):
+                self._observe_stage("legacy-frontier-write", archive_source_name,
+                                    refs_total=len(scan.refs), issues=len(migration_issues),
+                                    write_attempts=index, writes_completed=writes_completed)
+
+        self._observe_stage("legacy-marker", archive_source_name,
+                            refs_total=len(scan.refs), issues=len(migration_issues),
+                            write_attempts=len(scan.refs), writes_completed=writes_completed)
 
         if migration_issues:
             issue_path, _detail = min(
@@ -181,6 +223,9 @@ class IncrementalRecorderArchiveReconciler(RecorderArchiveReconciler):
                     issue_count=len(migration_issues),
                     issue_sample=issue_sample,
                 )
+            self._observe_stage("legacy-marker-published", archive_source_name,
+                                refs_total=len(scan.refs), issues=len(migration_issues),
+                                write_attempts=len(scan.refs), writes_completed=writes_completed)
             return
 
         with _admit_frontier_write(
@@ -192,6 +237,9 @@ class IncrementalRecorderArchiveReconciler(RecorderArchiveReconciler):
                 source_name=archive_source_name,
                 instance_id=instance_id,
             )
+        self._observe_stage("legacy-marker-published", archive_source_name,
+                            refs_total=len(scan.refs), issues=0,
+                            write_attempts=len(scan.refs), writes_completed=writes_completed)
 
     def _pending_for_source(
         self,
@@ -215,6 +263,7 @@ class IncrementalRecorderArchiveReconciler(RecorderArchiveReconciler):
                     source_name,
                     archive_source_name,
                 )
+        self._observe_stage("pending-discovery", source_name)
         return self.frontier.pending(
             source_name=source_name,
             instance_id=checkpoint.agent_instance_id,
@@ -382,6 +431,7 @@ class IncrementalRecorderArchiveReconciler(RecorderArchiveReconciler):
                 # the batch locally publishable.
                 continue
             counters["eligible"] += 1
+            self._observe_stage("pending-validation", archive_source_name)
             self._validate_pending_evidence(
                 pending=pending,
                 checkpoint=checkpoint,
@@ -405,6 +455,7 @@ class IncrementalRecorderArchiveReconciler(RecorderArchiveReconciler):
                 raw_sha256=ref.raw_sha256,
                 day=day,
             )
+            self._observe_stage("derived-read", archive_source_name)
             observations = self._read_observations(observation_path)
             self._validate_observation_identity(
                 observations=observations,
@@ -457,6 +508,7 @@ class IncrementalRecorderArchiveReconciler(RecorderArchiveReconciler):
                     raw_last_sequence=ref.last_sequence,
                     observations=chunk,
                 )
+                self._observe_stage("outbox-enqueue", archive_source_name)
                 _entry, created = self.queue.enqueue(
                     session_id=self.target.session_id,
                     group_id=self.target.group_id,
@@ -477,6 +529,7 @@ class IncrementalRecorderArchiveReconciler(RecorderArchiveReconciler):
             # pre-existing). A crash before this unlink merely causes harmless
             # duplicate reconciliation; a crash before the outbox write leaves
             # the pointer intact because control never reaches this line.
+            self._observe_stage("pending-retirement", archive_source_name)
             self.frontier.retire(pending)
 
 

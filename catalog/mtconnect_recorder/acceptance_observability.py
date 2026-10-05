@@ -35,6 +35,20 @@ _REQUIRED_PROGRESS = {
     "recorder-recovery": frozenset({"next_sequence_after", "advanced_sequences"}),
     "publication-reconcile": _PROGRESS_FIELDS - {"next_sequence_after", "advanced_sequences"},
 }
+PUBLICATION_CYCLE_SCHEMA = "fcp.recorder.publication-cycle-diagnostics.v1"
+_CYCLE_STAGES = frozenset({
+    "connect", "client-close", "announce", "status", "selection", "route-build",
+    "delivery", "jsonl", "pending-read", "local-reconcile", "retry-pending-read",
+})
+_WORKER_STAGES = frozenset({
+    "validate", "checkpoint", "backlog-probe", "reconcile", "delivery", "retirement",
+})
+_CYCLE_COUNTERS = _PROGRESS_FIELDS | {"committed", "attempted", "retired", "pending_batches"}
+_RECONCILE_STAGES = frozenset({
+    "legacy-scan", "legacy-frontier-write", "legacy-marker", "legacy-marker-published", "pending-discovery",
+    "pending-validation", "derived-read", "outbox-enqueue", "pending-retirement",
+})
+_RECONCILE_COUNTERS = frozenset({"refs_total", "issues", "writes_completed", "write_attempts"})
 
 
 def _utc() -> str:
@@ -213,6 +227,263 @@ class ObservationRegistry:
             }
         finally:
             self._lock.release()
+
+
+class PublicationCycleObservation:
+    """One owned current cycle; diagnostics never replace completed-span evidence.
+
+    Reads/updates are nonblocking and have no I/O. A missed update makes the
+    retained cycle unavailable rather than leaving its previous stage current.
+    The existing duration registry and its loss/completion rules are untouched.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._record: dict[str, object] | None = None
+        self._worker_generation: str | None = None
+        self._worker_provenance: dict[str, object] | None = None
+        self._lost = 0
+        self._sequence = 0
+
+    def _lose(self) -> None:
+        self._lost = min(MAX_COUNTER, self._lost + 1)
+
+    def new_worker(self) -> str | None:
+        if not self._lock.acquire(blocking=False):
+            # Replacement admission must fence the previous coroutine even when
+            # its diagnostic callback currently holds the nonblocking lock.
+            self._worker_generation = None
+            self._lose()
+            return
+        try:
+            self._record = None
+            self._worker_generation = uuid.uuid4().hex
+            self._worker_provenance = None
+            self._sequence = 0
+            return self._worker_generation
+        except Exception:  # noqa: BLE001 - diagnostics cannot change lifecycle
+            self._worker_generation = None
+            self._lose()
+        finally:
+            self._lock.release()
+
+    def begin(self, cycle_id: str, *, session_id: str, node_id: str,
+              worker_generation: str | None) -> tuple[str, str] | None:
+        if not self._lock.acquire(blocking=False):
+            self._lose()
+            return None
+        try:
+            if worker_generation is None or worker_generation != self._worker_generation:
+                return None  # A superseded coroutine cannot begin a new owned cycle.
+            self._record = None
+            provenance = process_provenance()
+            if (self._worker_generation is None
+                    or re.fullmatch(r"[0-9a-f]{32}", cycle_id) is None
+                    or any(not isinstance(value, str) or _TOKEN.fullmatch(value) is None
+                           for value in (session_id, node_id))
+                    or not self._valid_provenance(provenance)
+                    or (self._worker_provenance is not None
+                        and self._worker_provenance != provenance)):
+                raise ValueError("unrepresentable cycle identity")
+            self._worker_provenance = dict(provenance)
+            started_ns = time.monotonic_ns()
+            started_utc = _utc()
+            if type(started_ns) is not int or started_ns <= 0:
+                raise ValueError("invalid cycle start clock")
+            self._sequence = min(MAX_COUNTER, self._sequence + 1)
+            self._record = {
+                "publication_loop_generation": self._worker_generation,
+                "cycle_id": cycle_id, "cycle_sequence": self._sequence,
+                "transition_sequence": 1,
+                "provenance": provenance,
+                "context": {"session_id": session_id, "node_id": node_id,
+                            "storage_group": None, "authority_node_id": None},
+                "outcome": "running", "stage": "connect", "cycle_stage": None,
+                "reconciliation": None,
+                "terminal_scope": "cycle-awaiting-coroutine",
+                "started_at_utc": started_utc, "started_at_monotonic_ns": started_ns,
+                "transition_at_utc": started_utc, "transition_at_monotonic_ns": started_ns,
+                "ended_at_utc": None, "ended_at_monotonic_ns": None,
+                "progress": {key: None for key in sorted(_CYCLE_COUNTERS)},
+                "error_type": None, "failure_stage": None, "failure_cycle_stage": None,
+                "failure_reconciliation": None,
+                "last_failure": None,
+                "terminal_error_type": None, "observation_loss_count": self._lost,
+            }
+            return self._worker_generation, cycle_id
+        except Exception:  # noqa: BLE001 - invalid/missing diagnostics stay missing
+            self._lose()
+            return None
+        finally:
+            self._lock.release()
+
+    def transition(self, token: tuple[str, str] | None, stage: str, *,
+                   cycle_stage: str | None = None,
+                   progress: Mapping[str, object] | None = None,
+                   storage_group: str | None = None,
+                   authority_node_id: str | None = None,
+                   reconciliation: Mapping[str, object] | None = None) -> None:
+        self._update(token, stage=stage, cycle_stage=cycle_stage, progress=progress,
+                     storage_group=storage_group, authority_node_id=authority_node_id,
+                     reconciliation=reconciliation)
+
+    def finish(self, token: tuple[str, str] | None, *, outcome: str,
+               error: BaseException | None = None) -> None:
+        self._update(token, outcome=outcome, error=error)
+
+    def failure(self, token: tuple[str, str] | None, error: BaseException) -> None:
+        self._update(token, failure=error)
+
+    def observation_failed(self, token: tuple[str, str] | None) -> None:
+        if not self._lock.acquire(blocking=False):
+            self._lose()
+            return
+        try:
+            if self._record is not None and token == (self._record["publication_loop_generation"], self._record["cycle_id"]):
+                self._lose()
+        finally:
+            self._lock.release()
+
+    def _update(self, token: tuple[str, str] | None, **changes: object) -> None:
+        if token is None:
+            return
+        if not self._lock.acquire(blocking=False):
+            self._lose()
+            return
+        try:
+            record = self._record
+            if (record is None or self._worker_generation is None
+                    or record["publication_loop_generation"] != self._worker_generation
+                    or token != (record["publication_loop_generation"], record["cycle_id"])):
+                return  # An old callback cannot modify the newer owner.
+            if record["outcome"] != "running":
+                return
+            stamp_ns, stamp_utc = time.monotonic_ns(), _utc()
+            if (type(stamp_ns) is not int
+                    or stamp_ns < record["transition_at_monotonic_ns"]):
+                raise ValueError("invalid cycle transition clock")
+            updated = copy.deepcopy(record)
+            if "stage" in changes:
+                stage, worker_stage = changes["stage"], changes["cycle_stage"]
+                if stage not in _CYCLE_STAGES or (worker_stage is not None and worker_stage not in _WORKER_STAGES):
+                    raise ValueError("unrepresentable cycle stage")
+                updated.update(stage=stage, cycle_stage=worker_stage)
+                detail = changes["reconciliation"]
+                updated["reconciliation"] = None
+                if detail is not None:
+                    if (worker_stage != "reconcile" or not isinstance(detail, Mapping)
+                            or detail.get("stage") not in _RECONCILE_STAGES
+                            or not isinstance(detail.get("source_alias"), str)
+                            or re.fullmatch(r"[0-9a-f]{64}", detail["source_alias"]) is None
+                            or not isinstance(detail.get("progress"), Mapping)):
+                        raise ValueError("unrepresentable reconciliation stage")
+                    counts = {}
+                    for key, value in detail["progress"].items():
+                        if key not in _RECONCILE_COUNTERS:
+                            continue
+                        if type(value) is not int or not 0 <= value <= MAX_COUNTER:
+                            raise ValueError("unrepresentable reconciliation progress")
+                        counts[key] = value
+                    updated["reconciliation"] = {
+                        "stage": detail["stage"], "source_alias": detail["source_alias"],
+                        "progress": counts,
+                    }
+                for key in ("storage_group", "authority_node_id"):
+                    value = changes[key]
+                    if value is not None:
+                        if not isinstance(value, str) or _TOKEN.fullmatch(value) is None:
+                            raise ValueError("unrepresentable cycle context")
+                        updated["context"][key] = value
+                progress = changes["progress"]
+                if progress is not None:
+                    if not isinstance(progress, Mapping):
+                        raise ValueError("invalid cycle progress")
+                    for key, value in progress.items():
+                        if key not in _CYCLE_COUNTERS:
+                            continue
+                        if type(value) is not int or not 0 <= value <= MAX_COUNTER:
+                            raise ValueError("unrepresentable cycle progress")
+                        updated["progress"][key] = value
+            elif "failure" in changes:
+                error = changes["failure"]
+                if not isinstance(error, BaseException):
+                    raise ValueError("invalid cycle error")
+                name = type(error).__name__
+                updated["last_failure"] = {
+                    "error_type": name if _TOKEN.fullmatch(name) else "Exception",
+                    "stage": record["stage"], "cycle_stage": record["cycle_stage"],
+                    "reconciliation": copy.deepcopy(record["reconciliation"]),
+                }
+                if updated["error_type"] is None:
+                    updated.update(error_type=name if _TOKEN.fullmatch(name) else "Exception",
+                                   failure_stage=record["stage"], failure_cycle_stage=record["cycle_stage"],
+                                   failure_reconciliation=copy.deepcopy(record["reconciliation"]))
+            else:
+                outcome, error = changes["outcome"], changes["error"]
+                if outcome not in {"completed", "waiting", "failed", "interrupted"}:
+                    raise ValueError("invalid cycle outcome")
+                if error is not None and not isinstance(error, BaseException):
+                    raise ValueError("invalid cycle error")
+                name = type(error).__name__ if error is not None else None
+                updated.update(outcome=outcome, ended_at_utc=stamp_utc,
+                               ended_at_monotonic_ns=stamp_ns,
+                               terminal_error_type=name if name is None or _TOKEN.fullmatch(name) else "Exception")
+            updated.update(transition_at_utc=stamp_utc, transition_at_monotonic_ns=stamp_ns,
+                           transition_sequence=min(MAX_COUNTER, record["transition_sequence"] + 1))
+            # Loss earlier in this cycle stays explicit even after another update.
+            self._record = updated
+        except Exception:  # noqa: BLE001 - do not change publication exceptions
+            self._lose()
+        finally:
+            self._lock.release()
+
+    def snapshot(self, *, expected_session: str | None, expected_node: str | None) -> dict[str, object]:
+        missing = {"schema": PUBLICATION_CYCLE_SCHEMA, "available": False,
+                   "acceptance_completion_evidence": False}
+        if not self._lock.acquire(blocking=False):
+            self._lose()
+            return missing
+        try:
+            record = self._record
+            current = process_provenance()
+            observed_ns, observed_utc = time.monotonic_ns(), _utc()
+            if (record is None or self._worker_generation is None
+                    or record["publication_loop_generation"] != self._worker_generation
+                    or record["provenance"] != current
+                    or not self._valid_provenance(current)
+                    or record["context"]["session_id"] != expected_session
+                    or record["context"]["node_id"] != expected_node
+                    or record["observation_loss_count"] != self._lost
+                    or type(observed_ns) is not int
+                    or not 0 < record["started_at_monotonic_ns"] <= record["transition_at_monotonic_ns"] <= observed_ns):
+                return {**missing, "dropped_updates": self._lost}
+            stamps = [datetime.fromisoformat(value.replace("Z", "+00:00"))
+                      for value in (record["started_at_utc"], record["transition_at_utc"], observed_utc)]
+            if (any(stamp.tzinfo is None for stamp in stamps)
+                    or not stamps[0] <= stamps[1] <= stamps[2]):
+                return {**missing, "dropped_updates": self._lost}
+            return {"schema": PUBLICATION_CYCLE_SCHEMA, "available": True,
+                    "acceptance_completion_evidence": False, "observed_at_utc": observed_utc,
+                    "observed_at_monotonic_ns": observed_ns, "dropped_updates": self._lost,
+                    **copy.deepcopy(record)}
+        except Exception:  # noqa: BLE001 - racing/unrepresentable evidence unavailable
+            self._lose()
+            return {**missing, "dropped_updates": self._lost}
+        finally:
+            self._lock.release()
+
+    @staticmethod
+    def _valid_provenance(value: object) -> bool:
+        return (isinstance(value, dict)
+                and set(value) == {"candidate_sha", "runtime_generation", "supervisor_generation", "pid"}
+                and isinstance(value.get("candidate_sha"), str)
+                and re.fullmatch(r"[0-9a-f]{40}", value["candidate_sha"]) is not None
+                and isinstance(value.get("runtime_generation"), str)
+                and re.fullmatch(r"[0-9a-f]{32}", value["runtime_generation"]) is not None
+                and (value.get("supervisor_generation") is None
+                     or isinstance(value["supervisor_generation"], str)
+                     and re.fullmatch(r"[0-9a-f]{32}", value["supervisor_generation"]) is not None)
+                and type(value.get("pid")) is int and value["pid"] > 0)
 
 
 _REGISTRY = ObservationRegistry()
