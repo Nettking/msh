@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from hashlib import sha256
 from pathlib import Path
 
 import pytest
@@ -58,6 +59,86 @@ def _mark_stored_pending(frontier, *, batch, stored, source_name="Mazak"):
             source_name=source_name,
         ),
     )
+
+
+def test_legacy_relative_raw_path_migrates_without_rewriting_evidence(
+    tmp_path, monkeypatch
+):
+    """A relative writer and absolute publisher name the same real capture."""
+    client = RecordingClient()
+    store, checkpoint_file, outbox, _queue, legacy = _build_reconciler(
+        tmp_path, client=client
+    )
+    reconciler = _incremental_from(legacy)
+    probe, _batch, stored = _store_sample(store, SAMPLE_XML)
+    _write_checkpoint(checkpoint_file, probe_sha256=probe.sha256, next_sequence=13)
+    manifest_path = stored.raw_path.with_suffix(".manifest.json")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["raw_file"] = stored.raw_path.relative_to(tmp_path).as_posix()
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    original_manifest = manifest_path.read_bytes()
+    original_raw = stored.raw_path.read_bytes()
+    monkeypatch.chdir(tmp_path)
+
+    result = reconciler.reconcile()
+
+    assert result.enqueued == 1
+    assert result.quarantine.total == 0
+    assert reconciler.frontier.initialized(source_name="Mazak", instance_id=77)
+    assert reconciler.frontier.pending(source_name="Mazak", instance_id=77) == ()
+    entry, = outbox.pending()
+    assert entry.payload["content"]["raw_sha256"] == "sha256:" + stored.raw_sha256
+    assert entry.payload["content"]["agent_instance_id"] == 77
+    assert entry.payload["content"]["first_sequence"] == 10
+    assert entry.payload["content"]["last_sequence"] == 12
+    assert manifest_path.read_bytes() == original_manifest
+    assert stored.raw_path.read_bytes() == original_raw
+
+
+def test_repaired_blocked_migration_retries_explicitly_then_returns_to_bounded_path(
+    tmp_path, monkeypatch
+):
+    """Operator retry does not mark migration complete or trigger repeated scans."""
+    store, checkpoint_file, outbox, _queue, legacy = _build_reconciler(
+        tmp_path, client=RecordingClient()
+    )
+    reconciler = _incremental_from(legacy)
+    probe, _batch, stored = _store_sample(store, SAMPLE_XML)
+    _write_checkpoint(checkpoint_file, probe_sha256=probe.sha256, next_sequence=13)
+    mark_pending = reconciler.frontier.mark_pending
+
+    def prior_path_failure(**kwargs):
+        raise MtconnectProtocolError("Publication frontier raw evidence is outside its durable root.")
+
+    monkeypatch.setattr(reconciler.frontier, "mark_pending", prior_path_failure)
+    failed = reconciler.reconcile()
+    assert failed.enqueued == 0 and failed.quarantine.total == 1
+    marker = reconciler.frontier._state_path("Mazak", 77)
+    original = marker.read_bytes()
+    manifest = stored.raw_path.with_suffix(".manifest.json").read_bytes()
+    raw = stored.raw_path.read_bytes()
+    monkeypatch.setattr(reconciler.frontier, "mark_pending", mark_pending)
+    # A fixed binary alone must not silently discard a preserved refusal.
+    assert reconciler.reconcile().enqueued == 0
+    receipt = reconciler.frontier.retry_blocked_migration(
+        source_name="Mazak", instance_id=77,
+        expected_state_sha256=sha256(original).hexdigest(),
+    )
+    assert receipt.read_bytes() == original
+    assert not reconciler.frontier.initialized(source_name="Mazak", instance_id=77)
+    repaired = reconciler.reconcile()
+    assert repaired.enqueued == 1 and repaired.quarantine.total == 0
+    assert len(outbox.pending()) == 1
+    assert reconciler.frontier.initialized(source_name="Mazak", instance_id=77)
+    assert stored.raw_path.read_bytes() == raw
+    assert stored.raw_path.with_suffix(".manifest.json").read_bytes() == manifest
+    assert receipt.read_bytes() == original
+
+    def refuse_rescan(**kwargs):
+        raise AssertionError("operator retry introduced a repeated lifetime scan")
+
+    monkeypatch.setattr(store, "scan_raw_batches", refuse_rescan)
+    assert reconciler.reconcile().enqueued == 0
 
 
 def test_new_recorder_evidence_does_not_require_rereading_prior_manifests(

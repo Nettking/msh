@@ -13,13 +13,21 @@ incremental path.
 from __future__ import annotations
 
 import json
+import os
 import re
 from dataclasses import dataclass
 from datetime import date
+from hashlib import sha256
 from heapq import nsmallest
 from pathlib import Path
 
-from .model import MtconnectProtocolError, RawBatchRef, _slug, _write_json_atomic
+from .model import (
+    MtconnectProtocolError,
+    RawBatchRef,
+    _fsync_directory,
+    _slug,
+    _write_json_atomic,
+)
 from .storage import DurableRecorderStore, _confined_storage_path
 
 PENDING_PUBLICATION_SCHEMA = "fcp.mtconnect.pending_publication.v1"
@@ -92,6 +100,17 @@ def _ensure_confined_without_reparse(
 ) -> None:
     """Reject a managed path that escapes or traverses a link-like component."""
 
+    # Capture may retain a relative raw_file while its publisher uses an
+    # absolute data directory. Compare equivalent lexical representations,
+    # without resolving links before the reparse checks below. The evidence
+    # paths and their recorded provenance remain unchanged.
+    try:
+        path = path.absolute()
+        root = root.absolute()
+    except OSError as exc:
+        raise MtconnectProtocolError(
+            f"Publication frontier {label} identity is unavailable."
+        ) from exc
     try:
         path.relative_to(root)
     except ValueError as exc:
@@ -571,6 +590,96 @@ class RecorderPublicationFrontier:
 
     def initialized(self, *, source_name: str, instance_id: int) -> bool:
         return self.migration_state(source_name=source_name, instance_id=instance_id) == "initialized"
+
+    def retry_blocked_migration(
+        self,
+        *,
+        source_name: str,
+        instance_id: int,
+        expected_state_sha256: str,
+    ) -> Path:
+        """Explicitly retry one repaired legacy migration, retaining its refusal.
+
+        The operator must hold the supported host mutation lease and prove the
+        publication writer is stopped before calling this method. It is not a
+        live control endpoint and does not provide a filesystem compare-and-swap
+        against an uncoordinated writer. Capture evidence and outbox rows are
+        never changed. Only a validated blocked marker with the exact expected
+        bytes may be retired; initialized markers cannot be reset.
+
+        A same-directory, exclusive, fsynced copy preserves the complete original
+        marker before its removal. Interrupted removal can be retried with the
+        same hash. A partial or conflicting receipt fails closed, preserving the
+        marker for investigation. Ordinary reconciliation performs the one-time
+        migration again and retains any remaining real issue as blocked.
+        """
+        expected = _digest(expected_state_sha256)
+        source = _required_text(source_name, "source_name")
+        instance = _positive_int(instance_id, "instance_id")
+        path = self._state_path(source, instance)
+        receipt = path.with_name(f".blocked-{expected}.json")
+        _ensure_confined_without_reparse(
+            receipt, root=self.store.root, label="migration retry receipt"
+        )
+
+        def read_exact(candidate: Path) -> bytes:
+            if _is_reparse_point(candidate) or not candidate.is_file():
+                raise MtconnectProtocolError("Publication frontier retry input is not a regular file.")
+            if candidate.stat().st_size > PUBLICATION_FRONTIER_STATE_MAX_BYTES:
+                raise MtconnectProtocolError("Publication frontier retry input exceeds its fixed bound.")
+            value = candidate.read_bytes()
+            if len(value) > PUBLICATION_FRONTIER_STATE_MAX_BYTES:
+                raise MtconnectProtocolError("Publication frontier retry input exceeds its fixed bound.")
+            if sha256(value).hexdigest() != expected:
+                raise MtconnectProtocolError("Publication frontier retry state hash mismatch.")
+            return value
+
+        try:
+            if not path.exists():
+                # Replay after successful removal proves the retained original,
+                # rather than inventing a new blocked or initialized marker.
+                value = read_exact(receipt)
+                payload = json.loads(value)
+                if (
+                    payload.get("schema") != PUBLICATION_FRONTIER_STATE_SCHEMA
+                    or payload.get("state") != "blocked"
+                    or payload.get("source_name") != source
+                    or type(payload.get("agent_instance_id")) is not int
+                    or payload["agent_instance_id"] != instance
+                    or payload.get("archive_root_identity")
+                    != self._archive_root_identity(source, instance)
+                    or type(payload.get("issue_count")) is not int
+                    or payload["issue_count"] <= 0
+                    or not isinstance(payload.get("issue_sample"), str)
+                    or not payload["issue_sample"].strip()
+                ):
+                    raise MtconnectProtocolError("Publication frontier retry receipt identity mismatch.")
+                return receipt
+            if self.migration_state(source_name=source, instance_id=instance) != "blocked":
+                raise MtconnectProtocolError("Publication frontier retry requires a blocked migration.")
+            value = read_exact(path)
+            try:
+                with receipt.open("xb") as handle:
+                    handle.write(value)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                _fsync_directory(receipt.parent)
+            except FileExistsError:
+                # A prior call may have durably copied the refusal but failed
+                # before removing it. Never overwrite an existing receipt.
+                if read_exact(receipt) != value:
+                    raise MtconnectProtocolError("Publication frontier retry receipt conflict.")
+            # Windows FlushFileBuffers needs a handle opened for writing; the
+            # retained bytes are never rewritten through this handle.
+            with receipt.open("r+b") as handle:
+                os.fsync(handle.fileno())
+            _fsync_directory(receipt.parent)
+            read_exact(path)
+            path.unlink()
+            _fsync_directory(path.parent)
+            return receipt
+        except (OSError, ValueError, AttributeError) as exc:
+            raise MtconnectProtocolError("Publication frontier migration retry is unavailable.") from exc
 
     def mark_initialized(self, *, source_name: str, instance_id: int) -> Path:
         source = _required_text(source_name, "source_name")
