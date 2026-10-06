@@ -1420,6 +1420,12 @@ class RecorderRuntime:
                     break
 
                 validate_batch_continuity(batch, expected)
+                # A cursorless recovery sample can report a newer Agent
+                # frontier than the earlier /current response. Keep draining
+                # against that observed frontier rather than declaring the
+                # cycle caught up at the stale /current lastSequence.
+                if batch.header.last_sequence >= current_header.last_sequence:
+                    current_header = batch.header
                 recovery_frontier = RecorderRecoveryFrontier(self.store)
                 recovery_frontier.mark_pending(
                     source_name=source_name,
@@ -1461,7 +1467,7 @@ class RecorderRuntime:
                     stored.observation_count,
                 )
 
-                if expected > batch.header.last_sequence:
+                if expected > current_header.last_sequence:
                     break
 
             timestamp = _utc_now()

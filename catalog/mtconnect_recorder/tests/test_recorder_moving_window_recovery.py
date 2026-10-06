@@ -30,7 +30,14 @@ def _streams(
     *,
     instance_id: int = _INSTANCE_ID,
     discontinuous: bool = False,
+    last_sequence: int | None = None,
+    buffer_first_sequence: int | None = None,
 ) -> str:
+    # /sample can report the Agent's latest lastSequence while nextSequence
+    # identifies the next cursor after just the returned observations.
+    last = first + 2 if last_sequence is None else last_sequence
+    buffer_first = first if buffer_first_sequence is None else buffer_first_sequence
+    next_sequence = first + 3
     sequences = [first, first + 2] if discontinuous else range(first, first + 3)
     observations = "".join(
         f'<Position dataItemId="x" sequence="{sequence}" '
@@ -39,8 +46,8 @@ def _streams(
     )
     return (
         "<MTConnectStreams>"
-        f'<Header instanceId="{instance_id}" firstSequence="{first}" '
-        f'lastSequence="{first + 2}" nextSequence="{first + 3}"/>'
+        f'<Header instanceId="{instance_id}" firstSequence="{buffer_first}" '
+        f'lastSequence="{last}" nextSequence="{next_sequence}"/>'
         '<Streams><DeviceStream name="Synthetic" uuid="SYNTHETIC-001">'
         '<ComponentStream component="Linear"><Samples>'
         f"{observations}</Samples></ComponentStream></DeviceStream></Streams>"
@@ -77,7 +84,27 @@ def _agent(mode: str) -> Iterator[tuple[str, dict[str, object]]]:
                 requests = state["sample_requests"]
                 assert isinstance(requests, list)
                 requests.append(params)
-                if "from" in params and mode in {
+                if mode == "http_404_rolling_frontier":
+                    requested = int(params["from"][0]) if "from" in params else None
+                    if requested == 10:
+                        status_code = 404
+                        state["front"] = 109
+                        body = (
+                            "<MTConnectError><Errors>"
+                            '<Error errorCode="OUT_OF_RANGE">expired cursor</Error>'
+                            "</Errors></MTConnectError>"
+                        )
+                    elif requested is not None:
+                        body = _streams(
+                            requested, last_sequence=109, buffer_first_sequence=101
+                        )
+                    else:
+                        body = _streams(101, last_sequence=109)
+                    if status_code == 200:
+                        responses = state["responses"]
+                        assert isinstance(responses, list)
+                        responses.append(body)
+                elif "from" in params and mode in {
                     "http_404_out_of_range",
                     "http_404_invalid_request",
                     "http_404_malformed",
@@ -211,6 +238,47 @@ def test_out_of_range_fallback_archives_available_sample_and_persists_gap(
             assert state["sample_requests"] == [
                 {"from": ["10"], "count": [str(recorder_runtime.BATCH_SIZE)]},
                 {"count": [str(recorder_runtime.BATCH_SIZE)]},
+            ]
+        finally:
+            _close(worker)
+
+
+def test_out_of_range_fallback_drains_against_advanced_sample_frontier(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with _agent("http_404_rolling_frontier") as (endpoint, state):
+        worker = _runtime(tmp_path, endpoint, monkeypatch)
+        try:
+            result = worker.capture_source(_SOURCE, endpoint)
+
+            assert result.success and result.transaction_complete
+            assert worker.raw_batches_written == 3
+            assert worker.observations_written == 9
+            assert worker.checkpoints[_SOURCE].next_sequence == 110
+            source = worker.source_status[_SOURCE]
+            assert source["agent_last_sequence"] == 109
+            assert source["caught_up"] is True
+            assert len(list(worker.store.raw_root.rglob("*.xml.gz"))) == 3
+            gap = json.loads(
+                (
+                    worker.store.gap_root
+                    / _SOURCE
+                    / str(_INSTANCE_ID)
+                    / "gap-10-100.json"
+                ).read_text(encoding="utf-8")
+            )
+            assert (gap["missing_from"], gap["missing_to"], gap["reason"]) == (
+                10,
+                100,
+                "agent_buffer_overflow",
+            )
+            requests = state["sample_requests"]
+            assert requests == [
+                {"from": ["10"], "count": [str(recorder_runtime.BATCH_SIZE)]},
+                {"count": [str(recorder_runtime.BATCH_SIZE)]},
+                {"from": ["104"], "count": [str(recorder_runtime.BATCH_SIZE)]},
+                {"from": ["107"], "count": [str(recorder_runtime.BATCH_SIZE)]},
             ]
         finally:
             _close(worker)
