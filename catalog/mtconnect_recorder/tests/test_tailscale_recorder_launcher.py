@@ -415,6 +415,12 @@ def test_windows_probe_rejects_runtime_that_cannot_import_exact_entrypoint(
             "FCP_TEST_BLOCKED_RUNTIME_LOG": str(invocation_log),
             "FCP_TEST_BLOCKER_DIRECTORY": str(blocker_directory),
             "FCP_TEST_REAL_PYTHON": sys.executable,
+            # The launcher intentionally tries its repository venv, python.exe,
+            # and py.exe after the configured override. Make the import failure
+            # apply to every candidate so this test verifies the terminal
+            # refusal instead of depending on which interpreters happen to be
+            # installed on the host running the suite.
+            "PYTHONPATH": str(blocker_directory),
         }
     )
 
@@ -435,12 +441,86 @@ def test_windows_probe_rejects_runtime_that_cannot_import_exact_entrypoint(
         env=environment,
     )
 
-    assert completed.returncode == 0, completed.stderr or completed.stdout
+    assert completed.returncode == 2
+    assert "No Python 3 interpreter can load the FCP recorder" in completed.stderr
     invocations = invocation_log.read_text(encoding="utf-8").splitlines()
     assert len(invocations) == 1
     assert "ARGS=-c" in invocations[0]
     assert "import scripts.start_tailscale_recorder as launcher" in invocations[0]
     assert "-m scripts.start_tailscale_recorder" not in invocations[0]
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows launcher execution")
+def test_windows_launcher_uses_healthy_python_fallback_after_bad_override(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "isolated-repository"
+    windows_scripts = root / "scripts" / "windows"
+    windows_scripts.mkdir(parents=True)
+    (windows_scripts / "start_tailscale_recorder.ps1").write_text(
+        _powershell_script().read_text(encoding="utf-8"), encoding="utf-8"
+    )
+
+    selected_python_path = tmp_path / "selected-python.txt"
+    (windows_scripts / "fcp_recorder_supervisor.ps1").write_text(
+        "param(\n"
+        "    [string]$RepoRoot,\n"
+        "    [string]$PythonExecutable,\n"
+        "    [string[]]$PythonPrefix,\n"
+        "    [string[]]$RecorderArguments\n"
+        ")\n"
+        "Set-Content -LiteralPath $env:FCP_TEST_SELECTED_PYTHON "
+        "-Value $PythonExecutable\n"
+        "exit 0\n",
+        encoding="utf-8",
+    )
+
+    bad_python = tmp_path / "bad-python.cmd"
+    bad_invocation_log = tmp_path / "bad-python-invocations.txt"
+    bad_python.write_text(
+        "@echo off\n"
+        '>> "%FCP_TEST_BAD_PYTHON_LOG%" echo ARGS=%*\n'
+        "exit /b 1\n",
+        encoding="utf-8",
+    )
+
+    python_directory = str(Path(sys.executable).resolve().parent)
+    environment = dict(os.environ)
+    environment.pop("FCP_RECORDER_FEDERATION_KEY", None)
+    environment.update(
+        {
+            "FCP_RECORDER_PYTHON": str(bad_python),
+            "FCP_TEST_BAD_PYTHON_LOG": str(bad_invocation_log),
+            "FCP_TEST_SELECTED_PYTHON": str(selected_python_path),
+            # The isolated checkout deliberately has no package tree; the
+            # configured test interpreter imports the exact source under test.
+            "PYTHONPATH": str(_repository_root()),
+            "PATH": python_directory + os.pathsep + os.environ.get("PATH", ""),
+        }
+    )
+
+    completed = subprocess.run(
+        [
+            "powershell.exe",
+            "-NoLogo",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(windows_scripts / "start_tailscale_recorder.ps1"),
+            "--help",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert len(bad_invocation_log.read_text(encoding="utf-8").splitlines()) == 1
+    assert Path(selected_python_path.read_text(encoding="utf-8").strip()).resolve() == (
+        Path(sys.executable).resolve()
+    )
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows launcher execution")
