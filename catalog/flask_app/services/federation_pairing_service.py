@@ -490,6 +490,7 @@ class PairingRelayNodeClient(RelayNodeClient):
         # with the relay's reason instead of an opaque task cancellation.
         self._replay_teardown_codes = {}
         self._gap_replay_tasks = {}
+        self._expected_teardown_cancellations = set()
         self._receiver_task = None
         self._heartbeat_task = None
         self._inbound = asyncio.Queue(maxsize=MAX_INBOUND_MESSAGES)

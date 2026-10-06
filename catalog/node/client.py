@@ -165,6 +165,7 @@ class RelayNodeClient:
         ] = {}
         self._replay_teardown_codes: dict[str, str] = {}
         self._gap_replay_tasks: dict[str, asyncio.Task[None]] = {}
+        self._expected_teardown_cancellations: set[asyncio.Task[Any]] = set()
         self._receiver_task: asyncio.Task[None] | None = None
         self._heartbeat_task: asyncio.Task[None] | None = None
         self._inbound: asyncio.Queue[RelayEnvelope] = asyncio.Queue(
@@ -416,6 +417,8 @@ class RelayNodeClient:
             if task is not None and task is not current
         ]
         for task in tasks:
+            self._expected_teardown_cancellations.add(task)
+            task.add_done_callback(self._expected_teardown_cancellations.discard)
             task.cancel()
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
@@ -562,14 +565,21 @@ class RelayNodeClient:
             # Aggregate reconnect deadlines cancel in-flight RPCs from outside
             # this method. Preserve their safe correlation data while keeping
             # cancellation semantics intact for the caller.
-            _LOGGER.warning(
-                "relay request cancelled message_type=%s request_id=%s "
-                "session_id=%s timeout_seconds=%s",
-                message_type,
-                envelope.request_id,
-                session_id,
-                request_timeout,
+            current = asyncio.current_task()
+            expected_teardown = (
+                current is not None
+                and current in self._expected_teardown_cancellations
+                and current.cancelling() == 1
             )
+            if not expected_teardown:
+                _LOGGER.warning(
+                    "relay request cancelled message_type=%s request_id=%s "
+                    "session_id=%s timeout_seconds=%s",
+                    message_type,
+                    envelope.request_id,
+                    session_id,
+                    request_timeout,
+                )
             raise
         except ConnectionClosed as exc:
             # A socket may close during send, before the receiver translates

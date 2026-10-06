@@ -237,6 +237,44 @@ def test_cancelled_request_logs_safe_operation_and_correlation_only(
     asyncio.run(scenario())
 
 
+def test_expected_disconnect_cancellation_does_not_log_request_warning(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    async def scenario() -> None:
+        client = _client(tmp_path)
+        _join_connected_session(client)
+        send_finished = asyncio.Event()
+
+        class WebSocket:
+            async def send(self, raw: str) -> None:
+                send_finished.set()
+
+            async def close(self) -> None:
+                pass
+
+        client._websocket = WebSocket()  # type: ignore[assignment]
+        client._receiver_task = asyncio.create_task(asyncio.Event().wait())
+        client.connected_event.set()
+        client.disconnected_event.clear()
+        request_task = asyncio.create_task(
+            client.request("heartbeat", session_id="session-a", payload={})
+        )
+        client._heartbeat_task = request_task
+        await asyncio.wait_for(send_finished.wait(), timeout=1)
+
+        await client.disconnect(error_code="relay-disconnected")
+
+        assert request_task.cancelled()
+        assert not any(
+            "relay request cancelled" in record.message
+            for record in caplog.records
+        )
+
+    caplog.set_level(logging.WARNING, logger=node_client_module.__name__)
+    asyncio.run(scenario())
+
+
 def test_unexpected_receiver_failure_is_logged_without_exception_payload(
     tmp_path: Path,
     caplog: pytest.LogCaptureFixture,
