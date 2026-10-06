@@ -541,6 +541,46 @@ function Stop-BuildClient([System.Diagnostics.Process]$Process) {
     return [bool]$Process.HasExited
 }
 
+function Start-FcpBuildProcess([string]$Executable, [string[]]$Arguments) {
+    $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $startInfo.FileName = $Executable
+    $startInfo.Arguments = (($Arguments | ForEach-Object {
+        ConvertTo-WindowsProcessArgument $_
+    }) -join ' ')
+    $startInfo.WorkingDirectory = $RepoRoot
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    # Stream output without buffering a whole build, and own its handle from
+    # creation. Reopening
+    # a Start-Process -PassThru object after a fast exit can lose its exit code.
+    $process = New-Object System.Diagnostics.Process
+    $process.StartInfo = $startInfo
+    $started = $false
+    try {
+        if (-not $process.Start()) { throw 'core_image_build_failed' }
+        $started = $true
+        $outputTasks = @(
+            $process.StandardOutput.BaseStream.CopyToAsync([Console]::OpenStandardOutput()),
+            $process.StandardError.BaseStream.CopyToAsync([Console]::OpenStandardError())
+        )
+        Add-Member -InputObject $process -NotePropertyName FcpOutputTasks -NotePropertyValue $outputTasks
+        return $process
+    }
+    catch {
+        try {
+            if ($started -and -not (Stop-BuildClient $process)) {
+                throw 'build_writer_stop_unverified'
+            }
+            throw 'core_image_build_failed'
+        }
+        finally {
+            $process.Dispose()
+        }
+    }
+}
+
 function Invoke-ControlledCoreBuild([string]$BackingPath) {
     $name = Ensure-FcpControllableBuilder
     $docker = $script:DockerExe
@@ -551,70 +591,78 @@ function Invoke-ControlledCoreBuild([string]$BackingPath) {
     )
 
     try {
-        # Retain the native process handle. Start-Process -PassThru can expose
-        # a null ExitCode after a short-lived child exits; casting that to int
-        # would turn a failed Docker build into success with existing images.
-        $process = Start-Process `
-            -FilePath $docker `
-            -ArgumentList $arguments `
-            -NoNewWindow `
-            -PassThru
-        $null = $process.Handle
+        $process = Start-FcpBuildProcess $docker $arguments
     }
     catch {
-        throw 'core_image_build_failed'
+        $startupFailure = $_
+        $settled = Settle-FcpBuildWriter $name -DiscardCache
+        if (-not $settled.Quiescent) { throw 'build_writer_stop_unverified' }
+        if (-not $settled.CacheDiscarded) { throw 'build_cache_discard_failed' }
+        throw $startupFailure
     }
-
-    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($BuildTimeoutSeconds)
-    while (-not $process.HasExited) {
-        $freeBytes = Get-FcpResourceFreeBytes -BackingPath $BackingPath
-        $level = Get-FcpResourcePressureLevel -FreeBytes $freeBytes
-        if ($level -in @('pressure', 'critical')) {
-            $clientStopped = Stop-BuildClient $process
-            $settled = Settle-FcpBuildWriter $name -DiscardCache
-            if (-not $clientStopped -or -not $settled.Quiescent) {
-                throw 'build_writer_stop_unverified'
+    try {
+        $deadline = [DateTimeOffset]::UtcNow.AddSeconds($BuildTimeoutSeconds)
+        while (-not $process.HasExited) {
+            $freeBytes = Get-FcpResourceFreeBytes -BackingPath $BackingPath
+            $level = Get-FcpResourcePressureLevel -FreeBytes $freeBytes
+            if ($level -in @('pressure', 'critical')) {
+                $clientStopped = Stop-BuildClient $process
+                $settled = Settle-FcpBuildWriter $name -DiscardCache
+                if (-not $clientStopped -or -not $settled.Quiescent) {
+                    throw 'build_writer_stop_unverified'
+                }
+                if (-not $settled.CacheDiscarded) {
+                    throw 'build_cache_discard_failed'
+                }
+                throw 'build_resource_pressure'
             }
-            if (-not $settled.CacheDiscarded) {
-                throw 'build_cache_discard_failed'
+            if ([DateTimeOffset]::UtcNow -ge $deadline) {
+                $clientStopped = Stop-BuildClient $process
+                $settled = Settle-FcpBuildWriter $name -DiscardCache
+                if (-not $clientStopped -or -not $settled.Quiescent) {
+                    throw 'build_writer_stop_unverified'
+                }
+                if (-not $settled.CacheDiscarded) {
+                    throw 'build_cache_discard_failed'
+                }
+                throw 'core_image_build_timeout'
             }
-            throw 'build_resource_pressure'
+            Start-Sleep -Milliseconds $BuildPollMilliseconds
         }
-        if ([DateTimeOffset]::UtcNow -ge $deadline) {
-            $clientStopped = Stop-BuildClient $process
-            $settled = Settle-FcpBuildWriter $name -DiscardCache
-            if (-not $clientStopped -or -not $settled.Quiescent) {
-                throw 'build_writer_stop_unverified'
-            }
-            if (-not $settled.CacheDiscarded) {
-                throw 'build_cache_discard_failed'
-            }
-            throw 'core_image_build_timeout'
-        }
-        Start-Sleep -Milliseconds $BuildPollMilliseconds
-    }
 
-    $process.WaitForExit()
-    $exit = $process.ExitCode
-    if ($null -eq $exit -or $exit -ne 0) {
-        $cleanupOk = Invoke-BuildCachePrune
-        if (-not $cleanupOk) {
+        $process.WaitForExit()
+        $exit = $process.ExitCode
+        $outputComplete = $false
+        try {
+            $outputComplete = [System.Threading.Tasks.Task]::WaitAll(
+                [System.Threading.Tasks.Task[]]$process.FcpOutputTasks, 5000
+            )
+        }
+        catch {}
+        if ($null -eq $exit -or $exit -ne 0 -or -not $outputComplete) {
+            $cleanupOk = Invoke-BuildCachePrune
+            if (-not $cleanupOk) {
+                if (-not (Stop-FcpBuildWriter $name)) {
+                    throw 'build_writer_stop_unverified'
+                }
+                throw 'build_failed_and_cache_prune_failed'
+            }
+            if ($null -eq $exit) { throw 'core_image_build_exit_unavailable' }
+            if ($exit -eq 0) { throw 'core_image_build_output_incomplete' }
+            throw "core_image_build_failed:$exit"
+        }
+        if (-not (Invoke-BuildCachePrune)) {
             if (-not (Stop-FcpBuildWriter $name)) {
                 throw 'build_writer_stop_unverified'
             }
-            throw 'build_failed_and_cache_prune_failed'
+            throw 'build_cache_prune_failed'
         }
-        if ($null -eq $exit) { throw 'core_image_build_exit_unavailable' }
-        throw "core_image_build_failed:$exit"
-    }
-    if (-not (Invoke-BuildCachePrune)) {
         if (-not (Stop-FcpBuildWriter $name)) {
             throw 'build_writer_stop_unverified'
         }
-        throw 'build_cache_prune_failed'
     }
-    if (-not (Stop-FcpBuildWriter $name)) {
-        throw 'build_writer_stop_unverified'
+    finally {
+        $process.Dispose()
     }
 }
 

@@ -15,18 +15,25 @@ def _read(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
 
 
+def _controlled_build_functions() -> str:
+    source = _read("scripts/windows/fcp_host_build.ps1")
+    return (
+        source[source.index("function ConvertTo-WindowsProcessArgument"):
+               source.index("function Invoke-BoundedDockerResult")]
+        + source[source.index("function Start-FcpBuildProcess"):
+                 source.index("function Get-NonEmptyTextLines")]
+    )
+
+
 @pytest.mark.skipif(os.name != "nt", reason="native Windows process exit status")
 @pytest.mark.parametrize("child_exit", [0, 7])
+@pytest.mark.parametrize("observe_after_exit", [False, True])
 def test_native_build_child_exit_controls_success_and_cleanup(
-    tmp_path: Path, child_exit: int,
+    tmp_path: Path, child_exit: int, observe_after_exit: bool,
 ) -> None:
     # Execute the real controller function with a real native child process.
     # Its Python script stands in for Docker; only disk/builder I/O is stubbed.
-    source = _read("scripts/windows/fcp_host_build.ps1")
-    function = source[
-        source.index("function Invoke-ControlledCoreBuild"):
-        source.index("function Get-NonEmptyTextLines")
-    ]
+    function = _controlled_build_functions()
     (tmp_path / "compose").write_text(
         "import sys\nprint('native-build-stdout', flush=True)\n"
         "print('native-build-stderr', file=sys.stderr, flush=True)\n"
@@ -53,6 +60,13 @@ def test_native_build_child_exit_controls_success_and_cleanup(
         "function Stop-FcpBuildWriter { $script:writerStopped = $true; "
         "return $true }\n"
         + function
+        + (
+            "\n$script:OwnedBuildProcessFactory = ${function:Start-FcpBuildProcess}\n"
+            "function Start-FcpBuildProcess { param([string]$Executable,[string[]]$Arguments)\n"
+            "  $child = & $script:OwnedBuildProcessFactory $Executable $Arguments\n"
+            "  $child.WaitForExit()\n  return $child\n}\n"
+            if observe_after_exit else ""
+        )
         + "\n$failure = $null\n"
         "try { Invoke-ControlledCoreBuild 'unused' } "
         "catch { $failure = $_.Exception.Message }\n"
@@ -75,6 +89,206 @@ def test_native_build_child_exit_controls_success_and_cleanup(
     assert outcome["failure"] == expected
     assert outcome["prunes"] == 1
     assert outcome["writerStopped"] is True
+
+
+@pytest.mark.skipif(os.name != "nt", reason="native Windows process lifecycle")
+@pytest.mark.parametrize("reason", ["timeout", "pressure"])
+def test_native_build_failure_stops_the_owned_child_before_writer_cleanup(
+    tmp_path: Path, reason: str,
+) -> None:
+    (tmp_path / "compose").write_text("import time\ntime.sleep(15)\n")
+    script = tmp_path / "bounded-failure.ps1"
+    script.write_text(
+        "$ErrorActionPreference = 'Stop'\nSet-StrictMode -Version Latest\n"
+        f"$RepoRoot = '{str(tmp_path).replace(chr(39), chr(39) * 2)}'\n"
+        f"$script:DockerExe = '{str(sys.executable).replace(chr(39), chr(39) * 2)}'\n"
+        "$BuildTimeoutSeconds = 0\n$BuildPollMilliseconds = 10\n"
+        "$script:childStopped = $false\n$script:writerSettled = $false\n"
+        "function Ensure-FcpControllableBuilder { return 'fcp-build-test' }\n"
+        "function Get-FcpResourceFreeBytes { return 1099511627776 }\n"
+        f"function Get-FcpResourcePressureLevel {{ return '{'pressure' if reason == 'pressure' else 'normal'}' }}\n"
+        "function Stop-BuildClient { param([System.Diagnostics.Process]$Process)\n"
+        "  $Process.Kill(); $Process.WaitForExit(); $script:childStopped = $Process.HasExited\n"
+        "  return $script:childStopped\n}\n"
+        "function Settle-FcpBuildWriter { param($Name,[switch]$DiscardCache)\n"
+        "  if (-not $script:childStopped) { throw 'cleanup_before_child_stopped' }\n"
+        "  $script:writerSettled = $true\n"
+        "  return [pscustomobject]@{ Quiescent = $true; CacheDiscarded = $true }\n}\n"
+        + _controlled_build_functions()
+        + "\n$failure = $null\ntry { Invoke-ControlledCoreBuild 'unused' } catch { $failure = $_.Exception.Message }\n"
+        "@{ failure=$failure; childStopped=$script:childStopped; writerSettled=$script:writerSettled } | ConvertTo-Json -Compress\n",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", str(script)],
+        cwd=tmp_path, capture_output=True, text=True, timeout=20,
+        check=False,
+        creationflags=subprocess.CREATE_NO_WINDOW,
+    )
+    assert result.returncode == 0, result.stderr
+    outcome = json.loads(result.stdout.splitlines()[-1])
+    assert outcome == {
+        "failure": "build_resource_pressure" if reason == "pressure" else "core_image_build_timeout",
+        "childStopped": True, "writerSettled": True,
+    }
+
+
+@pytest.mark.skipif(os.name != "nt", reason="native Windows argument forwarding")
+def test_owned_build_process_preserves_special_arguments_and_working_directory(tmp_path: Path) -> None:
+    directory = tmp_path / "working directory & spaces"
+    directory.mkdir()
+    child = directory / "echo arguments.py"
+    child.write_text("import json,os,sys\nprint(json.dumps({'argv':sys.argv[1:],'cwd':os.getcwd()}))\n")
+    argument = 'quoted "value" with a trailing slash\\'
+    def quote(value: object) -> str:
+        return "'" + str(value).replace("'", "''") + "'"
+    script = tmp_path / "owned-arguments.ps1"
+    script.write_text(
+        "$ErrorActionPreference = 'Stop'\nSet-StrictMode -Version Latest\n"
+        f"$RepoRoot = {quote(directory)}\n"
+        + _controlled_build_functions()
+        + f"\n$process = Start-FcpBuildProcess {quote(sys.executable)} @({quote(child)}, {quote(argument)})\n"
+        "try { $process.WaitForExit(); [System.Threading.Tasks.Task]::WaitAll([System.Threading.Tasks.Task[]]$process.FcpOutputTasks); if ($process.ExitCode -ne 0) { throw 'child_failed' } } finally { $process.Dispose() }\n",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", str(script)],
+        cwd=tmp_path, capture_output=True, text=True, timeout=20,
+        check=False,
+        creationflags=subprocess.CREATE_NO_WINDOW,
+    )
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {"argv": [argument], "cwd": str(directory)}
+
+
+@pytest.mark.skipif(os.name != "nt", reason="native Windows process startup")
+def test_owned_build_process_start_failure_cannot_report_success(tmp_path: Path) -> None:
+    script = tmp_path / "missing-child.ps1"
+    script.write_text(
+        "$ErrorActionPreference = 'Stop'\nSet-StrictMode -Version Latest\n"
+        f"$RepoRoot = '{str(tmp_path).replace(chr(39), chr(39) * 2)}'\n"
+        + _controlled_build_functions()
+        + "\n$failure = $null\ntry { $process = Start-FcpBuildProcess 'Z:\\absent-fcp-child.exe' @('compose') } catch { $failure = $_.Exception.Message }\n"
+        "@{ failure=$failure } | ConvertTo-Json -Compress\n",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", str(script)],
+        cwd=tmp_path, capture_output=True, text=True, timeout=20,
+        check=False,
+        creationflags=subprocess.CREATE_NO_WINDOW,
+    )
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {"failure": "core_image_build_failed"}
+
+
+@pytest.mark.skipif(os.name != "nt", reason="native Windows output-drain lifecycle")
+@pytest.mark.parametrize(
+    "child_exit,output_state,prune_ok,writer_ok,expected",
+    [
+        (0, "faulted", True, True, "core_image_build_output_incomplete"),
+        (0, "pending", True, True, "core_image_build_output_incomplete"),
+        (7, "faulted", True, True, "core_image_build_failed:7"),
+        (0, "faulted", False, True, "build_failed_and_cache_prune_failed"),
+        (0, "faulted", False, False, "build_writer_stop_unverified"),
+    ],
+)
+def test_native_build_output_drain_fails_closed_and_preserves_cleanup_precedence(
+    tmp_path: Path, child_exit: int, output_state: str,
+    prune_ok: bool, writer_ok: bool, expected: str,
+) -> None:
+    # The real owned child has finished; only its output-copy task outcome is
+    # substituted to discriminate the bounded drain from process exit status.
+    (tmp_path / "compose").write_text(f"raise SystemExit({child_exit})\n")
+
+    def quote(value: object) -> str:
+        return "'" + str(value).replace("'", "''") + "'"
+
+    script = tmp_path / "output-drain.ps1"
+    script.write_text(
+        "$ErrorActionPreference = 'Stop'\nSet-StrictMode -Version Latest\n"
+        f"$RepoRoot = {quote(tmp_path)}\n"
+        f"$script:DockerExe = {quote(sys.executable)}\n"
+        "$BuildTimeoutSeconds = 10\n$BuildPollMilliseconds = 10\n"
+        "$script:prunes = 0\n$script:writerStops = 0\n"
+        "function Ensure-FcpControllableBuilder { return 'fcp-build-test' }\n"
+        "function Get-FcpResourceFreeBytes { return 1099511627776 }\n"
+        "function Get-FcpResourcePressureLevel { return 'normal' }\n"
+        "function Invoke-BuildCachePrune { $script:prunes++; "
+        f"return ${str(prune_ok).lower()} }}\n"
+        "function Stop-FcpBuildWriter { $script:writerStops++; "
+        f"return ${str(writer_ok).lower()} }}\n"
+        + _controlled_build_functions()
+        + "\n$script:OwnedBuildProcessFactory = ${function:Start-FcpBuildProcess}\n"
+        "function Start-FcpBuildProcess { param([string]$Executable,[string[]]$Arguments)\n"
+        "  $child = & $script:OwnedBuildProcessFactory $Executable $Arguments\n"
+        "  $child.WaitForExit()\n"
+        "  $copy = New-Object 'System.Threading.Tasks.TaskCompletionSource[bool]'\n"
+        + (
+            "  $copy.SetException((New-Object System.InvalidOperationException 'fixture_copy_fault'))\n"
+            if output_state == "faulted" else ""
+        )
+        + "  Add-Member -InputObject $child -NotePropertyName FcpOutputTasks -NotePropertyValue @($copy.Task) -Force\n"
+        "  $script:ownedHandle = $child.SafeHandle\n  return $child\n}\n"
+        "$timer = [System.Diagnostics.Stopwatch]::StartNew()\n"
+        "$failure = $null\ntry { Invoke-ControlledCoreBuild 'unused' } catch { $failure = $_.Exception.Message }\n"
+        "$timer.Stop()\n$disposed = $script:ownedHandle.IsClosed\n"
+        "@{ failure=$failure; prunes=$script:prunes; writerStops=$script:writerStops; "
+        "disposed=$disposed; elapsed=$timer.Elapsed.TotalSeconds } | ConvertTo-Json -Compress\n",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", str(script)],
+        cwd=tmp_path, capture_output=True, text=True, timeout=20, check=False,
+        creationflags=subprocess.CREATE_NO_WINDOW,
+    )
+    assert result.returncode == 0, result.stderr
+    outcome = json.loads(result.stdout.splitlines()[-1])
+    assert outcome["failure"] == expected
+    assert outcome["prunes"] == 1
+    assert outcome["writerStops"] == (0 if prune_ok else 1)
+    assert outcome["disposed"] is True
+    assert outcome["elapsed"] < 12
+    if output_state == "pending":
+        assert outcome["elapsed"] >= 4.5
+
+
+@pytest.mark.skipif(os.name != "nt", reason="native Windows process startup cleanup")
+@pytest.mark.parametrize("stage", ["output-setup", "start"])
+def test_failed_build_start_stops_its_child_and_settles_only_the_owned_writer(tmp_path: Path, stage: str) -> None:
+    (tmp_path / "compose").write_text("import time\ntime.sleep(15)\n")
+    source = _read("scripts/windows/fcp_host_build.ps1")
+    stop_client = source[source.index("function Stop-BuildClient"):
+                         source.index("function Start-FcpBuildProcess")]
+    executable = str(sys.executable) if stage == "output-setup" else str(tmp_path / "absent-child.exe")
+    script = tmp_path / "setup-failure.ps1"
+    script.write_text(
+        "$ErrorActionPreference = 'Stop'\nSet-StrictMode -Version Latest\n"
+        f"$RepoRoot = '{str(tmp_path).replace(chr(39), chr(39) * 2)}'\n"
+        f"$script:DockerExe = '{executable.replace(chr(39), chr(39) * 2)}'\n"
+        "$script:childId = $null\n$script:childStoppedBeforeWriter = $false\n$script:writerName = $null\n"
+        "function Ensure-FcpControllableBuilder { return 'fcp-build-isolated' }\n"
+        "function Add-Member { param($InputObject,$NotePropertyName,$NotePropertyValue)\n"
+        "  $script:childId = $InputObject.Id; throw 'injected-output-setup-failure'\n}\n"
+        "function Settle-FcpBuildWriter { param($Name,[switch]$DiscardCache)\n"
+        "  $script:writerName = $Name\n"
+        "  $alive = if ($null -ne $script:childId) { Get-Process -Id $script:childId -ErrorAction SilentlyContinue } else { $null }\n"
+        "  $script:childStoppedBeforeWriter = ($null -eq $alive)\n"
+        "  return [pscustomobject]@{ Quiescent = $true; CacheDiscarded = $true }\n}\n"
+        + stop_client + _controlled_build_functions()
+        + "\n$failure = $null\ntry { Invoke-ControlledCoreBuild 'unused' } catch { $failure = $_.Exception.Message }\n"
+        "@{ failure=$failure; childStoppedBeforeWriter=$script:childStoppedBeforeWriter; writerName=$script:writerName } | ConvertTo-Json -Compress\n",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", str(script)],
+        cwd=tmp_path, capture_output=True, text=True, timeout=20, check=False,
+        creationflags=subprocess.CREATE_NO_WINDOW,
+    )
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout.splitlines()[-1]) == {
+        "failure": "core_image_build_failed", "childStoppedBeforeWriter": True, "writerName": "fcp-build-isolated",
+    }
 
 
 def test_windows_host_build_owns_a_checkout_scoped_buildkit_writer() -> None:
@@ -105,7 +319,8 @@ def test_windows_active_build_stops_client_tree_and_proves_writer_at_pressure() 
     assert "while (-not $process.HasExited)" in build
     assert "Get-FcpResourceFreeBytes -BackingPath $BackingPath" in build
     assert "$level -in @('pressure', 'critical')" in build
-    assert build.index("Stop-BuildClient $process") < build.index(
+    active_build = build[build.index("while (-not $process.HasExited)"):]
+    assert active_build.index("Stop-BuildClient $process") < active_build.index(
         "Settle-FcpBuildWriter $name -DiscardCache"
     )
     assert "build_writer_stop_unverified" in build
