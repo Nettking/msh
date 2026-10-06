@@ -56,7 +56,10 @@ from catalog.capabilities.retry_claim import attempt_owner
 from catalog.capabilities.update_drain import SQLiteNodeUpdateDrainStore
 from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
 from catalog.node.identity import IdentityStore
-from catalog.orchestrator.analysis_federation import DeviceFederationAuthority
+from catalog.orchestrator.analysis_federation import (
+    DeviceFederationAuthority,
+    ThreadsafeRelayLifecycleTransport,
+)
 from catalog.runner.data_filtering import source_files_for_dates
 from catalog.runner.script_catalog import discover_runnable_scripts, repo_root
 
@@ -503,7 +506,10 @@ class AnalysisRuntime:
         close_transport = getattr(self.transport, "close", None)
         if callable(close_transport):
             try:
-                close_transport()
+                if isinstance(self.transport, ThreadsafeRelayLifecycleTransport):
+                    close_transport(artifact_carrier=self.artifact_carrier)
+                else:
+                    close_transport()
             except Exception:  # noqa: BLE001 - replacement must remain fail-safe
                 return
 
