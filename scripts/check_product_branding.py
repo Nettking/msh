@@ -69,6 +69,14 @@ ALLOWED_NON_PRODUCT_LITERALS = {
     "docs/implementation/v1_b01_b09_physical_acceptance.md": (
         LEGACY.upper() + " Recorder", LEGACY + "-recorder",
     ),
+    # Existing physical host/path labels are operational provenance, not the
+    # product name. Keep the exceptions literal and file-scoped.
+    "docs/implementation/nitro_artifact_archive.md": (
+        LEGACY.upper() + "-to-Nitro Recorder backup",
+    ),
+    "scripts/windows/tests/test_recorder_pause_resume_guard.py": (
+        "C:\\" + LEGACY + "\\git",
+    ),
     "scripts/acceptance/b01_b09_physical_contract.py": (LEGACY.upper() + " Recorder restart",),
 }
 

@@ -31,6 +31,23 @@ class _CommittingClient:
         return PhaseDIngestOutcome(committed=True)
 
 
+class _FailFirstTwoDatasetsClient:
+    def __init__(self) -> None:
+        self.batch_ids: list[str] = []
+
+    async def ingest_batch(self, **kwargs):
+        batch_id = str(kwargs["batch_id"])
+        self.batch_ids.append(batch_id)
+        if batch_id.startswith(("dataset-a-", "dataset-b-")):
+            return PhaseDIngestOutcome(
+                committed=False,
+                retryable=True,
+                error_code="test-offline",
+                message="test storage unavailable",
+            )
+        return PhaseDIngestOutcome(committed=True)
+
+
 def _queue(outbox, client):
     return DurableRecorderDeliveryQueue(
         outbox=outbox,
@@ -117,6 +134,53 @@ def test_restart_retry_remains_one_head_per_dataset(tmp_path) -> None:
     assert attempts["dataset-b-batch-1"] == 2
     assert attempts["dataset-a-batch-2"] == 0
     assert attempts["dataset-b-batch-2"] == 0
+
+
+def test_backoff_heads_do_not_fill_window_ahead_of_due_dataset_heads(tmp_path) -> None:
+    outbox = SQLiteOutbox(tmp_path / "outbox.sqlite3")
+    client = _FailFirstTwoDatasetsClient()
+    queue = _queue(outbox, client)
+    for dataset_id, indexes in (
+        ("dataset-a", (1, 2)),
+        ("dataset-b", (1,)),
+        ("dataset-c", (1,)),
+    ):
+        for index in indexes:
+            queue.enqueue(
+                session_id="session-a",
+                group_id="fcp-local-storage",
+                dataset_id=dataset_id,
+                batch_id=f"{dataset_id}-batch-{index}",
+                idempotency_key=f"{dataset_id}:{index}",
+                content={"dataset": dataset_id, "index": index},
+                created_at=NOW,
+            )
+
+    first = asyncio.run(queue.run_once(limit=2))
+    assert first.attempted == 2
+    assert first.pending == 2
+    assert client.batch_ids == ["dataset-a-batch-1", "dataset-b-batch-1"]
+
+    # Dataset C remains due while A and B wait for durable retry times. The
+    # capped query must select C's head before those deferred heads; A's newer
+    # row remains fenced and cannot be sent ahead of its predecessor.
+    second = asyncio.run(queue.run_once(limit=2))
+    assert second.attempted == 1
+    assert second.committed == 1
+    assert client.batch_ids == [
+        "dataset-a-batch-1",
+        "dataset-b-batch-1",
+        "dataset-c-batch-1",
+    ]
+
+    rows = outbox.pending()
+    by_batch = {entry.payload["batch_id"]: entry for entry in rows}
+    assert by_batch["dataset-a-batch-1"].attempt_count == 1
+    assert by_batch["dataset-b-batch-1"].attempt_count == 1
+    assert by_batch["dataset-a-batch-2"].attempt_count == 0
+    committed = outbox.get(4)
+    assert committed is not None
+    assert committed.state.value == "completed"
 
 
 def test_successful_startup_probe_reaches_each_dataset_before_backlog_drain(

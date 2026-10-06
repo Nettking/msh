@@ -74,9 +74,10 @@ def _status() -> dict[str, object]:
 class _FaultyOutbox(SQLiteOutbox):
     """A durable outbox whose store can be made to fail like a real one.
 
-    ``read_fault`` stands in for whatever ``pending()`` can actually raise:
-    ``sqlite3.Error`` from the store itself, and ``FederationValidationError``
-    (``malformed-outbox-row``) from its own row decoding.
+    ``read_fault`` stands in for a durable pending-row read failure, whether
+    the caller needs decoded rows from ``pending()`` or the payload-free
+    health summary from ``pending_summary()``. Both are reads of the same
+    durable store and must expose the same underlying failure.
     """
 
     def __init__(self, database) -> None:
@@ -89,6 +90,11 @@ class _FaultyOutbox(SQLiteOutbox):
         if self.read_fault is not None:
             raise self.read_fault
         return super().pending(*args, **kwargs)
+
+    def pending_summary(self, *args, **kwargs):
+        if self.read_fault is not None:
+            raise self.read_fault
+        return super().pending_summary(*args, **kwargs)
 
     def acknowledge(self, outbox_id: int, **kwargs):
         if self.acknowledge_fault is not None:

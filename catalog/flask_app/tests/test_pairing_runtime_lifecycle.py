@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import threading
-from concurrent.futures import CancelledError, ThreadPoolExecutor
+from concurrent.futures import CancelledError, Future, ThreadPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -172,3 +172,205 @@ def test_close_failure_remains_visible_without_retaining_exception_details(tmp_p
     assert runtime._loop is not None and runtime._loop.is_closed()
     assert runtime._shutdown_error == "RuntimeError"
     assert runtime.close(timeout=0) is False
+
+
+def test_saved_reconnect_has_aggregate_budget_without_raising_rpc_budget(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    state = _state()
+    runtime = pairing.PairingRelayRuntime(
+        state_directory=tmp_path,
+        display_name="Member",
+        timeout_seconds=0.04,
+    )
+    phases = threading.Event()
+    disconnected = threading.Event()
+
+    class SlowInitialSyncClient:
+        def __init__(self, **kwargs):
+            del kwargs
+            self.node_id = state.binding.device_id
+            self.connected_event = asyncio.Event()
+            self.state = SimpleNamespace(
+                joined_sessions=lambda: [
+                    SimpleNamespace(session_id=state.binding.internal_session_id)
+                ]
+            )
+
+        async def connect(self, **kwargs):
+            del kwargs
+            # Six individually bounded capability sync steps take longer than
+            # one ordinary request budget, but less than the reconnect budget.
+            for _ in range(6):
+                await asyncio.sleep(0.012)
+            self.connected_event.set()
+            phases.set()
+
+        async def disconnect(self, **kwargs):
+            del kwargs
+            self.connected_event.clear()
+            disconnected.set()
+
+    monkeypatch.setattr(pairing, "PairingRelayNodeClient", SlowInitialSyncClient)
+    try:
+        # This is the pre-fix path: it incorrectly gives the multi-step
+        # connection the one-RPC deadline, so the six successful substeps are
+        # cancelled as a group.
+        with pytest.raises(FederationOperationError) as old_path:
+            runtime._submit(runtime._ensure_connected(state))
+        assert old_path.value.code == "pairing-relay-timeout"
+        assert disconnected.wait(1)
+        disconnected.clear()
+
+        runtime.ensure_connected(state)
+        assert phases.is_set()
+        assert runtime._client is not None
+        # Ordinary operations keep the original short deadline.
+        with pytest.raises(FederationOperationError) as error:
+            runtime._submit(asyncio.sleep(0.08))
+        assert error.value.code == "pairing-relay-timeout"
+    finally:
+        runtime.close(timeout=2)
+
+
+def test_saved_reconnect_respects_its_own_bounded_deadline(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    state = _state()
+    runtime = pairing.PairingRelayRuntime(
+        state_directory=tmp_path,
+        display_name="Member",
+        timeout_seconds=0.04,
+        connect_timeout_seconds=0.07,
+    )
+    cancelled = threading.Event()
+    disconnected = threading.Event()
+
+    class StalledInitialSyncClient:
+        def __init__(self, **kwargs):
+            del kwargs
+            self.node_id = state.binding.device_id
+            self.connected_event = asyncio.Event()
+            self.state = SimpleNamespace(
+                joined_sessions=lambda: [
+                    SimpleNamespace(session_id=state.binding.internal_session_id)
+                ]
+            )
+
+        async def connect(self, **kwargs):
+            del kwargs
+            try:
+                await asyncio.Future()
+            except asyncio.CancelledError:
+                cancelled.set()
+                raise
+
+        async def disconnect(self, **kwargs):
+            del kwargs
+            self.connected_event.clear()
+            disconnected.set()
+
+    monkeypatch.setattr(pairing, "PairingRelayNodeClient", StalledInitialSyncClient)
+    try:
+        with pytest.raises(FederationOperationError) as error:
+            runtime.ensure_connected(state)
+        assert error.value.code == "pairing-relay-timeout"
+        # The timed-out connection remains owned until its cancellation cleanup
+        # closes the unpublished client; it is never published as connected.
+        assert cancelled.wait(1)
+        assert disconnected.wait(1)
+        assert runtime._client is None
+    finally:
+        runtime.close(timeout=2)
+
+
+def test_inner_relay_request_timeout_is_not_mislabeled_as_aggregate_deadline(
+    tmp_path: Path,
+) -> None:
+    runtime = pairing.PairingRelayRuntime(state_directory=tmp_path, display_name="Member")
+
+    async def inner_timeout():
+        raise TimeoutError("per-request timeout")
+
+    try:
+        with pytest.raises(FederationOperationError) as error:
+            runtime._submit(inner_timeout(), operation="saved reconnect")
+        assert error.value.code == "pairing-relay-request-timeout"
+        assert "individual relay request timeout" in error.value.message
+        assert isinstance(error.value.__cause__, TimeoutError)
+    finally:
+        runtime.close(timeout=2)
+
+
+@pytest.mark.parametrize(
+    ("timeout_seconds", "expected_connect_timeout"),
+    [(190, 3420), (200, 3600), (3600, 3600)],
+)
+def test_default_connect_budget_preserves_supported_rpc_timeout_values(
+    tmp_path: Path, timeout_seconds: float, expected_connect_timeout: float,
+) -> None:
+    runtime = pairing.PairingRelayRuntime(
+        state_directory=tmp_path,
+        display_name="Member",
+        timeout_seconds=timeout_seconds,
+    )
+    try:
+        assert runtime.timeout_seconds == timeout_seconds
+        assert runtime.connect_timeout_seconds == expected_connect_timeout
+    finally:
+        assert runtime.close(timeout=2)
+
+
+@pytest.mark.parametrize(
+    "completion_window",
+    ["before-classification", "during-cancel", "inner-timeout-during-cancel"],
+)
+def test_submit_classifies_future_completion_at_outer_timeout_boundary(
+    tmp_path: Path, monkeypatch, completion_window: str,
+) -> None:
+    runtime = pairing.PairingRelayRuntime(
+        state_directory=tmp_path,
+        display_name="Member",
+    )
+
+    class CompletedAtDeadline(Future):
+        def __init__(self) -> None:
+            super().__init__()
+            self.wait_expired = False
+
+        def result(self, timeout=None):
+            if timeout is not None and not self.wait_expired:
+                self.wait_expired = True
+                if completion_window == "before-classification":
+                    self.set_result("connection-published")
+                raise TimeoutError("outer wait reached its deadline")
+            return super().result(timeout=timeout)
+
+        def cancel(self):
+            if completion_window == "during-cancel":
+                self.set_result("connection-published")
+                return False
+            if completion_window == "inner-timeout-during-cancel":
+                self.set_exception(TimeoutError("per-request timeout"))
+                return False
+            return super().cancel()
+
+    future = CompletedAtDeadline()
+    monkeypatch.setattr(runtime, "_start_loop", lambda: object())
+    monkeypatch.setattr(
+        pairing.asyncio,
+        "run_coroutine_threadsafe",
+        lambda _coroutine, _loop: future,
+    )
+    try:
+        # Completion can race either the first done() check or cancellation,
+        # matching the scheduling gap around the reconnect deadline.
+        if completion_window == "inner-timeout-during-cancel":
+            with pytest.raises(FederationOperationError) as error:
+                runtime._submit(SimpleNamespace(close=lambda: None), operation="saved reconnect")
+            assert error.value.code == "pairing-relay-request-timeout"
+            assert isinstance(error.value.__cause__, TimeoutError)
+        else:
+            assert runtime._submit(SimpleNamespace(close=lambda: None)) == "connection-published"
+    finally:
+        assert runtime.close(timeout=2)

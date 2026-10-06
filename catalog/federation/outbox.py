@@ -188,6 +188,43 @@ _OUTBOX_INDEX_DDL = (
     "ON outbox(state, next_attempt_at, outbox_id);"
 )
 
+# Dataset identity lives inside the immutable outbox JSON payload. The fair
+# delivery query uses this exact expression to find the oldest row for each
+# ordered dataset. Keeping it indexed avoids decoding/sorting every pending
+# payload on every cycle when a large offline backlog has accumulated.
+_OUTBOX_DELIVERY_DATASET_KEY_SQL = """
+CASE
+    WHEN json_type(payload_json, '$.dataset_id') = 'text'
+        AND length(json_extract(payload_json, '$.dataset_id')) > 0
+    THEN json_extract(payload_json, '$.dataset_id')
+    ELSE printf('__unkeyed-outbox-row:%lld', outbox_id)
+END
+""".strip()
+_OUTBOX_DELIVERY_INDEX_DDL = f"""
+CREATE INDEX IF NOT EXISTS outbox_pending_delivery_dataset
+ON outbox(
+    state,
+    session_id,
+    destination_id,
+    schema_id,
+    {_OUTBOX_DELIVERY_DATASET_KEY_SQL},
+    outbox_id,
+    next_attempt_at,
+    last_error
+)
+WHERE state = 'pending';
+"""
+_OUTBOX_DELIVERY_INDEX_KEY_COLUMNS = (
+    "state",
+    "session_id",
+    "destination_id",
+    "schema_id",
+    None,  # The dataset-ordering expression above.
+    "outbox_id",
+    "next_attempt_at",
+    "last_error",
+)
+
 
 def _outbox_table_ddl(name: str, *, if_not_exists: bool) -> str:
     """Return the current outbox DDL.
@@ -446,6 +483,24 @@ class SQLiteOutbox:
                         "version",
                         str(version),
                     )
+                # This is a derived lookup index, so it can be restored for
+                # existing schema-v3 outboxes without changing their durable
+                # row format or identity. Prior versions of this index did
+                # not include next_attempt_at and last_error; IF NOT EXISTS
+                # would silently keep a non-covering shape, so replace any
+                # incompatible shape inside the same initialization
+                # transaction. Do this after a possible v2 table rebuild.
+                delivery_index = db.execute(
+                    "PRAGMA index_xinfo('outbox_pending_delivery_dataset')"
+                ).fetchall()
+                delivery_key_columns = tuple(
+                    row["name"] for row in delivery_index if row["key"]
+                )
+                if delivery_index and delivery_key_columns != (
+                    _OUTBOX_DELIVERY_INDEX_KEY_COLUMNS
+                ):
+                    db.execute("DROP INDEX outbox_pending_delivery_dataset")
+                db.execute(_OUTBOX_DELIVERY_INDEX_DDL)
                 db.commit()
             except Exception:
                 db.rollback()
@@ -701,6 +756,49 @@ class SQLiteOutbox:
         with self._connect() as db:
             return tuple(self._decode(row) for row in db.execute(query, args))
 
+    def pending_summary(
+        self,
+        *,
+        session_id: str,
+        destination_id: str,
+        schema_id: str,
+    ) -> tuple[int, bool]:
+        """Count one delivery route without decoding its pending payloads.
+
+        Publication health needs the durable backlog size and whether any
+        pending row already records an error. Materialising ``pending()`` for
+        those two facts makes each status cycle read every payload in a large
+        offline outbox, even though delivery itself is bounded.
+        """
+
+        if not isinstance(session_id, str) or not session_id:
+            raise FederationValidationError(
+                "invalid-id", "session_id", "must be non-empty text"
+            )
+        if not isinstance(destination_id, str) or not destination_id:
+            raise FederationValidationError(
+                "invalid-id", "destination_id", "must be non-empty text"
+            )
+        if not isinstance(schema_id, str) or not schema_id:
+            raise FederationValidationError(
+                "invalid-id", "schema_id", "must be non-empty text"
+            )
+        query = """
+            SELECT COUNT(*) AS pending_count,
+                   MAX(last_error IS NOT NULL) AS has_pending_error
+            FROM outbox INDEXED BY outbox_pending_delivery_dataset
+            WHERE state='pending'
+              AND session_id=?
+              AND destination_id=?
+              AND schema_id=?
+        """
+        with self._connect() as db:
+            row = db.execute(
+                query,
+                (session_id, destination_id, schema_id),
+            ).fetchone()
+        return int(row["pending_count"]), bool(row["has_pending_error"])
+
     def has_pending(
         self,
         *,
@@ -742,6 +840,7 @@ class SQLiteOutbox:
         destination_id: str | None,
         schema_id: str,
         limit: int,
+        now: datetime | None = None,
     ) -> tuple[OutboxEntry, ...]:
         """Return a bounded, fair window of pending delivery rows.
 
@@ -755,8 +854,10 @@ class SQLiteOutbox:
 
         Rows are intentionally not filtered by ``next_attempt_at`` here. A
         deferred head must still be visible so the delivery queue can fence
-        newer rows behind it. The queue decides whether the head may receive
-        its startup probe or is waiting for its durable backoff.
+        newer rows behind it. When ``now`` is supplied, due dataset heads are
+        selected before deferred heads so a bounded window cannot be consumed
+        entirely by retry-delayed datasets. The queue still applies durable
+        backoff and ordering fences after reading the bounded rows.
         """
 
         if (
@@ -783,18 +884,16 @@ class SQLiteOutbox:
             raise FederationValidationError(
                 "invalid-id", "schema_id", "must be non-empty text"
             )
+        if now is not None and not isinstance(now, datetime):
+            raise FederationValidationError(
+                "invalid-time", "now", "must be a datetime when supplied"
+            )
+        now_stamp = _time(now) if now is not None else None
 
         # JSON validity is a table invariant. Non-string or absent dataset
         # values are assigned a unique synthetic key, matching the delivery
         # queue's rule that such a row has no ordering fence of its own.
-        ordering_key = """
-            CASE
-                WHEN json_type(payload_json, '$.dataset_id') = 'text'
-                    AND length(json_extract(payload_json, '$.dataset_id')) > 0
-                THEN json_extract(payload_json, '$.dataset_id')
-                ELSE printf('__unkeyed-outbox-row:%lld', outbox_id)
-            END
-        """
+        ordering_key = _OUTBOX_DELIVERY_DATASET_KEY_SQL
         where = "state='pending' AND session_id=? AND schema_id=?"
         args: list[object] = [session_id, schema_id]
         if destination_id is not None:
@@ -811,22 +910,39 @@ class SQLiteOutbox:
                 ).fetchone()[0]
             )
             rows_per_dataset = max(1, limit // max(ordering_group_count, 1))
+            head_priority_order = (
+                "outbox_id"
+                if now_stamp is None
+                else "CASE WHEN delivery_rank=1 AND next_attempt_at<=? "
+                "THEN 0 ELSE 1 END, outbox_id"
+            )
+            priority_args: tuple[str, ...] = (
+                () if now_stamp is None else (now_stamp,)
+            )
             rows = db.execute(
                 f"""
-                SELECT * FROM (
-                    SELECT outbox.*,
+                WITH ranked_outbox AS (
+                    SELECT outbox_id,
+                           next_attempt_at,
                            ROW_NUMBER() OVER (
                                PARTITION BY destination_id, {ordering_key}
                                ORDER BY outbox_id
                            ) AS delivery_rank
                     FROM outbox
                     WHERE {where}
+                ), bounded_outbox_ids AS (
+                    SELECT outbox_id
+                    FROM ranked_outbox
+                    WHERE delivery_rank <= ?
+                    ORDER BY {head_priority_order}
+                    LIMIT ?
                 )
-                WHERE delivery_rank <= ?
-                ORDER BY outbox_id
-                LIMIT ?
+                SELECT entry.*
+                FROM bounded_outbox_ids AS bounded
+                JOIN outbox AS entry ON entry.outbox_id = bounded.outbox_id
+                ORDER BY bounded.outbox_id
                 """,
-                [*args, rows_per_dataset, limit],
+                [*args, rows_per_dataset, *priority_args, limit],
             ).fetchall()
         return tuple(self._decode(row) for row in rows)
 

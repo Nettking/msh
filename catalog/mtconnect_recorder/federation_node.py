@@ -188,6 +188,36 @@ def _current_recorder_pending(
     )
 
 
+def _pending_outbox_summary(
+    outbox: object,
+    *,
+    session_id: str,
+    group_id: str,
+) -> tuple[int, bool]:
+    """Read a payload-free summary when supported, preserving old adapters.
+
+    Production ``SQLiteOutbox`` implements ``pending_summary`` so status does
+    not decode a large backlog. Older adapters only expose ``pending``; keep
+    them compatible and derive the same route-scoped facts from their rows.
+    """
+
+    summary_reader = getattr(outbox, "pending_summary", None)
+    if callable(summary_reader):
+        return summary_reader(
+            session_id=session_id,
+            destination_id=group_id,
+            schema_id=RECORDER_STORAGE_SCHEMA,
+        )
+
+    pending_reader = getattr(outbox, "pending", None)
+    if not callable(pending_reader):
+        raise TypeError("outbox adapter must implement pending_summary() or pending()")
+    current = _current_recorder_pending(
+        pending_reader(), session_id=session_id, group_id=group_id
+    )
+    return len(current), any(getattr(entry, "last_error", None) for entry in current)
+
+
 def _publication_cycle_status(
     *,
     pending_entries: tuple[object, ...],
@@ -195,6 +225,8 @@ def _publication_cycle_status(
     group_id: str,
     delivery: RecorderDeliveryRunResult,
     retired_total: int = 0,
+    pending_count: int | None = None,
+    pending_has_error: bool | None = None,
 ) -> tuple[str, int, str | None]:
     """Classify only deliverable rows owned by this authenticated session.
 
@@ -207,16 +239,22 @@ def _publication_cycle_status(
     does not -- it waits for a person.
     """
 
-    current = _current_recorder_pending(
-        pending_entries,
-        session_id=session_id,
-        group_id=group_id,
+    current = (
+        _current_recorder_pending(
+            pending_entries,
+            session_id=session_id,
+            group_id=group_id,
+        )
+        if pending_count is None
+        else ()
     )
-    pending = len(current)
+    pending = len(current) if pending_count is None else pending_count
     if retired_total > 0:
         return "degraded", pending, "recorder-delivery-retired"
-    failed = delivery.pending > 0 or any(
-        getattr(entry, "last_error", None) for entry in current
+    failed = delivery.pending > 0 or (
+        any(getattr(entry, "last_error", None) for entry in current)
+        if pending_has_error is None
+        else pending_has_error
     )
     if failed:
         return "backlogged", pending, "recorder-delivery-pending"
@@ -1145,7 +1183,12 @@ class RecorderFederationNode:
                         )
                         try:
                             await candidate.start()
-                            worker, outbox = self._worker(
+                            # Opening the durable outbox can run an additive
+                            # index build against a large pending backlog. Keep
+                            # that SQLite startup work off the relay loop so
+                            # heartbeat and response processing stay live.
+                            worker, outbox = await asyncio.to_thread(
+                                self._worker,
                                 state=state,
                                 storage_client=candidate,
                                 group_id=selected.group_id,
@@ -1188,14 +1231,21 @@ class RecorderFederationNode:
                     )
                     retry_stage = "pending-read"
                     self._publication_diagnostics.transition(cycle_token, retry_stage)
-                    pending_snapshot = await asyncio.to_thread(outbox.pending)
+                    pending, pending_has_error = await asyncio.to_thread(
+                        _pending_outbox_summary,
+                        outbox,
+                        session_id=state.binding.internal_session_id,
+                        group_id=group_id,
+                    )
                     storage_state, pending, delivery_error = (
                         _publication_cycle_status(
-                            pending_entries=pending_snapshot,
+                            pending_entries=(),
                             session_id=state.binding.internal_session_id,
                             group_id=group_id,
                             delivery=cycle.delivery,
                             retired_total=cycle.retirement.total,
+                            pending_count=pending,
+                            pending_has_error=pending_has_error,
                         )
                     )
                     self._set_snapshot(
@@ -1273,21 +1323,14 @@ class RecorderFederationNode:
                     if pending_outbox is not None:
                         try:
                             self._publication_diagnostics.transition(cycle_token, "retry-pending-read")
-                            pending_snapshot = await asyncio.to_thread(
-                                pending_outbox.pending
+                            pending_batches, _ = await asyncio.to_thread(
+                                _pending_outbox_summary,
+                                pending_outbox,
+                                session_id=state.binding.internal_session_id,
+                                group_id=pending_group or "",
                             )
                         except PUBLICATION_RETRY_ERRORS:
                             pass
-                        else:
-                            pending_batches = len(
-                                _current_recorder_pending(
-                                    pending_snapshot,
-                                    session_id=(
-                                        state.binding.internal_session_id
-                                    ),
-                                    group_id=pending_group or "",
-                                )
-                            )
                     self._set_snapshot(
                         status="retrying",
                         storage_state="backlogged",

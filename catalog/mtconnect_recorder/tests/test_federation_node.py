@@ -21,6 +21,7 @@ from catalog.mtconnect_recorder import federation_node as federation_node_module
 from catalog.mtconnect_recorder.federation_node import (
     RecorderFederationNode,
     RecorderFederationSnapshot,
+    _pending_outbox_summary,
     _publication_cycle_status,
     select_storage_authority,
     sharing_state_detail,
@@ -40,6 +41,43 @@ def test_stop_does_not_close_an_injected_services_runtime(tmp_path) -> None:
     )
     node.stop()
     assert not calls
+
+
+def test_legacy_outbox_adapter_summary_fallback_is_route_scoped() -> None:
+    session_id = "session-1"
+    rows = (
+        SimpleNamespace(
+            session_id=session_id,
+            destination_id="telemetry",
+            schema_id=RECORDER_STORAGE_SCHEMA,
+            last_error="TimeoutError",
+        ),
+        SimpleNamespace(
+            session_id="other-session",
+            destination_id="telemetry",
+            schema_id=RECORDER_STORAGE_SCHEMA,
+            last_error=None,
+        ),
+        SimpleNamespace(
+            session_id=session_id,
+            destination_id="archive",
+            schema_id=RECORDER_STORAGE_SCHEMA,
+            last_error=None,
+        ),
+        SimpleNamespace(
+            session_id=session_id,
+            destination_id="telemetry",
+            schema_id="other-schema",
+            last_error=None,
+        ),
+    )
+    legacy_adapter = SimpleNamespace(pending=lambda: rows)
+
+    assert _pending_outbox_summary(
+        legacy_adapter,
+        session_id=session_id,
+        group_id="telemetry",
+    ) == (1, True)
 
 
 def _status(*capabilities: dict[str, object]) -> dict[str, object]:
@@ -99,7 +137,9 @@ def test_select_storage_authority_rejects_non_owner_self_advertisement() -> None
     assert selected.group_id is None
 
 
-def test_select_storage_authority_requires_explicit_choice_for_multiple_groups() -> None:
+def test_select_storage_authority_requires_explicit_choice_for_multiple_groups() -> (
+    None
+):
     selected = select_storage_authority(
         _status(_authority(group_ids=["telemetry", "archive"])),
         session_id="session-1",
@@ -480,7 +520,9 @@ def test_publication_loop_proves_each_dataset_before_full_backlog_drain(
         node.runtime = _Runtime()
         node._lock = threading.RLock()
         node._stop = threading.Event()
-        node._publication_diagnostics = federation_node_module.PublicationCycleObservation()
+        node._publication_diagnostics = (
+            federation_node_module.PublicationCycleObservation()
+        )
         node._publication_future = Future()
         node._snapshot = RecorderFederationSnapshot(
             status="connected",
@@ -638,6 +680,34 @@ def test_degraded_outranks_up_to_date_when_evidence_was_withdrawn() -> None:
         delivery=RecorderDeliveryRunResult(attempted=1, committed=1, pending=0),
         retired_total=1,
     ) == ("degraded", 0, "recorder-delivery-retired")
+
+
+def test_publication_cycle_status_accepts_payload_free_pending_summary() -> None:
+    delivery = RecorderDeliveryRunResult(attempted=0, committed=0, pending=0)
+    assert _publication_cycle_status(
+        pending_entries=(),
+        session_id="session-current",
+        group_id="group-current",
+        delivery=delivery,
+        pending_count=0,
+        pending_has_error=False,
+    ) == ("up-to-date", 0, None)
+    assert _publication_cycle_status(
+        pending_entries=(),
+        session_id="session-current",
+        group_id="group-current",
+        delivery=delivery,
+        pending_count=5,
+        pending_has_error=False,
+    ) == ("publishing", 5, None)
+    assert _publication_cycle_status(
+        pending_entries=(),
+        session_id="session-current",
+        group_id="group-current",
+        delivery=delivery,
+        pending_count=5,
+        pending_has_error=True,
+    ) == ("backlogged", 5, "recorder-delivery-pending")
 
 
 def test_degraded_outranks_backlogged() -> None:

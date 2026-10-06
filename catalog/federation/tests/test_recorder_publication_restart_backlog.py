@@ -331,6 +331,7 @@ def test_delivery_queue_uses_the_bounded_production_window() -> None:
         client=_EmptyClient(),
         session_id="session-a",
         destination_id="fcp-local-storage",
+        clock=lambda: datetime(2026, 10, 6, 10, 0, tzinfo=timezone.utc),
     )
 
     result = asyncio.run(queue.run_once(limit=7))
@@ -341,4 +342,5 @@ def test_delivery_queue_uses_the_bounded_production_window() -> None:
         "destination_id": "fcp-local-storage",
         "schema_id": RECORDER_STORAGE_SCHEMA,
         "limit": 7,
+        "now": datetime(2026, 10, 6, 10, 0, tzinfo=timezone.utc),
     }
