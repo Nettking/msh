@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+import threading
 import warnings
-from contextlib import ExitStack, asynccontextmanager
+from contextlib import ExitStack, asynccontextmanager, contextmanager
 from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -136,24 +137,54 @@ class _Cluster:
             self.running_runtimes.remove(index)
 
 
+@contextmanager
+def _initial_bootstrap_schedule(runtimes):
+    # This fixture's callers require the genesis creator to be the initial
+    # current leader at product term 1. A slow authenticated bootstrap RPC must
+    # not let another automatic lifecycle pump recover that same genesis and
+    # legitimately replace the creator before setup finishes. Keep real start,
+    # listeners, election, RPC, quorum and fencing; defer only automatic rounds.
+    allowed = threading.Event()
+    originals = [(runtime, runtime._drive_lifecycle_round,
+                  "_drive_lifecycle_round" in vars(runtime),
+                  vars(runtime).get("_drive_lifecycle_round")) for runtime in runtimes]
+    try:
+        for runtime, drive, _owned, _value in originals:
+            def initial_round(drive=drive):
+                if allowed.is_set():
+                    return drive()
+                return None
+
+            runtime._drive_lifecycle_round = initial_round
+        yield
+    finally:
+        allowed.set()
+        for runtime, _drive, owned, value in originals:
+            if owned:
+                runtime._drive_lifecycle_round = value
+            else:
+                del runtime._drive_lifecycle_round
+
+
 @asynccontextmanager
 async def _cluster(root: Path):
     cluster = _Cluster(root)
     try:
-        for index, runtime in enumerate(cluster.runtimes):
-            await asyncio.to_thread(runtime.start)
-            cluster.running_runtimes.add(index)
-        for index, relay in enumerate(cluster.relays):
-            await relay.start()
-            cluster.running_relays.add(index)
-        creator = cluster.runtimes[0]
-        await asyncio.to_thread(
-            creator.bootstrap_new_federation,
-            federation_id=FEDERATION,
-            session_id=SESSION,
-            creator_node_id=creator.node.voter_id,
-            display_name="Public journal continuity",
-        )
+        with _initial_bootstrap_schedule(cluster.runtimes):
+            for index, runtime in enumerate(cluster.runtimes):
+                await asyncio.to_thread(runtime.start)
+                cluster.running_runtimes.add(index)
+            for index, relay in enumerate(cluster.relays):
+                await relay.start()
+                cluster.running_relays.add(index)
+            creator = cluster.runtimes[0]
+            await asyncio.to_thread(
+                creator.bootstrap_new_federation,
+                federation_id=FEDERATION,
+                session_id=SESSION,
+                creator_node_id=creator.node.voter_id,
+                display_name="Public journal continuity",
+            )
         await _wait(
             lambda: all(runtime.ready for runtime in cluster.runtimes),
             "the three authenticated voters did not become ready",
