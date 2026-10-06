@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import threading
-from concurrent.futures import CancelledError, ThreadPoolExecutor
+from concurrent.futures import CancelledError, Future, ThreadPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -300,3 +300,77 @@ def test_inner_relay_request_timeout_is_not_mislabeled_as_aggregate_deadline(
         assert isinstance(error.value.__cause__, TimeoutError)
     finally:
         runtime.close(timeout=2)
+
+
+@pytest.mark.parametrize(
+    ("timeout_seconds", "expected_connect_timeout"),
+    [(190, 3420), (200, 3600), (3600, 3600)],
+)
+def test_default_connect_budget_preserves_supported_rpc_timeout_values(
+    tmp_path: Path, timeout_seconds: float, expected_connect_timeout: float,
+) -> None:
+    runtime = pairing.PairingRelayRuntime(
+        state_directory=tmp_path,
+        display_name="Member",
+        timeout_seconds=timeout_seconds,
+    )
+    try:
+        assert runtime.timeout_seconds == timeout_seconds
+        assert runtime.connect_timeout_seconds == expected_connect_timeout
+    finally:
+        assert runtime.close(timeout=2)
+
+
+@pytest.mark.parametrize(
+    "completion_window",
+    ["before-classification", "during-cancel", "inner-timeout-during-cancel"],
+)
+def test_submit_classifies_future_completion_at_outer_timeout_boundary(
+    tmp_path: Path, monkeypatch, completion_window: str,
+) -> None:
+    runtime = pairing.PairingRelayRuntime(
+        state_directory=tmp_path,
+        display_name="Member",
+    )
+
+    class CompletedAtDeadline(Future):
+        def __init__(self) -> None:
+            super().__init__()
+            self.wait_expired = False
+
+        def result(self, timeout=None):
+            if timeout is not None and not self.wait_expired:
+                self.wait_expired = True
+                if completion_window == "before-classification":
+                    self.set_result("connection-published")
+                raise TimeoutError("outer wait reached its deadline")
+            return super().result(timeout=timeout)
+
+        def cancel(self):
+            if completion_window == "during-cancel":
+                self.set_result("connection-published")
+                return False
+            if completion_window == "inner-timeout-during-cancel":
+                self.set_exception(TimeoutError("per-request timeout"))
+                return False
+            return super().cancel()
+
+    future = CompletedAtDeadline()
+    monkeypatch.setattr(runtime, "_start_loop", lambda: object())
+    monkeypatch.setattr(
+        pairing.asyncio,
+        "run_coroutine_threadsafe",
+        lambda _coroutine, _loop: future,
+    )
+    try:
+        # Completion can race either the first done() check or cancellation,
+        # matching the scheduling gap around the reconnect deadline.
+        if completion_window == "inner-timeout-during-cancel":
+            with pytest.raises(FederationOperationError) as error:
+                runtime._submit(SimpleNamespace(close=lambda: None), operation="saved reconnect")
+            assert error.value.code == "pairing-relay-request-timeout"
+            assert isinstance(error.value.__cause__, TimeoutError)
+        else:
+            assert runtime._submit(SimpleNamespace(close=lambda: None)) == "connection-published"
+    finally:
+        assert runtime.close(timeout=2)

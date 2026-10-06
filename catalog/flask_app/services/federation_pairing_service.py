@@ -596,8 +596,6 @@ class PairingRelayRuntime:
             or not isinstance(connect_timeout_seconds, (int, float))
             or not math.isfinite(connect_timeout_seconds)
             or not 0 < connect_timeout_seconds <= MAX_CLIENT_INTERVAL_SECONDS
-            or connect_timeout_seconds + timeout_seconds
-            > MAX_CLIENT_INTERVAL_SECONDS
         ):
             raise FederationValidationError(
                 "invalid-pairing-connect-timeout",
@@ -754,17 +752,28 @@ class PairingRelayRuntime:
         try:
             return future.result(timeout=deadline_seconds)
         except TimeoutError as exc:
+            def completed_result() -> Any:
+                try:
+                    return future.result()
+                except TimeoutError as request_exc:
+                    raise FederationOperationError(
+                        "pairing-relay-request-timeout",
+                        f"{operation} received an individual relay request timeout",
+                    ) from request_exc
+
             if future.done():
                 # ``Future.result`` raises TimeoutError both for its own wait
                 # deadline and when the coroutine completed with an inner
                 # ``asyncio.wait_for`` timeout. Preserve that distinction so
                 # the reconnect monitor does not misreport a stalled RPC as an
                 # exhausted aggregate connection budget.
-                raise FederationOperationError(
-                    "pairing-relay-request-timeout",
-                    f"{operation} received an individual relay request timeout",
-                ) from exc
-            future.cancel()
+                return completed_result()
+            cancelled = future.cancel()
+            # Completion can race with the caller's timeout and cancellation.
+            # If the operation completed successfully in that gap, preserve
+            # its result instead of reporting a timeout after publishing state.
+            if not cancelled and future.done():
+                return completed_result()
             raise FederationOperationError(
                 "pairing-relay-timeout",
                 f"{operation} exceeded its bounded deadline",
