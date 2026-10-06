@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
+from collections.abc import Awaitable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+import pytest
 
 from catalog.federation.acknowledgement import AcknowledgementMode
 from catalog.federation.commit_tracking import DurableAcknowledgementStore
@@ -34,10 +38,11 @@ from catalog.relay.service import RelayServer
 
 NOW = datetime(2026, 7, 31, 8, 0, tzinfo=timezone.utc)
 TIMEOUT = 5.0
-# Reaching the control-waiting state is observed, not timed. Reusing the product
-# TIMEOUT above as a wall-clock deadline made a correct run fail whenever a
-# loaded CI runner was slower than that budget. This ceiling exists only so a
-# genuine hang still ends the test, and is far outside normal scheduling noise.
+# Startup and reaching control waiting are observed, not given a one-request
+# SLA. Bootstrap makes several independently bounded relay requests. Reusing
+# TIMEOUT for their combined duration can cancel the last healthy request.
+# This test-only ceiling still ends a hang; product request/control deadlines
+# and every grant, identity, manifest and fencing assertion remain unchanged.
 BOOTSTRAP_OBSERVATION_TIMEOUT = 120.0
 
 
@@ -121,6 +126,10 @@ async def _wait_for_control_waiting(
         if not waiter.done():
             waiter.cancel()
         await asyncio.gather(waiter, return_exceptions=True)
+
+
+async def _wait_for_bootstrap(bootstrap: Awaitable[None]) -> None:
+    await asyncio.wait_for(bootstrap, BOOTSTRAP_OBSERVATION_TIMEOUT)
 
 
 async def _wait_for_promotion(
@@ -320,8 +329,8 @@ def test_primary_loss_promotes_complete_replica_and_old_grant_stays_fenced(
                 (primary.node_id, replica.node_id)
             )
             assert initial_plan.publication_revision == 1
-            await asyncio.wait_for(primary_bootstrap, TIMEOUT)
-            await asyncio.wait_for(replica_bootstrap, TIMEOUT)
+            await _wait_for_bootstrap(primary_bootstrap)
+            await _wait_for_bootstrap(replica_bootstrap)
 
             acknowledgements = DurableAcknowledgementStore(
                 tmp_path / "authority-acks.sqlite3"
@@ -447,7 +456,7 @@ def test_primary_loss_promotes_complete_replica_and_old_grant_stays_fenced(
                 control_sync_timeout=TIMEOUT,
                 clock=lambda: NOW,
             )
-            await asyncio.wait_for(primary.bootstrap(), TIMEOUT)
+            await _wait_for_bootstrap(primary.bootstrap())
             assert primary.node_id == old_primary_node_id
             assert primary.status()["provider"]["groups"] == [
                 {"group_id": "storage-main", "role": "unassigned"}
@@ -513,5 +522,144 @@ def test_primary_loss_promotes_complete_replica_and_old_grant_stays_fenced(
                 await authority.disconnect()
             if relay is not None:
                 await relay.stop()
+
+    asyncio.run(scenario())
+
+
+def test_returning_primary_observation_keeps_individual_deadlines(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Real loopback responses each meet their budget; their sum exceeds it."""
+    original_bootstrap = LiveStorageNodeAgent.bootstrap
+    original_send = RelayServer._send_live
+    started_providers: set[str] = set()
+    returning_ids: set[str] = set()
+    response_delays: list[float] = []
+    returning_elapsed: list[float] = []
+
+    async def bootstrap(self, **kwargs):
+        provider = self.storage.config.provider_id
+        returning = provider in started_providers
+        started_providers.add(provider)
+        if returning:
+            returning_ids.add(self.node_id)
+            # These remain product/per-request budgets, not test observations.
+            assert self.client.request_timeout == TIMEOUT
+            assert self.control_sync_timeout == TIMEOUT
+        start = time.monotonic()
+        try:
+            return await original_bootstrap(self, **kwargs)
+        finally:
+            if returning:
+                returning_ids.remove(self.node_id)
+                returning_elapsed.append(time.monotonic() - start)
+
+    async def send(self, record, envelope):
+        if (
+            record.node_id in returning_ids
+            and envelope.message_type == "capability.announce.accepted"
+        ):
+            start = time.monotonic()
+            await asyncio.sleep(1.3)
+            response_delays.append(time.monotonic() - start)
+        return await original_send(self, record, envelope)
+
+    monkeypatch.setattr(LiveStorageNodeAgent, "bootstrap", bootstrap)
+    monkeypatch.setattr(RelayServer, "_send_live", send)
+    # Reuse the actual promotion, durable grant/report, signed current control,
+    # identity retention, unassigned role and stale-grant rejection assertions.
+    test_primary_loss_promotes_complete_replica_and_old_grant_stays_fenced(
+        tmp_path
+    )
+    assert len(response_delays) >= 4
+    assert all(delay < TIMEOUT for delay in response_delays)
+    assert returning_elapsed[0] > TIMEOUT
+
+
+def test_bootstrap_observation_does_not_hide_individual_request_timeout(
+    tmp_path: Path,
+) -> None:
+    class NoResponseSocket:
+        sends = 0
+
+        async def send(self, _raw):
+            self.sends += 1
+
+    async def scenario():
+        client = RelayNodeClient(
+            state_directory=tmp_path / "isolated-node",
+            display_name="Timeout fixture",
+            relay_url="ws://127.0.0.1:9",
+            request_timeout=0.02,
+            allow_insecure_local=True,
+        )
+        socket = NoResponseSocket()
+        client._websocket = socket
+        client._receiver_task = asyncio.current_task()
+        start = time.monotonic()
+        with pytest.raises(TimeoutError):
+            await _wait_for_bootstrap(
+                client.request("capability.announce", payload={})
+            )
+        assert time.monotonic() - start < 1.0
+        assert socket.sends == 1
+        assert client._pending == {}
+
+    asyncio.run(scenario())
+
+
+def test_bootstrap_observation_still_bounds_a_hang(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(__name__ + ".BOOTSTRAP_OBSERVATION_TIMEOUT", 0.02)
+
+    async def scenario():
+        cancelled = asyncio.Event()
+
+        async def hung():
+            try:
+                await asyncio.Future()
+            finally:
+                cancelled.set()
+
+        with pytest.raises(TimeoutError):
+            await _wait_for_bootstrap(hung())
+        assert cancelled.is_set()
+
+    asyncio.run(scenario())
+
+
+def test_bootstrap_observation_preserves_caller_cancellation() -> None:
+    async def scenario():
+        entered = asyncio.Event()
+        cancelled = asyncio.Event()
+
+        async def bootstrap():
+            entered.set()
+            try:
+                await asyncio.Future()
+            finally:
+                cancelled.set()
+
+        task = asyncio.create_task(_wait_for_bootstrap(bootstrap()))
+        await entered.wait()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert cancelled.is_set()
+
+    asyncio.run(scenario())
+
+
+def test_bootstrap_observation_preserves_inner_failure() -> None:
+    error = ValueError("invalid signed control fixture")
+
+    async def scenario():
+        async def rejected():
+            raise error
+
+        with pytest.raises(ValueError) as caught:
+            await _wait_for_bootstrap(rejected())
+        assert caught.value is error
 
     asyncio.run(scenario())
