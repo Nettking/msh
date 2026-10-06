@@ -98,8 +98,10 @@ def _retire(docker: _Docker, *, running=(), removable=True):
     return outcome, removed
 
 
-def test_the_owner_stamp_survives_a_path_buildx_would_otherwise_split() -> None:
-    awkward = Path("/srv/Machines, Tools & Parts/fcp")
+def test_the_owner_stamp_survives_a_path_buildx_would_otherwise_split(tmp_path: Path) -> None:
+    # Use a fully qualified host path: /srv is drive-relative on Windows,
+    # while the builder stamps the resolved checkout that it actually owns.
+    awkward = tmp_path / "Machines, Tools & Parts" / "fcp"
     option = builder_retirement.builder_root_driver_opt(awkward)
 
     assert "," not in option
