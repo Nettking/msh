@@ -639,6 +639,13 @@ def test_returning_real_reply_loss_observes_exact_catchup_after_normal_round(tmp
 
     def runtime(*args):
         value = factory(*args)
+        # This test owns the bootstrap, failover, and replication transitions
+        # synchronously. Disable only the independent periodic lifecycle loop
+        # so a slow runner cannot elect another follower during the controlled
+        # returning-peer response. Election, witnessed recovery, replication,
+        # and acknowledgements below still use the real sockets; dedicated
+        # lifecycle tests cover the background loop separately.
+        value._lifecycle_loop = lambda: None
         created.append(value)
         if len(created) != 4:
             return value
