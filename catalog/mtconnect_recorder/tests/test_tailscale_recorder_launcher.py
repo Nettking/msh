@@ -435,7 +435,8 @@ def test_windows_probe_rejects_runtime_that_cannot_import_exact_entrypoint(
         env=environment,
     )
 
-    assert completed.returncode == 0, completed.stderr or completed.stdout
+    assert completed.returncode == 2
+    assert "No Python 3 interpreter can load the FCP recorder" in completed.stderr
     invocations = invocation_log.read_text(encoding="utf-8").splitlines()
     assert len(invocations) == 1
     assert "ARGS=-c" in invocations[0]

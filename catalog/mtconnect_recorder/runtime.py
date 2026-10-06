@@ -196,7 +196,15 @@ class MtconnectClient:
                 raise MtconnectProtocolError(
                     f"MTConnect /{endpoint} did not return a response."
                 )
-            response.raise_for_status()
+            status_code = response.status_code
+            # MTConnect Agents report an expired sample cursor with HTTP 404
+            # and an MTConnectError body (errorCode=OUT_OF_RANGE). Read only
+            # that bounded response before raising the normal HTTP error so
+            # fetch_sample can distinguish the specified rolling-window race.
+            if status_code >= 400 and not (
+                endpoint == "sample" and status_code == 404
+            ):
+                response.raise_for_status()
             declared_length = response.headers.get("Content-Length")
             if declared_length is not None:
                 try:
@@ -243,6 +251,18 @@ class MtconnectClient:
                 raise MtconnectProtocolError(
                     f"MTConnect /{endpoint} response was not valid text."
                 ) from exc
+            if endpoint == "sample" and status_code == 404:
+                try:
+                    error_root = ET.fromstring(body)
+                except ET.ParseError:
+                    error_root = None
+                if error_root is not None and _local_name(error_root.tag) == "MTConnectError":
+                    try:
+                        parse_stream_header(body)
+                    except MtconnectProtocolError as exc:
+                        if str(exc).startswith("OUT_OF_RANGE:"):
+                            raise
+                response.raise_for_status()
         except (
             requests.Timeout,
             TimeoutError,
@@ -267,10 +287,19 @@ class MtconnectClient:
         return self._get("probe")
 
     def fetch_sample(self, *, from_sequence: int, count: int) -> str:
-        return self._get(
-            "sample",
-            params={"from": int(from_sequence), "count": int(count)},
-        )
+        try:
+            return self._get(
+                "sample",
+                params={"from": int(from_sequence), "count": int(count)},
+            )
+        except MtconnectProtocolError as exc:
+            if not str(exc).startswith("OUT_OF_RANGE:"):
+                raise
+            # The rolling buffer can advance between /current and /sample.
+            # Retry once without the expired cursor; capture_source validates
+            # the returned header and records any missing sequence range before
+            # it commits the available observations.
+            return self._get("sample", params={"count": int(count)})
 
 
 DATA_DIR = Path(os.getenv("FCP_RECORDER_DATA_DIR", "data"))
@@ -1386,7 +1415,6 @@ class RecorderRuntime:
                         self.gaps_detected += 1
                     expected = batch.header.first_sequence
                     compatibility_values = {}
-                    continue
 
                 if not batch.observations:
                     break
