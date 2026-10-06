@@ -124,11 +124,19 @@ def test_existing_v3_outbox_rebuilds_fair_delivery_index_and_uses_it(tmp_path):
     ranked_ids = normalized_delivery_query.split(") SELECT entry.*", 1)[0]
     assert "SELECT outbox_id," in ranked_ids
     assert "SELECT outbox.*" not in ranked_ids
-    assert "JOIN outbox AS entry ON entry.outbox_id = ranked.outbox_id" in (
+    bounded_ids = normalized_delivery_query.split("bounded_outbox_ids AS (", 1)[
+        1
+    ].split(") SELECT entry.*", 1)[0]
+    assert "SELECT outbox_id FROM ranked_outbox" in bounded_ids
+    assert "WHERE delivery_rank <= 1" in bounded_ids
+    assert "ORDER BY outbox_id LIMIT 4" in bounded_ids
+    assert "JOIN outbox AS entry ON entry.outbox_id = bounded.outbox_id" in (
         normalized_delivery_query
     )
-    assert "WHERE ranked.delivery_rank <= " in normalized_delivery_query
-    assert normalized_delivery_query.endswith("LIMIT 4")
+    assert normalized_delivery_query.index("LIMIT 4") < normalized_delivery_query.index(
+        "SELECT entry.*"
+    )
+    assert normalized_delivery_query.endswith("ORDER BY bounded.outbox_id")
 
 
 def test_existing_v3_outbox_rebuilds_older_noncovering_delivery_index(tmp_path):
@@ -200,3 +208,41 @@ def test_existing_v3_outbox_rebuilds_older_noncovering_delivery_index(tmp_path):
     )
     assert "COVERING INDEX outbox_pending_delivery_dataset" in repr(plan)
     assert version == 3
+
+
+def test_pending_delivery_bounds_payload_join_when_groups_exceed_limit(tmp_path):
+    database = tmp_path / "outbox.sqlite3"
+    outbox = _TracingOutbox(database)
+    timestamp = datetime(2026, 10, 6, tzinfo=UTC)
+    for index in range(12):
+        outbox.enqueue(
+            session_id="session-a",
+            destination_id="group-a",
+            schema_id="fcp.recorder.storage_delivery.v1",
+            payload={"dataset_id": f"dataset-{index}", "batch_id": f"batch-{index}"},
+            idempotency_key=f"key-{index}",
+            content_hash=f"sha256:{index:064x}",
+            now=timestamp,
+        )
+
+    outbox.statements.clear()
+    entries = outbox.pending_for_delivery(
+        session_id="session-a",
+        destination_id="group-a",
+        schema_id="fcp.recorder.storage_delivery.v1",
+        limit=3,
+    )
+
+    assert [entry.outbox_id for entry in entries] == [1, 2, 3]
+    delivery_query = next(
+        statement
+        for statement in outbox.statements
+        if statement.lstrip().startswith("WITH ranked_outbox AS (")
+    )
+    normalized = " ".join(delivery_query.split())
+    bounded_ids = normalized.split("bounded_outbox_ids AS (", 1)[1].split(
+        ") SELECT entry.*", 1
+    )[0]
+    assert "WHERE delivery_rank <= 1" in bounded_ids
+    assert "ORDER BY outbox_id LIMIT 3" in bounded_ids
+    assert normalized.index("LIMIT 3") < normalized.index("SELECT entry.*")

@@ -910,13 +910,17 @@ class SQLiteOutbox:
                            ) AS delivery_rank
                     FROM outbox
                     WHERE {where}
+                ), bounded_outbox_ids AS (
+                    SELECT outbox_id
+                    FROM ranked_outbox
+                    WHERE delivery_rank <= ?
+                    ORDER BY outbox_id
+                    LIMIT ?
                 )
                 SELECT entry.*
-                FROM ranked_outbox AS ranked
-                JOIN outbox AS entry ON entry.outbox_id = ranked.outbox_id
-                WHERE ranked.delivery_rank <= ?
-                ORDER BY ranked.outbox_id
-                LIMIT ?
+                FROM bounded_outbox_ids AS bounded
+                JOIN outbox AS entry ON entry.outbox_id = bounded.outbox_id
+                ORDER BY bounded.outbox_id
                 """,
                 [*args, rows_per_dataset, limit],
             ).fetchall()
