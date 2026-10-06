@@ -21,6 +21,7 @@ from catalog.mtconnect_recorder import federation_node as federation_node_module
 from catalog.mtconnect_recorder.federation_node import (
     RecorderFederationNode,
     RecorderFederationSnapshot,
+    _pending_outbox_summary,
     _publication_cycle_status,
     select_storage_authority,
     sharing_state_detail,
@@ -40,6 +41,43 @@ def test_stop_does_not_close_an_injected_services_runtime(tmp_path) -> None:
     )
     node.stop()
     assert not calls
+
+
+def test_legacy_outbox_adapter_summary_fallback_is_route_scoped() -> None:
+    session_id = "session-1"
+    rows = (
+        SimpleNamespace(
+            session_id=session_id,
+            destination_id="telemetry",
+            schema_id=RECORDER_STORAGE_SCHEMA,
+            last_error="TimeoutError",
+        ),
+        SimpleNamespace(
+            session_id="other-session",
+            destination_id="telemetry",
+            schema_id=RECORDER_STORAGE_SCHEMA,
+            last_error=None,
+        ),
+        SimpleNamespace(
+            session_id=session_id,
+            destination_id="archive",
+            schema_id=RECORDER_STORAGE_SCHEMA,
+            last_error=None,
+        ),
+        SimpleNamespace(
+            session_id=session_id,
+            destination_id="telemetry",
+            schema_id="other-schema",
+            last_error=None,
+        ),
+    )
+    legacy_adapter = SimpleNamespace(pending=lambda: rows)
+
+    assert _pending_outbox_summary(
+        legacy_adapter,
+        session_id=session_id,
+        group_id="telemetry",
+    ) == (1, True)
 
 
 def _status(*capabilities: dict[str, object]) -> dict[str, object]:

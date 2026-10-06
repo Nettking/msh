@@ -188,6 +188,36 @@ def _current_recorder_pending(
     )
 
 
+def _pending_outbox_summary(
+    outbox: object,
+    *,
+    session_id: str,
+    group_id: str,
+) -> tuple[int, bool]:
+    """Read a payload-free summary when supported, preserving old adapters.
+
+    Production ``SQLiteOutbox`` implements ``pending_summary`` so status does
+    not decode a large backlog. Older adapters only expose ``pending``; keep
+    them compatible and derive the same route-scoped facts from their rows.
+    """
+
+    summary_reader = getattr(outbox, "pending_summary", None)
+    if callable(summary_reader):
+        return summary_reader(
+            session_id=session_id,
+            destination_id=group_id,
+            schema_id=RECORDER_STORAGE_SCHEMA,
+        )
+
+    pending_reader = getattr(outbox, "pending", None)
+    if not callable(pending_reader):
+        raise TypeError("outbox adapter must implement pending_summary() or pending()")
+    current = _current_recorder_pending(
+        pending_reader(), session_id=session_id, group_id=group_id
+    )
+    return len(current), any(getattr(entry, "last_error", None) for entry in current)
+
+
 def _publication_cycle_status(
     *,
     pending_entries: tuple[object, ...],
@@ -1202,10 +1232,10 @@ class RecorderFederationNode:
                     retry_stage = "pending-read"
                     self._publication_diagnostics.transition(cycle_token, retry_stage)
                     pending, pending_has_error = await asyncio.to_thread(
-                        outbox.pending_summary,
+                        _pending_outbox_summary,
+                        outbox,
                         session_id=state.binding.internal_session_id,
-                        destination_id=group_id,
-                        schema_id=RECORDER_STORAGE_SCHEMA,
+                        group_id=group_id,
                     )
                     storage_state, pending, delivery_error = (
                         _publication_cycle_status(
@@ -1294,10 +1324,10 @@ class RecorderFederationNode:
                         try:
                             self._publication_diagnostics.transition(cycle_token, "retry-pending-read")
                             pending_batches, _ = await asyncio.to_thread(
-                                pending_outbox.pending_summary,
+                                _pending_outbox_summary,
+                                pending_outbox,
                                 session_id=state.binding.internal_session_id,
-                                destination_id=pending_group or "",
-                                schema_id=RECORDER_STORAGE_SCHEMA,
+                                group_id=pending_group or "",
                             )
                         except PUBLICATION_RETRY_ERRORS:
                             pass

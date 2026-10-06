@@ -213,6 +213,15 @@ ON outbox(
 )
 WHERE state = 'pending';
 """
+_OUTBOX_DELIVERY_INDEX_KEY_COLUMNS = (
+    "state",
+    "session_id",
+    "destination_id",
+    "schema_id",
+    None,  # The dataset-ordering expression above.
+    "outbox_id",
+    "last_error",
+)
 
 
 def _outbox_table_ddl(name: str, *, if_not_exists: bool) -> str:
@@ -474,8 +483,21 @@ class SQLiteOutbox:
                     )
                 # This is a derived lookup index, so it can be restored for
                 # existing schema-v3 outboxes without changing their durable
-                # row format or identity. It is deliberately created after a
+                # row format or identity. A prior version of this index did
+                # not include last_error; IF NOT EXISTS would silently keep
+                # that non-covering index, so replace any incompatible shape
+                # inside the same initialization transaction. Do this after a
                 # possible v2 table rebuild above.
+                delivery_index = db.execute(
+                    "PRAGMA index_xinfo('outbox_pending_delivery_dataset')"
+                ).fetchall()
+                delivery_key_columns = tuple(
+                    row["name"] for row in delivery_index if row["key"]
+                )
+                if delivery_index and delivery_key_columns != (
+                    _OUTBOX_DELIVERY_INDEX_KEY_COLUMNS
+                ):
+                    db.execute("DROP INDEX outbox_pending_delivery_dataset")
                 db.execute(_OUTBOX_DELIVERY_INDEX_DDL)
                 db.commit()
             except Exception:
