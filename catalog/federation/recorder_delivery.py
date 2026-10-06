@@ -312,11 +312,13 @@ class DurableRecorderDeliveryQueue:
                 "must be callable when supplied",
             )
 
+        now = self.clock()
         # Read only a bounded, fair delivery window. The SQLite implementation
         # includes the oldest row for every ordered dataset before filling the
-        # remaining window, so a large offline dataset cannot starve a healthy
-        # one and a bad head still fences only its own dataset. Keep the
-        # blocking query and bounded row decoding off the relay event loop.
+        # remaining window, prioritizing due heads before backoff-delayed heads
+        # when there are more datasets than the window can hold. A bad head
+        # still fences only its own dataset. Keep the blocking query and bounded
+        # row decoding off the relay event loop.
         pending_for_delivery = getattr(self.outbox, "pending_for_delivery", None)
         if callable(pending_for_delivery):
             pending_snapshot = await asyncio.to_thread(
@@ -325,6 +327,7 @@ class DurableRecorderDeliveryQueue:
                 destination_id=self.destination_id,
                 schema_id=RECORDER_STORAGE_SCHEMA,
                 limit=limit,
+                now=now,
             )
         else:
             # Compatibility for small test/durable-store adapters that expose
@@ -349,7 +352,6 @@ class DurableRecorderDeliveryQueue:
         # A failed or not-yet-due older entry fences newer entries for that same
         # session/group/dataset until the older entry commits. Other datasets
         # remain free to make progress.
-        now = self.clock()
         pending_entries = tuple(
             sorted(
                 (

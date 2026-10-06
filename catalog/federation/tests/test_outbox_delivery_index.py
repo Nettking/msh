@@ -204,6 +204,7 @@ def test_existing_v3_outbox_rebuilds_older_noncovering_delivery_index(tmp_path):
         "schema_id",
         None,
         "outbox_id",
+        "next_attempt_at",
         "last_error",
     )
     assert "COVERING INDEX outbox_pending_delivery_dataset" in repr(plan)

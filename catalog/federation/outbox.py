@@ -209,6 +209,7 @@ ON outbox(
     schema_id,
     {_OUTBOX_DELIVERY_DATASET_KEY_SQL},
     outbox_id,
+    next_attempt_at,
     last_error
 )
 WHERE state = 'pending';
@@ -220,6 +221,7 @@ _OUTBOX_DELIVERY_INDEX_KEY_COLUMNS = (
     "schema_id",
     None,  # The dataset-ordering expression above.
     "outbox_id",
+    "next_attempt_at",
     "last_error",
 )
 
@@ -483,11 +485,11 @@ class SQLiteOutbox:
                     )
                 # This is a derived lookup index, so it can be restored for
                 # existing schema-v3 outboxes without changing their durable
-                # row format or identity. A prior version of this index did
-                # not include last_error; IF NOT EXISTS would silently keep
-                # that non-covering index, so replace any incompatible shape
-                # inside the same initialization transaction. Do this after a
-                # possible v2 table rebuild above.
+                # row format or identity. Prior versions of this index did
+                # not include next_attempt_at and last_error; IF NOT EXISTS
+                # would silently keep a non-covering shape, so replace any
+                # incompatible shape inside the same initialization
+                # transaction. Do this after a possible v2 table rebuild.
                 delivery_index = db.execute(
                     "PRAGMA index_xinfo('outbox_pending_delivery_dataset')"
                 ).fetchall()
@@ -838,6 +840,7 @@ class SQLiteOutbox:
         destination_id: str | None,
         schema_id: str,
         limit: int,
+        now: datetime | None = None,
     ) -> tuple[OutboxEntry, ...]:
         """Return a bounded, fair window of pending delivery rows.
 
@@ -851,8 +854,10 @@ class SQLiteOutbox:
 
         Rows are intentionally not filtered by ``next_attempt_at`` here. A
         deferred head must still be visible so the delivery queue can fence
-        newer rows behind it. The queue decides whether the head may receive
-        its startup probe or is waiting for its durable backoff.
+        newer rows behind it. When ``now`` is supplied, due dataset heads are
+        selected before deferred heads so a bounded window cannot be consumed
+        entirely by retry-delayed datasets. The queue still applies durable
+        backoff and ordering fences after reading the bounded rows.
         """
 
         if (
@@ -879,6 +884,11 @@ class SQLiteOutbox:
             raise FederationValidationError(
                 "invalid-id", "schema_id", "must be non-empty text"
             )
+        if now is not None and not isinstance(now, datetime):
+            raise FederationValidationError(
+                "invalid-time", "now", "must be a datetime when supplied"
+            )
+        now_stamp = _time(now) if now is not None else None
 
         # JSON validity is a table invariant. Non-string or absent dataset
         # values are assigned a unique synthetic key, matching the delivery
@@ -900,10 +910,20 @@ class SQLiteOutbox:
                 ).fetchone()[0]
             )
             rows_per_dataset = max(1, limit // max(ordering_group_count, 1))
+            head_priority_order = (
+                "outbox_id"
+                if now_stamp is None
+                else "CASE WHEN delivery_rank=1 AND next_attempt_at<=? "
+                "THEN 0 ELSE 1 END, outbox_id"
+            )
+            priority_args: tuple[str, ...] = (
+                () if now_stamp is None else (now_stamp,)
+            )
             rows = db.execute(
                 f"""
                 WITH ranked_outbox AS (
                     SELECT outbox_id,
+                           next_attempt_at,
                            ROW_NUMBER() OVER (
                                PARTITION BY destination_id, {ordering_key}
                                ORDER BY outbox_id
@@ -914,7 +934,7 @@ class SQLiteOutbox:
                     SELECT outbox_id
                     FROM ranked_outbox
                     WHERE delivery_rank <= ?
-                    ORDER BY outbox_id
+                    ORDER BY {head_priority_order}
                     LIMIT ?
                 )
                 SELECT entry.*
@@ -922,7 +942,7 @@ class SQLiteOutbox:
                 JOIN outbox AS entry ON entry.outbox_id = bounded.outbox_id
                 ORDER BY bounded.outbox_id
                 """,
-                [*args, rows_per_dataset, limit],
+                [*args, rows_per_dataset, *priority_args, limit],
             ).fetchall()
         return tuple(self._decode(row) for row in rows)
 
