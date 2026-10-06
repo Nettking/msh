@@ -639,6 +639,13 @@ def test_returning_real_reply_loss_observes_exact_catchup_after_normal_round(tmp
 
     def runtime(*args):
         value = factory(*args)
+        # This test drives the bootstrap and ordinary replication round
+        # synchronously. Keep the independent periodic lifecycle bootstrap
+        # outside its bounded observation window so slow Windows runners do
+        # not elect the other follower concurrently with the controlled
+        # returning-peer response. Election, witnessed recovery, replication,
+        # and acknowledgements below still use the real sockets.
+        value.heartbeat_seconds = 300.0
         created.append(value)
         if len(created) != 4:
             return value
