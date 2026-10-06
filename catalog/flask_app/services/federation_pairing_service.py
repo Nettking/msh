@@ -71,6 +71,7 @@ DEFAULT_PAIRING_TIMEOUT_SECONDS: Final = 20.0
 # by ``timeout_seconds``; this aggregate budget is never unbounded.
 PAIRING_CONNECT_TIMEOUT_RPC_MULTIPLIER: Final = 18.0
 _SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,511}$")
+_SAFE_ERROR_CODE = re.compile(r"^[a-z0-9][a-z0-9.-]{0,127}$")
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -884,7 +885,10 @@ class PairingRelayRuntime:
             # Neither another caller nor runtime shutdown can own that client
             # yet, so this operation must close it before releasing the lock.
             error_code = getattr(exc, "code", None)
-            if not isinstance(error_code, str) or not _SAFE_ID.fullmatch(error_code):
+            if (
+                not isinstance(error_code, str)
+                or not _SAFE_ERROR_CODE.fullmatch(error_code)
+            ):
                 if isinstance(exc, asyncio.CancelledError):
                     error_code = "pairing-connect-cancelled"
                 elif isinstance(exc, TimeoutError):
