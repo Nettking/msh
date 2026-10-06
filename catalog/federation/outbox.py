@@ -188,6 +188,31 @@ _OUTBOX_INDEX_DDL = (
     "ON outbox(state, next_attempt_at, outbox_id);"
 )
 
+# Dataset identity lives inside the immutable outbox JSON payload. The fair
+# delivery query uses this exact expression to find the oldest row for each
+# ordered dataset. Keeping it indexed avoids decoding/sorting every pending
+# payload on every cycle when a large offline backlog has accumulated.
+_OUTBOX_DELIVERY_DATASET_KEY_SQL = """
+CASE
+    WHEN json_type(payload_json, '$.dataset_id') = 'text'
+        AND length(json_extract(payload_json, '$.dataset_id')) > 0
+    THEN json_extract(payload_json, '$.dataset_id')
+    ELSE printf('__unkeyed-outbox-row:%lld', outbox_id)
+END
+""".strip()
+_OUTBOX_DELIVERY_INDEX_DDL = f"""
+CREATE INDEX IF NOT EXISTS outbox_pending_delivery_dataset
+ON outbox(
+    state,
+    session_id,
+    destination_id,
+    schema_id,
+    {_OUTBOX_DELIVERY_DATASET_KEY_SQL},
+    outbox_id
+)
+WHERE state = 'pending';
+"""
+
 
 def _outbox_table_ddl(name: str, *, if_not_exists: bool) -> str:
     """Return the current outbox DDL.
@@ -446,6 +471,11 @@ class SQLiteOutbox:
                         "version",
                         str(version),
                     )
+                # This is a derived lookup index, so it can be restored for
+                # existing schema-v3 outboxes without changing their durable
+                # row format or identity. It is deliberately created after a
+                # possible v2 table rebuild above.
+                db.execute(_OUTBOX_DELIVERY_INDEX_DDL)
                 db.commit()
             except Exception:
                 db.rollback()
@@ -787,14 +817,7 @@ class SQLiteOutbox:
         # JSON validity is a table invariant. Non-string or absent dataset
         # values are assigned a unique synthetic key, matching the delivery
         # queue's rule that such a row has no ordering fence of its own.
-        ordering_key = """
-            CASE
-                WHEN json_type(payload_json, '$.dataset_id') = 'text'
-                    AND length(json_extract(payload_json, '$.dataset_id')) > 0
-                THEN json_extract(payload_json, '$.dataset_id')
-                ELSE printf('__unkeyed-outbox-row:%lld', outbox_id)
-            END
-        """
+        ordering_key = _OUTBOX_DELIVERY_DATASET_KEY_SQL
         where = "state='pending' AND session_id=? AND schema_id=?"
         args: list[object] = [session_id, schema_id]
         if destination_id is not None:
@@ -813,8 +836,8 @@ class SQLiteOutbox:
             rows_per_dataset = max(1, limit // max(ordering_group_count, 1))
             rows = db.execute(
                 f"""
-                SELECT * FROM (
-                    SELECT outbox.*,
+                WITH ranked_outbox AS (
+                    SELECT outbox_id,
                            ROW_NUMBER() OVER (
                                PARTITION BY destination_id, {ordering_key}
                                ORDER BY outbox_id
@@ -822,8 +845,11 @@ class SQLiteOutbox:
                     FROM outbox
                     WHERE {where}
                 )
-                WHERE delivery_rank <= ?
-                ORDER BY outbox_id
+                SELECT entry.*
+                FROM ranked_outbox AS ranked
+                JOIN outbox AS entry ON entry.outbox_id = ranked.outbox_id
+                WHERE ranked.delivery_rank <= ?
+                ORDER BY ranked.outbox_id
                 LIMIT ?
                 """,
                 [*args, rows_per_dataset, limit],

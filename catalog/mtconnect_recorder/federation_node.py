@@ -1145,7 +1145,12 @@ class RecorderFederationNode:
                         )
                         try:
                             await candidate.start()
-                            worker, outbox = self._worker(
+                            # Opening the durable outbox can run an additive
+                            # index build against a large pending backlog. Keep
+                            # that SQLite startup work off the relay loop so
+                            # heartbeat and response processing stay live.
+                            worker, outbox = await asyncio.to_thread(
+                                self._worker,
                                 state=state,
                                 storage_client=candidate,
                                 group_id=selected.group_id,

@@ -81,6 +81,15 @@ def test_startup_readiness_is_published_at_first_commit(tmp_path, monkeypatch) -
 
     storage_client = _StorageClient()
     outbox = SQLiteOutbox(tmp_path / "outbox.sqlite3")
+    outbox_constructor_threads: list[int] = []
+
+    def open_outbox(_database):
+        outbox_constructor_threads.append(threading.get_ident())
+        # Model the bounded SQLite schema/index work needed by an existing
+        # outbox. The publication loop's relay event loop must stay responsive.
+        threading.Event().wait(0.4)
+        return outbox
+
     seed_queue = DurableRecorderDeliveryQueue(
         outbox=outbox,
         client=storage_client,
@@ -112,7 +121,7 @@ def test_startup_readiness_is_published_at_first_commit(tmp_path, monkeypatch) -
     monkeypatch.setattr(
         federation_node_module,
         "SQLiteOutbox",
-        lambda _database: outbox,
+        open_outbox,
     )
     monkeypatch.setattr(
         federation_node_module,
@@ -162,6 +171,14 @@ def test_startup_readiness_is_published_at_first_commit(tmp_path, monkeypatch) -
         )
     )
     async def scenario() -> None:
+        loop = asyncio.get_running_loop()
+        loop_thread_id = threading.get_ident()
+        heartbeat_deadline = loop.time() + 0.02
+        heartbeat_observed: list[float] = []
+        loop.call_later(
+            0.02,
+            lambda: heartbeat_observed.append(loop.time()),
+        )
         runner = asyncio.create_task(node._publication_loop(state))
         try:
             await asyncio.wait_for(storage_client.first_commit.wait(), timeout=2.0)
@@ -175,6 +192,10 @@ def test_startup_readiness_is_published_at_first_commit(tmp_path, monkeypatch) -
             assert snapshot.last_committed_count == 1
             assert snapshot.jsonl_state == "ready"
             assert len(storage_client.batch_ids) < 8
+            assert outbox_constructor_threads
+            assert outbox_constructor_threads[0] != loop_thread_id
+            assert heartbeat_observed
+            assert heartbeat_observed[0] - heartbeat_deadline < 0.25
 
             await asyncio.wait_for(storage_client.all_commits.wait(), timeout=4.0)
             for _ in range(20):
