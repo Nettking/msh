@@ -2,18 +2,34 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
+import socket
+import threading
+import time
+from collections import deque
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
+from catalog.federation.control_plane_bootstrap_proposal import (
+    propose_bootstrap_command,
+)
 from catalog.federation.control_plane_journal import (
     PRODUCT_JOURNAL_INITIALIZE,
     journal_history_digest,
     journal_prefix_digest,
+    public_row_content_hash,
 )
 from catalog.federation.control_plane_legacy_migration import _read_event_journal
 from catalog.federation.control_plane_readiness import BOOTSTRAP_SEAL_CAPABILITY_ID
-from catalog.federation.control_plane_replication import ReplicaNode
+from catalog.federation.control_plane_replication import (
+    AuthorityCommand,
+    ControlPlaneError,
+    QuorumUnavailable,
+    ReplicaNode,
+)
 from catalog.federation.tests.test_c03_offline_creator_migration import (
     CREATOR,
     FEDERATION,
@@ -24,6 +40,127 @@ from catalog.federation.tests.test_c03_offline_creator_migration import (
     _topology,
     _write_member_witness,
 )
+from catalog.federation.tests.test_control_plane_secure_transport import (
+    _close as _close_secure,
+)
+from catalog.federation.tests.test_control_plane_secure_transport import (
+    _cluster as _secure_cluster,
+)
+from catalog.federation.tests.test_control_plane_secure_transport import (
+    _genesis as _secure_genesis,
+)
+
+
+class _WitnessedRecoveryDiagnostics:
+    """Bounded public-only observations; never alter a consensus outcome."""
+
+    def __init__(self, runtimes, monkeypatch):
+        self.runtimes = runtimes
+        self.records = deque(maxlen=128)
+        self.lock = threading.Lock()
+        self.dropped = 0
+        self.observed_store_results = {}
+        for runtime in runtimes:
+            self._wrap(monkeypatch, runtime.transport, "_rpc", "client-rpc",
+                       lambda args, _kwargs, runtime=runtime: {
+                           "voter": runtime.node.voter_id, "target": args[0], "rpc": args[1],
+                       }, self._response)
+            self._wrap(monkeypatch, runtime.server, "_dispatch", "server-dispatch",
+                       lambda args, _kwargs, runtime=runtime: {
+                           "voter": runtime.node.voter_id, "sender": args[0].sender_id,
+                           "rpc": args[0].rpc,
+                       }, self._response)
+            self._wrap(monkeypatch, runtime.node.store, "append_entries", "follower-store",
+                       lambda _args, _kwargs, runtime=runtime: {"voter": runtime.node.voter_id},
+                       lambda result, before: self._remember_store(before["voter"], "append_match_index", result))
+            for attribute in ("set_term_and_vote", "set_commit_index", "append_local"):
+                self._wrap(monkeypatch, runtime.node.store, attribute, "business-store-write",
+                           lambda args, _kwargs, runtime=runtime, attribute=attribute: {
+                               "voter": runtime.node.voter_id, "operation": attribute,
+                               "value": args[0].log_index if attribute == "append_local" else args[0],
+                           }, lambda _result, before: self._remember_store(
+                               before["voter"], before["operation"], before["value"]))
+            self._wrap(monkeypatch, runtime.node, "propose", "proposal",
+                       lambda args, _kwargs, runtime=runtime: {
+                           "voter": runtime.node.voter_id, "command_type": args[0].command_type,
+                           "command_id_sha256": hashlib.sha256(args[0].command_id.encode()).hexdigest(),
+                           "command_hash": args[0].content_hash,
+                           "before": self._node(runtime.node),
+                       }, lambda _result, _before, runtime=runtime: {"after": self._node(runtime.node)})
+
+    @staticmethod
+    def _response(result, _before=None):
+        return {key: result[key] for key in ("term", "success", "match_index", "conflict_index", "granted")
+                if isinstance(result, dict) and key in result and type(result[key]) in (int, bool)}
+
+    @staticmethod
+    def _error(error):
+        return {"type": type(error).__name__, "reason_sha256": hashlib.sha256(str(error).encode()).hexdigest(),
+                **{key: getattr(error, key) for key in ("errno", "winerror", "sqlite_errorcode")
+                   if type(getattr(error, key, None)) is int}}
+
+    def _remember_store(self, voter, operation, value):
+        if type(value) is int:
+            self.observed_store_results.setdefault(voter, {})[operation] = value
+        return {"last_business_store_results": dict(self.observed_store_results.get(voter, {}))}
+
+    def _node(self, node):
+        return {"voter": node.voter_id, "role": node.role, "leader": node.leader_id,
+                "match_index": dict(node._match_index),
+                "last_business_store_results": dict(self.observed_store_results.get(node.voter_id, {})),
+                "snapshot_kind": "cached-memory-and-last-business-store-results", "atomic_snapshot": False}
+
+    def _safe(self, callback, *args):
+        try:
+            return callback(*args)
+        except Exception as error:  # noqa: BLE001 - failed diagnostics must preserve the business exception.
+            return {"diagnostic_unavailable": True, "diagnostic_error_type": type(error).__name__}
+
+    def _record(self, value):
+        if not self.lock.acquire(blocking=False):
+            self.dropped += 1
+            return
+        try:
+            if len(self.records) == self.records.maxlen:
+                self.dropped += 1
+            self.records.append(value)
+        finally:
+            self.lock.release()
+
+    def _wrap(self, monkeypatch, owner, attribute, stage, fields, response):
+        original = getattr(owner, attribute)
+
+        def observe(*args, **kwargs):
+            started = time.monotonic()
+            before = self._safe(fields, args, kwargs)
+            try:
+                result = original(*args, **kwargs)
+            except BaseException as error:
+                self._record({"stage": stage, **before, "outcome": "ERROR",
+                              "duration_seconds": time.monotonic() - started,
+                              "error": self._safe(self._error, error)})
+                raise
+            self._record({"stage": stage, **before, "outcome": "RETURNED",
+                          "duration_seconds": time.monotonic() - started,
+                          **self._safe(response, result, before)})
+            return result
+
+        monkeypatch.setattr(owner, attribute, observe)
+
+    def attach(self, error):
+        if self.lock.acquire(blocking=False):
+            try:
+                records = list(self.records)
+            finally:
+                self.lock.release()
+        else:
+            records = []
+            self.dropped += 1
+        error.add_note("witnessed-recovery-diagnostics:" + json.dumps({
+            "schema": "fcp.test.witnessed-recovery-diagnostics.v1",
+            "records": records, "dropped_records": self.dropped,
+            "voters": [self._safe(self._node, runtime.node) for runtime in self.runtimes],
+        }, sort_keys=True, separators=(",", ":")))
 
 
 def _wire_events(runtime):
@@ -65,6 +202,7 @@ def test_different_voter_completes_exact_witnessed_prefix_after_first_real_chunk
         return result
 
     monkeypatch.setattr(original, "_propose_bootstrap_command", interrupt_after_committed_chunk)
+    diagnostics = _WitnessedRecoveryDiagnostics(runtimes, monkeypatch)
     try:
         for runtime in runtimes:
             runtime.start()
@@ -128,6 +266,256 @@ def test_different_voter_completes_exact_witnessed_prefix_after_first_real_chunk
             assert runtime.node.store.receipt_for_command(command.command_id).content_hash == command.content_hash
         for node_db, _pairing in witnesses:
             assert _read_event_journal(node_db, SESSION) == events
+    except BaseException as error:
+        diagnostics.attach(error)
+        raise
     finally:
         for runtime in reversed(started):
             runtime.close()
+
+
+@pytest.mark.parametrize("fault", ["response-lost", "authenticated-rejection"])
+def test_real_socket_new_chunk_failure_preserves_exact_pending_recovery(tmp_path, monkeypatch, request, fault):
+    configuration, registry, _credentials, nodes, _codecs, servers, transports = _secure_cluster(tmp_path)
+    original_id, successor_id, follower_id = configuration.voter_ids
+    original, successor, follower = (nodes[voter] for voter in configuration.voter_ids)
+    session = "session-secure"
+    rows = []
+    for revision in (1, 2):
+        event_type = "session.created" if revision == 1 else "demo.bootstrap.note"
+        payload = json.dumps({"session_id": session, "display_name": "Secure Federation"}
+                             if revision == 1 else {"sequence": revision},
+                             sort_keys=True, separators=(",", ":"))
+        rows.append({"session_id": session, "revision": revision, "event_id": f"socket-event-{revision}",
+                     "event_type": event_type, "occurred_at": "2026-09-08T09:00:00Z",
+                     "actor_node_id": original_id, "payload_json": payload,
+                     "request_id": "sha256:" + hashlib.sha256(str(revision).encode()).hexdigest(),
+                     "content_hash": public_row_content_hash(event_type, payload)})
+    payload = {"session_id": session, "expected_revision": 2, "prefix_digest": journal_prefix_digest(rows)}
+    try:
+        assert original.start_election(transports[original_id])
+        propose_bootstrap_command(original, transports[original_id], _secure_genesis(configuration, registry, original_id))
+        first = AuthorityCommand("socket-journal-first", PRODUCT_JOURNAL_INITIALIZE, configuration.cluster_id,
+                                 original_id, {**payload, "public_rows": rows[:1], "final": False})
+        propose_bootstrap_command(original, transports[original_id], first)
+        staged = successor.state["product_journal"]["initializing"][session]
+        assert staged["rows"] == rows[:1]
+        servers[original_id].close()
+        assert successor.start_election(transports[successor_id])
+        term = successor.store.current_term
+        commit = successor.store.commit_index
+        assert term > original.store.current_term
+        command = AuthorityCommand("socket-journal-final", PRODUCT_JOURNAL_INITIALIZE, configuration.cluster_id,
+                                   successor_id, {**payload, "public_rows": rows[1:], "final": True})
+        handler_socket = threading.local()
+        handler = servers[follower_id]._server.RequestHandlerClass
+        original_handle = handler.handle
+        dispatch = servers[follower_id]._dispatch
+        faults = []
+
+        def capture_socket(self):
+            handler_socket.connection = self.request
+            try:
+                original_handle(self)
+            finally:
+                del handler_socket.connection
+
+        def fail_one_new_chunk(opened):
+            entries = opened.payload.get("entries", ())
+            selected = any(entry["command"]["command_id"] == command.command_id for entry in entries)
+            if opened.rpc != "append_entries" or not selected or faults:
+                return dispatch(opened)
+            faults.append(opened.sender_id)
+            assert opened.sender_id == successor_id  # Already authenticated by the original handler.
+            if fault == "authenticated-rejection":
+                raise ControlPlaneError("synthetic authenticated new-chunk rejection")
+            response = dispatch(opened)  # Durable append happens before the real socket loses its response.
+            assert response["success"] is True
+            handler_socket.connection.shutdown(socket.SHUT_RDWR)
+            return response
+
+        monkeypatch.setattr(handler, "handle", capture_socket)
+        monkeypatch.setattr(servers[follower_id], "_dispatch", fail_one_new_chunk)
+        diagnostics = _WitnessedRecoveryDiagnostics([
+            SimpleNamespace(node=nodes[voter], server=servers[voter], transport=transports[voter])
+            for voter in configuration.voter_ids
+        ], monkeypatch)
+        with pytest.raises(QuorumUnavailable, match="authority command was not committed by quorum") as failed:
+            propose_bootstrap_command(successor, transports[successor_id], command)
+        diagnostics.attach(failed.value)
+        observation = json.loads(failed.value.__notes__[-1].split(":", 1)[1])
+        follower_errors = [record for record in observation["records"]
+                           if record["stage"] == "client-rpc" and record["target"] == follower_id
+                           and record["outcome"] == "ERROR"]
+        assert len(follower_errors) == 1
+        assert follower_errors[0]["error"]["type"] == (
+            "OSError" if fault == "response-lost" else "ControlPlaneError"
+        )
+        server_records = [record for record in observation["records"]
+                          if record["stage"] == "server-dispatch" and record["voter"] == follower_id]
+        assert server_records[-1]["outcome"] == ("RETURNED" if fault == "response-lost" else "ERROR")
+        assert faults == [successor_id]
+        pending = successor.store.entry_for_command(command.command_id)
+        assert pending is not None and pending.command == command
+        assert pending.log_term == term and pending.log_index == commit + 1
+        assert successor.store.current_term == term and successor.role == ReplicaNode.LEADER
+        assert successor.store.commit_index == commit
+        assert successor.state["product_journal"]["initializing"][session] == staged
+        assert session not in successor.state["product_journal"]["sessions"]
+        for node in (successor, follower):
+            assert node.store.receipt_for_command(command.command_id) is None
+        follower_pending = follower.store.entry_for_command(command.command_id)
+        assert (follower_pending == pending) if fault == "response-lost" else (follower_pending is None)
+
+        entry, _events = propose_bootstrap_command(successor, transports[successor_id], command)
+        assert entry == pending
+        assert successor.store.last_log_index() == pending.log_index
+        assert successor.store.current_term == term
+        assert faults == [successor_id]
+        for node in (successor, follower):
+            assert node.store.receipt_for_command(command.command_id).content_hash == command.content_hash
+            assert node.store.entry_for_command(command.command_id) == pending
+            assert node.store.commit_index == pending.log_index
+            assert node.state["product_journal"]["sessions"][session]["rows"] == rows
+            assert session not in node.state["product_journal"]["initializing"]
+        request.node.user_properties.append(("controlled_socket_boundary", json.dumps({
+            "fault": fault, "old_CI_cause_claimed": False,
+            "command_id": command.command_id, "command_hash": command.content_hash,
+            "pending_term": term, "pending_index": pending.log_index,
+            "first_call_commit_index": commit,
+            "follower_stored_before_replay": follower_pending is not None,
+            "replay_commit_index": successor.store.commit_index,
+            "first_call_diagnostics": observation,
+        }, sort_keys=True)))
+    finally:
+        _close_secure(servers)
+
+
+def test_witnessed_diagnostics_are_bounded_and_redact_private_errors(monkeypatch):
+    diagnostics = _WitnessedRecoveryDiagnostics([], monkeypatch)
+    secret = "private-token-and-payload"
+    failure = OSError(10061, secret)
+
+    def rejected():
+        raise failure
+
+    owner = SimpleNamespace(call=rejected)
+    diagnostics._wrap(monkeypatch, owner, "call", "client-rpc", lambda _args, _kwargs: {"rpc": "append_entries"},
+                      diagnostics._response)
+    with pytest.raises(OSError) as actual:
+        owner.call()
+    assert actual.value is failure
+    diagnostics.attach(failure)
+    note = failure.__notes__[-1]
+    assert secret not in note
+    observation = json.loads(note.split(":", 1)[1])
+    assert observation["records"][0]["error"]["errno"] == 10061
+    assert observation["records"][0]["error"]["reason_sha256"] == hashlib.sha256(str(failure).encode()).hexdigest()
+    for index in range(300):
+        diagnostics._record({"stage": "bounded", "index": index})
+    diagnostics.lock.acquire()
+    try:
+        diagnostics._record({"stage": "lost"})
+    finally:
+        diagnostics.lock.release()
+    error = RuntimeError("original failure")
+    diagnostics.attach(error)
+    value = json.loads(error.__notes__[-1].split(":", 1)[1])
+    assert len(value["records"]) == 128 and value["dropped_records"] == 174
+    assert value["records"][-1]["index"] == 299
+    assert diagnostics._response({"success": True, "term": 2, "payload": secret, "match_index": "secret"}) == {
+        "success": True, "term": 2,
+    }
+
+
+def test_witnessed_diagnostic_read_failure_cannot_replace_original_exception(monkeypatch):
+    diagnostics = _WitnessedRecoveryDiagnostics([], monkeypatch)
+    original = RuntimeError("business-error")
+
+    def failed(*_args):
+        raise ValueError("private diagnostic failure")
+
+    def business():
+        raise original
+
+    owner = SimpleNamespace(call=business)
+    diagnostics._wrap(monkeypatch, owner, "call", "proposal", failed, failed)
+    with pytest.raises(RuntimeError) as actual:
+        owner.call()
+    assert actual.value is original
+    diagnostics.attach(original)
+    value = json.loads(original.__notes__[-1].split(":", 1)[1])
+    assert value["records"][0]["diagnostic_unavailable"] is True
+    assert value["records"][0]["diagnostic_error_type"] == "ValueError"
+    assert value["records"][0]["error"]["type"] == "RuntimeError"
+    assert "private diagnostic failure" not in original.__notes__[-1]
+
+
+def test_witnessed_diagnostics_never_read_store_for_a_snapshot_or_note(monkeypatch):
+    failed_write = RuntimeError("original store failure")
+
+    class BusinessStore:
+        def __getattr__(self, name):
+            raise AssertionError("diagnostic database read forbidden: " + name)
+
+        @property
+        def current_term(self):
+            raise AssertionError("diagnostic current_term read forbidden")
+
+        @property
+        def commit_index(self):
+            raise AssertionError("diagnostic commit_index read forbidden")
+
+        def last_log_index(self):
+            raise AssertionError("diagnostic last_log_index read forbidden")
+
+        def append_entries(self, _entries, **_kwargs):
+            return 7
+
+        def append_local(self, _entry):
+            return None
+
+        def set_term_and_vote(self, _term, _vote):
+            return None
+
+        def set_commit_index(self, _index):
+            if _index == 9:
+                raise failed_write
+
+    original_error = QuorumUnavailable("original quorum failure")
+
+    def propose(command, _transport):
+        node.store.append_local(SimpleNamespace(log_index=8))
+        if command.command_id == "failure":
+            raise original_error
+        return "original result"
+
+    node = SimpleNamespace(voter_id="voter", role="LEADER", leader_id="voter", _match_index={"peer": 7},
+                           store=BusinessStore(), propose=propose)
+    transport = SimpleNamespace(_rpc=lambda *_args: {"term": 3, "success": True})
+    server = SimpleNamespace(_dispatch=lambda _opened: {"term": 3, "success": True})
+    runtime = SimpleNamespace(node=node, transport=transport, server=server)
+    diagnostics = _WitnessedRecoveryDiagnostics([runtime], monkeypatch)
+    assert diagnostics._node(node)["last_business_store_results"] == {}
+    node.store.set_term_and_vote(3, "voter")
+    node.store.set_commit_index(7)
+    with pytest.raises(RuntimeError) as actual_write:
+        node.store.set_commit_index(9)
+    assert actual_write.value is failed_write
+    node.store.append_entries(())
+    command = SimpleNamespace(command_id="success", command_type=PRODUCT_JOURNAL_INITIALIZE,
+                              content_hash="sha256:" + "a" * 64)
+    assert node.propose(command, transport) == "original result"
+    assert transport._rpc("peer", "append_entries", {}) == {"term": 3, "success": True}
+    command.command_id = "failure"
+    with pytest.raises(QuorumUnavailable) as actual:
+        node.propose(command, transport)
+    assert actual.value is original_error
+    diagnostics.attach(original_error)
+    value = json.loads(original_error.__notes__[-1].split(":", 1)[1])
+    snapshot = value["voters"][0]
+    assert snapshot["atomic_snapshot"] is False
+    assert snapshot["last_business_store_results"] == {
+        "set_term_and_vote": 3, "set_commit_index": 7, "append_match_index": 7, "append_local": 8,
+    }
+    assert not any(record.get("diagnostic_unavailable") for record in value["records"])
