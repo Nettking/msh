@@ -61,6 +61,14 @@ MAX_PAIRING_CODE_BYTES: Final = 32_768
 MAX_PAIRING_TTL_SECONDS: Final = 600
 DEFAULT_PAIRING_TTL_SECONDS: Final = 300
 DEFAULT_PAIRING_TIMEOUT_SECONDS: Final = 20.0
+# Initial reconnect is a bounded synchronization, not one RPC: authentication,
+# coordinator status, session replay, and cached capability replay all happen
+# before the client is published to callers. Keep its aggregate budget separate
+# from the per-operation/RPC timeout. Six cached capabilities need up to twelve
+# sequential request/replay steps, in addition to WebSocket authentication,
+# coordinator status, and session replay. Each individual RPC remains bounded
+# by ``timeout_seconds``; this aggregate budget is never unbounded.
+PAIRING_CONNECT_TIMEOUT_RPC_MULTIPLIER: Final = 18.0
 _SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,511}$")
 
 
@@ -565,11 +573,42 @@ class PairingRelayRuntime:
         display_name: str,
         clock: Callable[[], datetime] = _utc_now,
         timeout_seconds: float = DEFAULT_PAIRING_TIMEOUT_SECONDS,
+        connect_timeout_seconds: float | None = None,
     ) -> None:
+        if (
+            isinstance(timeout_seconds, bool)
+            or not isinstance(timeout_seconds, (int, float))
+            or not math.isfinite(timeout_seconds)
+            or not 0 < timeout_seconds <= MAX_CLIENT_INTERVAL_SECONDS
+        ):
+            raise FederationValidationError(
+                "invalid-pairing-timeout",
+                "timeout_seconds",
+                "must be finite, positive, and within the supported bound",
+            )
+        if connect_timeout_seconds is None:
+            connect_timeout_seconds = min(
+                MAX_CLIENT_INTERVAL_SECONDS,
+                float(timeout_seconds) * PAIRING_CONNECT_TIMEOUT_RPC_MULTIPLIER,
+            )
+        if (
+            isinstance(connect_timeout_seconds, bool)
+            or not isinstance(connect_timeout_seconds, (int, float))
+            or not math.isfinite(connect_timeout_seconds)
+            or not 0 < connect_timeout_seconds <= MAX_CLIENT_INTERVAL_SECONDS
+            or connect_timeout_seconds + timeout_seconds
+            > MAX_CLIENT_INTERVAL_SECONDS
+        ):
+            raise FederationValidationError(
+                "invalid-pairing-connect-timeout",
+                "connect_timeout_seconds",
+                "must be finite, positive, and within the supported bound",
+            )
         self.state_directory = Path(state_directory)
         self.display_name = display_name
         self._clock = clock
-        self.timeout_seconds = timeout_seconds
+        self.timeout_seconds = float(timeout_seconds)
+        self.connect_timeout_seconds = float(connect_timeout_seconds)
         self._lock = threading.RLock()
         self._loop: asyncio.AbstractEventLoop | None = None
         self._thread: threading.Thread | None = None
@@ -691,7 +730,16 @@ class PairingRelayRuntime:
         thread.join(timeout=timeout)
         return not thread.is_alive() and self._shutdown_error is None
 
-    def _submit(self, coroutine: Any) -> Any:
+    def _submit(
+        self,
+        coroutine: Any,
+        *,
+        timeout_seconds: float | None = None,
+        operation: str = "the remote relay operation",
+    ) -> Any:
+        deadline_seconds = (
+            self.timeout_seconds if timeout_seconds is None else timeout_seconds
+        )
         try:
             loop = self._start_loop()
             with self._lock:
@@ -704,12 +752,12 @@ class PairingRelayRuntime:
             coroutine.close()
             raise
         try:
-            return future.result(timeout=self.timeout_seconds)
+            return future.result(timeout=deadline_seconds)
         except TimeoutError as exc:
             future.cancel()
             raise FederationOperationError(
                 "pairing-relay-timeout",
-                "the remote relay did not respond in time",
+                f"{operation} exceeded its bounded deadline",
             ) from exc
 
     async def _disconnect_current(self) -> None:
@@ -772,7 +820,11 @@ class PairingRelayRuntime:
         )
 
     def redeem(self, offer: PairingOffer) -> FederationSessionBinding:
-        return self._submit(self._redeem(offer))
+        return self._submit(
+            self._redeem(offer),
+            timeout_seconds=self.connect_timeout_seconds + self.timeout_seconds,
+            operation="relay pairing and initial synchronization",
+        )
 
     async def _ensure_connected(self, state: RemotePairingState) -> None:
         async with self._connection_lock:
@@ -816,7 +868,11 @@ class PairingRelayRuntime:
         self._relay_url = state.relay_url
 
     def ensure_connected(self, state: RemotePairingState) -> None:
-        self._submit(self._ensure_connected(state))
+        self._submit(
+            self._ensure_connected(state),
+            timeout_seconds=self.connect_timeout_seconds,
+            operation="saved relay reconnect and initial synchronization",
+        )
 
     def coordinator_status(self) -> dict[str, Any]:
         client = self._client
@@ -880,7 +936,9 @@ class PairingRelayRuntime:
                 actor_node_id=actor_node_id,
                 last_applied_revision=last_applied_revision,
                 limit=limit,
-            )
+            ),
+            timeout_seconds=self.connect_timeout_seconds + self.timeout_seconds,
+            operation="relay reconnect and coordinator replay",
         )
 
 
