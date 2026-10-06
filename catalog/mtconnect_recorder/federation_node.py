@@ -195,6 +195,8 @@ def _publication_cycle_status(
     group_id: str,
     delivery: RecorderDeliveryRunResult,
     retired_total: int = 0,
+    pending_count: int | None = None,
+    pending_has_error: bool | None = None,
 ) -> tuple[str, int, str | None]:
     """Classify only deliverable rows owned by this authenticated session.
 
@@ -207,16 +209,22 @@ def _publication_cycle_status(
     does not -- it waits for a person.
     """
 
-    current = _current_recorder_pending(
-        pending_entries,
-        session_id=session_id,
-        group_id=group_id,
+    current = (
+        _current_recorder_pending(
+            pending_entries,
+            session_id=session_id,
+            group_id=group_id,
+        )
+        if pending_count is None
+        else ()
     )
-    pending = len(current)
+    pending = len(current) if pending_count is None else pending_count
     if retired_total > 0:
         return "degraded", pending, "recorder-delivery-retired"
-    failed = delivery.pending > 0 or any(
-        getattr(entry, "last_error", None) for entry in current
+    failed = delivery.pending > 0 or (
+        any(getattr(entry, "last_error", None) for entry in current)
+        if pending_has_error is None
+        else pending_has_error
     )
     if failed:
         return "backlogged", pending, "recorder-delivery-pending"
@@ -1193,14 +1201,21 @@ class RecorderFederationNode:
                     )
                     retry_stage = "pending-read"
                     self._publication_diagnostics.transition(cycle_token, retry_stage)
-                    pending_snapshot = await asyncio.to_thread(outbox.pending)
+                    pending, pending_has_error = await asyncio.to_thread(
+                        outbox.pending_summary,
+                        session_id=state.binding.internal_session_id,
+                        destination_id=group_id,
+                        schema_id=RECORDER_STORAGE_SCHEMA,
+                    )
                     storage_state, pending, delivery_error = (
                         _publication_cycle_status(
-                            pending_entries=pending_snapshot,
+                            pending_entries=(),
                             session_id=state.binding.internal_session_id,
                             group_id=group_id,
                             delivery=cycle.delivery,
                             retired_total=cycle.retirement.total,
+                            pending_count=pending,
+                            pending_has_error=pending_has_error,
                         )
                     )
                     self._set_snapshot(
@@ -1278,21 +1293,14 @@ class RecorderFederationNode:
                     if pending_outbox is not None:
                         try:
                             self._publication_diagnostics.transition(cycle_token, "retry-pending-read")
-                            pending_snapshot = await asyncio.to_thread(
-                                pending_outbox.pending
+                            pending_batches, _ = await asyncio.to_thread(
+                                pending_outbox.pending_summary,
+                                session_id=state.binding.internal_session_id,
+                                destination_id=pending_group or "",
+                                schema_id=RECORDER_STORAGE_SCHEMA,
                             )
                         except PUBLICATION_RETRY_ERRORS:
                             pass
-                        else:
-                            pending_batches = len(
-                                _current_recorder_pending(
-                                    pending_snapshot,
-                                    session_id=(
-                                        state.binding.internal_session_id
-                                    ),
-                                    group_id=pending_group or "",
-                                )
-                            )
                     self._set_snapshot(
                         status="retrying",
                         storage_state="backlogged",

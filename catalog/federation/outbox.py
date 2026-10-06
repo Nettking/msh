@@ -208,7 +208,8 @@ ON outbox(
     destination_id,
     schema_id,
     {_OUTBOX_DELIVERY_DATASET_KEY_SQL},
-    outbox_id
+    outbox_id,
+    last_error
 )
 WHERE state = 'pending';
 """
@@ -730,6 +731,49 @@ class SQLiteOutbox:
         query += " ORDER BY next_attempt_at,outbox_id"
         with self._connect() as db:
             return tuple(self._decode(row) for row in db.execute(query, args))
+
+    def pending_summary(
+        self,
+        *,
+        session_id: str,
+        destination_id: str,
+        schema_id: str,
+    ) -> tuple[int, bool]:
+        """Count one delivery route without decoding its pending payloads.
+
+        Publication health needs the durable backlog size and whether any
+        pending row already records an error. Materialising ``pending()`` for
+        those two facts makes each status cycle read every payload in a large
+        offline outbox, even though delivery itself is bounded.
+        """
+
+        if not isinstance(session_id, str) or not session_id:
+            raise FederationValidationError(
+                "invalid-id", "session_id", "must be non-empty text"
+            )
+        if not isinstance(destination_id, str) or not destination_id:
+            raise FederationValidationError(
+                "invalid-id", "destination_id", "must be non-empty text"
+            )
+        if not isinstance(schema_id, str) or not schema_id:
+            raise FederationValidationError(
+                "invalid-id", "schema_id", "must be non-empty text"
+            )
+        query = """
+            SELECT COUNT(*) AS pending_count,
+                   MAX(last_error IS NOT NULL) AS has_pending_error
+            FROM outbox INDEXED BY outbox_pending_delivery_dataset
+            WHERE state='pending'
+              AND session_id=?
+              AND destination_id=?
+              AND schema_id=?
+        """
+        with self._connect() as db:
+            row = db.execute(
+                query,
+                (session_id, destination_id, schema_id),
+            ).fetchone()
+        return int(row["pending_count"]), bool(row["has_pending_error"])
 
     def has_pending(
         self,

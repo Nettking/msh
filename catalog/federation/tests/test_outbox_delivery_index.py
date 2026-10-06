@@ -67,6 +67,14 @@ def test_existing_v3_outbox_rebuilds_fair_delivery_index_and_uses_it(tmp_path):
     )
 
     assert [entry.outbox_id for entry in entries] == [2, 3, 4, 5]
+    outbox.record_failure(2, error="TimeoutError", now=timestamp)
+    pending_count, pending_has_error = outbox.pending_summary(
+        session_id="session-a",
+        destination_id="group-a",
+        schema_id="fcp.recorder.storage_delivery.v1",
+    )
+    assert pending_count == 4
+    assert pending_has_error is True
     count_queries = [
         statement
         for statement in outbox.statements
@@ -77,13 +85,22 @@ def test_existing_v3_outbox_rebuilds_fair_delivery_index_and_uses_it(tmp_path):
         for statement in outbox.statements
         if statement.lstrip().startswith("WITH ranked_outbox AS (")
     ]
-    assert len(count_queries) == len(delivery_queries) == 1
+    summary_queries = [
+        statement
+        for statement in outbox.statements
+        if statement.lstrip().startswith("SELECT COUNT(*) AS pending_count,")
+    ]
+    assert len(count_queries) == len(delivery_queries) == len(summary_queries) == 1
     count_query = count_queries[0]
     delivery_query = delivery_queries[0]
+    summary_query = summary_queries[0]
     with sqlite3.connect(f"file:{database}?mode=ro", uri=True) as connection:
         count_plan = connection.execute(f"EXPLAIN QUERY PLAN {count_query}").fetchall()
         delivery_plan = connection.execute(
             f"EXPLAIN QUERY PLAN {delivery_query}"
+        ).fetchall()
+        summary_plan = connection.execute(
+            f"EXPLAIN QUERY PLAN {summary_query}"
         ).fetchall()
         version = connection.execute(
             "SELECT version FROM outbox_schema WHERE singleton=1"
@@ -94,3 +111,4 @@ def test_existing_v3_outbox_rebuilds_fair_delivery_index_and_uses_it(tmp_path):
     assert "outbox_pending_delivery_dataset" in repr(delivery_plan)
     assert "COVERING INDEX outbox_pending_delivery_dataset" in repr(delivery_plan)
     assert "USE TEMP B-TREE FOR LAST 2 TERMS OF ORDER BY" not in repr(delivery_plan)
+    assert "COVERING INDEX outbox_pending_delivery_dataset" in repr(summary_plan)
