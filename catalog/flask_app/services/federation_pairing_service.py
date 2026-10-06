@@ -754,6 +754,16 @@ class PairingRelayRuntime:
         try:
             return future.result(timeout=deadline_seconds)
         except TimeoutError as exc:
+            if future.done():
+                # ``Future.result`` raises TimeoutError both for its own wait
+                # deadline and when the coroutine completed with an inner
+                # ``asyncio.wait_for`` timeout. Preserve that distinction so
+                # the reconnect monitor does not misreport a stalled RPC as an
+                # exhausted aggregate connection budget.
+                raise FederationOperationError(
+                    "pairing-relay-request-timeout",
+                    f"{operation} received an individual relay request timeout",
+                ) from exc
             future.cancel()
             raise FederationOperationError(
                 "pairing-relay-timeout",

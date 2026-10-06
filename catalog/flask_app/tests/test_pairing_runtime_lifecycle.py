@@ -282,3 +282,21 @@ def test_saved_reconnect_respects_its_own_bounded_deadline(
         assert runtime._client is None
     finally:
         runtime.close(timeout=2)
+
+
+def test_inner_relay_request_timeout_is_not_mislabeled_as_aggregate_deadline(
+    tmp_path: Path,
+) -> None:
+    runtime = pairing.PairingRelayRuntime(state_directory=tmp_path, display_name="Member")
+
+    async def inner_timeout():
+        raise TimeoutError("per-request timeout")
+
+    try:
+        with pytest.raises(FederationOperationError) as error:
+            runtime._submit(inner_timeout(), operation="saved reconnect")
+        assert error.value.code == "pairing-relay-request-timeout"
+        assert "individual relay request timeout" in error.value.message
+        assert isinstance(error.value.__cause__, TimeoutError)
+    finally:
+        runtime.close(timeout=2)
