@@ -491,8 +491,12 @@ class ThreadsafeRelayLifecycleTransport:
             )
         )
 
-    def close(self) -> None:
-        """Close the wrapped endpoint from a scheduler thread, bounded.
+    def close(
+        self,
+        *,
+        artifact_carrier: RelayAnalysisArtifactEndpoint | None = None,
+    ) -> None:
+        """Close this runtime's owned readers on their relay loop, bounded.
 
         ``AnalysisRuntime.stop`` releases a superseded transport with a plain
         ``getattr(transport, "close", None)``. Without this method that lookup
@@ -508,10 +512,24 @@ class ThreadsafeRelayLifecycleTransport:
         loop = self.event_loop
         if loop.is_closed() or not loop.is_running():
             return
+        async def close_owned_readers() -> None:
+            try:
+                if artifact_carrier is not None:
+                    if (
+                        artifact_carrier.relay_client is not self.relay_client
+                        or artifact_carrier.message_source is not self.endpoint
+                    ):
+                        raise ValueError("artifact carrier belongs to another relay transport")
+                    await artifact_carrier.close()
+            finally:
+                await self.endpoint.close()
+
+        close_operation = close_owned_readers()
         try:
-            future = asyncio.run_coroutine_threadsafe(self.endpoint.close(), loop)
+            future = asyncio.run_coroutine_threadsafe(close_operation, loop)
         except RuntimeError:
             # The loop stopped between the check above and the submission.
+            close_operation.close()
             return
         try:
             future.result(timeout=self.close_timeout_seconds)

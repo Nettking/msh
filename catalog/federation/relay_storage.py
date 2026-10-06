@@ -71,6 +71,34 @@ def _request_diagnostic_fields(envelope: StorageRequestEnvelope) -> dict[str, An
     }
 
 
+def _response_failure_fields(
+    response: StorageResponseEnvelope,
+    error: Exception,
+) -> dict[str, Any]:
+    """Describe the failed response send without exposing its payload/message."""
+    response_error = response.error
+    relay_code = getattr(error, "code", None)
+    safe_relay_codes = {
+        "target-disconnected", "target-unavailable", "request-id-conflict",
+        "unauthorized", "session-mismatch",
+        "connection-closed", "connection-replaced", "heartbeat-failed", "relay-rejected",
+    }
+    return {
+        "storage_response_ok": response.ok if type(response.ok) is bool else None,
+        "storage_response_error_code": (
+            response_error.code.value
+            if isinstance(response_error, StorageError)
+            and isinstance(response_error.code, StorageErrorCode)
+            else None
+        ),
+        "storage_relay_request_id": _diagnostic_text(f"relay-response-{response.request_id}"),
+        "storage_relay_error_code": (
+            relay_code if isinstance(relay_code, str) and relay_code in safe_relay_codes else None
+        ),
+        "storage_relay_error_code_sha256": _diagnostic_text(relay_code),
+    }
+
+
 class RelayMessageClient(Protocol):
     node_id: str
 
@@ -581,6 +609,7 @@ class RelayStorageEndpoint:
                 "storage_provider_id": _diagnostic_text(provider_id),
                 "storage_elapsed_seconds": round(time.monotonic() - delivery_started, 6),
                 "storage_exception_type": type(exc).__name__,
+                **_response_failure_fields(response, exc),
                 **diagnostic_fields,
             })
             raise
