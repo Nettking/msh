@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -138,6 +139,80 @@ def test_request_send_closure_is_retryable_and_cleans_up_connection(
                     future.exception()
             await client.disconnect()
 
+    asyncio.run(scenario())
+
+
+def test_request_timeout_logs_safe_operation_and_correlation_only(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    async def scenario() -> None:
+        client = _client(tmp_path)
+        _join_connected_session(client)
+        client.request_timeout = 0.01
+        sent: list[RelayEnvelope] = []
+
+        class WebSocket:
+            async def send(self, raw: str) -> None:
+                sent.append(RelayEnvelope.from_json(raw))
+
+            async def close(self) -> None:
+                pass
+
+        client._websocket = WebSocket()  # type: ignore[assignment]
+        client._receiver_task = asyncio.create_task(asyncio.Event().wait())
+        client.connected_event.set()
+        client.disconnected_event.clear()
+        try:
+            with pytest.raises(TimeoutError):
+                await client.request(
+                    "storage.commit",
+                    session_id="session-a",
+                    payload={"private_value": "must-not-be-logged"},
+                )
+            assert len(sent) == 1
+            record = caplog.records[-1]
+            assert record.levelno == logging.WARNING
+            assert "message_type=storage.commit" in record.message
+            assert f"request_id={sent[0].request_id}" in record.message
+            assert "session_id=session-a" in record.message
+            assert "timeout_seconds=0.01" in record.message
+            assert "must-not-be-logged" not in record.message
+        finally:
+            await client.disconnect()
+
+    caplog.set_level(logging.WARNING, logger=node_client_module.__name__)
+    asyncio.run(scenario())
+
+
+def test_unexpected_receiver_failure_is_logged_without_exception_payload(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    async def scenario() -> None:
+        client = _client(tmp_path)
+
+        class BrokenWebSocket:
+            def __aiter__(self) -> BrokenWebSocket:
+                return self
+
+            async def __anext__(self) -> str:
+                raise RuntimeError("secret response body must not be logged")
+
+        codes: list[str | None] = []
+
+        async def disconnect(*, error_code: str | None = None) -> None:
+            codes.append(error_code)
+
+        client._websocket = BrokenWebSocket()  # type: ignore[assignment]
+        client.disconnect = disconnect  # type: ignore[method-assign]
+        await client._receiver_loop()
+        assert codes == ["relay-receiver-failed"]
+        assert "exception_type=RuntimeError" in caplog.records[-1].message
+        assert "error_code=relay-receiver-failed" in caplog.records[-1].message
+        assert "secret response body" not in caplog.records[-1].message
+
+    caplog.set_level(logging.ERROR, logger=node_client_module.__name__)
     asyncio.run(scenario())
 
 

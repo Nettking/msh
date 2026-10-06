@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import logging
 import math
 import os
 import re
@@ -70,6 +71,7 @@ DEFAULT_PAIRING_TIMEOUT_SECONDS: Final = 20.0
 # by ``timeout_seconds``; this aggregate budget is never unbounded.
 PAIRING_CONNECT_TIMEOUT_RPC_MULTIPLIER: Final = 18.0
 _SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,511}$")
+_LOGGER = logging.getLogger(__name__)
 
 
 def _utc_now() -> datetime:
@@ -864,8 +866,10 @@ class PairingRelayRuntime:
             clock=self._clock,
             request_timeout=min(self.timeout_seconds, 60.0),
         )
+        failure_stage = "relay-connect-and-initial-sync"
         try:
             await client.connect()
+            failure_stage = "saved-membership-validation"
             joined = {
                 item.session_id for item in client.state.joined_sessions()
             }
@@ -879,8 +883,22 @@ class PairingRelayRuntime:
             # A caller timeout can cancel us before the client is published.
             # Neither another caller nor runtime shutdown can own that client
             # yet, so this operation must close it before releasing the lock.
+            error_code = getattr(exc, "code", None)
+            if not isinstance(error_code, str) or not _SAFE_ID.fullmatch(error_code):
+                if isinstance(exc, asyncio.CancelledError):
+                    error_code = "pairing-connect-cancelled"
+                elif isinstance(exc, TimeoutError):
+                    error_code = "pairing-connect-timeout"
+                else:
+                    error_code = "pairing-connect-failed"
+            _LOGGER.warning(
+                "saved Relay reconnect failed stage=%s exception_type=%s error_code=%s",
+                failure_stage,
+                type(exc).__name__,
+                error_code,
+            )
             await client.disconnect(
-                error_code=getattr(exc, "code", None) or "pairing-connect-failed"
+                error_code=error_code
             )
             raise
         self._client = client

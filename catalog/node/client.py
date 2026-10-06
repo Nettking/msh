@@ -6,6 +6,7 @@ import argparse
 import asyncio
 import getpass
 import json
+import logging
 import math
 import ssl
 import sys
@@ -53,6 +54,8 @@ MAX_PENDING_REQUESTS = 128
 MAX_REPLAY_PAGES_PER_PASS = 1_024
 MAX_STATUS_PAGES = 1_024
 MAX_STATUS_SNAPSHOT_RESTARTS = 3
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class RelayRemoteError(FederationOperationError):
@@ -534,13 +537,27 @@ class RelayNodeClient:
                 "request ID already has an in-flight operation",
             )
         self._pending[envelope.request_id] = future
+        request_timeout = self.request_timeout if timeout is None else timeout
         try:
             async with self._send_lock:
                 await websocket.send(envelope.to_json())
             return await asyncio.wait_for(
                 future,
-                timeout=self.request_timeout if timeout is None else timeout,
+                timeout=request_timeout,
             )
+        except TimeoutError:
+            # Retain enough safe correlation data to distinguish a stalled
+            # Relay RPC from a socket or authority failure. Never log payloads
+            # because provider messages may contain customer data.
+            _LOGGER.warning(
+                "relay request timed out message_type=%s request_id=%s "
+                "session_id=%s timeout_seconds=%s",
+                message_type,
+                envelope.request_id,
+                session_id,
+                request_timeout,
+            )
+            raise
         except ConnectionClosed as exc:
             # A socket may close during send, before the receiver translates
             # closure into a structured error for this request. Keep that race
@@ -1150,6 +1167,13 @@ class RelayNodeClient:
             ValueError,
         ) as exc:
             error_code = getattr(exc, "code", "invalid-relay-message")
+        except Exception as exc:  # noqa: BLE001 - preserve safe failure diagnostics
+            error_code = "relay-receiver-failed"
+            _LOGGER.error(
+                "relay receiver loop failed exception_type=%s error_code=%s",
+                type(exc).__name__,
+                error_code,
+            )
         finally:
             if self._websocket is websocket:
                 await self.disconnect(error_code=error_code)

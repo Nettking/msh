@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -182,3 +183,42 @@ def test_pairing_redemption_waits_for_pending_reconnect(
                 await client.disconnect()
 
     asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("runtime_type", RUNTIMES)
+def test_reconnect_timeout_retains_type_and_stage_without_exception_text(
+    tmp_path: Path,
+    monkeypatch,
+    caplog: pytest.LogCaptureFixture,
+    runtime_type,
+) -> None:
+    async def scenario() -> None:
+        state = _state()
+        disconnect_codes: list[str | None] = []
+
+        class Client:
+            def __init__(self, **kwargs):
+                self.node_id = state.binding.device_id
+                self.connected_event = asyncio.Event()
+                self.state = SimpleNamespace(joined_sessions=list)
+
+            async def connect(self, **kwargs):
+                raise TimeoutError("private transport detail")
+
+            async def disconnect(self, *, error_code=None):
+                disconnect_codes.append(error_code)
+
+        monkeypatch.setattr(pairing, "PairingRelayNodeClient", Client)
+        monkeypatch.setattr(resilient, "PairingRelayNodeClient", Client)
+        runtime = runtime_type(state_directory=tmp_path, display_name="Member")
+        with pytest.raises(TimeoutError):
+            await runtime._ensure_connected(state)
+        assert disconnect_codes == ["pairing-connect-timeout"]
+
+    caplog.set_level(logging.WARNING, logger=pairing.__name__)
+    asyncio.run(scenario())
+    record = caplog.records[-1]
+    assert "stage=relay-connect-and-initial-sync" in record.message
+    assert "exception_type=TimeoutError" in record.message
+    assert "error_code=pairing-connect-timeout" in record.message
+    assert "private transport detail" not in record.message
