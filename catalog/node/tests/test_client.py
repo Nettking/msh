@@ -185,6 +185,58 @@ def test_request_timeout_logs_safe_operation_and_correlation_only(
     asyncio.run(scenario())
 
 
+def test_cancelled_request_logs_safe_operation_and_correlation_only(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    async def scenario() -> None:
+        client = _client(tmp_path)
+        _join_connected_session(client)
+        sent: list[RelayEnvelope] = []
+        send_finished = asyncio.Event()
+
+        class WebSocket:
+            async def send(self, raw: str) -> None:
+                sent.append(RelayEnvelope.from_json(raw))
+                send_finished.set()
+
+            async def close(self) -> None:
+                pass
+
+        client._websocket = WebSocket()  # type: ignore[assignment]
+        client._receiver_task = asyncio.create_task(asyncio.Event().wait())
+        client.connected_event.set()
+        client.disconnected_event.clear()
+        try:
+            request_task = asyncio.create_task(
+                client.request(
+                    "storage.commit",
+                    session_id="session-a",
+                    payload={"private_value": "must-not-be-logged"},
+                )
+            )
+            await asyncio.wait_for(send_finished.wait(), timeout=1)
+            request_id = sent[0].request_id
+            request_task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await request_task
+
+            assert client._pending == {}
+            record = caplog.records[-1]
+            assert record.levelno == logging.WARNING
+            assert "relay request cancelled" in record.message
+            assert "message_type=storage.commit" in record.message
+            assert f"request_id={request_id}" in record.message
+            assert "session_id=session-a" in record.message
+            assert f"timeout_seconds={client.request_timeout}" in record.message
+            assert "must-not-be-logged" not in record.message
+        finally:
+            await client.disconnect()
+
+    caplog.set_level(logging.WARNING, logger=node_client_module.__name__)
+    asyncio.run(scenario())
+
+
 def test_unexpected_receiver_failure_is_logged_without_exception_payload(
     tmp_path: Path,
     caplog: pytest.LogCaptureFixture,

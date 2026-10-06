@@ -558,6 +558,19 @@ class RelayNodeClient:
                 request_timeout,
             )
             raise
+        except asyncio.CancelledError:
+            # Aggregate reconnect deadlines cancel in-flight RPCs from outside
+            # this method. Preserve their safe correlation data while keeping
+            # cancellation semantics intact for the caller.
+            _LOGGER.warning(
+                "relay request cancelled message_type=%s request_id=%s "
+                "session_id=%s timeout_seconds=%s",
+                message_type,
+                envelope.request_id,
+                session_id,
+                request_timeout,
+            )
+            raise
         except ConnectionClosed as exc:
             # A socket may close during send, before the receiver translates
             # closure into a structured error for this request. Keep that race
