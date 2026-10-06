@@ -29,6 +29,7 @@ from .test_live_storage_failover import (
     TIMEOUT,
     _enroll,
     _registration,
+    _wait_for_bootstrap,
     _wait_for_control_waiting,
     _wait_for_promotion,
     _write_config,
@@ -203,8 +204,8 @@ def test_live_catchup_repairs_only_missing_batches_and_keeps_node_unassigned(
                 _wait_for_control_waiting(replica, replica_bootstrap),
             )
             await failover.publish_current((primary.node_id, replica.node_id))
-            await asyncio.wait_for(primary_bootstrap, TIMEOUT)
-            await asyncio.wait_for(replica_bootstrap, TIMEOUT)
+            await _wait_for_bootstrap(primary_bootstrap)
+            await _wait_for_bootstrap(replica_bootstrap)
 
             logical = PhaseDLogicalStorageClient(
                 session_id=session_id,
@@ -252,7 +253,7 @@ def test_live_catchup_repairs_only_missing_batches_and_keeps_node_unassigned(
                 control_sync_timeout=TIMEOUT,
                 clock=lambda: NOW,
             )
-            await asyncio.wait_for(primary.bootstrap(), TIMEOUT)
+            await _wait_for_bootstrap(primary.bootstrap())
             assert primary.node_id == old_node_id
             assert primary.status()["provider"]["groups"] == [
                 {"group_id": "storage-main", "role": "unassigned"}

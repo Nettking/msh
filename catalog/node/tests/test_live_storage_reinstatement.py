@@ -32,6 +32,7 @@ from .test_live_storage_failover import (
     TIMEOUT,
     _enroll,
     _registration,
+    _wait_for_bootstrap,
     _wait_for_control_waiting,
     _wait_for_promotion,
     _write_config,
@@ -223,8 +224,8 @@ def test_live_reinstatement_restores_replica_and_acknowledgement_policy(
             await failover.publish_current(
                 (former_primary.node_id, promoted.node_id)
             )
-            await asyncio.wait_for(former_bootstrap, TIMEOUT)
-            await asyncio.wait_for(promoted_bootstrap, TIMEOUT)
+            await _wait_for_bootstrap(former_bootstrap)
+            await _wait_for_bootstrap(promoted_bootstrap)
 
             acknowledgements = DurableAcknowledgementStore(
                 tmp_path / "authority-acks.sqlite3"
@@ -275,7 +276,7 @@ def test_live_reinstatement_restores_replica_and_acknowledgement_policy(
                 control_sync_timeout=TIMEOUT,
                 clock=lambda: NOW,
             )
-            await asyncio.wait_for(former_primary.bootstrap(), TIMEOUT)
+            await _wait_for_bootstrap(former_primary.bootstrap())
             assert former_primary.node_id == old_node_id
             assert former_primary.status()["provider"]["groups"] == [
                 {"group_id": "storage-main", "role": "unassigned"}
