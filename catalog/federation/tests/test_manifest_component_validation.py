@@ -39,6 +39,7 @@ def count_decodes(monkeypatch):
 
 def test_each_history_validates_unique_components_but_hashes_every_revision(tmp_path, monkeypatch):
     control = seeded(tmp_path)
+    control.manifests._verified_revisions = None  # Isolate the per-history decoder.
     expected = control.manifests.history("session-1", "storage-main")
     calls = count_decodes(monkeypatch)
     actual = control.manifests.history("session-1", "storage-main")
@@ -99,6 +100,7 @@ def test_history_still_rejects_index_gap_and_head_tampering(tmp_path, tamper, co
 ])
 def test_cache_limits_fall_back_without_changing_manifest_bytes(tmp_path, monkeypatch, limit):
     control = seeded(tmp_path)
+    control.manifests._verified_revisions = None  # Exercise component limits, not revision reuse.
     expected = control.manifests.history("session-1", "storage-main")
     observed = []
     original_clear = manifest_store._HistoryComponentDecoder.clear

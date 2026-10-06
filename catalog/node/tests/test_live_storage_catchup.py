@@ -25,9 +25,11 @@ from catalog.node.live_storage_agent import LiveStorageNodeAgent
 from catalog.relay.service import RelayServer
 
 from .test_live_storage_failover import (
+    BOOTSTRAP_OBSERVATION_TIMEOUT,
     NOW,
     TIMEOUT,
     _enroll,
+    _publish_initial_control,
     _registration,
     _wait_for_bootstrap,
     _wait_for_control_waiting,
@@ -92,13 +94,13 @@ def test_live_catchup_repairs_only_missing_batches_and_keeps_node_unassigned(
             primary = LiveStorageNodeAgent(
                 primary_config,
                 control_authority_node_id=authority.node_id,
-                control_sync_timeout=TIMEOUT,
+                control_sync_timeout=BOOTSTRAP_OBSERVATION_TIMEOUT,
                 clock=lambda: NOW,
             )
             replica = LiveStorageNodeAgent(
                 replica_config,
                 control_authority_node_id=authority.node_id,
-                control_sync_timeout=TIMEOUT,
+                control_sync_timeout=BOOTSTRAP_OBSERVATION_TIMEOUT,
                 clock=lambda: NOW,
             )
 
@@ -203,7 +205,9 @@ def test_live_catchup_repairs_only_missing_batches_and_keeps_node_unassigned(
                 _wait_for_control_waiting(primary, primary_bootstrap),
                 _wait_for_control_waiting(replica, replica_bootstrap),
             )
-            await failover.publish_current((primary.node_id, replica.node_id))
+            await _publish_initial_control(
+                failover, (primary, replica), (primary_bootstrap, replica_bootstrap)
+            )
             await _wait_for_bootstrap(primary_bootstrap)
             await _wait_for_bootstrap(replica_bootstrap)
 

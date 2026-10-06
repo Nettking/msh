@@ -9,11 +9,14 @@ Phase E runtime bridges that boundary with a durable, idempotent local intent.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
+import sys
+import threading
 from collections.abc import Callable
 from contextlib import closing
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, fields, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -24,6 +27,7 @@ from .manifest import (
     DatasetManifest,
     ManifestItem,
     ManifestItemKind,
+    SequenceRange,
 )
 from .models import CommitState
 from .storage_control_plane import STORAGE_GROUP_CREATED
@@ -31,6 +35,9 @@ from .storage_control_plane import STORAGE_GROUP_CREATED
 _COMPONENT_CACHE_MAX_ENTRIES = 4096
 _COMPONENT_CACHE_MAX_BYTES = 4 * 1024 * 1024
 _COMPONENT_CACHE_MAX_KEY_BYTES = 64 * 1024
+_REVISION_CACHE_MAX_ENTRIES = 2048
+_REVISION_CACHE_MAX_BYTES = 64 * 1024 * 1024
+_REVISION_CACHE_MAX_OBJECTS = 200_000
 
 
 def _component_key_fits(value: Any, remaining: list[int], depth: int = 0) -> bool:
@@ -113,6 +120,124 @@ class _HistoryComponentDecoder:
     def clear(self) -> None:
         self._cache.clear()
         self._bytes = 0
+
+
+def _revision_fingerprint(row: sqlite3.Row) -> bytes | None:
+    """Identify exact row bytes and indexed scalar types in the fresh snapshot.
+
+    A hash from the row's manifest_hash column is never sufficient: an older
+    revision's JSON or its indexed metadata may have been changed independently.
+    Unkeyable rows keep the ordinary validation path.
+    """
+    try:
+        raw = row["manifest_json"]
+        if type(raw) is not str:
+            return None
+        encoded = raw.encode("utf-8")
+        digest = hashlib.sha256(b"fcp.verified-manifest-row.v1\x00")
+        digest.update(len(encoded).to_bytes(8, "big"))
+        digest.update(encoded)
+        for name in sorted(row.keys()):
+            if name == "manifest_json":
+                continue
+            value = row[name]
+            if value is not None and type(value) not in (str, int, float, bool):
+                return None
+            encoded = json.dumps(
+                [name, type(value).__name__, value],
+                ensure_ascii=True, separators=(",", ":"), allow_nan=False,
+            ).encode("ascii")
+            digest.update(len(encoded).to_bytes(8, "big"))
+            digest.update(encoded)
+        return digest.digest()
+    except (TypeError, ValueError, UnicodeError):
+        return None
+
+
+def _retained_graph_size(value: Any) -> int | None:
+    """Bound actual retained model graphs, keys and containers, counting sharing.
+
+    The revisions share frozen component models; charging every revision's JSON
+    size would either retain unaccounted graphs or evict the entire 721-row prefix
+    each pass. No raw manifest JSON is retained in this cache.
+    """
+    pending, seen, total = [value], set(), 0
+    while pending:
+        current = pending.pop()
+        identity = id(current)
+        if identity in seen:
+            continue
+        seen.add(identity)
+        if len(seen) > _REVISION_CACHE_MAX_OBJECTS:
+            return None
+        total += sys.getsizeof(current)
+        if total > _REVISION_CACHE_MAX_BYTES:
+            return None
+        kind = type(current)
+        if kind is dict:
+            if 2 * len(current) + len(pending) > _REVISION_CACHE_MAX_OBJECTS:
+                return None
+            pending.extend(current.keys())
+            pending.extend(current.values())
+        elif kind is tuple:
+            if len(current) + len(pending) > _REVISION_CACHE_MAX_OBJECTS:
+                return None
+            pending.extend(current)
+        elif kind in (AuthoritativeStorageManifest, DatasetManifest, ManifestItem, SequenceRange):
+            # Include the dataclass dictionary's allocation and every field.
+            total += sys.getsizeof(vars(current))
+            pending.extend(getattr(current, field.name) for field in fields(current))
+        elif current is None or kind in (str, bytes, int, float, bool, datetime):
+            pass
+        elif isinstance(current, (CommitState, ManifestItemKind)) or current in (
+            DatasetManifest, ManifestItem,
+        ):
+            pass  # Static enum/type objects have no cache-owned mutable graph.
+        else:
+            return None  # Future non-frozen fields must not enter the cache.
+        if total > _REVISION_CACHE_MAX_BYTES or len(pending) > _REVISION_CACHE_MAX_OBJECTS:
+            return None
+    return total
+
+
+class _VerifiedRevisionCache:
+    """Bounded content-verified reuse; snapshot/chain/head checks remain fresh."""
+
+    def __init__(self) -> None:
+        self.lock = threading.Lock()
+        self.revisions: dict[bytes, AuthoritativeStorageManifest] = {}
+        self.components: dict[tuple[type, bytes], Any] = {}
+        self.component_bytes = 0
+        self.retained_bytes = 0
+
+    def snapshot(self) -> tuple[dict[bytes, AuthoritativeStorageManifest], _HistoryComponentDecoder]:
+        decoder = _HistoryComponentDecoder()
+        if not self.lock.acquire(blocking=False):
+            return {}, decoder
+        try:
+            revisions = self.revisions.copy()
+            decoder._cache = self.components.copy()
+            decoder._bytes = self.component_bytes
+            return revisions, decoder
+        finally:
+            self.lock.release()
+
+    def publish(self, revisions: dict[bytes, AuthoritativeStorageManifest], decoder: _HistoryComponentDecoder) -> None:
+        if len(revisions) > _REVISION_CACHE_MAX_ENTRIES:
+            return
+        graph_size = _retained_graph_size((revisions, decoder._cache))
+        if graph_size is None:
+            return
+        graph_size += sys.getsizeof(self) + sys.getsizeof(vars(self)) + sys.getsizeof(self.lock) + 256
+        if graph_size > _REVISION_CACHE_MAX_BYTES or not self.lock.acquire(blocking=False):
+            return
+        try:
+            self.revisions = revisions
+            self.components = decoder._cache.copy()
+            self.component_bytes = decoder._bytes
+            self.retained_bytes = graph_size
+        finally:
+            self.lock.release()
 
 
 def _text(value: Any, field: str) -> str:
@@ -538,6 +663,7 @@ class AuthoritativeManifestStore:
 
     def __init__(self, database: Path | str) -> None:
         self.database = str(database)
+        self._verified_revisions = _VerifiedRevisionCache()
         Path(self.database).parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as connection:
             manifest_schema_existed = (
@@ -790,13 +916,29 @@ class AuthoritativeManifestStore:
                WHERE session_id=? AND group_id=? ORDER BY revision""",
             (session_id, group_id),
         ).fetchall()
-        decoder = _HistoryComponentDecoder()
+        cache = getattr(self, "_verified_revisions", None)
+        cached, decoder = ({}, _HistoryComponentDecoder()) if cache is None else cache.snapshot()
+        verified: dict[bytes, AuthoritativeStorageManifest] = {}
         try:
-            manifests = tuple(
-                self._decode_revision(row, component_decoder=decoder.decode) for row in rows
-            )
+            values = []
+            for row in rows:
+                fingerprint = _revision_fingerprint(row)
+                manifest = cached.get(fingerprint) if fingerprint is not None else None
+                if manifest is None:
+                    manifest = self._decode_revision(row, component_decoder=decoder.decode)
+                if fingerprint is not None:
+                    verified[fingerprint] = manifest
+                values.append(manifest)
+            manifests = tuple(values)
+            self._verify_chain(manifests)
+            if cache is not None:
+                cache.publish(verified, decoder)
         finally:
             decoder.clear()
+        return manifests
+
+    @staticmethod
+    def _verify_chain(manifests: tuple[AuthoritativeStorageManifest, ...]) -> None:
         for expected_revision, manifest in enumerate(manifests):
             if manifest.revision != expected_revision:
                 raise FederationValidationError(
@@ -815,7 +957,6 @@ class AuthoritativeManifestStore:
                     "previous_manifest_hash",
                     "manifest predecessor does not match the previous revision",
                 )
-        return manifests
 
     def _head(
         self,
@@ -837,7 +978,8 @@ class AuthoritativeManifestStore:
                 "storage group has no authoritative manifest",
             )
         # Callers may reuse a chain fully validated in this same transaction.
-        # Nothing is trusted across operations or SQLite snapshots.
+        # Every row's exact bytes/types and the entire chain are checked afresh.
+        # Frozen decoded models may be reused only for content-verified rows.
         history = (
             self._history(connection, session_id, group_id)
             if verified_history is None

@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from catalog.federation import manifest_store
 from catalog.federation.errors import FederationValidationError
 from catalog.federation.manifest_store import AuthoritativeManifestStore
 from catalog.federation.phase_d_control import PhaseDControlPlane
@@ -37,6 +38,9 @@ def read(control, method):
 @pytest.mark.parametrize("method", ["head", "history", "revision", "phase-d-history"])
 def test_every_read_validates_each_retained_revision_once(tmp_path, monkeypatch, count, method):
     control = seeded(tmp_path, count)
+    # This case characterizes one cold read; warm content-verified reads have
+    # independent every-row fingerprint/chain/head coverage.
+    control.manifests._verified_revisions = manifest_store._VerifiedRevisionCache()
     decoded = []
     original = AuthoritativeManifestStore._decode_revision
 

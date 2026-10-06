@@ -19,6 +19,7 @@ from .replication import (
     ReplicationTransport,
 )
 from .reporting import StorageReplicaReport
+from .storage_async import owned_storage_call
 from .storage_protocol import (
     STORAGE_PROTOCOL,
     STORAGE_PROTOCOL_VERSION,
@@ -301,6 +302,29 @@ class PhaseDStorageService:
         return snapshot, assignment, grant
 
     async def _ingest_primary(self, envelope: StorageRequestEnvelope, request: BatchIngestRequest):
+        snapshot, status, prepared = await owned_storage_call(
+            self.control_plane, self._prepare_primary_local, envelope, request,
+        )
+        # Keep this short provider/ACK boundary on its owning loop. Grant/control
+        # updates on that loop must not interleave between the fresh authority
+        # check and provider mutation. Slow manifest work is outside this chunk.
+        result, status = self._write_primary_local(snapshot, request, prepared)
+        if not status.committed and self.replication_transport is not None:
+            await self._deliver_batch(request)
+            status = self.acknowledgements.status(
+                request.authority.session_id,
+                request.authority.group_id,
+                request.batch_id,
+            )
+            assert status is not None
+        manifest = None
+        if status.committed:
+            manifest = await owned_storage_call(
+                self.control_plane, self._commit_manifest, request, status,
+            )
+        return result, status, manifest
+
+    def _prepare_primary_local(self, envelope: StorageRequestEnvelope, request: BatchIngestRequest):
         snapshot, assignment, _grant = self._validate_grant(request, require_primary_provider=True)
         context = envelope.authorization_context
         if context.get("provider_id") != self.provider_id or context.get("group_id") != request.authority.group_id:
@@ -347,6 +371,17 @@ class PhaseDStorageService:
             if already_authoritative
             else self._prepare_replication(snapshot, request, replica_ids)
         )
+        return snapshot, status, prepared
+
+    def _write_primary_local(self, snapshot, request: BatchIngestRequest, prepared):
+        # Complete validation may yield to other owner-loop control work. Check
+        # current authority again immediately before the physical provider write.
+        fresh, _assignment, _grant = self._validate_grant(request, require_primary_provider=True)
+        if fresh.revision != snapshot.revision:
+            raise FederationValidationError(
+                "concurrent-control-change", "expected_control_revision",
+                "control authority changed before provider mutation",
+            )
         result = self.provider.ingest(request)
         status = self.acknowledgements.mark_primary_committed(
             request.authority.session_id,
@@ -357,18 +392,7 @@ class PhaseDStorageService:
         for entry in prepared:
             if entry.state is OutboxState.PREPARED:
                 self.outbox.activate(entry.outbox_id, now=self.clock())
-        if not status.committed and self.replication_transport is not None:
-            await self._deliver_batch(request)
-            status = self.acknowledgements.status(
-                request.authority.session_id,
-                request.authority.group_id,
-                request.batch_id,
-            )
-            assert status is not None
-        manifest = None
-        if status.committed:
-            manifest = self._commit_manifest(request, status)
-        return result, status, manifest
+        return result, status
 
     def _commit_manifest(
         self,

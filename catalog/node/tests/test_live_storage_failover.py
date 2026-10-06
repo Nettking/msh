@@ -6,6 +6,7 @@ import time
 from collections.abc import Awaitable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -132,6 +133,30 @@ async def _wait_for_bootstrap(bootstrap: Awaitable[None]) -> None:
     await asyncio.wait_for(bootstrap, BOOTSTRAP_OBSERVATION_TIMEOUT)
 
 
+async def _publish_initial_control(failover, agents, bootstraps):
+    """Preserve the original failure and each initial bootstrap's inner state."""
+    try:
+        return await failover.publish_current(tuple(agent.node_id for agent in agents))
+    except BaseException as error:
+        states = []
+        for agent, bootstrap in zip(agents, bootstraps, strict=True):
+            inner = None
+            if bootstrap.done() and not bootstrap.cancelled():
+                inner = bootstrap.exception()
+            states.append({
+                "node_id": agent.node_id,
+                "connected": agent.client.connected_event.is_set(),
+                "control_waiting": agent.control_waiting_event.is_set(),
+                "control_ready": agent.control_ready_event.is_set(),
+                "bootstrap_done": bootstrap.done(),
+                "bootstrap_cancelled": bootstrap.cancelled(),
+                "bootstrap_error_type": None if inner is None else type(inner).__name__,
+                "bootstrap_error_code": None if inner is None else getattr(inner, "code", None),
+            })
+        error.add_note("Initial control/bootstrap states: " + json.dumps(states, sort_keys=True))
+        raise
+
+
 async def _wait_for_promotion(
     failover: StorageFailoverCoordinator,
 ) -> object:
@@ -203,13 +228,16 @@ def test_primary_loss_promotes_complete_replica_and_old_grant_stays_fenced(
             primary = LiveStorageNodeAgent(
                 primary_config,
                 control_authority_node_id=authority.node_id,
-                control_sync_timeout=TIMEOUT,
+                # Initial nodes wait while their peer completes bootstrap and
+                # the authority prepares the first signed plan. This is not a
+                # request response budget; publication/transport remain5s.
+                control_sync_timeout=BOOTSTRAP_OBSERVATION_TIMEOUT,
                 clock=lambda: NOW,
             )
             replica = LiveStorageNodeAgent(
                 replica_config,
                 control_authority_node_id=authority.node_id,
-                control_sync_timeout=TIMEOUT,
+                control_sync_timeout=BOOTSTRAP_OBSERVATION_TIMEOUT,
                 clock=lambda: NOW,
             )
 
@@ -325,8 +353,8 @@ def test_primary_loss_promotes_complete_replica_and_old_grant_stays_fenced(
                 _wait_for_control_waiting(primary, primary_bootstrap),
                 _wait_for_control_waiting(replica, replica_bootstrap),
             )
-            initial_plan = await failover.publish_current(
-                (primary.node_id, replica.node_id)
+            initial_plan = await _publish_initial_control(
+                failover, (primary, replica), (primary_bootstrap, replica_bootstrap)
             )
             assert initial_plan.publication_revision == 1
             await _wait_for_bootstrap(primary_bootstrap)
@@ -574,6 +602,98 @@ def test_returning_primary_observation_keeps_individual_deadlines(
     assert len(response_delays) >= 4
     assert all(delay < TIMEOUT for delay in response_delays)
     assert returning_elapsed[0] > TIMEOUT
+
+
+def test_initial_control_wait_includes_peer_bootstrap_and_plan_preparation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The first node must not expire while its peer is joining before a plan."""
+    original_join = LiveStorageNodeAgent._join_configured_session
+    original_apply = LiveStorageNodeAgent._apply_control_message
+    original_bootstrap = LiveStorageNodeAgent.bootstrap
+    original_publish = StorageControlRelayChannel.publish
+    initial_elapsed = []
+    delays = []
+    seen = set()
+
+    async def join(self, invitation):
+        if self.storage.config.provider_id == "provider-replica":
+            await asyncio.sleep(4.3)
+        return await original_join(self, invitation)
+
+    async def apply(self, actor_node_id, payload):
+        if (
+            self.storage.config.provider_id == "provider-primary"
+            and not self.control_ready_event.is_set()
+            and self.storage.config.provider_id not in seen
+        ):
+            seen.add(self.storage.config.provider_id)
+            start = time.monotonic()
+            await asyncio.sleep(1.0)
+            delays.append(time.monotonic() - start)
+        return await original_apply(self, actor_node_id, payload)
+
+    async def bootstrap(self, **kwargs):
+        assert self.client.request_timeout == TIMEOUT
+        first = self.storage.config.provider_id == "provider-primary" and not initial_elapsed
+        start = time.monotonic()
+        try:
+            return await original_bootstrap(self, **kwargs)
+        finally:
+            if first:
+                initial_elapsed.append(time.monotonic() - start)
+
+    async def publish(self, *args, **kwargs):
+        assert self.timeout == TIMEOUT
+        return await original_publish(self, *args, **kwargs)
+
+    monkeypatch.setattr(LiveStorageNodeAgent, "_join_configured_session", join)
+    monkeypatch.setattr(LiveStorageNodeAgent, "_apply_control_message", apply)
+    monkeypatch.setattr(LiveStorageNodeAgent, "bootstrap", bootstrap)
+    monkeypatch.setattr(StorageControlRelayChannel, "publish", publish)
+    # Execute real signed control, replica commit, promotion, retained identity,
+    # returning-primary write fencing and all original assertions unchanged.
+    test_primary_loss_promotes_complete_replica_and_old_grant_stays_fenced(tmp_path)
+    assert initial_elapsed[0] > TIMEOUT
+    assert delays and all(delay < TIMEOUT for delay in delays)
+
+
+def test_initial_control_failure_retains_original_and_inner_bootstrap_states():
+    error = TimeoutError("publication deadline")
+
+    async def scenario():
+        loop = asyncio.get_running_loop()
+        failed = loop.create_future()
+        failed.set_exception(ValueError("private inner detail must not enter status"))
+        cancelled = loop.create_future()
+        cancelled.cancel()
+        agents = []
+        for name in ("initial-primary", "initial-replica"):
+            connected, waiting, ready = asyncio.Event(), asyncio.Event(), asyncio.Event()
+            waiting.set()
+            agents.append(SimpleNamespace(
+                node_id=name, client=SimpleNamespace(connected_event=connected),
+                control_waiting_event=waiting, control_ready_event=ready,
+            ))
+
+        class Publisher:
+            async def publish_current(self, targets):
+                assert targets == ("initial-primary", "initial-replica")
+                raise error
+
+        with pytest.raises(TimeoutError) as caught:
+            await _publish_initial_control(Publisher(), tuple(agents), (failed, cancelled))
+        assert caught.value is error
+        note = error.__notes__[-1]
+        assert "private inner detail" not in note
+        states = json.loads(note.split(": ", 1)[1])
+        assert states[0]["bootstrap_error_type"] == "ValueError"
+        assert states[0]["bootstrap_done"] is True
+        assert states[1]["bootstrap_cancelled"] is True
+        assert states[1]["bootstrap_error_type"] is None
+        assert all(state["control_ready"] is False for state in states)
+
+    asyncio.run(scenario())
 
 
 def test_bootstrap_observation_does_not_hide_individual_request_timeout(
