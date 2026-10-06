@@ -2,14 +2,24 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import socket
 import sys
+import threading
+import time
 from contextlib import ExitStack, contextmanager
+from types import SimpleNamespace
 
 import pytest
 
+from catalog.federation.control_plane_replication import (
+    ControlPlaneError,
+    QuorumUnavailable,
+    ReplicaNode,
+    StaleTerm,
+)
 from catalog.federation.tests import test_control_plane_public_journal as journal
 from catalog.federation.tests.test_control_plane_health_leadership_race import (
     _endpoint_bind_failure,
@@ -245,3 +255,211 @@ def test_public_journal_cluster_propagates_cleanup_failure_without_reallocation(
         assert attempts[0]["closed_before_next_allocation"] is False
         assert len(_retry_warnings(recwarn)) == 1
         _assert_attempt_closed(attempts[0])
+
+
+@pytest.mark.parametrize("failure", [None, RuntimeError("setup failed"), SystemExit("setup cancelled")])
+def test_initial_bootstrap_schedule_restores_each_real_method_on_every_exit(failure):
+    calls = []
+    runtimes = [SimpleNamespace(_drive_lifecycle_round=lambda index=index: calls.append(index))
+                for index in range(3)]
+    original = [runtime._drive_lifecycle_round for runtime in runtimes]
+
+    def exercise():
+        with journal._initial_bootstrap_schedule(runtimes):
+            for runtime in runtimes:
+                runtime._drive_lifecycle_round()
+            assert calls == []
+            if failure is not None:
+                raise failure
+
+    if failure is None:
+        exercise()
+    else:
+        with pytest.raises(type(failure)) as caught:
+            exercise()
+        assert caught.value is failure
+    assert [runtime._drive_lifecycle_round for runtime in runtimes] == original
+    for runtime in runtimes:
+        runtime._drive_lifecycle_round()
+    assert calls == [0, 1, 2]
+
+
+def test_initial_schedule_restores_inherited_lookup_and_releases_captured_wrapper(monkeypatch):
+    calls = []
+
+    class Runtime:
+        def _drive_lifecycle_round(self):
+            calls.append("original")
+
+    runtime = Runtime()
+    assert "_drive_lifecycle_round" not in vars(runtime)
+    with journal._initial_bootstrap_schedule([runtime]):
+        captured = runtime._drive_lifecycle_round
+        captured()
+        assert calls == []
+    assert "_drive_lifecycle_round" not in vars(runtime)
+    captured()
+    assert calls == ["original"]
+    monkeypatch.setattr(Runtime, "_drive_lifecycle_round", lambda _self: calls.append("later-class-method"))
+    runtime._drive_lifecycle_round()
+    assert calls == ["original", "later-class-method"]
+
+
+def test_initial_slow_seal_keeps_original_creator_and_restores_automatic_rounds(
+    tmp_path, monkeypatch, record_property,
+):
+    cluster = journal._Cluster(tmp_path)
+    monkeypatch.setattr(journal, "_Cluster", lambda _root: cluster)
+    original_drives = [runtime._drive_lifecycle_round for runtime in cluster.runtimes]
+    creator = cluster.runtimes[0]
+    creator_id = creator.node.voter_id
+    original_wait = journal._wait
+    wait_checked = []
+
+    async def restored_wait(predicate, description):
+        assert [runtime._drive_lifecycle_round for runtime in cluster.runtimes] == original_drives
+        wait_checked.append(True)
+        await original_wait(predicate, description)
+
+    monkeypatch.setattr(journal, "_wait", restored_wait)
+    scope = threading.local()
+    propose = creator._propose_bootstrap_command
+    append = creator.transport.append_entries
+    delayed = []
+    ages = []
+
+    def observed_propose(command):
+        previous = getattr(scope, "seal", False)
+        scope.seal = command.command_id.startswith("bootstrap-seal-")
+        try:
+            return propose(command)
+        finally:
+            scope.seal = previous
+
+    def delayed_append(target, **request):
+        if getattr(scope, "seal", False) and not delayed:
+            before = time.monotonic()
+            time.sleep(creator.election_timeout_seconds + creator.heartbeat_seconds + 0.2)
+            delayed.append(time.monotonic() - before)
+            ages.extend(time.monotonic() - runtime.node.last_leader_contact
+                        for runtime in cluster.runtimes[1:])
+            assert all(age > runtime.election_timeout_seconds
+                       for age, runtime in zip(ages, cluster.runtimes[1:], strict=True))
+            assert creator.node.role == ReplicaNode.LEADER
+            assert creator.node.leader_id == creator_id
+            assert creator.node.store.current_term == request["leader_term"]
+        return append(target, **request)
+
+    monkeypatch.setattr(creator, "_propose_bootstrap_command", observed_propose)
+    monkeypatch.setattr(creator.transport, "append_entries", delayed_append)
+
+    async def scenario():
+        async with journal._cluster(tmp_path) as current:
+            assert current is cluster
+            assert creator is current.runtimes[0]
+            assert all(runtime.ready for runtime in current.runtimes)
+            genesis = creator._fresh_genesis()
+            assert genesis.payload["creator_node_id"] == creator_id
+            assert genesis.payload["federation_id"] == journal.FEDERATION
+            assert genesis.payload["session_id"] == journal.SESSION
+            assert set(genesis.payload["members"]) == set(creator.node.configuration.voter_ids)
+            leadership = creator.node.state["leaders"][journal.SESSION]
+            assert leadership["leader_node_id"] == creator_id
+            assert leadership["creator_node_id"] == creator_id
+            assert leadership["term"] == 1
+            assert creator.node.role == ReplicaNode.LEADER
+            assert creator.node.leader_id == creator_id
+            for runtime in current.runtimes:
+                await asyncio.to_thread(runtime.materialize)
+            prefix = journal._journal(creator)
+            assert prefix
+            assert all(journal._journal(runtime) == prefix for runtime in current.runtimes)
+            seals = [entry for entry in creator.node.store.entries()
+                     if entry.command.command_id.startswith("bootstrap-seal-")]
+            assert len(seals) == 1
+            assert seals[0].log_index <= creator.node.store.commit_index
+            # Supported retry validates the exact committed genesis, without
+            # inventing another identity or relaxing its creator provenance.
+            with pytest.raises(ControlPlaneError, match="conflicts with committed fresh Federation identity"):
+                await asyncio.to_thread(creator.bootstrap_new_federation,
+                    federation_id=journal.FEDERATION, session_id=journal.SESSION,
+                    creator_node_id="unrelated-creator", display_name="Public journal continuity")
+            assert journal._journal(creator) == prefix
+        assert not cluster.running_runtimes
+        assert not cluster.running_relays
+
+    asyncio.run(scenario())
+    assert delayed and wait_checked
+    record_property("initial_slow_seal", json.dumps({
+        "actual_delay_seconds": delayed[0], "follower_contact_ages": ages,
+        "original_creator_and_current_leader_preserved": True,
+        "product_term": 1, "restored_before_readiness": True,
+        "original_ci_cause_verified": False,
+    }, sort_keys=True))
+
+
+@pytest.mark.parametrize("failure", [StaleTerm("bootstrap leader lost"), QuorumUnavailable("no quorum")])
+def test_cluster_does_not_swallow_pre_genesis_fencing_or_quorum_error(tmp_path, monkeypatch, failure):
+    cluster = journal._Cluster(tmp_path)
+    monkeypatch.setattr(journal, "_Cluster", lambda _root: cluster)
+    original_drives = [runtime._drive_lifecycle_round for runtime in cluster.runtimes]
+    creator = cluster.runtimes[0]
+    calls = []
+
+    def refuse(**kwargs):
+        calls.append(kwargs)
+        assert creator._fresh_genesis() is None
+        raise failure
+
+    monkeypatch.setattr(creator, "bootstrap_new_federation", refuse)
+
+    async def scenario():
+        with pytest.raises(type(failure)) as caught:
+            async with journal._cluster(tmp_path):
+                pytest.fail("failed bootstrap entered the test body")
+        assert caught.value is failure
+
+    asyncio.run(scenario())
+    assert len(calls) == 1
+    assert [runtime._drive_lifecycle_round for runtime in cluster.runtimes] == original_drives
+    assert not cluster.running_runtimes
+    assert not cluster.running_relays
+
+
+def test_cluster_retains_real_unsealed_failure_and_restores_lifecycle_before_cleanup(tmp_path, monkeypatch):
+    cluster = journal._Cluster(tmp_path)
+    monkeypatch.setattr(journal, "_Cluster", lambda _root: cluster)
+    creator = cluster.runtimes[0]
+    original_drives = [runtime._drive_lifecycle_round for runtime in cluster.runtimes]
+    failure = RuntimeError("real public prefix interrupted before readiness seal")
+    observed = []
+
+    def interrupted_seal(**_kwargs):
+        assert creator._fresh_genesis() is not None
+        assert creator.node.state["product_journal"]["sessions"][journal.SESSION]
+        assert journal._journal(creator)
+        assert not creator.ready
+        observed.append(True)
+        raise failure
+
+    monkeypatch.setattr(creator, "_commit_readiness_seal", interrupted_seal)
+    for index, runtime in enumerate(cluster.runtimes):
+        close = runtime.close
+
+        def restored_close(*, _close=close, _index=index):
+            assert cluster.runtimes[_index]._drive_lifecycle_round == original_drives[_index]
+            _close()
+
+        monkeypatch.setattr(runtime, "close", restored_close)
+
+    async def scenario():
+        with pytest.raises(RuntimeError) as caught:
+            async with journal._cluster(tmp_path):
+                pytest.fail("unsealed failed bootstrap entered the test body")
+        assert caught.value is failure
+
+    asyncio.run(scenario())
+    assert observed
+    assert [runtime._drive_lifecycle_round for runtime in cluster.runtimes] == original_drives
+    assert not cluster.running_runtimes
+    assert not cluster.running_relays

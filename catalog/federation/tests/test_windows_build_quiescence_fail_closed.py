@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -88,7 +89,19 @@ def test_windows_preflight_reproves_quiescence_at_all_pressure_levels() -> None:
 def test_windows_failed_build_attempt_still_bounds_its_fcp_cache() -> None:
     text = _read("scripts/windows/fcp_host_build.ps1")
     build = text[text.index("function Invoke-ControlledCoreBuild") : text.index("function Assert-CoreImageCommits")]
-    failed = build[build.index("if ($null -eq $exit -or $exit -ne 0)") : build.index("if (-not (Invoke-BuildCachePrune))")]
+    # Locate the failure branch by its cleanup action. Output collection is
+    # now part of completion, so an old exact spelling of the exit-only guard
+    # cannot identify every failed build. Retain both original failure cases
+    # and require incomplete output to take the same bounded cleanup path.
+    guards = list(re.finditer(
+        r"if \(([^()\n]+)\) \{\s+\$cleanupOk = Invoke-BuildCachePrune", build
+    ))
+    assert len(guards) == 1
+    guard = guards[0]
+    assert set(guard.group(1).split(" -or ")) == {
+        "$null -eq $exit", "$exit -ne 0", "-not $outputComplete"
+    }
+    failed = build[guard.start() : build.index("if (-not (Invoke-BuildCachePrune))")]
 
     assert "$cleanupOk = Invoke-BuildCachePrune" in failed
     assert "Stop-FcpBuildWriter $name" in failed

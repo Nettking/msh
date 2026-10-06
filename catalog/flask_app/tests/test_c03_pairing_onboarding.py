@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import multiprocessing
+import re
+import time
+from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -151,6 +155,66 @@ def _receive(connection):
     return connection.recv()
 
 
+def _observe_authority_reads(coordinator, monkeypatch):
+    """Retain bounded call outcomes without another store/property read."""
+    records = deque(maxlen=16)
+    original = coordinator.session_authority
+
+    def observed(**kwargs):
+        try:
+            started = time.monotonic()
+        except Exception:  # noqa: BLE001 - unavailable diagnostics do not block the original call
+            return original(**kwargs)
+        try:
+            value = original(**kwargs)
+        except BaseException as error:
+            try:
+                records.append(
+                    {
+                        "outcome": "ERROR",
+                        "duration_seconds": time.monotonic() - started,
+                        "error_type": type(error).__name__,
+                        "reason_sha256": hashlib.sha256(
+                            str(error).encode()
+                        ).hexdigest(),
+                    }
+                )
+            except Exception:  # noqa: BLE001, S110 - diagnostics cannot replace the business exception
+                pass
+            raise
+        else:
+            try:
+                records.append(
+                    {
+                        "outcome": "RETURNED",
+                        "duration_seconds": time.monotonic() - started,
+                    }
+                )
+            except Exception:  # noqa: BLE001, S110 - diagnostics cannot replace the business result
+                pass
+            return value
+
+    monkeypatch.setattr(coordinator, "session_authority", observed)
+    return records
+
+
+def _authority_failure(response, records):
+    """Only public operation codes and timings enter an assertion failure."""
+    try:
+        body = response.get("json")
+        code = body.get("error") if isinstance(body, dict) else None
+        return {
+            "endpoint": "/test/authority",
+            "status": response.get("status"),
+            "error_code": code
+            if isinstance(code, str) and re.fullmatch(r"[a-z0-9-]{1,80}", code)
+            else None,
+            "authority_reads": tuple(records),
+        }
+    except Exception:  # noqa: BLE001 - a lost diagnostic is never an authority result
+        return {"endpoint": "/test/authority", "diagnostics_unavailable": True}
+
+
 def _binding(runtime, node_id: str) -> FederationSessionBinding:
     session = runtime.local.store.get_session(SESSION)
     assert session is not None
@@ -168,6 +232,7 @@ def _binding(runtime, node_id: str) -> FederationSessionBinding:
 
 def test_configured_flask_process_publishes_through_quorum_and_cannot_fall_back(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def scenario() -> None:
         async with _cluster(tmp_path) as cluster:
@@ -176,6 +241,9 @@ def test_configured_flask_process_publishes_through_quorum_and_cannot_fall_back(
             # Transfer this identity/NodeState connection to the Flask process.
             await member.disconnect()
             leader = cluster.runtimes[0]
+            authority_reads = _observe_authority_reads(
+                cluster.relays[0].coordinator, monkeypatch
+            )
             ctx = multiprocessing.get_context("spawn")
             parent_pipe, child_pipe = ctx.Pipe()
             process = ctx.Process(
@@ -218,7 +286,9 @@ def test_configured_flask_process_publishes_through_quorum_and_cannot_fall_back(
                 assert leadership["status"] == 200
                 assert leadership["json"]["leader_node_id"] == leader.node.voter_id
                 authority = await post("/test/authority", {})
-                assert authority["status"] == 200
+                assert authority["status"] == 200, _authority_failure(
+                    authority, authority_reads
+                )
                 typed_session = Session.from_dict(authority["json"]["session"])
                 assert typed_session.created_at == leader.local.store.get_session(
                     SESSION
@@ -258,6 +328,116 @@ def test_configured_flask_process_publishes_through_quorum_and_cannot_fall_back(
                 assert process.exitcode == 0
 
     asyncio.run(scenario())
+
+
+def test_authority_failure_retains_only_public_code_and_bounded_outcomes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Coordinator:
+        @property
+        def store(self):
+            raise AssertionError("diagnostics must not read the store")
+
+        def session_authority(self, **_kwargs):
+            return "original-result"
+
+    coordinator = Coordinator()
+    records = _observe_authority_reads(coordinator, monkeypatch)
+    for _ in range(20):
+        assert coordinator.session_authority() == "original-result"
+    assert len(records) == 16
+    failed = _authority_failure(
+        {
+            "status": 409,
+            "json": {"error": "pairing-relay-timeout", "private": "excluded"},
+        },
+        records,
+    )
+    assert failed["error_code"] == "pairing-relay-timeout"
+    assert set(failed) == {"endpoint", "status", "error_code", "authority_reads"}
+    assert all(
+        set(record) == {"outcome", "duration_seconds"}
+        for record in failed["authority_reads"]
+    )
+    assert (
+        _authority_failure(
+            {"status": 409, "json": {"error": "unbounded private message"}}, records
+        )["error_code"]
+        is None
+    )
+
+
+def test_authority_observer_preserves_exact_business_exception(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class OriginalFailure(RuntimeError):
+        def __str__(self):
+            raise ValueError("diagnostic string conversion failed")
+
+    original_error = OriginalFailure()
+
+    class Coordinator:
+        def session_authority(self, **_kwargs):
+            raise original_error
+
+    coordinator = Coordinator()
+    records = _observe_authority_reads(coordinator, monkeypatch)
+    with pytest.raises(OriginalFailure) as caught:
+        coordinator.session_authority()
+    assert caught.value is original_error
+    assert not records
+
+
+def test_authority_observer_error_retains_type_and_hash_without_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_error = RuntimeError("private inner cause")
+
+    class Coordinator:
+        def session_authority(self, **_kwargs):
+            raise original_error
+
+    coordinator = Coordinator()
+    records = _observe_authority_reads(coordinator, monkeypatch)
+    with pytest.raises(RuntimeError) as caught:
+        coordinator.session_authority()
+    assert caught.value is original_error
+    assert (
+        records[0]["reason_sha256"]
+        == hashlib.sha256(str(original_error).encode()).hexdigest()
+    )
+    assert records[0]["error_type"] == "RuntimeError"
+    assert set(records[0]) == {
+        "outcome",
+        "duration_seconds",
+        "error_type",
+        "reason_sha256",
+    }
+
+
+def test_authority_observer_lost_clock_does_not_change_original_call(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = []
+
+    class Coordinator:
+        def session_authority(self, **kwargs):
+            calls.append(kwargs)
+            return "original-result"
+
+    coordinator = Coordinator()
+    records = _observe_authority_reads(coordinator, monkeypatch)
+
+    def unavailable():
+        raise RuntimeError("diagnostic clock unavailable")
+
+    monkeypatch.setattr(time, "monotonic", unavailable)
+    assert (
+        coordinator.session_authority(session_id="original-session")
+        == "original-result"
+    )
+    assert calls == [{"session_id": "original-session"}]
+    assert not records
 
 
 def test_pairing_material_uses_authenticated_leader_and_real_quorum(

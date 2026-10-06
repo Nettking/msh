@@ -14,6 +14,7 @@ from .commit_tracking import DurableAcknowledgementStore
 from .errors import FederationValidationError
 from .manifest import ManifestItemKind
 from .manifest_store import ManifestCommitIntent
+from .storage_async import owned_storage_call
 from .storage_catalog import (
     CommittedBatchDeltaPage,
     CommittedBatchPage,
@@ -181,7 +182,7 @@ class PhaseDLogicalStorageClient:
                 "request belongs to another session",
             )
         group_id = request.authority.group_id
-        route = self._route(group_id)
+        route = await owned_storage_call(self.control_plane, self._route, group_id)
         correlation_id = uuid.uuid4().hex
         for attempt in range(2):
             routed = BatchIngestRequest(
@@ -203,7 +204,9 @@ class PhaseDLogicalStorageClient:
                 dataset_schema_name=request.dataset_schema_name,
                 dataset_schema_version=request.dataset_schema_version,
             )
-            intent = self._prepare_distributed_manifest(routed, route)
+            intent = await owned_storage_call(
+                self.control_plane, self._prepare_distributed_manifest, routed, route,
+            )
             request_id = f"storage-{correlation_id}-{attempt + 1}"
             response = await self.transport.request(
                 target_node_id=route.node_id,
@@ -223,7 +226,7 @@ class PhaseDLogicalStorageClient:
                 ),
             )
             if response.ok:
-                return self._accept_success(
+                return await owned_storage_call(self.control_plane, self._accept_success,
                     request=request,
                     routed=routed,
                     group_id=group_id,
@@ -243,7 +246,7 @@ class PhaseDLogicalStorageClient:
                 and response.error.code is StorageErrorCode.UNKNOWN_GRANT
             ):
                 try:
-                    refreshed_route = self._route(group_id)
+                    refreshed_route = await owned_storage_call(self.control_plane, self._route, group_id)
                 except FederationValidationError:
                     refreshed_route = route
                 if (

@@ -28,9 +28,11 @@ from catalog.node.live_storage_agent import LiveStorageNodeAgent
 from catalog.relay.service import RelayServer
 
 from .test_live_storage_failover import (
+    BOOTSTRAP_OBSERVATION_TIMEOUT,
     NOW,
     TIMEOUT,
     _enroll,
+    _publish_initial_control,
     _registration,
     _wait_for_bootstrap,
     _wait_for_control_waiting,
@@ -95,13 +97,13 @@ def test_live_reinstatement_restores_replica_and_acknowledgement_policy(
             former_primary = LiveStorageNodeAgent(
                 former_config,
                 control_authority_node_id=authority.node_id,
-                control_sync_timeout=TIMEOUT,
+                control_sync_timeout=BOOTSTRAP_OBSERVATION_TIMEOUT,
                 clock=lambda: NOW,
             )
             promoted = LiveStorageNodeAgent(
                 promoted_config,
                 control_authority_node_id=authority.node_id,
-                control_sync_timeout=TIMEOUT,
+                control_sync_timeout=BOOTSTRAP_OBSERVATION_TIMEOUT,
                 clock=lambda: NOW,
             )
 
@@ -221,8 +223,8 @@ def test_live_reinstatement_restores_replica_and_acknowledgement_policy(
                 _wait_for_control_waiting(former_primary, former_bootstrap),
                 _wait_for_control_waiting(promoted, promoted_bootstrap),
             )
-            await failover.publish_current(
-                (former_primary.node_id, promoted.node_id)
+            await _publish_initial_control(
+                failover, (former_primary, promoted), (former_bootstrap, promoted_bootstrap)
             )
             await _wait_for_bootstrap(former_bootstrap)
             await _wait_for_bootstrap(promoted_bootstrap)
