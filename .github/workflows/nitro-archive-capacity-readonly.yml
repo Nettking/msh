@@ -45,3 +45,4 @@ jobs:
             relevant_processes = @(Get-Process -Name 'python*','pytest*','Runner.Worker','wsl*' -ErrorAction SilentlyContinue | Select-Object Id,ProcessName)
             mutations = 'NONE: no checkout, deletion, test, service change or artifact transfer'
           } | ConvertTo-Json -Depth 6
+# Read-only C: capacity observation for the 2026-10-07 archive retry; no behavior change.
