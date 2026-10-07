@@ -652,3 +652,9 @@ def test_only_an_announcement_clears_the_restart_ladder():
     monitor._on_announced(_announcement(CapabilityStatus.READY))
     assert monitor._restart_count() == 0
     assert monitor.snapshot().status == "ready"
+
+
+def test_restart_delay_saturates_before_large_exponentiation():
+    assert storage_install._restart_delay_seconds(10**6) == (
+        storage_install._MAX_RETRY_SECONDS
+    )

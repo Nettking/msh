@@ -46,7 +46,13 @@ def _restart_delay_seconds(consecutive_failures: int) -> float:
     """Bounded exponential wait before rebuilding the publication worker."""
 
     exponent = max(0, consecutive_failures - 1)
-    return min(_DEFAULT_RETRY_SECONDS * 2.0**exponent, _MAX_RETRY_SECONDS)
+    delay = min(_DEFAULT_RETRY_SECONDS, _MAX_RETRY_SECONDS)
+    # Cap during growth so a long-lived failure ladder cannot overflow before
+    # min() applies the configured maximum.
+    while exponent and delay < _MAX_RETRY_SECONDS:
+        delay = min(delay * 2.0, _MAX_RETRY_SECONDS)
+        exponent -= 1
+    return delay
 
 
 def _env_bool(name: str, default: bool = False) -> bool:

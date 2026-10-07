@@ -54,7 +54,14 @@ def _restart_delay_seconds(consecutive_failures: int) -> float:
     """Bounded exponential wait before restarting the storage authority."""
 
     exponent = max(0, consecutive_failures - 1)
-    return min(_RETRY_SECONDS * 2.0**exponent, _MAX_RETRY_SECONDS)
+    delay = min(_RETRY_SECONDS, _MAX_RETRY_SECONDS)
+    # Cap during growth, not after exponentiation. A persistent worker can
+    # accumulate an arbitrarily large failure count; computing 2.0**exponent
+    # first eventually overflows and terminates the supervisor thread.
+    while exponent and delay < _MAX_RETRY_SECONDS:
+        delay = min(delay * 2.0, _MAX_RETRY_SECONDS)
+        exponent -= 1
+    return delay
 _AI_BRIDGE_EXTENSION_KEY = "federated_ai_product_bridge"
 
 
