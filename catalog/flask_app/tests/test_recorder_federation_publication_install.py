@@ -388,3 +388,9 @@ def test_the_restart_ladder_is_bounded_and_reset_only_by_publishing(tmp_path):
         )
     )
     assert monitor._restart_count() == 0
+
+
+def test_restart_delay_saturates_before_large_exponentiation():
+    assert install_module._restart_delay_seconds(10**6) == (
+        install_module._MAX_RETRY_SECONDS
+    )
