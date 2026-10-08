@@ -5,7 +5,9 @@ from __future__ import annotations
 import argparse
 import asyncio
 import getpass
+import hashlib
 import json
+import logging
 import math
 import ssl
 import sys
@@ -53,17 +55,19 @@ MAX_PENDING_REQUESTS = 128
 MAX_REPLAY_PAGES_PER_PASS = 1_024
 MAX_STATUS_PAGES = 1_024
 MAX_STATUS_SNAPSHOT_RESTARTS = 3
+_LOGGER = logging.getLogger(__name__)
 
 
 class RelayRemoteError(FederationOperationError):
     """A structured rejection returned by the relay."""
 
 
-@dataclass(frozen=True)
+@dataclass
 class _PendingMessageResponse:
     session_id: str
     target_node_id: str
     future: asyncio.Future[RelayEnvelope]
+    identity_mismatch_logged: bool = False
 
 
 def _now() -> datetime:
@@ -72,6 +76,12 @@ def _now() -> datetime:
 
 def _request_id() -> str:
     return f"request-{uuid.uuid4().hex}"
+
+
+def _diagnostic_fingerprint(value: str) -> str:
+    """Hash an identifier before including it in a transport diagnostic."""
+
+    return "sha256:" + hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
 
 
 def _validate_relay_url(
@@ -1180,10 +1190,40 @@ class RelayNodeClient:
         pending = self._pending_message_responses.get(correlation_id)
         if pending is None:
             return False
-        if (
-            envelope.session_id != pending.session_id
-            or envelope.actor_node_id != pending.target_node_id
-        ):
+        session_matches = envelope.session_id == pending.session_id
+        actor_matches = envelope.actor_node_id == pending.target_node_id
+        if not session_matches or not actor_matches:
+            if pending.identity_mismatch_logged:
+                return False
+            pending.identity_mismatch_logged = True
+            fields = {
+                "relay_stage": "correlated_response_identity_mismatch",
+                "correlation_id_fingerprint": _diagnostic_fingerprint(
+                    correlation_id
+                ),
+                "session_matches": session_matches,
+                "actor_matches": actor_matches,
+                "expected_session_fingerprint": _diagnostic_fingerprint(
+                    pending.session_id
+                ),
+                "received_session_fingerprint": (
+                    _diagnostic_fingerprint(envelope.session_id)
+                    if isinstance(envelope.session_id, str)
+                    else None
+                ),
+                "expected_actor_fingerprint": _diagnostic_fingerprint(
+                    pending.target_node_id
+                ),
+                "received_actor_fingerprint": (
+                    _diagnostic_fingerprint(envelope.actor_node_id)
+                    if isinstance(envelope.actor_node_id, str)
+                    else None
+                ),
+            }
+            _LOGGER.warning(
+                "correlated relay response identity mismatch %s",
+                json.dumps(fields, sort_keys=True, separators=(",", ":")),
+            )
             return False
         if not pending.future.done():
             pending.future.set_result(envelope)
