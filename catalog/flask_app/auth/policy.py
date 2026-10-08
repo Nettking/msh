@@ -126,6 +126,7 @@ ENDPOINT_PERMISSIONS: dict[str, str] = {
 
 READ_PERMISSIONS = {
     "docs_web": "data.read",
+    "digital_twin_web": "data.read",
     "federation_web": "federation.read",
     "federation_recorder_web": "federation.read",
     "provider_federation_web": "federation.read",

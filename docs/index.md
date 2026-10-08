@@ -13,6 +13,7 @@ Use the guides below for the current FCP product. Start from the task or product
 - [Operator knowledge capture](operator_strategy_capture.md) — capture, review, structure, compare, and export operator knowledge.
 - [Source synchronization](source_synchronization.md) — configure sources, normalized landing paths, and synchronization state.
 - [Workflow sessions](workflow_sessions.md) — work with workflow metadata, filtering, execution, cache reuse, bootstrap, and catch-up.
+- [Digital twin and what-if analysis](digital_twin.md) — inspect historical machine active time and explore a bounded non-active-time recovery scenario.
 - [AI explainer](ai_explainer.md) — use read-only repository explanation with local or connected Ollama.
 - [Troubleshooting](troubleshooting.md) — diagnose startup, data, playback, Docker, runtime, recorder, Federation update/discovery, and connectivity problems.
 

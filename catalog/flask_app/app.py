@@ -39,6 +39,7 @@ from .capability_startup_transition_routes import (
     capability_startup_transition_web,
 )
 from .data_upload_routes import data_upload_web
+from .digital_twin_routes import digital_twin_web
 from .docs_routes import docs_web
 from .federation_pairing_routes import federation_pairing_web
 from .federation_recorder_routes import federation_recorder_web
@@ -117,6 +118,7 @@ def create_app() -> Flask:
     app = Flask(__name__, template_folder="templates", static_folder="static")
     app.request_class = FCPRequest
     init_human_auth(app)
+    app.config.setdefault("FCP_DATA_ROOT", os.getenv("FCP_DATA_ROOT", "data"))
     if app.config.get("MAX_CONTENT_LENGTH") is None:
         app.config["MAX_CONTENT_LENGTH"] = int(
             os.getenv("FCP_UPLOAD_MAX_REQUEST_BYTES", str(1100 * 1024 * 1024))
@@ -355,6 +357,7 @@ def create_app() -> Flask:
     app.register_blueprint(server_setup_web)
     app.register_blueprint(web)
     app.register_blueprint(data_upload_web)
+    app.register_blueprint(digital_twin_web)
     app.register_blueprint(source_web)
     app.register_blueprint(operator_strategy_web)
     app.register_blueprint(operator_support_web)
