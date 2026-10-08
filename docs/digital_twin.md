@@ -56,5 +56,6 @@ cached in the Flask process and refreshed when the source-file inventory
 changes. If telemetry is being added while the page is open, reload after the
 short inventory check interval to pick up new files.
 
-The implementation and acceptance requirements are in
+The feature brief, EARS requirements, technical design, completed task list,
+and existing-data evaluation are linked from
 [`specs/digital_twin_what_if_v1.md`](specs/digital_twin_what_if_v1.md).
