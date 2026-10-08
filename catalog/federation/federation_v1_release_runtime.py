@@ -103,11 +103,18 @@ class FederationV1ReleaseRuntime(FederationV1Runtime):
                 self.node.role == ReplicaNode.LEADER
                 and self.node.leader_id == self.node.voter_id
             )
-            election_timeout_elapsed = (
-                now - self.node.last_leader_contact > self.election_timeout_seconds
-                and now >= self._next_election_at
-            )
-            if current_leader or election_timeout_elapsed:
+            if current_leader:
+                self._resume_witnessed_bootstrap()
+            elif (
+                now - self.node.last_leader_contact
+                <= self.election_timeout_seconds
+            ):
+                # Keep the existing rank stagger fresh for as long as this
+                # follower hears from the leader. Otherwise a long recovery
+                # leaves every follower's startup deadline expired and they
+                # can all start a competing election at once after leader loss.
+                self._next_election_at = self._election_deadline()
+            elif now >= self._next_election_at:
                 self._resume_witnessed_bootstrap()
             return
         super()._drive_lifecycle_round()

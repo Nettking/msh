@@ -47,14 +47,15 @@ def _events(runtime):
 
 
 def test_witnessed_recovery_waits_for_leader_or_real_election_timeout(monkeypatch) -> None:
-    now = time.monotonic()
+    clock = SimpleNamespace(now=100.0)
+    monkeypatch.setattr(release_runtime.time, "monotonic", lambda: clock.now)
     state = {"sessions": {SESSION: {}}, "product_journal": {"sessions": {}}}
     node = SimpleNamespace(
         state=state,
         role=ReplicaNode.FOLLOWER,
         leader_id="current-leader",
         voter_id="follower",
-        last_leader_contact=now,
+        last_leader_contact=clock.now,
         store=SimpleNamespace(entries=lambda: ()),
     )
     resumed: list[str] = []
@@ -62,19 +63,40 @@ def test_witnessed_recovery_waits_for_leader_or_real_election_timeout(monkeypatc
         node=node,
         ready=False,
         election_timeout_seconds=10.0,
-        _next_election_at=now,
+        election_stagger_seconds=3.0,
+        _next_election_at=clock.now - 1.0,
         _fresh_genesis=lambda: None,
         _resume_witnessed_bootstrap=lambda: resumed.append("resume"),
     )
+    runtime._election_deadline = lambda: (
+        clock.now + runtime.election_timeout_seconds + runtime.election_stagger_seconds
+    )
     monkeypatch.setattr(release_runtime, "authority_ready", lambda _state: True)
 
+    # An old startup deadline must be renewed while the leader remains alive.
+    FederationV1ReleaseRuntime._drive_lifecycle_round(runtime)
+    assert resumed == []
+    assert runtime._next_election_at == 113.0
+
+    # A later heartbeat renews the rank-specific stagger again.
+    clock.now = 104.0
+    node.last_leader_contact = clock.now
+    FederationV1ReleaseRuntime._drive_lifecycle_round(runtime)
+    assert resumed == []
+    assert runtime._next_election_at == 117.0
+
+    # The leader has now timed out, but this follower still waits for its
+    # refreshed stagger before starting witnessed recovery.
+    clock.now = 115.0
     FederationV1ReleaseRuntime._drive_lifecycle_round(runtime)
     assert resumed == []
 
     node.role = ReplicaNode.LEADER
     node.leader_id = "other-voter"
+    node.last_leader_contact = clock.now
     FederationV1ReleaseRuntime._drive_lifecycle_round(runtime)
     assert resumed == []
+    assert runtime._next_election_at == 128.0
 
     node.leader_id = node.voter_id
     FederationV1ReleaseRuntime._drive_lifecycle_round(runtime)
@@ -83,14 +105,14 @@ def test_witnessed_recovery_waits_for_leader_or_real_election_timeout(monkeypatc
     node.role = ReplicaNode.FOLLOWER
     node.leader_id = "current-leader"
 
-    # Fresh authority state alone is insufficient; only a genuinely expired
-    # leader-contact timeout and the normal election stagger may resume recovery.
-    node.last_leader_contact = now - runtime.election_timeout_seconds - 1.0
-    runtime._next_election_at = now + 1.0
+    # A genuinely expired leader-contact timeout still requires the renewed
+    # stagger deadline; once that deadline passes recovery may proceed.
+    node.last_leader_contact = 104.0
+    runtime._next_election_at = 117.0
     FederationV1ReleaseRuntime._drive_lifecycle_round(runtime)
     assert resumed == []
 
-    runtime._next_election_at = now - 1.0
+    clock.now = 117.0
     FederationV1ReleaseRuntime._drive_lifecycle_round(runtime)
     assert resumed == ["resume"]
 
