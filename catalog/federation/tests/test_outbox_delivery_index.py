@@ -343,12 +343,17 @@ def test_existing_v3_outbox_replaces_incompatible_retired_summary_index(
         # Same name and key columns, but the wrong partial predicate. A
         # name-only IF NOT EXISTS migration would silently preserve this.
         connection.execute(
-            """CREATE INDEX outbox_retired_summary
+            f"""CREATE INDEX outbox_retired_summary
                ON outbox(
                    session_id, destination_id, schema_id,
                    (retirement_dataset_id IS NULL), retirement_dataset_id
                ) WHERE state='{wrong_state}'"""
         )
+        inserted_index_sql = connection.execute(
+            "SELECT sql FROM sqlite_master "
+            "WHERE type='index' AND name='outbox_retired_summary'"
+        ).fetchone()[0]
+        assert f"WHERE state='{wrong_state}'" in inserted_index_sql
         connection.commit()
 
     outbox.initialize()
