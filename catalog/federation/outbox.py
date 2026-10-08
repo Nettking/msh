@@ -225,6 +225,48 @@ _OUTBOX_DELIVERY_INDEX_KEY_COLUMNS = (
     "last_error",
 )
 
+# Retirement health is read on every publication cycle. A partial index keeps
+# that summary proportional to terminal tombstones rather than every row in
+# the route's pending/completed history. The expression key preserves the
+# existing NULL-last ordering used by retired_summary.
+_OUTBOX_RETIRED_SUMMARY_INDEX_DDL = """
+CREATE INDEX IF NOT EXISTS outbox_retired_summary
+ON outbox(
+    session_id,
+    destination_id,
+    schema_id,
+    (retirement_dataset_id IS NULL),
+    retirement_dataset_id
+)
+WHERE state = 'retired';
+"""
+_OUTBOX_RETIRED_SUMMARY_INDEX_KEY_COLUMNS = (
+    "session_id",
+    "destination_id",
+    "schema_id",
+    None,  # NULL-last ordering for retirement_dataset_id.
+    "retirement_dataset_id",
+)
+
+
+def _normalize_index_sql_preserving_literals(sql: str) -> str:
+    """Normalize DDL keywords/spacing without changing string predicates."""
+
+    parts = re.split(r"('(?:''|[^'])*')", sql)
+    return "".join(
+        part if part.startswith("'") else "".join(part.lower().split())
+        for part in parts
+    ).rstrip(";")
+
+
+_OUTBOX_RETIRED_SUMMARY_INDEX_NORMALIZED_SQL = (
+    _normalize_index_sql_preserving_literals(
+        _OUTBOX_RETIRED_SUMMARY_INDEX_DDL.replace(
+            "CREATE INDEX IF NOT EXISTS", "CREATE INDEX"
+        )
+    )
+)
+
 
 def _outbox_table_ddl(name: str, *, if_not_exists: bool) -> str:
     """Return the current outbox DDL.
@@ -501,6 +543,35 @@ class SQLiteOutbox:
                 ):
                     db.execute("DROP INDEX outbox_pending_delivery_dataset")
                 db.execute(_OUTBOX_DELIVERY_INDEX_DDL)
+
+                retired_index = db.execute(
+                    "PRAGMA index_xinfo('outbox_retired_summary')"
+                ).fetchall()
+                retired_key_columns = tuple(
+                    row["name"] for row in retired_index if row["key"]
+                )
+                retired_sql_row = db.execute(
+                    "SELECT sql FROM sqlite_master "
+                    "WHERE type='index' AND name='outbox_retired_summary'"
+                ).fetchone()
+                retired_sql = (
+                    _normalize_index_sql_preserving_literals(
+                        retired_sql_row["sql"]
+                    )
+                    if retired_sql_row is not None
+                    else None
+                )
+                if (
+                    retired_index
+                    and (
+                        retired_key_columns
+                        != _OUTBOX_RETIRED_SUMMARY_INDEX_KEY_COLUMNS
+                        or retired_sql
+                        != _OUTBOX_RETIRED_SUMMARY_INDEX_NORMALIZED_SQL
+                    )
+                ):
+                    db.execute("DROP INDEX outbox_retired_summary")
+                db.execute(_OUTBOX_RETIRED_SUMMARY_INDEX_DDL)
                 db.commit()
             except Exception:
                 db.rollback()
@@ -1354,8 +1425,10 @@ class SQLiteOutbox:
                 "SELECT retirement_dataset_id AS dataset_id, "
                 "COUNT(*) AS row_count FROM outbox"
                 + where
-                + " GROUP BY retirement_dataset_id"
-                " ORDER BY (dataset_id IS NULL), dataset_id LIMIT ?",
+                + " GROUP BY (retirement_dataset_id IS NULL), "
+                "retirement_dataset_id"
+                " ORDER BY (retirement_dataset_id IS NULL), "
+                "retirement_dataset_id LIMIT ?",
                 [*args, bounded + 1],
             ).fetchall()
         truncated = len(grouped) > bounded
