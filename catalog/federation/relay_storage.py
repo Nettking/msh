@@ -81,40 +81,27 @@ def _late_response_diagnostic_fields(
     value: dict[str, Any], *, expected_request_id: str | None,
 ) -> dict[str, Any]:
     """Summarize a late response without accepting or logging its payload."""
+    response = None
+    try:
+        # Keep diagnostic classification aligned with the canonical protocol
+        # parser. This only describes a dropped late frame; it never accepts it.
+        response = StorageResponseEnvelope.from_dict(value)
+    except (TypeError, ValueError):
+        pass
     response_id = value.get("request_id")
-    ok = value.get("ok")
-    error = value.get("error")
-    result = value.get("result")
-    raw_code = error.get("code") if isinstance(error, dict) else None
-    safe_codes = {code.value for code in StorageErrorCode}
-    error_code = raw_code if isinstance(raw_code, str) and raw_code in safe_codes else None
-    error_shape_valid = (
-        isinstance(error, dict)
-        and error_code is not None
-        and isinstance(error.get("message"), str)
-        and bool(error.get("message"))
-        and type(error.get("retryable", False)) is bool
-        and ("field" not in error or error.get("field") is None or isinstance(error.get("field"), str))
+    request_id_matches = (
+        None if expected_request_id is None else response_id == expected_request_id
     )
-    response_shape_valid = (
-        value.get("schema") == StorageResponseEnvelope.SCHEMA
-        and value.get("protocol") == STORAGE_PROTOCOL
-        and value.get("protocol_version") == STORAGE_PROTOCOL_VERSION
-        and isinstance(response_id, str)
-        and (expected_request_id is None or response_id == expected_request_id)
-        and type(ok) is bool
-        and (
-            (ok and isinstance(result, dict) and error is None)
-            or (not ok and result is None and error_shape_valid)
-        )
-    )
+    response_shape_valid = response is not None and request_id_matches is not False
     return {
         "storage_late_response_valid": response_shape_valid,
-        "storage_late_response_request_id_matches": (
-            None if expected_request_id is None else response_id == expected_request_id
+        "storage_late_response_request_id_matches": request_id_matches,
+        "storage_late_response_ok": response.ok if response_shape_valid else None,
+        "storage_late_response_error_code": (
+            response.error.code.value
+            if response_shape_valid and response.error is not None
+            else None
         ),
-        "storage_late_response_ok": ok if response_shape_valid else None,
-        "storage_late_response_error_code": error_code if response_shape_valid and not ok else None,
     }
 
 

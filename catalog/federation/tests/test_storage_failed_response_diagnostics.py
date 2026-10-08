@@ -268,6 +268,115 @@ def test_late_response_with_mismatched_relay_identity_is_not_classified_valid(ca
     assert "PRIVATE-" not in record.getMessage()
 
 
+@pytest.mark.parametrize(
+    ("mutate", "expected_valid", "expected_request_match"),
+    [
+        (lambda response: response["result"].update(value=float("nan")), False, True),
+        (lambda response: response.update(request_id="  "), False, False),
+        (lambda response: response.update(protocol_version="1.1"), True, True),
+        (lambda response: response.update(protocol_version="².0"), False, True),
+    ],
+    ids=[
+        "non-json-result", "blank-request-id", "supported-minor-version",
+        "malformed-unicode-major",
+    ],
+)
+def test_late_response_diagnostics_follow_canonical_envelope_validation(
+    mutate, expected_valid, expected_request_match,
+):
+    response = relay_storage.StorageResponseEnvelope(
+        request_id="logical-request",
+        protocol=relay_storage.STORAGE_PROTOCOL,
+        protocol_version=relay_storage.STORAGE_PROTOCOL_VERSION,
+        ok=True,
+        result={"manifest_revision": 712},
+    ).to_dict()
+    mutate(response)
+
+    fields = relay_storage._late_response_diagnostic_fields(
+        response, expected_request_id="logical-request"
+    )
+
+    assert fields["storage_late_response_valid"] is expected_valid
+    assert fields["storage_late_response_request_id_matches"] is expected_request_match
+
+
+def test_late_response_diagnostics_reject_whitespace_only_error_message():
+    response = {
+        "schema": relay_storage.StorageResponseEnvelope.SCHEMA,
+        "request_id": "logical-request",
+        "protocol": relay_storage.STORAGE_PROTOCOL,
+        "protocol_version": relay_storage.STORAGE_PROTOCOL_VERSION,
+        "ok": False,
+        "result": None,
+        "error": {
+            "code": relay_storage.StorageErrorCode.INTERNAL_ERROR.value,
+            "message": "   ",
+            "retryable": True,
+        },
+    }
+
+    fields = relay_storage._late_response_diagnostic_fields(
+        response, expected_request_id="logical-request"
+    )
+
+    assert fields["storage_late_response_valid"] is False
+    assert fields["storage_late_response_ok"] is None
+
+
+def test_late_response_diagnostics_reject_wrong_expected_request_id():
+    response = relay_storage.StorageResponseEnvelope(
+        request_id="actual-request",
+        protocol=relay_storage.STORAGE_PROTOCOL,
+        protocol_version=relay_storage.STORAGE_PROTOCOL_VERSION,
+        ok=True,
+        result={"manifest_revision": 712},
+    ).to_dict()
+
+    fields = relay_storage._late_response_diagnostic_fields(
+        response, expected_request_id="different-request"
+    )
+
+    assert fields["storage_late_response_valid"] is False
+    assert fields["storage_late_response_request_id_matches"] is False
+    assert fields["storage_late_response_ok"] is None
+
+
+def test_malformed_late_response_version_does_not_escape_response_reader(caplog):
+    endpoint = relay_storage.RelayStorageEndpoint(
+        SimpleNamespace(node_id="PRIVATE-LOCAL-NODE")
+    )
+    caplog.set_level(logging.WARNING, logger=relay_storage.__name__)
+    response = {
+        "schema": relay_storage.StorageResponseEnvelope.SCHEMA,
+        "request_id": "logical-request",
+        "protocol": relay_storage.STORAGE_PROTOCOL,
+        "protocol_version": "².0",
+        "ok": True,
+        "result": {"manifest_revision": 712},
+    }
+
+    endpoint._accept_response(
+        SimpleNamespace(
+            request_id="relay-response-logical-request",
+            actor_node_id="PRIVATE-AUTHORITY-NODE",
+            session_id="PRIVATE-SESSION",
+        ),
+        {"provider_id": "PRIVATE-PROVIDER", "frame": json.dumps(response)},
+    )
+
+    record = next(
+        record for record in caplog.records if record.getMessage().startswith(
+            "storage response rejected "
+        )
+    )
+    fields = json.loads(record.getMessage().split(" ", 3)[3])
+    assert fields["storage_rejection_reason"] == "request_not_pending"
+    assert fields["storage_late_response_valid"] is False
+    assert fields["storage_late_response_request_id_matches"] is True
+    assert fields["storage_late_response_ok"] is None
+
+
 def test_request_relay_delivery_timeout_is_logged_with_elapsed_time(caplog):
     async def scenario():
         incoming = asyncio.Queue()
