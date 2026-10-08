@@ -348,6 +348,25 @@ class PhysicalReadyReplicatedFederationRuntime(
         # This covers empty stores and interrupted migration. Recovery must use
         # the validated bootstrap path and commit the final readiness seal.
         if not authority_ready(state):
+            # Once a Federation genesis or migration prefix is committed, a
+            # follower must not run the bootstrap recovery path while it still
+            # hears from the leader. Unlike sealed-authority recovery below,
+            # an unsealed prefix reaches this branch before readiness is true;
+            # letting every follower retry here can start a higher-term
+            # election in the middle of a long witnessed migration.
+            if (
+                state.get("federation_id") is not None
+                and not (
+                    self.node.role == ReplicaNode.LEADER
+                    and self.node.leader_id == self.node.voter_id
+                )
+            ):
+                now = time.monotonic()
+                if now - self.node.last_leader_contact <= self.election_timeout_seconds:
+                    self._next_election_at = self._election_deadline()
+                    return
+                if now < self._next_election_at:
+                    return
             self._attempt_existing_federation_bootstrap()
             return
 

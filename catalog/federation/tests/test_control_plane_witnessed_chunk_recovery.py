@@ -233,12 +233,11 @@ def test_different_voter_completes_exact_witnessed_prefix_after_first_real_chunk
     witnesses = [_write_member_witness(
         tmp_path, voter_id=voter_id, events=events,
     ) for voter_id in voter_ids]
-    # This test controls the leader stop and recovery synchronously. The full
-    # Windows release run measured this history transfer at 86.46 seconds, so
-    # the fixture's ordinary 60-second autonomous election window allowed the
-    # unrelated follower timer to race the explicit recovery proposal. Keep
-    # that timer outside this scenario; release_bootstrap_recovery separately
-    # exercises timeout-driven election and automatic recovery.
+    # This test controls leader stop and recovery synchronously. The witnessed
+    # transfer can outlast the ordinary election window, so keep background
+    # election timing outside the controlled handoff; the assertions below
+    # still exercise a follower lifecycle round while the old leader is active.
+    # release_bootstrap_recovery separately covers timeout-driven recovery.
     runtimes = [
         _runtime(deployment, *witness, election_timeout_seconds=600.0)
         for deployment, witness in zip(deployments, witnesses, strict=True)
@@ -276,10 +275,15 @@ def test_different_voter_completes_exact_witnessed_prefix_after_first_real_chunk
         assert receipt.content_hash == command.content_hash
         initial_leadership = interrupted_state["leaders"][SESSION]
         assert initial_leadership["leader_node_id"] == voter_ids[0]
+        successor, follower = runtimes[1:]
+        follower_term = follower.node.store.current_term
+        follower._drive_lifecycle_round()
+        assert follower.node.store.current_term == follower_term
+        assert follower.node.role == ReplicaNode.FOLLOWER
+        assert original.node.role == ReplicaNode.LEADER
         original.close()
         started.remove(original)
 
-        successor, follower = runtimes[1:]
         assert successor.node.state["product_journal"]["initializing"][SESSION] == staged
         # Use the real witnessed recovery entrypoint. Existing migration fixture
         # timers keep the injected process boundary deterministic; all elections,
