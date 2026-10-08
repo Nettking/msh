@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -242,7 +244,7 @@ def _relay_message(
 
 
 def test_message_response_is_claimed_before_the_shared_inbound_queue(
-    tmp_path: Path,
+    tmp_path: Path, caplog: pytest.LogCaptureFixture,
 ) -> None:
     class FakeWebSocket:
         def __init__(self, messages: list[str]) -> None:
@@ -258,6 +260,7 @@ def test_message_response_is_claimed_before_the_shared_inbound_queue(
                 raise StopAsyncIteration from error
 
     async def scenario() -> None:
+        caplog.set_level(logging.WARNING, logger=node_client_module.__name__)
         client = _client(tmp_path)
         sent = asyncio.Event()
         release_delivery = asyncio.Event()
@@ -337,6 +340,19 @@ def test_message_response_is_claimed_before_the_shared_inbound_queue(
         assert client._inbound.empty()
         assert client._pending_message_responses == {}
         assert disconnect_codes == [None]
+        mismatch_messages = [
+            record.getMessage().split(" ", 5)[-1]
+            for record in caplog.records
+            if record.getMessage().startswith(
+                "correlated relay response identity mismatch "
+            )
+        ]
+        assert len(mismatch_messages) == 1
+        mismatch_fields = [json.loads(message) for message in mismatch_messages]
+        assert mismatch_fields[0]["session_matches"] is True
+        assert mismatch_fields[0]["actor_matches"] is False
+        assert "session-a" not in " ".join(mismatch_messages)
+        assert "remote-node" not in " ".join(mismatch_messages)
 
     asyncio.run(scenario())
 
@@ -412,6 +428,120 @@ def test_message_response_requires_delivery_confirmation(tmp_path: Path) -> None
             )
 
         assert rejected.value.code == "message-delivery-not-confirmed"
+        assert client._pending_message_responses == {}
+
+    asyncio.run(scenario())
+
+
+def test_mismatched_session_is_logged_without_resolving_pending_reply(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture,
+) -> None:
+    async def scenario() -> None:
+        caplog.set_level(logging.WARNING, logger=node_client_module.__name__)
+        client = _client(tmp_path)
+        future: asyncio.Future[RelayEnvelope] = (
+            asyncio.get_running_loop().create_future()
+        )
+        client._pending_message_responses["correlation-session"] = (
+            node_client_module._PendingMessageResponse(
+                session_id="session-a",
+                target_node_id="remote-node",
+                future=future,
+            )
+        )
+        wrong_session = _relay_message(
+            client,
+            request_id="wrong-session-only",
+            session_id="session-b",
+            actor_node_id="remote-node",
+            correlation_id="correlation-session",
+        )
+
+        assert not client._resolve_pending_message_response(wrong_session)
+        assert not future.done()
+        messages = [
+            record.getMessage().split(" ", 5)[-1]
+            for record in caplog.records
+            if record.getMessage().startswith(
+                "correlated relay response identity mismatch "
+            )
+        ]
+        assert len(messages) == 1
+        fields = json.loads(messages[0])
+        assert fields["session_matches"] is False
+        assert fields["actor_matches"] is True
+        assert "session-a" not in messages[0]
+        assert "session-b" not in messages[0]
+        future.cancel()
+
+    asyncio.run(scenario())
+
+
+def test_message_response_timeout_identifies_relay_dispatch_stage(
+    tmp_path: Path,
+) -> None:
+    async def scenario() -> None:
+        client = _client(tmp_path)
+        client.request_timeout = 0.01
+
+        async def timed_out_dispatch(**_: Any) -> dict[str, Any]:
+            raise TimeoutError()
+
+        client.send_message = timed_out_dispatch  # type: ignore[method-assign]
+        with pytest.raises(
+            TimeoutError, match="relay message dispatch timed out"
+        ) as caught:
+            await client.request_message_response(
+                "session-a", "remote-node", {}, "correlation-a"
+            )
+
+        assert isinstance(caught.value.__cause__, TimeoutError)
+        assert client._pending_message_responses == {}
+
+    asyncio.run(scenario())
+
+
+def test_message_response_timeout_identifies_correlated_reply_stage(
+    tmp_path: Path,
+) -> None:
+    async def scenario() -> None:
+        client = _client(tmp_path)
+        client.request_timeout = 0.01
+
+        async def delivered_without_reply(**_: Any) -> dict[str, Any]:
+            return {"delivered": True}
+
+        client.send_message = delivered_without_reply  # type: ignore[method-assign]
+        with pytest.raises(
+            TimeoutError, match="correlated relay response wait timed out"
+        ) as caught:
+            await client.request_message_response(
+                "session-a", "remote-node", {}, "correlation-b"
+            )
+
+        assert isinstance(caught.value.__cause__, TimeoutError)
+        assert client._pending_message_responses == {}
+
+    asyncio.run(scenario())
+
+
+def test_receiver_timeout_error_is_not_mislabeled_as_reply_deadline(
+    tmp_path: Path,
+) -> None:
+    async def scenario() -> None:
+        client = _client(tmp_path)
+
+        async def receiver_failed(**_: Any) -> dict[str, Any]:
+            future = client._pending_message_responses["correlation-c"].future
+            future.set_exception(TimeoutError("receiver transport timed out"))
+            return {"delivered": True}
+
+        client.send_message = receiver_failed  # type: ignore[method-assign]
+        with pytest.raises(TimeoutError, match="receiver transport timed out"):
+            await client.request_message_response(
+                "session-a", "remote-node", {}, "correlation-c"
+            )
+
         assert client._pending_message_responses == {}
 
     asyncio.run(scenario())
