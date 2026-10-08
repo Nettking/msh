@@ -3,6 +3,8 @@ from __future__ import annotations
 import sqlite3
 from datetime import UTC, datetime
 
+import pytest
+
 from catalog.federation.outbox import (
     _OUTBOX_DELIVERY_DATASET_KEY_SQL,
     _OUTBOX_RETIRED_SUMMARY_INDEX_KEY_COLUMNS,
@@ -312,7 +314,10 @@ def test_retired_summary_uses_bounded_covering_index_without_temp_sort(tmp_path)
     assert "USE TEMP B-TREE" not in repr(grouped_plan)
 
 
-def test_existing_v3_outbox_replaces_incompatible_retired_summary_index(tmp_path):
+@pytest.mark.parametrize("wrong_state", ["pending", "RETIRED"])
+def test_existing_v3_outbox_replaces_incompatible_retired_summary_index(
+    tmp_path, wrong_state
+):
     database = tmp_path / "outbox.sqlite3"
     outbox = SQLiteOutbox(database)
     timestamp = datetime(2026, 10, 6, tzinfo=UTC)
@@ -342,7 +347,7 @@ def test_existing_v3_outbox_replaces_incompatible_retired_summary_index(tmp_path
                ON outbox(
                    session_id, destination_id, schema_id,
                    (retirement_dataset_id IS NULL), retirement_dataset_id
-               ) WHERE state='pending'"""
+               ) WHERE state='{wrong_state}'"""
         )
         connection.commit()
 

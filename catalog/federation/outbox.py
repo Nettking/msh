@@ -247,14 +247,24 @@ _OUTBOX_RETIRED_SUMMARY_INDEX_KEY_COLUMNS = (
     None,  # NULL-last ordering for retirement_dataset_id.
     "retirement_dataset_id",
 )
-_OUTBOX_RETIRED_SUMMARY_INDEX_NORMALIZED_SQL = " ".join(
-    _OUTBOX_RETIRED_SUMMARY_INDEX_DDL.replace(
-        "CREATE INDEX IF NOT EXISTS", "CREATE INDEX"
+
+
+def _normalize_index_sql_preserving_literals(sql: str) -> str:
+    """Normalize DDL keywords/spacing without changing string predicates."""
+
+    parts = re.split(r"('(?:''|[^'])*')", sql)
+    return "".join(
+        part if part.startswith("'") else "".join(part.lower().split())
+        for part in parts
+    ).rstrip(";")
+
+
+_OUTBOX_RETIRED_SUMMARY_INDEX_NORMALIZED_SQL = (
+    _normalize_index_sql_preserving_literals(
+        _OUTBOX_RETIRED_SUMMARY_INDEX_DDL.replace(
+            "CREATE INDEX IF NOT EXISTS", "CREATE INDEX"
+        )
     )
-    .strip()
-    .rstrip(";")
-    .lower()
-    .split()
 )
 
 
@@ -545,7 +555,9 @@ class SQLiteOutbox:
                     "WHERE type='index' AND name='outbox_retired_summary'"
                 ).fetchone()
                 retired_sql = (
-                    " ".join(retired_sql_row["sql"].lower().split())
+                    _normalize_index_sql_preserving_literals(
+                        retired_sql_row["sql"]
+                    )
                     if retired_sql_row is not None
                     else None
                 )
