@@ -6,9 +6,11 @@ import threading
 import time
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
+from catalog.federation import federation_v1_release_runtime as release_runtime
 from catalog.federation.control_plane_journal import PRODUCT_JOURNAL_INITIALIZE
 from catalog.federation.control_plane_replication import ControlPlaneError, ReplicaNode
 from catalog.federation.federation_v1_release_runtime import FederationV1ReleaseRuntime
@@ -42,6 +44,43 @@ def _events(runtime):
     return tuple(event.to_dict() for event in runtime.local.store.replay_events(
         session_id=SESSION, last_applied_revision=0,
     ))
+
+
+def test_witnessed_recovery_waits_for_leader_or_real_election_timeout(monkeypatch) -> None:
+    now = time.monotonic()
+    state = {"sessions": {SESSION: {}}, "product_journal": {"sessions": {}}}
+    node = SimpleNamespace(
+        state=state,
+        role=ReplicaNode.FOLLOWER,
+        leader_id="current-leader",
+        voter_id="follower",
+        last_leader_contact=now,
+        store=SimpleNamespace(entries=lambda: ()),
+    )
+    resumed: list[str] = []
+    runtime = SimpleNamespace(
+        node=node,
+        ready=False,
+        election_timeout_seconds=10.0,
+        _next_election_at=now,
+        _fresh_genesis=lambda: None,
+        _resume_witnessed_bootstrap=lambda: resumed.append("resume"),
+    )
+    monkeypatch.setattr(release_runtime, "authority_ready", lambda _state: True)
+
+    FederationV1ReleaseRuntime._drive_lifecycle_round(runtime)
+    assert resumed == []
+
+    # Fresh authority state alone is insufficient; only a genuinely expired
+    # leader-contact timeout and the normal election stagger may resume recovery.
+    node.last_leader_contact = now - runtime.election_timeout_seconds - 1.0
+    runtime._next_election_at = now + 1.0
+    FederationV1ReleaseRuntime._drive_lifecycle_round(runtime)
+    assert resumed == []
+
+    runtime._next_election_at = now - 1.0
+    FederationV1ReleaseRuntime._drive_lifecycle_round(runtime)
+    assert resumed == ["resume"]
 
 
 @pytest.mark.parametrize(("boundary", "delay_after_journal_sync"), [

@@ -93,7 +93,17 @@ class FederationV1ReleaseRuntime(FederationV1Runtime):
                 self._resume_fresh_bootstrap()
             return
         if authority_ready(self.node.state) and not self.ready:
-            self._resume_witnessed_bootstrap()
+            # A committed authority with an incomplete witnessed journal is
+            # still being recovered by its current leader. Followers must not
+            # independently start the same recovery (and elect a higher term)
+            # while that leader is active. Once leader contact has actually
+            # expired, use the normal staggered election gate before resuming.
+            if self.node.role == ReplicaNode.LEADER or (
+                time.monotonic() - self.node.last_leader_contact
+                > self.election_timeout_seconds
+                and time.monotonic() >= self._next_election_at
+            ):
+                self._resume_witnessed_bootstrap()
             return
         super()._drive_lifecycle_round()
 
