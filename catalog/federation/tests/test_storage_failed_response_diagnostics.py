@@ -130,6 +130,50 @@ def test_known_local_teardown_and_server_rejection_codes_are_not_conflated(code)
     assert "PRIVATE-" not in json.dumps(fields)
 
 
+def test_rejected_late_response_logs_redacted_correlation_and_reason(caplog):
+    endpoint = relay_storage.RelayStorageEndpoint(
+        SimpleNamespace(node_id="PRIVATE-LOCAL-NODE")
+    )
+    caplog.set_level(logging.WARNING, logger=relay_storage.__name__)
+
+    endpoint._accept_response(
+        SimpleNamespace(
+            request_id="PRIVATE-RELAY-REQUEST",
+            actor_node_id="PRIVATE-AUTHORITY-NODE",
+            session_id="PRIVATE-SESSION",
+        ),
+        {
+            "provider_id": "PRIVATE-PROVIDER",
+            "frame": json.dumps({"request_id": "PRIVATE-LOGICAL-REQUEST"}),
+        },
+    )
+
+    record = next(
+        record for record in caplog.records if record.getMessage().startswith(
+            "storage response rejected "
+        )
+    )
+    fields = json.loads(record.getMessage().split(" ", 3)[3])
+    assert fields["storage_stage"] == "response_rejected"
+    assert fields["storage_rejection_reason"] == "request_not_pending"
+    assert fields["storage_request_id"] == relay_storage._diagnostic_text(
+        "PRIVATE-LOGICAL-REQUEST"
+    )
+    assert fields["storage_relay_request_id"] == relay_storage._diagnostic_text(
+        "PRIVATE-RELAY-REQUEST"
+    )
+    assert fields["storage_session_id"] == relay_storage._diagnostic_text(
+        "PRIVATE-SESSION"
+    )
+    assert fields["storage_actor_node_id"] == relay_storage._diagnostic_text(
+        "PRIVATE-AUTHORITY-NODE"
+    )
+    assert fields["storage_provider_id"] == relay_storage._diagnostic_text(
+        "PRIVATE-PROVIDER"
+    )
+    assert "PRIVATE-" not in record.getMessage()
+
+
 def test_successful_response_send_keeps_info_severity_without_new_failure_records(caplog):
     async def send():
         request = _envelope(_request(), request_id="successful-response-original")

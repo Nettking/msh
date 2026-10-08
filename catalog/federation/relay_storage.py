@@ -32,6 +32,12 @@ def _log_failure(message: str, *, extra: dict[str, Any]) -> None:
     _LOGGER.error("%s %s", message, json.dumps(extra, sort_keys=True, separators=(",", ":"), allow_nan=False), extra=extra)
 
 
+def _log_rejection(message: str, *, extra: dict[str, Any]) -> None:
+    # Default container logging formats only the message. Preserve the reason
+    # and redacted request correlation when a late or malformed reply is dropped.
+    _LOGGER.warning("%s %s", message, json.dumps(extra, sort_keys=True, separators=(",", ":"), allow_nan=False), extra=extra)
+
+
 def _diagnostic_text(value: Any, *, maximum: int = 2048) -> str | None:
     if value is None:
         return None
@@ -358,7 +364,7 @@ class RelayStorageEndpoint:
         }
         frame = payload.get("frame")
         if not isinstance(frame, str):
-            _LOGGER.warning(
+            _log_rejection(
                 "storage response rejected",
                 extra={
                     "storage_stage": "response_rejected",
@@ -370,7 +376,7 @@ class RelayStorageEndpoint:
         try:
             response_value = json.loads(frame)
         except json.JSONDecodeError:
-            _LOGGER.warning(
+            _log_rejection(
                 "storage response rejected",
                 extra={
                     "storage_stage": "response_rejected",
@@ -380,7 +386,7 @@ class RelayStorageEndpoint:
             )
             return
         if not isinstance(response_value, dict):
-            _LOGGER.warning(
+            _log_rejection(
                 "storage response rejected",
                 extra={
                     "storage_stage": "response_rejected",
@@ -391,7 +397,7 @@ class RelayStorageEndpoint:
             return
         request_id = response_value.get("request_id")
         if not isinstance(request_id, str):
-            _LOGGER.warning(
+            _log_rejection(
                 "storage response rejected",
                 extra={
                     "storage_stage": "response_rejected",
@@ -413,7 +419,7 @@ class RelayStorageEndpoint:
             "storage_provider_id": _diagnostic_text(response_provider_id),
         }
         if pending is None:
-            _LOGGER.warning(
+            _log_rejection(
                 "storage response rejected",
                 extra={
                     "storage_stage": "response_rejected",
@@ -429,7 +435,7 @@ class RelayStorageEndpoint:
                 if response_provider_id != pending.provider_id
                 else "route_mismatch"
             )
-            _LOGGER.warning(
+            _log_rejection(
                 "storage response rejected",
                 extra={
                     "storage_stage": "response_rejected",
@@ -442,7 +448,7 @@ class RelayStorageEndpoint:
         try:
             response = StorageResponseEnvelope.from_dict(response_value)
         except FederationValidationError as exc:
-            _LOGGER.warning(
+            _log_rejection(
                 "storage response rejected",
                 extra={
                     "storage_stage": "response_rejected",
@@ -466,7 +472,7 @@ class RelayStorageEndpoint:
                 },
             )
         else:
-            _LOGGER.warning(
+            _log_rejection(
                 "storage response arrived after request completed",
                 extra={
                     "storage_stage": "response_rejected",
