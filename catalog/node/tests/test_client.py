@@ -417,6 +417,76 @@ def test_message_response_requires_delivery_confirmation(tmp_path: Path) -> None
     asyncio.run(scenario())
 
 
+def test_message_response_timeout_identifies_relay_dispatch_stage(
+    tmp_path: Path,
+) -> None:
+    async def scenario() -> None:
+        client = _client(tmp_path)
+        client.request_timeout = 0.01
+
+        async def timed_out_dispatch(**_: Any) -> dict[str, Any]:
+            raise TimeoutError()
+
+        client.send_message = timed_out_dispatch  # type: ignore[method-assign]
+        with pytest.raises(
+            TimeoutError, match="relay message dispatch timed out"
+        ) as caught:
+            await client.request_message_response(
+                "session-a", "remote-node", {}, "correlation-a"
+            )
+
+        assert isinstance(caught.value.__cause__, TimeoutError)
+        assert client._pending_message_responses == {}
+
+    asyncio.run(scenario())
+
+
+def test_message_response_timeout_identifies_correlated_reply_stage(
+    tmp_path: Path,
+) -> None:
+    async def scenario() -> None:
+        client = _client(tmp_path)
+        client.request_timeout = 0.01
+
+        async def delivered_without_reply(**_: Any) -> dict[str, Any]:
+            return {"delivered": True}
+
+        client.send_message = delivered_without_reply  # type: ignore[method-assign]
+        with pytest.raises(
+            TimeoutError, match="correlated relay response wait timed out"
+        ) as caught:
+            await client.request_message_response(
+                "session-a", "remote-node", {}, "correlation-b"
+            )
+
+        assert isinstance(caught.value.__cause__, TimeoutError)
+        assert client._pending_message_responses == {}
+
+    asyncio.run(scenario())
+
+
+def test_receiver_timeout_error_is_not_mislabeled_as_reply_deadline(
+    tmp_path: Path,
+) -> None:
+    async def scenario() -> None:
+        client = _client(tmp_path)
+
+        async def receiver_failed(**_: Any) -> dict[str, Any]:
+            future = client._pending_message_responses["correlation-c"].future
+            future.set_exception(TimeoutError("receiver transport timed out"))
+            return {"delivered": True}
+
+        client.send_message = receiver_failed  # type: ignore[method-assign]
+        with pytest.raises(TimeoutError, match="receiver transport timed out"):
+            await client.request_message_response(
+                "session-a", "remote-node", {}, "correlation-c"
+            )
+
+        assert client._pending_message_responses == {}
+
+    asyncio.run(scenario())
+
+
 def test_disconnect_fails_and_clears_pending_message_responses(
     tmp_path: Path,
 ) -> None:

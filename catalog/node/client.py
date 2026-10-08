@@ -702,11 +702,18 @@ class RelayNodeClient:
         )
         self._pending_message_responses[correlation_id] = pending
         try:
-            delivery = await self.send_message(
-                session_id=session_id,
-                target_node_id=target_node_id,
-                payload=outbound_payload,
-            )
+            try:
+                delivery = await self.send_message(
+                    session_id=session_id,
+                    target_node_id=target_node_id,
+                    payload=outbound_payload,
+                )
+            except TimeoutError as error:
+                # Keep the dispatch and correlated-reply deadlines distinct.
+                # The recorder's durable outbox stores the exception text, so
+                # a bare TimeoutError otherwise erases which operation timed
+                # out and leaves a live publication failure untriageable.
+                raise TimeoutError("relay message dispatch timed out") from error
             if (
                 not isinstance(delivery, dict)
                 or delivery.get("delivered") is not True
@@ -715,10 +722,20 @@ class RelayNodeClient:
                     "message-delivery-not-confirmed",
                     "relay did not confirm routed message delivery",
                 )
-            return await asyncio.wait_for(
-                future,
-                timeout=self.request_timeout if timeout is None else timeout,
-            )
+            try:
+                return await asyncio.wait_for(
+                    future,
+                    timeout=self.request_timeout if timeout is None else timeout,
+                )
+            except TimeoutError as error:
+                # ``wait_for`` cancels the future when its own deadline
+                # expires. A TimeoutError raised by the receiver loop is a
+                # different failure and must keep its original meaning.
+                if future.cancelled():
+                    raise TimeoutError(
+                        "correlated relay response wait timed out"
+                    ) from error
+                raise
         finally:
             if self._pending_message_responses.get(correlation_id) is pending:
                 self._pending_message_responses.pop(correlation_id, None)
