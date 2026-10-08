@@ -71,6 +71,18 @@ def test_witnessed_recovery_waits_for_leader_or_real_election_timeout(monkeypatc
     FederationV1ReleaseRuntime._drive_lifecycle_round(runtime)
     assert resumed == []
 
+    node.role = ReplicaNode.LEADER
+    node.leader_id = "other-voter"
+    FederationV1ReleaseRuntime._drive_lifecycle_round(runtime)
+    assert resumed == []
+
+    node.leader_id = node.voter_id
+    FederationV1ReleaseRuntime._drive_lifecycle_round(runtime)
+    assert resumed == ["resume"]
+    resumed.clear()
+    node.role = ReplicaNode.FOLLOWER
+    node.leader_id = "current-leader"
+
     # Fresh authority state alone is insufficient; only a genuinely expired
     # leader-contact timeout and the normal election stagger may resume recovery.
     node.last_leader_contact = now - runtime.election_timeout_seconds - 1.0

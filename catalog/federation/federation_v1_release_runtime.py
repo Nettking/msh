@@ -98,11 +98,16 @@ class FederationV1ReleaseRuntime(FederationV1Runtime):
             # independently start the same recovery (and elect a higher term)
             # while that leader is active. Once leader contact has actually
             # expired, use the normal staggered election gate before resuming.
-            if self.node.role == ReplicaNode.LEADER or (
-                time.monotonic() - self.node.last_leader_contact
-                > self.election_timeout_seconds
-                and time.monotonic() >= self._next_election_at
-            ):
+            now = time.monotonic()
+            current_leader = (
+                self.node.role == ReplicaNode.LEADER
+                and self.node.leader_id == self.node.voter_id
+            )
+            election_timeout_elapsed = (
+                now - self.node.last_leader_contact > self.election_timeout_seconds
+                and now >= self._next_election_at
+            )
+            if current_leader or election_timeout_elapsed:
                 self._resume_witnessed_bootstrap()
             return
         super()._drive_lifecycle_round()
