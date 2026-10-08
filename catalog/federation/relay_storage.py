@@ -77,6 +77,47 @@ def _request_diagnostic_fields(envelope: StorageRequestEnvelope) -> dict[str, An
     }
 
 
+def _late_response_diagnostic_fields(
+    value: dict[str, Any], *, expected_request_id: str | None,
+) -> dict[str, Any]:
+    """Summarize a late response without accepting or logging its payload."""
+    response_id = value.get("request_id")
+    ok = value.get("ok")
+    error = value.get("error")
+    result = value.get("result")
+    raw_code = error.get("code") if isinstance(error, dict) else None
+    safe_codes = {code.value for code in StorageErrorCode}
+    error_code = raw_code if isinstance(raw_code, str) and raw_code in safe_codes else None
+    error_shape_valid = (
+        isinstance(error, dict)
+        and error_code is not None
+        and isinstance(error.get("message"), str)
+        and bool(error.get("message"))
+        and type(error.get("retryable", False)) is bool
+        and ("field" not in error or error.get("field") is None or isinstance(error.get("field"), str))
+    )
+    response_shape_valid = (
+        value.get("schema") == StorageResponseEnvelope.SCHEMA
+        and value.get("protocol") == STORAGE_PROTOCOL
+        and value.get("protocol_version") == STORAGE_PROTOCOL_VERSION
+        and isinstance(response_id, str)
+        and (expected_request_id is None or response_id == expected_request_id)
+        and type(ok) is bool
+        and (
+            (ok and isinstance(result, dict) and error is None)
+            or (not ok and result is None and error_shape_valid)
+        )
+    )
+    return {
+        "storage_late_response_valid": response_shape_valid,
+        "storage_late_response_request_id_matches": (
+            None if expected_request_id is None else response_id == expected_request_id
+        ),
+        "storage_late_response_ok": ok if response_shape_valid else None,
+        "storage_late_response_error_code": error_code if response_shape_valid and not ok else None,
+    }
+
+
 def _response_failure_fields(
     response: StorageResponseEnvelope,
     error: Exception,
@@ -246,28 +287,44 @@ class RelayStorageEndpoint:
             diagnostic_fields,
         )
         try:
-            delivery = await self.relay_client.send_message(
-                session_id=envelope.session_id,
-                target_node_id=target_node_id,
-                request_id=f"relay-{envelope.request_id}",
-                payload={
-                    "kind": RELAY_STORAGE_KIND,
-                    "message": "request",
-                    "provider_id": provider_id,
-                    "frame": json.dumps(
-                        envelope.to_dict(),
-                        sort_keys=True,
-                        separators=(",", ":"),
-                        ensure_ascii=False,
-                        allow_nan=False,
-                    ),
-                },
-            )
+            delivery_started = time.monotonic()
+            try:
+                delivery = await self.relay_client.send_message(
+                    session_id=envelope.session_id,
+                    target_node_id=target_node_id,
+                    request_id=f"relay-{envelope.request_id}",
+                    payload={
+                        "kind": RELAY_STORAGE_KIND,
+                        "message": "request",
+                        "provider_id": provider_id,
+                        "frame": json.dumps(
+                            envelope.to_dict(),
+                            sort_keys=True,
+                            separators=(",", ":"),
+                            ensure_ascii=False,
+                            allow_nan=False,
+                        ),
+                    },
+                )
+            except Exception as exc:
+                _log_failure("storage request relay delivery failed", extra={
+                    "storage_stage": "request_delivery_failed",
+                    "storage_request_id": _diagnostic_text(envelope.request_id),
+                    "storage_session_id": _diagnostic_text(envelope.session_id),
+                    "storage_target_node_id": _diagnostic_text(target_node_id),
+                    "storage_provider_id": _diagnostic_text(provider_id),
+                    "storage_delivery_elapsed_seconds": round(time.monotonic() - delivery_started, 6),
+                    "storage_exception_type": type(exc).__name__,
+                    **diagnostic_fields,
+                })
+                raise
+            delivery_elapsed = time.monotonic() - delivery_started
             if not isinstance(delivery, dict) or delivery.get("delivered") is not True:
                 _log_failure("storage request delivery not confirmed", extra={
                     "storage_stage": "request_delivery", "storage_request_id": _diagnostic_text(envelope.request_id),
                     "storage_session_id": _diagnostic_text(envelope.session_id), "storage_target_node_id": _diagnostic_text(target_node_id),
                     "storage_provider_id": _diagnostic_text(provider_id), "storage_delivery_confirmed": False,
+                    "storage_delivery_elapsed_seconds": round(delivery_elapsed, 6),
                     **diagnostic_fields})
                 raise FederationValidationError(
                     "storage-route-failed", "target_node_id", "relay did not confirm delivery"
@@ -277,6 +334,7 @@ class RelayStorageEndpoint:
                 "storage_stage": "request_delivery", "storage_request_id": _diagnostic_text(envelope.request_id),
                 "storage_session_id": _diagnostic_text(envelope.session_id), "storage_target_node_id": _diagnostic_text(target_node_id),
                 "storage_provider_id": _diagnostic_text(provider_id), "storage_delivery_confirmed": True,
+                "storage_delivery_elapsed_seconds": round(delivery_elapsed, 6),
                 **diagnostic_fields})
             try:
                 response = await asyncio.wait_for(future, timeout=self.request_timeout)
@@ -285,12 +343,15 @@ class RelayStorageEndpoint:
                     "storage_stage": "response_wait", "storage_request_id": _diagnostic_text(envelope.request_id),
                     "storage_session_id": _diagnostic_text(envelope.session_id), "storage_target_node_id": _diagnostic_text(target_node_id),
                     "storage_provider_id": _diagnostic_text(provider_id), "storage_elapsed_seconds": round(time.monotonic()-started, 6),
+                    "storage_delivery_elapsed_seconds": round(delivery_elapsed, 6),
                     **diagnostic_fields})
                 raise
             _LOGGER.info("storage response accepted", extra={
                 "storage_stage": "response_accepted", "storage_request_id": _diagnostic_text(envelope.request_id),
                 "storage_session_id": _diagnostic_text(envelope.session_id), "storage_target_node_id": _diagnostic_text(target_node_id),
                 "storage_provider_id": _diagnostic_text(provider_id), "storage_response_ok": response.ok,
+                "storage_delivery_elapsed_seconds": round(delivery_elapsed, 6),
+                "storage_response_wait_elapsed_seconds": round(time.monotonic()-started, 6),
                 **diagnostic_fields})
             return response
         finally:
@@ -419,12 +480,22 @@ class RelayStorageEndpoint:
             "storage_provider_id": _diagnostic_text(response_provider_id),
         }
         if pending is None:
+            response_request_prefix = "relay-response-"
+            expected_late_request_id = (
+                relay_request_id.removeprefix(response_request_prefix)
+                if isinstance(relay_request_id, str)
+                and relay_request_id.startswith(response_request_prefix)
+                else None
+            )
             _log_rejection(
                 "storage response rejected",
                 extra={
                     "storage_stage": "response_rejected",
                     "storage_rejection_reason": "request_not_pending",
                     **response_context,
+                    **_late_response_diagnostic_fields(
+                        response_value, expected_request_id=expected_late_request_id,
+                    ),
                 },
             )
             return
@@ -537,11 +608,26 @@ class RelayStorageEndpoint:
                         **diagnostic_fields,
                     })
                     raise
-                _LOGGER.info("storage provider dispatch completed", extra={
-                    "storage_stage":"provider_dispatch_complete", "storage_request_id":_diagnostic_text(request.request_id),
-                    "storage_session_id":_diagnostic_text(request.session_id), "storage_actor_node_id":_diagnostic_text(getattr(relay_message,"actor_node_id",None)),
-                    "storage_provider_id":_diagnostic_text(provider_id), "storage_response_ok":response.ok,
-                    "storage_elapsed_seconds":round(time.monotonic()-started,6), **diagnostic_fields})
+                dispatch_elapsed = time.monotonic() - started
+                dispatch_fields = {
+                    "storage_stage": "provider_dispatch_complete",
+                    "storage_request_id": _diagnostic_text(request.request_id),
+                    "storage_session_id": _diagnostic_text(request.session_id),
+                    "storage_actor_node_id": _diagnostic_text(
+                        getattr(relay_message, "actor_node_id", None)
+                    ),
+                    "storage_provider_id": _diagnostic_text(provider_id),
+                    "storage_response_ok": response.ok,
+                    "storage_elapsed_seconds": round(dispatch_elapsed, 6),
+                    **diagnostic_fields,
+                }
+                if dispatch_elapsed >= min(10.0, self.request_timeout * (2 / 3)):
+                    _LOGGER.warning(
+                        "storage provider dispatch was slow %s",
+                        json.dumps(dispatch_fields, sort_keys=True, separators=(",", ":"), allow_nan=False),
+                        extra=dispatch_fields,
+                    )
+                _LOGGER.info("storage provider dispatch completed", extra=dispatch_fields)
         except (FederationValidationError, json.JSONDecodeError) as exc:
             raw_request_id = (
                 request_value.get("request_id")
@@ -619,9 +705,21 @@ class RelayStorageEndpoint:
                 **diagnostic_fields,
             })
             raise
-        _LOGGER.info("storage response relay delivery result", extra={
-            "storage_stage":"response_delivery", "storage_request_id":_diagnostic_text(response.request_id),
-            "storage_session_id":_diagnostic_text(session_id), "storage_target_node_id":_diagnostic_text(target_node_id),
-            "storage_provider_id":_diagnostic_text(provider_id),
-            "storage_delivery_confirmed":isinstance(delivery,dict) and delivery.get("delivered") is True,
-            **diagnostic_fields})
+        delivery_elapsed = time.monotonic() - delivery_started
+        delivery_fields = {
+            "storage_stage": "response_delivery",
+            "storage_request_id": _diagnostic_text(response.request_id),
+            "storage_session_id": _diagnostic_text(session_id),
+            "storage_target_node_id": _diagnostic_text(target_node_id),
+            "storage_provider_id": _diagnostic_text(provider_id),
+            "storage_delivery_confirmed": isinstance(delivery, dict) and delivery.get("delivered") is True,
+            "storage_elapsed_seconds": round(delivery_elapsed, 6),
+            **diagnostic_fields,
+        }
+        if delivery_elapsed >= min(10.0, self.request_timeout * (2 / 3)):
+            _LOGGER.warning(
+                "storage response relay delivery was slow %s",
+                json.dumps(delivery_fields, sort_keys=True, separators=(",", ":"), allow_nan=False),
+                extra=delivery_fields,
+            )
+        _LOGGER.info("storage response relay delivery result", extra=delivery_fields)
