@@ -233,9 +233,16 @@ def test_different_voter_completes_exact_witnessed_prefix_after_first_real_chunk
     witnesses = [_write_member_witness(
         tmp_path, voter_id=voter_id, events=events,
     ) for voter_id in voter_ids]
-    runtimes = [_runtime(deployment, *witness) for deployment, witness in zip(
-        deployments, witnesses, strict=True,
-    )]
+    # This test controls the leader stop and recovery synchronously. The full
+    # Windows release run measured this history transfer at 86.46 seconds, so
+    # the fixture's ordinary 60-second autonomous election window allowed the
+    # unrelated follower timer to race the explicit recovery proposal. Keep
+    # that timer outside this scenario; release_bootstrap_recovery separately
+    # exercises timeout-driven election and automatic recovery.
+    runtimes = [
+        _runtime(deployment, *witness, election_timeout_seconds=600.0)
+        for deployment, witness in zip(deployments, witnesses, strict=True)
+    ]
     original = runtimes[0]
     original_propose = original._propose_bootstrap_command
     interrupted = {}
@@ -302,7 +309,9 @@ def test_different_voter_completes_exact_witnessed_prefix_after_first_real_chunk
         assert _wire_events(follower) == _wire_events(successor)
         assert state["federation_id"] == FEDERATION
 
-        returning = _runtime(deployments[0], *witnesses[0])
+        returning = _runtime(
+            deployments[0], *witnesses[0], election_timeout_seconds=600.0
+        )
         diagnostics.observe_runtime(returning)
         returning.start()
         started.append(returning)
