@@ -646,8 +646,11 @@ def test_returning_real_reply_loss_observes_exact_catchup_after_normal_round(tmp
     observations = []
     factory = _runtime
 
-    def runtime(*args):
-        value = factory(*args)
+    def runtime(*args, **kwargs):
+        # Preserve optional fixture controls passed by the inner scenario.
+        # In particular, its election-timeout override must reach the original
+        # runtime factory instead of failing at this interception wrapper.
+        value = factory(*args, **kwargs)
         # This test owns the bootstrap, failover, and replication transitions
         # synchronously. Disable only the independent periodic lifecycle loop
         # so a slow runner cannot elect another follower during the controlled
