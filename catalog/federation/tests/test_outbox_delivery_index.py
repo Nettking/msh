@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 
 from catalog.federation.outbox import (
     _OUTBOX_DELIVERY_DATASET_KEY_SQL,
+    _OUTBOX_RETIRED_SUMMARY_INDEX_KEY_COLUMNS,
     SQLiteOutbox,
 )
 
@@ -247,3 +248,128 @@ def test_pending_delivery_bounds_payload_join_when_groups_exceed_limit(tmp_path)
     assert "WHERE delivery_rank <= 1" in bounded_ids
     assert "ORDER BY outbox_id LIMIT 3" in bounded_ids
     assert normalized.index("LIMIT 3") < normalized.index("SELECT entry.*")
+
+
+def test_retired_summary_uses_bounded_covering_index_without_temp_sort(tmp_path):
+    database = tmp_path / "outbox.sqlite3"
+    outbox = _TracingOutbox(database)
+    timestamp = datetime(2026, 10, 6, tzinfo=UTC)
+    for index in range(256):
+        entry, _created = outbox.enqueue(
+            session_id="session-a",
+            destination_id="group-a",
+            schema_id="fcp.recorder.storage_delivery.v1",
+            payload={"dataset_id": f"dataset-{index:03d}"},
+            idempotency_key=f"key-{index}",
+            content_hash=f"sha256:{index:064x}",
+            now=timestamp,
+        )
+        if index % 64 == 0:
+            outbox.retire(
+                entry.outbox_id,
+                reason="payload-field-missing",
+                dataset_id=None if index == 0 else f"dataset-{index:03d}",
+                now=timestamp,
+            )
+
+    outbox.statements.clear()
+    summary = outbox.retired_summary(
+        session_id="session-a",
+        destination_id="group-a",
+        schema_id="fcp.recorder.storage_delivery.v1",
+    )
+    assert summary.total == 4
+    assert [item.dataset_id for item in summary.datasets] == [
+        "dataset-064",
+        "dataset-128",
+        "dataset-192",
+        None,
+    ]
+
+    count_queries = [
+        statement
+        for statement in outbox.statements
+        if statement.lstrip().startswith("SELECT COUNT(*) AS total FROM outbox")
+    ]
+    grouped_queries = [
+        statement
+        for statement in outbox.statements
+        if statement.lstrip().startswith(
+            "SELECT retirement_dataset_id AS dataset_id"
+        )
+    ]
+    assert len(count_queries) == len(grouped_queries) == 1
+    with sqlite3.connect(f"file:{database}?mode=ro", uri=True) as connection:
+        count_plan = connection.execute(
+            f"EXPLAIN QUERY PLAN {count_queries[0]}"
+        ).fetchall()
+        grouped_plan = connection.execute(
+            f"EXPLAIN QUERY PLAN {grouped_queries[0]}"
+        ).fetchall()
+
+    assert "COVERING INDEX outbox_retired_summary" in repr(count_plan)
+    assert "COVERING INDEX outbox_retired_summary" in repr(grouped_plan)
+    assert "USE TEMP B-TREE" not in repr(grouped_plan)
+
+
+def test_existing_v3_outbox_replaces_incompatible_retired_summary_index(tmp_path):
+    database = tmp_path / "outbox.sqlite3"
+    outbox = SQLiteOutbox(database)
+    timestamp = datetime(2026, 10, 6, tzinfo=UTC)
+    entry, _created = outbox.enqueue(
+        session_id="session-a",
+        destination_id="group-a",
+        schema_id="fcp.recorder.storage_delivery.v1",
+        payload={"dataset_id": "dataset-a"},
+        idempotency_key="key-a",
+        content_hash="sha256:" + "a" * 64,
+        now=timestamp,
+    )
+    outbox.retire(
+        entry.outbox_id,
+        reason="payload-field-missing",
+        dataset_id="dataset-a",
+        now=timestamp,
+    )
+    before = outbox.get(entry.outbox_id)
+
+    with sqlite3.connect(database) as connection:
+        connection.execute("DROP INDEX outbox_retired_summary")
+        # Same name and key columns, but the wrong partial predicate. A
+        # name-only IF NOT EXISTS migration would silently preserve this.
+        connection.execute(
+            """CREATE INDEX outbox_retired_summary
+               ON outbox(
+                   session_id, destination_id, schema_id,
+                   (retirement_dataset_id IS NULL), retirement_dataset_id
+               ) WHERE state='pending'"""
+        )
+        connection.commit()
+
+    outbox.initialize()
+
+    assert outbox.get(entry.outbox_id) == before
+    assert outbox.retired_summary(
+        session_id="session-a",
+        destination_id="group-a",
+        schema_id="fcp.recorder.storage_delivery.v1",
+    ).total == 1
+    with sqlite3.connect(database) as connection:
+        index_columns = tuple(
+            row[2]
+            for row in connection.execute(
+                "PRAGMA index_xinfo('outbox_retired_summary')"
+            ).fetchall()
+            if row[5]
+        )
+        index_sql = connection.execute(
+            "SELECT sql FROM sqlite_master "
+            "WHERE type='index' AND name='outbox_retired_summary'"
+        ).fetchone()[0]
+        version = connection.execute(
+            "SELECT version FROM outbox_schema WHERE singleton=1"
+        ).fetchone()[0]
+
+    assert index_columns == _OUTBOX_RETIRED_SUMMARY_INDEX_KEY_COLUMNS
+    assert "WHERE state = 'retired'" in index_sql
+    assert version == 3
