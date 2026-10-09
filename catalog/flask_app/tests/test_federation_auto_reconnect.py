@@ -1,20 +1,30 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 from flask import Flask
 
 from catalog.federation.coordinator import SessionCoordinator
+from catalog.federation.errors import FederationOperationError
 from catalog.federation.onboarding_compat import federation_id_from_session_id
-from catalog.flask_app.services import federation_pairing_install
+from catalog.flask_app.services import (
+    federation_pairing_install,
+    federation_pairing_service,
+)
 from catalog.flask_app.services.federation_pairing_install import (
     SavedFederationReconnectMonitor,
 )
-from catalog.flask_app.services.federation_pairing_service import PairingCodeCodec
+from catalog.flask_app.services.federation_pairing_service import (
+    PairingCodeCodec,
+    PairingRelayRuntime,
+    RemotePairingState,
+)
 from catalog.flask_app.services.resilient_pairing_runtime import (
     ResilientPairingRelayRuntime,
 )
@@ -22,6 +32,60 @@ from catalog.node.identity import IdentityStore
 from catalog.relay.service import RelayServer
 
 NOW = datetime(2026, 8, 6, 16, 30, tzinfo=timezone.utc)
+
+
+@pytest.mark.parametrize(
+    ("remote_code", "expected_code", "logged_remote_code"),
+    [
+        ("relay-not-ready", "relay-not-ready", True),
+        ("fcp_enroll_secretmaterial", "pairing-connect-failed", False),
+        ("RelayRejected", "pairing-connect-failed", False),
+    ],
+)
+def test_saved_reconnect_logs_only_stable_error_codes(
+    tmp_path: Path,
+    monkeypatch,
+    caplog,
+    remote_code: str,
+    expected_code: str,
+    logged_remote_code: bool,
+) -> None:
+    class FailingClient:
+        disconnect_code: str | None = None
+
+        async def connect(self) -> None:
+            raise FederationOperationError(remote_code, "redacted failure")
+
+        async def disconnect(self, *, error_code: str | None = None) -> None:
+            self.disconnect_code = error_code
+
+    client = FailingClient()
+    monkeypatch.setattr(
+        federation_pairing_service,
+        "PairingRelayNodeClient",
+        lambda **kwargs: client,
+    )
+    runtime = PairingRelayRuntime(
+        state_directory=tmp_path / "state",
+        display_name="FCP owner",
+    )
+    state = RemotePairingState(
+        relay_url="ws://relay:8765",
+        binding=SimpleNamespace(internal_session_id="session-test"),  # type: ignore[arg-type]
+    )
+
+    with (
+        caplog.at_level(
+            logging.WARNING,
+            logger="catalog.flask_app.services.federation_pairing_service",
+        ),
+        pytest.raises(FederationOperationError),
+    ):
+        asyncio.run(runtime._ensure_connected_owned(state))
+
+    assert client.disconnect_code == expected_code
+    assert f"error_code={expected_code}" in caplog.text
+    assert (remote_code in caplog.text) is logged_remote_code
 
 
 def test_existing_enrollment_and_membership_recover_remote_binding(
