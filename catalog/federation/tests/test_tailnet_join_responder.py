@@ -221,6 +221,27 @@ def test_refusal_incomplete_body_or_socket_error_ends_cleanup(result) -> None:
     assert 0 < timeouts[0] <= responder.GRANT_TIMEOUT_SECONDS
 
 
+def test_refusal_cleanup_timeout_never_exceeds_bound_after_float_rounding(
+    monkeypatch,
+) -> None:
+    handler = responder._Handler.__new__(responder._Handler)
+    handler.headers = {"Content-Length": "1"}
+    timeouts = []
+    handler.connection = SimpleNamespace(settimeout=timeouts.append)
+    handler.rfile = SimpleNamespace(read1=lambda _size: b"")
+    # This representable clock value makes (now + 10) - now round slightly
+    # above 10 on Windows/Python, while a coarse clock can return now twice.
+    now = 8.000000000000005
+    clock = iter((now, now))
+    monkeypatch.setattr(
+        responder, "time", SimpleNamespace(monotonic=lambda: next(clock))
+    )
+
+    handler._discard_refused_post_body()
+
+    assert timeouts == [responder.GRANT_TIMEOUT_SECONDS]
+
+
 def test_health_endpoint_reports_readiness_without_granting(monkeypatch) -> None:
     monkeypatch.setattr(responder, "local_tailnet_identity", lambda: PEER)
 
