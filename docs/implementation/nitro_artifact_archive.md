@@ -62,7 +62,7 @@ created or restarted by the workflow change.
 The normal closeout process must still copy the final ICSE publication bundle to
 its authorized release/publication destination before this 90-day retention
 expires. A GitHub artifact is not a Recorder backup or a replacement for the
-independent MSH-to-Nitro data-transfer responsibility.
+independent Recorder data-transfer responsibility.
 
 ## Current deployment and machine roles (2026-09-19)
 
