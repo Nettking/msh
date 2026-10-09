@@ -46,6 +46,35 @@ def test_excluded_candidates_skip_ancestor_marker_checks(tmp_path, monkeypatch, 
     assert checked == expected
 
 
+def test_recorder_raw_archive_tree_is_pruned_before_directory_enumeration(
+    tmp_path, monkeypatch
+):
+    bridge = _bridge(tmp_path, "recorder-raw-pruning")
+    root = bridge.data_root
+    raw_root = root / "sources/mtconnect_recorder/raw"
+    _file(
+        root,
+        "sources/mtconnect_recorder/raw/M8012N7193N/1791435146/2026-10-08/"
+        "not-generic-source.jsonl",
+    )
+    local = _file(root, "exports/local.jsonl")
+    scanned = []
+    original_scandir = os.scandir
+
+    def record_scandir(path):
+        scanned.append(Path(path))
+        return original_scandir(path)
+
+    monkeypatch.setattr(data_loading.os, "scandir", record_scandir)
+    assert list(bridge._local_candidates()) == [
+        ("exports/local.jsonl", local)
+    ]
+    assert all(
+        path != raw_root and not path.is_relative_to(raw_root)
+        for path in scanned
+    ), "the dedicated sequence-aware archive must not be enumerated by generic JSONL discovery"
+
+
 def test_optional_file_filter_preserves_sorted_default_discovery(tmp_path):
     root = tmp_path / "data"
     files = [_file(root, relative) for relative in ("z.jsonl", "nested/b.jsonl", "a.jsonl")]
@@ -140,7 +169,7 @@ def test_windows_junction_alias_keeps_current_glob_selection(tmp_path):
     assert link.resolve().is_relative_to(tmp_path.resolve())
     result = subprocess.run(
         ["cmd.exe", "/d", "/c", "mklink", "/J", str(link), str(allowed.parent)],
-        capture_output=True, timeout=10,
+        capture_output=True, check=False, timeout=10,
     )
     assert result.returncode == 0, result.stderr.decode(errors="replace")
     assert link.is_junction()
@@ -279,7 +308,7 @@ def test_final_resolution_rejects_junction_rebound_after_prefilter(tmp_path, mon
         assert link.parent.resolve() == root and target.resolve().is_relative_to(root)
         result = subprocess.run(
             ["cmd.exe", "/d", "/c", "mklink", "/J", str(link), str(target)],
-            capture_output=True, timeout=10,
+            capture_output=True, check=False, timeout=10,
         )
         assert result.returncode == 0, result.stderr.decode(errors="replace")
         assert link.is_junction()

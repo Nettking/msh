@@ -188,6 +188,8 @@ def _runtime(
     deployment: ReplicatedControlPlaneDeployment,
     node_db: Path,
     pairing: Path,
+    *,
+    election_timeout_seconds: float = 60.0,
 ) -> FederationV1ReleaseRuntime:
     return FederationV1ReleaseRuntime(
         deployment,
@@ -196,7 +198,7 @@ def _runtime(
         legacy_node_state_database=node_db,
         legacy_pairing_state_path=pairing,
         heartbeat_seconds=60.0,
-        election_timeout_seconds=60.0,
+        election_timeout_seconds=election_timeout_seconds,
         election_stagger_seconds=5.0,
         credential_sync_seconds=60.0,
     )

@@ -116,7 +116,12 @@ _EXCLUDED_LOCAL_PREFIXES = (
     "federation/",
     # Has a stronger sequence-aware publication and mirror contract of its own.
     "sources/mtconnect_recorder/jsonl/",
+    # Raw batches have a separate sequence-aware outbox. Walking this tree for
+    # generic JSONL files needlessly enumerates every raw envelope and manifest
+    # on installations where the Recorder data root is a slow host bind mount.
+    "sources/mtconnect_recorder/raw/",
 )
+_PRUNED_LOCAL_DIRECTORY_PREFIXES = ("sources/mtconnect_recorder/raw/",)
 #: Prefixes that are published by default but that a deployment may withhold.
 #: Browser uploads are the case that matters: they are shared like any other
 #: local JSONL, and an installation that treats uploaded files as device-local
@@ -733,6 +738,32 @@ class FederatedJsonlProductBridge:
         last_parent: Path | None = None
         last_resolved_parent: Path | None = None
 
+        def include_directory(entry: os.DirEntry[str]) -> bool:
+            # Keep the established alias traversal for other excluded trees.
+            # The ordinary Recorder raw root is a dedicated sequence-aware
+            # archive boundary, so generic JSONL discovery can skip it before
+            # enumerating the many raw envelopes and manifests beneath it.
+            # Reparse directories still take the existing full traversal path.
+            try:
+                if os.name == "nt" and (
+                    getattr(entry.stat(follow_symlinks=False), "st_file_attributes", 0)
+                    & stat.FILE_ATTRIBUTE_REPARSE_POINT
+                ):
+                    return True
+                relative = (
+                    Path(entry.path)
+                    .relative_to(self.data_root)
+                    .as_posix()
+                    .rstrip("/")
+                    + "/"
+                )
+            except (OSError, ValueError):
+                return True  # Preserve discovery if pruning cannot be proven safe.
+            return not any(
+                relative.startswith(prefix)
+                for prefix in _PRUNED_LOCAL_DIRECTORY_PREFIXES
+            )
+
         def include_entry(entry: os.DirEntry[str]) -> bool:
             nonlocal last_parent, last_resolved_parent
             # Readdir already knows ordinary leaf types (and Windows attributes).
@@ -786,7 +817,7 @@ class FederatedJsonlProductBridge:
 
         for path in iter_jsonl_files(
             self.data_root, recursive=True, file_filter=include_file,
-            entry_filter=include_entry,
+            entry_filter=include_entry, directory_filter=include_directory,
         ):
             try:
                 relative = path.resolve().relative_to(self.data_root).as_posix()

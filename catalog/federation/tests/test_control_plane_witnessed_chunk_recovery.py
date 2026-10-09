@@ -233,9 +233,15 @@ def test_different_voter_completes_exact_witnessed_prefix_after_first_real_chunk
     witnesses = [_write_member_witness(
         tmp_path, voter_id=voter_id, events=events,
     ) for voter_id in voter_ids]
-    runtimes = [_runtime(deployment, *witness) for deployment, witness in zip(
-        deployments, witnesses, strict=True,
-    )]
+    # This test controls leader stop and recovery synchronously. The witnessed
+    # transfer can outlast the ordinary election window, so keep background
+    # election timing outside the controlled handoff; the assertions below
+    # still exercise a follower lifecycle round while the old leader is active.
+    # release_bootstrap_recovery separately covers timeout-driven recovery.
+    runtimes = [
+        _runtime(deployment, *witness, election_timeout_seconds=600.0)
+        for deployment, witness in zip(deployments, witnesses, strict=True)
+    ]
     original = runtimes[0]
     original_propose = original._propose_bootstrap_command
     interrupted = {}
@@ -269,10 +275,15 @@ def test_different_voter_completes_exact_witnessed_prefix_after_first_real_chunk
         assert receipt.content_hash == command.content_hash
         initial_leadership = interrupted_state["leaders"][SESSION]
         assert initial_leadership["leader_node_id"] == voter_ids[0]
+        successor, follower = runtimes[1:]
+        follower_term = follower.node.store.current_term
+        follower._drive_lifecycle_round()
+        assert follower.node.store.current_term == follower_term
+        assert follower.node.role == ReplicaNode.FOLLOWER
+        assert original.node.role == ReplicaNode.LEADER
         original.close()
         started.remove(original)
 
-        successor, follower = runtimes[1:]
         assert successor.node.state["product_journal"]["initializing"][SESSION] == staged
         # Use the real witnessed recovery entrypoint. Existing migration fixture
         # timers keep the injected process boundary deterministic; all elections,
@@ -302,7 +313,9 @@ def test_different_voter_completes_exact_witnessed_prefix_after_first_real_chunk
         assert _wire_events(follower) == _wire_events(successor)
         assert state["federation_id"] == FEDERATION
 
-        returning = _runtime(deployments[0], *witnesses[0])
+        returning = _runtime(
+            deployments[0], *witnesses[0], election_timeout_seconds=600.0
+        )
         diagnostics.observe_runtime(returning)
         returning.start()
         started.append(returning)
@@ -637,8 +650,11 @@ def test_returning_real_reply_loss_observes_exact_catchup_after_normal_round(tmp
     observations = []
     factory = _runtime
 
-    def runtime(*args):
-        value = factory(*args)
+    def runtime(*args, **kwargs):
+        # Preserve optional fixture controls passed by the inner scenario.
+        # In particular, its election-timeout override must reach the original
+        # runtime factory instead of failing at this interception wrapper.
+        value = factory(*args, **kwargs)
         # This test owns the bootstrap, failover, and replication transitions
         # synchronously. Disable only the independent periodic lifecycle loop
         # so a slow runner cannot elect another follower during the controlled

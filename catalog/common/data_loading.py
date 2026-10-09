@@ -58,6 +58,7 @@ def iter_jsonl_files(
     recursive: bool = True,
     file_filter: Callable[[Path], bool] | None = None,
     entry_filter: Callable[[os.DirEntry[str]], bool] | None = None,
+    directory_filter: Callable[[os.DirEntry[str]], bool] | None = None,
 ) -> Iterator[Path]:
     """
     Yield JSONL files from a directory in sorted order.
@@ -73,9 +74,13 @@ def iter_jsonl_files(
         Reject otherwise matching files before inspecting ancestor upload
         markers. Omitted by default, preserving complete JSONL discovery.
     entry_filter : callable, optional
-        Reject matching directory entries before constructing/sorting paths or
-        issuing per-file Path metadata calls. Retained candidates still pass
+        Reject matching JSONL file entries before constructing/sorting paths
+        or issuing per-file Path metadata calls. Retained candidates still pass
         the ordinary file and incomplete-import checks. Omitted by default.
+    directory_filter : callable, optional
+        Return True for directory entries that should be traversed. Returning
+        False prunes that subtree before it is enumerated. Omitted by default,
+        preserving complete recursive JSONL discovery.
 
     Yields
     ------
@@ -90,8 +95,13 @@ def iter_jsonl_files(
     root = Path(data_dir)
     pattern = "*.jsonl"
     iterator = (
-        _filtered_jsonl_entries(root, recursive=recursive, entry_filter=entry_filter)
-        if entry_filter is not None
+        _filtered_jsonl_entries(
+            root,
+            recursive=recursive,
+            entry_filter=entry_filter,
+            directory_filter=directory_filter,
+        )
+        if entry_filter is not None or directory_filter is not None
         else root.rglob(pattern) if recursive else root.glob(pattern)
     )
 
@@ -108,7 +118,8 @@ def _filtered_jsonl_entries(
     root: Path,
     *,
     recursive: bool,
-    entry_filter: Callable[[os.DirEntry[str]], bool],
+    entry_filter: Callable[[os.DirEntry[str]], bool] | None,
+    directory_filter: Callable[[os.DirEntry[str]], bool] | None,
 ) -> Iterator[Path]:
     """Use readdir metadata without changing default discovery callers.
 
@@ -128,14 +139,21 @@ def _filtered_jsonl_entries(
         except OSError:
             continue
         if directory:
-            if recursive:
+            if recursive and (
+                directory_filter is None or directory_filter(entry)
+            ):
                 directories.append(Path(entry.path))
-        elif fnmatch.fnmatch(entry.name, "*.jsonl") and entry_filter(entry):
+        elif fnmatch.fnmatch(entry.name, "*.jsonl") and (
+            entry_filter is None or entry_filter(entry)
+        ):
             yield Path(entry.path)
     del entries
     for directory in directories:
         yield from _filtered_jsonl_entries(
-            directory, recursive=True, entry_filter=entry_filter
+            directory,
+            recursive=True,
+            entry_filter=entry_filter,
+            directory_filter=directory_filter,
         )
 
 
