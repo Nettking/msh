@@ -1,16 +1,24 @@
 from __future__ import annotations
 
+import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
 
+from catalog.federation.errors import FederationValidationError
 from catalog.federation.host_resources import (
     FilesystemMeasurement,
     HostResourceRefused,
     PressureThresholds,
 )
-from catalog.federation.outbox import OutboxState, SQLiteOutbox
+from catalog.federation.outbox import (
+    _OUTBOX_MAX_MIGRATION_BYTES,
+    _OUTBOX_MUTATION_FIXED_BYTES,
+    _OUTBOX_MUTATION_FIXED_INODES,
+    OutboxState,
+    SQLiteOutbox,
+)
 from catalog.federation.process_resource_admission import (
     SerializedProcessResourceAdmission,
 )
@@ -51,6 +59,20 @@ def _enqueue(outbox: SQLiteOutbox, key: str = "key-1"):
         idempotency_key=key,
         content_hash=f"sha256:{key}",
         now=NOW,
+    )
+
+
+class _OversizedSQLiteOutbox(SQLiteOutbox):
+    """Exercise the large-file admission path without creating a huge fixture."""
+
+    def _database_bytes(self) -> int:
+        return _OUTBOX_MAX_MIGRATION_BYTES + 1
+
+
+def _large_outbox(database: Path) -> _OversizedSQLiteOutbox:
+    return _OversizedSQLiteOutbox(
+        database,
+        resource_admission=_admission(1_000_000_000),
     )
 
 
@@ -103,3 +125,69 @@ def test_outbox_exception_unwinds_admission_for_the_next_transaction(
     entry, created = _enqueue(outbox)
     assert created
     assert entry.state is OutboxState.PENDING
+
+
+def test_large_current_v3_outbox_uses_only_bounded_noop_startup(tmp_path: Path) -> None:
+    database = tmp_path / "outbox.sqlite3"
+    original = SQLiteOutbox(database, resource_admission=_admission(1_000_000_000))
+    entry, _ = _enqueue(original)
+
+    oversized = _OversizedSQLiteOutbox.__new__(_OversizedSQLiteOutbox)
+    oversized.database = str(database)
+    oversized.database_path = database
+    oversized.resource_admission = _admission(1_000_000_000)
+    requirements = oversized._migration_requirements()
+    assert requirements == (
+        (
+            database.parent,
+            _OUTBOX_MUTATION_FIXED_BYTES,
+            _OUTBOX_MUTATION_FIXED_INODES + 2,
+        ),
+    )
+
+    reopened = _large_outbox(database)
+    preserved = reopened.get(entry.outbox_id)
+    assert preserved == entry
+    with sqlite3.connect(f"file:{database}?mode=ro", uri=True) as connection:
+        assert connection.execute(
+            "SELECT version FROM outbox_schema WHERE singleton=1"
+        ).fetchone()[0] == 3
+        assert connection.execute(
+            "SELECT COUNT(*) FROM outbox"
+        ).fetchone()[0] == 1
+
+
+def test_large_outbox_with_old_schema_still_fails_closed(tmp_path: Path) -> None:
+    database = tmp_path / "outbox.sqlite3"
+    SQLiteOutbox(database, resource_admission=_admission(1_000_000_000))
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            "UPDATE outbox_schema SET version=2 WHERE singleton=1"
+        )
+        connection.commit()
+
+    with pytest.raises(FederationValidationError) as rejected:
+        _large_outbox(database)
+
+    assert rejected.value.code == "outbox-resource-envelope"
+    with sqlite3.connect(f"file:{database}?mode=ro", uri=True) as connection:
+        assert connection.execute(
+            "SELECT version FROM outbox_schema WHERE singleton=1"
+        ).fetchone()[0] == 2
+
+
+def test_large_outbox_with_missing_index_still_fails_closed(tmp_path: Path) -> None:
+    database = tmp_path / "outbox.sqlite3"
+    SQLiteOutbox(database, resource_admission=_admission(1_000_000_000))
+    with sqlite3.connect(database) as connection:
+        connection.execute("DROP INDEX outbox_pending_due")
+        connection.commit()
+
+    with pytest.raises(FederationValidationError) as rejected:
+        _large_outbox(database)
+
+    assert rejected.value.code == "outbox-resource-envelope"
+    with sqlite3.connect(f"file:{database}?mode=ro", uri=True) as connection:
+        assert connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='index' AND name='outbox_pending_due'"
+        ).fetchone() is None
