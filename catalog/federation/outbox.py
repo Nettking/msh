@@ -458,6 +458,19 @@ class SQLiteOutbox:
         if not required_columns <= columns:
             return False
 
+        outbox_table = db.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='outbox'"
+        ).fetchone()
+        if (
+            outbox_table is None
+            or outbox_table[0] is None
+            or _normalize_index_sql_preserving_literals(outbox_table[0])
+            != _normalize_index_sql_preserving_literals(
+                _outbox_table_ddl("outbox", if_not_exists=False)
+            )
+        ):
+            return False
+
         expected_indexes = {
             "outbox_pending_due": (
                 ("state", "next_attempt_at", "outbox_id"),

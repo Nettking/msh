@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from catalog.federation import outbox as outbox_module
 from catalog.federation.errors import FederationValidationError
 from catalog.federation.host_resources import (
     FilesystemMeasurement,
@@ -191,3 +192,35 @@ def test_large_outbox_with_missing_index_still_fails_closed(tmp_path: Path) -> N
         assert connection.execute(
             "SELECT 1 FROM sqlite_master WHERE type='index' AND name='outbox_pending_due'"
         ).fetchone() is None
+
+
+def test_large_outbox_without_idempotency_constraint_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    database = tmp_path / "outbox.sqlite3"
+    original_ddl = outbox_module._outbox_table_ddl
+
+    def without_idempotency_constraint(name: str, *, if_not_exists: bool) -> str:
+        unique_clause = (
+            ",\n"
+            "                    UNIQUE(session_id, destination_id, idempotency_key)"
+        )
+        return original_ddl(name, if_not_exists=if_not_exists).replace(
+            unique_clause, ""
+        )
+
+    monkeypatch.setattr(
+        outbox_module, "_outbox_table_ddl", without_idempotency_constraint
+    )
+    SQLiteOutbox(database, resource_admission=_admission(1_000_000_000))
+    monkeypatch.setattr(outbox_module, "_outbox_table_ddl", original_ddl)
+
+    with pytest.raises(FederationValidationError) as rejected:
+        _large_outbox(database)
+
+    assert rejected.value.code == "outbox-resource-envelope"
+    with sqlite3.connect(f"file:{database}?mode=ro", uri=True) as connection:
+        create_sql = connection.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='outbox'"
+        ).fetchone()[0]
+        assert "UNIQUE(session_id, destination_id, idempotency_key)" not in create_sql
