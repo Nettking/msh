@@ -1,9 +1,9 @@
 # CI evidence archives: Nitro and scoped GitHub Actions artifacts
 
 > **Scope update (2026-10-09):** This document records the Nitro SSH archive
-> implementation for workflows that still use it. Phase 2 Go module-lock
-> evidence and ICSE tool-demo evidence now use explicitly configured GitHub
-> Actions artifact paths. This is not a fallback in the Nitro action: remaining
+> implementation for workflows that still use it. Phase 2 Go module-lock,
+> ICSE tool-demo, and Phase F7 closeout evidence now use explicitly configured
+> GitHub Actions artifact paths. This is not a fallback in the Nitro action: remaining
 > Nitro consumers still fail closed. The Federation v1 software
 > release gate and campaign-tooling checks no longer depend on Nitro or another
 > fixed runner: they use GitHub-hosted runners and immutable run/attempt-bound
@@ -16,9 +16,9 @@
 The Nitro implementation details below apply only to workflows that still
 invoke the Nitro archive action. Those workflows remain fail-closed and must not
 silently fall back to another store. The Federation v1 release gate, Phase 2 Go
-module-lock evidence, and ICSE tool-demo evidence explicitly use GitHub Actions
-artifacts; each is a separately configured evidence path, not a fallback
-performed by the Nitro action.
+module-lock evidence, ICSE tool-demo evidence, and Phase F7 closeout evidence
+explicitly use GitHub Actions artifacts; each is a separately configured
+evidence path, not a fallback performed by the Nitro action.
 
 This is an infrastructure change, independent of the frozen Federation candidate.
 Introduce it through normal PR review and required checks. Infrastructure merge
@@ -30,6 +30,15 @@ paid runners. The direct Phase 2 and ICSE artifact paths below are explicit
 workflow configuration, not fallback behavior.
 
 ## Current scoped GitHub artifact paths (Phase 2 and ICSE)
+
+The `Phase F7 capability scheduling closeout` workflow stores each native
+JUnit result with an adjacent manifest that binds the result hash and size to
+the exact checked-out SHA, workflow run/attempt, job, matrix role, and runner.
+The artifact name carries the run ID, attempt, and platform; its immutable
+GitHub artifact ID and digest are recorded in the job summary. This avoids
+staging an unchanged JUnit file on the runner solely for the former Nitro
+transfer, while retaining the completed test evidence under the same 90-day
+closeout policy.
 
 The `Phase 2 federation` workflow stores the Go `go.mod` and `go.sum` capture
 with an `archive-manifest.json` containing the event and actual checkout SHA,
