@@ -461,13 +461,17 @@ class SQLiteOutbox:
         outbox_table = db.execute(
             "SELECT sql FROM sqlite_master WHERE type='table' AND name='outbox'"
         ).fetchone()
+        expected_outbox_table_ddls = {
+            _normalize_index_sql_preserving_literals(
+                _outbox_table_ddl(name, if_not_exists=False)
+            )
+            for name in ("outbox", '"outbox"')
+        }
         if (
             outbox_table is None
             or outbox_table[0] is None
             or _normalize_index_sql_preserving_literals(outbox_table[0])
-            != _normalize_index_sql_preserving_literals(
-                _outbox_table_ddl("outbox", if_not_exists=False)
-            )
+            not in expected_outbox_table_ddls
         ):
             return False
 

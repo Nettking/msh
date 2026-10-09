@@ -158,6 +158,45 @@ def test_large_current_v3_outbox_uses_only_bounded_noop_startup(tmp_path: Path) 
         ).fetchone()[0] == 1
 
 
+def test_large_current_v3_outbox_accepts_quoted_table_identifier(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "outbox.sqlite3"
+    with sqlite3.connect(database) as connection:
+        connection.execute("PRAGMA journal_mode=WAL")
+        connection.execute(
+            "CREATE TABLE outbox_schema ("
+            "singleton INTEGER PRIMARY KEY CHECK (singleton = 1), "
+            "version INTEGER NOT NULL CHECK (version > 0))"
+        )
+        connection.execute(
+            "INSERT INTO outbox_schema(singleton, version) VALUES(1, 3)"
+        )
+        connection.execute(
+            outbox_module._outbox_table_ddl('"outbox"', if_not_exists=False)
+        )
+        connection.execute(outbox_module._OUTBOX_INDEX_DDL)
+        connection.execute(outbox_module._OUTBOX_DELIVERY_INDEX_DDL)
+        connection.execute(outbox_module._OUTBOX_RETIRED_SUMMARY_INDEX_DDL)
+        connection.commit()
+
+    with sqlite3.connect(f"file:{database}?mode=ro", uri=True) as connection:
+        create_sql = connection.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='outbox'"
+        ).fetchone()[0]
+        assert 'CREATE TABLE "outbox"' in create_sql
+
+    reopened = _large_outbox(database)
+    assert reopened.pending() == ()
+    with sqlite3.connect(f"file:{database}?mode=ro", uri=True) as connection:
+        assert connection.execute(
+            "SELECT version FROM outbox_schema WHERE singleton=1"
+        ).fetchone()[0] == 3
+        assert connection.execute(
+            "SELECT COUNT(*) FROM outbox"
+        ).fetchone()[0] == 0
+
+
 def test_large_outbox_with_old_schema_still_fails_closed(tmp_path: Path) -> None:
     database = tmp_path / "outbox.sqlite3"
     SQLiteOutbox(database, resource_admission=_admission(1_000_000_000))
