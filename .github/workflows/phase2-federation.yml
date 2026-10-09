@@ -83,20 +83,117 @@ jobs:
           go test ./...
           mkdir -p ../../build
           go build -trimpath -o ../../build/fcp-peer-sidecar .
-      - name: Capture Go module lock
+      - name: Stage Go module lock evidence
         if: always()
-        uses: ./.github/actions/nitro-artifact
+        env:
+          EVIDENCE_DIR: ${{ runner.temp }}/f62-go-module-lock-${{ github.run_id }}-a${{ github.run_attempt }}-linux
+          SOURCE_SHA: ${{ github.sha }}
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          JOB_KEY: ${{ github.job }}
+          RUNNER_NAME: ${{ runner.name }}
+          RUNNER_OS: ${{ runner.os }}
+          JOB_STATUS: ${{ job.status }}
+          MATRIX_JSON: '{}'
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import shutil
+          import subprocess
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          root = Path(os.environ["EVIDENCE_DIR"])
+          root.mkdir(parents=True, exist_ok=False)
+          sources = {
+              "go.mod": Path("cmd/fcp-peer-sidecar/go.mod"),
+              "go.sum": Path("cmd/fcp-peer-sidecar/go.sum"),
+          }
+          checkout_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+          if checkout_sha != os.environ["SOURCE_SHA"]:
+              raise SystemExit("checked-out source SHA does not match the workflow event SHA")
+          for name, source in sources.items():
+              if not source.is_file():
+                  raise SystemExit(f"required evidence is missing: {source}")
+              shutil.copy2(source, root / name)
+          files = []
+          for name, source in sources.items():
+              data = (root / name).read_bytes()
+              files.append({
+                  "path": name,
+                  "source_path": source.as_posix(),
+                  "size": len(data),
+                  "sha256": hashlib.sha256(data).hexdigest(),
+              })
+          manifest = {
+              "schema": "fcp.ci-evidence-manifest.v1",
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "source_sha": os.environ["SOURCE_SHA"],
+              "checkout_sha": checkout_sha,
+              "workflow": os.environ["GITHUB_WORKFLOW"],
+              "workflow_ref": os.environ["WORKFLOW_REF"],
+              "workflow_sha": os.environ["WORKFLOW_SHA"],
+              "run_id": os.environ["RUN_ID"],
+              "run_attempt": int(os.environ["RUN_ATTEMPT"]),
+              "job_key": os.environ["JOB_KEY"],
+              "matrix": json.loads(os.environ["MATRIX_JSON"]),
+              "runner_name": os.environ["RUNNER_NAME"],
+              "runner_os": os.environ["RUNNER_OS"],
+              "job_status_at_capture": os.environ["JOB_STATUS"],
+              "captured_at_utc": datetime.now(timezone.utc).isoformat(),
+              "files": files,
+          }
+          (root / "archive-manifest.json").write_text(
+              json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          PY
+      - name: Upload Go module lock evidence
+        id: lock_artifact
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          operation: upload
-          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
-          host: ${{ vars.NITRO_ARTIFACT_HOST }}
-          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
-          matrix: ${{ toJSON(matrix) }}
-          job-status: ${{ job.status }}
-          name: f62-go-module-lock
-          path: |
-            cmd/fcp-peer-sidecar/go.mod
-            cmd/fcp-peer-sidecar/go.sum
+          name: f62-go-module-lock-${{ github.run_id }}-a${{ github.run_attempt }}-linux
+          path: ${{ runner.temp }}/f62-go-module-lock-${{ github.run_id }}-a${{ github.run_attempt }}-linux/
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
+      - name: Record Go module lock artifact receipt
+        if: always()
+        env:
+          ARTIFACT_NAME: f62-go-module-lock-${{ github.run_id }}-a${{ github.run_attempt }}-linux
+          ARTIFACT_ID: ${{ steps.lock_artifact.outputs.artifact-id }}
+          ARTIFACT_DIGEST: ${{ steps.lock_artifact.outputs.artifact-digest }}
+          ARTIFACT_URL: ${{ steps.lock_artifact.outputs.artifact-url }}
+          SOURCE_SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          JOB_KEY: ${{ github.job }}
+          MATRIX_JSON: '{}'
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = {
+              "artifact_name": os.environ["ARTIFACT_NAME"],
+              "artifact_id": os.environ.get("ARTIFACT_ID", ""),
+              "artifact_digest": os.environ.get("ARTIFACT_DIGEST", ""),
+              "artifact_url": os.environ.get("ARTIFACT_URL", ""),
+              "source_sha": os.environ["SOURCE_SHA"],
+              "run_id": os.environ["RUN_ID"],
+              "run_attempt": int(os.environ["RUN_ATTEMPT"]),
+              "job_key": os.environ["JOB_KEY"],
+              "matrix": json.loads(os.environ["MATRIX_JSON"]),
+          }
+          with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as stream:
+              stream.write("### Go module lock evidence artifact\n\n")
+              stream.write("```json\n" + json.dumps(receipt, indent=2, sort_keys=True) + "\n```\n")
+          PY
       - name: Ubuntu storage precondition
         uses: ./.github/actions/ubuntu-storage-precondition
 

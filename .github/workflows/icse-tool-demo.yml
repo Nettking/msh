@@ -51,7 +51,7 @@ jobs:
       matrix:
         include:
           - os: Linux
-            runner: nettking-linux
+            runner: fcp-linux-fast
             shell: bash
           - os: Windows
             runner: fcp-windows
@@ -81,38 +81,99 @@ jobs:
         run: >-
           python -m demo.icse.run
           --output "${{ runner.temp }}/fcp-icse-components-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}/icse-summary.json"
-      - if: always()
-        uses: ./.github/actions/nitro-artifact
+      - name: Manifest E1-E4 evidence
+        if: always()
+        env:
+          EVIDENCE_DIR: ${{ runner.temp }}/fcp-icse-components-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}
+          SOURCE_SHA: ${{ github.sha }}
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          JOB_KEY: ${{ github.job }}
+          RUNNER_NAME: ${{ runner.name }}
+          RUNNER_OS: ${{ runner.os }}
+          JOB_STATUS: ${{ job.status }}
+          MATRIX_JSON: ${{ toJSON(matrix) }}
+          MANIFEST_KIND: icse-component
+          MANIFEST_FILES: '["icse-summary.json"]'
+        run: >-
+          python -c "import datetime,hashlib,json,os,subprocess; from pathlib import Path; root=Path(os.environ['EVIDENCE_DIR']); checkout_sha=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(); assert checkout_sha==os.environ['SOURCE_SHA'], 'checkout SHA does not match workflow event SHA'; expected=set(json.loads(os.environ['MANIFEST_FILES'])); actual={p.name for p in root.iterdir()}; assert actual==expected, f'unexpected evidence files: {sorted(actual)}'; entries=[{'path':p.name,'size':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()} for p in sorted(root.iterdir()) if p.is_file()]; manifest={'schema':'fcp.ci-evidence-manifest.v1','kind':os.environ['MANIFEST_KIND'],'repository':os.environ['GITHUB_REPOSITORY'],'source_sha':os.environ['SOURCE_SHA'],'checkout_sha':checkout_sha,'event_sha':os.environ['GITHUB_SHA'],'workflow':os.environ['GITHUB_WORKFLOW'],'workflow_ref':os.environ['WORKFLOW_REF'],'workflow_sha':os.environ['WORKFLOW_SHA'],'run_id':os.environ['RUN_ID'],'run_attempt':int(os.environ['RUN_ATTEMPT']),'job_key':os.environ['JOB_KEY'],'matrix':json.loads(os.environ['MATRIX_JSON']),'runner_name':os.environ['RUNNER_NAME'],'runner_os':os.environ['RUNNER_OS'],'job_status_at_capture':os.environ['JOB_STATUS'],'captured_at_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),'files':entries}; (root/'archive-manifest.json').write_text(json.dumps(manifest,indent=2,sort_keys=True)+'\n',encoding='utf-8')"
+      - name: Upload E1-E4 evidence
+        id: components_artifact
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          operation: upload
-          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
-          host: ${{ vars.NITRO_ARTIFACT_HOST }}
-          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
-          matrix: ${{ toJSON(matrix) }}
-          job-status: ${{ job.status }}
-          name: icse-summary-${{ matrix.os }}
-          path: ${{ runner.temp }}/fcp-icse-components-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}/icse-summary.json
+          name: icse-summary-${{ github.run_id }}-a${{ github.run_attempt }}-reviewer-entrypoint-${{ matrix.os }}
+          path: ${{ runner.temp }}/fcp-icse-components-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}/
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
+      - name: Record E1-E4 artifact receipt
+        if: always()
+        env:
+          ARTIFACT_NAME: icse-summary-${{ github.run_id }}-a${{ github.run_attempt }}-reviewer-entrypoint-${{ matrix.os }}
+          ARTIFACT_ID: ${{ steps.components_artifact.outputs.artifact-id }}
+          ARTIFACT_DIGEST: ${{ steps.components_artifact.outputs.artifact-digest }}
+          ARTIFACT_URL: ${{ steps.components_artifact.outputs.artifact-url }}
+          SOURCE_SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          JOB_KEY: ${{ github.job }}
+          MATRIX_JSON: ${{ toJSON(matrix) }}
+        run: >-
+          python -c "import json,os; from pathlib import Path; receipt={'artifact_name':os.environ['ARTIFACT_NAME'],'artifact_id':os.environ.get('ARTIFACT_ID',''),'artifact_digest':os.environ.get('ARTIFACT_DIGEST',''),'artifact_url':os.environ.get('ARTIFACT_URL',''),'source_sha':os.environ['SOURCE_SHA'],'run_id':os.environ['RUN_ID'],'run_attempt':int(os.environ['RUN_ATTEMPT']),'job_key':os.environ['JOB_KEY'],'matrix':json.loads(os.environ['MATRIX_JSON'])}; Path(os.environ['GITHUB_STEP_SUMMARY']).open('a',encoding='utf-8').write('### E1-E4 evidence artifact receipt\n\n'+json.dumps(receipt,indent=2,sort_keys=True)+'\n\n')"
       - name: Run independent-node network demonstration
         id: network_demo
         run: >-
           python -B -m demo.icse.network.run
           --source-sha "${{ github.sha }}"
           --output "${{ runner.temp }}/fcp-icse-network-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}"
-      - name: Preserve network evidence even after failure
+      - name: Manifest public network evidence
         if: ${{ always() && (steps.network_demo.outcome == 'success' || steps.network_demo.outcome == 'failure') }}
-        uses: ./.github/actions/nitro-artifact
+        env:
+          EVIDENCE_DIR: ${{ runner.temp }}/fcp-icse-network-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}/public
+          SOURCE_SHA: ${{ github.sha }}
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          JOB_KEY: ${{ github.job }}
+          RUNNER_NAME: ${{ runner.name }}
+          RUNNER_OS: ${{ runner.os }}
+          JOB_STATUS: ${{ job.status }}
+          MATRIX_JSON: ${{ toJSON(matrix) }}
+          MANIFEST_KIND: icse-network-public
+          MANIFEST_FILES: '["events.jsonl","operator-report.html","summary.json"]'
+        run: >-
+          python -c "import datetime,hashlib,json,os,subprocess; from pathlib import Path; root=Path(os.environ['EVIDENCE_DIR']); checkout_sha=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(); assert checkout_sha==os.environ['SOURCE_SHA'], 'checkout SHA does not match workflow event SHA'; expected=set(json.loads(os.environ['MANIFEST_FILES'])); actual={p.name for p in root.iterdir()}; assert actual==expected, f'unexpected evidence files: {sorted(actual)}'; entries=[{'path':p.name,'size':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()} for p in sorted(root.iterdir()) if p.is_file()]; manifest={'schema':'fcp.ci-evidence-manifest.v1','kind':os.environ['MANIFEST_KIND'],'repository':os.environ['GITHUB_REPOSITORY'],'source_sha':os.environ['SOURCE_SHA'],'checkout_sha':checkout_sha,'event_sha':os.environ['GITHUB_SHA'],'workflow':os.environ['GITHUB_WORKFLOW'],'workflow_ref':os.environ['WORKFLOW_REF'],'workflow_sha':os.environ['WORKFLOW_SHA'],'run_id':os.environ['RUN_ID'],'run_attempt':int(os.environ['RUN_ATTEMPT']),'job_key':os.environ['JOB_KEY'],'matrix':json.loads(os.environ['MATRIX_JSON']),'runner_name':os.environ['RUNNER_NAME'],'runner_os':os.environ['RUNNER_OS'],'job_status_at_capture':os.environ['JOB_STATUS'],'captured_at_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),'files':entries}; (root/'archive-manifest.json').write_text(json.dumps(manifest,indent=2,sort_keys=True)+'\n',encoding='utf-8')"
+      - name: Upload public network evidence
+        id: network_artifact
+        if: ${{ always() && (steps.network_demo.outcome == 'success' || steps.network_demo.outcome == 'failure') }}
+        uses: actions/upload-artifact@v4
         with:
-          operation: upload
-          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
-          host: ${{ vars.NITRO_ARTIFACT_HOST }}
-          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
-          matrix: ${{ toJSON(matrix) }}
-          job-status: ${{ job.status }}
-          name: icse-network-summary-${{ matrix.os }}
+          name: icse-network-summary-${{ github.run_id }}-a${{ github.run_attempt }}-reviewer-entrypoint-${{ matrix.os }}
           path: ${{ runner.temp }}/fcp-icse-network-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}/public/
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
+      - name: Record network artifact receipt
+        if: always()
+        env:
+          ARTIFACT_NAME: icse-network-summary-${{ github.run_id }}-a${{ github.run_attempt }}-reviewer-entrypoint-${{ matrix.os }}
+          ARTIFACT_ID: ${{ steps.network_artifact.outputs.artifact-id }}
+          ARTIFACT_DIGEST: ${{ steps.network_artifact.outputs.artifact-digest }}
+          ARTIFACT_URL: ${{ steps.network_artifact.outputs.artifact-url }}
+          SOURCE_SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          JOB_KEY: ${{ github.job }}
+          MATRIX_JSON: ${{ toJSON(matrix) }}
+        run: >-
+          python -c "import json,os; from pathlib import Path; receipt={'artifact_name':os.environ['ARTIFACT_NAME'],'artifact_id':os.environ.get('ARTIFACT_ID',''),'artifact_digest':os.environ.get('ARTIFACT_DIGEST',''),'artifact_url':os.environ.get('ARTIFACT_URL',''),'source_sha':os.environ['SOURCE_SHA'],'run_id':os.environ['RUN_ID'],'run_attempt':int(os.environ['RUN_ATTEMPT']),'job_key':os.environ['JOB_KEY'],'matrix':json.loads(os.environ['MATRIX_JSON'])}; Path(os.environ['GITHUB_STEP_SUMMARY']).open('a',encoding='utf-8').write('### Network evidence artifact receipt\n\n'+json.dumps(receipt,indent=2,sort_keys=True)+'\n\n')"
 
   reviewer-compose:
-    runs-on: [self-hosted, Linux, X64, nettking-linux]
+    runs-on: [self-hosted, Linux, X64, fcp-linux-fast]
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -125,47 +186,154 @@ jobs:
           docker compose -f demo/icse/docker-compose.yml run --build --rm demo --output /evidence/icse-summary.json
       - name: Validate retained Compose evidence
         run: python3 -m json.tool demo/icse/evidence/icse-summary.json > /dev/null
-      - if: always()
-        uses: ./.github/actions/nitro-artifact
+      - name: Manifest Compose evidence
+        if: always()
+        env:
+          EVIDENCE_DIR: demo/icse/evidence
+          SOURCE_SHA: ${{ github.sha }}
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          JOB_KEY: ${{ github.job }}
+          RUNNER_NAME: ${{ runner.name }}
+          RUNNER_OS: ${{ runner.os }}
+          JOB_STATUS: ${{ job.status }}
+          MATRIX_JSON: '{}'
+          MANIFEST_KIND: icse-component
+          MANIFEST_FILES: '["icse-summary.json"]'
+        run: >-
+          python3 -c "import datetime,hashlib,json,os,subprocess; from pathlib import Path; root=Path(os.environ['EVIDENCE_DIR']); checkout_sha=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(); assert checkout_sha==os.environ['SOURCE_SHA'], 'checkout SHA does not match workflow event SHA'; expected=set(json.loads(os.environ['MANIFEST_FILES'])); actual={p.name for p in root.iterdir() if p.name!='.gitignore'}; assert actual==expected, f'unexpected evidence files: {sorted(actual)}'; entries=[{'path':p.name,'size':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()} for p in sorted(root.iterdir()) if p.is_file() and p.name!='.gitignore']; manifest={'schema':'fcp.ci-evidence-manifest.v1','kind':os.environ['MANIFEST_KIND'],'repository':os.environ['GITHUB_REPOSITORY'],'source_sha':os.environ['SOURCE_SHA'],'checkout_sha':checkout_sha,'event_sha':os.environ['GITHUB_SHA'],'workflow':os.environ['GITHUB_WORKFLOW'],'workflow_ref':os.environ['WORKFLOW_REF'],'workflow_sha':os.environ['WORKFLOW_SHA'],'run_id':os.environ['RUN_ID'],'run_attempt':int(os.environ['RUN_ATTEMPT']),'job_key':os.environ['JOB_KEY'],'matrix':json.loads(os.environ['MATRIX_JSON']),'runner_name':os.environ['RUNNER_NAME'],'runner_os':os.environ['RUNNER_OS'],'job_status_at_capture':os.environ['JOB_STATUS'],'captured_at_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),'files':entries}; (root/'archive-manifest.json').write_text(json.dumps(manifest,indent=2,sort_keys=True)+'\n',encoding='utf-8')"
+      - name: Upload Compose evidence
+        id: compose_artifact
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          operation: upload
-          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
-          host: ${{ vars.NITRO_ARTIFACT_HOST }}
-          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
-          matrix: ${{ toJSON(matrix) }}
-          job-status: ${{ job.status }}
-          name: icse-summary-compose
-          path: demo/icse/evidence/icse-summary.json
+          name: icse-summary-${{ github.run_id }}-a${{ github.run_attempt }}-reviewer-compose
+          path: |
+            demo/icse/evidence/icse-summary.json
+            demo/icse/evidence/archive-manifest.json
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
+      - name: Record Compose artifact receipt
+        if: always()
+        env:
+          ARTIFACT_NAME: icse-summary-${{ github.run_id }}-a${{ github.run_attempt }}-reviewer-compose
+          ARTIFACT_ID: ${{ steps.compose_artifact.outputs.artifact-id }}
+          ARTIFACT_DIGEST: ${{ steps.compose_artifact.outputs.artifact-digest }}
+          ARTIFACT_URL: ${{ steps.compose_artifact.outputs.artifact-url }}
+          SOURCE_SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          JOB_KEY: ${{ github.job }}
+          MATRIX_JSON: '{}'
+        run: >-
+          python3 -c "import json,os; from pathlib import Path; receipt={'artifact_name':os.environ['ARTIFACT_NAME'],'artifact_id':os.environ.get('ARTIFACT_ID',''),'artifact_digest':os.environ.get('ARTIFACT_DIGEST',''),'artifact_url':os.environ.get('ARTIFACT_URL',''),'source_sha':os.environ['SOURCE_SHA'],'run_id':os.environ['RUN_ID'],'run_attempt':int(os.environ['RUN_ATTEMPT']),'job_key':os.environ['JOB_KEY'],'matrix':json.loads(os.environ['MATRIX_JSON'])}; Path(os.environ['GITHUB_STEP_SUMMARY']).open('a',encoding='utf-8').write('### Compose evidence artifact receipt\n\n'+json.dumps(receipt,indent=2,sort_keys=True)+'\n\n')"
 
   publication-bundle:
     needs: [reviewer-entrypoint, reviewer-compose]
-    runs-on: [self-hosted, Linux, X64, nettking-linux]
+    runs-on: [self-hosted, Linux, X64, fcp-linux-fast]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/self-hosted-python
         with:
           python-version: "3.12"
-      - uses: ./.github/actions/nitro-artifact
+      - name: Download current-attempt component evidence
+        uses: actions/download-artifact@v4
         with:
-          operation: download
-          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
-          host: ${{ vars.NITRO_ARTIFACT_HOST }}
-          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
-          matrix: ${{ toJSON(matrix) }}
-          job-status: ${{ job.status }}
-          pattern: icse-summary-*
+          pattern: icse-summary-${{ github.run_id }}-a${{ github.run_attempt }}-*
           path: downloaded-evidence
-      - uses: ./.github/actions/nitro-artifact
+          merge-multiple: false
+      - name: Download current-attempt network evidence
+        uses: actions/download-artifact@v4
         with:
-          operation: download
-          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
-          host: ${{ vars.NITRO_ARTIFACT_HOST }}
-          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
-          matrix: ${{ toJSON(matrix) }}
-          job-status: ${{ job.status }}
-          pattern: icse-network-summary-*
+          pattern: icse-network-summary-${{ github.run_id }}-a${{ github.run_attempt }}-*
           path: downloaded-network-evidence
+          merge-multiple: false
+      - name: Verify run-bound evidence manifests
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          REPOSITORY: ${{ github.repository }}
+          WORKFLOW: ${{ github.workflow }}
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          run_id = os.environ["RUN_ID"]
+          attempt = os.environ["RUN_ATTEMPT"]
+          component_root = Path("downloaded-evidence")
+          network_root = Path("downloaded-network-evidence")
+          expected_components = {
+              f"icse-summary-{run_id}-a{attempt}-reviewer-entrypoint-Linux": ("reviewer-entrypoint", "Linux", {"icse-summary.json"}, "icse-summary-Linux", "Linux"),
+              f"icse-summary-{run_id}-a{attempt}-reviewer-entrypoint-Windows": ("reviewer-entrypoint", "Windows", {"icse-summary.json"}, "icse-summary-Windows", "Windows"),
+              f"icse-summary-{run_id}-a{attempt}-reviewer-compose": ("reviewer-compose", None, {"icse-summary.json"}, "icse-summary-compose", "Linux"),
+          }
+          expected_network = {
+              f"icse-network-summary-{run_id}-a{attempt}-reviewer-entrypoint-Linux": ("reviewer-entrypoint", "Linux", {"events.jsonl", "operator-report.html", "summary.json"}, "icse-network-summary-Linux", "Linux"),
+              f"icse-network-summary-{run_id}-a{attempt}-reviewer-entrypoint-Windows": ("reviewer-entrypoint", "Windows", {"events.jsonl", "operator-report.html", "summary.json"}, "icse-network-summary-Windows", "Windows"),
+          }
+          def verify_group(root, expected, kind):
+              if not root.is_dir() or {p.name for p in root.iterdir()} != set(expected):
+                  raise SystemExit(f"{kind}: missing, extra, or stale run/attempt artifacts")
+              for artifact_name, (job_key, matrix_os, expected_files, canonical_name, expected_runner_os) in expected.items():
+                  source = root / artifact_name
+                  if source.is_symlink() or not source.is_dir():
+                      raise SystemExit(f"{artifact_name}: not an ordinary artifact directory")
+                  manifest_path = source / "archive-manifest.json"
+                  manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                  expected_metadata = {
+                      "schema": "fcp.ci-evidence-manifest.v1",
+                      "kind": kind,
+                      "repository": os.environ["REPOSITORY"],
+                      "source_sha": os.environ["SOURCE_SHA"],
+                      "checkout_sha": os.environ["SOURCE_SHA"],
+                      "event_sha": os.environ["SOURCE_SHA"],
+                      "workflow": os.environ["WORKFLOW"],
+                      "workflow_ref": os.environ["WORKFLOW_REF"],
+                      "workflow_sha": os.environ["WORKFLOW_SHA"],
+                      "run_id": run_id,
+                      "run_attempt": int(attempt),
+                      "job_key": job_key,
+                  }
+                  if any(manifest.get(key) != value for key, value in expected_metadata.items()):
+                      raise SystemExit(f"{artifact_name}: provenance identity mismatch")
+                  if manifest.get("runner_os") != expected_runner_os:
+                      raise SystemExit(f"{artifact_name}: runner OS mismatch")
+                  matrix = manifest.get("matrix")
+                  if (matrix_os is None and matrix != {}) or (matrix_os is not None and matrix.get("os") != matrix_os):
+                      raise SystemExit(f"{artifact_name}: matrix identity mismatch")
+                  entries = manifest.get("files")
+                  actual_files = {p.name for p in source.iterdir() if p.name != "archive-manifest.json"}
+                  if actual_files != expected_files or not isinstance(entries, list):
+                      raise SystemExit(f"{artifact_name}: file inventory mismatch")
+                  recorded = {entry.get("path"): entry for entry in entries if isinstance(entry, dict)}
+                  if set(recorded) != expected_files:
+                      raise SystemExit(f"{artifact_name}: manifest file list mismatch")
+                  for name in sorted(expected_files):
+                      file_path = source / name
+                      if file_path.is_symlink() or not file_path.is_file():
+                          raise SystemExit(f"{artifact_name}/{name}: not an ordinary file")
+                      entry = recorded[name]
+                      data = file_path.read_bytes()
+                      if entry.get("size") != len(data) or entry.get("sha256") != hashlib.sha256(data).hexdigest():
+                          raise SystemExit(f"{artifact_name}/{name}: size/hash mismatch")
+                  manifest_path.unlink()
+                  destination = root / canonical_name
+                  if destination.exists():
+                      raise SystemExit(f"{canonical_name}: destination already exists")
+                  source.rename(destination)
+          verify_group(component_root, expected_components, "icse-component")
+          verify_group(network_root, expected_network, "icse-network-public")
+          PY
       - name: Build publication bundle
         env:
           ARTIFACT_VERSION: ${{ startsWith(github.ref, 'refs/tags/fcp-icse-tool-demo-v') && github.ref_name || 'candidate' }}
@@ -178,14 +346,27 @@ jobs:
             --evidence-root downloaded-evidence \
             --network-evidence-root downloaded-network-evidence \
             --output publication-bundle
-      - if: always()
-        uses: ./.github/actions/nitro-artifact
+      - name: Upload ICSE publication bundle
+        id: publication_artifact
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          operation: upload
-          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
-          host: ${{ vars.NITRO_ARTIFACT_HOST }}
-          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
-          matrix: ${{ toJSON(matrix) }}
-          job-status: ${{ job.status }}
-          name: fcp-icse-tool-demo-bundle-${{ github.sha }}
-          path: publication-bundle
+          name: fcp-icse-tool-demo-bundle-${{ github.sha }}-${{ github.run_id }}-a${{ github.run_attempt }}
+          path: publication-bundle/
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
+      - name: Record publication artifact receipt
+        if: always()
+        env:
+          ARTIFACT_NAME: fcp-icse-tool-demo-bundle-${{ github.sha }}-${{ github.run_id }}-a${{ github.run_attempt }}
+          ARTIFACT_ID: ${{ steps.publication_artifact.outputs.artifact-id }}
+          ARTIFACT_DIGEST: ${{ steps.publication_artifact.outputs.artifact-digest }}
+          ARTIFACT_URL: ${{ steps.publication_artifact.outputs.artifact-url }}
+          SOURCE_SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          JOB_KEY: ${{ github.job }}
+          MATRIX_JSON: '{}'
+        run: >-
+          python3 -c "import json,os; from pathlib import Path; receipt={'artifact_name':os.environ['ARTIFACT_NAME'],'artifact_id':os.environ.get('ARTIFACT_ID',''),'artifact_digest':os.environ.get('ARTIFACT_DIGEST',''),'artifact_url':os.environ.get('ARTIFACT_URL',''),'source_sha':os.environ['SOURCE_SHA'],'run_id':os.environ['RUN_ID'],'run_attempt':int(os.environ['RUN_ATTEMPT']),'job_key':os.environ['JOB_KEY'],'matrix':json.loads(os.environ['MATRIX_JSON'])}; Path(os.environ['GITHUB_STEP_SUMMARY']).open('a',encoding='utf-8').write('### ICSE publication artifact receipt\n\n'+json.dumps(receipt,indent=2,sort_keys=True)+'\n\n')"
