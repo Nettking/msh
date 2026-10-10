@@ -249,14 +249,40 @@ _OUTBOX_RETIRED_SUMMARY_INDEX_KEY_COLUMNS = (
 )
 
 
-def _normalize_index_sql_preserving_literals(sql: str) -> str:
-    """Normalize DDL keywords/spacing without changing string predicates."""
+_SQL_DDL_TOKEN = re.compile(
+    r"""
+    '(?:''|[^'])*'
+    | "(?:""|[^"])*"
+    | `(?:``|[^`])*`
+    | \[(?:\]\]|[^\]])*\]
+    | [A-Za-z_][A-Za-z0-9_$]*
+    | [0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?
+    | <=|>=|<>|!=|==|\|\||<<|>>
+    | \S
+    """,
+    re.VERBOSE | re.ASCII,
+)
 
-    parts = re.split(r"('(?:''|[^'])*')", sql)
-    return "".join(
-        part if part.startswith("'") else "".join(part.lower().split())
-        for part in parts
-    ).rstrip(";")
+
+def _normalize_index_sql_preserving_literals(
+    sql: str,
+) -> tuple[tuple[str, str], ...]:
+    """Normalize DDL case/spacing without erasing SQL token boundaries."""
+
+    tokens: list[tuple[str, str]] = []
+    for match in _SQL_DDL_TOKEN.finditer(sql):
+        token = match.group(0)
+        if token == ";":
+            continue
+        if token.startswith("'"):
+            tokens.append(("literal", token))
+        elif token.startswith(('"', "`", "[")):
+            tokens.append(("quoted-identifier", token))
+        elif token[0].isascii() and (token[0].isalpha() or token[0] == "_"):
+            tokens.append(("word", token.lower()))
+        else:
+            tokens.append(("symbol", token))
+    return tuple(tokens)
 
 
 _OUTBOX_RETIRED_SUMMARY_INDEX_NORMALIZED_SQL = (

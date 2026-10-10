@@ -263,3 +263,65 @@ def test_large_outbox_without_idempotency_constraint_fails_closed(
             "SELECT sql FROM sqlite_master WHERE type='table' AND name='outbox'"
         ).fetchone()[0]
         assert "UNIQUE(session_id, destination_id, idempotency_key)" not in create_sql
+
+
+def test_large_outbox_with_merged_primary_key_tokens_fails_closed(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "outbox.sqlite3"
+    with sqlite3.connect(database) as connection:
+        connection.execute("PRAGMA journal_mode=WAL")
+        connection.execute(
+            "CREATE TABLE outbox_schema ("
+            "singleton INTEGER PRIMARY KEY CHECK (singleton = 1), "
+            "version INTEGER NOT NULL CHECK (version > 0))"
+        )
+        connection.execute(
+            "INSERT INTO outbox_schema(singleton, version) VALUES(1, 3)"
+        )
+        current_ddl = outbox_module._outbox_table_ddl(
+            "outbox", if_not_exists=False
+        )
+        malformed_ddl = current_ddl.replace(
+            "outbox_id INTEGER PRIMARY KEY AUTOINCREMENT",
+            "outbox_id INTEGERPRIMARYKEYAUTOINCREMENT",
+        )
+        assert malformed_ddl != current_ddl
+        connection.execute(malformed_ddl)
+        connection.execute(outbox_module._OUTBOX_INDEX_DDL)
+        connection.execute(outbox_module._OUTBOX_DELIVERY_INDEX_DDL)
+        connection.execute(outbox_module._OUTBOX_RETIRED_SUMMARY_INDEX_DDL)
+        for idempotency_key in ("first", "second"):
+            connection.execute(
+                """
+                INSERT INTO outbox(
+                    outbox_id, session_id, destination_id, schema_id,
+                    payload_json, idempotency_key, content_hash, state,
+                    created_at, updated_at, next_attempt_at
+                ) VALUES(1204, 'session', 'destination', 'schema', '{}', ?,
+                    'sha256:test', 'pending', 'created', 'updated', 'next')
+                """,
+                (idempotency_key,),
+            )
+        connection.commit()
+
+    with sqlite3.connect(f"file:{database}?mode=ro", uri=True) as connection:
+        outbox_id_info = next(
+            row for row in connection.execute("PRAGMA table_info('outbox')")
+            if row[1] == "outbox_id"
+        )
+        assert outbox_id_info[5] == 0
+        assert connection.execute(
+            "SELECT COUNT(*) FROM outbox WHERE outbox_id=1204"
+        ).fetchone()[0] == 2
+
+    with pytest.raises(FederationValidationError) as rejected:
+        _large_outbox(database)
+
+    assert rejected.value.code == "outbox-resource-envelope"
+    with sqlite3.connect(f"file:{database}?mode=ro", uri=True) as connection:
+        rows = connection.execute(
+            "SELECT outbox_id, idempotency_key, state FROM outbox "
+            "ORDER BY idempotency_key"
+        ).fetchall()
+        assert rows == [(1204, "first", "pending"), (1204, "second", "pending")]
