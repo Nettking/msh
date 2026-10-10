@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import sqlite3
+import subprocess
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -156,6 +158,47 @@ def test_large_current_v3_outbox_uses_only_bounded_noop_startup(tmp_path: Path) 
         assert connection.execute(
             "SELECT COUNT(*) FROM outbox"
         ).fetchone()[0] == 1
+
+
+def test_large_current_v3_startup_does_not_checkpoint_unreserved_wal(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "outbox.sqlite3"
+    original = SQLiteOutbox(database, resource_admission=_admission(1_000_000_000))
+    entries = [_enqueue(original, key=f"key-{index}")[0] for index in range(3)]
+    large_payload = '{"padding":"' + ("x" * 900_000) + '"}'
+
+    # Model a process that crashed after committing a large WAL. Its abrupt
+    # exit leaves the committed frames for the startup path to recover.
+    write_large_wal = """
+import os, sqlite3, sys
+connection = sqlite3.connect(sys.argv[1])
+connection.execute("PRAGMA wal_autocheckpoint=0")
+payload = '{\\"padding\\":\\"' + ('x' * 900_000) + '\\"}'
+connection.execute("UPDATE outbox SET payload_json=?", (payload,))
+connection.commit()
+os._exit(0)
+"""
+    subprocess.run([sys.executable, "-c", write_large_wal, str(database)], check=True)
+
+    wal = Path(f"{database}-wal")
+    assert wal.stat().st_size > _OUTBOX_MUTATION_FIXED_BYTES
+    main_bytes_before = database.stat().st_size
+    wal_bytes_before = wal.stat().st_size
+
+    _large_outbox(database)
+
+    # The large-schema no-op must not merge WAL pages into the main database:
+    # that implicit last-connection checkpoint is outside its fixed reserve.
+    assert database.stat().st_size == main_bytes_before
+    assert wal.stat().st_size == wal_bytes_before
+    with sqlite3.connect(f"file:{database}?mode=ro", uri=True) as connection:
+        rows = connection.execute(
+            "SELECT outbox_id, state, payload_json FROM outbox ORDER BY outbox_id"
+        ).fetchall()
+        assert rows == [
+            (entry.outbox_id, "pending", large_payload) for entry in entries
+        ]
 
 
 def test_large_current_v3_outbox_accepts_quoted_table_identifier(

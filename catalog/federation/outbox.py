@@ -637,7 +637,23 @@ class SQLiteOutbox:
             # Recheck while holding SQLite's writer reservation. This path
             # intentionally performs no DDL, journal-mode switch, migration,
             # or index rebuild; a changed schema must keep failing closed.
-            with self._connect() as db:
+            # SQLite can checkpoint a pre-existing WAL into the main database
+            # when the last writable connection closes, even after this no-op
+            # transaction. Keep a read-only transaction active across that
+            # close so the bounded startup reservation is not bypassed by an
+            # implicit WAL rewrite.
+            read_guard_uri = (
+                f"{self.database_path.resolve().as_uri()}?mode=ro"
+            )
+            read_guard = sqlite3.connect(read_guard_uri, uri=True, timeout=1.0)
+            db: sqlite3.Connection | None = None
+            try:
+                read_guard.execute("PRAGMA query_only=ON")
+                read_guard.execute("BEGIN")
+                read_guard.execute(
+                    "SELECT rootpage FROM sqlite_master LIMIT 1"
+                ).fetchone()
+                db = self._connect()
                 db.execute("BEGIN IMMEDIATE")
                 try:
                     if not self._current_schema_is_noop(db):
@@ -650,6 +666,12 @@ class SQLiteOutbox:
                 except Exception:
                     db.rollback()
                     raise
+            finally:
+                try:
+                    if db is not None:
+                        db.close()
+                finally:
+                    read_guard.close()
             return
         with self._connect() as db:
             db.execute("PRAGMA journal_mode=WAL")
