@@ -446,7 +446,7 @@ async def run_trusted_storage_authority(
 
         endpoint = RelayStorageEndpoint(
             client,
-            request_timeout=settings.request_timeout,
+            request_timeout=settings.storage_request_timeout,
             message_source=message_source,  # type: ignore[arg-type]
         )
         # In shared mode the existing product endpoint still owns the raw

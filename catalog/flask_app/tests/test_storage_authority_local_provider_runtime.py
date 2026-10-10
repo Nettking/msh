@@ -116,7 +116,9 @@ def test_creator_builtin_storage_provider_is_hosted_and_accepts_logical_ingest(
 ) -> None:
     async def scenario() -> None:
         now = datetime.now(timezone.utc)
-        settings = _settings(tmp_path)
+        settings = replace(
+            _settings(tmp_path), request_timeout=0.02, storage_request_timeout=0.2
+        )
         client = _LoopbackRelayClient("node-creator")
         control = PhaseDControlPlane(settings.storage_control_database)
         provider_id = runtime._builtin_local_provider_id(client.node_id)
@@ -128,7 +130,9 @@ def test_creator_builtin_storage_provider_is_hosted_and_accepts_logical_ingest(
             now=now,
         )
 
-        endpoint = RelayStorageEndpoint(client, request_timeout=2.0)
+        endpoint = RelayStorageEndpoint(
+            client, request_timeout=settings.storage_request_timeout
+        )
         try:
             service = runtime._ensure_builtin_local_storage_service(
                 endpoint=endpoint,
@@ -138,6 +142,14 @@ def test_creator_builtin_storage_provider_is_hosted_and_accepts_logical_ingest(
             )
             assert service is not None
             assert endpoint.services[provider_id] is service
+            original_dispatch = service.dispatch
+
+            async def delayed_dispatch(request):
+                await asyncio.sleep(0.05)
+                return await original_dispatch(request)
+
+            service.dispatch = delayed_dispatch
+            assert settings.request_timeout < 0.05 < settings.storage_request_timeout
 
             await endpoint.start()
             logical = PhaseDLogicalStorageClient(
