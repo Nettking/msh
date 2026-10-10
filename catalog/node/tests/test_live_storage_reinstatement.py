@@ -406,12 +406,76 @@ def test_live_reinstatement_restores_replica_and_acknowledgement_policy(
                 session_id=session_id,
                 clock=lambda: NOW,
             )
-            completed = await restarted.run_once(
-                group_id="storage-main",
-                returning_provider_id="provider-primary",
-            )
+            original_restart_publish = channel.publish
+            restart_publish_response_lost = False
+
+            async def publish_then_lose_response(plan, target_node_ids):
+                nonlocal restart_publish_response_lost
+                result = await original_restart_publish(plan, target_node_ids)
+                current = restarted.store.active(
+                    session_id, "storage-main", "provider-primary"
+                )
+                if (
+                    not restart_publish_response_lost
+                    and current is not None
+                    and current.final_publication == plan
+                ):
+                    # The final redundancy plan is durably applied, but the
+                    # sender observes a timeout before receiving confirmation.
+                    restart_publish_response_lost = True
+                    raise TimeoutError
+                return result
+
+            channel.publish = publish_then_lose_response
+            try:
+                completed = await restarted.run_once(
+                    group_id="storage-main",
+                    returning_provider_id="provider-primary",
+                )
+            finally:
+                channel.publish = original_restart_publish
+            assert restart_publish_response_lost
+            assert completed.status == "retryable", completed.to_dict()
+            assert completed.code == "live-reinstatement-retryable"
+            assert completed.reason == "TimeoutError"
+            assert completed.record is not None
+            assert completed.record.final_publication is not None
+            persisted_final_plan = completed.record.final_publication
+            # Resume the same immutable reinstatement record a bounded number
+            # of times; persistent timeouts still fail this end-to-end test.
+            for _ in range(3):
+                if completed.status == "completed":
+                    break
+                assert completed.status == "retryable", completed.to_dict()
+                assert completed.code == "live-reinstatement-retryable", (
+                    completed.to_dict()
+                )
+                assert completed.reason == "TimeoutError", completed.to_dict()
+                assert completed.record is not None, completed.to_dict()
+                previous = completed.record
+                completed = await restarted.run_once(
+                    group_id="storage-main",
+                    returning_provider_id="provider-primary",
+                )
+                assert completed.record is not None, completed.to_dict()
+                assert (
+                    completed.record.reinstatement_id == previous.reinstatement_id
+                )
+                assert (
+                    completed.record.immutable_binding()
+                    == previous.immutable_binding()
+                )
+                for field in (
+                    "assignment_publication",
+                    "rollback_publication",
+                    "final_publication",
+                ):
+                    prior_plan = getattr(previous, field)
+                    if prior_plan is not None:
+                        assert getattr(completed.record, field) == prior_plan
             assert completed.status == "completed", completed.to_dict()
             assert completed.record is not None
+            assert completed.record.final_publication == persisted_final_plan
             assert completed.record.state == "completed"
             assert completed.record.final_report_revision is not None
             assert completed.record.final_report_hash is not None

@@ -848,6 +848,36 @@ class LiveFormerPrimaryReinstatementCoordinator:
             record = locals().get("record")
             reason = str(exc) or type(exc).__name__
             if isinstance(record, LiveReinstatementRecord):
+                # _resume saves each durable stage before a network await. Its
+                # local record may therefore be newer than this caller's copy.
+                # Re-read before recording the retryable error so a timeout
+                # cannot roll back a persisted plan, report, or completion.
+                persisted = self.store.get(record.reinstatement_id)
+                if persisted is not None:
+                    record = persisted
+                if record.state == _STATE_COMPLETED:
+                    return self._result(
+                        "completed",
+                        "live-reinstatement-complete",
+                        "former primary is a verified replica and redundancy policy is restored",
+                        record,
+                    )
+                if record.state == _STATE_OPERATOR:
+                    return self._result(
+                        "operator-attention",
+                        record.latest_error_code or "live-reinstatement-conflict",
+                        record.latest_error_reason
+                        or "reinstatement requires operator attention",
+                        record,
+                    )
+                if record.state == _STATE_ROLLED_BACK:
+                    return self._result(
+                        "retryable",
+                        record.latest_error_code
+                        or "reinstatement-catchup-required",
+                        record.latest_error_reason or "run catch-up again",
+                        record,
+                    )
                 record = self.store.save(
                     replace(
                         record,
