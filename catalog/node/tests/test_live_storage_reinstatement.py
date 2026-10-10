@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
 
@@ -406,16 +407,134 @@ def test_live_reinstatement_restores_replica_and_acknowledgement_policy(
                 session_id=session_id,
                 clock=lambda: NOW,
             )
-            completed = await restarted.run_once(
-                group_id="storage-main",
-                returning_provider_id="provider-primary",
-            )
+            original_restart_publish = channel.publish
+            restart_publish_response_lost = False
+
+            async def publish_then_lose_response(plan, target_node_ids):
+                nonlocal restart_publish_response_lost
+                result = await original_restart_publish(plan, target_node_ids)
+                current = restarted.store.active(
+                    session_id, "storage-main", "provider-primary"
+                )
+                if (
+                    not restart_publish_response_lost
+                    and current is not None
+                    and current.final_publication == plan
+                ):
+                    # The final redundancy plan is durably applied, but the
+                    # sender observes a timeout before receiving confirmation.
+                    restart_publish_response_lost = True
+                    raise TimeoutError
+                return result
+
+            channel.publish = publish_then_lose_response
+            try:
+                completed = await restarted.run_once(
+                    group_id="storage-main",
+                    returning_provider_id="provider-primary",
+                )
+            finally:
+                channel.publish = original_restart_publish
+            assert restart_publish_response_lost
+            assert completed.status == "retryable", completed.to_dict()
+            assert completed.code == "live-reinstatement-retryable"
+            assert completed.reason == "TimeoutError"
+            assert completed.record is not None
+            assert completed.record.final_publication is not None
+            persisted_final_plan = completed.record.final_publication
+            # Resume the same immutable reinstatement record a bounded number
+            # of times; persistent timeouts still fail this end-to-end test.
+            for _ in range(3):
+                if completed.status == "completed":
+                    break
+                assert completed.status == "retryable", completed.to_dict()
+                assert completed.code == "live-reinstatement-retryable", (
+                    completed.to_dict()
+                )
+                assert completed.reason == "TimeoutError", completed.to_dict()
+                assert completed.record is not None, completed.to_dict()
+                previous = completed.record
+                completed = await restarted.run_once(
+                    group_id="storage-main",
+                    returning_provider_id="provider-primary",
+                )
+                assert completed.record is not None, completed.to_dict()
+                assert (
+                    completed.record.reinstatement_id == previous.reinstatement_id
+                )
+                assert (
+                    completed.record.immutable_binding()
+                    == previous.immutable_binding()
+                )
+                for field in (
+                    "assignment_publication",
+                    "rollback_publication",
+                    "final_publication",
+                ):
+                    prior_plan = getattr(previous, field)
+                    if prior_plan is not None:
+                        assert getattr(completed.record, field) == prior_plan
             assert completed.status == "completed", completed.to_dict()
             assert completed.record is not None
+            assert completed.record.final_publication == persisted_final_plan
             assert completed.record.state == "completed"
             assert completed.record.final_report_revision is not None
             assert completed.record.final_report_hash is not None
             assert completed.record.final_publication is not None
+
+            # Model another invocation completing while this caller still
+            # holds an active snapshot and then receives a lost response.
+            # The timeout handler must merge its error onto the completed row,
+            # retain the final plan, and re-check the live completion proof.
+            completed_record = completed.record
+            restarted.store.save(
+                replace(
+                    completed_record,
+                    state="control-restored",
+                    completed_at=None,
+                )
+            )
+            original_resume = restarted._resume
+            original_validate_completed = restarted._validate_completed
+            completion_proof_checks = 0
+
+            async def complete_elsewhere_then_lose_response(_record):
+                restarted.store.save(completed_record)
+                raise TimeoutError("response lost after durable completion")
+
+            def track_completed_proof(record):
+                nonlocal completion_proof_checks
+                completion_proof_checks += 1
+                return original_validate_completed(record)
+
+            restarted._resume = complete_elsewhere_then_lose_response
+            restarted._validate_completed = track_completed_proof
+            try:
+                recovered_completion = await restarted.run_once(
+                    group_id="storage-main",
+                    returning_provider_id="provider-primary",
+                )
+            finally:
+                restarted._resume = original_resume
+                restarted._validate_completed = original_validate_completed
+            assert recovered_completion.status == "completed", (
+                recovered_completion.to_dict()
+            )
+            assert completion_proof_checks == 1
+            assert recovered_completion.record is not None
+            assert recovered_completion.record.state == "completed"
+            assert (
+                recovered_completion.record.final_publication
+                == completed_record.final_publication
+            )
+            assert (
+                recovered_completion.record.latest_error_code
+                == "live-reinstatement-retryable"
+            )
+            assert (
+                recovered_completion.record.latest_error_reason
+                == "response lost after durable completion"
+            )
 
             snapshot = control.snapshot(session_id)
             assignment = snapshot.groups["storage-main"]
