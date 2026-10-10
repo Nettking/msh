@@ -96,7 +96,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt -c constraints-phase2.txt
-          python -m pip install pytest ruff
+          python -m pip install pytest ruff==0.16.10
       - name: Ubuntu storage precondition
         if: runner.os == 'Linux'
         uses: ./.github/actions/ubuntu-storage-precondition
@@ -156,15 +156,44 @@ jobs:
         run: docker compose config --quiet
       - name: Diff hygiene
         run: git diff --check origin/${{ github.base_ref || 'main' }}...HEAD
-      - name: Preserve native F7 test evidence
+      - name: Manifest native F7 test evidence
         if: always()
-        uses: ./.github/actions/nitro-artifact
+        env:
+          EVIDENCE_PATH: ${{ runner.temp }}/f7-closeout-${{ matrix.os }}.xml
+          EVIDENCE_DIR: ${{ runner.temp }}/f7-closeout-${{ github.run_id }}-a${{ github.run_attempt }}-${{ matrix.os }}
+          SOURCE_SHA: ${{ github.sha }}
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          JOB_KEY: ${{ github.job }}
+          RUNNER_NAME: ${{ runner.name }}
+          RUNNER_OS: ${{ runner.os }}
+          JOB_STATUS: ${{ job.status }}
+          MATRIX_JSON: ${{ toJSON(matrix) }}
+        run: >-
+          python -c "import datetime,hashlib,json,os,shutil,subprocess; from pathlib import Path; source=Path(os.environ['EVIDENCE_PATH']); root=Path(os.environ['EVIDENCE_DIR']); assert source.is_file(), f'required JUnit evidence is missing: {source}'; checkout_sha=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(); assert checkout_sha==os.environ['SOURCE_SHA'], 'checked-out source SHA does not match the workflow event SHA'; root.mkdir(parents=True,exist_ok=False); retained=root/source.name; shutil.copy2(source,retained); data=retained.read_bytes(); manifest={'schema':'fcp.ci-evidence-manifest.v1','kind':'f7-closeout-junit','repository':os.environ['GITHUB_REPOSITORY'],'source_sha':os.environ['SOURCE_SHA'],'checkout_sha':checkout_sha,'event_sha':os.environ['GITHUB_SHA'],'workflow':os.environ['GITHUB_WORKFLOW'],'workflow_ref':os.environ['WORKFLOW_REF'],'workflow_sha':os.environ['WORKFLOW_SHA'],'run_id':os.environ['RUN_ID'],'run_attempt':int(os.environ['RUN_ATTEMPT']),'job_key':os.environ['JOB_KEY'],'matrix':json.loads(os.environ['MATRIX_JSON']),'runner_name':os.environ['RUNNER_NAME'],'runner_os':os.environ['RUNNER_OS'],'job_status_at_capture':os.environ['JOB_STATUS'],'captured_at_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),'files':[{'path':retained.name,'source_path':source.as_posix(),'size':len(data),'sha256':hashlib.sha256(data).hexdigest()}]}; (root/'archive-manifest.json').write_text(json.dumps(manifest,indent=2,sort_keys=True)+'\n',encoding='utf-8')"
+      - name: Upload native F7 test evidence
+        id: f7_artifact
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          operation: upload
-          ssh-key: ${{ secrets.NITRO_ARTIFACT_SSH_KEY }}
-          host: ${{ vars.NITRO_ARTIFACT_HOST }}
-          known-hosts: ${{ vars.NITRO_ARTIFACT_KNOWN_HOSTS }}
-          matrix: ${{ toJSON(matrix) }}
-          job-status: ${{ job.status }}
-          name: f7-closeout-${{ matrix.os }}
-          path: ${{ runner.temp }}/f7-closeout-${{ matrix.os }}.xml
+          name: f7-closeout-${{ github.run_id }}-a${{ github.run_attempt }}-${{ matrix.os }}
+          path: ${{ runner.temp }}/f7-closeout-${{ github.run_id }}-a${{ github.run_attempt }}-${{ matrix.os }}/
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
+      - name: Record F7 artifact receipt
+        if: always()
+        env:
+          ARTIFACT_NAME: f7-closeout-${{ github.run_id }}-a${{ github.run_attempt }}-${{ matrix.os }}
+          ARTIFACT_ID: ${{ steps.f7_artifact.outputs.artifact-id }}
+          ARTIFACT_DIGEST: ${{ steps.f7_artifact.outputs.artifact-digest }}
+          ARTIFACT_URL: ${{ steps.f7_artifact.outputs.artifact-url }}
+          SOURCE_SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          JOB_KEY: ${{ github.job }}
+          MATRIX_JSON: ${{ toJSON(matrix) }}
+        run: >-
+          python -c "import json,os; from pathlib import Path; receipt={'artifact_name':os.environ['ARTIFACT_NAME'],'artifact_id':os.environ.get('ARTIFACT_ID',''),'artifact_digest':os.environ.get('ARTIFACT_DIGEST',''),'artifact_url':os.environ.get('ARTIFACT_URL',''),'source_sha':os.environ['SOURCE_SHA'],'run_id':os.environ['RUN_ID'],'run_attempt':int(os.environ['RUN_ATTEMPT']),'job_key':os.environ['JOB_KEY'],'matrix':json.loads(os.environ['MATRIX_JSON'])}; Path(os.environ['GITHUB_STEP_SUMMARY']).open('a',encoding='utf-8').write('### F7 test evidence artifact receipt\\n\\n'+json.dumps(receipt,indent=2,sort_keys=True)+'\\n\\n')"

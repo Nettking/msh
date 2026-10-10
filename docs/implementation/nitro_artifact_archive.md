@@ -1,7 +1,10 @@
-# Nitro artifact archive
+# CI evidence archives: Nitro and scoped GitHub Actions artifacts
 
-> **Scope update (2026-10-04):** This document records the Nitro SSH archive
-> implementation for workflows that still use it. The Federation v1 software
+> **Scope update (2026-10-09):** This document records the Nitro SSH archive
+> implementation for workflows that still use it. Phase 2 Go module-lock,
+> ICSE tool-demo, and Phase F7 closeout evidence now use explicitly configured
+> GitHub Actions artifact paths. This is not a fallback in the Nitro action: remaining
+> Nitro consumers still fail closed. The Federation v1 software
 > release gate and campaign-tooling checks no longer depend on Nitro or another
 > fixed runner: they use GitHub-hosted runners and immutable run/attempt-bound
 > Actions artifacts. Final v1 closeout carries accepted CI evidence into the
@@ -10,18 +13,65 @@
 > acceptance host requirements. Do not use this historical implementation to
 > reintroduce Nitro as a v1 software-qualification prerequisite.
 
-The implementation details below apply only to workflows that still invoke
-the Nitro archive action. Those workflows remain fail-closed and must not
-silently fall back to another store. The Federation v1 release gate explicitly
-uses GitHub Actions artifacts; this is a separate configured evidence path,
-not a fallback performed by the Nitro action.
+The Nitro implementation details below apply only to workflows that still
+invoke the Nitro archive action. Those workflows remain fail-closed and must not
+silently fall back to another store. The Federation v1 release gate, Phase 2 Go
+module-lock evidence, ICSE tool-demo evidence, and Phase F7 closeout evidence
+explicitly use GitHub Actions artifacts; each is a separately configured
+evidence path, not a fallback performed by the Nitro action.
 
 This is an infrastructure change, independent of the frozen Federation candidate.
 Introduce it through normal PR review and required checks. Infrastructure merge
 does not move the product freeze or authorize physical acceptance on a new SHA.
 There are no new subscriptions, public services, runner pools or storage platforms.
-Keep all GitHub budgets at $0 with Stop usage enabled. Never fall back to Actions
-artifacts, LFS, Packages, release assets, cloud storage, or paid runners.
+Keep all GitHub budgets at $0 with Stop usage enabled. Nitro consumers do not
+fall back to Actions artifacts, LFS, Packages, release assets, cloud storage, or
+paid runners. The direct Phase 2 and ICSE artifact paths below are explicit
+workflow configuration, not fallback behavior.
+
+## Current scoped GitHub artifact paths (Phase 2 and ICSE)
+
+The `Phase F7 capability scheduling closeout` workflow stores each native
+JUnit result with an adjacent manifest that binds the result hash and size to
+the exact checked-out SHA, workflow run/attempt, job, matrix role, and runner.
+The artifact name carries the run ID, attempt, and platform; its immutable
+GitHub artifact ID and digest are recorded in the job summary. This avoids
+staging an unchanged JUnit file on the runner solely for the former Nitro
+transfer, while retaining the completed test evidence under the same 90-day
+closeout policy.
+
+The `Phase 2 federation` workflow stores the Go `go.mod` and `go.sum` capture
+with an `archive-manifest.json` containing the event and actual checkout SHA,
+workflow ref/SHA, run ID and attempt, job key, runner, matrix, capture time,
+original paths, sizes, and SHA-256 hashes. The `ICSE tool demonstration` workflow uses the same manifest
+schema for each E1-E4 and public network producer. Its publication job downloads
+only artifacts whose names bind the current run ID and attempt, checks the full
+producer/job/matrix identity and every listed file size/hash, then removes the
+transport sidecars before invoking the existing ICSE bundle validator. That
+validator still enforces scenario results, network provenance, public-only files,
+teardown, the artifact manifest, and `SHA256SUMS`; the accepted final bundle is
+uploaded separately.
+
+These uploads use `actions/upload-artifact@v4`, unique names containing run ID,
+attempt, job role and matrix label (plus source SHA for the final ICSE bundle),
+`overwrite: false`, and 90-day retention. Each producer records GitHub's
+immutable artifact ID, SHA-256 digest, URL, and the same run/attempt/job/matrix
+identity in its workflow summary. The download action operates only on the
+current workflow run; attempt-specific names prevent an earlier retry's files
+from being selected. The GitHub artifact record and digest are the durable
+transport receipt, while embedded manifests and existing ICSE bundle checks
+verify content and provenance. No Nitro secret, host, SSH connection, or
+cross-run artifact lookup is used by these two workflows.
+
+The ICSE Linux entrypoint, Compose, and bundle jobs use the existing
+`fcp-linux-fast` self-hosted runner pool. This is a platform-compatible runner
+selection for CI evidence jobs, not a production-host dependency; no runner is
+created or restarted by the workflow change.
+
+The normal closeout process must still copy the final ICSE publication bundle to
+its authorized release/publication destination before this 90-day retention
+expires. A GitHub artifact is not a Recorder backup or a replacement for the
+independent Recorder data-transfer responsibility.
 
 ## Current deployment and machine roles (2026-09-19)
 
@@ -40,7 +90,7 @@ artifacts, LFS, Packages, release assets, cloud storage, or paid runners.
   margins. WSL checks both its Linux filesystem and physical `/mnt/c`. Nitro
   retains its 200 GiB reserve and 2 GiB per-package bound. No runner labels,
   accounts or services were changed.
-- Ten upload steps and three download steps use the SSH adapter on this branch;
+- The Sept 19 baseline had ten upload steps and three download steps using the SSH adapter;
   29 external setup-python pip caches are disabled. Production SSH credentials
   are configured, but **main still uses its original storage until reviewed merge**.
 - No paid services, budget changes, release recovery, freeze change or physical
@@ -256,11 +306,12 @@ workflows because `.github/actions/**` is watched. The introduction audit matche
 runs without duplicate dispatches, preserving all required checks and zero-dollar
 Stop usage budgets. A failed job does not authorize another recovery attempt.
 
-After normal merge, record the actual resulting main SHA and verify the four
-remaining Nitro-backed producers (`icse-tool-demo`, `phase2-federation`,
-`phase-f7-closeout`, `cf8-role-retirement`) against their native checkout logs.
-Verify an ordinary download consumer and its immutable receipts, plus the run's
-empty GitHub artifact inventory. Transport smoke alone does not prove main adoption.
+After normal merge, record the actual resulting main SHA and verify the remaining
+Nitro-backed producers (including `phase-f7-closeout` and `cf8-role-retirement`)
+against their native checkout logs. Verify the Phase 2 and ICSE artifact
+IDs/digests, run/attempt/job/matrix manifests, and exact-attempt ICSE downloads.
+Verify an ordinary Nitro download consumer and the run's empty GitHub artifact
+inventory for Nitro-only runs. Transport smoke alone does not prove main adoption.
 
 The frozen product candidate remains `a9bb08a2b3391e8bf072755c5b26b2ef3ebc5759`.
 Its qualification is not automatically qualification of the infrastructure merge.
@@ -269,8 +320,9 @@ as unmapped paths: selecting the new main as a product candidate requires the
 normal qualification, freeze and revalidation process; no physical evidence is
 carried by assumption. The current physical campaign has no completed PASS.
 
-Until reviewed merge, main still contains its original GitHub upload/cache steps.
-No main workflow was dispatched as part of this change. GitHub continues to host
-code, coordination, native job logs/status and short summaries. Those logs are a
-deliberate remaining GitHub dependency, not a substitute archive for evidence
-packages. Existing artifact storage is retained pending explicit deletion consent.
+Until reviewed merge, main still contains its original archive path. No main
+workflow was dispatched as part of this change. GitHub continues to host code,
+coordination, native job logs/status and short summaries. The scoped Phase 2 and
+ICSE artifacts are durable evidence packages for their own runs; summaries and
+logs alone are not substitutes for those packages. Existing Nitro artifact
+storage is retained pending explicit deletion consent.

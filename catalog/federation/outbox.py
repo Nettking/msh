@@ -249,14 +249,40 @@ _OUTBOX_RETIRED_SUMMARY_INDEX_KEY_COLUMNS = (
 )
 
 
-def _normalize_index_sql_preserving_literals(sql: str) -> str:
-    """Normalize DDL keywords/spacing without changing string predicates."""
+_SQL_DDL_TOKEN = re.compile(
+    r"""
+    '(?:''|[^'])*'
+    | "(?:""|[^"])*"
+    | `(?:``|[^`])*`
+    | \[(?:\]\]|[^\]])*\]
+    | [A-Za-z_][A-Za-z0-9_$]*
+    | [0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?
+    | <=|>=|<>|!=|==|\|\||<<|>>
+    | \S
+    """,
+    re.VERBOSE | re.ASCII,
+)
 
-    parts = re.split(r"('(?:''|[^'])*')", sql)
-    return "".join(
-        part if part.startswith("'") else "".join(part.lower().split())
-        for part in parts
-    ).rstrip(";")
+
+def _normalize_index_sql_preserving_literals(
+    sql: str,
+) -> tuple[tuple[str, str], ...]:
+    """Normalize DDL case/spacing without erasing SQL token boundaries."""
+
+    tokens: list[tuple[str, str]] = []
+    for match in _SQL_DDL_TOKEN.finditer(sql):
+        token = match.group(0)
+        if token == ";":
+            continue
+        if token.startswith("'"):
+            tokens.append(("literal", token))
+        elif token.startswith(('"', "`", "[")):
+            tokens.append(("quoted-identifier", token))
+        elif token[0].isascii() and (token[0].isalpha() or token[0] == "_"):
+            tokens.append(("word", token.lower()))
+        else:
+            tokens.append(("symbol", token))
+    return tuple(tokens)
 
 
 _OUTBOX_RETIRED_SUMMARY_INDEX_NORMALIZED_SQL = (
@@ -337,6 +363,7 @@ class SQLiteOutbox:
         self.database = str(database)
         self.database_path = Path(self.database)
         self.resource_admission = resource_admission or PROCESS_RESOURCE_ADMISSION
+        self._large_current_schema_startup = False
         with self._reserve_resources(
             self._migration_requirements(),
         ) as reservations:
@@ -360,13 +387,39 @@ class SQLiteOutbox:
                 ) from exc
         return total
 
+    def _database_wal_bytes(self) -> int:
+        """Measure the existing WAL without opening SQLite or creating sidecars."""
+
+        try:
+            return int(Path(f"{self.database}-wal").stat().st_size)
+        except FileNotFoundError:
+            return 0
+        except OSError as exc:
+            raise FederationValidationError(
+                "outbox-resource-measurement-failed",
+                "database",
+                "could not measure the durable outbox WAL before admission",
+            ) from exc
+
     def _migration_requirements(self) -> tuple[tuple[Path, int, int], ...]:
+        self._large_current_schema_startup = False
         existing = self._database_bytes()
         if existing > _OUTBOX_MAX_MIGRATION_BYTES:
-            raise FederationValidationError(
-                "outbox-resource-envelope",
-                "database",
-                "durable outbox is too large for a bounded startup migration",
+            # Do not open SQLite to inspect the schema before admission. Even
+            # a read-only WAL connection can create/extend -shm (and, for an
+            # absent WAL, sidecars) before the resource reservation is held.
+            # SQLite's WAL-index uses 32 KiB per 4,062 WAL frames, so reserving
+            # one full WAL-sized allowance safely covers its reconstruction;
+            # the fixed allowance covers the small/empty-WAL case. The actual
+            # no-op schema check below runs under this reservation and still
+            # refuses any large database that would need a migration.
+            self._large_current_schema_startup = True
+            return (
+                (
+                    self.database_path.parent,
+                    _OUTBOX_MUTATION_FIXED_BYTES + self._database_wal_bytes(),
+                    _OUTBOX_MUTATION_FIXED_INODES + 2,
+                ),
             )
         # A v2-to-v3 migration rebuilds the table while retaining the old one
         # until the transactional DROP. Reserve the old database plus a second
@@ -381,6 +434,121 @@ class SQLiteOutbox:
                 _OUTBOX_MUTATION_FIXED_INODES + 2,
             ),
         )
+
+    def _current_schema_is_noop(self, db: sqlite3.Connection) -> bool:
+        """Return true only when normal initialization would make no schema writes."""
+
+        mode_row = db.execute("PRAGMA journal_mode").fetchone()
+        if mode_row is None or str(mode_row[0]).lower() != "wal":
+            return False
+        schema_table = db.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' "
+            "AND name='outbox_schema'"
+        ).fetchone()
+        expected_schema_table = """
+            CREATE TABLE outbox_schema (
+                singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+                version INTEGER NOT NULL CHECK (version > 0)
+            )
+        """
+        if (
+            schema_table is None
+            or schema_table[0] is None
+            or _normalize_index_sql_preserving_literals(schema_table[0])
+            != _normalize_index_sql_preserving_literals(expected_schema_table)
+        ):
+            return False
+        version_row = db.execute(
+            "SELECT version FROM outbox_schema WHERE singleton=1"
+        ).fetchone()
+        if (
+            version_row is None
+            or isinstance(version_row[0], bool)
+            or not isinstance(version_row[0], int)
+            or version_row[0] != SCHEMA_VERSION
+        ):
+            return False
+        columns = {
+            row[1] for row in db.execute("PRAGMA table_info('outbox')").fetchall()
+        }
+        required_columns = {
+            "outbox_id",
+            "session_id",
+            "destination_id",
+            "schema_id",
+            "payload_json",
+            "idempotency_key",
+            "content_hash",
+            "state",
+            "payload_compacted",
+            "attempt_count",
+            "created_at",
+            "updated_at",
+            "next_attempt_at",
+            "last_error",
+            "retired_at",
+            "retirement_reason",
+            "retirement_dataset_id",
+        }
+        if not required_columns <= columns:
+            return False
+
+        outbox_table = db.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='outbox'"
+        ).fetchone()
+        expected_outbox_table_ddls = {
+            _normalize_index_sql_preserving_literals(
+                _outbox_table_ddl(name, if_not_exists=False)
+            )
+            for name in ("outbox", '"outbox"')
+        }
+        if (
+            outbox_table is None
+            or outbox_table[0] is None
+            or _normalize_index_sql_preserving_literals(outbox_table[0])
+            not in expected_outbox_table_ddls
+        ):
+            return False
+
+        expected_indexes = {
+            "outbox_pending_due": (
+                ("state", "next_attempt_at", "outbox_id"),
+                _OUTBOX_INDEX_DDL.replace(
+                    "CREATE INDEX IF NOT EXISTS", "CREATE INDEX"
+                ),
+            ),
+            "outbox_pending_delivery_dataset": (
+                _OUTBOX_DELIVERY_INDEX_KEY_COLUMNS,
+                _OUTBOX_DELIVERY_INDEX_DDL.replace(
+                    "CREATE INDEX IF NOT EXISTS", "CREATE INDEX"
+                ),
+            ),
+            "outbox_retired_summary": (
+                _OUTBOX_RETIRED_SUMMARY_INDEX_KEY_COLUMNS,
+                _OUTBOX_RETIRED_SUMMARY_INDEX_DDL.replace(
+                    "CREATE INDEX IF NOT EXISTS", "CREATE INDEX"
+                ),
+            ),
+        }
+        for name, (expected_columns, expected_sql) in expected_indexes.items():
+            row = db.execute(
+                "SELECT sql FROM sqlite_master WHERE type='index' AND name=?",
+                (name,),
+            ).fetchone()
+            if row is None or row[0] is None:
+                return False
+            actual_columns = tuple(
+                item[2]
+                for item in db.execute(f"PRAGMA index_xinfo('{name}')").fetchall()
+                if item[5]
+            )
+            if actual_columns != expected_columns:
+                return False
+            if _normalize_index_sql_preserving_literals(row[0]) != (
+                _normalize_index_sql_preserving_literals(expected_sql)
+            ):
+                return False
+        return True
 
     @contextmanager
     def _reserve_resources(
@@ -455,6 +623,46 @@ class SQLiteOutbox:
             self._assert_resource_identity(reservations)
 
     def _initialize_unadmitted(self) -> None:
+        if self._large_current_schema_startup:
+            # Recheck while holding SQLite's writer reservation. This path
+            # intentionally performs no DDL, journal-mode switch, migration,
+            # or index rebuild; a changed schema must keep failing closed.
+            # SQLite can checkpoint a pre-existing WAL into the main database
+            # when the last writable connection closes, even after this no-op
+            # transaction. Keep a read-only transaction active across that
+            # close so the bounded startup reservation is not bypassed by an
+            # implicit WAL rewrite.
+            read_guard_uri = (
+                f"{self.database_path.resolve().as_uri()}?mode=ro"
+            )
+            read_guard = sqlite3.connect(read_guard_uri, uri=True, timeout=1.0)
+            db: sqlite3.Connection | None = None
+            try:
+                read_guard.execute("PRAGMA query_only=ON")
+                read_guard.execute("BEGIN")
+                read_guard.execute(
+                    "SELECT rootpage FROM sqlite_master LIMIT 1"
+                ).fetchone()
+                db = self._connect()
+                db.execute("BEGIN IMMEDIATE")
+                try:
+                    if not self._current_schema_is_noop(db):
+                        raise FederationValidationError(
+                            "outbox-resource-envelope",
+                            "database",
+                            "large outbox changed after no-op startup admission",
+                        )
+                    db.commit()
+                except Exception:
+                    db.rollback()
+                    raise
+            finally:
+                try:
+                    if db is not None:
+                        db.close()
+                finally:
+                    read_guard.close()
+            return
         with self._connect() as db:
             db.execute("PRAGMA journal_mode=WAL")
             db.executescript(f"""

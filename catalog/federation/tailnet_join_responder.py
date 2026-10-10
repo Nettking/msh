@@ -211,7 +211,9 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             return
         deadline = time.monotonic() + GRANT_TIMEOUT_SECONDS
         while remaining:
-            timeout = deadline - time.monotonic()
+            # Floating-point rounding can make deadline - now exceed the
+            # configured bound when the monotonic clock has coarse resolution.
+            timeout = min(GRANT_TIMEOUT_SECONDS, deadline - time.monotonic())
             if timeout <= 0:
                 return
             try:

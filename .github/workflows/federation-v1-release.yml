@@ -404,7 +404,41 @@ jobs:
       - name: Ubuntu storage precondition
         uses: ./.github/actions/ubuntu-storage-precondition
       - name: Start disposable PostgreSQL 16
-        uses: ./.github/actions/self-hosted-postgres
+        shell: bash
+        run: |
+          set -euo pipefail
+          role="fcp_ci_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
+          database="${role}"
+          password="$(openssl rand -hex 24)"
+          printf '::add-mask::%s\n' "$password"
+          printf 'FCP_CI_POSTGRES_ROLE=%s\nFCP_CI_POSTGRES_DATABASE=%s\n' \
+            "$role" "$database" >> "$GITHUB_ENV"
+
+          # Ubuntu 24.04 runners include PostgreSQL 16. Starting the bundled
+          # service avoids an unnecessary Docker Hub image pull while keeping
+          # this database isolated to the ephemeral hosted job.
+          sudo systemctl start postgresql.service
+          for attempt in $(seq 1 30); do
+            if pg_isready -q; then break; fi
+            sleep 1
+          done
+          pg_isready
+          version_num="$(sudo -u postgres psql --no-psqlrc --tuples-only \
+            --no-align --set=ON_ERROR_STOP=1 \
+            --command='SHOW server_version_num')"
+          test "$version_num" -ge 160000
+          test "$version_num" -lt 170000
+
+          sudo -u postgres psql --no-psqlrc --set=ON_ERROR_STOP=1 \
+            --set=role="$role" --set=password="$password" <<'SQL'
+          CREATE ROLE :"role" LOGIN PASSWORD :'password';
+          SQL
+          sudo -u postgres createdb --owner="$role" "$database"
+          PGPASSWORD="$password" psql --no-psqlrc --set=ON_ERROR_STOP=1 \
+            "host=127.0.0.1 port=5432 dbname=$database user=$role" \
+            --tuples-only --no-align --command='SELECT current_database()'
+          printf 'FCP_TEST_POSTGRES_DSN=postgresql://%s:%s@127.0.0.1:5432/%s\n' \
+            "$role" "$password" "$database" >> "$GITHUB_ENV"
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip==26.2.1
@@ -418,9 +452,18 @@ jobs:
 
       - name: Remove disposable PostgreSQL 16
         if: always()
-        uses: ./.github/actions/self-hosted-postgres
-        with:
-          operation: stop
+        shell: bash
+        run: |
+          set -euo pipefail
+          if systemctl is-active --quiet postgresql.service; then
+            if [[ -n "${FCP_CI_POSTGRES_DATABASE:-}" ]]; then
+              sudo -u postgres dropdb --if-exists --force "$FCP_CI_POSTGRES_DATABASE"
+            fi
+            if [[ -n "${FCP_CI_POSTGRES_ROLE:-}" ]]; then
+              sudo -u postgres dropuser --if-exists "$FCP_CI_POSTGRES_ROLE"
+            fi
+            sudo systemctl stop postgresql.service
+          fi
 
   suite-order-runs:
     name: Full-suite order (${{ matrix.order }})

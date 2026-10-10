@@ -28,6 +28,8 @@ ALLOWED_REPOSITORY_FILES = frozenset(
         "scripts/artifact_archive.py",
         "scripts/artifact_archive_ci.py",
         "scripts/tests/test_artifact_archive.py",
+        # This regression fixture binds synthetic manifests to the exact repo.
+        "scripts/tests/test_icse_workflow_evidence_verifier.py",
         "docs/implementation/nitro_artifact_archive.md",
     }
 )
