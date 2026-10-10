@@ -387,28 +387,37 @@ class SQLiteOutbox:
                 ) from exc
         return total
 
+    def _database_wal_bytes(self) -> int:
+        """Measure the existing WAL without opening SQLite or creating sidecars."""
+
+        try:
+            return int(Path(f"{self.database}-wal").stat().st_size)
+        except FileNotFoundError:
+            return 0
+        except OSError as exc:
+            raise FederationValidationError(
+                "outbox-resource-measurement-failed",
+                "database",
+                "could not measure the durable outbox WAL before admission",
+            ) from exc
+
     def _migration_requirements(self) -> tuple[tuple[Path, int, int], ...]:
         self._large_current_schema_startup = False
         existing = self._database_bytes()
         if existing > _OUTBOX_MAX_MIGRATION_BYTES:
-            if not self._large_database_is_current_noop():
-                raise FederationValidationError(
-                    "outbox-resource-envelope",
-                    "database",
-                    "durable outbox is too large for a bounded startup migration",
-                )
-            # A current schema-v3 outbox with the required indexes already in
-            # WAL mode does not need the table rebuild or index work for which
-            # the full-copy envelope is reserved. It still needs the ordinary
-            # small SQLite metadata/journal allowance. _initialize_unadmitted
-            # rechecks this invariant under BEGIN IMMEDIATE before accepting
-            # the no-op startup, so a concurrent schema change cannot bypass
-            # the migration bound.
+            # Do not open SQLite to inspect the schema before admission. Even
+            # a read-only WAL connection can create/extend -shm (and, for an
+            # absent WAL, sidecars) before the resource reservation is held.
+            # SQLite's WAL-index uses 32 KiB per 4,062 WAL frames, so reserving
+            # one full WAL-sized allowance safely covers its reconstruction;
+            # the fixed allowance covers the small/empty-WAL case. The actual
+            # no-op schema check below runs under this reservation and still
+            # refuses any large database that would need a migration.
             self._large_current_schema_startup = True
             return (
                 (
                     self.database_path.parent,
-                    _OUTBOX_MUTATION_FIXED_BYTES,
+                    _OUTBOX_MUTATION_FIXED_BYTES + self._database_wal_bytes(),
                     _OUTBOX_MUTATION_FIXED_INODES + 2,
                 ),
             )
@@ -540,25 +549,6 @@ class SQLiteOutbox:
             ):
                 return False
         return True
-
-    def _large_database_is_current_noop(self) -> bool:
-        """Read-only admission probe for a large, already initialized v3 outbox."""
-
-        if not self.database_path.is_file():
-            return False
-        db: sqlite3.Connection | None = None
-        try:
-            uri = f"{self.database_path.resolve().as_uri()}?mode=ro"
-            db = sqlite3.connect(uri, uri=True, timeout=1.0)
-            db.execute("PRAGMA query_only=ON")
-            return self._current_schema_is_noop(db)
-        except (OSError, sqlite3.Error, RuntimeError, TypeError, ValueError):
-            # An unreadable schema cannot establish that initialization is a
-            # no-op, so retain the conservative migration refusal.
-            return False
-        finally:
-            if db is not None:
-                db.close()
 
     @contextmanager
     def _reserve_resources(

@@ -140,10 +140,12 @@ def test_large_current_v3_outbox_uses_only_bounded_noop_startup(tmp_path: Path) 
     oversized.database_path = database
     oversized.resource_admission = _admission(1_000_000_000)
     requirements = oversized._migration_requirements()
+    wal_path = Path(f"{database}-wal")
+    wal_bytes = wal_path.stat().st_size if wal_path.exists() else 0
     assert requirements == (
         (
             database.parent,
-            _OUTBOX_MUTATION_FIXED_BYTES,
+            _OUTBOX_MUTATION_FIXED_BYTES + wal_bytes,
             _OUTBOX_MUTATION_FIXED_INODES + 2,
         ),
     )
@@ -199,6 +201,77 @@ os._exit(0)
         assert rows == [
             (entry.outbox_id, "pending", large_payload) for entry in entries
         ]
+
+
+def test_large_outbox_refusal_does_not_create_wal_sidecars_before_admission(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "outbox.sqlite3"
+    write_wal_and_crash = '''
+import os, sqlite3, sys
+from catalog.federation.outbox import SQLiteOutbox
+database = sys.argv[1]
+SQLiteOutbox(database)
+connection = sqlite3.connect(database)
+connection.execute("PRAGMA wal_autocheckpoint=0")
+payload = '{"padding":"' + ('x' * 900000) + '"}'
+for index in range(3):
+    connection.execute(
+        "INSERT INTO outbox(session_id, destination_id, schema_id, payload_json, "
+        "idempotency_key, content_hash, state, created_at, updated_at, next_attempt_at) "
+        "VALUES(?, ?, ?, ?, ?, ?, 'pending', "
+        "'2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00', "
+        "'2026-01-01T00:00:00+00:00')",
+        ('session', 'destination', 'schema', payload, f'key-{index}', f'hash-{index}'),
+    )
+connection.commit()
+os._exit(0)
+'''
+    subprocess.run(
+        [sys.executable, "-c", write_wal_and_crash, str(database)], check=True
+    )
+
+    wal = Path(f"{database}-wal")
+    shm = Path(f"{database}-shm")
+    assert wal.exists()
+    assert shm.exists()
+    # Remove the WAL index from a fresh process after the simulated crash. The
+    # parent process has never opened this database, avoiding Windows mapped-
+    # file locking while preserving the exact missing-sidecar startup case.
+    subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import os, sys; os.unlink(sys.argv[1])",
+            str(shm),
+        ],
+        check=True,
+    )
+    assert not shm.exists()
+    wal_bytes_before = wal.stat().st_size
+    main_bytes_before = database.stat().st_size
+    assert wal_bytes_before > _OUTBOX_MUTATION_FIXED_BYTES
+
+    oversized = _OversizedSQLiteOutbox.__new__(_OversizedSQLiteOutbox)
+    oversized.database = str(database)
+    oversized.database_path = database
+    oversized.resource_admission = _admission(1_000_000_000)
+    requirements = oversized._migration_requirements()
+    assert requirements[0][1] == _OUTBOX_MUTATION_FIXED_BYTES + wal_bytes_before
+
+    with pytest.raises(HostResourceRefused):
+        _OversizedSQLiteOutbox(
+            database,
+            resource_admission=_admission(200),
+        )
+
+    assert not shm.exists()
+
+    reopened = _large_outbox(database)
+    assert shm.exists()
+    assert database.stat().st_size == main_bytes_before
+    assert wal.stat().st_size == wal_bytes_before
+    assert len(reopened.pending()) == 3
 
 
 def test_large_current_v3_outbox_accepts_quoted_table_identifier(
