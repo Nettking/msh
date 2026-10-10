@@ -265,8 +265,9 @@ def test_a_stopped_authority_closes_its_relay_endpoint(tmp_path, monkeypatch) ->
         def announced(_announcement: object) -> None:
             stop.set()
 
+        settings = _settings(tmp_path)
         await runtime.run_trusted_storage_authority(
-            _settings(tmp_path), stop=stop, on_announced=announced
+            settings, stop=stop, on_announced=announced
         )
         assert not [
             task
@@ -278,6 +279,9 @@ def test_a_stopped_authority_closes_its_relay_endpoint(tmp_path, monkeypatch) ->
     endpoints = asyncio.run(scenario())
 
     assert len(endpoints) == 1
+    # Storage RPCs need a bounded allowance for durable provider commits;
+    # control/heartbeat traffic keeps its shorter request_timeout.
+    assert endpoints[0].request_timeout == 60.0
     assert endpoints[0]._closed is True
     assert endpoints[0]._reader_task is None
     assert client.announced
