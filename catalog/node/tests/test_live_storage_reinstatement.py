@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
 
@@ -480,6 +481,60 @@ def test_live_reinstatement_restores_replica_and_acknowledgement_policy(
             assert completed.record.final_report_revision is not None
             assert completed.record.final_report_hash is not None
             assert completed.record.final_publication is not None
+
+            # Model another invocation completing while this caller still
+            # holds an active snapshot and then receives a lost response.
+            # The timeout handler must merge its error onto the completed row,
+            # retain the final plan, and re-check the live completion proof.
+            completed_record = completed.record
+            restarted.store.save(
+                replace(
+                    completed_record,
+                    state="control-restored",
+                    completed_at=None,
+                )
+            )
+            original_resume = restarted._resume
+            original_validate_completed = restarted._validate_completed
+            completion_proof_checks = 0
+
+            async def complete_elsewhere_then_lose_response(_record):
+                restarted.store.save(completed_record)
+                raise TimeoutError("response lost after durable completion")
+
+            def track_completed_proof(record):
+                nonlocal completion_proof_checks
+                completion_proof_checks += 1
+                return original_validate_completed(record)
+
+            restarted._resume = complete_elsewhere_then_lose_response
+            restarted._validate_completed = track_completed_proof
+            try:
+                recovered_completion = await restarted.run_once(
+                    group_id="storage-main",
+                    returning_provider_id="provider-primary",
+                )
+            finally:
+                restarted._resume = original_resume
+                restarted._validate_completed = original_validate_completed
+            assert recovered_completion.status == "completed", (
+                recovered_completion.to_dict()
+            )
+            assert completion_proof_checks == 1
+            assert recovered_completion.record is not None
+            assert recovered_completion.record.state == "completed"
+            assert (
+                recovered_completion.record.final_publication
+                == completed_record.final_publication
+            )
+            assert (
+                recovered_completion.record.latest_error_code
+                == "live-reinstatement-retryable"
+            )
+            assert (
+                recovered_completion.record.latest_error_reason
+                == "response lost after durable completion"
+            )
 
             snapshot = control.snapshot(session_id)
             assignment = snapshot.groups["storage-main"]

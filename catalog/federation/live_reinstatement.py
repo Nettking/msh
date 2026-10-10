@@ -519,6 +519,66 @@ class LiveReinstatementStore:
             )
         return record
 
+    def record_failure_if_current(
+        self,
+        expected: LiveReinstatementRecord,
+        *,
+        code: str,
+        reason: str,
+        now: datetime,
+        retryable: bool,
+    ) -> tuple[LiveReinstatementRecord | None, bool]:
+        """Record an error without replacing progress committed by another run.
+
+        The read, comparison and update share a writer transaction. On a stale
+        caller we retain the newest stage and plans, merging only the error
+        fields. A non-retryable failure changes an active record to operator
+        attention only when the failed snapshot is still current.
+        """
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                row = connection.execute(
+                    """SELECT * FROM storage_live_reinstatements
+                       WHERE reinstatement_id=?""",
+                    (expected.reinstatement_id,),
+                ).fetchone()
+                if row is None:
+                    connection.commit()
+                    return None, False
+                current = self._decode(row)
+                matched = current.to_dict() == expected.to_dict()
+                if current.state in {_STATE_OPERATOR, _STATE_ROLLED_BACK}:
+                    connection.commit()
+                    return current, matched
+
+                state = current.state
+                if matched and not retryable:
+                    state = _STATE_OPERATOR
+                updated = replace(
+                    current,
+                    state=state,
+                    latest_error_code=code,
+                    latest_error_reason=reason,
+                    updated_at=max(current.updated_at, _utc(now)),
+                )
+                connection.execute(
+                    """UPDATE storage_live_reinstatements
+                       SET state=?, record_json=?, updated_at=?
+                       WHERE reinstatement_id=?""",
+                    (
+                        updated.state,
+                        _json(updated.to_dict()),
+                        _stamp(updated.updated_at),
+                        updated.reinstatement_id,
+                    ),
+                )
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+        return updated, matched
+
     def restore_control_atomically(
         self,
         record: LiveReinstatementRecord,
@@ -798,12 +858,10 @@ class LiveFormerPrimaryReinstatementCoordinator:
                     self.session_id, group_id, returning_provider_id
                 )
                 if latest is not None and latest.state == _STATE_COMPLETED:
-                    self._validate_completed(latest)
-                    return self._result(
-                        "completed",
-                        "live-reinstatement-complete",
-                        "former primary is already a verified replica",
+                    record = latest
+                    return self._completed_result(
                         latest,
+                        reason="former primary is already a verified replica",
                     )
                 catchup = await self.catchup.run_once(
                     group_id=group_id,
@@ -826,17 +884,38 @@ class LiveFormerPrimaryReinstatementCoordinator:
             retryable = _retryable_validation(exc)
             if isinstance(record, LiveReinstatementRecord):
                 try:
-                    record = self.store.save(
-                        replace(
-                            record,
-                            state=(record.state if retryable else _STATE_OPERATOR),
-                            latest_error_code=exc.code,
-                            latest_error_reason=str(exc),
-                            updated_at=self.clock(),
-                        )
+                    record, matched = self.store.record_failure_if_current(
+                        record,
+                        code=exc.code,
+                        reason=str(exc),
+                        now=self.clock(),
+                        retryable=retryable,
                     )
                 except FederationValidationError:
-                    pass
+                    matched = True
+                if isinstance(record, LiveReinstatementRecord):
+                    if record.state in {_STATE_OPERATOR, _STATE_ROLLED_BACK}:
+                        terminal = self._terminal_result(record)
+                        if terminal is not None:
+                            return terminal
+                    if record.state == _STATE_COMPLETED and not matched:
+                        try:
+                            return self._completed_result(record)
+                        except FederationValidationError as current_exc:
+                            current_retryable = _retryable_validation(current_exc)
+                            try:
+                                record, _ = self.store.record_failure_if_current(
+                                    record,
+                                    code=current_exc.code,
+                                    reason=str(current_exc),
+                                    now=self.clock(),
+                                    retryable=current_retryable,
+                                )
+                            except FederationValidationError:
+                                pass
+                            return self._validation_error_result(
+                                current_exc, record
+                            )
             return LiveReinstatementResult(
                 "retryable" if retryable else "operator-attention",
                 exc.code,
@@ -848,44 +927,31 @@ class LiveFormerPrimaryReinstatementCoordinator:
             record = locals().get("record")
             reason = str(exc) or type(exc).__name__
             if isinstance(record, LiveReinstatementRecord):
-                # _resume saves each durable stage before a network await. Its
-                # local record may therefore be newer than this caller's copy.
-                # Re-read before recording the retryable error so a timeout
-                # cannot roll back a persisted plan, report, or completion.
-                persisted = self.store.get(record.reinstatement_id)
-                if persisted is not None:
-                    record = persisted
-                if record.state == _STATE_COMPLETED:
-                    return self._result(
-                        "completed",
-                        "live-reinstatement-complete",
-                        "former primary is a verified replica and redundancy policy is restored",
-                        record,
-                    )
-                if record.state == _STATE_OPERATOR:
-                    return self._result(
-                        "operator-attention",
-                        record.latest_error_code or "live-reinstatement-conflict",
-                        record.latest_error_reason
-                        or "reinstatement requires operator attention",
-                        record,
-                    )
-                if record.state == _STATE_ROLLED_BACK:
-                    return self._result(
-                        "retryable",
-                        record.latest_error_code
-                        or "reinstatement-catchup-required",
-                        record.latest_error_reason or "run catch-up again",
-                        record,
-                    )
-                record = self.store.save(
-                    replace(
-                        record,
-                        latest_error_code="live-reinstatement-retryable",
-                        latest_error_reason=reason,
-                        updated_at=self.clock(),
-                    )
+                record, _ = self.store.record_failure_if_current(
+                    record,
+                    code="live-reinstatement-retryable",
+                    reason=reason,
+                    now=self.clock(),
+                    retryable=True,
                 )
+                if isinstance(record, LiveReinstatementRecord):
+                    try:
+                        terminal = self._terminal_result(record)
+                    except FederationValidationError as proof_error:
+                        proof_retryable = _retryable_validation(proof_error)
+                        try:
+                            record, _ = self.store.record_failure_if_current(
+                                record,
+                                code=proof_error.code,
+                                reason=str(proof_error),
+                                now=self.clock(),
+                                retryable=proof_retryable,
+                            )
+                        except FederationValidationError:
+                            pass
+                        return self._validation_error_result(proof_error, record)
+                    if terminal is not None:
+                        return terminal
             return LiveReinstatementResult(
                 "retryable",
                 "live-reinstatement-retryable",
@@ -897,27 +963,9 @@ class LiveFormerPrimaryReinstatementCoordinator:
     async def _resume(
         self, record: LiveReinstatementRecord
     ) -> LiveReinstatementResult:
-        if record.state == _STATE_COMPLETED:
-            return self._result(
-                "completed",
-                "live-reinstatement-complete",
-                "former primary is already a verified replica",
-                record,
-            )
-        if record.state == _STATE_OPERATOR:
-            return self._result(
-                "operator-attention",
-                record.latest_error_code or "live-reinstatement-conflict",
-                record.latest_error_reason or "reinstatement requires operator attention",
-                record,
-            )
-        if record.state == _STATE_ROLLED_BACK:
-            return self._result(
-                "retryable",
-                record.latest_error_code or "reinstatement-catchup-required",
-                record.latest_error_reason or "run catch-up again before reinstatement",
-                record,
-            )
+        terminal = self._terminal_result(record)
+        if terminal is not None:
+            return terminal
         if record.state == _STATE_ROLLBACK_PENDING:
             return await self._publish_rollback(record)
 
@@ -1485,6 +1533,52 @@ class LiveFormerPrimaryReinstatementCoordinator:
                 "final_report",
                 "completed replica proof is missing or no longer current",
             )
+
+    def _completed_result(
+        self,
+        record: LiveReinstatementRecord,
+        *,
+        reason: str = "former primary is a verified replica and redundancy policy is restored",
+    ) -> LiveReinstatementResult:
+        self._validate_completed(record)
+        return self._result(
+            "completed", "live-reinstatement-complete", reason, record
+        )
+
+    def _terminal_result(
+        self, record: LiveReinstatementRecord
+    ) -> LiveReinstatementResult | None:
+        if record.state == _STATE_COMPLETED:
+            return self._completed_result(record)
+        if record.state == _STATE_OPERATOR:
+            return self._result(
+                "operator-attention",
+                record.latest_error_code or "live-reinstatement-conflict",
+                record.latest_error_reason
+                or "reinstatement requires operator attention",
+                record,
+            )
+        if record.state == _STATE_ROLLED_BACK:
+            return self._result(
+                "retryable",
+                record.latest_error_code or "reinstatement-catchup-required",
+                record.latest_error_reason or "run catch-up again",
+                record,
+            )
+        return None
+
+    @staticmethod
+    def _validation_error_result(
+        error: FederationValidationError,
+        record: LiveReinstatementRecord | None,
+    ) -> LiveReinstatementResult:
+        return LiveReinstatementResult(
+            "retryable" if _retryable_validation(error) else "operator-attention",
+            error.code,
+            str(error),
+            None if record is None else record.reinstatement_id,
+            record,
+        )
 
     def _validate_restored(self, record: LiveReinstatementRecord) -> None:
         snapshot = self.control_plane.snapshot(record.session_id)
