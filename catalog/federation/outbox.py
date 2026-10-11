@@ -188,16 +188,29 @@ _OUTBOX_INDEX_DDL = (
     "ON outbox(state, next_attempt_at, outbox_id);"
 )
 
-# Dataset identity lives inside the immutable outbox JSON payload. The fair
-# delivery query uses this exact expression to find the oldest row for each
-# ordered dataset. Keeping it indexed avoids decoding/sorting every pending
-# payload on every cycle when a large offline backlog has accumulated.
+# Dataset identity lives inside the immutable outbox JSON payload. MTConnect
+# sequence numbers restart when an Agent instance changes, so storage batches
+# are ordered per (dataset, agent instance). Other delivery schemas retain
+# their existing per-dataset ordering. The fair delivery query uses this exact
+# expression to find the oldest row for each ordered stream. Keeping it
+# indexed avoids decoding/sorting every pending payload on every cycle when a
+# large offline backlog has accumulated.
 _OUTBOX_DELIVERY_DATASET_KEY_SQL = """
 CASE
+    WHEN schema_id = 'fcp.recorder.storage_delivery.v1'
+        AND json_type(payload_json, '$.dataset_id') = 'text'
+        AND length(json_extract(payload_json, '$.dataset_id')) > 0
+        AND json_type(payload_json, '$.content.agent_instance_id') = 'integer'
+        AND json_extract(payload_json, '$.content.agent_instance_id') > 0
+    THEN json_array(
+        'mtconnect-agent-instance',
+        json_extract(payload_json, '$.dataset_id'),
+        json_extract(payload_json, '$.content.agent_instance_id')
+    )
     WHEN json_type(payload_json, '$.dataset_id') = 'text'
         AND length(json_extract(payload_json, '$.dataset_id')) > 0
-    THEN json_extract(payload_json, '$.dataset_id')
-    ELSE printf('__unkeyed-outbox-row:%lld', outbox_id)
+    THEN json_array('dataset', json_extract(payload_json, '$.dataset_id'))
+    ELSE json_array('unkeyed-outbox-row', outbox_id)
 END
 """.strip()
 _OUTBOX_DELIVERY_INDEX_DDL = f"""
@@ -746,8 +759,28 @@ class SQLiteOutbox:
                 delivery_key_columns = tuple(
                     row["name"] for row in delivery_index if row["key"]
                 )
-                if delivery_index and delivery_key_columns != (
-                    _OUTBOX_DELIVERY_INDEX_KEY_COLUMNS
+                delivery_index_sql_row = db.execute(
+                    "SELECT sql FROM sqlite_master "
+                    "WHERE type='index' AND name='outbox_pending_delivery_dataset'"
+                ).fetchone()
+                delivery_index_sql = (
+                    _normalize_index_sql_preserving_literals(
+                        delivery_index_sql_row["sql"]
+                    )
+                    if delivery_index_sql_row is not None
+                    and delivery_index_sql_row["sql"] is not None
+                    else None
+                )
+                expected_delivery_index_sql = (
+                    _normalize_index_sql_preserving_literals(
+                        _OUTBOX_DELIVERY_INDEX_DDL.replace(
+                            "CREATE INDEX IF NOT EXISTS", "CREATE INDEX"
+                        )
+                    )
+                )
+                if delivery_index and (
+                    delivery_key_columns != _OUTBOX_DELIVERY_INDEX_KEY_COLUMNS
+                    or delivery_index_sql != expected_delivery_index_sql
                 ):
                     db.execute("DROP INDEX outbox_pending_delivery_dataset")
                 db.execute(_OUTBOX_DELIVERY_INDEX_DDL)
@@ -1124,16 +1157,18 @@ class SQLiteOutbox:
         """Return a bounded, fair window of pending delivery rows.
 
         A delivery worker must see the oldest row for every ordered
-        ``(destination, dataset)`` pair so one unavailable route cannot hide
-        healthy ones. Once those heads are represented, the window can include
-        additional rows from each pair while never exceeding the worker's
-        delivery limit. The dataset key is read from the JSON envelope only
-        inside SQLite; no payload is decoded or retained by Python beyond the
-        bounded result.
+        ``(destination, delivery stream)`` pair so one unavailable route
+        cannot hide healthy ones. Recorder MTConnect streams include the Agent
+        instance because sequence numbers restart across instances; all other
+        schemas remain ordered by dataset. Once those heads are represented,
+        the window can include additional rows from each pair while never
+        exceeding the worker's delivery limit. The stream key is read from the
+        JSON envelope only inside SQLite; no payload is decoded or retained by
+        Python beyond the bounded result.
 
         Rows are intentionally not filtered by ``next_attempt_at`` here. A
         deferred head must still be visible so the delivery queue can fence
-        newer rows behind it. When ``now`` is supplied, due dataset heads are
+        newer rows behind it. When ``now`` is supplied, due stream heads are
         selected before deferred heads so a bounded window cannot be consumed
         entirely by retry-delayed datasets. The queue still applies durable
         backoff and ordering fences after reading the bounded rows.
@@ -1188,7 +1223,7 @@ class SQLiteOutbox:
                     args,
                 ).fetchone()[0]
             )
-            rows_per_dataset = max(1, limit // max(ordering_group_count, 1))
+            rows_per_stream = max(1, limit // max(ordering_group_count, 1))
             head_priority_order = (
                 "outbox_id"
                 if now_stamp is None
@@ -1221,7 +1256,7 @@ class SQLiteOutbox:
                 JOIN outbox AS entry ON entry.outbox_id = bounded.outbox_id
                 ORDER BY bounded.outbox_id
                 """,
-                [*args, rows_per_dataset, *priority_args, limit],
+                [*args, rows_per_stream, *priority_args, limit],
             ).fetchall()
         return tuple(self._decode(row) for row in rows)
 

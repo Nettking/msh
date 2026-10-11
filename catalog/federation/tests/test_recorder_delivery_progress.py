@@ -47,6 +47,44 @@ def _enqueue(outbox: SQLiteOutbox, dataset_id: str, batch_id: str) -> None:
     )
 
 
+def _enqueue_instance(
+    outbox: SQLiteOutbox,
+    dataset_id: str,
+    batch_id: str,
+    agent_instance_id: int,
+) -> None:
+    outbox.enqueue(
+        session_id="session-1",
+        destination_id="telemetry",
+        schema_id=RECORDER_STORAGE_SCHEMA,
+        payload={
+            "group_id": "telemetry",
+            "dataset_id": dataset_id,
+            "batch_id": batch_id,
+            "idempotency_key": batch_id,
+            "content": {
+                "dataset": dataset_id,
+                "agent_instance_id": agent_instance_id,
+            },
+            "created_at": "2026-08-20T17:21:00Z",
+        },
+        idempotency_key=batch_id,
+        content_hash="b" * 64,
+        now=datetime(2026, 8, 20, 17, 21, tzinfo=UTC),
+    )
+
+
+class _FailFirstClient:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def ingest_batch(self, **_kwargs):
+        self.calls += 1
+        if self.calls == 1:
+            raise TimeoutError()
+        return PhaseDIngestOutcome(committed=True)
+
+
 def test_progress_observer_runs_after_each_durable_commit(tmp_path) -> None:
     outbox = SQLiteOutbox(tmp_path / "outbox.sqlite3")
     _enqueue(outbox, "dataset-a", "batch-a")
@@ -95,6 +133,31 @@ def test_timeout_remains_pending_with_durable_error_type(tmp_path) -> None:
     assert entry.state == "pending"
     assert entry.attempt_count == 1
     assert entry.last_error == "TimeoutError"
+
+
+def test_recorder_delivery_fence_is_scoped_to_agent_instance(tmp_path) -> None:
+    outbox = SQLiteOutbox(tmp_path / "outbox.sqlite3")
+    dataset_id = "mtconnect:node-recorder-1:M8012"
+    _enqueue_instance(outbox, dataset_id, "old-instance-head", 101)
+    _enqueue_instance(outbox, dataset_id, "old-instance-next", 101)
+    _enqueue_instance(outbox, dataset_id, "current-instance-head", 202)
+    queue = DurableRecorderDeliveryQueue(
+        outbox=outbox,
+        client=_FailFirstClient(),
+        session_id="session-1",
+        destination_id="telemetry",
+    )
+
+    result = asyncio.run(queue.run_once(limit=3))
+
+    assert result.attempted == 2
+    assert result.committed == 1
+    assert outbox.get(1).state == "pending"
+    assert outbox.get(2).state == "pending"
+    assert outbox.get(3).state == "completed"
+    # The failed older instance fences only its own successor. The new
+    # instance can advance without deleting or reclassifying old pending data.
+    assert sorted(entry.outbox_id for entry in outbox.pending()) == [1, 2]
 
 
 def test_sync_observer_failure_after_commit_does_not_reclassify_delivery(tmp_path) -> None:
