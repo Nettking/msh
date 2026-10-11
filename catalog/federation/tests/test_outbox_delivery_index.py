@@ -298,6 +298,45 @@ def test_pending_delivery_uses_agent_instance_as_recorder_ordering_stream(tmp_pa
     assert [entry.outbox_id for entry in entries] == [1, 2, 3]
 
 
+def test_pending_delivery_keeps_large_agent_instance_ids_distinct(tmp_path):
+    database = tmp_path / "outbox.sqlite3"
+    outbox = SQLiteOutbox(database)
+    timestamp = datetime(2026, 10, 6, tzinfo=UTC)
+    dataset_id = "mtconnect:node-recorder-1:M8012"
+    large_instance = 2**63
+    for index, (instance_id, sequence) in enumerate(
+        ((large_instance, 1), (large_instance, 2), (large_instance + 1, 1)),
+        start=1,
+    ):
+        outbox.enqueue(
+            session_id="session-a",
+            destination_id="group-a",
+            schema_id="fcp.recorder.storage_delivery.v1",
+            payload={
+                "dataset_id": dataset_id,
+                "batch_id": f"batch-{index}",
+                "content": {
+                    "agent_instance_id": instance_id,
+                    "sequence": sequence,
+                },
+            },
+            idempotency_key=f"key-{index}",
+            content_hash=f"sha256:{index:064x}",
+            now=timestamp,
+        )
+
+    # SQLite JSON1 returns large integer tokens as REAL from json_extract;
+    # their rounded json_array keys can collide. Preserve the original token
+    # text so a failed older instance cannot fence the next instance.
+    entries = outbox.pending_for_delivery(
+        session_id="session-a",
+        destination_id="group-a",
+        schema_id="fcp.recorder.storage_delivery.v1",
+        limit=2,
+    )
+    assert [entry.outbox_id for entry in entries] == [1, 3]
+
+
 def test_initialization_rebuilds_delivery_index_when_ordering_expression_changes(
     tmp_path,
 ):

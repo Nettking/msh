@@ -205,7 +205,7 @@ CASE
     THEN json_array(
         'mtconnect-agent-instance',
         json_extract(payload_json, '$.dataset_id'),
-        json_extract(payload_json, '$.content.agent_instance_id')
+        CAST(payload_json -> '$.content.agent_instance_id' AS TEXT) || ''
     )
     WHEN json_type(payload_json, '$.dataset_id') = 'text'
         AND length(json_extract(payload_json, '$.dataset_id')) > 0
