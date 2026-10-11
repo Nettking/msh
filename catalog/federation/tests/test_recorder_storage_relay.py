@@ -1150,7 +1150,7 @@ def test_recorder_ingress_task_failure_is_consumed_and_correlated(caplog) -> Non
     records = [
         record
         for record in caplog.records
-        if record.getMessage() == "recorder storage request handler task failed"
+        if record.getMessage().startswith("recorder storage request handler task failed ")
     ]
     assert len(records) == 1
     record = records[0]
@@ -1162,6 +1162,13 @@ def test_recorder_ingress_task_failure_is_consumed_and_correlated(caplog) -> Non
     assert record.storage_batch_id == _diagnostic_fingerprint(RECORDER_BATCH_ID)
     assert record.storage_dataset_id == _diagnostic_fingerprint(RECORDER_DATASET_ID)
     assert record.storage_exception_type == "TimeoutError"
+    # The production container formatter emits only the message, not extras.
+    # Retain the safe correlation and exception type in that actual format.
+    formatted = logging.Formatter("%(message)s").format(record)
+    fields = json.loads(formatted.split("recorder storage request handler task failed ", 1)[1])
+    assert fields["storage_exception_type"] == "TimeoutError"
+    assert fields["storage_correlation_id"] == _diagnostic_fingerprint("corr-1")
+    assert fields["storage_batch_id"] == _diagnostic_fingerprint(RECORDER_BATCH_ID)
     assert "sensitive detail must not be logged" not in caplog.text
     assert "never-log-this-value" not in caplog.text
 

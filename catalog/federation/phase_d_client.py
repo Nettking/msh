@@ -12,7 +12,7 @@ from typing import Any, Protocol
 
 from .commit_tracking import DurableAcknowledgementStore
 from .errors import FederationValidationError
-from .manifest import ManifestItemKind
+from .manifest import AuthoritativeStorageManifest, ManifestItemKind
 from .manifest_store import ManifestCommitIntent
 from .storage_async import owned_storage_call
 from .storage_catalog import (
@@ -350,6 +350,7 @@ class PhaseDLogicalStorageClient:
 
         authoritative_revision = remote_manifest_revision
         authoritative_hash = remote_manifest_hash
+        manifest = None
         if intent is not None:
             try:
                 coordinated = self._finalize_distributed_manifest(
@@ -361,30 +362,40 @@ class PhaseDLogicalStorageClient:
                 return self._invalid_success(
                     f"distributed manifest evidence was rejected: {exc.message}"
                 )
+            if not isinstance(coordinated, AuthoritativeStorageManifest):
+                return self._invalid_success(
+                    "distributed finalization lacks authoritative manifest evidence"
+                )
+            # Finalization verified the complete chain, head and projections in
+            # its committing transaction. Use that exact receipt: rereading the
+            # growing history here repeats the same verification after the
+            # durable ACK and can exhaust the recorder's response deadline.
+            manifest = coordinated
             authoritative_revision = coordinated.revision
             authoritative_hash = coordinated.manifest_hash
 
-        history_reader = getattr(
-            self.control_plane,
-            "manifest_history",
-            None,
-        )
-        if not callable(history_reader):
-            return self._invalid_success(
-                "authoritative manifest verification is unavailable"
+        if manifest is None:
+            history_reader = getattr(
+                self.control_plane,
+                "manifest_history",
+                None,
             )
-        try:
-            history = history_reader(self.session_id, group_id)
-            manifest = history[authoritative_revision]
-        except (
-            FederationValidationError,
-            IndexError,
-            TypeError,
-            ValueError,
-        ) as exc:
-            return self._invalid_success(
-                f"manifest evidence cannot be verified: {exc}"
-            )
+            if not callable(history_reader):
+                return self._invalid_success(
+                    "authoritative manifest verification is unavailable"
+                )
+            try:
+                history = history_reader(self.session_id, group_id)
+                manifest = history[authoritative_revision]
+            except (
+                FederationValidationError,
+                IndexError,
+                TypeError,
+                ValueError,
+            ) as exc:
+                return self._invalid_success(
+                    f"manifest evidence cannot be verified: {exc}"
+                )
         item = next(
             (
                 candidate

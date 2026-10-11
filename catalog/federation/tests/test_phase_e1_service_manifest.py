@@ -5,7 +5,7 @@ import hashlib
 import json
 import logging
 import sqlite3
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -1739,6 +1739,97 @@ def test_logical_client_requires_authoritative_manifest_reader(
     assert outcome.retryable
     assert outcome.error_code == "invalid-storage-response"
     assert outcome.message == "authoritative manifest verification is unavailable"
+
+
+def test_distributed_success_uses_committing_snapshot_for_first_and_retried_batch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime = _runtime(tmp_path, acknowledgement_mode=AcknowledgementMode.PRIMARY)
+
+    class Transport:
+        async def request(self, *, target_node_id, envelope):
+            assert target_node_id == PRIMARY_NODE_ID
+            return await runtime.service.dispatch(envelope)
+
+    def repeated_history(*_args):
+        raise TimeoutError("redundant history read exhausted the response deadline")
+
+    monkeypatch.setattr(runtime.control, "manifest_history", repeated_history)
+    client = PhaseDLogicalStorageClient(
+        session_id=SESSION_ID, actor_node_id="recorder-node",
+        control_plane=runtime.control, transport=Transport(),
+        acknowledgements=runtime.acknowledgements, clock=lambda: NOW,
+    )
+
+    async def exercise():
+        assert (await client.ingest(_request())).committed
+        assert (await client.ingest(_request())).committed
+
+    asyncio.run(exercise())
+    head = runtime.control.manifests.head(SESSION_ID, GROUP_ID)
+    assert head.revision == 1
+    assert len(head.items) == 1
+    assert head.items[0].content_hash == _request().content_hash
+    assert runtime.control.manifests.intent(
+        SESSION_ID, GROUP_ID, _request().batch_id,
+    ).committed_revision == 1
+
+
+def test_distributed_success_still_checks_the_finalized_batch_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from catalog.federation.manifest import AuthoritativeStorageManifest
+
+    runtime = _runtime(tmp_path, acknowledgement_mode=AcknowledgementMode.PRIMARY)
+    original = runtime.control.finalize_batch_manifest_intent
+
+    def wrong_batch(*args, **kwargs):
+        head = original(*args, **kwargs)
+        return AuthoritativeStorageManifest.build(
+            session_id=head.session_id, group_id=head.group_id,
+            revision=head.revision, term=head.term,
+            previous_manifest_hash=head.previous_manifest_hash,
+            datasets=head.datasets,
+            items=(replace(head.items[0], content_hash="sha256:" + "0" * 64),),
+            updated_at=head.updated_at,
+        )
+
+    class Transport:
+        async def request(self, *, target_node_id, envelope):
+            return await runtime.service.dispatch(envelope)
+
+    monkeypatch.setattr(runtime.control, "finalize_batch_manifest_intent", wrong_batch)
+    client = PhaseDLogicalStorageClient(
+        session_id=SESSION_ID, actor_node_id="recorder-node",
+        control_plane=runtime.control, transport=Transport(),
+        acknowledgements=runtime.acknowledgements, clock=lambda: NOW,
+    )
+    outcome = asyncio.run(client.ingest(_request()))
+    assert not outcome.committed and outcome.retryable
+    assert outcome.error_code == "invalid-storage-response"
+
+
+def test_non_distributed_success_still_verifies_authoritative_history(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime = _runtime(tmp_path, acknowledgement_mode=AcknowledgementMode.PRIMARY)
+
+    class Transport:
+        async def request(self, *, target_node_id, envelope):
+            return await runtime.service.dispatch(envelope)
+
+    def corrupt_history(*_args):
+        raise FederationValidationError("manifest-chain-mismatch", "revision", "corrupt chain")
+
+    monkeypatch.setattr(runtime.control, "manifest_history", corrupt_history)
+    client = PhaseDLogicalStorageClient(
+        session_id=SESSION_ID, actor_node_id="recorder-node",
+        control_plane=runtime.control, transport=Transport(), clock=lambda: NOW,
+    )
+    outcome = asyncio.run(client.ingest(_request()))
+    assert not outcome.committed and outcome.retryable
+    assert outcome.error_code == "invalid-storage-response"
+    assert "corrupt chain" in outcome.message
 
 
 def test_acknowledgement_store_migrates_legacy_rows_fail_closed(
