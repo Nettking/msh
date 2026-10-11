@@ -252,6 +252,135 @@ def test_pending_delivery_bounds_payload_join_when_groups_exceed_limit(tmp_path)
     assert normalized.index("LIMIT 3") < normalized.index("SELECT entry.*")
 
 
+def test_pending_delivery_uses_agent_instance_as_recorder_ordering_stream(tmp_path):
+    database = tmp_path / "outbox.sqlite3"
+    outbox = SQLiteOutbox(database)
+    timestamp = datetime(2026, 10, 6, tzinfo=UTC)
+    dataset_id = "mtconnect:node-recorder-1:M8012"
+    for index, (instance_id, sequence) in enumerate(
+        ((101, 1), (101, 2), (202, 1)), start=1
+    ):
+        outbox.enqueue(
+            session_id="session-a",
+            destination_id="group-a",
+            schema_id="fcp.recorder.storage_delivery.v1",
+            payload={
+                "dataset_id": dataset_id,
+                "batch_id": f"batch-{index}",
+                "content": {
+                    "agent_instance_id": instance_id,
+                    "sequence": sequence,
+                },
+            },
+            idempotency_key=f"key-{index}",
+            content_hash=f"sha256:{index:064x}",
+            now=timestamp,
+        )
+
+    # With a two-row window the query must expose both instance heads instead
+    # of spending the entire allowance on the older instance's backlog.
+    entries = outbox.pending_for_delivery(
+        session_id="session-a",
+        destination_id="group-a",
+        schema_id="fcp.recorder.storage_delivery.v1",
+        limit=2,
+    )
+    assert [entry.outbox_id for entry in entries] == [1, 3]
+
+    # The same-instance successor remains ordered when the window is large
+    # enough to include more than one row per instance.
+    entries = outbox.pending_for_delivery(
+        session_id="session-a",
+        destination_id="group-a",
+        schema_id="fcp.recorder.storage_delivery.v1",
+        limit=4,
+    )
+    assert [entry.outbox_id for entry in entries] == [1, 2, 3]
+
+
+def test_pending_delivery_keeps_large_agent_instance_ids_distinct(tmp_path):
+    database = tmp_path / "outbox.sqlite3"
+    outbox = SQLiteOutbox(database)
+    timestamp = datetime(2026, 10, 6, tzinfo=UTC)
+    dataset_id = "mtconnect:node-recorder-1:M8012"
+    large_instance = 2**63
+    for index, (instance_id, sequence) in enumerate(
+        ((large_instance, 1), (large_instance, 2), (large_instance + 1, 1)),
+        start=1,
+    ):
+        outbox.enqueue(
+            session_id="session-a",
+            destination_id="group-a",
+            schema_id="fcp.recorder.storage_delivery.v1",
+            payload={
+                "dataset_id": dataset_id,
+                "batch_id": f"batch-{index}",
+                "content": {
+                    "agent_instance_id": instance_id,
+                    "sequence": sequence,
+                },
+            },
+            idempotency_key=f"key-{index}",
+            content_hash=f"sha256:{index:064x}",
+            now=timestamp,
+        )
+
+    # SQLite JSON1 returns large integer tokens as REAL from json_extract;
+    # their rounded json_array keys can collide. Preserve the original token
+    # text so a failed older instance cannot fence the next instance.
+    entries = outbox.pending_for_delivery(
+        session_id="session-a",
+        destination_id="group-a",
+        schema_id="fcp.recorder.storage_delivery.v1",
+        limit=2,
+    )
+    assert [entry.outbox_id for entry in entries] == [1, 3]
+
+
+def test_initialization_rebuilds_delivery_index_when_ordering_expression_changes(
+    tmp_path,
+):
+    database = tmp_path / "outbox.sqlite3"
+    outbox = SQLiteOutbox(database)
+    # Recreate the previous expression with the current covering columns. The
+    # index_xinfo key-column names alone cannot detect expression changes.
+    with sqlite3.connect(database) as connection:
+        connection.execute("DROP INDEX outbox_pending_delivery_dataset")
+        connection.execute(
+            """CREATE INDEX outbox_pending_delivery_dataset
+               ON outbox(
+                   state, session_id, destination_id, schema_id,
+                   CASE
+                       WHEN json_type(payload_json, '$.dataset_id') = 'text'
+                           AND length(json_extract(payload_json, '$.dataset_id')) > 0
+                       THEN json_extract(payload_json, '$.dataset_id')
+                       ELSE printf('__unkeyed-outbox-row:%lld', outbox_id)
+                   END,
+                   outbox_id, next_attempt_at, last_error
+               ) WHERE state='pending'"""
+        )
+        connection.commit()
+
+    # Reopening the same database must rebuild that derived index without
+    # changing the durable outbox table or schema version.
+    outbox.initialize()
+    with sqlite3.connect(database) as connection:
+        index_sql = connection.execute(
+            "SELECT sql FROM sqlite_master WHERE type='index' "
+            "AND name='outbox_pending_delivery_dataset'"
+        ).fetchone()[0]
+        version = connection.execute(
+            "SELECT version FROM outbox_schema WHERE singleton=1"
+        ).fetchone()[0]
+    assert "$.content.agent_instance_id" in index_sql
+    assert version == 3
+    assert outbox.pending_summary(
+        session_id="session-a",
+        destination_id="group-a",
+        schema_id="fcp.recorder.storage_delivery.v1",
+    ) == (0, False)
+
+
 def test_retired_summary_uses_bounded_covering_index_without_temp_sort(tmp_path):
     database = tmp_path / "outbox.sqlite3"
     outbox = _TracingOutbox(database)

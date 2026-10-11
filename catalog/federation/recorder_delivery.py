@@ -266,7 +266,7 @@ class DurableRecorderDeliveryQueue:
         """Whether this queue still owes its first bounded route probe.
 
         A new queue object is a new process/runtime delivery session, and its
-        first pass deliberately retries one deferred head per ordered dataset
+        first pass deliberately retries one deferred head per ordered stream
         so an outage that has since been repaired is proven quickly rather
         than waited out. The worker asks this to decide whether a backlog
         that is not yet due is still worth deferring reconciliation for.
@@ -275,14 +275,28 @@ class DurableRecorderDeliveryQueue:
         return self._startup_probe_available
 
     @staticmethod
-    def _ordering_key(entry) -> tuple[str, str, str] | None:
+    def _ordering_key(entry) -> tuple[str, str, str, int | None] | None:
         payload = entry.payload
         if not isinstance(payload, dict):
             return None
         dataset_id = payload.get("dataset_id")
         if not isinstance(dataset_id, str) or not dataset_id:
             return None
-        return entry.session_id, entry.destination_id, dataset_id
+        instance_id = None
+        if entry.schema_id == RECORDER_STORAGE_SCHEMA:
+            content = payload.get("content")
+            candidate = (
+                content.get("agent_instance_id")
+                if isinstance(content, dict)
+                else None
+            )
+            if (
+                isinstance(candidate, int)
+                and not isinstance(candidate, bool)
+                and candidate > 0
+            ):
+                instance_id = candidate
+        return entry.session_id, entry.destination_id, dataset_id, instance_id
 
     async def run_once(
         self,
@@ -314,7 +328,7 @@ class DurableRecorderDeliveryQueue:
 
         now = self.clock()
         # Read only a bounded, fair delivery window. The SQLite implementation
-        # includes the oldest row for every ordered dataset before filling the
+        # includes the oldest row for every ordered stream before filling the
         # remaining window, prioritizing due heads before backoff-delayed heads
         # when there are more datasets than the window can hold. A bad head
         # still fences only its own dataset. Keep the blocking query and bounded
@@ -337,7 +351,7 @@ class DurableRecorderDeliveryQueue:
 
         # A new queue object is a new process/runtime delivery session. Its
         # automatic first pass is a bounded route proof: try no more than the
-        # oldest row of each ordered dataset, including one row whose durable
+        # oldest row of each ordered stream, including one row whose durable
         # backoff is not yet due. This prevents one large dataset from occupying
         # the whole startup cycle before the recorder can report a proven route,
         # while later passes retain the configured backlog-drain throughput.
@@ -373,9 +387,9 @@ class DurableRecorderDeliveryQueue:
                 key=lambda entry: entry.outbox_id,
             )
         )
-        blocked: set[tuple[str, str, str]] = set()
-        deferred_retry_used: set[tuple[str, str, str]] = set()
-        startup_probe_used: set[tuple[str, str, str]] = set()
+        blocked: set[tuple[str, str, str, int | None]] = set()
+        deferred_retry_used: set[tuple[str, str, str, int | None]] = set()
+        startup_probe_used: set[tuple[str, str, str, int | None]] = set()
         retired_datasets: set[str] = set()
         attempted = 0
         committed = 0
@@ -398,7 +412,7 @@ class DurableRecorderDeliveryQueue:
                 # or repaired the remote authority it can leave a zero-touch
                 # recorder waiting an hour before proving the new path. On the
                 # queue's first pass, allow exactly the oldest deferred row of
-                # each ordered dataset one immediate attempt. No timestamp,
+                # each ordered stream one immediate attempt. No timestamp,
                 # attempt counter, error, payload, or later row is rewritten.
                 if (
                     not retry_deferred_heads
@@ -633,7 +647,7 @@ class DurableRecorderDeliveryQueue:
         self,
         entry,
         defect: RecorderPayloadDefect,
-        ordering_key: tuple[str, str, str] | None,
+        ordering_key: tuple[str, str, str, int | None] | None,
     ) -> bool:
         """Durably retire one deterministically undeliverable row.
 
