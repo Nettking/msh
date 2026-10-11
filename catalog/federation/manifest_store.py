@@ -38,6 +38,8 @@ _COMPONENT_CACHE_MAX_KEY_BYTES = 64 * 1024
 _REVISION_CACHE_MAX_ENTRIES = 2048
 _REVISION_CACHE_MAX_BYTES = 64 * 1024 * 1024
 _REVISION_CACHE_MAX_OBJECTS = 200_000
+# Bound the per-connection read mapping; unsupported VFS/builds retain xRead.
+_MANIFEST_MMAP_MAX_BYTES = 512 * 1024 * 1024
 
 
 def _component_key_fits(value: Any, remaining: list[int], depth: int = 0) -> bool:
@@ -797,6 +799,7 @@ class AuthoritativeManifestStore:
         connection.execute("PRAGMA foreign_keys=ON")
         connection.execute("PRAGMA busy_timeout=30000")
         connection.execute("PRAGMA synchronous=FULL")
+        connection.execute(f"PRAGMA mmap_size={_MANIFEST_MMAP_MAX_BYTES}")
         return connection
 
     @staticmethod
@@ -1484,6 +1487,10 @@ class AuthoritativeManifestStore:
         )
         manifest_term = _uint(manifest_term, "manifest_term")
         now = _utc(now, "now")
+        # Cold canonical decoding must not hold the coordinator's writer lock
+        # needed for heartbeats. This is only a cache prewarm: the transaction
+        # below still validates every fresh row, chain, head and projection.
+        self.history(intent.session_id, intent.group_id)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
@@ -1833,6 +1840,11 @@ class AuthoritativeManifestStore:
         return ManifestCommitResult(manifest, revision, True)
 
     def commit(self, proposal: ManifestItemProposal) -> ManifestCommitResult:
+        if not isinstance(proposal, ManifestItemProposal):
+            raise FederationValidationError(
+                "invalid-object", "proposal", "must be ManifestItemProposal",
+            )
+        self.history(proposal.session_id, proposal.group_id)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
