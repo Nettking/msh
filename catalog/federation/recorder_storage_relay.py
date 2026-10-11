@@ -467,7 +467,7 @@ class RecorderAwareStorageControlRelayChannel(StorageControlRelayChannel):
         error = task.exception()
         if error is None:
             return
-        _LOGGER.error(
+        _log_failure(
             "recorder storage request handler task failed",
             extra={
                 "storage_stage": "recorder_request_handler_task_failed",
