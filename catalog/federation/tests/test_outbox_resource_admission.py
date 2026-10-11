@@ -79,6 +79,36 @@ def _large_outbox(database: Path) -> _OversizedSQLiteOutbox:
     )
 
 
+def _legacy_delivery_outbox(
+    database: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> SQLiteOutbox:
+    with monkeypatch.context() as legacy_index:
+        legacy_index.setattr(
+            outbox_module,
+            "_OUTBOX_DELIVERY_INDEX_DDL",
+            outbox_module._OUTBOX_LEGACY_DELIVERY_INDEX_DDL,
+        )
+        outbox = SQLiteOutbox(
+            database,
+            resource_admission=_admission(10_000_000_000),
+        )
+        for index in range(4):
+            outbox.enqueue(
+                session_id="session-1",
+                destination_id="destination-1",
+                schema_id="fcp.recorder.storage_delivery.v1",
+                payload={
+                    "dataset_id": "dataset-1",
+                    "content": {"agent_instance_id": 1791604906, "sequence": index},
+                },
+                idempotency_key=f"instance-1791604906-{index}",
+                content_hash=f"sha256:batch-{index}",
+                now=NOW,
+            )
+        return outbox
+
+
 def test_outbox_startup_refusal_happens_before_parent_creation(tmp_path: Path) -> None:
     database = tmp_path / "managed-outbox" / "outbox.sqlite3"
 
@@ -160,6 +190,111 @@ def test_large_current_v3_outbox_uses_only_bounded_noop_startup(tmp_path: Path) 
         assert connection.execute(
             "SELECT COUNT(*) FROM outbox"
         ).fetchone()[0] == 1
+
+
+def test_large_legacy_delivery_index_migrates_only_after_extra_reservation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    database = tmp_path / "outbox.sqlite3"
+    _legacy_delivery_outbox(database, monkeypatch)
+
+    with sqlite3.connect(f"file:{database}?mode=ro", uri=True) as connection:
+        before_rows = connection.execute(
+            "SELECT outbox_id, session_id, destination_id, schema_id, payload_json, "
+            "idempotency_key, content_hash, state, attempt_count, created_at, "
+            "updated_at, next_attempt_at, last_error FROM outbox ORDER BY outbox_id"
+        ).fetchall()
+        old_index_sql = connection.execute(
+            "SELECT sql FROM sqlite_master WHERE type='index' "
+            "AND name='outbox_pending_delivery_dataset'"
+        ).fetchone()[0]
+        assert outbox_module._normalize_index_sql_preserving_literals(
+            old_index_sql
+        ) == outbox_module._normalize_index_sql_preserving_literals(
+            outbox_module._OUTBOX_LEGACY_DELIVERY_INDEX_DDL.replace(
+                "CREATE INDEX IF NOT EXISTS", "CREATE INDEX"
+            )
+        )
+
+    with pytest.raises(HostResourceRefused):
+        _OversizedSQLiteOutbox(
+            database,
+            resource_admission=_admission(4_000_000_000),
+        )
+
+    with sqlite3.connect(f"file:{database}?mode=ro", uri=True) as connection:
+        assert connection.execute(
+            "SELECT sql FROM sqlite_master WHERE type='index' "
+            "AND name='outbox_pending_delivery_dataset'"
+        ).fetchone()[0] == old_index_sql
+        assert connection.execute(
+            "SELECT outbox_id, session_id, destination_id, schema_id, payload_json, "
+            "idempotency_key, content_hash, state, attempt_count, created_at, "
+            "updated_at, next_attempt_at, last_error FROM outbox ORDER BY outbox_id"
+        ).fetchall() == before_rows
+
+    migrated = _OversizedSQLiteOutbox(
+        database,
+        resource_admission=_admission(10_000_000_000),
+    )
+    with sqlite3.connect(f"file:{database}?mode=ro", uri=True) as connection:
+        rows_after = connection.execute(
+            "SELECT outbox_id, session_id, destination_id, schema_id, payload_json, "
+            "idempotency_key, content_hash, state, attempt_count, created_at, "
+            "updated_at, next_attempt_at, last_error FROM outbox ORDER BY outbox_id"
+        ).fetchall()
+        current_index_sql = connection.execute(
+            "SELECT sql FROM sqlite_master WHERE type='index' "
+            "AND name='outbox_pending_delivery_dataset'"
+        ).fetchone()[0]
+        assert rows_after == before_rows
+        assert outbox_module._normalize_index_sql_preserving_literals(
+            current_index_sql
+        ) == outbox_module._normalize_index_sql_preserving_literals(
+            outbox_module._OUTBOX_DELIVERY_INDEX_DDL.replace(
+                "CREATE INDEX IF NOT EXISTS", "CREATE INDEX"
+            )
+        )
+        assert connection.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+
+    assert len(migrated.pending()) == 4
+
+
+def test_large_outbox_with_unknown_delivery_index_expression_fails_closed(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "outbox.sqlite3"
+    original = SQLiteOutbox(database, resource_admission=_admission(10_000_000_000))
+    _enqueue(original)
+    with sqlite3.connect(database) as connection:
+        connection.execute("DROP INDEX outbox_pending_delivery_dataset")
+        connection.execute(
+            "CREATE INDEX outbox_pending_delivery_dataset ON outbox("
+            "state, session_id, destination_id, schema_id, "
+            "json_extract(payload_json, '$.dataset_id'), outbox_id, "
+            "next_attempt_at, last_error) WHERE state='pending'"
+        )
+        connection.commit()
+    with sqlite3.connect(f"file:{database}?mode=ro", uri=True) as connection:
+        unknown_index_sql = connection.execute(
+            "SELECT sql FROM sqlite_master WHERE type='index' "
+            "AND name='outbox_pending_delivery_dataset'"
+        ).fetchone()[0]
+
+    with pytest.raises(FederationValidationError) as rejected:
+        _OversizedSQLiteOutbox(
+            database,
+            resource_admission=_admission(10_000_000_000),
+        )
+
+    assert rejected.value.code == "outbox-resource-envelope"
+    with sqlite3.connect(f"file:{database}?mode=ro", uri=True) as connection:
+        assert connection.execute(
+            "SELECT sql FROM sqlite_master WHERE type='index' "
+            "AND name='outbox_pending_delivery_dataset'"
+        ).fetchone()[0] == unknown_index_sql
+        assert connection.execute("SELECT COUNT(*) FROM outbox").fetchone()[0] == 1
 
 
 def test_large_current_v3_startup_does_not_checkpoint_unreserved_wal(

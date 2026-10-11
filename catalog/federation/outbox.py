@@ -227,6 +227,29 @@ ON outbox(
 )
 WHERE state = 'pending';
 """
+# The exact schema-v3 index shipped by the immediately preceding qualified
+# release. Large outboxes normally refuse DDL during startup, but this one
+# derived lookup index has a narrowly-scoped migration below because instance
+# ordering must take effect without rebuilding or rewriting any outbox rows.
+_OUTBOX_LEGACY_DELIVERY_INDEX_DDL = """
+CREATE INDEX IF NOT EXISTS outbox_pending_delivery_dataset
+ON outbox(
+    state,
+    session_id,
+    destination_id,
+    schema_id,
+    CASE
+        WHEN json_type(payload_json, '$.dataset_id') = 'text'
+            AND length(json_extract(payload_json, '$.dataset_id')) > 0
+        THEN json_extract(payload_json, '$.dataset_id')
+        ELSE printf('__unkeyed-outbox-row:%lld', outbox_id)
+    END,
+    outbox_id,
+    next_attempt_at,
+    last_error
+)
+WHERE state = 'pending';
+"""
 _OUTBOX_DELIVERY_INDEX_KEY_COLUMNS = (
     "state",
     "session_id",
@@ -377,6 +400,7 @@ class SQLiteOutbox:
         self.database_path = Path(self.database)
         self.resource_admission = resource_admission or PROCESS_RESOURCE_ADMISSION
         self._large_current_schema_startup = False
+        self._large_delivery_index_migration_reserve = 0
         with self._reserve_resources(
             self._migration_requirements(),
         ) as reservations:
@@ -423,10 +447,15 @@ class SQLiteOutbox:
             # absent WAL, sidecars) before the resource reservation is held.
             # SQLite's WAL-index uses 32 KiB per 4,062 WAL frames, so reserving
             # one full WAL-sized allowance safely covers its reconstruction;
-            # the fixed allowance covers the small/empty-WAL case. The actual
-            # no-op schema check below runs under this reservation and still
-            # refuses any large database that would need a migration.
+            # the fixed allowance covers the small/empty-WAL case. A possible
+            # instance-ordering index migration gets an additional reservation
+            # only after the exact legacy schema is verified under the writer
+            # lock; ordinary large-outbox startup retains this bounded no-op.
             self._large_current_schema_startup = True
+            self._large_delivery_index_migration_reserve = max(
+                _OUTBOX_MUTATION_FIXED_BYTES,
+                2 * existing,
+            )
             return (
                 (
                     self.database_path.parent,
@@ -448,8 +477,13 @@ class SQLiteOutbox:
             ),
         )
 
-    def _current_schema_is_noop(self, db: sqlite3.Connection) -> bool:
-        """Return true only when normal initialization would make no schema writes."""
+    def _current_schema_is_noop(
+        self,
+        db: sqlite3.Connection,
+        *,
+        allow_legacy_delivery_index: bool = False,
+    ) -> bool:
+        """Check exact current schema, optionally accepting its one known old index."""
 
         mode_row = db.execute("PRAGMA journal_mode").fetchone()
         if mode_row is None or str(mode_row[0]).lower() != "wal":
@@ -557,9 +591,17 @@ class SQLiteOutbox:
             )
             if actual_columns != expected_columns:
                 return False
-            if _normalize_index_sql_preserving_literals(row[0]) != (
-                _normalize_index_sql_preserving_literals(expected_sql)
-            ):
+            actual_sql = _normalize_index_sql_preserving_literals(row[0])
+            expected_sqls = {_normalize_index_sql_preserving_literals(expected_sql)}
+            if name == "outbox_pending_delivery_dataset" and allow_legacy_delivery_index:
+                expected_sqls.add(
+                    _normalize_index_sql_preserving_literals(
+                        _OUTBOX_LEGACY_DELIVERY_INDEX_DDL.replace(
+                            "CREATE INDEX IF NOT EXISTS", "CREATE INDEX"
+                        )
+                    )
+                )
+            if actual_sql not in expected_sqls:
                 return False
         return True
 
@@ -660,12 +702,42 @@ class SQLiteOutbox:
                 db.execute("BEGIN IMMEDIATE")
                 try:
                     if not self._current_schema_is_noop(db):
-                        raise FederationValidationError(
-                            "outbox-resource-envelope",
-                            "database",
-                            "large outbox changed after no-op startup admission",
+                        if not self._current_schema_is_noop(
+                            db,
+                            allow_legacy_delivery_index=True,
+                        ):
+                            raise FederationValidationError(
+                                "outbox-resource-envelope",
+                                "database",
+                                "large outbox changed outside the supported delivery-index migration",
+                            )
+                        # The exact known legacy index is the only large-v3
+                        # exception. Reserve a conservative second copy of the
+                        # database before touching it; the existing fixed/WAL
+                        # reservation remains held, and the writer lock prevents
+                        # the measured outbox from growing during this admission.
+                        migration_bytes = max(
+                            self._large_delivery_index_migration_reserve,
+                            2 * self._database_bytes(),
                         )
-                    db.commit()
+                        with self._reserve_resources(
+                            (
+                                (
+                                    self.database_path.parent,
+                                    migration_bytes,
+                                    _OUTBOX_MUTATION_FIXED_INODES + 2,
+                                ),
+                            )
+                        ) as migration_reservations:
+                            self._assert_resource_identity(migration_reservations)
+                            db.execute(
+                                "DROP INDEX outbox_pending_delivery_dataset"
+                            )
+                            db.execute(_OUTBOX_DELIVERY_INDEX_DDL)
+                            db.commit()
+                            self._assert_resource_identity(migration_reservations)
+                    else:
+                        db.commit()
                 except Exception:
                     db.rollback()
                     raise
