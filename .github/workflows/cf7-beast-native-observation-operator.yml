@@ -1,371 +1,77 @@
-name: Bounded CF7 BEAST native observation (operator only)
+name: Bounded CF7 BEAST existing-host metadata (operator only)
 on:
   push:
     branches: [codex/cf7-beast-windows-d4d29b-20261012]
-    paths:
-      - .github/workflows/cf7-beast-native-observation-operator.yml
-      - scripts/acceptance/operator_cf7_beast_native_observation.py
+    paths: [.github/workflows/cf7-beast-native-observation-operator.yml]
 permissions:
   contents: read
 concurrency:
-  group: cf7-beast-native-observation-d4d29b
+  group: cf7-beast-readonly-existing-host-metadata
   cancel-in-progress: false
 jobs:
-  bounded-pip-cache-cleanup:
-    if: "${{ startsWith(github.event.head_commit.message, 'ops: bounded BEAST cache cleanup') }}"
+  windows-existing-volumes:
     runs-on: [self-hosted, Windows, X64, beast-windows]
-    timeout-minutes: 25
-    defaults:
-      run:
-        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+    timeout-minutes: 3
     steps:
-      - name: Verify Beast, inventory and remove only bounded pip cache files
+      - name: Read already mounted fixed local Windows volume facts only
+        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
         run: |
           $ErrorActionPreference = 'Stop'
-          if ($env:RUNNER_NAME -ne 'Beast') { throw 'Wrong registered physical runner' }
-
+          if ($env:RUNNER_NAME -ne 'Beast') { throw 'Wrong trusted Windows runner' }
+          $root = Join-Path 'C:\fcp-cf7-physical' ('volumes-' + $env:GITHUB_RUN_ID + '-a' + $env:GITHUB_RUN_ATTEMPT)
+          if (Test-Path -LiteralPath $root) { throw 'Existing evidence namespace' }
+          New-Item -ItemType Directory -Path $root | Out-Null
+          "CF7_VOLUME_EVIDENCE=$root" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           $sha = [Security.Cryptography.SHA256]::Create()
-          function Hash-Text([string]$value) { -join ($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($value)) | ForEach-Object { $_.ToString('x2') }) }
-          function Get-CFreeBytes { [long](Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='C:'").FreeSpace }
-          function Get-PipCacheFiles([string]$cachePath) {
-            $files = [System.Collections.Generic.List[object]]::new()
-            $pending = [System.Collections.Generic.Queue[string]]::new()
-            $pending.Enqueue($cachePath)
-            while ($pending.Count -gt 0) {
-              $directory = $pending.Dequeue()
-              foreach ($item in @(Get-ChildItem -LiteralPath $directory -Force -ErrorAction Stop)) {
-                if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw "Reparse point inside pip cache; refusing to follow or delete it" }
-                if ($item.PSIsContainer) { $pending.Enqueue($item.FullName) }
-                else {
-                  $relative = $item.FullName.Substring($cachePath.Length).TrimStart('\')
-                  $files.Add([ordered]@{ relative_path=$relative; length_bytes=[long]$item.Length; last_write_utc=$item.LastWriteTimeUtc.ToString('o'); full_path=$item.FullName })
-                  if ($files.Count -gt 50000) { throw 'Pip cache file count exceeds bounded cleanup limit' }
-                }
-              }
-            }
-            return $files.ToArray()
-          }
-
-          $product = Get-CimInstance Win32_ComputerSystemProduct
-          $machineHash = Hash-Text ($product.UUID + '|' + $env:COMPUTERNAME)
-          if ($machineHash -ne '2aba9fde97872439a143c4612c3e3cd2cff0c83f1b9e92c354974eeb2fcfb36c') { throw 'Host identity differs from retained Beast checkpoint' }
-          $volume = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='C:'"
-          $volumeHash = Hash-Text $volume.VolumeSerialNumber
-          if ($volumeHash -ne '70edbc02af91d463f8fc19cb4f7e00ccc5f0140414addd85ddbbbf36d235236b') { throw 'C: volume differs from retained Beast checkpoint' }
-
-          $localAppData = [Environment]::GetFolderPath('LocalApplicationData')
-          $cachePath = [IO.Path]::GetFullPath((Join-Path $localAppData 'pip\Cache')).TrimEnd('\')
-          if ([IO.Path]::GetPathRoot($cachePath) -ne 'C:\') { throw 'Pip cache is not on C:; refusing cleanup' }
-          $processes = @(Get-CimInstance Win32_Process)
-          $pipProcesses = @($processes | Where-Object {
-            $_.Name -match '^(pythonw?\.exe|pip3?\.exe|uv\.exe)$' -and
-            $_.CommandLine -match '(?i)(-m\s+pip|\\pip3?\.exe|\buv\s+pip)'
+          function Hash-Text([string]$v) { -join ($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($v)) | ForEach-Object { $_.ToString('x2') }) }
+          $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+          $volumes = @(Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3' | Select-Object -First 16 | ForEach-Object {
+            [ordered]@{drive=$_.DeviceID; filesystem=$_.FileSystem; total_bytes=[long]$_.Size; free_bytes=[long]$_.FreeSpace; volume_identity_sha256=(Hash-Text $_.VolumeSerialNumber); user_writeability='NOT_TESTED'; directory_scanned=$false}
           })
-          $cacheReferenceProcesses = @($processes | Where-Object {
-            $_.CommandLine -and $_.CommandLine.IndexOf($cachePath, [StringComparison]::OrdinalIgnoreCase) -ge 0
-          })
-          if ($pipProcesses.Count -gt 0 -or $cacheReferenceProcesses.Count -gt 0) { throw 'An active executable references pip/cache work; refusing cleanup' }
-
-          $runRoot = Join-Path 'C:\fcp-cf7-physical' ('capacity-' + $env:GITHUB_RUN_ID + '-a' + $env:GITHUB_RUN_ATTEMPT)
-          if (Test-Path -LiteralPath $runRoot) { throw 'Fresh capacity evidence root already exists' }
-          $evidence = Join-Path $runRoot 'evidence'
-          New-Item -ItemType Directory -Path $evidence | Out-Null
-          "BEAST_CAPACITY_EVIDENCE_ROOT=$evidence" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
-          $reserve = [long]12893316031
-          $estimate = [long]2147483648
-          $freeBefore = Get-CFreeBytes
-          $cacheExists = Test-Path -LiteralPath $cachePath -PathType Container
-          $files = @()
-          if ($cacheExists) {
-            foreach ($knownCachePath in @($localAppData, (Join-Path $localAppData 'pip'), $cachePath)) {
-              $knownCacheItem = Get-Item -LiteralPath $knownCachePath -ErrorAction Stop
-              if (($knownCacheItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'Pip cache path contains a reparse point; refusing cleanup' }
-            }
-            $files = @(Get-PipCacheFiles $cachePath)
-          }
-          $cacheBytes = [long]0
-          foreach ($entry in $files) { $cacheBytes += [long]$entry.length_bytes }
-          $minimumReclaim = [long]3221225472
-          $requiredForMargin = [long]([Math]::Max($minimumReclaim, ($reserve + $estimate + 1073741824 - $freeBefore)))
-          $fileManifest = [ordered]@{
-            schema='fcp.beast.pip-cache-predelete-manifest.v1'; observed_utc=[DateTime]::UtcNow.ToString('o')
-            runner_name=$env:RUNNER_NAME; github_run_id=$env:GITHUB_RUN_ID; github_run_attempt=$env:GITHUB_RUN_ATTEMPT
-            host_identity_sha256=$machineHash; c_volume_serial_sha256=$volumeHash
-            c_free_before_bytes=$freeBefore; reserve_bytes=$reserve; operation_estimate_bytes=$estimate
-            cache_root='%LOCALAPPDATA%\pip\Cache'; cache_exists=$cacheExists; file_count=$files.Count; total_file_bytes=$cacheBytes
-            files=@($files | ForEach-Object { [ordered]@{ relative_path=$_.relative_path; length_bytes=$_.length_bytes; last_write_utc=$_.last_write_utc } })
-          }
-          $manifestPath = Join-Path $evidence 'PIP_CACHE_PREDELETE_MANIFEST.json'
-          $manifestJson = $fileManifest | ConvertTo-Json -Depth 8
-          [IO.File]::WriteAllText($manifestPath, $manifestJson, [Text.UTF8Encoding]::new($false))
-          $manifestHash = (Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).Hash.ToLowerInvariant()
-
-          $cleanupPerformed = $false
-          $deletedCount = 0
-          if ($cacheExists -and $cacheBytes -ge $requiredForMargin -and $files.Count -gt 0) {
-            foreach ($entry in $files) {
-              $item = Get-Item -LiteralPath $entry.full_path -ErrorAction Stop
-              if ($item.PSIsContainer -or (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) -or [long]$item.Length -ne [long]$entry.length_bytes) {
-                throw 'Pip cache changed after manifest capture; refusing literal-path deletion'
-              }
-            }
-            foreach ($entry in $files) {
-              Remove-Item -LiteralPath $entry.full_path -Force -ErrorAction Stop
-              if (Test-Path -LiteralPath $entry.full_path) { throw 'A manifested pip cache file remains after deletion' }
-              $deletedCount++
-            }
-            $cleanupPerformed = $true
-          }
-
-          $freeAfter = Get-CFreeBytes
-          $summary = [ordered]@{
-            schema='fcp.beast.bounded-pip-cache-cleanup.v1'; observed_utc=[DateTime]::UtcNow.ToString('o')
-            runner_name=$env:RUNNER_NAME; github_run_id=$env:GITHUB_RUN_ID; github_run_attempt=$env:GITHUB_RUN_ATTEMPT
-            host_identity_sha256=$machineHash; c_volume_serial_sha256=$volumeHash
-            c_total_bytes=[long]$volume.Size; c_free_before_bytes=$freeBefore; c_free_after_bytes=$freeAfter
-            c_free_delta_bytes=($freeAfter-$freeBefore); reserve_bytes=$reserve; operation_estimate_bytes=$estimate
-            reserve_margin_after_estimate_bytes=($freeAfter-$reserve-$estimate)
-            cache_root='%LOCALAPPDATA%\pip\Cache'; cache_file_count=$files.Count; cache_bytes=$cacheBytes
-            minimum_reclaim_bytes=$requiredForMargin; cleanup_performed=$cleanupPerformed; deleted_file_count=$deletedCount
-            predelete_manifest='PIP_CACHE_PREDELETE_MANIFEST.json'; predelete_manifest_sha256=$manifestHash
-            deletion_method='Remove-Item -LiteralPath per manifested regular file; no directory or other path deleted'
-            active_pip_or_uv_process_count=$pipProcesses.Count; active_processes_referencing_cache_path=$cacheReferenceProcesses.Count
-            product_or_qualification_started=$false
-          }
-          $summary | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $evidence 'BEAST_CAPACITY_CLEANUP.json') -Encoding utf8
-          $summary | ConvertTo-Json -Depth 6
+          [ordered]@{schema='fcp.cf7.windows-existing-volumes-metadata.v1'; utc=[DateTime]::UtcNow.ToString('o'); run_id=$env:GITHUB_RUN_ID; runner_id=28; runner_name=$env:RUNNER_NAME; principal_sha256=(Hash-Text $sid); local_fixed_volumes=$volumes; mutations='Only new tiny metadata evidence namespace'; no_product_or_cleanup_or_docker_or_wsl=$true} | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $root 'WINDOWS_VOLUMES.json') -Encoding utf8
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: beast-pip-cache-cleanup-${{ github.run_id }}-a${{ github.run_attempt }}
-          path: ${{ env.BEAST_CAPACITY_EVIDENCE_ROOT }}
-          if-no-files-found: error
+          name: cf7-beast-windows-volumes-${{ github.run_id }}-a${{ github.run_attempt }}
+          path: ${{ env.CF7_VOLUME_EVIDENCE }}
           retention-days: 90
-          include-hidden-files: false
-
-  bounded-runner-temp-venv-inventory:
-    if: "${{ startsWith(github.event.head_commit.message, 'ops: inspect BEAST RUNNER_TEMP venv inventory') }}"
-    runs-on: [self-hosted, Windows, X64, beast-windows]
-    timeout-minutes: 25
-    permissions:
-      contents: read
-      actions: read
-    defaults:
-      run:
-        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+          if-no-files-found: error
+  linux-existing-topology:
+    runs-on: [self-hosted, Linux, X64, beast-linux, fcp-linux-fast]
+    timeout-minutes: 3
     steps:
-      - name: Inventory only action-generated Windows venv roots under RUNNER_TEMP
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Read actual already running Linux environment facts only
+        shell: bash
         run: |
-          $ErrorActionPreference = 'Stop'
-          if ($env:RUNNER_NAME -ne 'Beast') { throw 'Wrong registered physical runner' }
-
-          $sha = [Security.Cryptography.SHA256]::Create()
-          function Hash-Text([string]$value) { -join ($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($value)) | ForEach-Object { $_.ToString('x2') }) }
-          function Get-CFreeBytes { [long](Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='C:'").FreeSpace }
-          function Get-TreeMetadata([string]$root) {
-            $pending = [System.Collections.Generic.Queue[string]]::new()
-            $pending.Enqueue($root)
-            $fileCount = 0; $directoryCount = 0; $totalBytes = [long]0; $reparseCount = 0
-            $sensitivePathCount = 0; $editableLinkCount = 0; $localSourceReferenceCount = 0
-            while ($pending.Count -gt 0) {
-              $directory = $pending.Dequeue()
-              foreach ($item in @(Get-ChildItem -LiteralPath $directory -Force -ErrorAction Stop)) {
-                $relative = $item.FullName.Substring($root.Length).TrimStart('\')
-                if ([regex]::IsMatch($relative, '(?i)(^|[\\/])(?:cf7|fcp-cf7-physical|evidence|artifacts?|credentials?|secrets?|recordings?|identities|sessions|backups?)([\\/]|$)')) { $sensitivePathCount++ }
-                if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { $reparseCount++; continue }
-                if ($item.PSIsContainer) { $directoryCount++; $pending.Enqueue($item.FullName) }
-                else {
-                  $fileCount++; $totalBytes += [long]$item.Length
-                  if ($item.Name -match '(?i)\.egg-link$') { $editableLinkCount++ }
-                  if ($item.Name -match '(?i)\.pth$') {
-                    $text = [IO.File]::ReadAllText($item.FullName)
-                    if ($text -match '(?i)(?:[A-Z]:\\|file://|_work[\\/]|fcp-cf7|\\msh[\\/])') { $localSourceReferenceCount++ }
-                  }
-                  if ($item.Name -eq 'direct_url.json') {
-                    if ($item.Length -gt 65536) { throw 'Unexpected oversized direct_url metadata file' }
-                    $text = [IO.File]::ReadAllText($item.FullName)
-                    if ($text -match '(?i)("editable"\s*:\s*true|"url"\s*:\s*"file:|_work[\\/]|fcp-cf7|\\msh[\\/])') { $localSourceReferenceCount++ }
-                  }
-                  if ($fileCount -gt 250000 -or ($fileCount + $directoryCount) -gt 300000) { throw 'Venv inventory exceeds bounded item limit' }
-                }
-              }
-            }
-            return [ordered]@{ file_count=$fileCount; directory_count=$directoryCount; total_file_bytes=$totalBytes; reparse_point_count=$reparseCount; sensitive_path_segment_count=$sensitivePathCount; editable_link_file_count=$editableLinkCount; local_source_reference_count=$localSourceReferenceCount }
-          }
-
-          $product = Get-CimInstance Win32_ComputerSystemProduct
-          $machineHash = Hash-Text ($product.UUID + '|' + $env:COMPUTERNAME)
-          if ($machineHash -ne '2aba9fde97872439a143c4612c3e3cd2cff0c83f1b9e92c354974eeb2fcfb36c') { throw 'Host identity differs from retained Beast checkpoint' }
-          $volume = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='C:'"
-          $volumeHash = Hash-Text $volume.VolumeSerialNumber
-          if ($volumeHash -ne '70edbc02af91d463f8fc19cb4f7e00ccc5f0140414addd85ddbbbf36d235236b') { throw 'C: volume differs from retained Beast checkpoint' }
-
-          $runnerTemp = [IO.Path]::GetFullPath($env:RUNNER_TEMP).TrimEnd('\')
-          if ([IO.Path]::GetPathRoot($runnerTemp) -ne 'C:\') { throw 'RUNNER_TEMP is not on C:' }
-          $runnerTempItem = Get-Item -LiteralPath $runnerTemp -ErrorAction Stop
-          if (($runnerTempItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'RUNNER_TEMP is a reparse point; refusing inventory' }
-
-          $headers = @{ Authorization = ('Bearer ' + $env:GITHUB_TOKEN); Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28' }
-          $api = 'https://api.github.com/repos/' + $env:GITHUB_REPOSITORY + '/actions/runs?status=in_progress&per_page=100'
-          $activeRunCheck = $true; $activeRunCheckError = $null; $otherRuns = @()
-          try {
-            $runPage = Invoke-RestMethod -Method Get -Uri $api -Headers $headers -ErrorAction Stop
-            if ([long]$runPage.total_count -gt @($runPage.workflow_runs).Count) { throw 'In-progress workflow run list exceeds the bounded 100-run page' }
-            $otherRuns = @($runPage.workflow_runs | Where-Object { [string]$_.id -ne [string]$env:GITHUB_RUN_ID })
-          } catch { $activeRunCheck = $false; $activeRunCheckError = $_.Exception.GetType().Name }
-
-          $allProcesses = @(Get-CimInstance Win32_Process)
-          $workerProcesses = @($allProcesses | Where-Object { $_.Name -ieq 'Runner.Worker.exe' })
-          if ($workerProcesses.Count -gt 1) { throw 'Another active Runner.Worker exists; refusing venv candidate inspection' }
-          $candidateDirs = @(Get-ChildItem -LiteralPath $runnerTemp -Directory -Force | Where-Object { $_.Name -cmatch '^fcp-python-[0-9a-f]{32}$' } | Sort-Object Name)
-          if ($candidateDirs.Count -gt 20) { throw 'More than 20 exact-name venv candidates; refusing an incomplete inventory' }
-
-          $runRoot = Join-Path 'C:\fcp-cf7-physical' ('capacity-' + $env:GITHUB_RUN_ID + '-a' + $env:GITHUB_RUN_ATTEMPT)
-          if (Test-Path -LiteralPath $runRoot) { throw 'Fresh capacity evidence root already exists' }
-          $evidence = Join-Path $runRoot 'evidence'
-          New-Item -ItemType Directory -Path $evidence | Out-Null
-          "BEAST_CAPACITY_EVIDENCE_ROOT=$evidence" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          $freeBefore = Get-CFreeBytes
-
-          $candidateRecords = [System.Collections.Generic.List[object]]::new()
-          foreach ($candidate in $candidateDirs) {
-            $candidatePath = [IO.Path]::GetFullPath($candidate.FullName).TrimEnd('\')
-            if (-not $candidatePath.StartsWith(($runnerTemp + '\'), [StringComparison]::OrdinalIgnoreCase)) { throw 'Candidate escaped RUNNER_TEMP' }
-            $top = @(Get-ChildItem -LiteralPath $candidatePath -Force)
-            $topNames = @($top | ForEach-Object { $_.Name } | Sort-Object)
-            $allowedTopNames = @('.gitignore','Include','Lib','Scripts','pyvenv.cfg')
-            $unexpectedTopNames = @($topNames | Where-Object { $_ -notin $allowedTopNames })
-            $requiredTopNames = @('Include','Lib','Scripts','pyvenv.cfg')
-            $missingTopNames = @($requiredTopNames | Where-Object { $_ -notin $topNames })
-            $cfg = Join-Path $candidatePath 'pyvenv.cfg'
-            $cfgValid = $false; $cfgHash = $null; $cfgVersion = $null; $cfgHomeIsAbsolute = $false
-            if (Test-Path -LiteralPath $cfg -PathType Leaf) {
-              $cfgItem = Get-Item -LiteralPath $cfg -Force
-              if ((($cfgItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0) -and $cfgItem.Length -le 4096) {
-                $cfgText = [IO.File]::ReadAllText($cfg)
-                $cfgHash = (Get-FileHash -LiteralPath $cfg -Algorithm SHA256).Hash.ToLowerInvariant()
-                if ($cfgText -match '(?m)^\s*version\s*=\s*([^\r\n]+)') { $cfgVersion = $Matches[1].Trim() }
-                if ($cfgText -match '(?m)^\s*home\s*=\s*([^\r\n]+)') { $cfgHomeIsAbsolute = [IO.Path]::IsPathRooted($Matches[1].Trim()) }
-                $cfgValid = ($cfgVersion -like '3.12.*' -and $cfgHomeIsAbsolute)
-              }
-            }
-            $metadata = Get-TreeMetadata $candidatePath
-            $processReferences = @($allProcesses | Where-Object {
-              ($_.ExecutablePath -and $_.ExecutablePath.IndexOf($candidatePath, [StringComparison]::OrdinalIgnoreCase) -ge 0) -or
-              ($_.CommandLine -and $_.CommandLine.IndexOf($candidatePath, [StringComparison]::OrdinalIgnoreCase) -ge 0)
-            })
-            $standardVenv = ($unexpectedTopNames.Count -eq 0 -and $missingTopNames.Count -eq 0 -and $cfgValid -and $metadata.reparse_point_count -eq 0)
-            $reviewCandidate = ($standardVenv -and $metadata.sensitive_path_segment_count -eq 0 -and $metadata.editable_link_file_count -eq 0 -and $metadata.local_source_reference_count -eq 0 -and $processReferences.Count -eq 0 -and $activeRunCheck -and $otherRuns.Count -eq 0 -and $workerProcesses.Count -eq 1)
-            $candidateRecords.Add([ordered]@{
-              root=$candidatePath; top_level_names=$topNames; unexpected_top_level_names=$unexpectedTopNames; missing_standard_top_level_names=$missingTopNames
-              pyvenv_cfg_sha256=$cfgHash; python_version=$cfgVersion; pyvenv_home_is_absolute=$cfgHomeIsAbsolute; standard_venv_layout=$standardVenv
-              metadata=$metadata; active_process_reference_count=$processReferences.Count; active_other_workflow_run_count=$otherRuns.Count
-              eligible_for_independent_disposable_target_review=$reviewCandidate
-            })
-          }
-          $freeAfter = Get-CFreeBytes
-          $summary = [ordered]@{
-            schema='fcp.beast.runner-temp-venv-inventory.v1'; observed_utc=[DateTime]::UtcNow.ToString('o')
-            runner_name=$env:RUNNER_NAME; github_run_id=$env:GITHUB_RUN_ID; github_run_attempt=$env:GITHUB_RUN_ATTEMPT
-            host_identity_sha256=$machineHash; c_volume_serial_sha256=$volumeHash; c_total_bytes=[long]$volume.Size
-            c_free_before_bytes=$freeBefore; c_free_after_bytes=$freeAfter; c_free_delta_bytes=($freeAfter-$freeBefore)
-            runner_temp_root=$runnerTemp; candidate_count=$candidateDirs.Count; candidates=@($candidateRecords.ToArray())
-            active_workflow_run_check_passed=$activeRunCheck; active_workflow_run_check_error_type=$activeRunCheckError
-            active_other_workflow_run_count=$otherRuns.Count; active_runner_worker_process_count=$workerProcesses.Count
-            generator=' .github/actions/self-hosted-python/action.yml creates RUNNER_TEMP/fcp-python-<32 lowercase hex> with python -m venv; inventory only'
-            metadata_only=$true; deleted_anything=$false; product_or_qualification_started=$false
-          }
-          $summaryPath = Join-Path $evidence 'BEAST_RUNNER_TEMP_VENV_INVENTORY.json'
-          $summaryJson = $summary | ConvertTo-Json -Depth 8
-          [IO.File]::WriteAllText($summaryPath, $summaryJson, [Text.UTF8Encoding]::new($false))
-          $summaryHash = (Get-FileHash -LiteralPath $summaryPath -Algorithm SHA256).Hash.ToLowerInvariant()
-          $summary | Add-Member -NotePropertyName inventory_summary_sha256 -NotePropertyValue $summaryHash
-          $summary | ConvertTo-Json -Depth 8
+          set -eu
+          test "$RUNNER_NAME" = 'Beast-Linux-WSL'
+          root="$RUNNER_TEMP/cf7-linux-topology-$GITHUB_RUN_ID-a$GITHUB_RUN_ATTEMPT"
+          test ! -e "$root"
+          mkdir "$root"
+          echo "CF7_LINUX_EVIDENCE=$root" >> "$GITHUB_ENV"
+          CF7_FACT_ROOT="$root" python3 -I -B - <<'PY'
+          import datetime, hashlib, json, os, pathlib, platform, subprocess
+          def hashed_file(path):
+              try: return hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest()
+              except OSError: return None
+          def virt(flag):
+              try:
+                  result=subprocess.run(['systemd-detect-virt', flag], capture_output=True, text=True, timeout=5)
+                  return {'exit':result.returncode, 'kind':result.stdout.strip()[:128]}
+              except (OSError, subprocess.TimeoutExpired) as e:
+                  return {'unavailable':type(e).__name__}
+          release={}
+          for line in pathlib.Path('/etc/os-release').read_text().splitlines():
+              key,sep,value=line.partition('=')
+              if sep and key in ('NAME','PRETTY_NAME','ID','VERSION_ID'): release[key]=value.strip('"')
+          proc=pathlib.Path('/proc/version').read_text()[:8192]
+          facts={'schema':'fcp.cf7.already-running-linux-topology-metadata.v1', 'utc':datetime.datetime.now(datetime.timezone.utc).isoformat(), 'run_id':os.environ['GITHUB_RUN_ID'], 'runner_id':29, 'runner_name':os.environ['RUNNER_NAME'], 'actual_os':platform.system(), 'kernel_release':platform.release(), 'architecture':platform.machine(), 'distro':release, 'uid':os.getuid(), 'principal_sha256':hashlib.sha256((str(os.getuid())+'|'+str(os.getgid())).encode()).hexdigest(), 'linux_instance_identity_sha256':hashed_file('/etc/machine-id'), 'boot_identity_sha256':hashed_file('/proc/sys/kernel/random/boot_id'), 'machine_dmi_identity_sha256':hashed_file('/sys/class/dmi/id/product_uuid'), 'vm_virtualization':virt('--vm'), 'container_virtualization':virt('--container'), 'proc_version_microsoft':('microsoft' in proc.lower()), 'wsl_distro_name':os.environ.get('WSL_DISTRO_NAME'), 'wsl_interop_present':bool(os.environ.get('WSL_INTEROP')), 'new_runtime_started':False, 'checkout_or_packages_or_benchmarks':False, 'physical_linux_acceptance_pass_claimed':False}
+          pathlib.Path(os.environ['CF7_FACT_ROOT'],'LINUX_TOPOLOGY.json').write_text(json.dumps(facts,indent=2))
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: beast-runner-temp-venv-inventory-${{ github.run_id }}-a${{ github.run_attempt }}
-          path: ${{ env.BEAST_CAPACITY_EVIDENCE_ROOT }}
-          if-no-files-found: error
+          name: cf7-beast-linux-topology-${{ github.run_id }}-a${{ github.run_attempt }}
+          path: ${{ env.CF7_LINUX_EVIDENCE }}
           retention-days: 90
-          include-hidden-files: false
-
-  actual-windows:
-    if: "${{ !startsWith(github.event.head_commit.message, 'ops: bounded BEAST cache cleanup') && !startsWith(github.event.head_commit.message, 'ops: inspect BEAST RUNNER_TEMP venv inventory') }}"
-    runs-on: [self-hosted, Windows, X64, beast-windows]
-    timeout-minutes: 25
-    defaults:
-      run:
-        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
-    steps:
-      - name: Admit actual host-visible storage before checkout or startup
-        run: |
-          $ErrorActionPreference = 'Stop'
-          if ($env:RUNNER_NAME -ne 'Beast') { throw 'Wrong registered physical runner' }
-          $root = Join-Path 'C:\fcp-cf7-physical' ($env:GITHUB_RUN_ID + '-a' + $env:GITHUB_RUN_ATTEMPT)
-          if (Test-Path -LiteralPath $root) { throw 'Fresh isolated run root already exists' }
-          $evidence = Join-Path $root 'evidence'
-          New-Item -ItemType Directory -Path $evidence | Out-Null
-          "CF7_STATE_ROOT=$root" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          "CF7_EVIDENCE_ROOT=$evidence" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          $volume = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='C:'"
-          $os = Get-CimInstance Win32_OperatingSystem
-          $system = Get-CimInstance Win32_ComputerSystem
-          $product = Get-CimInstance Win32_ComputerSystemProduct
-          $principal = (& whoami /user /fo csv /nh | Out-String).Trim()
-          $sha = [Security.Cryptography.SHA256]::Create()
-          function Hash-Text([string]$value) { -join ($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($value)) | ForEach-Object { $_.ToString('x2') }) }
-          $reserve = [long]12893316031
-          $estimate = [long]2147483648
-          $pass = [long]$volume.FreeSpace -ge ($reserve + $estimate)
-          [ordered]@{
-            schema='fcp.cf7.physical-windows-host-admission.v1'; observed_utc=[DateTime]::UtcNow.ToString('o')
-            candidate='d4d29b0c1890c63ce3e7b43415a9068a03e302cc'; github_run_id=$env:GITHUB_RUN_ID
-            runner_id=28; runner_name=$env:RUNNER_NAME; runner_environment=$env:RUNNER_ENVIRONMENT
-            os_family='windows'; os_caption=$os.Caption; os_version=$os.Version; architecture=$os.OSArchitecture
-            host_identity_sha256=(Hash-Text ($product.UUID + '|' + $env:COMPUTERNAME))
-            service_principal_sha256=(Hash-Text $principal); host_total_memory_bytes=[long]$system.TotalPhysicalMemory
-            hypervisor_present=[bool]$system.HypervisorPresent; volume_serial_sha256=(Hash-Text $volume.VolumeSerialNumber)
-            total_bytes=[long]$volume.Size; free_bytes=[long]$volume.FreeSpace
-            unchanged_reserve_bytes=$reserve; estimated_operation_bytes=$estimate; required_before_operation_bytes=($reserve+$estimate)
-            admission_pass=$pass; product_started=$false; source_cloned=$false
-            note='Authenticated existing self-hosted Windows runner; actual native host measurement, no cleanup, Docker start, WSL operation or production change'
-          } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $evidence 'HOST_ADMISSION.json') -Encoding utf8
-          if (-not $pass) { throw 'Actual Windows C free space does not preserve reserve plus bounded operation estimate' }
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
-          path: cf7-operator-${{ github.run_id }}
-          persist-credentials: false
-          fetch-depth: 1
-      - name: Observe exact candidate through isolated supported native service boundaries
-        env:
-          CF7_READ_TOKEN: ${{ github.token }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          python -B "$env:GITHUB_WORKSPACE\cf7-operator-$env:GITHUB_RUN_ID\scripts\acceptance\operator_cf7_beast_native_observation.py" --root $env:CF7_STATE_ROOT
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Always close only this job's native process incarnation
-        if: always()
-        run: |
-          $ErrorActionPreference = 'Stop'
-          if (-not $env:CF7_STATE_ROOT) { exit 0 }
-          $owner = Join-Path $env:CF7_STATE_ROOT 'process-owner.json'
-          if (-not (Test-Path -LiteralPath $owner)) { exit 0 }
-          $record = Get-Content -LiteralPath $owner -Raw | ConvertFrom-Json
-          $process = Get-Process -Id ([int]$record.pid) -ErrorAction SilentlyContinue
-          if ($process -and $process.StartTime.ToUniversalTime().ToFileTimeUtc().ToString() -eq $record.creation_filetime) {
-            Stop-Process -Id $process.Id -ErrorAction Stop
-            [ordered]@{schema='fcp.cf7.scoped-native-cleanup.v1'; utc=[DateTime]::UtcNow.ToString('o'); same_incarnation_closed=$true; unrelated_processes_changed=$false} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $env:CF7_EVIDENCE_ROOT 'WORKFLOW_CLEANUP.json') -Encoding utf8
-          }
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: cf7-beast-native-d4d29b-${{ github.run_id }}-a${{ github.run_attempt }}
-          path: ${{ env.CF7_EVIDENCE_ROOT }}
           if-no-files-found: error
-          retention-days: 90
-          include-hidden-files: false
