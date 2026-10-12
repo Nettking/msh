@@ -437,7 +437,11 @@ class RecorderArchiveReconciler:
                 "observation_file",
                 "committed batch has no detailed observations",
             )
-        observations.sort(key=lambda record: int(record["sequence"]))
+        # Preserve the original parser/JSONL order here. The publisher needs
+        # the first durable observation to recover the batch-level machine
+        # identity that capture originally put in SourceCheckpoint. Callers
+        # select that identity before sorting by sequence for validation and
+        # chunk emission.
         return observations
 
     @staticmethod
@@ -480,6 +484,7 @@ class RecorderArchiveReconciler:
         *,
         source_name: str,
         checkpoint: SourceCheckpoint,
+        machine_id: str,
         raw_sha256: str,
         raw_first_sequence: int,
         raw_last_sequence: int,
@@ -488,7 +493,7 @@ class RecorderArchiveReconciler:
         return {
             "schema": RECORDER_TELEMETRY_SCHEMA,
             "source_name": source_name,
-            "machine_id": checkpoint.machine_id,
+            "machine_id": machine_id,
             "agent_instance_id": checkpoint.agent_instance_id,
             "first_sequence": observations[0]["sequence"],
             "last_sequence": observations[-1]["sequence"],
@@ -503,11 +508,39 @@ class RecorderArchiveReconciler:
             "observations": observations,
         }
 
+    @staticmethod
+    def _batch_machine_id(
+        checkpoint: SourceCheckpoint,
+        first_observation: dict[str, Any],
+    ) -> str:
+        """Resolve the batch identity using capture's first observation.
+
+        Capture sets SourceCheckpoint.machine_id from the first parsed
+        observation. A later checkpoint can therefore have a different label
+        while older raw batches remain unchanged. The durable observation
+        file preserves the original parser order and each observation's own
+        device identity; multi-DeviceStream batches may legitimately contain
+        different machine IDs. Legacy observations without an identity retain
+        the checkpoint fallback.
+        """
+
+        value = first_observation.get("machine_id")
+        if value is None or value == "":
+            return checkpoint.machine_id
+        if not isinstance(value, str) or not value.strip():
+            raise FederationValidationError(
+                "invalid-recorder-publication",
+                "observations[1].machine_id",
+                "must be non-empty text when present",
+            )
+        return value
+
     def _chunks(
         self,
         *,
         source_name: str,
         checkpoint: SourceCheckpoint,
+        machine_id: str,
         raw_sha256: str,
         raw_first_sequence: int,
         raw_last_sequence: int,
@@ -520,6 +553,7 @@ class RecorderArchiveReconciler:
             content = self._content(
                 source_name=source_name,
                 checkpoint=checkpoint,
+                machine_id=machine_id,
                 raw_sha256=raw_sha256,
                 raw_first_sequence=raw_first_sequence,
                 raw_last_sequence=raw_last_sequence,
@@ -542,6 +576,7 @@ class RecorderArchiveReconciler:
             single = self._content(
                 source_name=source_name,
                 checkpoint=checkpoint,
+                machine_id=machine_id,
                 raw_sha256=raw_sha256,
                 raw_first_sequence=raw_first_sequence,
                 raw_last_sequence=raw_last_sequence,
@@ -643,6 +678,8 @@ class RecorderArchiveReconciler:
                 day=day,
             )
             observations = self._read_observations(observation_path)
+            machine_id = self._batch_machine_id(checkpoint, observations[0])
+            observations.sort(key=lambda record: int(record["sequence"]))
             sequences = [int(item["sequence"]) for item in observations]
             if (
                 sequences[0] != ref.first_sequence
@@ -667,6 +704,7 @@ class RecorderArchiveReconciler:
             chunks = self._chunks(
                 source_name=source_name,
                 checkpoint=checkpoint,
+                machine_id=machine_id,
                 raw_sha256=ref.raw_sha256,
                 raw_first_sequence=ref.first_sequence,
                 raw_last_sequence=ref.last_sequence,
@@ -692,6 +730,7 @@ class RecorderArchiveReconciler:
                 content = self._content(
                     source_name=source_name,
                     checkpoint=checkpoint,
+                    machine_id=machine_id,
                     raw_sha256=ref.raw_sha256,
                     raw_first_sequence=ref.first_sequence,
                     raw_last_sequence=ref.last_sequence,
