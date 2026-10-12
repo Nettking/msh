@@ -84,7 +84,8 @@ jobs:
             }
             $files = @(Get-PipCacheFiles $cachePath)
           }
-          $cacheBytes = [long](($files | Measure-Object -Property length_bytes -Sum).Sum)
+          $cacheBytes = [long]0
+          foreach ($entry in $files) { $cacheBytes += [long]$entry.length_bytes }
           $minimumReclaim = [long]3221225472
           $requiredForMargin = [long]([Math]::Max($minimumReclaim, ($reserve + $estimate + 1073741824 - $freeBefore)))
           $fileManifest = [ordered]@{
