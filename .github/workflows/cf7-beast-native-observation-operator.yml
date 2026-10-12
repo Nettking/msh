@@ -82,7 +82,7 @@ jobs:
             while ($ancestor) {
               $ancestorItem = Get-Item -LiteralPath $ancestor -ErrorAction Stop
               if (($ancestorItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'Pip cache path traverses a reparse point; refusing cleanup' }
-              $parent = Split-Path -LiteralPath $ancestor -Parent
+              $parent = [IO.Path]::GetDirectoryName($ancestor)
               if (-not $parent -or $parent -eq $ancestor) { break }
               $ancestor = $parent
             }
