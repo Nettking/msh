@@ -85,6 +85,10 @@ def _safe_log_error_code(error: BaseException) -> str:
 
 MAX_SHARING_READY_SECONDS = 600.0
 MAX_FEDERATION_REQUEST_SECONDS = 120.0
+# Publication includes authority preparation, the provider response and the
+# authority's durable acknowledgement. Its data budget must cover that whole
+# path without extending ordinary Federation/control request deadlines.
+RECORDER_PUBLICATION_REQUEST_SECONDS = 300.0
 
 #: The Federation capability type every standalone recorder announces.
 #:
@@ -1179,7 +1183,7 @@ class RecorderFederationNode:
                             client,
                             session_id=state.binding.internal_session_id,
                             authority_node_id=selected.authority_node_id,
-                            request_timeout=self.request_timeout,
+                            request_timeout=RECORDER_PUBLICATION_REQUEST_SECONDS,
                         )
                         try:
                             await candidate.start()

@@ -505,10 +505,16 @@ def test_publication_loop_proves_each_dataset_before_full_backlog_drain(
             "SQLiteOutbox",
             lambda _database: outbox,
         )
+        created_storage_timeouts = []
+
+        def create_storage_client(*_args, **kwargs):
+            created_storage_timeouts.append(kwargs["request_timeout"])
+            return storage_client
+
         monkeypatch.setattr(
             federation_node_module,
             "RelayRecorderStorageClient",
-            lambda *_args, **_kwargs: storage_client,
+            create_storage_client,
         )
 
         node = RecorderFederationNode.__new__(RecorderFederationNode)
@@ -563,6 +569,8 @@ def test_publication_loop_proves_each_dataset_before_full_backlog_drain(
         runner = asyncio.create_task(node._publication_loop(state))
         try:
             await asyncio.wait_for(storage_client.first_a_started.wait(), timeout=1.0)
+            assert created_storage_timeouts == [300.0]
+            assert node.request_timeout == 1.0
             readiness = (
                 None
                 if jsonl_failure

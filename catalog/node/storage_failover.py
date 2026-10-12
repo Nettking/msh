@@ -67,7 +67,7 @@ class StorageAuthoritySettings:
     # Provider commits can take longer than control-plane requests under a
     # large but healthy backlog. Keep that deadline separate so routine
     # membership/control probes remain responsive.
-    storage_request_timeout: float = 60.0
+    storage_request_timeout: float = 120.0
     scan_interval: float = 2.0
     lease_seconds: float = 300.0
     #: Bytes this authority offers the Federation, reserved on disk in advance.

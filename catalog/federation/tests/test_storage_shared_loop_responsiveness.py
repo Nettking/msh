@@ -8,6 +8,8 @@ import threading
 from dataclasses import replace
 from datetime import datetime, timezone
 
+import pytest
+
 from catalog.ai.relay_remote import RelayRemoteAIEndpoint
 from catalog.capabilities.relay_lifecycle import RelayLifecycleEndpoint
 from catalog.federation.commit_tracking import DurableAcknowledgementStore
@@ -23,7 +25,7 @@ from catalog.federation.recorder_storage_relay import (
     RecorderLogicalStorageAuthority,
     RelayRecorderStorageClient,
 )
-from catalog.federation.relay_storage import RelayStorageEndpoint
+from catalog.federation.relay_storage import RELAY_STORAGE_KIND, RelayStorageEndpoint
 from catalog.federation.tests.test_recorder_storage_relay import _request_payload
 from catalog.flask_app.services import (
     trusted_storage_authority_runtime as authority_runtime,
@@ -34,6 +36,9 @@ from catalog.flask_app.services.federation_storage_authority_install import (
 from catalog.flask_app.tests.test_storage_authority_local_provider_runtime import (
     _register_primary,
     _settings,
+)
+from catalog.mtconnect_recorder.federation_node import (
+    RECORDER_PUBLICATION_REQUEST_SECONDS,
 )
 from catalog.node.client import RelayNodeClient
 from catalog.relay.service import RelayServer
@@ -171,3 +176,128 @@ def test_real_shared_wire_cold_validation_heartbeat_and_two_distinct_commits(tmp
             await relay.stop()
 
     asyncio.run(asyncio.wait_for(scenario(), 25))
+
+
+@pytest.mark.parametrize(
+    "provider_budget,publication_budget,response_delay,committed",
+    [
+        (60.0, 300.0, 77.5, False),
+        (120.0, 120.0, 77.5, False),
+        (None, None, 77.5, True),
+        (None, None, 135.0, False),
+    ],
+    ids=["old-provider-expiry", "old-publication-expiry", "nested-response", "finite-expiry"],
+)
+def test_shared_self_provider_response_budget_preserves_commit_and_correlation(
+    tmp_path, monkeypatch, caplog, provider_budget, publication_budget, response_delay, committed,
+):
+    """Scale real asyncio deadlines, not payloads or correlation checks.
+
+    Physical failures had up to 67.7s authority preparation, a valid provider
+    response after 77.5s, and a nominal 60s deadline firing after 107.5s under
+    loop delay. One percent of the preparation/response times keeps this wire
+    regression short while exercising pending-future expiry and durable commit.
+    """
+    async def scenario():
+        scale = .01
+        relay = RelayServer(SessionCoordinator(tmp_path / "relay.sqlite3"), host="127.0.0.1", port=0)
+        await relay.start()
+        clients = [RelayNodeClient(
+            state_directory=tmp_path / name, relay_url=relay.url,
+            display_name=f"Isolated {name}", allow_insecure_local=True, request_timeout=2,
+        ) for name in ("creator", "recorder")]
+        creator, recorder = clients
+        stages, sender, responses = [], None, []
+        try:
+            for client in clients:
+                token = relay.coordinator.create_enrollment_token(ttl_seconds=30, max_uses=1)
+                await client.connect(enrollment_token=token["token"])
+            session_id = (await creator.create_session("Isolated delayed provider response"))["session_id"]
+            invitation = await creator.create_invitation(session_id, ttl_seconds=30, max_uses=1)
+            await recorder.join_session(invitation["token"])
+            settings = replace(_settings(tmp_path), session_id=session_id, relay=relay.url)
+            assert settings.request_timeout == 15.0
+            assert settings.storage_request_timeout == 120.0
+            assert settings.lease_seconds == 300.0
+            assert RECORDER_PUBLICATION_REQUEST_SECONDS == 300.0
+            control = PhaseDControlPlane(settings.storage_control_database)
+            provider_id = authority_runtime._builtin_local_provider_id(creator.node_id)
+            group = "fcp-local-storage"
+            _register_primary(control, session_id=session_id, provider_id=provider_id,
+                              node_id=creator.node_id, now=datetime.now(timezone.utc))
+            ai = RelayRemoteAIEndpoint(creator, request_timeout=2)
+            await ai.start()
+            stages.append(ai)
+            endpoint = RelayStorageEndpoint(creator, message_source=ai,
+                request_timeout=(provider_budget or settings.storage_request_timeout) * scale)
+            service = authority_runtime._ensure_builtin_local_storage_service(
+                endpoint=endpoint, control=control, client=creator, settings=settings)
+            assert service is not None
+            await endpoint.start()
+            stages.append(endpoint)
+            channel = authority_runtime.SharedRecorderAwareStorageControlRelayChannel(creator, endpoint)
+            logical = PhaseDLogicalStorageClient(
+                session_id=session_id, actor_node_id=creator.node_id, control_plane=control,
+                transport=endpoint, acknowledgements=DurableAcknowledgementStore(settings.acknowledgements_database))
+            authority = RecorderLogicalStorageAuthority(client=creator, logical_client=logical, session_id=session_id)
+            original_handler = authority.handle_request
+
+            async def prepared_handler(*args):
+                await asyncio.sleep(67.7 * scale)
+                await original_handler(*args)
+
+            channel.set_recorder_ingest_handler(prepared_handler)
+            await channel.start()
+            stages.append(channel)
+            original_send = creator.send_message
+
+            async def delayed_response(**kwargs):
+                payload = kwargs["payload"]
+                if payload.get("kind") == RELAY_STORAGE_KIND and payload.get("message") == "response":
+                    responses.append(json.loads(payload["frame"]))
+                    await asyncio.sleep(response_delay * scale)
+                return await original_send(**kwargs)
+
+            monkeypatch.setattr(creator, "send_message", delayed_response)
+            sender = RelayRecorderStorageClient(recorder, session_id=session_id, authority_node_id=creator.node_id,
+                request_timeout=(publication_budget or RECORDER_PUBLICATION_REQUEST_SECONDS) * scale)
+            await sender.start()
+            payload = _request_payload()
+            dataset_id = "mtconnect:" + recorder.node_id + ":Mazak"
+            request = {
+                "group_id": group,
+                "dataset_id": dataset_id,
+                "batch_id": payload["batch_id"],
+                "idempotency_key": session_id + ":" + dataset_id + ":" + payload["batch_id"],
+                "content": payload["content"],
+                "created_at": datetime.now(timezone.utc),
+                "dataset_schema_name": payload["dataset_schema_name"],
+                "dataset_schema_version": 1,
+            }
+            if committed:
+                outcome = await asyncio.wait_for(sender.ingest_batch(**request), 5)
+                assert outcome.committed is True
+                assert logical.acknowledgements.status(session_id, group, request["batch_id"]).committed
+            else:
+                with pytest.raises(TimeoutError):
+                    await asyncio.wait_for(sender.ingest_batch(**request), 5)
+                # A late genuine receiver commit remains true; an expired
+                # sender future must not be reconstructed as successful.
+                await asyncio.sleep(.6)
+                assert not sender._pending
+            assert responses and all(response["ok"] is True for response in responses)
+            assert service.provider.read(session_id=session_id, group_id=group,
+                batch_id=request["batch_id"]) == request["content"]
+            if provider_budget == 60.0 or response_delay == 135.0:
+                assert any(getattr(record, "storage_rejection_reason", None) == "request_not_pending"
+                           for record in caplog.records)
+        finally:
+            if sender is not None:
+                await sender.close()
+            for stage in reversed(stages):
+                await stage.close()
+            for client in reversed(clients):
+                await client.disconnect()
+            await relay.stop()
+
+    asyncio.run(asyncio.wait_for(scenario(), 15))
