@@ -78,13 +78,9 @@ jobs:
           $cacheExists = Test-Path -LiteralPath $cachePath -PathType Container
           $files = @()
           if ($cacheExists) {
-            $ancestor = $cachePath
-            while ($ancestor) {
-              $ancestorItem = Get-Item -LiteralPath $ancestor -ErrorAction Stop
-              if (($ancestorItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'Pip cache path traverses a reparse point; refusing cleanup' }
-              $parent = [IO.Path]::GetDirectoryName($ancestor)
-              if (-not $parent -or $parent -eq $ancestor) { break }
-              $ancestor = $parent
+            foreach ($knownCachePath in @($localAppData, (Join-Path $localAppData 'pip'), $cachePath)) {
+              $knownCacheItem = Get-Item -LiteralPath $knownCachePath -ErrorAction Stop
+              if (($knownCacheItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'Pip cache path contains a reparse point; refusing cleanup' }
             }
             $files = @(Get-PipCacheFiles $cachePath)
           }
