@@ -1,0 +1,88 @@
+name: Bounded CF7 BEAST native observation (operator only)
+on:
+  push:
+    branches: [codex/cf7-beast-windows-d4d29b-20261012]
+    paths:
+      - .github/workflows/cf7-beast-native-observation-operator.yml
+      - scripts/acceptance/operator_cf7_beast_native_observation.py
+permissions:
+  contents: read
+concurrency:
+  group: cf7-beast-native-observation-d4d29b
+  cancel-in-progress: false
+jobs:
+  actual-windows:
+    runs-on: [self-hosted, Windows, X64, beast-windows]
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+    steps:
+      - name: Admit actual host-visible storage before checkout or startup
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:RUNNER_NAME -ne 'Beast') { throw 'Wrong registered physical runner' }
+          $root = Join-Path 'C:\fcp-cf7-physical' $env:GITHUB_RUN_ID
+          if (Test-Path -LiteralPath $root) { throw 'Fresh isolated run root already exists' }
+          $evidence = Join-Path $root 'evidence'
+          New-Item -ItemType Directory -Path $evidence | Out-Null
+          "CF7_STATE_ROOT=$root" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "CF7_EVIDENCE_ROOT=$evidence" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $volume = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='C:'"
+          $os = Get-CimInstance Win32_OperatingSystem
+          $system = Get-CimInstance Win32_ComputerSystem
+          $product = Get-CimInstance Win32_ComputerSystemProduct
+          $principal = (& whoami /user /fo csv /nh | Out-String).Trim()
+          $sha = [Security.Cryptography.SHA256]::Create()
+          function Hash-Text([string]$value) { -join ($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($value)) | ForEach-Object { $_.ToString('x2') }) }
+          $reserve = [long]12893316031
+          $estimate = [long]2147483648
+          $pass = [long]$volume.FreeSpace -ge ($reserve + $estimate)
+          [ordered]@{
+            schema='fcp.cf7.physical-windows-host-admission.v1'; observed_utc=[DateTime]::UtcNow.ToString('o')
+            candidate='d4d29b0c1890c63ce3e7b43415a9068a03e302cc'; github_run_id=$env:GITHUB_RUN_ID
+            runner_id=28; runner_name=$env:RUNNER_NAME; runner_environment=$env:RUNNER_ENVIRONMENT
+            os_family='windows'; os_caption=$os.Caption; os_version=$os.Version; architecture=$os.OSArchitecture
+            host_identity_sha256=(Hash-Text ($product.UUID + '|' + $env:COMPUTERNAME))
+            service_principal_sha256=(Hash-Text $principal); host_total_memory_bytes=[long]$system.TotalPhysicalMemory
+            hypervisor_present=[bool]$system.HypervisorPresent; volume_serial_sha256=(Hash-Text $volume.VolumeSerialNumber)
+            total_bytes=[long]$volume.Size; free_bytes=[long]$volume.FreeSpace
+            unchanged_reserve_bytes=$reserve; estimated_operation_bytes=$estimate; required_before_operation_bytes=($reserve+$estimate)
+            admission_pass=$pass; product_started=$false; source_cloned=$false
+            note='Authenticated existing self-hosted Windows runner; actual native host measurement, no cleanup, Docker start, WSL operation or production change'
+          } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $evidence 'HOST_ADMISSION.json') -Encoding utf8
+          if (-not $pass) { throw 'Actual Windows C free space does not preserve reserve plus bounded operation estimate' }
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: cf7-operator-${{ github.run_id }}
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Observe exact candidate through isolated supported native service boundaries
+        env:
+          CF7_READ_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python -B "$env:GITHUB_WORKSPACE\cf7-operator-$env:GITHUB_RUN_ID\scripts\acceptance\operator_cf7_beast_native_observation.py" --root $env:CF7_STATE_ROOT
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Always close only this job's native process incarnation
+        if: always()
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not $env:CF7_STATE_ROOT) { exit 0 }
+          $owner = Join-Path $env:CF7_STATE_ROOT 'process-owner.json'
+          if (-not (Test-Path -LiteralPath $owner)) { exit 0 }
+          $record = Get-Content -LiteralPath $owner -Raw | ConvertFrom-Json
+          $process = Get-Process -Id ([int]$record.pid) -ErrorAction SilentlyContinue
+          if ($process -and $process.StartTime.ToUniversalTime().ToFileTimeUtc().ToString() -eq $record.creation_filetime) {
+            Stop-Process -Id $process.Id -ErrorAction Stop
+            [ordered]@{schema='fcp.cf7.scoped-native-cleanup.v1'; utc=[DateTime]::UtcNow.ToString('o'); same_incarnation_closed=$true; unrelated_processes_changed=$false} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $env:CF7_EVIDENCE_ROOT 'WORKFLOW_CLEANUP.json') -Encoding utf8
+          }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cf7-beast-native-d4d29b-${{ github.run_id }}
+          path: ${{ env.CF7_EVIDENCE_ROOT }}
+          if-no-files-found: error
+          retention-days: 90
+          include-hidden-files: false
