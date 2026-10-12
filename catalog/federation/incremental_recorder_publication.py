@@ -457,6 +457,8 @@ class IncrementalRecorderArchiveReconciler(RecorderArchiveReconciler):
             )
             self._observe_stage("derived-read", archive_source_name)
             observations = self._read_observations(observation_path)
+            machine_id = self._batch_machine_id(checkpoint, observations[0])
+            observations.sort(key=lambda record: int(record["sequence"]))
             self._validate_observation_identity(
                 observations=observations,
                 source_name=source_name,
@@ -481,7 +483,6 @@ class IncrementalRecorderArchiveReconciler(RecorderArchiveReconciler):
                 )
 
             created_at = self._received_at(ref.manifest_path, observations)
-            machine_id = self._batch_machine_id(checkpoint, observations)
             chunks = self._chunks(
                 source_name=source_name,
                 checkpoint=checkpoint,

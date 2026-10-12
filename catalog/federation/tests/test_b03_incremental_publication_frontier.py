@@ -411,10 +411,10 @@ def test_reconciler_quarantines_observation_identity_tampering(tmp_path):
     assert reconciler.frontier.pending(source_name="Mazak", instance_id=77)
 
 
-def test_replay_uses_each_batches_machine_identity_after_checkpoint_label_changes(
+def test_replay_uses_first_durable_device_for_mixed_batch_after_checkpoint_changes(
     tmp_path,
 ):
-    """An old completed batch keeps its device identity while new data uses the new one."""
+    """Replay keeps the first durable device ID and each mixed-device observation."""
 
     client = RecordingClient()
     store, checkpoint_file, outbox, queue, legacy = _build_reconciler(
@@ -422,22 +422,71 @@ def test_replay_uses_each_batches_machine_identity_after_checkpoint_label_change
     )
     reconciler = _incremental_from(legacy)
 
-    old_machine_xml = SAMPLE_XML.replace(
-        'uuid="MAZAK-001"', 'uuid="Mazak"'
-    )
+    # XML DeviceStream order is intentionally different from sequence order.
+    # The canonical recorder parser stores this batch in sequence order, so its
+    # first durable observation (M8012) defines the original checkpoint label.
+    # Mixed DeviceStreams remain valid, and each row keeps its own identity.
+    old_machine_xml = """<?xml version="1.0" encoding="UTF-8"?>
+<MTConnectStreams xmlns="urn:mtconnect.org:MTConnectStreams:1.7">
+  <Header creationTime="2026-08-09T03:00:03Z" sender="agent" instanceId="77" bufferSize="4096" firstSequence="10" lastSequence="12" nextSequence="13"/>
+  <Streams>
+    <DeviceStream name="Mazak" uuid="Mazak">
+      <ComponentStream component="Linear" componentId="x" name="X">
+        <Samples>
+          <Position dataItemId="xp" sequence="12" timestamp="2026-08-09T03:00:03Z">3.00</Position>
+        </Samples>
+      </ComponentStream>
+    </DeviceStream>
+    <DeviceStream name="M8012" uuid="M8012">
+      <ComponentStream component="Linear" componentId="x" name="X">
+        <Samples>
+          <Position dataItemId="xp" sequence="10" timestamp="2026-08-09T03:00:01Z">1.00</Position>
+          <Position dataItemId="xp" sequence="11" timestamp="2026-08-09T03:00:02Z">2.00</Position>
+        </Samples>
+      </ComponentStream>
+    </DeviceStream>
+  </Streams>
+</MTConnectStreams>
+"""
     old_probe, old_batch, old_stored = _store_sample(store, old_machine_xml)
+    assert [
+        (row["sequence"], row["machine_id"]) for row in old_batch.observations
+    ] == [
+        (10, "M8012"),
+        (11, "M8012"),
+        (12, "Mazak"),
+    ]
+    persisted_source_order = [
+        json.loads(line)
+        for line in old_stored.observation_path.read_text(encoding="utf-8").splitlines()
+    ]
+    assert [
+        (row["sequence"], row["machine_id"]) for row in persisted_source_order
+    ] == [
+        (10, "M8012"),
+        (11, "M8012"),
+        (12, "Mazak"),
+    ]
     _write_checkpoint(
         checkpoint_file,
         probe_sha256=old_probe.sha256,
         next_sequence=13,
     )
-    _set_checkpoint_machine_id(checkpoint_file, "Mazak")
+    _set_checkpoint_machine_id(checkpoint_file, "M8012")
     first = reconciler.reconcile()
     assert first.enqueued == 1
 
     original, = outbox.pending()
     assert original.payload["content"]["source_name"] == "Mazak"
-    assert original.payload["content"]["machine_id"] == "Mazak"
+    assert original.payload["content"]["machine_id"] == "M8012"
+    assert [
+        (row["sequence"], row["machine_id"])
+        for row in original.payload["content"]["observations"]
+    ] == [
+        (10, "M8012"),
+        (11, "M8012"),
+        (12, "Mazak"),
+    ]
     assert asyncio.run(queue.run_once()).committed == 1
     completed = outbox.get(original.outbox_id)
     assert completed is not None
@@ -489,16 +538,16 @@ def test_replay_uses_each_batches_machine_identity_after_checkpoint_label_change
 
 
 @pytest.mark.parametrize(
-    ("identity_values", "expected_code"),
+    ("invalid_first_machine_id", "expected_code"),
     [
-        (["Mazak", "Other", "Mazak"], "recorder-machine-id-conflict"),
-        (["Mazak", 7, "Mazak"], "invalid-recorder-publication"),
+        (7, "invalid-recorder-publication"),
+        ("   ", "invalid-recorder-publication"),
     ],
 )
-def test_reconciler_rejects_conflicting_or_invalid_batch_machine_ids(
+def test_reconciler_rejects_invalid_first_batch_machine_id(
     tmp_path,
     monkeypatch,
-    identity_values,
+    invalid_first_machine_id,
     expected_code,
 ):
     store, checkpoint_file, outbox, _queue, legacy = _build_reconciler(
@@ -518,9 +567,7 @@ def test_reconciler_rejects_conflicting_or_invalid_batch_machine_ids(
 
     def altered_observations(path):
         observations = read_observations(path)
-        observations[0]["machine_id"] = identity_values[0]
-        observations[1]["machine_id"] = identity_values[1]
-        observations[2]["machine_id"] = identity_values[2]
+        observations[0]["machine_id"] = invalid_first_machine_id
         return observations
 
     monkeypatch.setattr(reconciler, "_read_observations", altered_observations)

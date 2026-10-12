@@ -437,7 +437,11 @@ class RecorderArchiveReconciler:
                 "observation_file",
                 "committed batch has no detailed observations",
             )
-        observations.sort(key=lambda record: int(record["sequence"]))
+        # Preserve the original parser/JSONL order here. The publisher needs
+        # the first durable observation to recover the batch-level machine
+        # identity that capture originally put in SourceCheckpoint. Callers
+        # select that identity before sorting by sequence for validation and
+        # chunk emission.
         return observations
 
     @staticmethod
@@ -507,41 +511,29 @@ class RecorderArchiveReconciler:
     @staticmethod
     def _batch_machine_id(
         checkpoint: SourceCheckpoint,
-        observations: list[dict[str, Any]],
+        first_observation: dict[str, Any],
     ) -> str:
-        """Resolve device identity from the durable observations in this batch.
+        """Resolve the batch identity using capture's first observation.
 
-        A checkpoint's machine label can change while its Agent instance and
-        committed raw batches remain unchanged. Replaying an old batch with
-        that mutable label would reuse the idempotency key with different
-        content. Older observations that predate ``machine_id`` retain the
-        established checkpoint fallback.
+        Capture sets SourceCheckpoint.machine_id from the first parsed
+        observation. A later checkpoint can therefore have a different label
+        while older raw batches remain unchanged. The durable observation
+        file preserves the original parser order and each observation's own
+        device identity; multi-DeviceStream batches may legitimately contain
+        different machine IDs. Legacy observations without an identity retain
+        the checkpoint fallback.
         """
 
-        machine_ids: list[str] = []
-        for index, observation in enumerate(observations, start=1):
-            value = observation.get("machine_id")
-            if value is None or value == "":
-                continue
-            if not isinstance(value, str) or not value.strip():
-                raise FederationValidationError(
-                    "invalid-recorder-publication",
-                    f"observations[{index}].machine_id",
-                    "must be non-empty text when present",
-                )
-            machine_ids.append(value)
-
-        if not machine_ids:
+        value = first_observation.get("machine_id")
+        if value is None or value == "":
             return checkpoint.machine_id
-
-        machine_id = machine_ids[0]
-        if any(value != machine_id for value in machine_ids[1:]):
+        if not isinstance(value, str) or not value.strip():
             raise FederationValidationError(
-                "recorder-machine-id-conflict",
-                "observations.machine_id",
-                "must be consistent within one committed raw batch",
+                "invalid-recorder-publication",
+                "observations[1].machine_id",
+                "must be non-empty text when present",
             )
-        return machine_id
+        return value
 
     def _chunks(
         self,
@@ -686,6 +678,8 @@ class RecorderArchiveReconciler:
                 day=day,
             )
             observations = self._read_observations(observation_path)
+            machine_id = self._batch_machine_id(checkpoint, observations[0])
+            observations.sort(key=lambda record: int(record["sequence"]))
             sequences = [int(item["sequence"]) for item in observations]
             if (
                 sequences[0] != ref.first_sequence
@@ -707,7 +701,6 @@ class RecorderArchiveReconciler:
                 ref.manifest_path,
                 observations,
             )
-            machine_id = self._batch_machine_id(checkpoint, observations)
             chunks = self._chunks(
                 source_name=source_name,
                 checkpoint=checkpoint,
