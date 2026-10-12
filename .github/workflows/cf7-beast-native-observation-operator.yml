@@ -11,7 +11,144 @@ concurrency:
   group: cf7-beast-native-observation-d4d29b
   cancel-in-progress: false
 jobs:
+  bounded-pip-cache-cleanup:
+    if: "${{ startsWith(github.event.head_commit.message, 'ops: bounded BEAST cache cleanup') }}"
+    runs-on: [self-hosted, Windows, X64, beast-windows]
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+    steps:
+      - name: Verify Beast, inventory and remove only bounded pip cache files
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:RUNNER_NAME -ne 'Beast') { throw 'Wrong registered physical runner' }
+
+          $sha = [Security.Cryptography.SHA256]::Create()
+          function Hash-Text([string]$value) { -join ($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($value)) | ForEach-Object { $_.ToString('x2') }) }
+          function Get-CFreeBytes { [long](Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='C:'").FreeSpace }
+          function Get-PipCacheFiles([string]$cachePath) {
+            $files = [System.Collections.Generic.List[object]]::new()
+            $pending = [System.Collections.Generic.Queue[string]]::new()
+            $pending.Enqueue($cachePath)
+            while ($pending.Count -gt 0) {
+              $directory = $pending.Dequeue()
+              foreach ($item in @(Get-ChildItem -LiteralPath $directory -Force -ErrorAction Stop)) {
+                if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw "Reparse point inside pip cache; refusing to follow or delete it" }
+                if ($item.PSIsContainer) { $pending.Enqueue($item.FullName) }
+                else {
+                  $relative = $item.FullName.Substring($cachePath.Length).TrimStart('\')
+                  $files.Add([ordered]@{ relative_path=$relative; length_bytes=[long]$item.Length; last_write_utc=$item.LastWriteTimeUtc.ToString('o'); full_path=$item.FullName })
+                  if ($files.Count -gt 50000) { throw 'Pip cache file count exceeds bounded cleanup limit' }
+                }
+              }
+            }
+            return $files.ToArray()
+          }
+
+          $product = Get-CimInstance Win32_ComputerSystemProduct
+          $machineHash = Hash-Text ($product.UUID + '|' + $env:COMPUTERNAME)
+          if ($machineHash -ne '2aba9fde97872439a143c4612c3e3cd2cff0c83f1b9e92c354974eeb2fcfb36c') { throw 'Host identity differs from retained Beast checkpoint' }
+          $volume = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='C:'"
+          $volumeHash = Hash-Text $volume.VolumeSerialNumber
+          if ($volumeHash -ne '70edbc02af91d463f8fc19cb4f7e00ccc5f0140414addd85ddbbbf36d235236b') { throw 'C: volume differs from retained Beast checkpoint' }
+
+          $localAppData = [Environment]::GetFolderPath('LocalApplicationData')
+          $cachePath = [IO.Path]::GetFullPath((Join-Path $localAppData 'pip\Cache')).TrimEnd('\')
+          if ([IO.Path]::GetPathRoot($cachePath) -ne 'C:\') { throw 'Pip cache is not on C:; refusing cleanup' }
+          $processes = @(Get-CimInstance Win32_Process)
+          $pipProcesses = @($processes | Where-Object {
+            $_.Name -match '^(pythonw?\.exe|pip3?\.exe|uv\.exe)$' -and
+            $_.CommandLine -match '(?i)(-m\s+pip|\\pip3?\.exe|\buv\s+pip)'
+          })
+          $cacheReferenceProcesses = @($processes | Where-Object {
+            $_.CommandLine -and $_.CommandLine.IndexOf($cachePath, [StringComparison]::OrdinalIgnoreCase) -ge 0
+          })
+          if ($pipProcesses.Count -gt 0 -or $cacheReferenceProcesses.Count -gt 0) { throw 'An active executable references pip/cache work; refusing cleanup' }
+
+          $runRoot = Join-Path 'C:\fcp-cf7-physical' ('capacity-' + $env:GITHUB_RUN_ID + '-a' + $env:GITHUB_RUN_ATTEMPT)
+          if (Test-Path -LiteralPath $runRoot) { throw 'Fresh capacity evidence root already exists' }
+          $evidence = Join-Path $runRoot 'evidence'
+          New-Item -ItemType Directory -Path $evidence | Out-Null
+          "BEAST_CAPACITY_EVIDENCE_ROOT=$evidence" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+          $reserve = [long]12893316031
+          $estimate = [long]2147483648
+          $freeBefore = Get-CFreeBytes
+          $cacheExists = Test-Path -LiteralPath $cachePath -PathType Container
+          $files = @()
+          if ($cacheExists) {
+            $ancestor = $cachePath
+            while ($ancestor) {
+              $ancestorItem = Get-Item -LiteralPath $ancestor -ErrorAction Stop
+              if (($ancestorItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'Pip cache path traverses a reparse point; refusing cleanup' }
+              $parent = Split-Path -LiteralPath $ancestor -Parent
+              if (-not $parent -or $parent -eq $ancestor) { break }
+              $ancestor = $parent
+            }
+            $files = @(Get-PipCacheFiles $cachePath)
+          }
+          $cacheBytes = [long](($files | Measure-Object -Property length_bytes -Sum).Sum)
+          $minimumReclaim = [long]3221225472
+          $requiredForMargin = [long]([Math]::Max($minimumReclaim, ($reserve + $estimate + 1073741824 - $freeBefore)))
+          $fileManifest = [ordered]@{
+            schema='fcp.beast.pip-cache-predelete-manifest.v1'; observed_utc=[DateTime]::UtcNow.ToString('o')
+            runner_name=$env:RUNNER_NAME; github_run_id=$env:GITHUB_RUN_ID; github_run_attempt=$env:GITHUB_RUN_ATTEMPT
+            host_identity_sha256=$machineHash; c_volume_serial_sha256=$volumeHash
+            c_free_before_bytes=$freeBefore; reserve_bytes=$reserve; operation_estimate_bytes=$estimate
+            cache_root='%LOCALAPPDATA%\pip\Cache'; cache_exists=$cacheExists; file_count=$files.Count; total_file_bytes=$cacheBytes
+            files=@($files | ForEach-Object { [ordered]@{ relative_path=$_.relative_path; length_bytes=$_.length_bytes; last_write_utc=$_.last_write_utc } })
+          }
+          $manifestPath = Join-Path $evidence 'PIP_CACHE_PREDELETE_MANIFEST.json'
+          $manifestJson = $fileManifest | ConvertTo-Json -Depth 8
+          [IO.File]::WriteAllText($manifestPath, $manifestJson, [Text.UTF8Encoding]::new($false))
+          $manifestHash = (Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).Hash.ToLowerInvariant()
+
+          $cleanupPerformed = $false
+          $deletedCount = 0
+          if ($cacheExists -and $cacheBytes -ge $requiredForMargin -and $files.Count -gt 0) {
+            foreach ($entry in $files) {
+              $item = Get-Item -LiteralPath $entry.full_path -ErrorAction Stop
+              if ($item.PSIsContainer -or (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) -or [long]$item.Length -ne [long]$entry.length_bytes) {
+                throw 'Pip cache changed after manifest capture; refusing literal-path deletion'
+              }
+            }
+            foreach ($entry in $files) {
+              Remove-Item -LiteralPath $entry.full_path -Force -ErrorAction Stop
+              if (Test-Path -LiteralPath $entry.full_path) { throw 'A manifested pip cache file remains after deletion' }
+              $deletedCount++
+            }
+            $cleanupPerformed = $true
+          }
+
+          $freeAfter = Get-CFreeBytes
+          $summary = [ordered]@{
+            schema='fcp.beast.bounded-pip-cache-cleanup.v1'; observed_utc=[DateTime]::UtcNow.ToString('o')
+            runner_name=$env:RUNNER_NAME; github_run_id=$env:GITHUB_RUN_ID; github_run_attempt=$env:GITHUB_RUN_ATTEMPT
+            host_identity_sha256=$machineHash; c_volume_serial_sha256=$volumeHash
+            c_total_bytes=[long]$volume.Size; c_free_before_bytes=$freeBefore; c_free_after_bytes=$freeAfter
+            c_free_delta_bytes=($freeAfter-$freeBefore); reserve_bytes=$reserve; operation_estimate_bytes=$estimate
+            reserve_margin_after_estimate_bytes=($freeAfter-$reserve-$estimate)
+            cache_root='%LOCALAPPDATA%\pip\Cache'; cache_file_count=$files.Count; cache_bytes=$cacheBytes
+            minimum_reclaim_bytes=$requiredForMargin; cleanup_performed=$cleanupPerformed; deleted_file_count=$deletedCount
+            predelete_manifest='PIP_CACHE_PREDELETE_MANIFEST.json'; predelete_manifest_sha256=$manifestHash
+            deletion_method='Remove-Item -LiteralPath per manifested regular file; no directory or other path deleted'
+            active_pip_or_uv_process_count=$pipProcesses.Count; active_processes_referencing_cache_path=$cacheReferenceProcesses.Count
+            product_or_qualification_started=$false
+          }
+          $summary | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $evidence 'BEAST_CAPACITY_CLEANUP.json') -Encoding utf8
+          $summary | ConvertTo-Json -Depth 6
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: beast-pip-cache-cleanup-${{ github.run_id }}-a${{ github.run_attempt }}
+          path: ${{ env.BEAST_CAPACITY_EVIDENCE_ROOT }}
+          if-no-files-found: error
+          retention-days: 90
+          include-hidden-files: false
+
   actual-windows:
+    if: "${{ !startsWith(github.event.head_commit.message, 'ops: bounded BEAST cache cleanup') }}"
     runs-on: [self-hosted, Windows, X64, beast-windows]
     timeout-minutes: 25
     defaults:
@@ -22,7 +159,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           if ($env:RUNNER_NAME -ne 'Beast') { throw 'Wrong registered physical runner' }
-          $root = Join-Path 'C:\fcp-cf7-physical' $env:GITHUB_RUN_ID
+          $root = Join-Path 'C:\fcp-cf7-physical' ($env:GITHUB_RUN_ID + '-a' + $env:GITHUB_RUN_ATTEMPT)
           if (Test-Path -LiteralPath $root) { throw 'Fresh isolated run root already exists' }
           $evidence = Join-Path $root 'evidence'
           New-Item -ItemType Directory -Path $evidence | Out-Null
@@ -81,7 +218,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: cf7-beast-native-d4d29b-${{ github.run_id }}
+          name: cf7-beast-native-d4d29b-${{ github.run_id }}-a${{ github.run_attempt }}
           path: ${{ env.CF7_EVIDENCE_ROOT }}
           if-no-files-found: error
           retention-days: 90
