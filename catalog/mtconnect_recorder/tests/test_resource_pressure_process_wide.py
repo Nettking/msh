@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -17,7 +17,7 @@ from catalog.mtconnect_recorder import resource_pressure as pressure
 def _measurement(resource_id: str, free_bytes: int) -> FilesystemMeasurement:
     return FilesystemMeasurement(
         resource_id=resource_id,
-        observed_at=datetime.now(timezone.utc),
+        observed_at=datetime.now(UTC),
         total_bytes=1_000,
         free_bytes=free_bytes,
         total_inodes=None,
