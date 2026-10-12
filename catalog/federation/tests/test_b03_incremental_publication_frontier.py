@@ -1,15 +1,18 @@
 """B03 consequence regressions for incremental recorder publication reconciliation."""
 from __future__ import annotations
 
+import asyncio
 import json
 from hashlib import sha256
 from pathlib import Path
 
 import pytest
 
+from catalog.federation.errors import FederationValidationError
 from catalog.federation.incremental_recorder_publication import (
     IncrementalRecorderArchiveReconciler,
 )
+from catalog.federation.outbox import OutboxState
 from catalog.federation.tests.test_recorder_publication import (
     SAMPLE_XML,
     RecordingClient,
@@ -58,6 +61,15 @@ def _mark_stored_pending(frontier, *, batch, stored, source_name="Mazak"):
             ),
             source_name=source_name,
         ),
+    )
+
+
+def _set_checkpoint_machine_id(checkpoint_file: Path, machine_id: str) -> None:
+    payload = json.loads(checkpoint_file.read_text(encoding="utf-8"))
+    payload["sources"]["Mazak"]["machine_id"] = machine_id
+    checkpoint_file.write_text(
+        json.dumps(payload, sort_keys=True),
+        encoding="utf-8",
     )
 
 
@@ -397,6 +409,163 @@ def test_reconciler_quarantines_observation_identity_tampering(tmp_path):
     assert result.quarantine.total == 1
     assert outbox.pending() == ()
     assert reconciler.frontier.pending(source_name="Mazak", instance_id=77)
+
+
+def test_replay_uses_each_batches_machine_identity_after_checkpoint_label_changes(
+    tmp_path,
+):
+    """An old completed batch keeps its device identity while new data uses the new one."""
+
+    client = RecordingClient()
+    store, checkpoint_file, outbox, queue, legacy = _build_reconciler(
+        tmp_path, client=client
+    )
+    reconciler = _incremental_from(legacy)
+
+    old_machine_xml = SAMPLE_XML.replace(
+        'uuid="MAZAK-001"', 'uuid="Mazak"'
+    )
+    old_probe, old_batch, old_stored = _store_sample(store, old_machine_xml)
+    _write_checkpoint(
+        checkpoint_file,
+        probe_sha256=old_probe.sha256,
+        next_sequence=13,
+    )
+    _set_checkpoint_machine_id(checkpoint_file, "Mazak")
+    first = reconciler.reconcile()
+    assert first.enqueued == 1
+
+    original, = outbox.pending()
+    assert original.payload["content"]["source_name"] == "Mazak"
+    assert original.payload["content"]["machine_id"] == "Mazak"
+    assert asyncio.run(queue.run_once()).committed == 1
+    completed = outbox.get(original.outbox_id)
+    assert completed is not None
+    assert completed.state is OutboxState.COMPLETED
+    original_hash = completed.content_hash
+
+    # A crash can leave the discovery pointer after the durable enqueue. Re-add
+    # that exact pointer to model replay beside later data from the renamed device.
+    _mark_stored_pending(
+        reconciler.frontier,
+        batch=old_batch,
+        stored=old_stored,
+    )
+    current_machine_xml = _second_sample().replace(
+        'uuid="MAZAK-001"', 'uuid="M8012N7193N"'
+    )
+    current_probe, current_batch, current_stored = _store_sample(
+        store,
+        current_machine_xml,
+    )
+    _mark_stored_pending(
+        reconciler.frontier,
+        batch=current_batch,
+        stored=current_stored,
+    )
+    _write_checkpoint(
+        checkpoint_file,
+        probe_sha256=current_probe.sha256,
+        next_sequence=16,
+    )
+    _set_checkpoint_machine_id(checkpoint_file, "M8012N7193N")
+
+    replay = reconciler.reconcile()
+
+    assert replay.scanned_batches == 2
+    assert replay.already_enqueued == 1
+    assert replay.enqueued == 1
+    completed_after_replay = outbox.get(original.outbox_id)
+    assert completed_after_replay is not None
+    assert completed_after_replay.state is OutboxState.COMPLETED
+    assert completed_after_replay.content_hash == original_hash
+    new_entry, = outbox.pending()
+    assert new_entry.payload["content"]["source_name"] == "Mazak"
+    assert new_entry.payload["content"]["machine_id"] == "M8012N7193N"
+    assert {
+        row["machine_id"] for row in new_entry.payload["content"]["observations"]
+    } == {"M8012N7193N"}
+    assert reconciler.frontier.pending(source_name="Mazak", instance_id=77) == ()
+
+
+@pytest.mark.parametrize(
+    ("identity_values", "expected_code"),
+    [
+        (["Mazak", "Other", "Mazak"], "recorder-machine-id-conflict"),
+        (["Mazak", 7, "Mazak"], "invalid-recorder-publication"),
+    ],
+)
+def test_reconciler_rejects_conflicting_or_invalid_batch_machine_ids(
+    tmp_path,
+    monkeypatch,
+    identity_values,
+    expected_code,
+):
+    store, checkpoint_file, outbox, _queue, legacy = _build_reconciler(
+        tmp_path, client=RecordingClient()
+    )
+    reconciler = _incremental_from(legacy)
+    probe, batch, stored = _store_sample(store, SAMPLE_XML)
+    _mark_stored_pending(reconciler.frontier, batch=batch, stored=stored)
+    reconciler.frontier.mark_initialized(source_name="Mazak", instance_id=77)
+    _write_checkpoint(
+        checkpoint_file,
+        probe_sha256=probe.sha256,
+        next_sequence=13,
+    )
+
+    read_observations = reconciler._read_observations
+
+    def altered_observations(path):
+        observations = read_observations(path)
+        observations[0]["machine_id"] = identity_values[0]
+        observations[1]["machine_id"] = identity_values[1]
+        observations[2]["machine_id"] = identity_values[2]
+        return observations
+
+    monkeypatch.setattr(reconciler, "_read_observations", altered_observations)
+
+    with pytest.raises(FederationValidationError) as caught:
+        reconciler.reconcile()
+
+    assert caught.value.code == expected_code
+    assert outbox.pending() == ()
+    assert reconciler.frontier.pending(source_name="Mazak", instance_id=77)
+
+
+def test_legacy_observations_without_machine_id_use_checkpoint_fallback(
+    tmp_path, monkeypatch
+):
+    store, checkpoint_file, outbox, _queue, legacy = _build_reconciler(
+        tmp_path, client=RecordingClient()
+    )
+    reconciler = _incremental_from(legacy)
+    probe, batch, stored = _store_sample(store, SAMPLE_XML)
+    _mark_stored_pending(reconciler.frontier, batch=batch, stored=stored)
+    reconciler.frontier.mark_initialized(source_name="Mazak", instance_id=77)
+    _write_checkpoint(
+        checkpoint_file,
+        probe_sha256=probe.sha256,
+        next_sequence=13,
+    )
+    _set_checkpoint_machine_id(checkpoint_file, "legacy-checkpoint-machine")
+
+    read_observations = reconciler._read_observations
+
+    def legacy_observations(path):
+        observations = read_observations(path)
+        for observation in observations:
+            observation.pop("machine_id", None)
+        return observations
+
+    monkeypatch.setattr(reconciler, "_read_observations", legacy_observations)
+
+    result = reconciler.reconcile()
+
+    assert result.enqueued == 1
+    entry, = outbox.pending()
+    assert entry.payload["content"]["source_name"] == "Mazak"
+    assert entry.payload["content"]["machine_id"] == "legacy-checkpoint-machine"
 
 
 def test_malformed_initialized_marker_fails_closed_without_rescanning(

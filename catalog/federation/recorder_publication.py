@@ -480,6 +480,7 @@ class RecorderArchiveReconciler:
         *,
         source_name: str,
         checkpoint: SourceCheckpoint,
+        machine_id: str,
         raw_sha256: str,
         raw_first_sequence: int,
         raw_last_sequence: int,
@@ -488,7 +489,7 @@ class RecorderArchiveReconciler:
         return {
             "schema": RECORDER_TELEMETRY_SCHEMA,
             "source_name": source_name,
-            "machine_id": checkpoint.machine_id,
+            "machine_id": machine_id,
             "agent_instance_id": checkpoint.agent_instance_id,
             "first_sequence": observations[0]["sequence"],
             "last_sequence": observations[-1]["sequence"],
@@ -503,11 +504,51 @@ class RecorderArchiveReconciler:
             "observations": observations,
         }
 
+    @staticmethod
+    def _batch_machine_id(
+        checkpoint: SourceCheckpoint,
+        observations: list[dict[str, Any]],
+    ) -> str:
+        """Resolve device identity from the durable observations in this batch.
+
+        A checkpoint's machine label can change while its Agent instance and
+        committed raw batches remain unchanged. Replaying an old batch with
+        that mutable label would reuse the idempotency key with different
+        content. Older observations that predate ``machine_id`` retain the
+        established checkpoint fallback.
+        """
+
+        machine_ids: list[str] = []
+        for index, observation in enumerate(observations, start=1):
+            value = observation.get("machine_id")
+            if value is None or value == "":
+                continue
+            if not isinstance(value, str) or not value.strip():
+                raise FederationValidationError(
+                    "invalid-recorder-publication",
+                    f"observations[{index}].machine_id",
+                    "must be non-empty text when present",
+                )
+            machine_ids.append(value)
+
+        if not machine_ids:
+            return checkpoint.machine_id
+
+        machine_id = machine_ids[0]
+        if any(value != machine_id for value in machine_ids[1:]):
+            raise FederationValidationError(
+                "recorder-machine-id-conflict",
+                "observations.machine_id",
+                "must be consistent within one committed raw batch",
+            )
+        return machine_id
+
     def _chunks(
         self,
         *,
         source_name: str,
         checkpoint: SourceCheckpoint,
+        machine_id: str,
         raw_sha256: str,
         raw_first_sequence: int,
         raw_last_sequence: int,
@@ -520,6 +561,7 @@ class RecorderArchiveReconciler:
             content = self._content(
                 source_name=source_name,
                 checkpoint=checkpoint,
+                machine_id=machine_id,
                 raw_sha256=raw_sha256,
                 raw_first_sequence=raw_first_sequence,
                 raw_last_sequence=raw_last_sequence,
@@ -542,6 +584,7 @@ class RecorderArchiveReconciler:
             single = self._content(
                 source_name=source_name,
                 checkpoint=checkpoint,
+                machine_id=machine_id,
                 raw_sha256=raw_sha256,
                 raw_first_sequence=raw_first_sequence,
                 raw_last_sequence=raw_last_sequence,
@@ -664,9 +707,11 @@ class RecorderArchiveReconciler:
                 ref.manifest_path,
                 observations,
             )
+            machine_id = self._batch_machine_id(checkpoint, observations)
             chunks = self._chunks(
                 source_name=source_name,
                 checkpoint=checkpoint,
+                machine_id=machine_id,
                 raw_sha256=ref.raw_sha256,
                 raw_first_sequence=ref.first_sequence,
                 raw_last_sequence=ref.last_sequence,
@@ -692,6 +737,7 @@ class RecorderArchiveReconciler:
                 content = self._content(
                     source_name=source_name,
                     checkpoint=checkpoint,
+                    machine_id=machine_id,
                     raw_sha256=ref.raw_sha256,
                     raw_first_sequence=ref.first_sequence,
                     raw_last_sequence=ref.last_sequence,

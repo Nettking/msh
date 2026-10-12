@@ -481,9 +481,11 @@ class IncrementalRecorderArchiveReconciler(RecorderArchiveReconciler):
                 )
 
             created_at = self._received_at(ref.manifest_path, observations)
+            machine_id = self._batch_machine_id(checkpoint, observations)
             chunks = self._chunks(
                 source_name=source_name,
                 checkpoint=checkpoint,
+                machine_id=machine_id,
                 raw_sha256=ref.raw_sha256,
                 raw_first_sequence=ref.first_sequence,
                 raw_last_sequence=ref.last_sequence,
@@ -503,6 +505,7 @@ class IncrementalRecorderArchiveReconciler(RecorderArchiveReconciler):
                 content = self._content(
                     source_name=source_name,
                     checkpoint=checkpoint,
+                    machine_id=machine_id,
                     raw_sha256=ref.raw_sha256,
                     raw_first_sequence=ref.first_sequence,
                     raw_last_sequence=ref.last_sequence,
