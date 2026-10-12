@@ -281,7 +281,7 @@ def test_a_stopped_authority_closes_its_relay_endpoint(tmp_path, monkeypatch) ->
     assert len(endpoints) == 1
     # Storage RPCs need a bounded allowance for durable provider commits;
     # control/heartbeat traffic keeps its shorter request_timeout.
-    assert endpoints[0].request_timeout == 60.0
+    assert endpoints[0].request_timeout == 120.0
     assert endpoints[0]._closed is True
     assert endpoints[0]._reader_task is None
     assert client.announced

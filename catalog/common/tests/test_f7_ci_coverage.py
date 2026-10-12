@@ -101,13 +101,23 @@ def test_trigger_and_runner_boundaries_remain_native():
     assert "  workflow_dispatch:" in text
     jobs = text.split("\njobs:\n", 1)[1]
     assert re.findall(r"^  ([\w-]+):$", jobs, re.MULTILINE) == ["capability-closeout"]
-    assert "os: Linux\n            runner: fcp-linux-fast" in jobs
-    assert "os: Windows\n            runner: fcp-windows" in jobs
-    assert 'runs-on: [self-hosted, "${{ matrix.runner }}"]' in jobs
+    assert "os: Linux\n            runner: ubuntu-24.04" in jobs
+    assert "os: Windows\n            runner: [self-hosted, fcp-windows]" in jobs
+    assert "runs-on: ${{ matrix.runner }}" in jobs
     assert "ubuntu-latest" not in text and "windows-latest" not in text
     assert "timeout-minutes: 30" in jobs and "fail-fast: false" in jobs
-    assert "uses: ./.github/actions/self-hosted-python" in jobs
-    assert 'python-version: "3.12"' in jobs
+    assert (
+        "uses: ./.github/actions/hosted-python\n"
+        "        if: runner.os == 'Linux'\n"
+        "        with:\n"
+        '          python-version: "3.12.13"'
+    ) in jobs
+    assert (
+        "uses: ./.github/actions/self-hosted-python\n"
+        "        if: runner.os == 'Windows'\n"
+        "        with:\n"
+        '          python-version: "3.12"'
+    ) in jobs
     assert "uses: ./.github/actions/ubuntu-storage-precondition" in jobs
     assert "docker compose config --quiet" in jobs
     assert "git diff --check" in jobs

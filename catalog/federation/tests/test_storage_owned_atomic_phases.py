@@ -27,8 +27,8 @@ from catalog.federation.tests.test_phase_e1_service_manifest import (
 )
 
 
-def wait_event(event):
-    return asyncio.wait_for(asyncio.to_thread(event.wait, 3), 4)
+def wait_event(event, *, timeout=3):
+    return asyncio.wait_for(asyncio.to_thread(event.wait, timeout), timeout + 1)
 
 
 @pytest.mark.parametrize("failure", [False, True])
@@ -247,7 +247,7 @@ def test_endpoint_repeated_close_waits_for_owned_writer_and_sends_no_success(tmp
     def held(*args):
         result = original(*args)
         entered.set()
-        assert release.wait(3)
+        assert release.wait(30)
         return result
 
     class RelayClient:
@@ -267,7 +267,9 @@ def test_endpoint_repeated_close_waits_for_owned_writer_and_sends_no_success(tmp
         endpoint._handler_tasks.add(handler)
         handler.add_done_callback(endpoint._finish_handler)
         try:
-            assert await wait_event(entered)
+            # Entry follows real durable disk work; this is a synchronization
+            # watchdog, not a three-second provider performance requirement.
+            assert await wait_event(entered, timeout=30)
             first_close = asyncio.create_task(endpoint.close())
             await asyncio.sleep(.01)
             second_close = asyncio.create_task(endpoint.close())

@@ -50,7 +50,7 @@ concurrency:
 
 jobs:
   linux:
-    runs-on: [self-hosted, fcp-linux-fast]
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -58,9 +58,15 @@ jobs:
           fetch-depth: 0
       - name: Start disposable PostgreSQL 16
         uses: ./.github/actions/self-hosted-postgres
-      - uses: ./.github/actions/self-hosted-python
+      - uses: ./.github/actions/hosted-python
         with:
-          python-version: "3.12"
+          python-version: "3.12.13"
+      - name: Verify SQLite JSON operator runtime
+        run: >-
+          python -c "import json, sqlite3, sys;
+          db = sqlite3.connect(':memory:');
+          assert db.execute('SELECT ? ->> ?', (json.dumps(dict(value=1)), 'value')).fetchone() == (1,);
+          print(json.dumps(dict(python=sys.version.split()[0], sqlite=sqlite3.sqlite_version)))"
       - uses: actions/setup-go@v5
         with:
           go-version-file: "cmd/fcp-peer-sidecar/go.mod"
