@@ -1,5 +1,6 @@
 """Run the exact ICSE artifact in the prebuilt, network-isolated container."""
 from __future__ import annotations
+
 import hashlib
 import json
 import os
