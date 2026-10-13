@@ -370,3 +370,64 @@ jobs:
           MATRIX_JSON: '{}'
         run: >-
           python3 -c "import json,os; from pathlib import Path; receipt={'artifact_name':os.environ['ARTIFACT_NAME'],'artifact_id':os.environ.get('ARTIFACT_ID',''),'artifact_digest':os.environ.get('ARTIFACT_DIGEST',''),'artifact_url':os.environ.get('ARTIFACT_URL',''),'source_sha':os.environ['SOURCE_SHA'],'run_id':os.environ['RUN_ID'],'run_attempt':int(os.environ['RUN_ATTEMPT']),'job_key':os.environ['JOB_KEY'],'matrix':json.loads(os.environ['MATRIX_JSON'])}; Path(os.environ['GITHUB_STEP_SUMMARY']).open('a',encoding='utf-8').write('### ICSE publication artifact receipt\n\n'+json.dumps(receipt,indent=2,sort_keys=True)+'\n\n')"
+
+  prebuilt-reviewer:
+    name: Prebuilt offline reviewer package
+    needs: [publication-bundle]
+    runs-on: [self-hosted, Linux, X64, fcp-linux-fast]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unit-check safety validation
+        run: python3 -m unittest discover -s demo/icse/reviewer -p 'test_*.py' -v
+      - name: Download same-run canonical publication bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: fcp-icse-tool-demo-bundle-${{ github.sha }}-${{ github.run_id }}-a${{ github.run_attempt }}
+          path: publication-bundle
+      - name: Build preinstalled dependency runtime
+        shell: bash
+        run: |
+          docker build --platform linux/amd64 \
+            -f demo/icse/reviewer/Dockerfile \
+            --build-arg "FCP_BUILD_COMMIT=$GITHUB_SHA" \
+            -t "fcp-icse-reviewer:$(printf '%s' "$GITHUB_SHA" | cut -c1-12)" .
+      - name: Smoke-test the exact publication archive offline
+        shell: bash
+        run: |
+          mkdir -p reviewer-smoke
+          docker run --rm --network none --cap-drop ALL --security-opt no-new-privileges \
+            --mount "type=bind,source=$PWD/publication-bundle,target=/input,readonly" \
+            --mount "type=bind,source=$PWD/reviewer-smoke,target=/output" \
+            "fcp-icse-reviewer:$(printf '%s' "$GITHUB_SHA" | cut -c1-12)"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          root = Path("reviewer-smoke")
+          assert json.loads((root / "components.json").read_text())["passed"] == 4
+          net = json.loads((root / "network" / "summary.json").read_text())
+          assert net["result"] == "PASS" and net["all_owned_processes_stopped"] is True
+          assert len(net["checks"]) == 10 and set(net["checks"].values()) == {"PASS"}
+          provenance = json.loads((root / "PROVENANCE.json").read_text())
+          assert provenance["source_sha"] == os.environ["GITHUB_SHA"]
+          PY
+      - name: Package prebuilt image, verified source ZIP, and launchers
+        shell: bash
+        run: |
+          mkdir -p ready-run
+          IMAGE_REF="fcp-icse-reviewer:$(printf '%s' "$GITHUB_SHA" | cut -c1-12)"
+          docker save "$IMAGE_REF" | gzip -1 > ready-run/image.tar.gz
+          printf '%s\n' "$IMAGE_REF" > ready-run/IMAGE_REF
+          cp publication-bundle/fcp-icse-tool-demo-*.zip ready-run/
+          cp publication-bundle/ZENODO_SHA256 ready-run/
+          cp demo/icse/reviewer/run.sh demo/icse/reviewer/run.ps1 demo/icse/reviewer/README.md ready-run/
+          (cd ready-run && sha256sum image.tar.gz IMAGE_REF fcp-icse-tool-demo-*.zip ZENODO_SHA256 run.sh run.ps1 README.md > READY_RUN_SHA256SUMS)
+      - name: Upload prebuilt offline reviewer package
+        uses: actions/upload-artifact@v4
+        with:
+          name: fcp-icse-ready-run-${{ github.sha }}-${{ github.run_id }}-a${{ github.run_attempt }}
+          path: ready-run/
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 0
