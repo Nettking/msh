@@ -289,6 +289,15 @@ def test_shared_self_provider_response_budget_preserves_commit_and_correlation(
             assert service.provider.read(session_id=session_id, group_id=group,
                 batch_id=request["batch_id"]) == request["content"]
             if provider_budget == 60.0 or response_delay == 135.0:
+                # The deliberately delayed wire response must reach the live
+                # receiver before its correlation-rejection log can exist.
+                loop = asyncio.get_running_loop()
+                rejection_deadline = loop.time() + 5
+                while not any(getattr(record, "storage_rejection_reason", None) == "request_not_pending"
+                              for record in caplog.records):
+                    if loop.time() >= rejection_deadline:
+                        break
+                    await asyncio.sleep(.01)
                 assert any(getattr(record, "storage_rejection_reason", None) == "request_not_pending"
                            for record in caplog.records)
         finally:
