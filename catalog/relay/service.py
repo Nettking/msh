@@ -28,6 +28,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from types import TracebackType
 from typing import Any, Final, Self
+from urllib.parse import urlsplit, urlunsplit
 
 from websockets.asyncio.server import Server, ServerConnection, serve
 from websockets.exceptions import ConnectionClosed, ConnectionClosedError
@@ -43,6 +44,12 @@ from catalog.federation.errors import (
     FederationOperationError,
     FederationValidationError,
     ProtocolCompatibilityError,
+)
+from catalog.federation.human_auth import (
+    AUTHORITY_EVENT,
+    AUTHORITY_SCHEMA,
+    MEMBER_ENDPOINT_EVENT,
+    MEMBER_ENDPOINT_SCHEMA,
 )
 from catalog.federation.models import (
     CapabilityAnnouncement,
@@ -61,7 +68,7 @@ from catalog.federation.recorder_control_events import (
 from catalog.federation.recorder_control_events import (
     mask_recorder_control_scan_event_payload,
 )
-from catalog.federation.redaction import redact_secrets
+from catalog.federation.redaction import REDACTED, is_secret_text, redact_secrets
 from catalog.federation.service_incarnation import (
     STOP_COMPLETED,
     STOP_FAILURE,
@@ -71,6 +78,7 @@ from catalog.federation.service_incarnation import (
     record_service_stop,
 )
 from catalog.federation.shared_file_storage import mask_public_jsonl_chunk_paths
+from catalog.node.identity import derive_node_id_from_public_key
 
 from .authentication import (
     create_authentication_nonce,
@@ -229,6 +237,56 @@ def _bounded_token(payload: dict[str, Any], field: str = "token") -> str:
     return value
 
 
+def _mask_human_auth_routing_payload(value: object, event_type: str | None) -> object:
+    """Admit only the existing, closed human sign-in origin field."""
+
+    schemas = {
+        AUTHORITY_EVENT: (AUTHORITY_SCHEMA, {"schema", "node_id", "public_key", "base_url"}),
+        MEMBER_ENDPOINT_EVENT: (MEMBER_ENDPOINT_SCHEMA, {"schema", "node_id", "base_url"}),
+    }
+    contract = schemas.get(event_type)
+    if (
+        contract is None
+        or not isinstance(value, dict)
+        or set(value) != contract[1]
+        or value.get("schema") != contract[0]
+        or not isinstance(value.get("node_id"), str)
+        or not 0 < len(value["node_id"]) <= 512
+    ):
+        return value
+    origin = value.get("base_url")
+    if (
+        not isinstance(origin, str)
+        or len(origin.encode("utf-8")) > 2_048
+        or is_secret_text(origin)
+        or not origin.isascii()
+        or any(char.isspace() or ord(char) < 32 or ord(char) == 127 or char == "\\" for char in origin)
+    ):
+        return value
+    try:
+        parsed = urlsplit(origin)
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+            or "%" in parsed.netloc
+            or parsed.query
+            or parsed.fragment
+            or parsed.path not in {"", "/"}
+            or (parsed.port is not None and not 1 <= parsed.port <= 65_535)
+            or origin != urlunsplit((parsed.scheme, parsed.netloc, "", "", ""))
+        ):
+            return value
+        if event_type == AUTHORITY_EVENT and (
+            derive_node_id_from_public_key(value["public_key"]) != value["node_id"]
+        ):
+            return value
+    except (TypeError, ValueError, FederationValidationError):
+        return value
+    return {**value, "base_url": REDACTED}
+
+
 def _ensure_bounded_json(
     value: object,
     *,
@@ -267,7 +325,7 @@ def _ensure_bounded_json(
         return
     if redacted == mask_public_jsonl_chunk_paths(value):
         return
-    # Recorder control is the second, and only other, narrow allowance.
+    # Recorder control also has a narrow allowance.
     # ``fcp.recorder-control.v1`` scan events intentionally carry a bounded
     # RFC1918 scan network, and the generic pass always alters two of their
     # fields: ``cidr`` by value, and ``port`` by key. Both must be admitted or
@@ -285,6 +343,12 @@ def _ensure_bounded_json(
         event_type in RECORDER_CONTROL_SCAN_EVENTS
         and redacted == mask_recorder_control_scan_event_payload(value)
     ):
+        return
+    # Human sign-in intentionally publishes one bounded origin. Only its two
+    # closed routing schemas earn this allowance; all other fields still pass
+    # generic redaction, and the coordinator still enforces member-self and
+    # current-leader authority after the transport guard.
+    if redacted == _mask_human_auth_routing_payload(value, event_type):
         return
     raise FederationValidationError(
         "nonpublic-payload",
