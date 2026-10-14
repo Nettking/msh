@@ -195,11 +195,11 @@ def test_shared_self_provider_response_budget_preserves_commit_and_correlation(
 
     Physical failures had up to 67.7s authority preparation, a valid provider
     response after 77.5s, and a nominal 60s deadline firing after 107.5s under
-    loop delay. One percent of the preparation/response times keeps this wire
-    regression short while exercising pending-future expiry and durable commit.
+    loop delay. Ten percent preserves those deadline ratios without reducing
+    real wire/filesystem work to a subsecond provider-response budget.
     """
     async def scenario():
-        scale = .01
+        scale = .1
         relay = RelayServer(SessionCoordinator(tmp_path / "relay.sqlite3"), host="127.0.0.1", port=0)
         await relay.start()
         clients = [RelayNodeClient(
@@ -275,12 +275,12 @@ def test_shared_self_provider_response_budget_preserves_commit_and_correlation(
                 "dataset_schema_version": 1,
             }
             if committed:
-                outcome = await asyncio.wait_for(sender.ingest_batch(**request), 5)
+                outcome = await asyncio.wait_for(sender.ingest_batch(**request), sender.request_timeout + 5)
                 assert outcome.committed is True
                 assert logical.acknowledgements.status(session_id, group, request["batch_id"]).committed
             else:
                 with pytest.raises(TimeoutError):
-                    await asyncio.wait_for(sender.ingest_batch(**request), 5)
+                    await asyncio.wait_for(sender.ingest_batch(**request), sender.request_timeout + 5)
                 # A late genuine receiver commit remains true; an expired
                 # sender future must not be reconstructed as successful.
                 await asyncio.sleep(.6)
@@ -309,4 +309,4 @@ def test_shared_self_provider_response_budget_preserves_commit_and_correlation(
                 await client.disconnect()
             await relay.stop()
 
-    asyncio.run(asyncio.wait_for(scenario(), 15))
+    asyncio.run(asyncio.wait_for(scenario(), 60))
