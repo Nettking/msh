@@ -46,6 +46,18 @@
   </section>
   {% endif %}
 
+  {% if vm.active_section == 'services' and federation_local_install_model %}
+  <section class="federation-panel">
+    <span class="federation-eyebrow">Local language model</span>
+    <h3>Install the configured model</h3>
+    <p>Install {{ federation_local_install_model }} on this computer. The host checks available storage before downloading. Installation does not enable a contribution.</p>
+    <form method="post" action="{{ url_for('server_setup_web.pull_model') }}">
+      <input type="hidden" name="_csrf_token" value="{{ mtconnect_discovery_csrf_token }}">
+      <button class="federation-button federation-button--secondary" type="submit">Install {{ federation_local_install_model }}</button>
+    </form>
+  </section>
+  {% endif %}
+
   {% if vm.active_section == 'this-device' %}
   <section class="federation-panel">
     <header class="federation-panel__header">
