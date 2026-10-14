@@ -65,7 +65,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt -c constraints-phase2.txt
-          python -m pip install pytest ruff
+          python -m pip install -c constraints-release.txt pytest ruff
       - name: Compile CFI-1 integration
         run: >-
           python -m compileall -q
