@@ -202,9 +202,10 @@ def test_shared_self_provider_response_budget_preserves_commit_and_correlation(
         scale = .1
         relay = RelayServer(SessionCoordinator(tmp_path / "relay.sqlite3"), host="127.0.0.1", port=0)
         await relay.start()
+        # Keep the actual control/heartbeat budget; only storage deadlines scale.
         clients = [RelayNodeClient(
             state_directory=tmp_path / name, relay_url=relay.url,
-            display_name=f"Isolated {name}", allow_insecure_local=True, request_timeout=2,
+            display_name=f"Isolated {name}", allow_insecure_local=True,
         ) for name in ("creator", "recorder")]
         creator, recorder = clients
         stages, sender, responses = [], None, []
@@ -217,6 +218,7 @@ def test_shared_self_provider_response_budget_preserves_commit_and_correlation(
             await recorder.join_session(invitation["token"])
             settings = replace(_settings(tmp_path), session_id=session_id, relay=relay.url)
             assert settings.request_timeout == 15.0
+            assert creator.request_timeout == recorder.request_timeout == settings.request_timeout
             assert settings.storage_request_timeout == 120.0
             assert settings.lease_seconds == 300.0
             assert RECORDER_PUBLICATION_REQUEST_SECONDS == 300.0
