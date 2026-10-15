@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from math import isfinite
 from typing import Any, Protocol
 
 from catalog.federation.errors import FederationValidationError
@@ -85,15 +88,23 @@ class RelayLifecycleEndpoint:
         workers: dict[str, CancellableCapabilityWorker] | None = None,
         *,
         request_timeout: float = 15.0,
+        dispatch_response_timeout: float | None = None,
+        clock: Callable[[], datetime] | None = None,
         other_message_limit: int = 64,
         message_source: RelayMessageSource | None = None,
     ) -> None:
         if request_timeout <= 0:
             raise ValueError("request_timeout must be positive")
+        if dispatch_response_timeout is not None and (
+            not isfinite(dispatch_response_timeout) or dispatch_response_timeout <= 0
+        ):
+            raise ValueError("dispatch_response_timeout must be finite and positive")
         self.relay_client = relay_client
         self.message_source = message_source
         self.workers = dict(workers or {})
         self.request_timeout = float(request_timeout)
+        self.dispatch_response_timeout = dispatch_response_timeout
+        self.clock = clock or (lambda: datetime.now(timezone.utc))
         self._dispatches: dict[str, _PendingDispatch] = {}
         self._cancellations: dict[str, _PendingCancellation] = {}
         self._heartbeats: asyncio.Queue[AuthenticatedHeartbeat] = asyncio.Queue(
@@ -271,7 +282,16 @@ class RelayLifecycleEndpoint:
                 message="dispatch-request",
                 frame=request.to_json(),
             )
-            return await asyncio.wait_for(future, timeout=self.request_timeout)
+            timeout = self.request_timeout
+            if self.dispatch_response_timeout is not None:
+                # Dispatch replies contain the completed worker execution; control
+                # requests keep their short timeout and never inherit this window.
+                timeout = min(
+                    self.dispatch_response_timeout,
+                    request.job.timeout_policy.run_timeout_seconds,
+                    (request.lease_expires_at - self.clock()).total_seconds(),
+                )
+            return await asyncio.wait_for(future, timeout=max(0.0, timeout))
         finally:
             self._dispatches.pop(request.dispatch_id, None)
 

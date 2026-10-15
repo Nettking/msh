@@ -33,7 +33,10 @@ from catalog.capabilities.analysis.artifact_carrier import (
     LocalAnalysisArtifactCarrier,
     RelayAnalysisArtifactEndpoint,
 )
-from catalog.capabilities.analysis.contracts import ANALYSIS_CAPABILITY_TYPE
+from catalog.capabilities.analysis.contracts import (
+    ANALYSIS_CAPABILITY_TYPE,
+    ANALYSIS_LEASE_SECONDS,
+)
 from catalog.capabilities.analysis.gateway import AnalysisArtifactGateway
 from catalog.capabilities.analysis.provisioning import lifecycle_worker_factory
 from catalog.capabilities.lifecycle_worker import SQLiteLifecycleDispatchInbox
@@ -707,6 +710,8 @@ class DeviceFederationAuthority:
         lifecycle_endpoint = RelayLifecycleEndpoint(
             client,
             request_timeout=60.0,
+            dispatch_response_timeout=ANALYSIS_LEASE_SECONDS,
+            clock=clock,
             message_source=upstream_message_source,
         )
         asyncio.run_coroutine_threadsafe(
