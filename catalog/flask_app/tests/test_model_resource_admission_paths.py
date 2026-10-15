@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -345,3 +346,52 @@ def test_windows_model_pull_script_has_valid_powershell_syntax() -> None:
         text=True,
     )
     assert completed.returncode == 0, completed.stderr or completed.stdout
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows native process exit status")
+@pytest.mark.parametrize("pull_exit, expected_exit", [(0, 0), (7, 1)])
+def test_windows_model_pull_preserves_native_exit_status(
+    tmp_path, pull_exit: int, expected_exit: int,
+) -> None:
+    # The Windows CI temp root uses an extended prefix unsupported by PS 5 -File.
+    tmp_path = Path(str(tmp_path).removeprefix("\\\\?\\"))
+    script = tmp_path / "fcp_model_pull.ps1"
+    shutil.copyfile(ROOT / "scripts/windows/fcp_model_pull.ps1", script)
+    (tmp_path / "fcp_docker_resource.ps1").write_text(
+        "function Get-FcpDockerBackingPath { param([string]$RepoRoot); $RepoRoot }\n"
+        "function Get-FcpResourceFreeBytes { param([string]$BackingPath); [int64]30000000000 }\n",
+        encoding="utf-8",
+    )
+    # Only this fixture's batch file handles Docker commands; no engine is used.
+    (tmp_path / "docker.cmd").write_text(
+        "@echo off\n"
+        'if "%~2"=="exec" goto show\n'
+        'if "%~2"=="--profile" goto pull\n'
+        "exit /b 90\n"
+        ":show\n"
+        'if exist "%FCP_TEST_MODEL_MARKER%" exit /b 0\n'
+        "exit /b 1\n"
+        ":pull\n"
+        "ping -n 2 127.0.0.1 > nul\n"
+        'if "%FCP_TEST_PULL_EXIT%"=="0" echo installed>"%FCP_TEST_MODEL_MARKER%"\n'
+        "exit /b %FCP_TEST_PULL_EXIT%\n",
+        encoding="ascii",
+    )
+    environment = dict(os.environ)
+    environment["PATH"] = str(tmp_path) + os.pathsep + environment["PATH"]
+    environment["FCP_TEST_MODEL_MARKER"] = str(tmp_path / "installed.marker")
+    environment["FCP_TEST_PULL_EXIT"] = str(pull_exit)
+    environment["PSMODULEPATH"] = str(
+        Path(environment["SYSTEMROOT"]) / "System32/WindowsPowerShell/v1.0/Modules"
+    )
+    powershell = Path(environment["SYSTEMROOT"]) / "System32/WindowsPowerShell/v1.0/powershell.exe"
+    completed = subprocess.run(
+        [str(powershell), "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+         "-File", str(script), "-RepoRoot", str(tmp_path), "-Model", "fixture-model"],
+        env=environment, capture_output=True, text=True, timeout=30, check=False,
+    )
+    assert completed.returncode == expected_exit, completed.stderr or completed.stdout
+    if pull_exit == 0:
+        assert "installed and verified" in completed.stdout
+    else:
+        assert "exited with code 7" in completed.stderr
