@@ -353,6 +353,8 @@ def test_windows_model_pull_script_has_valid_powershell_syntax() -> None:
 def test_windows_model_pull_preserves_native_exit_status(
     tmp_path, pull_exit: int, expected_exit: int,
 ) -> None:
+    # The Windows CI temp root uses an extended prefix unsupported by PS 5 -File.
+    tmp_path = Path(str(tmp_path).removeprefix("\\\\?\\"))
     script = tmp_path / "fcp_model_pull.ps1"
     shutil.copyfile(ROOT / "scripts/windows/fcp_model_pull.ps1", script)
     (tmp_path / "fcp_docker_resource.ps1").write_text(
