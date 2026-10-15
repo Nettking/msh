@@ -144,6 +144,8 @@ $arguments = @(
     '--entrypoint', '/bin/ollama', $installer, 'pull', $Model
 )
 $process = Start-Process -FilePath 'docker' -ArgumentList $arguments -NoNewWindow -PassThru
+# Windows PowerShell needs a retained handle to read ExitCode after polling.
+$null = $process.Handle
 $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSeconds)
 
 while (-not $process.HasExited) {
