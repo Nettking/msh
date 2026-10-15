@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
+from websockets.exceptions import InvalidMessage
 
 from catalog.federation.errors import FederationOperationError
 from catalog.federation.outbox import SQLiteOutbox
@@ -393,13 +394,13 @@ def test_headless_jsonl_publisher_uses_the_selected_storage_route() -> None:
 
 @pytest.mark.parametrize(
     "jsonl_failure",
-    [False, True],
-    ids=["ready", "jsonl-failure"],
+    [None, "operation-error", "invalid-message"],
+    ids=["ready", "jsonl-failure", "jsonl-invalid-message"],
 )
 def test_publication_loop_proves_each_dataset_before_full_backlog_drain(
     tmp_path,
     monkeypatch,
-    jsonl_failure: bool,
+    jsonl_failure: str | None,
 ) -> None:
     class _LoopGuardOutbox(SQLiteOutbox):
         def __init__(self, database) -> None:
@@ -550,6 +551,8 @@ def test_publication_loop_proves_each_dataset_before_full_backlog_drain(
         ):
             assert authority_node_id == "node-owner"
             assert group_id == "telemetry"
+            if jsonl_failure == "invalid-message":
+                raise InvalidMessage("the reconnect handshake failed")
             if jsonl_failure:
                 raise FederationOperationError(
                     "test-jsonl-failure",
@@ -603,7 +606,18 @@ def test_publication_loop_proves_each_dataset_before_full_backlog_drain(
                 assert snapshot.storage_state == "backlogged"
                 assert snapshot.jsonl_state == "backlogged"
                 assert snapshot.pending_batches == 3
-                assert snapshot.last_error_code == "test-jsonl-failure"
+                assert snapshot.last_error_code == (
+                    "InvalidMessage"
+                    if jsonl_failure == "invalid-message"
+                    else "test-jsonl-failure"
+                )
+                assert not runner.done()
+                pending = await asyncio.to_thread(outbox.pending)
+                assert {entry.payload["batch_id"] for entry in pending} == {
+                    "dataset-a-batch-2",
+                    "dataset-a-batch-3",
+                    "dataset-a-batch-4",
+                }
             else:
                 assert snapshot.storage_state == "publishing"
                 assert snapshot.storage_group == "telemetry"
