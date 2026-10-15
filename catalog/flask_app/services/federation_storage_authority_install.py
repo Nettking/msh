@@ -333,7 +333,7 @@ class FederationStorageAuthorityMonitor:
 
         try:
             context = self._authorized_context()
-        except (FederationOperationError, FederationValidationError):
+        except (FederationOperationError, FederationValidationError, OSError):
             return "unknown"
         binding = getattr(context, "binding", None)
         coordinator = getattr(context, "coordinator", None)
