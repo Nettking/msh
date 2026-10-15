@@ -149,6 +149,46 @@ def test_an_unknown_creator_does_not_block_startup():
         assert monitor.session_creator_state() == "unknown"
 
 
+@pytest.mark.parametrize("transport_error", [ConnectionRefusedError, TimeoutError])
+def test_relay_outage_keeps_requests_available_and_authority_restartable(
+    monkeypatch, transport_error
+):
+    unavailable = True
+    started = threading.Event()
+
+    class ReconnectingOnboarding:
+        def authorized_context(self):
+            if unavailable:
+                raise transport_error("relay unavailable")
+            return _creator_context()
+
+    app = _app(FEDERATION_STORAGE_AUTHORITY_ENABLED=True)
+    app.get("/available")(lambda: "available")
+    monitor = install_federation_storage_authority(
+        app, onboarding_service=ReconnectingOnboarding()
+    )
+
+    async def fake_run(settings, *, stop=None, **_kwargs):
+        assert settings.session_id == SESSION
+        started.set()
+        await stop.wait()
+
+    monkeypatch.setattr(storage_install, "run_trusted_storage_authority", fake_run)
+    monkeypatch.setattr(storage_install, "_RETRY_SECONDS", 0.01)
+    try:
+        with app.app_context(), pytest.raises(transport_error):
+            monitor.build_settings()
+        assert app.test_client().get("/available").status_code == 200
+        assert not started.is_set()
+        unavailable = False
+        app.config["FEDERATION_STORAGE_AUTHORITY_RELAY_URL"] = RELAY
+        assert started.wait(5.0)
+    finally:
+        monitor.stop()
+        if monitor._thread is not None:
+            monitor._thread.join(5.0)
+
+
 def test_settings_require_a_relay_address():
     monitor = _monitor(
         context=_creator_context(),
