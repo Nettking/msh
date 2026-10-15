@@ -102,6 +102,12 @@ class AnalysisArtifactGateway:
         transfer_id: str | None = None,
         admission_held: bool = False,
     ) -> ArtifactDescriptor:
+        try:
+            created_at = self.authority.artifact(artifact_id).created_at
+        except FederationValidationError as exc:
+            if exc.code != "artifact-not-found":
+                raise
+            created_at = now
         descriptor = ArtifactDescriptor(
             artifact_id=artifact_id,
             session_id=session_id,
@@ -112,7 +118,7 @@ class AnalysisArtifactGateway:
             size_bytes=identity.size_bytes,
             endpoint_id=self.endpoint_id,
             object_key=object_key,
-            created_at=now,
+            created_at=created_at,
             transfer_id=transfer_id or f"transfer-{artifact_id}",
         )
         return self.authority.register_artifact(
