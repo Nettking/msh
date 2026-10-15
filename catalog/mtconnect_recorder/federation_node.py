@@ -24,6 +24,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from websockets.exceptions import InvalidMessage
+
 from catalog.federation.errors import (
     AuthenticationError,
     FederationOperationError,
@@ -148,6 +150,7 @@ PUBLICATION_RETRY_ERRORS: tuple[type[BaseException], ...] = (
     OSError,
     RuntimeError,
     TimeoutError,
+    InvalidMessage,
     # SQLite reports a full disk, an I/O error, a lock held past its busy
     # timeout and a malformed image as sqlite3.Error, which is not an OSError.
     sqlite3.Error,
