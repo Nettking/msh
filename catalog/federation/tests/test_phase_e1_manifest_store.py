@@ -542,3 +542,63 @@ def test_e1_legacy_phase_d_group_requires_verified_inventory(
         )
 
     assert error.value.code == "manifest-inventory-required"
+
+
+def test_e1_history_does_not_retain_all_serialized_revision_rows(tmp_path: Path) -> None:
+    import gc
+    import tracemalloc
+    from contextlib import closing
+
+    database = tmp_path / "coordinator.sqlite3"
+    control_revision = create_groups(database, "storage-main")
+    store = AuthoritativeManifestStore(database)
+    genesis = store.ensure_genesis(
+        "session-1", "storage-main", term=0,
+        expected_control_revision=control_revision, now=NOW,
+    )
+    expected_hashes = [genesis.manifest_hash]
+    for revision in range(1, 24):
+        result = store.commit(proposal(
+            item_id=f"batch-{revision}",
+            idempotency_key=f"recorder-a:batch-{revision}",
+            committed_at=NOW + timedelta(seconds=revision),
+        ))
+        expected_hashes.append(result.manifest.manifest_hash)
+    del result, genesis, store
+
+    # JSON whitespace preserves every canonical manifest/hash and validation;
+    # it makes retaining all raw SQLite rows observable independently of the
+    # much smaller, valid decoded manifest history that the API must return.
+    with closing(sqlite3.connect(database)) as connection, connection:
+        connection.execute(
+            "UPDATE storage_manifest_revisions SET manifest_json=? || manifest_json",
+            (" " * (1024 * 1024),),
+        )
+        count, serialized_bytes = connection.execute(
+            "SELECT COUNT(*),SUM(LENGTH(CAST(manifest_json AS BLOB))) "
+            "FROM storage_manifest_revisions"
+        ).fetchone()
+    assert count == 24 and serialized_bytes >= 24 * 1024 * 1024
+
+    store = AuthoritativeManifestStore(database)  # Fresh verified-revision cache.
+    gc.collect()
+    tracemalloc.start()
+    try:
+        history = store.history("session-1", "storage-main")
+        retained_bytes, peak_bytes = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    assert [manifest.revision for manifest in history] == list(range(24))
+    assert [manifest.manifest_hash for manifest in history] == expected_hashes
+    assert store.head("session-1", "storage-main") == history[-1]
+    metrics = {
+        "test_input_only": True, "revision_count": count,
+        "serialized_corpus_bytes": serialized_bytes,
+        "tracemalloc_retained_bytes": retained_bytes,
+        "tracemalloc_peak_bytes": peak_bytes,
+        "peak_bound_bytes": 8 * 1024 * 1024,
+        "all_revisions_hashes_and_head_verified": True,
+    }
+    (tmp_path / "MEMORY_MEASUREMENT.json").write_text(json.dumps(metrics, indent=2) + "\n")
+    print(json.dumps(metrics), flush=True)
+    assert peak_bytes < 8 * 1024 * 1024
