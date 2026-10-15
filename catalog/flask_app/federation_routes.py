@@ -35,6 +35,10 @@ from catalog.federation.projections import (
 
 from .capability_onboarding_routes import _CSRF_SESSION_KEY, _csrf_token
 from .services.capability_benchmark_service import get_capability_benchmark_service
+from .services.capability_config_service import (
+    CapabilityConfigError,
+    load_capability_config,
+)
 from .services.capability_onboarding_service import get_capability_onboarding_service
 from .services.federation_active_leader_runtime import (
     get_active_capability_request_service as get_federation_capability_request_service,
@@ -219,6 +223,14 @@ def _page_response(page: FederationPage) -> Response:
     current_device_name = (
         current_federation_device_name() if page is FederationPage.THIS_DEVICE else None
     )
+    local_install_model = None
+    if page is FederationPage.SERVICES:
+        try:
+            config = load_capability_config()
+            if config.ai_provider_mode == "local":
+                local_install_model = config.ai_model
+        except CapabilityConfigError:
+            pass
     update_status = None
     capability_request_status = None
     leadership_status = None
@@ -293,6 +305,7 @@ def _page_response(page: FederationPage) -> Response:
             federation_device_naming_available=device_naming_available,
             federation_device_self_naming_available=self_naming_available,
             federation_current_device_name=current_device_name,
+            federation_local_install_model=local_install_model,
             federation_csrf_token=(
                 _csrf_token()
                 if item_actions

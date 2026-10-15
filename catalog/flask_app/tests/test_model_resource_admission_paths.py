@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -37,6 +38,126 @@ def _config(*, mode: str = "local") -> CapabilityConfig:
         recorder_include_condition=False,
         updated_at="2026-08-25T19:00:00Z",
     )
+
+
+@pytest.fixture
+def services_model_install_app(tmp_path, monkeypatch):
+    from catalog.flask_app.app import create_app
+    from catalog.flask_app.services.capability_config_service import (
+        save_capability_config,
+    )
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("FCP_SKIP_ORCHESTRATION", "1")
+    save_capability_config(_config())
+    app = create_app()
+    app.config.update(TESTING=True)
+    return app, app.test_client(), tmp_path / "data/federation/update-agent/request.json"
+
+
+def _rendered_model_install_token(client) -> str:
+    response = client.get("/federation/services")
+    assert response.status_code == 200
+    form = re.search(
+        r'<form\b[^>]*action="/server-setup/pull-model"[^>]*>.*?</form>',
+        response.get_data(as_text=True),
+        flags=re.DOTALL,
+    )
+    assert form is not None
+    assert 'method="post"' in form.group()
+    token = re.search(r'name="_csrf_token"\s+value="([^"]+)"', form.group())
+    assert token is not None
+    with client.session_transaction() as browser_session:
+        assert token.group(1) == browser_session["mtconnect_discovery_csrf_token"]
+    return token.group(1)
+
+
+def test_services_model_install_get_renders_local_form_without_installing(
+    services_model_install_app, monkeypatch,
+) -> None:
+    from catalog.flask_app import server_setup_routes
+
+    _app, client, request_file = services_model_install_app
+
+    def unexpected_install(*_args, **_kwargs):
+        raise AssertionError("GET must never install or queue a model")
+
+    monkeypatch.setattr(server_setup_routes, "pull_ollama_model", unexpected_install)
+    monkeypatch.setattr(HostModelInstallHandoff, "queue", unexpected_install)
+
+    assert _rendered_model_install_token(client)
+    page = client.get("/federation/services").get_data(as_text=True)
+    assert "Install llama3.2:3b" in page
+    assert not request_file.exists()
+
+
+def test_services_model_install_connected_provider_has_no_install_form(
+    services_model_install_app,
+) -> None:
+    from catalog.flask_app.services.capability_config_service import (
+        save_capability_config,
+    )
+
+    _app, client, request_file = services_model_install_app
+    save_capability_config(_config(mode="connected"))
+
+    response = client.get("/federation/services")
+
+    assert response.status_code == 200
+    assert b'action="/server-setup/pull-model"' not in response.data
+    assert not request_file.exists()
+
+
+def test_services_model_install_normal_form_queues_configured_model(
+    services_model_install_app,
+) -> None:
+    _app, client, request_file = services_model_install_app
+    token = _rendered_model_install_token(client)
+    assert not request_file.exists()
+
+    response = client.post("/server-setup/pull-model", data={"_csrf_token": token})
+
+    assert response.status_code == 303
+    assert response.location == "/federation"
+    request = json.loads(request_file.read_text(encoding="utf-8"))
+    assert request["schema"] == MODEL_REQUEST_SCHEMA
+    assert request["request_id"] == MODEL_REQUEST_ID
+    assert request["action"] == "install"
+    assert request["model"] == "llama3.2:3b"
+    assert request["target"] == "ollama"
+    assert "command" not in request
+    assert "arguments" not in request
+
+
+@pytest.mark.parametrize("supplied_token", [None, "wrong-token"])
+def test_services_model_install_rejects_missing_or_wrong_csrf(
+    services_model_install_app, supplied_token,
+) -> None:
+    _app, client, request_file = services_model_install_app
+    _rendered_model_install_token(client)
+    data = {} if supplied_token is None else {"_csrf_token": supplied_token}
+
+    response = client.post("/server-setup/pull-model", data=data)
+
+    assert response.status_code == 303
+    assert not request_file.exists()
+    with client.session_transaction() as browser_session:
+        assert ("error", "The configuration form expired. Reload FCP and try again.") in (
+            browser_session["_flashes"]
+        )
+
+
+def test_services_model_install_corrupt_config_hides_install_form(
+    services_model_install_app, tmp_path,
+) -> None:
+    _app, client, request_file = services_model_install_app
+    (tmp_path / "data/capabilities/config.json").write_text("{", encoding="utf-8")
+
+    response = client.get("/federation/services")
+
+    assert response.status_code == 200
+    assert b'action="/server-setup/pull-model"' not in response.data
+    assert not request_file.exists()
 
 
 def test_browser_local_pull_is_a_declarative_host_request(tmp_path, monkeypatch) -> None:
