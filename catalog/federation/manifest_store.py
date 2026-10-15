@@ -918,7 +918,7 @@ class AuthoritativeManifestStore:
             """SELECT * FROM storage_manifest_revisions
                WHERE session_id=? AND group_id=? ORDER BY revision""",
             (session_id, group_id),
-        ).fetchall()
+        )
         cache = getattr(self, "_verified_revisions", None)
         cached, decoder = ({}, _HistoryComponentDecoder()) if cache is None else cache.snapshot()
         verified: dict[bytes, AuthoritativeStorageManifest] = {}

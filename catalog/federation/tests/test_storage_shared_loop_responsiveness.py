@@ -287,6 +287,11 @@ def test_shared_self_provider_response_budget_preserves_commit_and_correlation(
                 # sender future must not be reconstructed as successful.
                 await asyncio.sleep(.6)
                 assert not sender._pending
+                if publication_budget == 120.0:
+                    # Sender expiry is proved; observe actual receiver completion.
+                    response_deadline = asyncio.get_running_loop().time() + 5
+                    while not responses and asyncio.get_running_loop().time() < response_deadline:
+                        await asyncio.sleep(.01)
             assert responses and all(response["ok"] is True for response in responses)
             assert service.provider.read(session_id=session_id, group_id=group,
                 batch_id=request["batch_id"]) == request["content"]
