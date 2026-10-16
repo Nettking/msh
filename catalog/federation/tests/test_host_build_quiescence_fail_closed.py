@@ -91,6 +91,40 @@ def test_remove_builder_fails_closed_when_post_remove_absence_cannot_be_proven(
     assert host_build._remove_builder(tmp_path, "fcp-build-test", {}) is False
 
 
+@pytest.mark.parametrize("removal", ["removed", "cli-refused", "timeout"])
+def test_remove_builder_uses_supported_cli_with_bounded_failure_handling(
+    monkeypatch, tmp_path: Path, removal: str,
+) -> None:
+    name = "fcp-build-test"
+    environment = {"COMPOSE_PROJECT_NAME": "fcp"}
+    calls = []
+    monkeypatch.setattr(
+        host_build, "_builder_inspection",
+        lambda *_args, **_kwargs: SimpleNamespace(returncode=0),
+    )
+    absence_checks = []
+    monkeypatch.setattr(
+        host_build, "_builder_absent",
+        lambda *_args: absence_checks.append(name) or True,
+    )
+
+    def docker_run(root, args, *, env, timeout):
+        calls.append((root, args, env, timeout))
+        if "--timeout" in args:
+            return SimpleNamespace(returncode=2, stderr="unknown flag: --timeout")
+        if removal == "timeout":
+            raise subprocess.TimeoutExpired(args, timeout)
+        return SimpleNamespace(returncode=7 if removal == "cli-refused" else 0)
+
+    monkeypatch.setattr(host_build, "_docker_run", docker_run)
+
+    assert host_build._remove_builder(tmp_path, name, environment) is (removal == "removed")
+    assert calls == [
+        (tmp_path, ["docker", "buildx", "rm", "--force", name], environment, 30.0),
+    ]
+    assert absence_checks == ([name] if removal == "removed" else [])
+
+
 def test_pressure_preflight_refuses_when_old_writer_cannot_be_quiesced(
     monkeypatch, tmp_path: Path
 ) -> None:

@@ -425,7 +425,7 @@ def _remove_builder(root: Path, name: str, env: Mapping[str, str]) -> bool:
     try:
         removed = _docker_run(
             root,
-            ["docker", "buildx", "rm", "--force", "--timeout", "20s", name],
+            ["docker", "buildx", "rm", "--force", name],
             env=env,
             timeout=30.0,
         )

@@ -294,7 +294,7 @@ function Remove-FcpBuilder([string]$Name) {
     $inspection = Get-FcpBuilderInspection $Name
     if ($inspection.ExitCode -ne 0) { return Test-FcpBuilderAbsent $Name }
     $removed = Invoke-BoundedDockerResult @(
-        'buildx', 'rm', '--force', '--timeout', '20s', $Name
+        'buildx', 'rm', '--force', $Name
     )
     if ($removed.ExitCode -ne 0) { return $false }
     return Test-FcpBuilderAbsent $Name
