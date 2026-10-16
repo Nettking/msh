@@ -20,6 +20,7 @@ FEDERATION_DIRECTORY = ROOT / "catalog" / "federation"
 _HOST_PACKAGE = "_fcp_host_federation"
 _ALLOWED_MODULES = frozenset(
     {
+        "host_mutation",
         "tailnet_join_bridge",
         "tailnet_join_client",
         "tailnet_join_responder",
