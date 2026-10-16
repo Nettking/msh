@@ -66,10 +66,13 @@ def _inside_flask(
         [
             "docker",
             "compose",
-            "exec",
+            "run",
+            "--rm",
+            "--no-deps",
             "-T",
-            "flask",
+            "--entrypoint",
             "python",
+            "flask",
             "-m",
             module,
             *arguments,
@@ -193,32 +196,53 @@ def zero_touch_start(
 ) -> dict[str, object]:
     """Join or initialize once, then self-configure the trusted full FCP device."""
 
-    status = _status()
-    if status.get("state") != "connected":
-        snapshot = _discover(web_port=web_port)
-        federations = _federations(snapshot)
-        if federations:
-            _auto_join(snapshot)
-        elif initialize_federation:
-            if first_admin_credentials is None:
-                _initialize_first_federation()
-            else:
-                _initialize_first_federation(first_admin_credentials)
-        else:
-            raise ZeroTouchStartError(
-                "no Federation was discovered. This device is join-only; initialize the Federation only on the first device."
-            )
+    mutation = load_host_module("host_mutation")
+    with mutation.host_mutation_lock(ROOT):
+        # Like the normal existing-setup resume, machine setup must be the sole
+        # owner of this device's SDK connection while it validates membership.
+        _run(["docker", "compose", "stop", "flask"])
+        setup_error: BaseException | None = None
+        try:
+            status = _status()
+            if status.get("state") != "connected":
+                snapshot = _discover(web_port=web_port)
+                federations = _federations(snapshot)
+                if federations:
+                    _auto_join(snapshot)
+                elif initialize_federation:
+                    if first_admin_credentials is None:
+                        _initialize_first_federation()
+                    else:
+                        _initialize_first_federation(first_admin_credentials)
+                else:
+                    raise ZeroTouchStartError(
+                        "no Federation was discovered. This device is join-only; initialize the Federation only on the first device."
+                    )
 
-    final_status = _status()
-    if final_status.get("state") != "connected":
-        raise ZeroTouchStartError("trusted Federation membership was not established")
-    capability = _bootstrap_capabilities()
-    return {
-        "federation_state": final_status.get("state"),
-        "node_id": final_status.get("node_id"),
-        "federation_id": final_status.get("federation_id"),
-        "capability": capability,
-    }
+            final_status = _status()
+            if final_status.get("state") != "connected":
+                raise ZeroTouchStartError(
+                    "trusted Federation membership was not established"
+                )
+            capability = _bootstrap_capabilities()
+            return {
+                "federation_state": final_status.get("state"),
+                "node_id": final_status.get("node_id"),
+                "federation_id": final_status.get("federation_id"),
+                "capability": capability,
+            }
+        except BaseException as exc:
+            setup_error = exc
+            raise
+        finally:
+            try:
+                _run(["docker", "compose", "start", "flask"])
+            except (OSError, ZeroTouchStartError) as exc:
+                if setup_error is None:
+                    raise
+                # Preserve the setup failure and report the independent failure
+                # to hand the same existing container back to its normal owner.
+                print(f"FCP Flask restart also failed: {exc}", file=sys.stderr)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -267,4 +291,4 @@ if __name__ == "__main__":
     raise SystemExit(main())
 
 
-__all__ = ["ZeroTouchStartError", "zero_touch_start", "main"]
+__all__ = ["ZeroTouchStartError", "main", "zero_touch_start"]
