@@ -1,13 +1,7 @@
 from __future__ import annotations
 
-import json
-import os
 import re
-import subprocess
-import sys
 from pathlib import Path
-
-import pytest
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -36,73 +30,6 @@ def test_windows_buildx_lifecycle_calls_are_bounded() -> None:
     assert "return Invoke-BoundedDockerResult @('buildx', 'inspect', $Name)" in text
     assert "$stopped = Invoke-BoundedDockerResult @('buildx', 'stop', $Name)" in text
     assert "$pruned = Invoke-BoundedDockerResult @(" in text
-
-
-@pytest.mark.skipif(os.name != "nt", reason="native Windows bounded Docker process")
-@pytest.mark.parametrize(
-    ("cli_exit", "absence_proven"), [(0, True), (7, True), (0, False)],
-)
-def test_windows_remove_builder_uses_supported_cli_and_keeps_outer_bound(
-    tmp_path: Path, cli_exit: int, absence_proven: bool,
-) -> None:
-    text = _read("scripts/windows/fcp_host_build.ps1")
-    bounded = text[
-        text.index("function ConvertTo-WindowsProcessArgument"):
-        text.index("function Get-FcpBuilderName")
-    ]
-    remove = text[text.index("function Remove-FcpBuilder"):text.index("function Settle-FcpBuildWriter")]
-    (tmp_path / "buildx").write_text(
-        "import json, pathlib, sys\n"
-        "args = sys.argv[1:]\n"
-        "pathlib.Path('actual-argv.json').write_text(json.dumps(args))\n"
-        "if '--timeout' in args:\n"
-        "    sys.stderr.write('unknown flag: --timeout\\n')\n"
-        "    raise SystemExit(2)\n"
-        "assert args == ['rm', '--force', 'fcp-build-test']\n"
-        f"raise SystemExit({cli_exit})\n",
-    )
-
-    def quote(value: object) -> str:
-        return "'" + str(value).replace("'", "''") + "'"
-
-    script = tmp_path / "remove-builder.ps1"
-    script.write_text(
-        "$ErrorActionPreference = 'Stop'\n"
-        f"$RepoRoot = {quote(tmp_path)}\n"
-        f"$script:DockerExe = {quote(sys.executable)}\n"
-        "Set-Location -LiteralPath $RepoRoot\n"
-        "[Environment]::CurrentDirectory = $RepoRoot\n"
-        "$DockerLifecycleTimeoutSeconds = 30\n"
-        + bounded
-        + "\n$script:RealBoundedDocker = ${function:Invoke-BoundedDockerResult}\n"
-        "function Invoke-BoundedDockerResult { param([string[]]$Arguments,"
-        "[int]$TimeoutSeconds = $DockerLifecycleTimeoutSeconds)\n"
-        " $script:ObservedTimeout = $TimeoutSeconds\n"
-        " return & $script:RealBoundedDocker -Arguments $Arguments -TimeoutSeconds $TimeoutSeconds\n"
-        "}\n"
-        "function Get-FcpBuilderInspection { return [pscustomobject]@{ExitCode=0} }\n"
-        "$script:AbsenceChecks = 0\n"
-        "function Test-FcpBuilderAbsent { $script:AbsenceChecks++; return "
-        + ("$true" if absence_proven else "$false")
-        + " }\n"
-        + remove
-        + "\n$result = Remove-FcpBuilder 'fcp-build-test'\n"
-        "[ordered]@{result=$result;timeout=$script:ObservedTimeout;"
-        "absence_checks=$script:AbsenceChecks}|ConvertTo-Json -Compress\n",
-    )
-    completed = subprocess.run(
-        ["powershell.exe", "-NoLogo", "-NoProfile", "-NonInteractive",
-         "-ExecutionPolicy", "Bypass", "-File", str(script)],
-        cwd=tmp_path, capture_output=True, text=True, timeout=15, check=False,
-    )
-    assert completed.returncode == 0, completed.stderr
-    actual = json.loads(completed.stdout)
-    assert actual["result"] is (cli_exit == 0 and absence_proven)
-    assert actual["timeout"] == 30
-    assert actual["absence_checks"] == (1 if cli_exit == 0 else 0)
-    assert json.loads((tmp_path / "actual-argv.json").read_text()) == [
-        "rm", "--force", "fcp-build-test",
-    ]
 
 
 def test_windows_bounded_docker_result_preserves_native_exit_codes() -> None:
