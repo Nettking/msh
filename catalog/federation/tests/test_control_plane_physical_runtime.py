@@ -148,8 +148,6 @@ def test_permanent_leader_loss_recovers_same_federation_and_fences_returning_hos
     deployments = _deployments(tmp_path)
     runtimes = [_runtime(item) for item in deployments]
     old_runtime = runtimes[0]
-    successor = runtimes[1]
-    third = runtimes[2]
     restarted_old = None
     for runtime in runtimes:
         runtime.start()
@@ -161,9 +159,33 @@ def test_permanent_leader_loss_recovers_same_federation_and_fences_returning_hos
             creator_node_id=creator,
             display_name="Persistent Federation",
         )
+
+        def current_leader_is_ready() -> bool:
+            nonlocal old_runtime
+            if not all(runtime.ready for runtime in runtimes):
+                return False
+            leaders = [runtime for runtime in runtimes if runtime.node.role == ReplicaNode.LEADER]
+            if len(leaders) != 1:
+                return False
+            elected = leaders[0]
+            leadership = elected.node.state["leaders"]["session-survives-leader-loss"]
+            if (
+                elected.node.leader_id != elected.node.voter_id
+                or leadership["leader_node_id"] != elected.node.voter_id
+            ):
+                return False
+            old_runtime = elected
+            return True
+
+        _wait(current_leader_is_ready)
+        # Startup can already elect another voter. Lose the actual leader and
+        # keep its deployment paired for the returning-host fencing checks.
+        pairs = sorted(zip(runtimes, deployments), key=lambda pair: pair[0] is not old_runtime)
+        runtimes = [runtime for runtime, _deployment in pairs]
+        deployments = tuple(deployment for _runtime, deployment in pairs)
+        successor = runtimes[1]
         old_federation_id = old_runtime.node.state["federation_id"]
         old_term = old_runtime.node.store.current_term
-        _wait(lambda: successor.ready and third.ready)
 
         # The elected coordinator disappears and stays unavailable while the
         # two surviving authenticated voters retain quorum 2/3.
@@ -238,9 +260,9 @@ def test_permanent_leader_loss_recovers_same_federation_and_fences_returning_hos
                     == creator,
                 }
                 for label, runtime in (
-                    ("a-returning", restarted_old),
-                    ("b-survivor", runtimes[1]),
-                    ("c-survivor", runtimes[2]),
+                    ("returning-old", restarted_old),
+                    ("survivor-1", runtimes[1]),
+                    ("survivor-2", runtimes[2]),
                 )
                 if runtime is not None
             ]
