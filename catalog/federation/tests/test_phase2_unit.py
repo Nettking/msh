@@ -1369,6 +1369,41 @@ def test_pressure_lifecycle_accepts_bounded_capability_rows(bounded_control_stor
     assert store.resource_admission._reserved == {}
 
 
+@pytest.mark.parametrize("scenario", ["inactive-only", "mixed", "no-health-active-overflow"])
+def test_pressure_disconnect_bounds_only_capabilities_it_mutates(
+    bounded_control_store, scenario: str,
+) -> None:
+    store, owner, session, capacity = bounded_control_store
+    for index in range(35 if scenario == "mixed" else 33):
+        announcement = capability(
+            session_id=session.session_id, node_id=owner.identity.node_id,
+            capability_id=f"retained-{index}",
+        )
+        if scenario != "no-health-active-overflow" and index < 33:
+            announcement = replace(announcement, status=CapabilityStatus.UNAVAILABLE)
+        store.upsert_capability(
+            announcement, actor_node_id=owner.identity.node_id,
+            request_id=f"retained-{index}", now=NOW,
+        )
+    before = store.list_capabilities(session_id=session.session_id)
+    capacity["free_bytes"] = 11 * 1024**3
+    events = store.mark_disconnected(
+        node_id=owner.identity.node_id, now=NOW + timedelta(seconds=1),
+        emit_health_events=scenario != "no-health-active-overflow",
+    )
+    assert len(events) == (2 if scenario == "mixed" else 0)
+    with store.read_transaction() as database:
+        assert database.execute(
+            "SELECT state FROM node_connectivity WHERE node_id=?", (owner.identity.node_id,),
+        ).fetchone()[0] == "disconnected"
+    after = store.list_capabilities(session_id=session.session_id)
+    if scenario == "no-health-active-overflow":
+        assert after == before
+    else:
+        assert all(item.status is CapabilityStatus.UNAVAILABLE for item in after)
+    assert store.resource_admission._reserved == {}
+
+
 def test_pressure_audit_insert_defers_retirement_and_normal_traffic_converges(
     bounded_control_store, monkeypatch,
 ) -> None:

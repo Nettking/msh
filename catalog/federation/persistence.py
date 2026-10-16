@@ -311,7 +311,8 @@ class CoordinatorStore:
 
     @contextmanager
     def transaction(
-        self, *, bounded_control: bool = False, control_node_id: str | None = None
+        self, *, bounded_control: bool = False, control_node_id: str | None = None,
+        control_active_capabilities_only: bool = False,
     ) -> Iterator[sqlite3.Connection]:
         with self.resource_admission.reserve(
             self.database,
@@ -329,6 +330,13 @@ class CoordinatorStore:
                     if assessment.level >= PressureLevel.PRESSURE and control_node_id is not None:
                         # Bound actual persisted fanout before any lifecycle write,
                         # in the same writer snapshot as the subsequent updates.
+                        status_filter = " AND status IN (?,?)" if control_active_capabilities_only else ""
+                        parameters = (control_node_id,)
+                        if control_active_capabilities_only:
+                            parameters += (
+                                CapabilityStatus.READY.value,
+                                CapabilityStatus.REGISTERING.value,
+                            )
                         rows = database.execute(
                             """
                             SELECT length(CAST(session_id AS BLOB))
@@ -341,9 +349,9 @@ class CoordinatorStore:
                                  + length(CAST(properties_json AS BLOB))
                                  + length(CAST(announced_at AS BLOB))
                                  + length(CAST(last_heartbeat_at AS BLOB))
-                            FROM capabilities WHERE node_id=? LIMIT 33
-                            """,
-                            (control_node_id,),
+                            FROM capabilities WHERE node_id=?
+                            """ + status_filter + " LIMIT 33",
+                            parameters,
                         ).fetchall()
                         if len(rows) > 32 or sum(row[0] for row in rows) > 1024 * 1024:
                             raise HostResourceRefused("control_fanout_limit", assessment)
@@ -2180,7 +2188,11 @@ class CoordinatorStore:
     ) -> tuple[SessionEvent, ...]:
         summary = str(error)[:2048] if error else None
         events: list[SessionEvent] = []
-        with self.transaction(bounded_control=True, control_node_id=node_id) as database:
+        with self.transaction(
+            bounded_control=True,
+            control_node_id=node_id if emit_health_events else None,
+            control_active_capabilities_only=True,
+        ) as database:
             row = database.execute(
                 "SELECT state FROM node_connectivity WHERE node_id=?", (node_id,)
             ).fetchone()
