@@ -19,6 +19,7 @@ from catalog.federation.errors import (
     ProtocolCompatibilityError,
     RevisionGapError,
 )
+from catalog.federation.host_resources import FilesystemMeasurement, ProcessResourceAdmission
 from catalog.federation.models import (
     CapabilityAnnouncement,
     CapabilityStatus,
@@ -32,6 +33,7 @@ from catalog.federation.protocol import (
     MAX_MESSAGE_BYTES,
     RelayEnvelope,
 )
+from catalog.federation.process_resource_admission import SerializedProcessResourceAdmission
 from catalog.node.identity import IdentityStore, NodeCredentials
 
 NOW = datetime(2026, 7, 28, 12, tzinfo=timezone.utc)
@@ -1196,6 +1198,63 @@ def test_disconnect_or_relay_restart_marks_capability_unavailable(
     assert len(event) == 1
     assert event[0].event_type == "capability.health.changed"
     assert event[0].payload["status"] == "unavailable"
+
+
+@pytest.mark.parametrize("admission_type", [ProcessResourceAdmission, SerializedProcessResourceAdmission])
+def test_required_relay_sql_lifecycle_survives_host_pressure(
+    tmp_path: Path, admission_type: type[ProcessResourceAdmission],
+) -> None:
+    free_bytes = 32 * 1024**3
+
+    def measure(_path: Path | str) -> FilesystemMeasurement:
+        return FilesystemMeasurement(
+            resource_id="device:relay-control", observed_at=NOW,
+            total_bytes=64 * 1024**3, free_bytes=free_bytes,
+            total_inodes=100_000, free_inodes=10_000, available=True,
+        )
+
+    admission = admission_type(measurer=measure, clock=lambda: NOW)
+    database = tmp_path / "required-control.sqlite3"
+    store = CoordinatorStore(database, resource_admission=admission)
+    owner = credentials(tmp_path, "Pressure owner")
+    enroll(store, owner)
+    session = create_session(store, owner, session_id="session-control-pressure")
+    store.upsert_capability(
+        capability(session_id=session.session_id, node_id=owner.identity.node_id,
+                   capability_id="existing-provider"),
+        actor_node_id=owner.identity.node_id, request_id="announce-before-pressure", now=NOW,
+    )
+    previous_revision = store.get_session(session.session_id).revision
+
+    # The real SQL store was initialized normally. Only the host measurement
+    # changes; no store methods, clock, auth checks or SQLite writes are replaced.
+    free_bytes = 11 * 1024**3
+    store.mark_connected(node_id=owner.identity.node_id, connection_id="pressure-connection", now=NOW)
+    request = dict(actor_node_id=owner.identity.node_id, request_id="committed-read-route",
+                   message_type="relay.message", request_hash="sha256:read-request",
+                   session_id=session.session_id, target_node_id=owner.identity.node_id, now=NOW)
+    assert store.accept_request(**request)
+    assert not store.accept_request(**request)
+    store.heartbeat(node_id=owner.identity.node_id, now=NOW + timedelta(seconds=1))
+    store.mark_disconnected(node_id=owner.identity.node_id, now=NOW + timedelta(seconds=2))
+
+    with sqlite3.connect(database) as connection:
+        connection.row_factory = sqlite3.Row
+        runtime = connection.execute("SELECT * FROM node_connectivity WHERE node_id=?",
+                                     (owner.identity.node_id,)).fetchone()
+        assert runtime["state"] == "disconnected"
+        assert runtime["connection_id"] is None
+        assert runtime["last_heartbeat_at"] == (NOW + timedelta(seconds=1)).isoformat()
+        assert connection.execute(
+            "SELECT count(*) FROM accepted_requests WHERE message_type='relay.message'"
+        ).fetchone()[0] == 1
+        assert connection.execute("PRAGMA quick_check").fetchone()[0] == "ok"
+    assert store.public_identity(owner.identity.node_id) == owner.identity
+    assert store.list_capabilities(session_id=session.session_id)[0].status is CapabilityStatus.UNAVAILABLE
+    events = store.replay_events(session_id=session.session_id, last_applied_revision=previous_revision)
+    assert len(events) == 1 and events[0].event_type == "capability.health.changed"
+    assert events[0].payload["status"] == "unavailable"
+    assert admission._reserved == {}
 
 
 def envelope_dict(**changes: Any) -> dict[str, Any]:
