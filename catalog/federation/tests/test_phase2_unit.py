@@ -19,7 +19,11 @@ from catalog.federation.errors import (
     ProtocolCompatibilityError,
     RevisionGapError,
 )
-from catalog.federation.host_resources import FilesystemMeasurement, ProcessResourceAdmission
+from catalog.federation.host_resources import (
+    FilesystemMeasurement,
+    HostResourceRefused,
+    ProcessResourceAdmission,
+)
 from catalog.federation.models import (
     CapabilityAnnouncement,
     CapabilityStatus,
@@ -1255,6 +1259,178 @@ def test_required_relay_sql_lifecycle_survives_host_pressure(
     assert len(events) == 1 and events[0].event_type == "capability.health.changed"
     assert events[0].payload["status"] == "unavailable"
     assert admission._reserved == {}
+
+
+@pytest.fixture(params=[ProcessResourceAdmission, SerializedProcessResourceAdmission])
+def bounded_control_store(tmp_path: Path, request):
+    capacity = {"free_bytes": 32 * 1024**3}
+
+    def measure(_path: Path | str) -> FilesystemMeasurement:
+        return FilesystemMeasurement(
+            resource_id="device:bounded-control", observed_at=NOW,
+            total_bytes=64 * 1024**3, free_bytes=capacity["free_bytes"],
+            total_inodes=100_000, free_inodes=10_000, available=True,
+        )
+
+    admission = request.param(measurer=measure, clock=lambda: NOW)
+    store = CoordinatorStore(tmp_path / "bounded-control.sqlite3", resource_admission=admission)
+    owner = credentials(tmp_path, "Bounded control owner")
+    enroll(store, owner)
+    session = create_session(store, owner, session_id="session-bounded-control")
+    store.mark_connected(node_id=owner.identity.node_id, connection_id="before-pressure", now=NOW)
+    return store, owner, session, capacity
+
+
+def _control_rows(store: CoordinatorStore) -> tuple:
+    with store.read_transaction() as database:
+        return tuple(
+            (table, tuple(tuple(row) for row in database.execute(f"SELECT * FROM {table}")))
+            for table in ("node_connectivity", "capabilities", "session_events", "audit_log")
+        )
+
+
+@pytest.mark.parametrize("operation", ["generic", "mark-all", "sweep"])
+def test_unbounded_relay_transactions_remain_strict_under_pressure(
+    bounded_control_store, operation: str,
+) -> None:
+    store, owner, session, capacity = bounded_control_store
+    store.upsert_capability(
+        capability(session_id=session.session_id, node_id=owner.identity.node_id,
+                   capability_id="bulk-provider"),
+        actor_node_id=owner.identity.node_id, request_id="bulk-provider", now=NOW,
+    )
+    before = _control_rows(store)
+    capacity["free_bytes"] = 11 * 1024**3
+    with pytest.raises(HostResourceRefused, match="resource_pressure"):
+        if operation == "generic":
+            with store.transaction() as database:
+                database.execute("UPDATE node_connectivity SET state='disconnected'")
+        elif operation == "mark-all":
+            store.mark_all_disconnected(now=NOW + timedelta(seconds=10))
+        else:
+            store.sweep_stale_with_events(
+                now=NOW + timedelta(seconds=10), heartbeat_timeout_seconds=1,
+            )
+    assert _control_rows(store) == before
+    assert store.resource_admission._reserved == {}
+
+
+@pytest.mark.parametrize("overflow", ["rows", "bytes"])
+@pytest.mark.parametrize("operation", ["heartbeat", "disconnect"])
+def test_pressure_lifecycle_fanout_overflow_is_atomic(
+    bounded_control_store, overflow: str, operation: str,
+) -> None:
+    store, owner, session, capacity = bounded_control_store
+    count = 33 if overflow == "rows" else 24
+    for index in range(count):
+        announcement = capability(
+            session_id=session.session_id, node_id=owner.identity.node_id,
+            capability_id=f"provider-{index}",
+        )
+        if overflow == "bytes":
+            # Valid per-announcement payloads exceed the aggregate persisted
+            # byte limit without exceeding the row limit.
+            announcement = replace(announcement, properties={"description": "x" * 44_000})
+        store.upsert_capability(
+            announcement, actor_node_id=owner.identity.node_id,
+            request_id=f"provider-{index}", now=NOW,
+        )
+    before = _control_rows(store)
+    capacity["free_bytes"] = 11 * 1024**3
+    with pytest.raises(HostResourceRefused, match="control_fanout_limit"):
+        if operation == "heartbeat":
+            store.heartbeat(node_id=owner.identity.node_id, now=NOW + timedelta(seconds=1))
+        else:
+            store.mark_disconnected(node_id=owner.identity.node_id, now=NOW + timedelta(seconds=1))
+    assert _control_rows(store) == before
+    assert store.resource_admission._reserved == {}
+
+    # These are pressure-only admission bounds, not a new global capability cap.
+    capacity["free_bytes"] = 32 * 1024**3
+    store.heartbeat(node_id=owner.identity.node_id, now=NOW + timedelta(seconds=2))
+    events = store.mark_disconnected(node_id=owner.identity.node_id, now=NOW + timedelta(seconds=3))
+    assert len(events) == count
+    assert all(item.status is CapabilityStatus.UNAVAILABLE
+               for item in store.list_capabilities(session_id=session.session_id))
+
+
+def test_pressure_lifecycle_accepts_bounded_capability_rows(bounded_control_store) -> None:
+    store, owner, session, capacity = bounded_control_store
+    for index in range(32):
+        store.upsert_capability(
+            capability(session_id=session.session_id, node_id=owner.identity.node_id,
+                       capability_id=f"bounded-{index}"),
+            actor_node_id=owner.identity.node_id, request_id=f"bounded-{index}", now=NOW,
+        )
+    capacity["free_bytes"] = 11 * 1024**3
+    store.heartbeat(node_id=owner.identity.node_id, now=NOW + timedelta(seconds=1))
+    events = store.mark_disconnected(node_id=owner.identity.node_id, now=NOW + timedelta(seconds=2))
+    assert len(events) == 32
+    assert store.resource_admission._reserved == {}
+
+
+@pytest.mark.parametrize("scenario", ["inactive-only", "mixed", "no-health-active-overflow"])
+def test_pressure_disconnect_bounds_only_capabilities_it_mutates(
+    bounded_control_store, scenario: str,
+) -> None:
+    store, owner, session, capacity = bounded_control_store
+    for index in range(35 if scenario == "mixed" else 33):
+        announcement = capability(
+            session_id=session.session_id, node_id=owner.identity.node_id,
+            capability_id=f"retained-{index}",
+        )
+        if scenario != "no-health-active-overflow" and index < 33:
+            announcement = replace(announcement, status=CapabilityStatus.UNAVAILABLE)
+        store.upsert_capability(
+            announcement, actor_node_id=owner.identity.node_id,
+            request_id=f"retained-{index}", now=NOW,
+        )
+    before = store.list_capabilities(session_id=session.session_id)
+    capacity["free_bytes"] = 11 * 1024**3
+    events = store.mark_disconnected(
+        node_id=owner.identity.node_id, now=NOW + timedelta(seconds=1),
+        emit_health_events=scenario != "no-health-active-overflow",
+    )
+    assert len(events) == (2 if scenario == "mixed" else 0)
+    with store.read_transaction() as database:
+        assert database.execute(
+            "SELECT state FROM node_connectivity WHERE node_id=?", (owner.identity.node_id,),
+        ).fetchone()[0] == "disconnected"
+    after = store.list_capabilities(session_id=session.session_id)
+    if scenario == "no-health-active-overflow":
+        assert after == before
+    else:
+        assert all(item.status is CapabilityStatus.UNAVAILABLE for item in after)
+    assert store.resource_admission._reserved == {}
+
+
+def test_pressure_audit_insert_defers_retirement_and_normal_traffic_converges(
+    bounded_control_store, monkeypatch,
+) -> None:
+    store, owner, _session, capacity = bounded_control_store
+    monkeypatch.setattr("catalog.federation.persistence.MAX_AUDIT_ROWS", 2)
+    with store.transaction() as database:
+        for _ in range(5):
+            database.execute(
+                """INSERT INTO audit_log(
+                    occurred_at,action,outcome,reason,details_json
+                ) VALUES(?, 'legacy-audit', 'accepted', 'existing-history', '{}')""",
+                (NOW.isoformat(),),
+            )
+    before = dict(_control_rows(store))["audit_log"]
+    capacity["free_bytes"] = 11 * 1024**3
+    store.mark_connected(node_id=owner.identity.node_id, connection_id="pressure-audit", now=NOW)
+    store.mark_disconnected(node_id=owner.identity.node_id, now=NOW + timedelta(seconds=1))
+    after = dict(_control_rows(store))["audit_log"]
+    assert after[:len(before)] == before
+    assert len(after) == len(before) + 2
+    with store.read_transaction() as database:
+        assert [row[0] for row in database.execute(
+            "SELECT action FROM audit_log ORDER BY audit_id DESC LIMIT 2"
+        )] == ["node.disconnect", "node.connect"]
+    capacity["free_bytes"] = 32 * 1024**3
+    store.mark_connected(node_id=owner.identity.node_id, connection_id="normal-audit", now=NOW)
+    assert len(dict(_control_rows(store))["audit_log"]) == 2
 
 
 def envelope_dict(**changes: Any) -> dict[str, Any]:

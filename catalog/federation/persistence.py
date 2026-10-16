@@ -28,7 +28,7 @@ from .errors import (
     FederationValidationError,
     RevisionGapError,
 )
-from .host_resources import ProcessResourceAdmission
+from .host_resources import HostResourceRefused, PressureLevel, ProcessResourceAdmission
 from .models import (
     CapabilityAnnouncement,
     CapabilityStatus,
@@ -310,16 +310,51 @@ class CoordinatorStore:
         return connection
 
     @contextmanager
-    def transaction(self) -> Iterator[sqlite3.Connection]:
+    def transaction(
+        self, *, bounded_control: bool = False, control_node_id: str | None = None,
+        control_active_capabilities_only: bool = False,
+    ) -> Iterator[sqlite3.Connection]:
         with self.resource_admission.reserve(
             self.database,
             bytes_required=8 * 1024 * 1024,
             inodes_required=4,
-            operation="relay-control-transaction",
+            operation="relay-control-transaction" if bounded_control else "unspecified",
         ):
             database = self._connect()
             try:
                 database.execute("BEGIN IMMEDIATE")
+                if bounded_control:
+                    assessment = self.resource_admission.assessment(self.database)
+                    if assessment.level == PressureLevel.CRITICAL:
+                        raise HostResourceRefused("emergency_reserve", assessment)
+                    if assessment.level >= PressureLevel.PRESSURE and control_node_id is not None:
+                        # Bound actual persisted fanout before any lifecycle write,
+                        # in the same writer snapshot as the subsequent updates.
+                        status_filter = " AND status IN (?,?)" if control_active_capabilities_only else ""
+                        parameters = (control_node_id,)
+                        if control_active_capabilities_only:
+                            parameters += (
+                                CapabilityStatus.READY.value,
+                                CapabilityStatus.REGISTERING.value,
+                            )
+                        rows = database.execute(
+                            """
+                            SELECT length(CAST(session_id AS BLOB))
+                                 + length(CAST(capability_id AS BLOB))
+                                 + length(CAST(node_id AS BLOB))
+                                 + length(CAST(type AS BLOB))
+                                 + length(CAST(protocol AS BLOB))
+                                 + length(CAST(protocol_version AS BLOB))
+                                 + length(CAST(status AS BLOB))
+                                 + length(CAST(properties_json AS BLOB))
+                                 + length(CAST(announced_at AS BLOB))
+                                 + length(CAST(last_heartbeat_at AS BLOB))
+                            FROM capabilities WHERE node_id=?
+                            """ + status_filter + " LIMIT 33",
+                            parameters,
+                        ).fetchall()
+                        if len(rows) > 32 or sum(row[0] for row in rows) > 1024 * 1024:
+                            raise HostResourceRefused("control_fanout_limit", assessment)
                 yield database
                 database.commit()
             except BaseException:
@@ -526,6 +561,7 @@ class CoordinatorStore:
         session_id: str | None = None,
         request_id: str | None = None,
         details: dict[str, Any] | None = None,
+        maintenance: bool = True,
     ) -> None:
         details_json, _ = _canonical_json(
             redact_secrets(details or {}),
@@ -550,6 +586,8 @@ class CoordinatorStore:
                 details_json,
             ),
         )
+        if not maintenance:
+            return
         database.execute(
             """
             DELETE FROM audit_log
@@ -2094,7 +2132,7 @@ class CoordinatorStore:
         connection_id: str,
         now: datetime,
     ) -> None:
-        with self.transaction() as database:
+        with self.transaction(bounded_control=True) as database:
             self.require_active_node(node_id, database=database)
             database.execute(
                 """
@@ -2113,10 +2151,14 @@ class CoordinatorStore:
                 reason="identity-authenticated",
                 actor_node_id=node_id,
                 details={"connection_id": connection_id},
+                maintenance=(
+                    self.resource_admission.assessment(self.database).level
+                    < PressureLevel.PRESSURE
+                ),
             )
 
     def heartbeat(self, *, node_id: str, now: datetime) -> None:
-        with self.transaction() as database:
+        with self.transaction(bounded_control=True, control_node_id=node_id) as database:
             self.require_active_node(node_id, database=database)
             connectivity = database.execute(
                 "SELECT state FROM node_connectivity WHERE node_id=?", (node_id,)
@@ -2146,7 +2188,11 @@ class CoordinatorStore:
     ) -> tuple[SessionEvent, ...]:
         summary = str(error)[:2048] if error else None
         events: list[SessionEvent] = []
-        with self.transaction() as database:
+        with self.transaction(
+            bounded_control=True,
+            control_node_id=node_id if emit_health_events else None,
+            control_active_capabilities_only=True,
+        ) as database:
             row = database.execute(
                 "SELECT state FROM node_connectivity WHERE node_id=?", (node_id,)
             ).fetchone()
@@ -2214,6 +2260,10 @@ class CoordinatorStore:
                 reason="connection-closed",
                 actor_node_id=node_id,
                 details={"capabilities_changed": len(capabilities)},
+                maintenance=(
+                    self.resource_admission.assessment(self.database).level
+                    < PressureLevel.PRESSURE
+                ),
             )
         return tuple(events)
 
@@ -2402,7 +2452,7 @@ class CoordinatorStore:
         """
 
         request_key = _request_key(request_id)
-        with self.transaction() as database:
+        with self.transaction(bounded_control=True) as database:
             self.require_active_node(actor_node_id, database=database)
             if session_id is not None:
                 self._require_membership(

@@ -4,11 +4,18 @@ from __future__ import annotations
 
 import sqlite3
 from contextlib import closing, contextmanager
+from datetime import datetime, timezone
 
 import pytest
 
 from catalog.federation.control_plane_journal_store import JournalCoordinatorStore
+from catalog.federation.host_resources import (
+    FilesystemMeasurement,
+    HostResourceRefused,
+    ProcessResourceAdmission,
+)
 from catalog.federation.persistence import CoordinatorStore
+from catalog.federation.process_resource_admission import SerializedProcessResourceAdmission
 
 
 class _Controller:
@@ -204,3 +211,44 @@ def test_attached_guard_persists_after_reopening_without_controller(store):
         _insert(database, 1)
     with reopened.read_transaction() as reader:
         assert _revisions(reader) == [1]
+
+
+@pytest.mark.parametrize("admission_type", [ProcessResourceAdmission, SerializedProcessResourceAdmission])
+@pytest.mark.parametrize("attached", [False, True])
+def test_bounded_control_keywords_do_not_relax_attached_journal_admission(
+    store, admission_type, attached,
+):
+    now = datetime(2026, 10, 16, tzinfo=timezone.utc)
+    free_bytes = 32 * 1024**3
+
+    def measure(_path):
+        return FilesystemMeasurement(
+            resource_id="device:journal-control", observed_at=now,
+            total_bytes=64 * 1024**3, free_bytes=free_bytes,
+            total_inodes=100_000, free_inodes=10_000, available=True,
+        )
+
+    store.resource_admission = admission_type(measurer=measure, clock=lambda: now)
+    controller = _Controller()
+    if attached:
+        store.attach_controller(controller)
+    # Both the standalone and controller-owned normal paths accept the new
+    # inherited call signature; nested journal writes retain their owner.
+    with store.transaction(bounded_control=True, control_node_id="member") as database:
+        if attached:
+            with store.transaction(bounded_control=True, control_node_id="member") as nested:
+                assert nested is database
+        _insert(database, 1)
+
+    free_bytes = 11 * 1024**3
+    if attached:
+        with pytest.raises(HostResourceRefused, match="resource_pressure"):
+            with store.transaction(bounded_control=True, control_node_id="member"):
+                pytest.fail("attached journal must retain strict raw staging")
+    else:
+        with store.transaction(bounded_control=True, control_node_id="member") as database:
+            _insert(database, 2)
+    with store.read_transaction() as database:
+        assert _revisions(database) == ([1] if attached else [1, 2])
+    assert controller.calls == (2 if attached else 0)
+    assert store.resource_admission._reserved == {}

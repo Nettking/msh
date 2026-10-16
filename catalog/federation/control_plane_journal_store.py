@@ -142,7 +142,10 @@ class JournalCoordinatorStore(CoordinatorStore):
         self._journal_controller = controller
 
     @contextmanager
-    def transaction(self) -> Iterator[sqlite3.Connection]:
+    def transaction(
+        self, *, bounded_control: bool = False, control_node_id: str | None = None,
+        control_active_capabilities_only: bool = False,
+    ) -> Iterator[sqlite3.Connection]:
         if self._active_connection() is not None:
             with self.raw_transaction() as database:
                 yield database
@@ -150,7 +153,10 @@ class JournalCoordinatorStore(CoordinatorStore):
             with self._journal_controller.transaction(self) as database:
                 yield database
         else:
-            with super().transaction() as database:
+            with super().transaction(
+                bounded_control=bounded_control, control_node_id=control_node_id,
+                control_active_capabilities_only=control_active_capabilities_only,
+            ) as database:
                 yield database
 
     @contextmanager
