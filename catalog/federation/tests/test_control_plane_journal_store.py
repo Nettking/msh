@@ -242,9 +242,11 @@ def test_bounded_control_keywords_do_not_relax_attached_journal_admission(
 
     free_bytes = 11 * 1024**3
     if attached:
-        with pytest.raises(HostResourceRefused, match="resource_pressure"):
-            with store.transaction(bounded_control=True, control_node_id="member"):
-                pytest.fail("attached journal must retain strict raw staging")
+        with (
+            pytest.raises(HostResourceRefused, match="resource_pressure"),
+            store.transaction(bounded_control=True, control_node_id="member"),
+        ):
+            pytest.fail("attached journal must retain strict raw staging")
     else:
         with store.transaction(bounded_control=True, control_node_id="member") as database:
             _insert(database, 2)
