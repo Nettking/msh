@@ -117,7 +117,7 @@ def test_creator_builtin_storage_provider_is_hosted_and_accepts_logical_ingest(
     async def scenario() -> None:
         now = datetime.now(timezone.utc)
         settings = replace(
-            _settings(tmp_path), request_timeout=0.02, storage_request_timeout=0.2
+            _settings(tmp_path), request_timeout=0.02
         )
         client = _LoopbackRelayClient("node-creator")
         control = PhaseDControlPlane(settings.storage_control_database)
