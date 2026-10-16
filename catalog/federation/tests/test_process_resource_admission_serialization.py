@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import threading
-from datetime import datetime, timezone
+from dataclasses import replace
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -10,9 +11,14 @@ from catalog.federation.host_resources import (
     FilesystemMeasurement,
     HostResourceRefused,
     PressureThresholds,
+    ProcessResourceAdmission,
 )
 from catalog.federation.process_resource_admission import (
     SerializedProcessResourceAdmission,
+)
+from catalog.federation.resource_override import (
+    OperatorPrincipal,
+    ResourceOverrideAuthority,
 )
 
 
@@ -159,4 +165,184 @@ def test_reserve_many_is_all_or_nothing_across_resources() -> None:
     ):
         pass
 
+    assert admission._reserved == {}
+
+
+@pytest.mark.parametrize("admission_type", [ProcessResourceAdmission, SerializedProcessResourceAdmission])
+def test_bounded_relay_control_reservation_survives_pressure_and_unwinds(
+    admission_type: type[ProcessResourceAdmission],
+) -> None:
+    free_bytes = 150
+    measured: list[int] = []
+
+    def measure(_path: Path | str) -> FilesystemMeasurement:
+        measured.append(free_bytes)
+        return _measurement("device:control", free_bytes)
+
+    admission = admission_type(thresholds=_thresholds(), measurer=measure)
+    with pytest.raises(RuntimeError, match="control SQL failed"), admission.reserve(
+        "control.sqlite3", bytes_required=20, inodes_required=2,
+        operation="relay-control-transaction",
+    ) as reservation:
+        assert reservation.reserved_bytes == 20
+        assert admission._reserved == {"device:control": (20, 2)}
+        raise RuntimeError("control SQL failed")
+    assert admission._reserved == {}
+
+    # A later control transaction must measure again rather than reuse admission.
+    free_bytes = 100
+    with pytest.raises(HostResourceRefused), admission.reserve(
+        "control.sqlite3", bytes_required=1, operation="relay-control-transaction",
+    ):
+        pass
+    assert measured == [150, 100]
+    assert admission._reserved == {}
+
+
+@pytest.mark.parametrize("operation", [None, "relay-control-transaction-unknown"])
+@pytest.mark.parametrize("admission_type", [ProcessResourceAdmission, SerializedProcessResourceAdmission])
+def test_pressure_still_refuses_default_and_unknown_control_operations(
+    admission_type: type[ProcessResourceAdmission], operation: str | None,
+) -> None:
+    admission = admission_type(
+        thresholds=_thresholds(), measurer=lambda _path: _measurement("device:control", 150),
+    )
+    arguments = {} if operation is None else {"operation": operation}
+    with pytest.raises(HostResourceRefused) as refused, admission.reserve(
+        "control.sqlite3", bytes_required=1, **arguments,
+    ):
+        pass
+    assert refused.value.code == "resource_pressure"
+    assert admission._reserved == {}
+
+
+@pytest.mark.parametrize("bytes_required,inodes_required", [(8 * 1024**2 + 1, 4), (1, 5)])
+@pytest.mark.parametrize("admission_type", [ProcessResourceAdmission, SerializedProcessResourceAdmission])
+def test_relay_control_label_does_not_admit_oversized_work(
+    admission_type: type[ProcessResourceAdmission], bytes_required: int, inodes_required: int,
+) -> None:
+    admission = admission_type(measurer=lambda _path: replace(
+        _measurement("device:control", 11 * 1024**3), total_bytes=32 * 1024**3,
+        total_inodes=10_000, free_inodes=2_048,
+    ))
+    with pytest.raises(HostResourceRefused) as refused, admission.reserve(
+        "control.sqlite3", bytes_required=bytes_required, inodes_required=inodes_required,
+        operation="relay-control-transaction",
+    ):
+        pass
+    assert refused.value.code == "resource_pressure"
+    assert admission._reserved == {}
+
+
+@pytest.mark.parametrize(
+    "free_bytes,free_inodes,bytes_required,inodes_required,available,error_code",
+    [
+        (100, 25, 1, 1, True, "resource_pressure"),
+        (150, 25, 50, 1, True, "emergency_reserve"),
+        (150, 10, 1, 1, True, "resource_pressure"),
+        (150, 14, 1, 4, True, "emergency_reserve"),
+        (150, 25, 1, 1, False, "resource_pressure"),
+    ],
+    ids=["byte-floor", "would-cross-byte-floor", "inode-floor", "would-cross-inode-floor", "unavailable"],
+)
+@pytest.mark.parametrize("admission_type", [ProcessResourceAdmission, SerializedProcessResourceAdmission])
+def test_relay_control_cannot_spend_emergency_reserve(
+    admission_type: type[ProcessResourceAdmission], free_bytes: int, free_inodes: int,
+    bytes_required: int, inodes_required: int, available: bool, error_code: str,
+) -> None:
+    admission = admission_type(
+        thresholds=replace(_thresholds(), critical_free_inodes=10,
+                           pressure_free_inodes=20, warning_free_inodes=30),
+        measurer=lambda _path: replace(_measurement("device:control", free_bytes),
+            total_inodes=100, free_inodes=free_inodes, available=available),
+    )
+    with pytest.raises(HostResourceRefused) as refused, admission.reserve(
+        "control.sqlite3", bytes_required=bytes_required, inodes_required=inodes_required,
+        operation="relay-control-transaction",
+    ):
+        pass
+    assert refused.value.code == error_code
+    assert admission._reserved == {}
+
+
+def test_relay_control_coalesces_aliases_and_counts_other_active_control_work() -> None:
+    admission = SerializedProcessResourceAdmission(
+        thresholds=_thresholds(), measurer=lambda _path: _measurement("device:control", 190),
+    )
+    with admission.reserve_many(
+        (("control.sqlite3", 40, 1), ("control.sqlite3-wal", 20, 1)),
+        operation="relay-control-transaction",
+    ) as reservations:
+        assert len(reservations) == 1
+        assert admission._reserved == {"device:control": (60, 2)}
+        with pytest.raises(HostResourceRefused) as refused, admission.reserve(
+            "control.sqlite3-shm", bytes_required=30, operation="relay-control-transaction",
+        ):
+            pass
+        assert refused.value.code == "emergency_reserve"
+        assert admission._reserved == {"device:control": (60, 2)}
+    assert admission._reserved == {}
+
+    # Neither alias individually exceeds the cap; their coalesced request does.
+    with pytest.raises(HostResourceRefused) as oversized, admission.reserve_many(
+        (("control.sqlite3", 4 * 1024**2, 1), ("control.sqlite3-wal", 4 * 1024**2 + 1, 1)),
+        operation="relay-control-transaction",
+    ):
+        pass
+    assert oversized.value.code == "resource_pressure"
+    assert admission._reserved == {}
+
+
+@pytest.mark.parametrize("admission_type", [ProcessResourceAdmission, SerializedProcessResourceAdmission])
+def test_relay_control_refuses_failed_filesystem_measurement(
+    admission_type: type[ProcessResourceAdmission],
+) -> None:
+    def measure(_path: Path | str) -> FilesystemMeasurement:
+        raise OSError("filesystem unavailable")
+
+    admission = admission_type(thresholds=_thresholds(), measurer=measure)
+    with pytest.raises(HostResourceRefused) as refused, admission.reserve(
+        "control.sqlite3", bytes_required=1, operation="relay-control-transaction",
+    ):
+        pass
+    assert refused.value.code == "resource_pressure"
+    assert admission._reserved == {}
+
+
+@pytest.mark.parametrize("invalid_lease", ["operation", "revoked", "expired"])
+def test_relay_control_label_still_validates_a_supplied_override(
+    tmp_path: Path, invalid_lease: str,
+) -> None:
+    now = datetime.now(timezone.utc)
+    clock = now
+    admission = SerializedProcessResourceAdmission(
+        thresholds=_thresholds(), measurer=lambda _path: replace(
+            _measurement("device:control", 150), observed_at=clock), clock=lambda: clock,
+    )
+    audit_admission = SerializedProcessResourceAdmission(
+        thresholds=_thresholds(), measurer=lambda _path: replace(
+            _measurement("device:audit", 1024**3), total_bytes=2 * 1024**3,
+            observed_at=clock), clock=lambda: clock,
+    )
+    authority = ResourceOverrideAuthority(
+        tmp_path / "overrides.json", resource_admission=audit_admission, clock=lambda: clock,
+    )
+    lease = authority.issue_emergency_admission(
+        principal=OperatorPrincipal("admin@example.test", is_admin=True),
+        operation="other-operation" if invalid_lease == "operation" else "relay-control-transaction",
+        resource_ids=("device:control",), max_bytes=20, max_inodes=2,
+        expires_at=now + timedelta(seconds=30), reason="bounded control regression",
+    )
+    if invalid_lease == "revoked":
+        authority.revoke(principal=OperatorPrincipal("admin@example.test", is_admin=True),
+                         override_id=lease.override_id)
+    elif invalid_lease == "expired":
+        clock = now + timedelta(seconds=31)
+    with pytest.raises(HostResourceRefused) as refused, admission.reserve(
+        "control.sqlite3", bytes_required=20, inodes_required=2,
+        operation="relay-control-transaction", override=lease,
+    ):
+        pass
+    expected = "operation_scope" if invalid_lease == "operation" else invalid_lease
+    assert refused.value.code == "emergency_override_" + expected
     assert admission._reserved == {}

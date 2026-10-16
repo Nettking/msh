@@ -315,6 +315,7 @@ class CoordinatorStore:
             self.database,
             bytes_required=8 * 1024 * 1024,
             inodes_required=4,
+            operation="relay-control-transaction",
         ):
             database = self._connect()
             try:

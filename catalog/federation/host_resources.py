@@ -431,13 +431,14 @@ class ProcessResourceAdmission:
         *,
         bytes_required: int,
         inodes_required: int = 0,
+        operation: str = "unspecified",
     ) -> Iterator[ResourceReservation]:
         """Reserve one bounded transaction or refuse before it starts.
 
         Admission has two gates:
 
-        * the resource must currently be NORMAL or WARNING after existing active
-          reservations; and
+        * optional work requires NORMAL or WARNING after active reservations;
+          bounded relay control may also use PRESSURE headroom; and
         * subtracting this transaction's declared maximum must still leave the
           CRITICAL byte/inode reserve intact.
 
@@ -461,7 +462,14 @@ class ProcessResourceAdmission:
                 reserved_inodes=active_inodes,
                 now=self.clock(),
             )
-            if before.level >= PressureLevel.PRESSURE:
+            required_control = (
+                operation == "relay-control-transaction"
+                and bytes_required <= 8 * 1024 * 1024
+                and inodes_required <= 4
+            )
+            if before.level >= PressureLevel.PRESSURE and (
+                before.level == PressureLevel.CRITICAL or not required_control
+            ):
                 raise HostResourceRefused("resource_pressure", before)
 
             after = assess_measurement(

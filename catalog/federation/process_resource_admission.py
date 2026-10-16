@@ -239,10 +239,18 @@ class SerializedProcessResourceAdmission(ProcessResourceAdmission):
                         # The emergency floor is never operator-overridable.
                         raise HostResourceRefused("resource_pressure", before)
                     if override is None:
-                        raise HostResourceRefused("resource_pressure", before)
-                    requires_override = True
-                    if pressured_assessment is None:
-                        pressured_assessment = before
+                        # Bounded relay control must keep working after optional
+                        # writers stop; the emergency checks still apply below.
+                        if not (
+                            operation == "relay-control-transaction"
+                            and bytes_required <= 8 * 1024 * 1024
+                            and inodes_required <= 4
+                        ):
+                            raise HostResourceRefused("resource_pressure", before)
+                    else:
+                        requires_override = True
+                        if pressured_assessment is None:
+                            pressured_assessment = before
 
                 after = assess_measurement(
                     measurement,
