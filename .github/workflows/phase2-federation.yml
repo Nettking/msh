@@ -2,26 +2,8 @@ name: Phase 2 federation
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - ".github/actions/**"
-      - "catalog/federation/**"
-      - "catalog/node/**"
-      - "catalog/relay/**"
-      - "cmd/fcp-peer-sidecar/**"
-      - "docker-compose.yml"
-      - "requirements.txt"
-      - "constraints-phase2.txt"
-      - ".ruff.toml"
-      - ".github/workflows/phase2-federation.yml"
-      - ".github/workflows/phase-f6-closeout.yml"
-      - ".github/workflows/phase-f7-closeout.yml"
-      - "docs/implementation/phase_f6_closeout.md"
-      - "docs/implementation/phase_f7_closeout.md"
-      - "docs/connected_capabilities.md"
-      - "docs/architecture.md"
   push:
-    branches: [main]
+    branches: ['**']
     paths:
       - ".github/actions/**"
       - "catalog/federation/**"
@@ -39,7 +21,6 @@ on:
       - "docs/implementation/phase_f7_closeout.md"
       - "docs/connected_capabilities.md"
       - "docs/architecture.md"
-
 permissions:
   contents: read
   actions: read # Native job identity for evidence provenance only.
@@ -50,7 +31,8 @@ concurrency:
 
 jobs:
   linux:
-    runs-on: ubuntu-24.04
+    if: github.repository_id == '1033058161'
+    runs-on: [self-hosted, Linux, X64, fcp-linux-fast]
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -58,7 +40,7 @@ jobs:
           fetch-depth: 0
       - name: Start disposable PostgreSQL 16
         uses: ./.github/actions/self-hosted-postgres
-      - uses: ./.github/actions/hosted-python
+      - uses: ./.github/actions/self-hosted-python
         with:
           python-version: "3.12.13"
       - name: Verify SQLite JSON operator runtime
@@ -254,7 +236,8 @@ jobs:
           operation: stop
 
   windows:
-    runs-on: [self-hosted, fcp-windows]
+    if: github.repository_id == '1033058161'
+    runs-on: [self-hosted, Windows, X64, fcp-windows]
     defaults:
       run:
         shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}

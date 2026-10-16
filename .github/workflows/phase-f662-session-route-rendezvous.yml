@@ -1,16 +1,8 @@
 name: Phase F6.6.2 session route rendezvous
 
 on:
-  pull_request:
-    paths:
-      - "catalog/federation/session_route_rendezvous.py"
-      - "catalog/node/route_rendezvous.py"
-      - "catalog/relay/route_rendezvous.py"
-      - "catalog/relay/tests/test_phase_f662_route_rendezvous.py"
-      - "docs/implementation/phase_f662_session_route_rendezvous.md"
-      - ".github/workflows/phase-f662-session-route-rendezvous.yml"
   push:
-    branches: [main]
+    branches: ['**']
     paths:
       - "catalog/federation/session_route_rendezvous.py"
       - "catalog/node/route_rendezvous.py"
@@ -18,7 +10,6 @@ on:
       - "catalog/relay/tests/test_phase_f662_route_rendezvous.py"
       - "docs/implementation/phase_f662_session_route_rendezvous.md"
       - ".github/workflows/phase-f662-session-route-rendezvous.yml"
-
 permissions:
   contents: read
 
@@ -28,20 +19,29 @@ concurrency:
 
 jobs:
   session-route-rendezvous:
+    if: github.repository_id == '1033058161'
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+        include:
+          - os: Linux
+            runner: [self-hosted, Linux, X64, fcp-linux-fast]
+            shell: bash
+          - os: Windows
+            runner: [self-hosted, Windows, X64, fcp-windows]
+            shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: ./.github/actions/self-hosted-python
         with:
           python-version: "3.12"
-          cache: "" # No external Actions cache; local pip cache remains available.
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip

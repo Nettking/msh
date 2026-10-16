@@ -1,55 +1,8 @@
 name: Recorder Federation publication
 
 on:
-  pull_request:
-    paths:
-      - ".github/workflows/recorder-federation-publication.yml"
-      - ".ruff.toml"
-      - "docker-compose.yml"
-      - "start_recorder.py"
-      - "start-tailscale-recorder.cmd"
-      - "scripts/start_tailscale_recorder.py"
-      - "scripts/windows/start_tailscale_recorder.ps1"
-      - "scripts/windows/fcp_recorder_supervisor.ps1"
-      - "scripts/fcp_native_recorder_update_agent.py"
-      - "catalog/federation/recorder_control_events.py"
-      - "catalog/federation/recorder_delivery.py"
-      - "catalog/federation/recorder_publication.py"
-      - "catalog/federation/recorder_storage_relay.py"
-      - "catalog/federation/shared_file_storage.py"
-      - "catalog/federation/onboarding_compat.py"
-      - "catalog/federation/tests/test_recorder_control_events.py"
-      - "catalog/federation/tests/test_recorder_publication.py"
-      - "catalog/federation/tests/test_recorder_publication_quarantine.py"
-      - "catalog/federation/tests/test_recorder_storage_relay.py"
-      - "catalog/federation/tests/test_shared_file_storage.py"
-      - "catalog/flask_app/app.py"
-      - "catalog/flask_app/federation_pairing_routes.py"
-      - "catalog/flask_app/federation_recorder_routes.py"
-      - "catalog/flask_app/services/capability_config_migration_service.py"
-      - "catalog/flask_app/services/legacy_settings_migration.py"
-      - "catalog/flask_app/services/federated_data_runtime.py"
-      - "catalog/flask_app/services/federated_jsonl_product_bridge.py"
-      - "catalog/flask_app/services/federation_pairing_install.py"
-      - "catalog/flask_app/services/federation_recorder_control_service.py"
-      - "catalog/flask_app/services/recorder_federation_publication_install.py"
-      - "catalog/flask_app/templates/federation/_section_nav.html"
-      - "catalog/flask_app/templates/federation/onboarding/_federation.html"
-      - "catalog/flask_app/templates/federation_recorders.html"
-      - "catalog/flask_app/tests/test_federated_jsonl_product_bridge.py"
-      - "catalog/flask_app/tests/test_federation_pairing_service.py"
-      - "catalog/flask_app/tests/test_federation_recorder_control_service.py"
-      - "catalog/flask_app/tests/test_recorder_config_bootstrap.py"
-      - "catalog/flask_app/tests/test_recorder_federation_publication_install.py"
-      - "catalog/mtconnect_recorder/**"
-      - "catalog/node/storage_failover.py"
-      - "catalog/standalone-recorder_v2/README.md"
-      - "catalog/standalone-recorder_v2/standalone-recorder_v2.py"
-      - "catalog/standalone-recorder_v2/tests/test_lossless_recorder.py"
-      - "requirements.txt"
-      - "constraints-phase2.txt"
   push:
-    branches: [main]
+    branches: ['**']
     paths:
       - ".github/workflows/recorder-federation-publication.yml"
       - ".ruff.toml"
@@ -107,12 +60,22 @@ concurrency:
 
 jobs:
   recorder-publication:
+    if: github.repository_id == '1033058161'
     name: Recorder publication (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+        include:
+          - os: Linux
+            runner: [self-hosted, Linux, X64, fcp-linux-fast]
+            shell: bash
+          - os: Windows
+            runner: [self-hosted, Windows, X64, fcp-windows]
+            shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
     timeout-minutes: 20
 
     steps:
@@ -120,10 +83,9 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - uses: ./.github/actions/self-hosted-python
         with:
           python-version: "3.12"
-          cache: "" # No external Actions cache; local pip cache remains available.
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip

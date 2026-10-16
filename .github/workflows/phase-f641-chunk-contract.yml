@@ -1,18 +1,12 @@
 name: Phase F6.4.1 chunk contract
 
 on:
-  pull_request:
-    paths:
-      - "catalog/federation/object_transfer.py"
-      - "catalog/federation/tests/test_phase_f641_chunk_contract.py"
-      - ".github/workflows/phase-f641-chunk-contract.yml"
   push:
-    branches: [main]
+    branches: ['**']
     paths:
       - "catalog/federation/object_transfer.py"
       - "catalog/federation/tests/test_phase_f641_chunk_contract.py"
       - ".github/workflows/phase-f641-chunk-contract.yml"
-
 permissions:
   contents: read
 
@@ -22,18 +16,27 @@ concurrency:
 
 jobs:
   contract:
+    if: github.repository_id == '1033058161'
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+        include:
+          - os: Linux
+            runner: [self-hosted, Linux, X64, fcp-linux-fast]
+            shell: bash
+          - os: Windows
+            runner: [self-hosted, Windows, X64, fcp-windows]
+            shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: ./.github/actions/self-hosted-python
         with:
           python-version: "3.12"
-          cache: "" # No external Actions cache; local pip cache remains available.
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip

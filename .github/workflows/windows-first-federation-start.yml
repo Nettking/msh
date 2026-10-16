@@ -1,18 +1,8 @@
 name: Windows first-Federation bootstrap
 
 on:
-  pull_request:
-    paths:
-      - ".github/workflows/windows-first-federation-start.yml"
-      - "scripts/first_federation_start.py"
-      - "scripts/zero_touch_federation_start.py"
-      - "start.cmd"
-      - "start-tailscale.cmd"
-      - "start-tailscale.sh"
-      - "catalog/flask_app/tests/test_first_federation_start.py"
-      - "catalog/flask_app/tests/test_tailscale_compose_project.py"
   push:
-    branches: [main]
+    branches: ['**']
     paths:
       - ".github/workflows/windows-first-federation-start.yml"
       - "scripts/first_federation_start.py"
@@ -22,7 +12,6 @@ on:
       - "start-tailscale.sh"
       - "catalog/flask_app/tests/test_first_federation_start.py"
       - "catalog/flask_app/tests/test_tailscale_compose_project.py"
-
 permissions:
   contents: read
 
@@ -32,17 +21,20 @@ concurrency:
 
 jobs:
   bootstrap:
+    if: github.repository_id == '1033058161'
     name: Real Windows batch bootstrap boundary
-    runs-on: windows-latest
+    runs-on: [self-hosted, Windows, X64, fcp-windows]
+    defaults:
+      run:
+        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: ./.github/actions/self-hosted-python
         with:
           python-version: "3.12.10"
-          cache: "" # No external Actions cache; local pip cache remains available.
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip==26.2.1

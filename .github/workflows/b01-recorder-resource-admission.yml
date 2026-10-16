@@ -1,7 +1,8 @@
 name: B01 recorder resource admission
 
 on:
-  pull_request:
+  push:
+    branches: ['**']
     paths:
       - "catalog/mtconnect_recorder/**"
       - "catalog/federation/process_resource_admission.py"
@@ -10,16 +11,26 @@ on:
 
 jobs:
   recorder-resource-admission:
+    if: github.repository_id == '1033058161'
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+        include:
+          - os: Linux
+            runner: [self-hosted, Linux, X64, fcp-linux-fast]
+            shell: bash
+          - os: Windows
+            runner: [self-hosted, Windows, X64, fcp-windows]
+            shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: ./.github/actions/self-hosted-python
         with:
           python-version: "3.12"
       - name: Install test dependencies

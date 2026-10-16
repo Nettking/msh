@@ -2,16 +2,15 @@ name: Product branding boundary
 
 on:
   workflow_dispatch:
-  pull_request:
   push:
-    branches: [main]
-
+    branches: ['**']
 permissions:
   contents: read
 
 jobs:
   product-branding:
-    runs-on: [self-hosted, fcp-linux-fast]
+    if: github.repository_id == '1033058161'
+    runs-on: [self-hosted, Linux, X64, fcp-linux-fast]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/self-hosted-python

@@ -2,26 +2,8 @@ name: ICSE tool demonstration
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - ".github/actions/**"
-      - "CITATION.cff"
-      - ".github/workflows/icse-tool-demo.yml"
-      - "demo/icse/**"
-      - "Dockerfile.cli"
-      - "requirements.txt"
-      - "constraints-phase2.txt"
-      - "catalog/capabilities/**"
-      - "catalog/federation/**"
-      - "catalog/flask_app/**"
-      - "catalog/relay/**"
-      - "catalog/node/**"
   push:
-    branches:
-      - main
-      - "chatgpt/icse-tool-demo"
-    tags:
-      - "fcp-icse-tool-demo-v*"
+    branches: ['**']
     paths:
       - ".github/actions/**"
       - "CITATION.cff"
@@ -35,7 +17,6 @@ on:
       - "catalog/flask_app/**"
       - "catalog/relay/**"
       - "catalog/node/**"
-
 permissions:
   contents: read
   actions: read # Native job identity for evidence provenance only.
@@ -46,17 +27,18 @@ concurrency:
 
 jobs:
   reviewer-entrypoint:
+    if: github.repository_id == '1033058161'
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: Linux
-            runner: fcp-linux-fast
+            runner: [self-hosted, Linux, X64, fcp-linux-fast]
             shell: bash
           - os: Windows
-            runner: fcp-windows
+            runner: [self-hosted, Windows, X64, fcp-windows]
             shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
-    runs-on: [self-hosted, "${{ matrix.runner }}"]
+    runs-on: ${{ matrix.runner }}
     defaults:
       run:
         shell: ${{ matrix.shell }}
@@ -173,6 +155,7 @@ jobs:
           python -c "import json,os; from pathlib import Path; receipt={'artifact_name':os.environ['ARTIFACT_NAME'],'artifact_id':os.environ.get('ARTIFACT_ID',''),'artifact_digest':os.environ.get('ARTIFACT_DIGEST',''),'artifact_url':os.environ.get('ARTIFACT_URL',''),'source_sha':os.environ['SOURCE_SHA'],'run_id':os.environ['RUN_ID'],'run_attempt':int(os.environ['RUN_ATTEMPT']),'job_key':os.environ['JOB_KEY'],'matrix':json.loads(os.environ['MATRIX_JSON'])}; Path(os.environ['GITHUB_STEP_SUMMARY']).open('a',encoding='utf-8').write('### Network evidence artifact receipt\n\n'+json.dumps(receipt,indent=2,sort_keys=True)+'\n\n')"
 
   reviewer-compose:
+    if: github.repository_id == '1033058161'
     runs-on: [self-hosted, Linux, X64, fcp-linux-fast]
     timeout-minutes: 30
     steps:
@@ -232,6 +215,7 @@ jobs:
           python3 -c "import json,os; from pathlib import Path; receipt={'artifact_name':os.environ['ARTIFACT_NAME'],'artifact_id':os.environ.get('ARTIFACT_ID',''),'artifact_digest':os.environ.get('ARTIFACT_DIGEST',''),'artifact_url':os.environ.get('ARTIFACT_URL',''),'source_sha':os.environ['SOURCE_SHA'],'run_id':os.environ['RUN_ID'],'run_attempt':int(os.environ['RUN_ATTEMPT']),'job_key':os.environ['JOB_KEY'],'matrix':json.loads(os.environ['MATRIX_JSON'])}; Path(os.environ['GITHUB_STEP_SUMMARY']).open('a',encoding='utf-8').write('### Compose evidence artifact receipt\n\n'+json.dumps(receipt,indent=2,sort_keys=True)+'\n\n')"
 
   publication-bundle:
+    if: github.repository_id == '1033058161'
     needs: [reviewer-entrypoint, reviewer-compose]
     runs-on: [self-hosted, Linux, X64, fcp-linux-fast]
     timeout-minutes: 10

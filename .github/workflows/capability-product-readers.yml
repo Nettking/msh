@@ -1,20 +1,8 @@
 name: Capability product readers
 
 on:
-  pull_request:
-    paths:
-      - ".github/workflows/capability-product-readers.yml"
-      - "catalog/flask_app/app.py"
-      - "catalog/flask_app/capability_product_routes.py"
-      - "catalog/flask_app/routes.py"
-      - "catalog/flask_app/templates/status.html"
-      - "catalog/flask_app/test_navigation_smoke.py"
-      - "catalog/flask_app/tests/test_capability_product_routes.py"
-      - "catalog/flask_app/tests/test_capability_startup_transition_route.py"
-      - "catalog/flask_app/tests/test_legacy_startup_retired.py"
-      - "catalog/flask_app/tests/test_recorder_control_service.py"
   push:
-    branches: [main]
+    branches: ['**']
     paths:
       - ".github/workflows/capability-product-readers.yml"
       - "catalog/flask_app/app.py"
@@ -26,7 +14,6 @@ on:
       - "catalog/flask_app/tests/test_capability_startup_transition_route.py"
       - "catalog/flask_app/tests/test_legacy_startup_retired.py"
       - "catalog/flask_app/tests/test_recorder_control_service.py"
-
 permissions:
   contents: read
 
@@ -36,12 +23,22 @@ concurrency:
 
 jobs:
   product-readers:
+    if: github.repository_id == '1033058161'
     name: product-readers (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+        include:
+          - os: Linux
+            runner: [self-hosted, Linux, X64, fcp-linux-fast]
+            shell: bash
+          - os: Windows
+            runner: [self-hosted, Windows, X64, fcp-windows]
+            shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
     timeout-minutes: 30
 
     steps:
@@ -49,10 +46,9 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - uses: ./.github/actions/self-hosted-python
         with:
           python-version: "3.12"
-          cache: "" # No external Actions cache; local pip cache remains available.
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip

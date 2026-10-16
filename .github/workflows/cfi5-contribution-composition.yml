@@ -1,33 +1,8 @@
 name: CFI-5 contribution composition
 
 on:
-  pull_request:
-    paths:
-      - ".github/workflows/cfi5-contribution-composition.yml"
-      - "catalog/flask_app/app.py"
-      - "catalog/flask_app/capability_contribution_routes.py"
-      - "catalog/flask_app/services/capability_contribution_components.py"
-      - "catalog/flask_app/services/capability_contribution_service.py"
-      - "catalog/flask_app/services/mtconnect_discovery_service.py"
-      - "catalog/flask_app/services/recorder_control_service.py"
-      - "catalog/flask_app/services/run_once_capability_evidence.py"
-      - "catalog/flask_app/services/startup_contribution_reconcile.py"
-      - "catalog/flask_app/templates/federation/onboarding/_contributions.html"
-      - "catalog/flask_app/tests/test_capability_contribution_route.py"
-      - "catalog/flask_app/tests/test_unavailable_benchmark_review.py"
-      - "catalog/flask_app/tests/test_mtconnect_discovery_service.py"
-      - "catalog/flask_app/tests/test_recorder_control_service.py"
-      - "catalog/flask_app/tests/test_run_once_capability_evidence.py"
-      - "catalog/flask_app/tests/test_startup_contribution_reconcile.py"
-      - "catalog/capabilities/contributions/**"
-      - "catalog/flask_app/capability_benchmark_routes.py"
-      - "catalog/flask_app/services/capability_benchmark_service.py"
-      - "catalog/flask_app/services/capability_inspection_service.py"
-      - "catalog/federation/onboarding_models.py"
   push:
-    branches:
-      - main
-      - "agent/cfi5-*"
+    branches: ['**']
     paths:
       - ".github/workflows/cfi5-contribution-composition.yml"
       - "catalog/flask_app/app.py"
@@ -50,7 +25,6 @@ on:
       - "catalog/flask_app/services/capability_benchmark_service.py"
       - "catalog/flask_app/services/capability_inspection_service.py"
       - "catalog/federation/onboarding_models.py"
-
 permissions:
   contents: read
 
@@ -70,12 +44,12 @@ jobs:
       matrix:
         include:
           - os: Linux
-            runner: fcp-linux-fast
+            runner: [self-hosted, Linux, X64, fcp-linux-fast]
             shell: bash
           - os: Windows
-            runner: fcp-test-windows
+            runner: [self-hosted, Windows, X64, fcp-windows]
             shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
-    runs-on: [self-hosted, "${{ matrix.os }}", X64, "${{ matrix.runner }}"]
+    runs-on: ${{ matrix.runner }}
     defaults:
       run:
         shell: ${{ matrix.shell }}

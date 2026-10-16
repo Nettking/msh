@@ -1,4 +1,4 @@
-name: Nitro archive Beast capacity read-only
+name: Nitro archive pool capacity read-only
 on:
   push:
     branches: [codex/nitro-artifact-archive]
@@ -6,7 +6,11 @@ on:
 permissions: {}
 jobs:
   capacity:
-    runs-on: [self-hosted, beast-windows]
+    if: github.repository_id == '1033058161'
+    runs-on: [self-hosted, Windows, X64, fcp-windows]
+    defaults:
+      run:
+        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
     timeout-minutes: 2
     steps:
       - name: Read volume identity and bounded archive staging inventory

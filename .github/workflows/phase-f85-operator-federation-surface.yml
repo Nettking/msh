@@ -2,28 +2,8 @@ name: Phase F8.5 operator federation surface
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - ".github/actions/**"
-      - "start.cmd"
-      - "update.cmd"
-      - "docker-compose.yml"
-      - "scripts/windows/**"
-      - "catalog/capabilities/**"
-      - "catalog/flask_app/**"
-      - "catalog/common/data_loading.py"
-      - "catalog/ai/**"
-      - "catalog/federation/projections/**"
-      - "catalog/federation/tests/test_onboarding_projection_policy.py"
-      - "catalog/federation/tests/test_benchmark_latest_projection.py"
-      - "catalog/federation/tests/test_storage_candidate_projection_identity.py"
-      - "catalog/relay/tests/test_phase_f83_remote_ai_binding.py"
-      - "catalog/relay/tests/test_phase_f84_compute_worker_activation.py"
-      - "docs/implementation/phase_f85_plan.md"
-      - "docs/implementation/federation/active/pending_contribution_approval.md"
-      - ".github/workflows/phase-f85-operator-federation-surface.yml"
   push:
-    branches: [main]
+    branches: ['**']
     paths:
       - ".github/actions/**"
       - "start.cmd"
@@ -43,7 +23,6 @@ on:
       - "docs/implementation/phase_f85_plan.md"
       - "docs/implementation/federation/active/pending_contribution_approval.md"
       - ".github/workflows/phase-f85-operator-federation-surface.yml"
-
 permissions:
   contents: read
 
@@ -53,15 +32,16 @@ concurrency:
 
 jobs:
   operator-surface:
+    if: github.repository_id == '1033058161'
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: Linux
-            runner: ubuntu-24.04
+            runner: [self-hosted, Linux, X64, fcp-linux-fast]
             shell: bash
           - os: Windows
-            runner: [self-hosted, fcp-windows]
+            runner: [self-hosted, Windows, X64, fcp-windows]
             shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
     runs-on: ${{ matrix.runner }}
     defaults:
@@ -72,7 +52,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: ./.github/actions/hosted-python
+      - uses: ./.github/actions/self-hosted-python
         if: runner.os == 'Linux'
         with:
           python-version: "3.12.13"
@@ -110,8 +90,8 @@ jobs:
       - name: F8.5 and affected regressions
         if: runner.os == 'Linux'
         env:
-          TEMP: ${{ runner.os == 'Windows' && '\\?\C:\fcp-qtmp' || runner.temp }}
-          TMP: ${{ runner.os == 'Windows' && '\\?\C:\fcp-qtmp' || runner.temp }}
+          TEMP: ${{ runner.os == 'Windows' && format('\\?\{0}', env.FCP_CI_TEST_TEMP) || runner.temp }}
+          TMP: ${{ runner.os == 'Windows' && format('\\?\{0}', env.FCP_CI_TEST_TEMP) || runner.temp }}
         run: >-
           python -m pytest -o addopts= -q
           catalog/capabilities/tests
@@ -146,8 +126,8 @@ jobs:
       - name: Windows F8.5 regressions with long artifact paths
         if: runner.os == 'Windows'
         env:
-          TEMP: ${{ runner.os == 'Windows' && '\\?\C:\fcp-qtmp' || runner.temp }}
-          TMP: ${{ runner.os == 'Windows' && '\\?\C:\fcp-qtmp' || runner.temp }}
+          TEMP: ${{ runner.os == 'Windows' && format('\\?\{0}', env.FCP_CI_TEST_TEMP) || runner.temp }}
+          TMP: ${{ runner.os == 'Windows' && format('\\?\{0}', env.FCP_CI_TEST_TEMP) || runner.temp }}
         run: >-
           python -m pytest -o addopts= -q
           catalog/capabilities/tests

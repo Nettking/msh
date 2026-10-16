@@ -1,18 +1,8 @@
 name: Release image metadata
 
 on:
-  pull_request:
-    paths:
-      - ".github/actions/**"
-      - ".github/workflows/release-image-metadata.yml"
-      - "Dockerfile"
-      - "Dockerfile.cli"
-      - "docker-compose.yml"
-      - "catalog/flask_app/tests/test_release_reproducibility.py"
-      - "CHANGELOG.md"
-      - "docs/release_process.md"
   push:
-    branches: [main]
+    branches: ['**']
     paths:
       - ".github/actions/**"
       - ".github/workflows/release-image-metadata.yml"
@@ -29,8 +19,9 @@ permissions:
 
 jobs:
   verify-release-images:
+    if: github.repository_id == '1033058161'
     name: Verify immutable release image metadata
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, Linux, X64, fcp-linux-fast]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4

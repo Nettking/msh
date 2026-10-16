@@ -1,29 +1,8 @@
 name: CFI-4 benchmark composition
 
 on:
-  pull_request:
-    paths:
-      - ".github/workflows/cfi4-benchmark-composition.yml"
-      - "catalog/flask_app/app.py"
-      - "catalog/flask_app/capability_benchmark_routes.py"
-      - "catalog/flask_app/capability_inspection_routes.py"
-      - "catalog/flask_app/services/capability_benchmark_service.py"
-      - "catalog/flask_app/services/capability_inspection_service.py"
-      - "catalog/flask_app/services/capability_recovery_adapters.py"
-      - "catalog/flask_app/services/run_once_capability_evidence.py"
-      - "catalog/flask_app/templates/federation/onboarding/_benchmarks.html"
-      - "catalog/flask_app/tests/test_benchmark_runtime_parity.py"
-      - "catalog/flask_app/tests/test_capability_benchmark_route.py"
-      - "catalog/flask_app/tests/test_unavailable_benchmark_review.py"
-      - "catalog/flask_app/tests/test_capability_inspection_route.py"
-      - "catalog/flask_app/tests/test_run_once_capability_evidence.py"
-      - "catalog/capabilities/benchmarking/**"
-      - "catalog/federation/onboarding_models.py"
   push:
-    branches:
-      - main
-      - "agent/cfi4-*"
-      - "agent/benchmark-*"
+    branches: ['**']
     paths:
       - ".github/workflows/cfi4-benchmark-composition.yml"
       - "catalog/flask_app/app.py"
@@ -41,7 +20,6 @@ on:
       - "catalog/flask_app/tests/test_run_once_capability_evidence.py"
       - "catalog/capabilities/benchmarking/**"
       - "catalog/federation/onboarding_models.py"
-
 permissions:
   contents: read
 
@@ -61,12 +39,12 @@ jobs:
       matrix:
         include:
           - os: Linux
-            runner: fcp-linux-fast
+            runner: [self-hosted, Linux, X64, fcp-linux-fast]
             shell: bash
           - os: Windows
-            runner: fcp-test-windows
+            runner: [self-hosted, Windows, X64, fcp-windows]
             shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
-    runs-on: [self-hosted, "${{ matrix.os }}", X64, "${{ matrix.runner }}"]
+    runs-on: ${{ matrix.runner }}
     defaults:
       run:
         shell: ${{ matrix.shell }}

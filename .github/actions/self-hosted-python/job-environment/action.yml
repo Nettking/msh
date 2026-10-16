@@ -1,0 +1,7 @@
+name: Isolated self-hosted job directories
+description: Allocate job-owned Python and test directories and remove only those directories at job completion.
+runs:
+  using: node20
+  main: prepare.js
+  post: cleanup.js
+  post-if: always()
