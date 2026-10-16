@@ -397,6 +397,54 @@ def test_a_relay_teardown_during_announce_is_raised_for_the_supervisor(
     assert client.disconnected is True
 
 
+@pytest.mark.parametrize(
+    ("code", "field", "recovers"),
+    [
+        ("resource-pressure", "resource", True),
+        ("connection-closed", None, False),
+        ("revoked-node", None, False),
+        ("resource-pressure", "capability", False),
+    ],
+)
+def test_periodic_pressure_announcement_keeps_authority_reader_alive(
+    tmp_path, monkeypatch, code, field, recovers
+) -> None:
+    async def scenario() -> None:
+        stop = asyncio.Event()
+        endpoints = []
+
+        class Client(_CreatorClient):
+            attempts = 0
+
+            async def announce_capability(self, announcement):
+                self.attempts += 1
+                if self.attempts == 2:
+                    raise RelayRemoteError(code, "announcement refused", field)
+                if self.attempts == 3:
+                    assert not endpoints[0]._closed
+                    assert self.connected_event.is_set()
+                    stop.set()
+                return await super().announce_capability(announcement)
+
+        client = Client()
+        endpoints = _compose(monkeypatch, client)
+        operation = runtime.run_trusted_storage_authority(
+            _settings(tmp_path), stop=stop
+        )
+        if recovers:
+            await asyncio.wait_for(operation, timeout=2)
+            assert client.attempts == 3
+        else:
+            with pytest.raises(RelayRemoteError) as refused:
+                await asyncio.wait_for(operation, timeout=2)
+            assert refused.value.code == code
+            assert refused.value.field == field
+        assert endpoints[0]._closed
+        assert client.disconnected
+
+    asyncio.run(scenario())
+
+
 def test_stalled_failover_scan_cannot_silence_storage_discovery(
     tmp_path, monkeypatch
 ) -> None:

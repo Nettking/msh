@@ -33,6 +33,87 @@ NOW = datetime(2026, 7, 28, 12, tzinfo=timezone.utc)
 REQUEST_TIMEOUT_SECONDS = 3.0
 
 
+def test_pressure_refuses_capability_mutation_without_losing_live_routes(
+    tmp_path: Path,
+) -> None:
+    from dataclasses import replace
+
+    from catalog.federation.host_resources import FilesystemMeasurement
+    from catalog.federation.process_resource_admission import ProcessResourceAdmission
+
+    async def scenario() -> None:
+        relay = await _start_relay(tmp_path / "relay.sqlite3")
+        owner = _client(tmp_path / "owner", relay, "Owner")
+        peer = _client(tmp_path / "peer", relay, "Peer")
+        try:
+            await _enroll(relay, owner)
+            await _enroll(relay, peer)
+            session_id, _ = await _shared_session(owner, peer)
+            announcement = CapabilityAnnouncement(
+                capability_id="existing-storage",
+                node_id=owner.node_id,
+                session_id=session_id,
+                type="storage",
+                protocol="fcp-storage-v1",
+                protocol_version="1.0",
+                status=CapabilityStatus.READY,
+                properties={"label": "original"},
+                announced_at=NOW,
+            )
+            await owner.announce_capability(announcement)
+            before = relay.coordinator.store.list_capabilities(
+                session_id=session_id,
+                node_id=owner.node_id,
+            )
+            free_bytes = 95 * 1024**3 // 8
+            relay.coordinator.store.resource_admission = ProcessResourceAdmission(
+                measurer=lambda _path: FilesystemMeasurement(
+                    resource_id="relay-pressure",
+                    observed_at=NOW,
+                    total_bytes=512 * 1024**3,
+                    free_bytes=free_bytes,
+                    total_inodes=None,
+                    free_inodes=None,
+                    available=True,
+                ),
+                clock=lambda: NOW,
+            )
+            with pytest.raises(RelayRemoteError) as refused:
+                await owner.announce_capability(
+                    replace(announcement, properties={"label": "refused"})
+                )
+            assert refused.value.code == "resource-pressure"
+            assert refused.value.field == "resource"
+            assert owner.connected_event.is_set()
+            assert relay.coordinator.store.list_capabilities(
+                session_id=session_id,
+                node_id=owner.node_id,
+            ) == before
+            await owner.send_message(
+                session_id=session_id,
+                target_node_id=peer.node_id,
+                payload={"committed_read": "still available"},
+            )
+            delivered = await peer.receive_message(timeout=REQUEST_TIMEOUT_SECONDS)
+            assert delivered.payload == {"committed_read": "still available"}
+            await peer.send_message(
+                session_id=session_id,
+                target_node_id=owner.node_id,
+                payload={"reply": "same connection"},
+            )
+            assert (await owner.receive_message(timeout=REQUEST_TIMEOUT_SECONDS)).payload == {
+                "reply": "same connection"
+            }
+            free_bytes = 64 * 1024**3
+            await owner.announce_capability(
+                replace(announcement, properties={"label": "recovered"})
+            )
+        finally:
+            await _shutdown(relay, owner, peer)
+
+    asyncio.run(scenario())
+
+
 async def _start_relay(database: Path) -> RelayServer:
     relay = RelayServer(
         SessionCoordinator(database, clock=lambda: NOW),

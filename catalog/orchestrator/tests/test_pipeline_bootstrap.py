@@ -28,6 +28,59 @@ def _option(number: int, key: str) -> ScriptOption:
     )
 
 
+@pytest.mark.parametrize("initial_failure", ["resource-pressure", "update-error"])
+def test_poller_survives_refused_failure_status_and_recovers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, initial_failure: str
+) -> None:
+    now = datetime(2026, 8, 31, tzinfo=timezone.utc)
+    free_bytes = 64 * 1024**3
+    admission = ProcessResourceAdmission(
+        measurer=lambda _path: FilesystemMeasurement(
+            resource_id="runtime-pressure",
+            observed_at=now,
+            total_bytes=512 * 1024**3,
+            free_bytes=free_bytes,
+            total_inodes=None,
+            free_inodes=None,
+            available=True,
+        ),
+        clock=lambda: now,
+    )
+    monkeypatch.setattr(pipeline, "repo_root", lambda: tmp_path)
+    orchestrator = pipeline.RuntimeOrchestrator(resource_admission=admission)
+    orchestrator._persist_state()
+    original = orchestrator.state_path.read_bytes()
+    calls = []
+
+    def update(*, bootstrap):
+        nonlocal free_bytes
+        calls.append(bootstrap)
+        if len(calls) == 1:
+            free_bytes = 95 * 1024**3 // 8
+            if initial_failure == "update-error":
+                raise ValueError("original update failure")
+            orchestrator._persist_state()
+            raise AssertionError("pressure unexpectedly admitted runtime state")
+        orchestrator._state.last_failure = None
+        orchestrator._state.current_processing_phase = "idle"
+        orchestrator._persist_state()
+        orchestrator._stop.set()
+
+    def wait(_seconds):
+        nonlocal free_bytes
+        if len(calls) == 1:
+            assert orchestrator.state_path.read_bytes() == original
+            free_bytes = 64 * 1024**3
+
+    monkeypatch.setattr(orchestrator, "_run_update", update)
+    monkeypatch.setattr(orchestrator._stop, "wait", wait)
+    orchestrator._poll_loop()
+    assert calls == [True, True]
+    persisted = pipeline.json.loads(orchestrator.state_path.read_text())
+    assert persisted["last_failure"] is None
+    assert persisted["current_processing_phase"] == "idle"
+
+
 def test_automatic_runtime_contract_includes_playback_and_excludes_heavy_scripts():
     assert "data_visualizer" in pipeline.AUTO_COVERAGE_SCRIPT_KEYS
     assert pipeline.AUTO_COVERAGE_SCRIPT_KEYS == AUTOMATIC_RUNTIME_SCRIPT_KEYS

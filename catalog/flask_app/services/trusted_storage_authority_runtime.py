@@ -61,6 +61,7 @@ from catalog.federation.storage_protocol import (
     STORAGE_PROTOCOL,
     STORAGE_PROTOCOL_VERSION,
 )
+from catalog.node.client import RelayRemoteError
 from catalog.node.storage_failover import (
     StorageAuthoritySettings,
     _acknowledgements_database,
@@ -551,7 +552,14 @@ async def run_trusted_storage_authority(
             while stop is None or not stop.is_set():
                 await _wait_scan_interval(stop, settings.scan_interval)
                 if stop is None or not stop.is_set():
-                    await announce()
+                    try:
+                        await announce()
+                    except RelayRemoteError as exc:
+                        if (exc.code, exc.field) != ("resource-pressure", "resource"):
+                            raise
+                        # An existing authority retains its reader while this
+                        # periodic metadata write is refused. Initial enrollment,
+                        # permission failures and transport loss still fail closed.
 
         await failover.start()
         if on_message_source is not None:
