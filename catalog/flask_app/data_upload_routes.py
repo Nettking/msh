@@ -17,6 +17,8 @@ from flask import (
     url_for,
 )
 
+from catalog.federation.host_resources import HostResourceRefused
+
 from .services.data_upload_resource_admission import enqueue_with_resource_admission
 from .services.data_upload_service import DataUploadError, get_data_upload_service
 from .services.upload_analysis_job_service import (
@@ -110,8 +112,13 @@ def upload():
             service,
             request.files.getlist("files"),
         )
-    except DataUploadError as exc:
-        flash(exc.message, "error")
+    except (DataUploadError, HostResourceRefused) as exc:
+        flash(
+            exc.message
+            if isinstance(exc, DataUploadError)
+            else "The upload was not started because host storage is under resource pressure.",
+            "error",
+        )
         return redirect(url_for("data_upload_web.index"))
     flash(
         f"Upload received. Importing {batch['file_count']} JSONL file(s) in the background.",
