@@ -719,6 +719,9 @@ def test_fixture_stops_after_two_real_listener_bind_conflicts(
 def test_fixture_does_not_retry_listener_bind_error_after_servers_start(
     request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch, prestart_conflict,
 ) -> None:
+    # Windows may allow two SO_REUSEADDR listeners on the same endpoint. Keep
+    # this test's real listener exclusive without a close/rebind race.
+    monkeypatch.setattr(_CredentialRPCServer, "allow_reuse_address", False)
     original_deployments = _deployments
     original_runtime = FederationV1ReleaseRuntime
     allocations = []
@@ -758,12 +761,6 @@ def test_fixture_does_not_retry_listener_bind_error_after_servers_start(
             # Use the final current deployment so even a wrongly broadened
             # constructor catch would otherwise recognize this exact endpoint.
             target = current[-1]
-            target.credential_server.close()
-            blocker = blockers.enter_context(socket.socket())
-            if os.name == "nt":
-                blocker.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
-            blocker.bind(("127.0.0.1", target.deployment.listen_port + 1))
-            blocker.listen(1)
             CredentialReplicaServer(
                 target.node, target.codec, target.credential_store,
                 host="127.0.0.1", port=target.deployment.listen_port + 1,
