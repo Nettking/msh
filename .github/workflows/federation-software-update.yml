@@ -2,24 +2,22 @@ name: Federation software update
 
 on:
   workflow_dispatch:
-  pull_request:
   push:
-    branches:
-      - main
-
+    branches: ['**']
 jobs:
   update-contracts:
+    if: github.repository_id == '1033058161'
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: Linux
-            runner: fcp-linux-fast
+            runner: [self-hosted, Linux, X64, fcp-linux-fast]
             shell: bash
           - os: Windows
-            runner: fcp-windows
+            runner: [self-hosted, Windows, X64, fcp-windows]
             shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
-    runs-on: [self-hosted, "${{ matrix.runner }}"]
+    runs-on: ${{ matrix.runner }}
     defaults:
       run:
         shell: ${{ matrix.shell }}

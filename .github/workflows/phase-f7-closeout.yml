@@ -2,36 +2,8 @@ name: Phase F7 capability scheduling closeout
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - ".github/actions/**"
-      - "catalog/capabilities/**"
-      - "catalog/ai/**"
-      - "catalog/common/tests/test_f7_ci_coverage.py"
-      - "catalog/federation/object_transfer.py"
-      - "catalog/federation/resumable_chunk_transfer.py"
-      - "catalog/federation/tests/test_phase_f641_chunk_contract.py"
-      - "catalog/node/tests/test_phase_f642_verified_chunk_transfer.py"
-      - "catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py"
-      - "catalog/flask_app/ai_routes.py"
-      - "catalog/flask_app/services/server_setup_service.py"
-      - "catalog/flask_app/static/js/ai-explainer.js"
-      - "catalog/flask_app/templates/ai_explainer.html"
-      - "catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py"
-      - "catalog/flask_app/tests/test_ai_explainer_chat.py"
-      - "catalog/flask_app/tests/test_ai_runtime_integration.py"
-      - "catalog/flask_app/tests/test_connected_ai_provider.py"
-      - "catalog/flask_app/tests/test_model_provider_compose.py"
-      - "catalog/relay/tests/test_phase_f74_capability_dispatch.py"
-      - "catalog/relay/tests/test_phase_f75_retry_cancellation.py"
-      - "docs/connected_capabilities.md"
-      - "docs/architecture.md"
-      - "docs/implementation/phase_f7_closeout.md"
-      - ".github/workflows/phase-f7-closeout.yml"
-      - ".github/workflows/phase-f6-closeout.yml"
-      - ".github/workflows/phase2-federation.yml"
   push:
-    branches: [main]
+    branches: ['**']
     paths:
       - ".github/actions/**"
       - "catalog/capabilities/**"
@@ -59,7 +31,6 @@ on:
       - ".github/workflows/phase-f7-closeout.yml"
       - ".github/workflows/phase-f6-closeout.yml"
       - ".github/workflows/phase2-federation.yml"
-
 permissions:
   contents: read
   actions: read # Native job identity for evidence provenance only.
@@ -70,15 +41,16 @@ concurrency:
 
 jobs:
   capability-closeout:
+    if: github.repository_id == '1033058161'
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: Linux
-            runner: ubuntu-24.04
+            runner: [self-hosted, Linux, X64, fcp-linux-fast]
             shell: bash
           - os: Windows
-            runner: [self-hosted, fcp-windows]
+            runner: [self-hosted, Windows, X64, fcp-windows]
             shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
     runs-on: ${{ matrix.runner }}
     defaults:
@@ -89,7 +61,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: ./.github/actions/hosted-python
+      - uses: ./.github/actions/self-hosted-python
         if: runner.os == 'Linux'
         with:
           python-version: "3.12.13"
@@ -127,8 +99,8 @@ jobs:
           catalog/relay/tests/test_phase_f75_retry_cancellation.py
       - name: Complete F7 and Phase 6 acceptance matrix
         env:
-          TEMP: ${{ runner.os == 'Windows' && '\\?\C:\fcp-qtmp' || runner.temp }}
-          TMP: ${{ runner.os == 'Windows' && '\\?\C:\fcp-qtmp' || runner.temp }}
+          TEMP: ${{ runner.os == 'Windows' && format('\\?\{0}', env.FCP_CI_TEST_TEMP) || runner.temp }}
+          TMP: ${{ runner.os == 'Windows' && format('\\?\{0}', env.FCP_CI_TEST_TEMP) || runner.temp }}
         run: >-
           python -m pytest -o addopts= -q
           --junitxml="${{ runner.temp }}/f7-closeout-${{ matrix.os }}.xml"

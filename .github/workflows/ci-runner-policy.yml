@@ -1,0 +1,29 @@
+name: CI runner policy
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/**"
+      - "scripts/ci_runner_policy.py"
+      - "scripts/tests/test_ci_runner_policy.py"
+
+permissions:
+  contents: read
+
+jobs:
+  runner-policy:
+    if: github.repository_id == '1033058161'
+    runs-on: [self-hosted, Linux, X64, fcp-linux-fast]
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/self-hosted-python
+        with:
+          python-version: "3.12"
+      - name: Install workflow parser
+        run: python -m pip install PyYAML==6.0.3
+      - name: Test runner policy validation
+        run: python -m unittest scripts.tests.test_ci_runner_policy
+      - name: Require shared self-hosted pools for every possible job
+        run: python scripts/ci_runner_policy.py

@@ -1,20 +1,13 @@
 name: Phase F6.5 durable resumable chunk transfer
 
 on:
-  pull_request:
-    paths:
-      - "catalog/federation/resumable_chunk_transfer.py"
-      - "catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py"
-      - "docs/implementation/phase_f65_resumable_chunk_transfer.md"
-      - ".github/workflows/phase-f65-resumable-chunk-transfer.yml"
   push:
-    branches: [main]
+    branches: ['**']
     paths:
       - "catalog/federation/resumable_chunk_transfer.py"
       - "catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py"
       - "docs/implementation/phase_f65_resumable_chunk_transfer.md"
       - ".github/workflows/phase-f65-resumable-chunk-transfer.yml"
-
 permissions:
   contents: read
 
@@ -24,18 +17,27 @@ concurrency:
 
 jobs:
   durable-resume:
+    if: github.repository_id == '1033058161'
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+        include:
+          - os: Linux
+            runner: [self-hosted, Linux, X64, fcp-linux-fast]
+            shell: bash
+          - os: Windows
+            runner: [self-hosted, Windows, X64, fcp-windows]
+            shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: ./.github/actions/self-hosted-python
         with:
           python-version: "3.12"
-          cache: "" # No external Actions cache; local pip cache remains available.
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip

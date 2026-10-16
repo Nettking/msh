@@ -13,23 +13,22 @@ permissions:
   actions: read # Native job identity for evidence provenance only.
 jobs:
   transport:
+    if: github.repository_id == '1033058161'
     strategy:
       fail-fast: false
       matrix:
-        os: [Linux, Windows]
-        # Branch pushes exercise the currently authorized Beast scope only.
-        # Manual verification keeps both families in the required coverage.
-        family: ${{ fromJSON(github.event_name == 'push' && '["beast"]' || '["nettking", "beast"]') }}
         include:
           - os: Linux
+            runner: [self-hosted, Linux, X64, fcp-linux-fast]
+            family: shared-pool
             shell: bash
             python: /opt/fcp-ci/python/3.12.13/bin/python3.12
           - os: Windows
+            runner: [self-hosted, Windows, X64, fcp-windows]
+            family: shared-pool
             shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
             python: python
-    runs-on:
-      - self-hosted
-      - ${{ matrix.family == 'beast' && (matrix.os == 'Linux' && 'beast-linux' || 'beast-windows') || (matrix.os == 'Linux' && 'nettking-linux' || 'nettking') }}
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 5
     defaults:
       run:

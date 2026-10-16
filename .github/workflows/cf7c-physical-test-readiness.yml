@@ -2,36 +2,8 @@ name: CF7-C physical test readiness
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - ".github/actions/**"
-      - ".github/workflows/cf7c-physical-test-readiness.yml"
-      - ".gitignore"
-      - "start.cmd"
-      - "scripts/acceptance/cf7_physical_readiness.py"
-      - "scripts/acceptance/cf7_physical_topology.template.json"
-      - "scripts/acceptance/cf7_prepare_windows.ps1"
-      - "scripts/acceptance/cf7_prepare_linux.sh"
-      - "scripts/windows/stop_fcp_for_fresh_reset.ps1"
-      - "scripts/windows/tests/stop_fcp_for_fresh_reset_smoke.ps1"
-      - "catalog/flask_app/services/device_state_reset.py"
-      - "catalog/flask_app/services/headless_federation_cli.py"
-      - "catalog/flask_app/auth/routes.py"
-      - "catalog/flask_app/tests/test_device_state_reset.py"
-      - "catalog/flask_app/tests/test_first_user_bootstrap.py"
-      - "catalog/flask_app/tests/test_headless_federation_cli.py"
-      - "catalog/flask_app/tests/test_fresh_start_contract.py"
-      - "catalog/flask_app/tests/test_windows_start_script.py"
-      - "catalog/federation/tests/cf7_acceptance/test_physical_readiness.py"
-      - "catalog/federation/tests/cf7_acceptance/physical_evidence.py"
-      - "catalog/federation/tests/cf7_acceptance/test_physical_evidence.py"
-      - "docs/implementation/cf7c_physical_test_readiness.md"
-      - "docs/implementation/federation/acceptance/cf7c_physical_test_readiness.md"
   push:
-    branches:
-      - main
-      - agent/cf7c-physical-test-readiness
-      - fix/v1-physical-acceptance-blockers
+    branches: ['**']
     paths:
       - ".github/actions/**"
       - ".github/workflows/cf7c-physical-test-readiness.yml"
@@ -56,23 +28,23 @@ on:
       - "catalog/federation/tests/cf7_acceptance/test_physical_evidence.py"
       - "docs/implementation/cf7c_physical_test_readiness.md"
       - "docs/implementation/federation/acceptance/cf7c_physical_test_readiness.md"
-
 permissions:
   contents: read
 
 jobs:
   readiness:
+    if: github.repository_id == '1033058161'
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: Linux
-            runner: fcp-linux-fast
+            runner: [self-hosted, Linux, X64, fcp-linux-fast]
             shell: bash
           - os: Windows
-            runner: fcp-windows
+            runner: [self-hosted, Windows, X64, fcp-windows]
             shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
-    runs-on: [self-hosted, "${{ matrix.runner }}"]
+    runs-on: ${{ matrix.runner }}
     defaults:
       run:
         shell: ${{ matrix.shell }}

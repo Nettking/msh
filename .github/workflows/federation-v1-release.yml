@@ -1,35 +1,8 @@
 name: Federation v1 release gate
 
 on:
-  pull_request:
-    paths:
-      - ".github/actions/**"
-      - ".github/workflows/**"
-      - ".env.example"
-      - "CHANGELOG.md"
-      - "Dockerfile"
-      - "Dockerfile.cli"
-      - "README.md"
-      - "catalog/**"
-      - "cmd/fcp-peer-sidecar/**"
-      - "constraints-phase2.txt"
-      - "constraints-release.txt"
-      - "docker-compose.yml"
-      - "docs/**"
-      - "migrate.cmd"
-      - "requirements.txt"
-      - "requirements-dev.txt"
-      - "scripts/**"
-      - "setup_fcp.py"
-      - "start.cmd"
-      - "start.sh"
-      - "start-tailscale.cmd"
-      - "start-tailscale.sh"
-      - "start_recorder.py"
-      - "termux/**"
-      - "update.cmd"
   push:
-    branches: [main]
+    branches: ["**"]
     paths:
       - ".github/actions/**"
       - ".github/workflows/**"
@@ -68,17 +41,18 @@ concurrency:
 
 jobs:
   release-checks:
+    if: github.repository_id == '1033058161'
     name: Release checks (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: Linux
-            runner: ubuntu-24.04
+            runner: [self-hosted, Linux, X64, fcp-linux-fast]
             shell: bash
             python: "3.12.13"
           - os: Windows
-            runner: windows-2025
+            runner: [self-hosted, Windows, X64, fcp-windows]
             shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
             python: "3.12.10"
     runs-on: ${{ matrix.runner }}
@@ -92,7 +66,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: ./.github/actions/hosted-python
+      - uses: ./.github/actions/self-hosted-python
         with:
           python-version: ${{ matrix.python }}
 
@@ -245,8 +219,9 @@ jobs:
           fi
 
   linux-regressions:
+    if: github.repository_id == '1033058161'
     name: Linux regression shard (${{ matrix.shard }})
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, Linux, X64, fcp-linux-fast]
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -257,7 +232,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: ./.github/actions/hosted-python
+      - uses: ./.github/actions/self-hosted-python
         with:
           python-version: 3.12.13
 
@@ -306,8 +281,9 @@ jobs:
 
         if: ${{ always() }}
   windows-regressions:
+    if: github.repository_id == '1033058161'
     name: Windows regressions (${{ matrix.suite }})
-    runs-on: windows-2025
+    runs-on: [self-hosted, Windows, X64, fcp-windows]
     timeout-minutes: 30
     defaults:
       run:
@@ -321,7 +297,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: ./.github/actions/hosted-python
+      - uses: ./.github/actions/self-hosted-python
         with:
           python-version: 3.12.10
 
@@ -345,16 +321,16 @@ jobs:
       - name: Windows capability and product regressions
         if: matrix.suite == 'capability-product'
         env:
-          TEMP: '\\?\C:\fcp-qtmp'
-          TMP: '\\?\C:\fcp-qtmp'
+          TEMP: '\\?\${{ env.FCP_CI_TEST_TEMP }}'
+          TMP: '\\?\${{ env.FCP_CI_TEST_TEMP }}'
         run: >-
           python -m pytest -o addopts= -q --durations=20 --junitxml="${{ runner.temp }}/windows-${{ matrix.suite }}.xml" catalog/capabilities/tests catalog/ai/tests/test_remote_provider.py catalog/relay/tests/test_phase_f83_remote_ai_binding.py catalog/relay/tests/test_phase_f84_compute_worker_activation.py catalog/federation/tests/cf7_acceptance/test_product_acceptance.py catalog/federation/tests/cf7_acceptance/test_physical_evidence.py catalog/federation/tests/cf7_acceptance/test_foundation.py catalog/flask_app/tests/test_capability_onboarding_route.py catalog/flask_app/tests/test_capability_inspection_route.py catalog/flask_app/tests/test_capability_benchmark_route.py catalog/flask_app/tests/test_capability_contribution_route.py catalog/flask_app/tests/test_capability_startup_transition_route.py catalog/flask_app/tests/test_federation_overview_route.py catalog/flask_app/test_navigation_smoke.py catalog/flask_app/tests/test_mobile_layout_contract.py catalog/flask_app/tests/test_responsive_routes.py catalog/flask_app/tests/test_post_setup_handoff.py catalog/flask_app/tests/test_provider_federation_surface.py catalog/flask_app/tests/test_recorder_control_service.py catalog/flask_app/tests/test_ai_runtime_integration.py catalog/flask_app/tests/test_device_state_reset.py catalog/flask_app/tests/test_local_capability_candidates.py catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py catalog/flask_app/tests/test_capability_runtime_startup.py catalog/flask_app/tests/test_data_upload.py catalog/flask_app/tests/test_upload_analysis_jobs.py catalog/flask_app/tests/test_federation_auto_reconnect.py catalog/flask_app/tests/test_existing_setup_resume.py catalog/flask_app/tests/test_run_once_capability_evidence.py catalog/flask_app/tests/test_release_reproducibility.py catalog/flask_app/tests/test_windows_start_script.py catalog/flask_app/tests/test_windows_update_script.py catalog/flask_app/tests/test_windows_volume_name_selection.py catalog/federation/tests/test_federation_projections.py catalog/federation/tests/test_benchmark_latest_projection.py catalog/federation/tests/test_onboarding_contracts.py catalog/federation/tests/test_onboarding_discovery_service.py catalog/federation/tests/test_onboarding_projection_policy.py catalog/federation/tests/test_release_documentation_links.py catalog/federation/tests/test_phase0.py catalog/federation/tests/test_phase1.py catalog/federation/tests/test_phase2_unit.py
 
       - name: Windows path-sensitive startup and migration regressions
         if: ${{ !cancelled() && matrix.suite == 'capability-product' }}
         env:
-          TEMP: '${{ runner.temp }}\fcp-windows-compat'
-          TMP: '${{ runner.temp }}\fcp-windows-compat'
+          TEMP: '${{ env.FCP_CI_JOB_ROOT }}\windows-compat'
+          TMP: '${{ env.FCP_CI_JOB_ROOT }}\windows-compat'
         run: |
           New-Item -ItemType Directory -Path $env:TEMP -Force | Out-Null
           python -m pytest -o addopts= -q --durations=20 --junitxml="${{ runner.temp }}/windows-path-compat.xml" catalog/federation/tests/test_host_mutation_activation.py catalog/federation/tests/test_windows_controlled_build_contract.py catalog/flask_app/tests/test_first_federation_start.py catalog/flask_app/tests/test_federated_jsonl_candidate_filter.py catalog/flask_app/tests/test_model_resource_admission_paths.py catalog/flask_app/tests/test_windows_fresh_shutdown.py catalog/flask_app/tests/test_windows_fresh_url_output.py catalog/flask_app/tests/test_windows_migration_script.py catalog/flask_app/tests/test_windows_relay_volume_selector.py catalog/flask_app/tests/test_windows_runtime_state_resolver.py
@@ -362,16 +338,16 @@ jobs:
       - name: Windows transport, storage, and failover regressions
         if: matrix.suite == 'transport-storage'
         env:
-          TEMP: '\\?\C:\fcp-qtmp'
-          TMP: '\\?\C:\fcp-qtmp'
+          TEMP: '\\?\${{ env.FCP_CI_TEST_TEMP }}'
+          TMP: '\\?\${{ env.FCP_CI_TEST_TEMP }}'
         run: >-
           python -m pytest -o addopts= -q --durations=20 --junitxml="${{ runner.temp }}/windows-${{ matrix.suite }}.xml" catalog/node/tests/test_identity.py catalog/node/tests/test_state.py catalog/node/tests/test_client.py catalog/mtconnect_recorder/tests/test_multi_recorder_capability_identity.py catalog/node/tests/test_storage_agent.py catalog/node/tests/test_three_machine_deployment.py catalog/node/tests/test_physical_storage_failover.py catalog/node/tests/test_physical_storage_recovery.py catalog/node/tests/test_phase_f61_transport.py catalog/node/tests/test_phase_f62_direct_peer.py catalog/node/tests/test_phase_f63_relay_loss_continuity.py catalog/node/tests/test_live_storage_replication.py catalog/node/tests/test_live_storage_failover.py catalog/node/tests/test_live_storage_catchup.py catalog/node/tests/test_live_storage_reinstatement.py catalog/node/tests/test_verified_live_failover.py catalog/relay/tests/test_service.py catalog/relay/tests/test_leadership_transfer.py catalog/federation/tests/test_storage_protocol.py catalog/federation/tests/test_local_storage.py catalog/federation/tests/test_phase_d3_control_plane.py catalog/federation/tests/test_phase_d4_write_authority.py catalog/federation/tests/test_phase_d5_logical_storage.py catalog/federation/tests/test_phase_d6_replication.py catalog/federation/tests/test_phase_d7_d8_ack_handover.py catalog/federation/tests/test_phase_e0_contracts.py catalog/federation/tests/test_phase_e1_manifest_store.py catalog/federation/tests/test_phase_e1_service_manifest.py catalog/federation/tests/test_phase_e2_watermarks.py catalog/federation/tests/test_phase_e3_reports.py catalog/federation/tests/test_phase_e4_selection.py catalog/federation/tests/test_phase_e5_degraded_state.py catalog/federation/tests/test_phase_e6_promotion_transaction.py catalog/federation/tests/test_phase_e63_provider_fencing.py catalog/federation/tests/test_phase_e64_authority_grant.py catalog/federation/tests/test_phase_e65_finalization.py catalog/federation/tests/test_phase_e66_recovery.py catalog/federation/tests/test_phase_e67_coordinator_publication.py catalog/federation/tests/test_phase_e71_former_primary_recovery.py catalog/federation/tests/test_phase_e72_former_primary_transfer.py catalog/federation/tests/test_phase_e78_former_primary_completion.py catalog/federation/tests/test_manifest_read_snapshot.py catalog/federation/tests/test_manifest_component_validation.py catalog/federation/tests/test_verified_revision_cache.py catalog/federation/tests/test_storage_owned_atomic_phases.py catalog/federation/tests/test_storage_shared_loop_responsiveness.py
 
       - name: Windows replicated journal and reviewer artifact regressions
         if: matrix.suite == 'journal-artifacts'
         env:
-          TEMP: C:/fcp-qtmp
-          TMP: C:/fcp-qtmp
+          TEMP: ${{ env.FCP_CI_TEST_TEMP }}
+          TMP: ${{ env.FCP_CI_TEST_TEMP }}
         run: >-
           python -m pytest -o addopts= -q --durations=20 --junitxml="${{ runner.temp }}/windows-${{ matrix.suite }}.xml" catalog/federation/tests/test_control_plane_bootstrap_proposal.py catalog/federation/tests/test_control_plane_journal_private.py catalog/federation/tests/test_control_plane_journal_projection.py catalog/federation/tests/test_control_plane_journal_runtime.py catalog/federation/tests/test_control_plane_journal_store.py catalog/federation/tests/test_control_plane_product_journal.py catalog/federation/tests/test_control_plane_product_transactions.py catalog/federation/tests/test_control_plane_public_journal.py catalog/federation/tests/test_control_plane_public_journal_acquisition.py catalog/federation/tests/test_control_plane_port_probe_ownership.py catalog/federation/tests/test_control_plane_release_bootstrap_recovery.py catalog/federation/tests/test_control_plane_witnessed_chunk_recovery.py catalog/federation/tests/test_control_plane_session_authority.py catalog/federation/tests/test_control_plane_health_leadership_race.py catalog/flask_app/tests/test_c03_pairing_onboarding.py catalog/flask_app/tests/test_c03_provider_operator.py catalog/flask_app/tests/test_c03_session_authority.py catalog/federation/tests/test_c03_offline_creator_migration.py catalog/federation/tests/test_control_plane_runtime_retry.py catalog/federation/tests/test_icse_network_provenance.py catalog/federation/tests/test_icse_artifact_bundle.py catalog/federation/tests/test_control_plane_lifecycle_cleanup.py
 
@@ -393,52 +369,19 @@ jobs:
           if-no-files-found: error
           retention-days: 90
   postgres-storage:
+    if: github.repository_id == '1033058161'
     name: PostgreSQL storage release check
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, Linux, X64, fcp-linux-fast]
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/hosted-python
+      - uses: ./.github/actions/self-hosted-python
         with:
           python-version: "3.12.13"
       - name: Ubuntu storage precondition
         uses: ./.github/actions/ubuntu-storage-precondition
       - name: Start disposable PostgreSQL 16
-        shell: bash
-        run: |
-          set -euo pipefail
-          role="fcp_ci_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
-          database="${role}"
-          password="$(openssl rand -hex 24)"
-          printf '::add-mask::%s\n' "$password"
-          printf 'FCP_CI_POSTGRES_ROLE=%s\nFCP_CI_POSTGRES_DATABASE=%s\n' \
-            "$role" "$database" >> "$GITHUB_ENV"
-
-          # Ubuntu 24.04 runners include PostgreSQL 16. Starting the bundled
-          # service avoids an unnecessary Docker Hub image pull while keeping
-          # this database isolated to the ephemeral hosted job.
-          sudo systemctl start postgresql.service
-          for attempt in $(seq 1 30); do
-            if pg_isready -q; then break; fi
-            sleep 1
-          done
-          pg_isready
-          version_num="$(sudo -u postgres psql --no-psqlrc --tuples-only \
-            --no-align --set=ON_ERROR_STOP=1 \
-            --command='SHOW server_version_num')"
-          test "$version_num" -ge 160000
-          test "$version_num" -lt 170000
-
-          sudo -u postgres psql --no-psqlrc --set=ON_ERROR_STOP=1 \
-            --set=role="$role" --set=password="$password" <<'SQL'
-          CREATE ROLE :"role" LOGIN PASSWORD :'password';
-          SQL
-          sudo -u postgres createdb --owner="$role" "$database"
-          PGPASSWORD="$password" psql --no-psqlrc --set=ON_ERROR_STOP=1 \
-            "host=127.0.0.1 port=5432 dbname=$database user=$role" \
-            --tuples-only --no-align --command='SELECT current_database()'
-          printf 'FCP_TEST_POSTGRES_DSN=postgresql://%s:%s@127.0.0.1:5432/%s\n' \
-            "$role" "$password" "$database" >> "$GITHUB_ENV"
+        uses: ./.github/actions/self-hosted-postgres
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip==26.2.1
@@ -452,27 +395,19 @@ jobs:
 
       - name: Remove disposable PostgreSQL 16
         if: always()
-        shell: bash
-        run: |
-          set -euo pipefail
-          if systemctl is-active --quiet postgresql.service; then
-            if [[ -n "${FCP_CI_POSTGRES_DATABASE:-}" ]]; then
-              sudo -u postgres dropdb --if-exists --force "$FCP_CI_POSTGRES_DATABASE"
-            fi
-            if [[ -n "${FCP_CI_POSTGRES_ROLE:-}" ]]; then
-              sudo -u postgres dropuser --if-exists "$FCP_CI_POSTGRES_ROLE"
-            fi
-            sudo systemctl stop postgresql.service
-          fi
+        uses: ./.github/actions/self-hosted-postgres
+        with:
+          operation: stop
 
   suite-order-runs:
+    if: github.repository_id == '1033058161'
     name: Full-suite order (${{ matrix.order }})
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, Linux, X64, fcp-linux-fast]
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
-      - uses: ./.github/actions/hosted-python
+      - uses: ./.github/actions/self-hosted-python
         with:
           python-version: "3.12.13"
 
@@ -516,13 +451,13 @@ jobs:
             seed: ${{ github.run_number }}
   release-matrix:
     name: Release matrix (${{ matrix.os }})
-    if: always()
+    if: always() && github.repository_id == '1033058161'
     needs: [release-checks, linux-regressions, windows-regressions]
     strategy:
       fail-fast: false
       matrix:
         os: [Linux, Windows]
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, Linux, X64, fcp-linux-fast]
     timeout-minutes: 5
     steps:
       - name: Require release checks and every regression shard
@@ -535,7 +470,7 @@ jobs:
           test "$LINUX" = success
           test "$WINDOWS" = success
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/hosted-python
+      - uses: ./.github/actions/self-hosted-python
         with:
           python-version: "3.12.13"
       - uses: actions/download-artifact@v4
@@ -550,9 +485,9 @@ jobs:
           --count 4 --source-sha "${{ github.sha }}"
   suite-order-independence:
     name: Clean-checkout suite order independence
-    if: always()
+    if: always() && github.repository_id == '1033058161'
     needs: [suite-order-runs]
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, Linux, X64, fcp-linux-fast]
     timeout-minutes: 5
     steps:
       - name: Require both complete-suite order checks
@@ -561,9 +496,9 @@ jobs:
         run: test "$RESULT" = success
   release-verdict:
     name: Federation v1 automated release verdict
-    if: always()
+    if: always() && github.repository_id == '1033058161'
     needs: [release-matrix, postgres-storage, suite-order-independence]
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, Linux, X64, fcp-linux-fast]
     steps:
       - name: Require every automated release job
         shell: bash

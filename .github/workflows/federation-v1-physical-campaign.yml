@@ -6,10 +6,13 @@ name: Federation v1 physical campaign tooling
 # their registered acceptance hosts under the separate campaign procedure.
 
 on:
-  pull_request:
+  push:
+    branches: ['**']
     paths:
       - ".github/actions/**"
       - ".github/workflows/federation-v1-physical-campaign.yml"
+      - "scripts/acceptance/**"
+      - "catalog/federation/tests/cf7_acceptance/test_v1_physical_*.py"
       - "scripts/acceptance/v1_physical_campaign.py"
       - "scripts/acceptance/v1_physical_campaign_contract.py"
       - "scripts/acceptance/v1_physical_campaign_strict.py"
@@ -29,13 +32,6 @@ on:
       - "docs/implementation/v1_physical_campaign.md"
       - "docs/implementation/v1_physical_campaign_strict.md"
       - "docs/implementation/v1_physical_campaign_automation.md"
-  push:
-    branches: [main]
-    paths:
-      - ".github/actions/**"
-      - ".github/workflows/federation-v1-physical-campaign.yml"
-      - "scripts/acceptance/**"
-      - "catalog/federation/tests/cf7_acceptance/test_v1_physical_*.py"
   workflow_dispatch:
 
 permissions:
@@ -47,17 +43,18 @@ concurrency:
 
 jobs:
   campaign-tooling:
+    if: github.repository_id == '1033058161'
     name: Campaign tooling (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: Linux
-            runner: ubuntu-24.04
+            runner: [self-hosted, Linux, X64, fcp-linux-fast]
             shell: bash
             python: "3.12.13"
           - os: Windows
-            runner: windows-2025
+            runner: [self-hosted, Windows, X64, fcp-windows]
             shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
             python: "3.12.10"
     runs-on: ${{ matrix.runner }}
@@ -69,7 +66,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: ./.github/actions/hosted-python
+      - uses: ./.github/actions/self-hosted-python
         with:
           python-version: ${{ matrix.python }}
 

@@ -1,24 +1,8 @@
 name: CFI-3 device inspection composition
 
 on:
-  pull_request:
-    paths:
-      - ".github/workflows/cfi3-device-inspection-composition.yml"
-      - "catalog/flask_app/app.py"
-      - "catalog/flask_app/capability_inspection_routes.py"
-      - "catalog/flask_app/services/capability_inspection_service.py"
-      - "catalog/flask_app/services/run_once_capability_evidence.py"
-      - "catalog/flask_app/templates/federation/onboarding/_inspect.html"
-      - "catalog/flask_app/tests/test_capability_inspection_route.py"
-      - "catalog/flask_app/tests/test_run_once_capability_evidence.py"
-      - "catalog/capabilities/benchmarking/**"
-      - "catalog/federation/onboarding_models.py"
-      - "catalog/flask_app/services/mtconnect_discovery_service.py"
-      - "catalog/flask_app/services/server_setup_service.py"
   push:
-    branches:
-      - main
-      - "agent/cfi3-*"
+    branches: ['**']
     paths:
       - ".github/workflows/cfi3-device-inspection-composition.yml"
       - "catalog/flask_app/app.py"
@@ -32,7 +16,6 @@ on:
       - "catalog/federation/onboarding_models.py"
       - "catalog/flask_app/services/mtconnect_discovery_service.py"
       - "catalog/flask_app/services/server_setup_service.py"
-
 permissions:
   contents: read
 
@@ -52,12 +35,12 @@ jobs:
       matrix:
         include:
           - os: Linux
-            runner: fcp-linux-fast
+            runner: [self-hosted, Linux, X64, fcp-linux-fast]
             shell: bash
           - os: Windows
-            runner: fcp-test-windows
+            runner: [self-hosted, Windows, X64, fcp-windows]
             shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
-    runs-on: [self-hosted, "${{ matrix.os }}", X64, "${{ matrix.runner }}"]
+    runs-on: ${{ matrix.runner }}
     defaults:
       run:
         shell: ${{ matrix.shell }}

@@ -87,27 +87,28 @@ def _commands(text, marker):
     return found
 
 
-@pytest.mark.parametrize("event", ["pull_request", "push"])
 @pytest.mark.parametrize("changed_path", REQUIRED_PATHS)
-def test_relevant_single_file_changes_trigger_native_matrix(event, changed_path):
+def test_relevant_single_file_changes_trigger_native_matrix(changed_path):
     assert (ROOT / changed_path).is_file()
-    assert any(fnmatch.fnmatchcase(changed_path, p) for p in _paths(_workflow(), event))
+    assert any(fnmatch.fnmatchcase(changed_path, p) for p in _paths(_workflow(), "push"))
 
 
 def test_trigger_and_runner_boundaries_remain_native():
     text = _workflow()
-    assert _paths(text, "pull_request") == _paths(text, "push")
-    assert "branches: [main]" in _event(text, "push")
+    # Checked-in entry points use trusted branch pushes. Fork approval must
+    # also be enforced outside PR-editable workflow definitions.
+    assert "  pull_request:" not in text and "pull_request_target:" not in text
+    assert "branches: ['**']" in _event(text, "push")
     assert "  workflow_dispatch:" in text
     jobs = text.split("\njobs:\n", 1)[1]
     assert re.findall(r"^  ([\w-]+):$", jobs, re.MULTILINE) == ["capability-closeout"]
-    assert "os: Linux\n            runner: ubuntu-24.04" in jobs
-    assert "os: Windows\n            runner: [self-hosted, fcp-windows]" in jobs
+    assert "os: Linux\n            runner: [self-hosted, Linux, X64, fcp-linux-fast]" in jobs
+    assert "os: Windows\n            runner: [self-hosted, Windows, X64, fcp-windows]" in jobs
     assert "runs-on: ${{ matrix.runner }}" in jobs
-    assert "ubuntu-latest" not in text and "windows-latest" not in text
+    assert not re.search(r"\b(?:ubuntu|windows|macos)-(?:latest|\d)", text)
     assert "timeout-minutes: 30" in jobs and "fail-fast: false" in jobs
     assert (
-        "uses: ./.github/actions/hosted-python\n"
+        "uses: ./.github/actions/self-hosted-python\n"
         "        if: runner.os == 'Linux'\n"
         "        with:\n"
         '          python-version: "3.12.13"'
@@ -138,7 +139,8 @@ def test_unique_windows_modules_and_transfer_tests_are_unconditional():
         assert any(
             module == p or module.startswith(p.rstrip("/") + "/") for p in scopes
         )
-    assert "TEMP:" in body and "TMP:" in body and "fcp-qtmp" in body
+    assert "TEMP:" in body and "TMP:" in body and "env.FCP_CI_TEST_TEMP" in body
+    assert "C:\\fcp-qtmp" not in body
 
 
 def test_unique_lint_rules_and_relay_scopes_are_unconditional():

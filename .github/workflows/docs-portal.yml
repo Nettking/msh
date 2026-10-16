@@ -1,7 +1,8 @@
 name: Documentation portal
 
 on:
-  pull_request:
+  push:
+    branches: ['**']
     paths:
       - "catalog/flask_app/docs_routes.py"
       - "catalog/flask_app/templates/docs_viewer.html"
@@ -22,16 +23,16 @@ jobs:
       github.repository == 'Nettking/msh' &&
       (github.event_name != 'pull_request' ||
        github.event.pull_request.head.repo.full_name == 'Nettking/msh')
-    runs-on: [self-hosted, "${{ matrix.os }}", X64, "${{ matrix.runner }}"]
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: Linux
-            runner: fcp-linux-fast
+            runner: [self-hosted, Linux, X64, fcp-linux-fast]
             shell: bash
           - os: Windows
-            runner: fcp-test-windows
+            runner: [self-hosted, Windows, X64, fcp-windows]
             shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
     defaults:
       run:

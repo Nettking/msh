@@ -1,28 +1,8 @@
 name: Capability configuration boundary
 
 on:
-  pull_request:
-    paths:
-      - ".github/workflows/capability-config.yml"
-      - "catalog/flask_app/app.py"
-      - "catalog/flask_app/capability_startup_transition_routes.py"
-      - "catalog/flask_app/server_setup_routes.py"
-      - "catalog/flask_app/services/capability_config_migration_service.py"
-      - "catalog/flask_app/services/capability_config_service.py"
-      - "catalog/flask_app/services/server_setup_service.py"
-      - "catalog/mtconnect_recorder/config_bootstrap.py"
-      - "catalog/mtconnect_recorder/runtime.py"
-      - "catalog/standalone-recorder_v2/standalone-recorder_v2.py"
-      - "docker-compose.yml"
-      - "catalog/flask_app/tests/test_app_capability_config_saver.py"
-      - "catalog/flask_app/tests/test_capability_config_migration_service.py"
-      - "catalog/flask_app/tests/test_recorder_capability_config_runtime.py"
-      - "catalog/flask_app/tests/test_recorder_config_bootstrap.py"
-      - "catalog/flask_app/tests/test_post_setup_handoff.py"
-      - "catalog/flask_app/tests/test_connected_ai_provider.py"
-      - "catalog/flask_app/tests/test_legacy_startup_retired.py"
   push:
-    branches: [main]
+    branches: ['**']
     paths:
       - ".github/workflows/capability-config.yml"
       - "catalog/flask_app/app.py"
@@ -42,7 +22,6 @@ on:
       - "catalog/flask_app/tests/test_post_setup_handoff.py"
       - "catalog/flask_app/tests/test_connected_ai_provider.py"
       - "catalog/flask_app/tests/test_legacy_startup_retired.py"
-
 permissions:
   contents: read
 
@@ -52,12 +31,22 @@ concurrency:
 
 jobs:
   capability-config:
+    if: github.repository_id == '1033058161'
     name: capability-config (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+        include:
+          - os: Linux
+            runner: [self-hosted, Linux, X64, fcp-linux-fast]
+            shell: bash
+          - os: Windows
+            runner: [self-hosted, Windows, X64, fcp-windows]
+            shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
     timeout-minutes: 30
 
     steps:
@@ -65,10 +54,9 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - uses: ./.github/actions/self-hosted-python
         with:
           python-version: "3.12"
-          cache: "" # No external Actions cache; local pip cache remains available.
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip

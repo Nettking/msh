@@ -1,18 +1,12 @@
 name: Phase F6.6.1 circuit relay foundation
 
 on:
-  pull_request:
-    paths:
-      - "cmd/fcp-peer-sidecar/**"
-      - "docs/implementation/phase_f661_circuit_relay_foundation.md"
-      - ".github/workflows/phase-f661-circuit-relay-foundation.yml"
   push:
-    branches: [main]
+    branches: ['**']
     paths:
       - "cmd/fcp-peer-sidecar/**"
       - "docs/implementation/phase_f661_circuit_relay_foundation.md"
       - ".github/workflows/phase-f661-circuit-relay-foundation.yml"
-
 permissions:
   contents: read
 
@@ -22,11 +16,21 @@ concurrency:
 
 jobs:
   circuit-relay-foundation:
+    if: github.repository_id == '1033058161'
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+        include:
+          - os: Linux
+            runner: [self-hosted, Linux, X64, fcp-linux-fast]
+            shell: bash
+          - os: Windows
+            runner: [self-hosted, Windows, X64, fcp-windows]
+            shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4

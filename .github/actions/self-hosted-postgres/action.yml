@@ -14,21 +14,31 @@ runs:
       run: |
         set -euo pipefail
         name="fcp-ci-pg-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${GITHUB_JOB}"
+        password="$(openssl rand -hex 24)"
+        printf '::add-mask::%s\n' "$password"
         echo "FCP_CI_POSTGRES_CONTAINER=$name" >> "$GITHUB_ENV"
         docker run --detach --rm --name "$name" \
           --label "fcp.ci.run=${GITHUB_RUN_ID}" \
           --publish 127.0.0.1::5432 \
           --tmpfs /var/lib/postgresql/data:rw \
-          --env POSTGRES_USER=fcp --env POSTGRES_PASSWORD=fcp --env POSTGRES_DB=fcp_test \
+          --env POSTGRES_USER=fcp --env POSTGRES_PASSWORD="$password" --env POSTGRES_DB=fcp_test \
           --health-cmd 'pg_isready -U fcp -d fcp_test' \
           --health-interval 5s --health-timeout 5s --health-retries 10 \
           postgres:16-alpine
         for attempt in $(seq 1 60); do
           health=$(docker inspect --format '{{.State.Health.Status}}' "$name")
           if [ "$health" = healthy ]; then
+            version_num="$(docker exec "$name" psql -U fcp -d fcp_test \
+              --no-psqlrc --tuples-only --no-align --set=ON_ERROR_STOP=1 \
+              --command='SHOW server_version_num')"
+            test "$version_num" -ge 160000
+            test "$version_num" -lt 170000
+            docker exec "$name" psql -U fcp -d fcp_test --no-psqlrc \
+              --set=ON_ERROR_STOP=1 --tuples-only --no-align \
+              --command='SELECT current_database()'
             port=$(docker port "$name" 5432/tcp | sed -n 's/^127\.0\.0\.1://p')
             test -n "$port"
-            echo "FCP_TEST_POSTGRES_DSN=postgresql://fcp:fcp@127.0.0.1:${port}/fcp_test" >> "$GITHUB_ENV"
+            echo "FCP_TEST_POSTGRES_DSN=postgresql://fcp:${password}@127.0.0.1:${port}/fcp_test" >> "$GITHUB_ENV"
             exit 0
           fi
           if [ "$health" = unhealthy ]; then break; fi

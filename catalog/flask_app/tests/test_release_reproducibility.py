@@ -71,20 +71,23 @@ def test_release_workflow_uses_locked_inputs_and_covers_build_files() -> None:
         '"start.sh"',
         '"setup_fcp.py"',
     ):
-        assert text.count(required) >= 2
+        assert required in text
 
 
 def test_v1_ci_does_not_depend_on_a_named_runner_or_archive_device() -> None:
     release = (ROOT / ".github/workflows/federation-v1-release.yml").read_text(
         encoding="utf-8"
     )
-    assert re.search(r"(?m)^\s*runs-on:.*self-hosted", release) is None
-    assert not re.search(r"(?m)^\s*-\s*self-hosted\s*$", release)
+    assert "runs-on: ${{ matrix.runner }}" in release
+    assert release.count("runs-on: [self-hosted, Linux, X64, fcp-linux-fast]") == 6
+    assert "runs-on: [self-hosted, Windows, X64, fcp-windows]" in release
     assert "NITRO_ARTIFACT_" not in release
     assert ".github/actions/nitro-artifact" not in release
-    assert "runner: ubuntu-24.04" in release
-    assert "runner: windows-2025" in release
-    assert "actions/hosted-python" in release
+    assert "runner: [self-hosted, Linux, X64, fcp-linux-fast]" in release
+    assert "runner: [self-hosted, Windows, X64, fcp-windows]" in release
+    assert "actions/self-hosted-python" in release
+    assert "pull_request:" not in release
+    assert 'branches: ["**"]' in release
     assert "actions/upload-artifact@v4" in release
     assert "actions/download-artifact@v4" in release
     assert release.count("retention-days: 90") == 4
@@ -97,8 +100,8 @@ def test_v1_ci_does_not_depend_on_a_named_runner_or_archive_device() -> None:
     assert "if: ${{ !cancelled() && matrix.suite == 'capability-product' }}" in (
         path_compatibility
     )
-    assert "TEMP: '${{ runner.temp }}\\fcp-windows-compat'" in path_compatibility
-    assert "TMP: '${{ runner.temp }}\\fcp-windows-compat'" in path_compatibility
+    assert "TEMP: '${{ env.FCP_CI_JOB_ROOT }}\\windows-compat'" in path_compatibility
+    assert "TMP: '${{ env.FCP_CI_JOB_ROOT }}\\windows-compat'" in path_compatibility
     assert "\\\\?\\" not in path_compatibility
     assert "windows-path-compat.xml" in path_compatibility
     assert "windows-path-sensitive-compat" in release
@@ -117,30 +120,40 @@ def test_v1_ci_does_not_depend_on_a_named_runner_or_archive_device() -> None:
         assert windows_only_suite in release
         assert windows_only_suite in path_compatibility
 
-    hosted_python = (ROOT / ".github/actions/hosted-python/action.yml").read_text(
+    self_hosted_python = (ROOT / ".github/actions/self-hosted-python/action.yml").read_text(
         encoding="utf-8"
     )
-    assert "actions/setup-python@v5" in hosted_python
-    assert "cache: false" not in hosted_python
-    assert "python -m venv" in hosted_python
-    assert "Git Bash is required" in hosted_python
-    assert "TMPDIR=${RUNNER_TEMP}/fcp-test-tmp" in hosted_python
+    assert "/opt/fcp-ci/python/3.12.13/bin/python3.12" in self_hosted_python
+    assert "v == '3.12.10'" in self_hosted_python
+    assert "python -m venv" in self_hosted_python
+    assert "Git Bash is required" in self_hosted_python
+    assert "./.github/actions/self-hosted-python/job-environment" in self_hosted_python
+    assert "actions/setup-python" not in self_hosted_python
+
+    postgres = (ROOT / ".github/actions/self-hosted-postgres/action.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "uses: ./.github/actions/self-hosted-postgres" in release
+    assert "systemctl" not in release
+    assert "openssl rand -hex 24" in postgres
+    assert "test \"$version_num\" -ge 160000" in postgres
+    assert "test \"$version_num\" -lt 170000" in postgres
+    assert "--publish 127.0.0.1::5432" in postgres
+    assert "operation: stop" in release
 
     tooling = (
         ROOT / ".github/workflows/federation-v1-physical-campaign.yml"
     ).read_text(encoding="utf-8")
-    assert "self-hosted" not in tooling
-    assert "runner: ubuntu-24.04" in tooling
-    assert "runner: windows-2025" in tooling
-    assert "actions/hosted-python" in tooling
+    assert "runner: [self-hosted, Linux, X64, fcp-linux-fast]" in tooling
+    assert "runner: [self-hosted, Windows, X64, fcp-windows]" in tooling
+    assert "actions/self-hosted-python" in tooling
 
 
 def test_release_image_metadata_gate_checks_exact_digests() -> None:
     workflow = (ROOT / ".github/workflows/release-image-metadata.yml").read_text(
         encoding="utf-8"
     )
-    assert "runs-on: ubuntu-24.04" in workflow
-    assert "self-hosted" not in workflow
+    assert "runs-on: [self-hosted, Linux, X64, fcp-linux-fast]" in workflow
     assert "docker buildx imagetools inspect" in workflow
     assert PYTHON_IMAGE in workflow
     assert OLLAMA_IMAGE in workflow
