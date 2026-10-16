@@ -33,8 +33,9 @@ NOW = datetime(2026, 7, 28, 12, tzinfo=timezone.utc)
 REQUEST_TIMEOUT_SECONDS = 3.0
 
 
+@pytest.mark.parametrize("capability_count", [1, 33])
 def test_pressure_refuses_capability_mutation_without_losing_live_routes(
-    tmp_path: Path,
+    tmp_path: Path, capability_count: int,
 ) -> None:
     from dataclasses import replace
 
@@ -45,6 +46,19 @@ def test_pressure_refuses_capability_mutation_without_losing_live_routes(
         relay = await _start_relay(tmp_path / "relay.sqlite3")
         owner = _client(tmp_path / "owner", relay, "Owner")
         peer = _client(tmp_path / "peer", relay, "Peer")
+        heartbeat_tick = asyncio.Event()
+        heartbeat_retried = asyncio.Event()
+        heartbeat_waits = 0
+
+        async def heartbeat_sleep(_seconds):
+            nonlocal heartbeat_waits
+            heartbeat_waits += 1
+            if heartbeat_waits > 1:
+                heartbeat_retried.set()
+            await heartbeat_tick.wait()
+            heartbeat_tick.clear()
+
+        owner._sleep = heartbeat_sleep
         try:
             await _enroll(relay, owner)
             await _enroll(relay, peer)
@@ -61,6 +75,10 @@ def test_pressure_refuses_capability_mutation_without_losing_live_routes(
                 announced_at=NOW,
             )
             await owner.announce_capability(announcement)
+            for index in range(1, capability_count):
+                await owner.announce_capability(
+                    replace(announcement, capability_id=f"storage-{index}")
+                )
             before = relay.coordinator.store.list_capabilities(
                 session_id=session_id,
                 node_id=owner.node_id,
@@ -85,6 +103,14 @@ def test_pressure_refuses_capability_mutation_without_losing_live_routes(
             assert refused.value.code == "resource-pressure"
             assert refused.value.field == "resource"
             assert owner.connected_event.is_set()
+            # 33 persisted capability rows deliberately exceed the bounded
+            # heartbeat fanout. Admission must refuse it without losing this
+            # same connection; one row exercises the admitted-heartbeat case.
+            heartbeat_tick.set()
+            await asyncio.wait_for(
+                heartbeat_retried.wait(), timeout=REQUEST_TIMEOUT_SECONDS
+            )
+            assert owner.connected_event.is_set()
             assert relay.coordinator.store.list_capabilities(
                 session_id=session_id,
                 node_id=owner.node_id,
@@ -105,6 +131,11 @@ def test_pressure_refuses_capability_mutation_without_losing_live_routes(
                 "reply": "same connection"
             }
             free_bytes = 64 * 1024**3
+            heartbeat_retried.clear()
+            heartbeat_tick.set()
+            await asyncio.wait_for(
+                heartbeat_retried.wait(), timeout=REQUEST_TIMEOUT_SECONDS
+            )
             await owner.announce_capability(
                 replace(announcement, properties={"label": "recovered"})
             )
