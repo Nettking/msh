@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import io
+import sqlite3
 import threading
+from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import pytest
 from flask import Flask
+from jinja2 import DictLoader
 from werkzeug.datastructures import FileStorage
 from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.test import EnvironBuilder
@@ -414,6 +417,86 @@ def test_request_spool_pressure_refuses_before_root_or_body_creation(
             request.files.getlist("files")
 
     assert not (tmp_path / "request-spool").exists()
+
+
+@pytest.mark.parametrize("csrf_location", ["form", "header"])
+def test_multipart_pressure_returns_public_refusal_without_staging(
+    tmp_path: Path,
+    csrf_location: str,
+) -> None:
+    mode = {"free_bytes": 10_000_000}
+
+    def measure(_path: Path | str) -> FilesystemMeasurement:
+        return _measurement("upload-resource", free_bytes=mode["free_bytes"])
+
+    base = _admission(measure)
+    admission = SerializedProcessResourceAdmission(
+        thresholds=base.thresholds, measurer=measure, clock=base.clock
+    )
+    service = DataUploadService(
+        database=tmp_path / "imports" / "uploads.sqlite3",
+        staging_root=tmp_path / "imports" / "staging",
+        published_root=tmp_path / "data" / "uploads",
+        runtime_manager=_FakeUploadService(tmp_path),
+        max_files=2,
+        max_file_bytes=2048,
+        max_total_bytes=4096,
+        resource_admission=admission,
+    )
+    app = _request_app(tmp_path, admission)
+    app.config["SECRET_KEY"] = "multipart-pressure-regression"
+    app.extensions["data_upload_service"] = service
+    app.jinja_loader = DictLoader(
+        {"data_upload.html": "{{ get_flashed_messages() | join(' ') }}"}
+    )
+    app.register_blueprint(data_upload_routes.data_upload_web)
+    client = app.test_client()
+    assert client.get("/data-upload/").status_code == 200
+    with client.session_transaction() as session:
+        csrf = session["data_upload_csrf_token"]
+
+    def durable_database() -> tuple[str, ...]:
+        with closing(
+            sqlite3.connect(service.database.as_uri() + "?mode=ro", uri=True)
+        ) as connection:
+            connection.execute("PRAGMA query_only=ON")
+            return tuple(connection.iterdump())
+
+    before = durable_database()
+    invalid = client.post(
+        "/data-upload/", data={"_csrf_token": "invalid"}, follow_redirects=True
+    )
+    assert invalid.status_code == 200
+    assert b"The upload request expired." in invalid.data
+    assert durable_database() == before
+
+    mode["free_bytes"] = 200
+    data: dict[str, Any] = {
+        "files": (io.BytesIO(b'{"ok":true}\n'), "data.jsonl")
+    }
+    headers = {}
+    if csrf_location == "form":
+        data["_csrf_token"] = csrf
+    else:
+        headers["X-CSRF-Token"] = csrf
+    response = client.post(
+        "/data-upload/",
+        data=data,
+        headers=headers,
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert len(response.history) == 1 and response.history[0].status_code == 302
+    assert (
+        b"The upload was not started because host storage is under resource pressure."
+        in response.data
+    )
+    assert durable_database() == before
+    assert not (tmp_path / "request-spool").exists()
+    assert tuple(service.staging_root.iterdir()) == ()
+    assert tuple(service.published_root.iterdir()) == ()
 
 
 def _unsupported_multipart_environ(body: bytes, *, path: str = "/federation/nodes") -> dict:
