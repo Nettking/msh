@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import tempfile
 import unittest
+from pathlib import Path
 
 import yaml
 
 from scripts.ci_runner_policy import expand_matrix, validate_workflows
-
 
 LINUX = ["self-hosted", "Linux", "X64", "fcp-linux-fast"]
 WINDOWS = ["self-hosted", "Windows", "X64", "fcp-windows"]

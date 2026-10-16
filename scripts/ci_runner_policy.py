@@ -11,13 +11,12 @@ from __future__ import annotations
 import argparse
 import itertools
 import json
-from pathlib import Path
 import re
 import sys
+from pathlib import Path
 from typing import Any
 
 import yaml
-
 
 ALLOWED_POOLS = (
     frozenset(("self-hosted", "Linux", "X64", "fcp-linux-fast")),

@@ -154,7 +154,7 @@ class SQLitePreparationTests(unittest.TestCase):
         self.assertIn("unexpected child output", str(failure.exception))
 
     def test_probe_accepts_sqlite_module_without_file_metadata(self) -> None:
-        builtin_probe = "import _sqlite3; del _sqlite3.__file__\n" + SQLITE.PROBE
+        builtin_probe = "import _sqlite3; _sqlite3.__dict__.pop('__file__', None)\n" + SQLITE.PROBE
         with mock.patch.object(SQLITE, "PROBE", builtin_probe):
             result = SQLITE.probe(dict(os.environ))
         self.assertEqual(result["extension"], "<built-in>")
