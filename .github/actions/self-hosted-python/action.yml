@@ -19,6 +19,7 @@ runs:
         set -euo pipefail
         python=/opt/fcp-ci/python/3.12.13/bin/python3.12
         "$python" -c 'import os, platform; v=platform.python_version(); assert v == "3.12.13", v; assert v == os.environ["REQUIRED_PYTHON"] or os.environ["REQUIRED_PYTHON"] == "3.12", v; print(v)'
+        "$python" "${GITHUB_ACTION_PATH}/prepare_sqlite.py"
         venv="${FCP_CI_JOB_ROOT}/python"
         "$python" -m venv "$venv"
         echo "$venv/bin" >> "$GITHUB_PATH"
@@ -31,6 +32,8 @@ runs:
         $ErrorActionPreference = 'Stop'
         $env:PSMODULEPATH = 'C:\Windows\System32\WindowsPowerShell\v1.0\Modules;C:\Program Files\WindowsPowerShell\Modules'
         python -c "import os, platform; v=platform.python_version(); assert v == '3.12.10', v; assert v == os.environ['REQUIRED_PYTHON'] or os.environ['REQUIRED_PYTHON'] == '3.12', v; print(v)"
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        python "$env:GITHUB_ACTION_PATH\prepare_sqlite.py" --probe-only
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         $venv = Join-Path $env:FCP_CI_JOB_ROOT 'python'
         python -m venv $venv

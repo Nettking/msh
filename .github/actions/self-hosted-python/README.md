@@ -24,6 +24,21 @@ qualified Python 3.12.13 installation at
 access for the runner account. `actions/setup-go` retains the version in
 `cmd/fcp-peer-sidecar/go.mod`.
 
+Before creating the virtual environment, the action probes SQLite's `->` and
+`->>` JSON operators and expression indexes in a fresh process of the exact
+pinned interpreter. It logs the Python/SQLite versions, extension module and
+loaded library paths. Capable runtimes require no additional download or build.
+An older Linux SQLite runtime triggers a job-local build of the official SQLite
+3.54.0 amalgamation, verified against its published SHA3-256 checksum, using an
+already installed `cc` or `gcc`. The source and shared library stay inside the
+unique job directory. A fresh probe must prove that the same pinned interpreter
+loads that exact library and supports the required features before the action
+exports a job-only `LD_LIBRARY_PATH` prefix. Inherited library paths and
+`LD_PRELOAD` remain intact. A missing compiler or failed verification fails the
+job without installing packages or changing runner services. Windows only
+probes its existing runtime. The post-job cleanup also removes these optional
+build files.
+
 The Python action checks the exact platform version and creates a new virtual
 environment under a unique directory inside the job's temporary directory.
 Existing workflow dependency and tool pins remain authoritative. Linux test

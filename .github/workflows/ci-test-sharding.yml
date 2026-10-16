@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/ci-test-sharding.yml"
       - ".github/workflows/federation-v1-release.yml"
+      - ".github/actions/self-hosted-python/**"
       - "scripts/ci_pytest_shards.py"
       - "catalog/common/tests/test_ci_pytest_shards.py"
   workflow_dispatch:
@@ -49,8 +50,16 @@ jobs:
         run: |
           python -m unittest scripts.tests.test_ci_runner_policy
           python scripts/ci_runner_policy.py
+      - name: Verify job-local SQLite runtime qualification
+        run: >-
+          python -m unittest discover
+          -s .github/actions/self-hosted-python -p test_prepare_sqlite.py
       - name: Check shard tooling
-        run: python -m ruff check scripts/ci_pytest_shards.py catalog/common/tests/test_ci_pytest_shards.py
+        run: >-
+          python -m ruff check scripts/ci_pytest_shards.py
+          catalog/common/tests/test_ci_pytest_shards.py
+          .github/actions/self-hosted-python/prepare_sqlite.py
+          .github/actions/self-hosted-python/test_prepare_sqlite.py
       - name: Verify complete coverage, stable allocation and failure propagation
         run: >-
           python -m pytest -o addopts= -q
