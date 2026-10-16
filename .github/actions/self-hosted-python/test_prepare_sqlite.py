@@ -66,9 +66,11 @@ class SQLitePreparationTests(unittest.TestCase):
 
     def test_rejects_duplicate_required_source_member(self) -> None:
         payload = self.archive(duplicate=True)
-        with mock.patch.object(SQLITE, "SQLITE_SHA3", hashlib.sha3_256(payload).hexdigest()):
-            with self.assertRaisesRegex(RuntimeError, "Missing or duplicate"):
-                SQLITE.extract_source(payload, self.root)
+        with (
+            mock.patch.object(SQLITE, "SQLITE_SHA3", hashlib.sha3_256(payload).hexdigest()),
+            self.assertRaisesRegex(RuntimeError, "Missing or duplicate"),
+        ):
+            SQLITE.extract_source(payload, self.root)
 
     def test_build_root_must_be_the_unique_direct_child(self) -> None:
         self.assertEqual(SQLITE.job_root(self.environment), self.root)
@@ -102,10 +104,12 @@ class SQLitePreparationTests(unittest.TestCase):
             SQLITE.library_environment(library, {"LD_LIBRARY_PATH": "/path\nOTHER=injected"})
 
     def test_missing_compiler_fails_without_downloading_or_installing(self) -> None:
-        with (mock.patch.object(SQLITE.shutil, "which", return_value=None),
-              mock.patch.object(SQLITE.urllib.request, "urlopen") as download):
-            with self.assertRaisesRegex(RuntimeError, "preinstalled C compiler"):
-                SQLITE.build_library(self.root)
+        with (
+            mock.patch.object(SQLITE.shutil, "which", return_value=None),
+            mock.patch.object(SQLITE.urllib.request, "urlopen") as download,
+            self.assertRaisesRegex(RuntimeError, "preinstalled C compiler"),
+        ):
+            SQLITE.build_library(self.root)
         download.assert_not_called()
         self.assertEqual(list(self.root.iterdir()), [])
 
@@ -114,10 +118,12 @@ class SQLitePreparationTests(unittest.TestCase):
         existing.mkdir()
         evidence = existing / "keep"
         evidence.write_text("retain")
-        with (mock.patch.object(SQLITE.shutil, "which", return_value="/existing/cc"),
-              mock.patch.object(SQLITE.urllib.request, "urlopen") as download):
-            with self.assertRaises(FileExistsError):
-                SQLITE.build_library(self.root)
+        with (
+            mock.patch.object(SQLITE.shutil, "which", return_value="/existing/cc"),
+            mock.patch.object(SQLITE.urllib.request, "urlopen") as download,
+            self.assertRaises(FileExistsError),
+        ):
+            SQLITE.build_library(self.root)
         download.assert_not_called()
         self.assertEqual(evidence.read_text(), "retain")
 
