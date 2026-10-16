@@ -525,8 +525,6 @@ class LiveStorageNodeAgent:
             self.control_ready_event.set()
             self.control_waiting_event.clear()
             self._self_fenced_groups = ()
-            if self.client.connected_event.is_set():
-                await self.client.announce_capability(self.storage.capability())
         except FederationValidationError as exc:
             if isinstance(plan_value, dict):
                 publication_id = plan_value.get("publication_id")
@@ -554,6 +552,14 @@ class LiveStorageNodeAgent:
             ),
             payload=response,
         )
+        if response["status"] != "rejected" and self.client.connected_event.is_set():
+            try:
+                await self.client.announce_capability(self.storage.capability())
+            except FederationValidationError as exc:
+                # The signed control is already applied and acknowledged.
+                # Advertising failure must not replace its truthful receipt.
+                print(json.dumps({"error": {"code": exc.code, "field": exc.field}},
+                                 sort_keys=True), file=sys.stderr)
 
     async def run(
         self,

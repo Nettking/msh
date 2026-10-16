@@ -14,6 +14,7 @@ from catalog.federation.acknowledgement import AcknowledgementMode
 from catalog.federation.commit_tracking import DurableAcknowledgementStore
 from catalog.federation.control_sync import StorageControlPublicationStore
 from catalog.federation.coordinator import SessionCoordinator
+from catalog.federation.errors import FederationValidationError
 from catalog.federation.live_failover import (
     LiveFailoverStore,
     StorageControlRelayChannel,
@@ -552,6 +553,63 @@ def test_primary_loss_promotes_complete_replica_and_old_grant_stays_fenced(
                 await relay.stop()
 
     asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("advertisement_rejected", [False, True])
+def test_applied_control_is_acknowledged_before_capability_advertisement(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str], advertisement_rejected: bool,
+) -> None:
+    original_announce = RelayNodeClient.announce_capability
+    original_publish = _publish_initial_control
+    blocked_nodes: set[str] = set()
+    initial_agents = {}
+    control_entered: set[str] = set()
+    bootstrap_entered: set[str] = set()
+    release = asyncio.Event()
+    all_entered = asyncio.Event()
+
+    async def announce(self, capability):
+        if self.node_id in blocked_nodes:
+            agent = initial_agents[self.node_id]
+            is_control_task = asyncio.current_task() is agent._control_task
+            (control_entered if is_control_task else bootstrap_entered).add(self.node_id)
+            if control_entered == bootstrap_entered == blocked_nodes:
+                all_entered.set()
+            await release.wait()
+            if advertisement_rejected and is_control_task:
+                raise FederationValidationError(
+                    "advertisement-test-refused", "capability", "test refusal"
+                )
+        return await original_announce(self, capability)
+
+    async def publish(failover, agents, bootstraps):
+        blocked_nodes.update(agent.node_id for agent in agents)
+        initial_agents.update((agent.node_id, agent) for agent in agents)
+        try:
+            assert failover.channel.timeout == TIMEOUT
+            plan = await original_publish(failover, agents, bootstraps)
+            await asyncio.wait_for(all_entered.wait(), TIMEOUT)
+            for agent, bootstrap in zip(agents, bootstraps, strict=True):
+                applied = agent.replica_store.latest(agent.storage.config.session_id)
+                assert applied.publication_id == plan.publication_id
+                assert applied.content_hash == plan.content_hash
+                assert agent.control_ready_event.is_set()
+                assert not bootstrap.done()
+                assert agent.client.request_timeout == TIMEOUT
+            return plan
+        finally:
+            release.set()
+            blocked_nodes.clear()
+
+    monkeypatch.setattr(RelayNodeClient, "announce_capability", announce)
+    monkeypatch.setattr(__name__ + "._publish_initial_control", publish)
+    # Retain the real signed plan, replica commit, promotion, durable grant,
+    # retained identity and stale-primary fencing assertions from this flow.
+    test_primary_loss_promotes_complete_replica_and_old_grant_stays_fenced(tmp_path)
+    assert len(control_entered) == len(bootstrap_entered) == 2
+    if advertisement_rejected:
+        assert capsys.readouterr().err.count('"code": "advertisement-test-refused"') == 2
 
 
 def test_returning_primary_observation_keeps_individual_deadlines(
