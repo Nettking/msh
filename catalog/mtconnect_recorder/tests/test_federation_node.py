@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import threading
 from concurrent.futures import Future
 from contextlib import suppress
@@ -16,6 +18,7 @@ from catalog.federation.phase_d_client import PhaseDIngestOutcome
 from catalog.federation.recorder_delivery import (
     RECORDER_STORAGE_SCHEMA,
     DurableRecorderDeliveryQueue,
+    RecorderDeliveryProgress,
     RecorderDeliveryRunResult,
 )
 from catalog.mtconnect_recorder import federation_node as federation_node_module
@@ -785,3 +788,87 @@ def test_degraded_sharing_state_has_an_operator_remedy() -> None:
     assert "permanently withdrawn" in detail
     # An operator must not be told to go looking in the recorder archive.
     assert "primary archive was not touched" in detail
+
+
+def test_first_commit_progress_uses_payload_free_route_summary(tmp_path, monkeypatch):
+    outbox = SQLiteOutbox(tmp_path / "outbox.sqlite3")
+    now = datetime.now(timezone.utc)
+    for index, (session, destination, schema) in enumerate(
+        (
+            ("session-1", "telemetry", RECORDER_STORAGE_SCHEMA),
+            ("session-1", "telemetry", RECORDER_STORAGE_SCHEMA),
+            ("other-session", "telemetry", RECORDER_STORAGE_SCHEMA),
+            ("session-1", "other-group", RECORDER_STORAGE_SCHEMA),
+            ("session-1", "telemetry", "other-schema"),
+        )
+    ):
+        payload = {"index": index, "content": "x" * 4096}
+        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        entry, created = outbox.enqueue(
+            session_id=session,
+            destination_id=destination,
+            schema_id=schema,
+            payload=payload,
+            idempotency_key=f"boundedness-{index}",
+            content_hash=hashlib.sha256(encoded.encode()).hexdigest(),
+            now=now,
+        )
+        assert created
+        if index == 0:
+            outbox.record_failure(entry.outbox_id, error="previous outage", now=now)
+
+    decoded_routes = []
+    real_decode = outbox._decode
+
+    def observe_decode(row):
+        decoded_routes.append((row["session_id"], row["destination_id"], row["schema_id"]))
+        return real_decode(row)
+
+    monkeypatch.setattr(outbox, "_decode", observe_decode)
+    # The existing real SQLite aggregate already answers the required facts
+    # without decoding even one payload, including the historical-error flag.
+    assert _pending_outbox_summary(
+        outbox, session_id="session-1", group_id="telemetry"
+    ) == (2, True)
+    assert decoded_routes == []
+
+    node = RecorderFederationNode.__new__(RecorderFederationNode)
+    node._lock = threading.RLock()
+    node._snapshot = RecorderFederationSnapshot(
+        status="connected",
+        node_id="node-recorder",
+        federation_id="federation-1",
+        session_id="session-1",
+        storage_state="discovering",
+        jsonl_state="discovering",
+    )
+    publications = []
+
+    async def publish_jsonl(state, *, authority_node_id, group_id):
+        assert state.binding.internal_session_id == "session-1"
+        assert authority_node_id == "node-owner"
+        assert group_id == "telemetry"
+        publications.append(group_id)
+        return SimpleNamespace(published_chunks=1)
+
+    node._publish_jsonl_once = publish_jsonl
+    observer = node._startup_progress_observer(
+        state=SimpleNamespace(binding=SimpleNamespace(internal_session_id="session-1")),
+        authority_node_id="node-owner",
+        group_id="telemetry",
+        outbox=outbox,
+    )
+    asyncio.run(observer(RecorderDeliveryProgress(committed=1, pending=0)))
+    snapshot = node.snapshot()
+    assert publications == ["telemetry"]
+    assert snapshot.pending_batches == 2
+    # A fresh durable ACK must keep historical failure text from masking
+    # current progress; this semantic requirement is independent of the fix.
+    assert snapshot.storage_state == "publishing"
+    assert snapshot.last_error_code is None
+    assert snapshot.last_committed_count == 1
+    assert snapshot.jsonl_state == "ready"
+    assert decoded_routes == [], (
+        "startup readiness decoded pending payloads despite the existing "
+        f"payload-free summary; actual decoded routes: {decoded_routes!r}"
+    )
