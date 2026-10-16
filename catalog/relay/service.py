@@ -45,6 +45,7 @@ from catalog.federation.errors import (
     FederationValidationError,
     ProtocolCompatibilityError,
 )
+from catalog.federation.host_resources import HostResourceRefused
 from catalog.federation.human_auth import (
     AUTHORITY_EVENT,
     AUTHORITY_SCHEMA,
@@ -1255,6 +1256,31 @@ class RelayServer:
                         )
                     self.coordinator.require_active_node(record.node_id)
                     await self._dispatch(record, request)
+                except HostResourceRefused:
+                    # Refuse the mutation without tearing down the authenticated
+                    # route needed by already committed reads. The same pressure
+                    # may also refuse a durable rejection audit; do not bypass it.
+                    with suppress(HostResourceRefused):
+                        self._audit_rejection(
+                            action=request.message_type if request else "relay.receive",
+                            reason="resource-pressure",
+                            actor_node_id=record.node_id,
+                            request=request,
+                        )
+                    LOGGER.warning("relay operation refused under host resource pressure")
+                    with suppress(RelayTransportError, ConnectionClosed):
+                        await self._send_live(
+                            record,
+                            self._error_envelope(
+                                request,
+                                FederationOperationError(
+                                    "resource-pressure",
+                                    "relay operation refused under host resource pressure",
+                                    "resource",
+                                ),
+                                target_node_id=record.node_id,
+                            ),
+                        )
                 except (
                     FederationValidationError,
                     FederationOperationError,

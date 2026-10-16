@@ -34,6 +34,7 @@ from catalog.capabilities.analysis.resource_admission import (
 from catalog.common.artifact_registry import configured_scan_dirs, scan_artifacts
 from catalog.common.basic_metrics import basic_metrics_path, build_basic_metrics_dataset
 from catalog.common.data_loading import iter_jsonl_files
+from catalog.federation.host_resources import HostResourceRefused
 from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
 from catalog.runner.data_filtering import (
     date_range_source_signature,
@@ -1047,7 +1048,12 @@ class RuntimeOrchestrator:
                     self._state.last_failure = f"{exc.__class__.__name__}: {exc}"
                     self._state.update_running = False
                     self._state.current_processing_phase = "failed"
-                    self._persist_state()
+                    try:
+                        self._persist_state()
+                    except HostResourceRefused:
+                        # Keep the poller alive and retry after capacity returns;
+                        # a failed status write does not authorize another write.
+                        pass
                 self.status.warn(f"background update loop failure: {exc}")
             self._stop.wait(1 if run_bootstrap_once else self.poll_interval_seconds)
 

@@ -1299,7 +1299,14 @@ class RelayNodeClient:
             while self._websocket is not None:
                 await self._sleep(self.heartbeat_interval)
                 websocket = self._websocket
-                await self.request("heartbeat", payload={})
+                try:
+                    await self.request("heartbeat", payload={})
+                except RelayRemoteError as exc:
+                    if (exc.code, exc.field) != ("resource-pressure", "resource"):
+                        raise
+                    # Retry on the normal cadence without recording a refused
+                    # heartbeat as successful or replacing the authenticated route.
+                    continue
                 self.state.record_heartbeat(now=self._clock())
         except asyncio.CancelledError:
             raise
