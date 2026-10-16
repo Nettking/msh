@@ -581,19 +581,17 @@ class RecorderFederationNode:
                 # failure through the normal retry path.
                 startup_progress_reported = True
                 return
-            progress_pending = await asyncio.to_thread(outbox.pending)
+            pending_count, _ = await asyncio.to_thread(
+                _pending_outbox_summary,
+                outbox,
+                session_id=state.binding.internal_session_id,
+                group_id=group_id,
+            )
             progress_retirement = await asyncio.to_thread(
                 outbox.retired_summary,
                 session_id=state.binding.internal_session_id,
                 destination_id=group_id,
                 schema_id=RECORDER_STORAGE_SCHEMA,
-            )
-            pending_count = len(
-                _current_recorder_pending(
-                    progress_pending,
-                    session_id=state.binding.internal_session_id,
-                    group_id=group_id,
-                )
             )
             if progress_retirement.total:
                 progress_state = "degraded"
