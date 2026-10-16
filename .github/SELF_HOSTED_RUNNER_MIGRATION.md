@@ -98,16 +98,33 @@ or service and does not require AQG7NCC to be online.
 
 Pull-request workflow definitions are editable by the pull-request author. A
 job-level repository or fork check in that same editable definition is not an
-independent security boundary. Workflows therefore use pushes to branches in
-this repository and existing authorized manual dispatch entry points; they have no
-`pull_request` or `pull_request_target` execution entry point. Fork pushes cannot
-select this repository's registered self-hosted runners. The repository guard
-also prevents copied workflow definitions in other repositories from running.
+independent security boundary. The checked-in workflows use pushes to branches
+in this repository and existing authorized manual dispatch entry points; they
+have no `pull_request` or `pull_request_target` execution entry point. Ordinary
+fork pushes cannot select this repository's registered self-hosted runners. The
+repository guard also skips copied, unchanged workflow definitions in other
+repositories.
+
+**An independent GitHub-side restriction is still required for the public
+repository.** A fork author can change a workflow to add a pull-request trigger
+and remove the policy check before GitHub evaluates the proposed workflow.
+Removing triggers in this checkout does not prevent that attack. Before this
+migration can be considered secure for untrusted fork contributions, repository
+administrators must require approval for every outside collaborator workflow
+run, or enforce an equivalent restriction outside the editable workflow. A
+first-time-contributor approval policy does not cover previously approved
+contributors. This migration changes no repository settings or runner groups;
+that prerequisite remains a deployment blocker until independently verified.
+See GitHub's [workflow event-ref behavior](https://docs.github.com/en/actions/concepts/workflows-and-actions/workflows),
+[self-hosted runner security guidance](https://docs.github.com/en/actions/reference/security/secure-use#hardening-for-self-hosted-runners),
+and [fork approval controls](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/approve-runs-from-forks).
 
 Path filters are preserved, and branch pushes cover trusted repository branches
-so same-repository pull requests can receive checks for their head commit. Fork
-pull requests receive no automatic runner execution. A maintainer must review
-the external change before bringing it onto a trusted repository branch. Checks
+so same-repository pull requests can receive checks for their head commit. The
+checked-in workflow definitions do not automatically execute fork pull requests.
+A maintainer must review the external change before bringing it onto a trusted
+repository branch, and the independent restriction above must prevent modified
+fork workflow definitions from bypassing that review. Checks
 on branch pushes qualify that exact head SHA; they do not claim qualification
 of GitHub's synthetic pull-request merge commit. Release qualification continues
 to bind evidence to the exact checkout and event SHA.

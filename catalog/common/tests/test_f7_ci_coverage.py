@@ -95,8 +95,8 @@ def test_relevant_single_file_changes_trigger_native_matrix(changed_path):
 
 def test_trigger_and_runner_boundaries_remain_native():
     text = _workflow()
-    # Fork-owned workflow edits must never create an execution path to a
-    # persistent runner. Trusted repository branches still receive checks.
+    # Checked-in entry points use trusted branch pushes. Fork approval must
+    # also be enforced outside PR-editable workflow definitions.
     assert "  pull_request:" not in text and "pull_request_target:" not in text
     assert "branches: ['**']" in _event(text, "push")
     assert "  workflow_dispatch:" in text

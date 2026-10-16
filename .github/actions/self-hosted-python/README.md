@@ -9,10 +9,13 @@ fall back to hosted runners. The physical acceptance campaign itself remains
 bound to its registered real test hosts.
 
 Branch pushes in the trusted repository provide checks for the exact branch head,
-including same-repository pull requests. Fork pull requests do not trigger
-execution on the persistent pools. A maintainer must review external changes
-before placing them on a branch in the trusted repository. No workflow runs
-untrusted pull-request code through `pull_request_target`.
+including same-repository pull requests. The checked-in definitions have no
+fork pull-request trigger. An independent GitHub approval restriction is still
+required because a fork can modify those definitions before execution; see the
+[migration security prerequisite](../../SELF_HOSTED_RUNNER_MIGRATION.md#persistent-runner-security-and-isolation).
+A maintainer must review external changes before placing them on a trusted
+repository branch. No checked-in workflow executes code through
+`pull_request_target`.
 
 Windows requires Python 3.12.10 on the runner account's PATH, Windows PowerShell
 5.1, Git for Windows including Bash, and Docker CLI/Compose. Linux requires the
