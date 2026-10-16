@@ -28,7 +28,7 @@ import _sqlite3, json, os, platform, sqlite3, sys
 from pathlib import Path
 result = dict(python=platform.python_version(), executable=sys.executable,
               pid=os.getpid(),
-              sqlite=sqlite3.sqlite_version, extension=_sqlite3.__file__,
+              sqlite=sqlite3.sqlite_version, extension=getattr(_sqlite3, '__file__', '<built-in>'),
               library_path_set=bool(os.environ.get('LD_LIBRARY_PATH')),
               preload_set=bool(os.environ.get('LD_PRELOAD')), libraries=[])
 if sys.platform == 'linux':
@@ -57,9 +57,15 @@ def probe(environment: dict[str, str]) -> dict:
     # SQLite library already loaded by the parent Python interpreter.
     result = subprocess.run(
         [sys.executable, "-I", "-c", PROBE], env=environment,
-        check=True, capture_output=True, text=True,
+        check=False, capture_output=True, text=True,
     )
-    return json.loads(result.stdout)
+    diagnostic = f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+    if result.returncode:
+        raise RuntimeError(f"SQLite probe failed with exit code {result.returncode}\n{diagnostic}")
+    try:
+        return json.loads(result.stdout)
+    except json.JSONDecodeError as error:
+        raise RuntimeError(f"SQLite probe returned invalid JSON\n{diagnostic}") from error
 
 
 def job_root(environment: dict[str, str]) -> Path:

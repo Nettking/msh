@@ -135,6 +135,31 @@ class SQLitePreparationTests(unittest.TestCase):
         self.assertIn("sqlite", result)
         self.assertTrue(result["supported"], result)
 
+    def test_probe_preserves_child_stdout_and_stderr_on_failure(self) -> None:
+        failing_probe = (
+            "import sys; print('before SQLite import'); "
+            "sys.stderr.write('specific child import error\\n'); sys.exit(7)"
+        )
+        with (mock.patch.object(SQLITE, "PROBE", failing_probe),
+              self.assertRaises(RuntimeError) as failure):
+            SQLITE.probe(dict(os.environ))
+        self.assertIn("exit code 7", str(failure.exception))
+        self.assertIn("stdout:\nbefore SQLite import", str(failure.exception))
+        self.assertIn("stderr:\nspecific child import error", str(failure.exception))
+
+    def test_probe_explains_invalid_child_output(self) -> None:
+        with (mock.patch.object(SQLITE, "PROBE", "print('unexpected child output')"),
+              self.assertRaisesRegex(RuntimeError, "invalid JSON") as failure):
+            SQLITE.probe(dict(os.environ))
+        self.assertIn("unexpected child output", str(failure.exception))
+
+    def test_probe_accepts_sqlite_module_without_file_metadata(self) -> None:
+        builtin_probe = "import _sqlite3; del _sqlite3.__file__\n" + SQLITE.PROBE
+        with mock.patch.object(SQLITE, "PROBE", builtin_probe):
+            result = SQLITE.probe(dict(os.environ))
+        self.assertEqual(result["extension"], "<built-in>")
+        self.assertTrue(result["supported"], result)
+
     def run_preparation(self, before: dict, after: dict | None = None,
                         *, probe_only: bool = False) -> tuple[mock.Mock, mock.Mock]:
         library = self.root / "sqlite-3.54.0" / "libsqlite3.so.0"
