@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import sqlite3
 from datetime import datetime, timedelta, timezone
@@ -9,8 +11,11 @@ from pathlib import Path
 
 import pytest
 
+from catalog.federation import control_plane_legacy_migration as legacy_migration
 from catalog.federation.control_plane_legacy_migration import (
+    MAX_MANIFEST_BYTES,
     LegacyMigrationError,
+    _fold_manifest,
     _read_event_journal,
 )
 from catalog.federation.control_plane_product import (
@@ -36,7 +41,12 @@ from catalog.flask_app.services.federation_pairing_service import (
     RemotePairingStore,
 )
 from catalog.node.identity import IdentityStore
-from catalog.node.state import ConnectionState, EnrollmentState, NodeState
+from catalog.node.state import (
+    MAX_EVENT_BYTES,
+    ConnectionState,
+    EnrollmentState,
+    NodeState,
+)
 
 NOW = datetime(2026, 9, 8, 9, tzinfo=timezone.utc)
 SECRET = bytes(range(32))
@@ -398,3 +408,73 @@ def test_legacy_witness_reads_extended_windows_path_without_modifying_history(tm
     extended = Path(raw if raw.startswith("\\\\?\\") else "\\\\?\\" + raw)
     assert _read_event_journal(extended, SESSION) == events
     assert database.read_bytes() == original
+
+
+@pytest.mark.parametrize("extra_events", [0, 270], ids=["small-history", "over-2mib-history"])
+def test_legacy_witness_history_digest_preserves_exact_canonical_bytes(tmp_path, extra_events):
+    voter_ids = ("voter-a", "voter-b", "voter-c")
+    initial = _legacy_events(voter_ids)
+    events = initial + tuple(
+        _event(revision, "history.retained", voter_ids[0], {"note": "æ" * 4096})
+        for revision in range(len(initial) + 1, len(initial) + extra_events + 1)
+    )
+    encoded = json.dumps(
+        [event.to_dict() for event in events],
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+    assert (len(encoded) > MAX_MANIFEST_BYTES) is bool(extra_events)
+    assert all(
+        len(json.dumps(event.to_dict(), ensure_ascii=False).encode("utf-8")) < MAX_EVENT_BYTES
+        for event in events
+    )
+    database, pairing = _write_member_witness(tmp_path, voter_id=voter_ids[0], events=events)
+    original_pairing = pairing.read_bytes()
+
+    manifest = _fold_manifest(
+        federation_id=FEDERATION,
+        session_id=SESSION,
+        witness_voter_id=voter_ids[0],
+        node_state_database=database,
+        pairing_state_path=pairing,
+    )
+
+    assert manifest["history_digest"] == "sha256:" + hashlib.sha256(encoded).hexdigest()
+    assert manifest["last_revision"] == len(events)
+    assert len(legacy_migration._canonical(manifest)) < MAX_MANIFEST_BYTES
+    assert _read_event_journal(database, SESSION) == events
+    assert pairing.read_bytes() == original_pairing
+
+
+def test_legacy_witness_history_digest_retains_per_event_canonical_bound(tmp_path, monkeypatch):
+    voter_ids = ("voter-a", "voter-b", "voter-c")
+    initial = _legacy_events(voter_ids)
+    database, pairing = _write_member_witness(tmp_path, voter_id=voter_ids[0], events=initial)
+    oversized = _event(len(initial) + 1, "history.retained", voter_ids[0], {"note": "x" * MAX_MANIFEST_BYTES})
+    monkeypatch.setattr(legacy_migration, "_read_event_journal", lambda *_: initial + (oversized,))
+
+    with pytest.raises(LegacyMigrationError, match="exceeds its size bound"):
+        _fold_manifest(
+            federation_id=FEDERATION,
+            session_id=SESSION,
+            witness_voter_id=voter_ids[0],
+            node_state_database=database,
+            pairing_state_path=pairing,
+        )
+
+
+def test_legacy_witness_signed_manifest_retains_size_bound(tmp_path, monkeypatch):
+    deployments = _topology(tmp_path)
+    voter_ids = tuple(item.local_voter_id for item in deployments)
+    database, pairing = _write_member_witness(tmp_path, voter_id=voter_ids[0], events=_legacy_events(voter_ids))
+    runtime = _runtime(deployments[0], database, pairing)
+    monkeypatch.setattr(legacy_migration, "_fold_manifest", lambda **_: {"padding": "x" * MAX_MANIFEST_BYTES})
+    try:
+        with pytest.raises(LegacyMigrationError, match="exceeds its size bound"):
+            runtime.legacy_witness_server.attest(FEDERATION, SESSION)
+    finally:
+        runtime.legacy_witness_server._server.server_close()
+        runtime.credential_server._server.server_close()
+        runtime.server._server.server_close()
