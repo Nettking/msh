@@ -301,22 +301,29 @@ def test_large_current_v3_startup_does_not_checkpoint_unreserved_wal(
     tmp_path: Path,
 ) -> None:
     database = tmp_path / "outbox.sqlite3"
-    original = SQLiteOutbox(database, resource_admission=_admission(1_000_000_000))
-    entries = [_enqueue(original, key=f"key-{index}")[0] for index in range(3)]
     large_payload = '{"padding":"' + ("x" * 900_000) + '"}'
 
     # Model a process that crashed after committing a large WAL. Its abrupt
     # exit leaves the committed frames for the startup path to recover.
     write_large_wal = """
 import os, sqlite3, sys
+from catalog.federation.tests.test_outbox_resource_admission import SQLiteOutbox, _admission, _enqueue
+from pathlib import Path
+original = SQLiteOutbox(Path(sys.argv[1]), resource_admission=_admission(1_000_000_000))
+entries = [_enqueue(original, key=f"key-{index}")[0] for index in range(3)]
 connection = sqlite3.connect(sys.argv[1])
 connection.execute("PRAGMA wal_autocheckpoint=0")
 payload = '{\\"padding\\":\\"' + ('x' * 900_000) + '\\"}'
 connection.execute("UPDATE outbox SET payload_json=?", (payload,))
 connection.commit()
+print(" ".join(str(entry.outbox_id) for entry in entries), flush=True)
 os._exit(0)
 """
-    subprocess.run([sys.executable, "-c", write_large_wal, str(database)], check=True)
+    prepared = subprocess.run(
+        [sys.executable, "-c", write_large_wal, str(database)],
+        check=True, capture_output=True, text=True,
+    )
+    entry_ids = [int(value) for value in prepared.stdout.split()]
 
     wal = Path(f"{database}-wal")
     assert wal.stat().st_size > _OUTBOX_MUTATION_FIXED_BYTES
@@ -334,7 +341,7 @@ os._exit(0)
             "SELECT outbox_id, state, payload_json FROM outbox ORDER BY outbox_id"
         ).fetchall()
         assert rows == [
-            (entry.outbox_id, "pending", large_payload) for entry in entries
+            (entry_id, "pending", large_payload) for entry_id in entry_ids
         ]
 
 
