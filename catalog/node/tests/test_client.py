@@ -357,6 +357,89 @@ def test_message_response_is_claimed_before_the_shared_inbound_queue(
     asyncio.run(scenario())
 
 
+def test_self_routed_request_reaches_handler_before_its_correlated_response(
+    tmp_path: Path,
+) -> None:
+    async def scenario() -> None:
+        client = _client(tmp_path)
+        _join_connected_session(client)
+        frames: asyncio.Queue[str] = asyncio.Queue()
+
+        class WebSocket:
+            def __aiter__(self):
+                return self
+
+            async def __anext__(self) -> str:
+                return await frames.get()
+
+            async def close(self) -> None:
+                pass
+
+        async def send_message(
+            *, session_id: str, target_node_id: str, payload: dict[str, Any],
+            request_id: str | None = None,
+        ) -> dict[str, Any]:
+            assert target_node_id == client.node_id
+            request = RelayEnvelope(
+                request_id="self-request",
+                session_id=session_id,
+                actor_node_id=client.node_id,
+                target_node_id=client.node_id,
+                message_type="relay.message",
+                authorization_context={"kind": "authenticated-node"},
+                payload=payload,
+                sent_at=client._clock(),
+            )
+            await frames.put(request.to_json())
+            return {"delivered": True}
+
+        client._websocket = WebSocket()  # type: ignore[assignment]
+        client._receiver_task = asyncio.create_task(client._receiver_loop())
+        client.send_message = send_message  # type: ignore[method-assign]
+        request = asyncio.create_task(
+            client.request_message_response(
+                "session-a",
+                client.node_id,
+                {
+                    "kind": "fcp-recorder-logical-storage-v1",
+                    "message": "request",
+                    "operation": "batch.list",
+                },
+                "self-correlation",
+            )
+        )
+        try:
+            received = await client.receive_message(timeout=1)
+            assert received.payload["message"] == "request"
+            assert received.payload["correlation_id"] == "self-correlation"
+            assert not request.done()
+            response = RelayEnvelope(
+                request_id="self-response",
+                session_id="session-a",
+                actor_node_id=client.node_id,
+                target_node_id=client.node_id,
+                message_type="relay.message",
+                authorization_context={"kind": "authenticated-node"},
+                payload={
+                    "kind": "fcp-recorder-logical-storage-v1",
+                    "message": "response",
+                    "correlation_id": "self-correlation",
+                    "status": "accepted",
+                },
+                sent_at=client._clock(),
+            )
+            await frames.put(response.to_json())
+            assert await asyncio.wait_for(request, timeout=1) == response
+            assert client._inbound.empty()
+            assert client._pending_message_responses == {}
+        finally:
+            request.cancel()
+            await asyncio.gather(request, return_exceptions=True)
+            await client.disconnect()
+
+    asyncio.run(scenario())
+
+
 def test_message_response_rejects_duplicate_and_bounded_pending_ids(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
