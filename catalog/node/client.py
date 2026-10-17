@@ -1184,6 +1184,10 @@ class RelayNodeClient:
     def _resolve_pending_message_response(
         self, envelope: RelayEnvelope
     ) -> bool:
+        # A self-addressed request has the same actor, session and correlation
+        # as its future reply, but must first reach the application handler.
+        if envelope.payload.get("message") == "request":
+            return False
         correlation_id = envelope.payload.get("correlation_id")
         if not isinstance(correlation_id, str):
             return False

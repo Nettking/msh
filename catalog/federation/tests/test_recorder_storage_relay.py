@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import threading
 from datetime import datetime, timezone
 from types import SimpleNamespace
 from typing import Any
@@ -12,7 +13,10 @@ import pytest
 
 from catalog.federation.errors import FederationValidationError
 from catalog.federation.models import CommitState
-from catalog.federation.phase_d_client import PhaseDIngestOutcome
+from catalog.federation.phase_d_client import (
+    PhaseDIngestOutcome,
+    PhaseDLogicalStorageClient,
+)
 from catalog.federation.recorder_storage_relay import (
     RECORDER_CATALOG_MAX_PAGE_SIZE,
     RECORDER_LOGICAL_STORAGE_KIND,
@@ -310,6 +314,105 @@ class _LogicalCatalogClient:
     ) -> object:
         self.read_calls.append(reference)
         return self.content
+
+
+@pytest.mark.parametrize("listing_mode", ["full", "delta"])
+def test_cold_catalog_list_keeps_authorization_and_owner_loop_responsive(
+    listing_mode: str,
+) -> None:
+    async def run() -> None:
+        loop = asyncio.get_running_loop()
+        owner_thread = threading.get_ident()
+        owner_callback = threading.Event()
+        read_threads: list[int] = []
+        authorization_threads: list[int] = []
+        relay = _AuthorityRelayClient()
+        logical = _LogicalCatalogClient()
+        method = (
+            "list_committed_batches" if listing_mode == "full"
+            else "list_committed_batch_delta"
+        )
+        original = getattr(logical, method)
+
+        def cold_read(**kwargs):
+            read_threads.append(threading.get_ident())
+            loop.call_soon_threadsafe(owner_callback.set)
+            assert owner_callback.wait(2), "catalog read blocked its owner event loop"
+            return original(**kwargs)
+
+        setattr(logical, method, cold_read)
+        authority = RecorderLogicalStorageAuthority(
+            client=relay,
+            logical_client=logical,
+            session_id="session-1",
+            authorize_read=lambda *_: authorization_threads.append(threading.get_ident()),
+        )
+        payload = {
+            "kind": RECORDER_LOGICAL_STORAGE_KIND,
+            "message": "request",
+            "operation": StorageOperation.BATCH_LIST.value,
+            "listing_mode": listing_mode,
+            "correlation_id": "cold-catalog",
+            "group_id": "telemetry",
+            "limit": 20,
+        }
+        if listing_mode == "delta":
+            payload.update(
+                baseline_manifest_revision=0,
+                baseline_manifest_hash="sha256:" + "a" * 64,
+            )
+        await authority.handle_request("node-reader", "session-1", payload)
+        assert authorization_threads == [owner_thread]
+        assert len(read_threads) == 1 and read_threads[0] != owner_thread
+        assert relay.sent[-1]["payload"]["status"] == "accepted"
+        expected = logical.page if listing_mode == "full" else _committed_delta_page()
+        assert relay.sent[-1]["payload"]["page"] == expected.to_dict()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("pinned_reference", [True, False])
+def test_cold_catalog_read_resolution_keeps_owner_loop_responsive(
+    pinned_reference: bool,
+) -> None:
+    async def run() -> None:
+        loop = asyncio.get_running_loop()
+        owner_thread = threading.get_ident()
+        owner_callback = threading.Event()
+        resolution_threads: list[int] = []
+        provider_threads: list[int] = []
+        reference = _committed_reference()
+        client = PhaseDLogicalStorageClient(
+            session_id=reference.session_id,
+            actor_node_id="node-reader",
+            control_plane=SimpleNamespace(),
+            transport=SimpleNamespace(),
+        )
+
+        def cold_resolve(*_args, **_kwargs):
+            resolution_threads.append(threading.get_ident())
+            loop.call_soon_threadsafe(owner_callback.set)
+            assert owner_callback.wait(2), "catalog resolution blocked its owner event loop"
+            return reference
+
+        async def read(**kwargs):
+            provider_threads.append(threading.get_ident())
+            assert kwargs == {"group_id": reference.group_id, "batch_id": reference.batch_id}
+            return _committed_content()
+
+        client.batch_catalog = SimpleNamespace(
+            resolve_reference=cold_resolve, resolve_batch=cold_resolve,
+        )
+        client.read = read
+        kwargs = (
+            {"reference": reference} if pinned_reference else
+            {"group_id": reference.group_id, "batch_id": reference.batch_id}
+        )
+        assert await client.read_committed_batch(**kwargs) == _committed_content()
+        assert len(resolution_threads) == 1 and resolution_threads[0] != owner_thread
+        assert provider_threads == [owner_thread]
+
+    asyncio.run(run())
 
 
 def test_authority_authorizes_and_roundtrips_catalog_list_and_read() -> None:

@@ -614,7 +614,9 @@ class PhaseDLogicalStorageClient:
                     "reference",
                     "must not be combined with separate batch identity fields",
                 )
-            resolved = self.batch_catalog.resolve_reference(reference)
+            resolved = await owned_storage_call(
+                self.control_plane, self.batch_catalog.resolve_reference, reference,
+            )
         else:
             if group_id is None or batch_id is None:
                 raise FederationValidationError(
@@ -622,7 +624,9 @@ class PhaseDLogicalStorageClient:
                     "batch_id" if batch_id is None else "group_id",
                     "group_id and batch_id are required",
                 )
-            resolved = self.batch_catalog.resolve_batch(
+            resolved = await owned_storage_call(
+                self.control_plane,
+                self.batch_catalog.resolve_batch,
                 group_id,
                 batch_id,
                 dataset_id=dataset_id,
