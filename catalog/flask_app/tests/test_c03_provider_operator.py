@@ -137,10 +137,11 @@ def test_configured_c03_provider_page_and_manual_pending_approval(tmp_path: Path
                     return await asyncio.to_thread(_receive, parent_pipe)
 
                 view = await request("GET", "/provider-federation/api/providers")
+                csrf = view["json"]["view"]["csrf_token"]
                 approved = await request(
                     "POST", f"/provider-federation/api/providers/{CAPABILITY}/approve",
                     json={"expected_revision": revision, "command_id": "manual-approve"},
-                    headers={"X-CSRF-Token": CSRF},
+                    headers={"X-CSRF-Token": csrf},
                 )
                 # Both real paths must work; retain their actual failure response
                 # in pytest output when proving the unfixed composition defect.
@@ -169,7 +170,7 @@ def test_configured_c03_provider_page_and_manual_pending_approval(tmp_path: Path
                     return await request(
                         "POST", f"/provider-federation/api/providers/{CAPABILITY}/{name}",
                         json={"expected_revision": expected_revision, "command_id": command_id, **extra},
-                        headers={"X-CSRF-Token": CSRF},
+                        headers={"X-CSRF-Token": csrf},
                     )
 
                 # Rendered controls are never authorization. Existing CSRF,
@@ -213,7 +214,7 @@ def test_configured_c03_provider_page_and_manual_pending_approval(tmp_path: Path
                 refused_storage = await request(
                     "POST", "/provider-federation/api/providers/storage-pending/request",
                     json={"command_id": "storage-never-provider-approval"},
-                    headers={"X-CSRF-Token": CSRF},
+                    headers={"X-CSRF-Token": csrf},
                 )
                 assert refused_storage["status"] == 403
                 assert store.get(session_id=SESSION, capability_id="storage-pending") is None
