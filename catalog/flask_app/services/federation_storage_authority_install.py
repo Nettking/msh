@@ -15,14 +15,19 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import json
 import os
+import sqlite3
 import threading
+from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from flask import Flask
 
+from catalog.capabilities.contributions.candidates import _candidate_id
+from catalog.capabilities.contributions.types import LocalContributionDescriptor
 from catalog.common.federation_paths import DEFAULT_COORDINATOR_DATABASE
 from catalog.federation.errors import (
     AuthenticationError,
@@ -30,6 +35,8 @@ from catalog.federation.errors import (
     FederationValidationError,
 )
 from catalog.federation.models import CapabilityAnnouncement, CapabilityStatus
+from catalog.federation.onboarding_models import ContributionIntent
+from catalog.federation.storage_protocol import STORAGE_PROTOCOL
 from catalog.node.storage_failover import StorageAuthoritySettings
 
 from .federation_pairing_service import RemotePairingState
@@ -223,6 +230,68 @@ class FederationStorageAuthorityMonitor:
         )
 
     # ---- configuration ---------------------------------------------------
+
+    def _authorize_local_storage_write(self, node_id: str) -> None:
+        """Keep persisted local intent authoritative over later remote grants."""
+        configured = self.app.config.get(
+            "CAPABILITY_ONBOARDING_CONTRIBUTION_DATABASE",
+            self.app.config.get("CAPABILITY_ONBOARDING_STATE_DATABASE"),
+        )
+        if configured is None:
+            return  # Standalone/legacy authority without contribution state.
+        try:
+            database = Path(configured)
+            if not database.exists():
+                return
+            candidate_id = _candidate_id(
+                node_id,
+                LocalContributionDescriptor(
+                    logical_service_id="fcp-local-data-storage",
+                    capability_type="storage",
+                    capability_protocol=STORAGE_PROTOCOL,
+                    display_label="Local FCP data storage",
+                ),
+            )
+            with closing(
+                sqlite3.connect(
+                    database.resolve().as_uri() + "?mode=ro",
+                    uri=True,
+                    timeout=5,
+                )
+            ) as connection:
+                connection.execute("PRAGMA query_only=ON")
+                if (
+                    connection.execute(
+                        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='contribution_intents'"
+                    ).fetchone()
+                    is None
+                ):
+                    return
+                row = connection.execute(
+                    "SELECT intent_json FROM contribution_intents WHERE candidate_id=?",
+                    (candidate_id,),
+                ).fetchone()
+            if row is None:
+                return  # Preserve existing manually assigned legacy providers.
+            intent = ContributionIntent.from_dict(json.loads(row[0]))
+        except Exception as exc:
+            raise FederationValidationError(
+                "unauthorized",
+                "contribution",
+                "local storage contribution intent could not be read safely",
+            ) from exc
+        if (
+            intent.candidate_id != candidate_id
+            or intent.device_id != node_id
+            or intent.desired_state.value != "enabled"
+            or intent.activation_state.value != "active"
+            or intent.policy_state.value != "allowed"
+        ):
+            raise FederationValidationError(
+                "unauthorized",
+                "contribution",
+                "local storage contribution does not permit new writes",
+            )
 
     def _enabled(self) -> bool:
         return bool(self.app.config.get("FEDERATION_STORAGE_AUTHORITY_ENABLED", False))
@@ -492,6 +561,7 @@ class FederationStorageAuthorityMonitor:
         try:
             await run_trusted_storage_authority(
                 settings,
+                authorize_local_storage_write=self._authorize_local_storage_write,
                 stop=stop,
                 on_announced=self._on_announced,
                 client=(None if shared is None else shared.client),  # type: ignore[arg-type]

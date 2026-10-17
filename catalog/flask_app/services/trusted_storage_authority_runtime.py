@@ -36,6 +36,7 @@ from catalog.federation.errors import (
     AuthenticationError,
     AuthorizationError,
     FederationOperationError,
+    FederationValidationError,
 )
 from catalog.federation.live_failover import (
     STORAGE_CONTROL_REFRESH_MESSAGE,
@@ -60,6 +61,10 @@ from catalog.federation.storage_allocation import StorageAllocation
 from catalog.federation.storage_protocol import (
     STORAGE_PROTOCOL,
     STORAGE_PROTOCOL_VERSION,
+    StorageError,
+    StorageErrorCode,
+    StorageOperation,
+    StorageResponseEnvelope,
 )
 from catalog.node.client import RelayRemoteError
 from catalog.node.storage_failover import (
@@ -198,12 +203,54 @@ def _builtin_local_provider_paths(
     )
 
 
+class _LocalContributionStorageService(PhaseDStorageService):
+    """Fence only the hosted local provider at the existing write boundary."""
+
+    def __init__(
+        self,
+        *,
+        authorize_local_storage_write: Callable[[], None] | None = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(**kwargs)
+        self._authorize_local_storage_write = authorize_local_storage_write
+
+    def _validate_grant(self, request, *, require_primary_provider: bool):
+        if self._authorize_local_storage_write is not None:
+            self._authorize_local_storage_write()
+        return super()._validate_grant(
+            request,
+            require_primary_provider=require_primary_provider,
+        )
+
+    async def dispatch(self, envelope):
+        # Catchup ingest reaches the provider directly before _validate_grant.
+        if envelope.operation is StorageOperation.BATCH_INGEST:
+            try:
+                if self._authorize_local_storage_write is not None:
+                    self._authorize_local_storage_write()
+            except FederationValidationError as exc:
+                return StorageResponseEnvelope(
+                    request_id=envelope.request_id,
+                    protocol=STORAGE_PROTOCOL,
+                    protocol_version=envelope.protocol_version,
+                    ok=False,
+                    error=StorageError(
+                        code=StorageErrorCode.UNAUTHORIZED,
+                        message=exc.message,
+                        field=exc.field,
+                    ),
+                )
+        return await super().dispatch(envelope)
+
+
 def _ensure_builtin_local_storage_service(
     *,
     endpoint: RelayStorageEndpoint,
     control: PhaseDControlPlane,
     client: PairingRelayNodeClient,
     settings: StorageAuthoritySettings,
+    authorize_local_storage_write: Callable[[str], None] | None = None,
 ) -> PhaseDStorageService | None:
     """Expose the built-in host storage when the control plane assigns it here.
 
@@ -245,7 +292,11 @@ def _ensure_builtin_local_storage_service(
     storage_directory, outbox_database, acknowledgements_database = (
         _builtin_local_provider_paths(settings, provider_id)
     )
-    service = PhaseDStorageService(
+    service = _LocalContributionStorageService(
+        authorize_local_storage_write=(
+            None if authorize_local_storage_write is None
+            else lambda: authorize_local_storage_write(client.node_id)
+        ),
         provider_id=provider_id,
         # The bound travels with the provider rather than the control plane:
         # what this device can safely hold is a property of its own disk, and
@@ -420,6 +471,7 @@ async def run_trusted_storage_authority(
     client: PairingRelayNodeClient | None = None,
     message_source: object | None = None,
     on_message_source: Callable[[object], None] | None = None,
+    authorize_local_storage_write: Callable[[str], None] | None = None,
 ) -> None:
     """Run logical storage over either an owned or a borrowed creator client.
 
@@ -464,6 +516,7 @@ async def run_trusted_storage_authority(
             control=control,
             client=client,
             settings=settings,
+            authorize_local_storage_write=authorize_local_storage_write,
         )
         channel_type = (
             SharedRecorderAwareStorageControlRelayChannel
@@ -592,6 +645,7 @@ async def run_trusted_storage_authority(
                 control=control,
                 client=client,
                 settings=settings,
+                authorize_local_storage_write=authorize_local_storage_write,
             )
             if hosted is not None and provider_ready_id != hosted.provider_id:
                 await announce()
