@@ -690,6 +690,8 @@ def test_actual_node_local_retry_dispatches_current_cycle_not_previous_worker_ca
             # a new compatibility scan; no production marker is edited.
             archive_root = stored.raw_path.parent.parent
             retained = tmp_path/'retained-fixture-root'
+            if retained.exists():
+                return SimpleNamespace(published_chunks=0)
             archive_root.rename(retained)
             shutil.copytree(retained, archive_root)
             return SimpleNamespace(published_chunks=0)
