@@ -9,9 +9,10 @@ unchanged.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
-from flask import current_app
+from flask import current_app, has_app_context
 
 from catalog.federation.control_plane_runtime import AUTH_GENERATION_FILE
 from catalog.federation.errors import FederationOperationError
@@ -26,6 +27,13 @@ class CurrentLeaderFederationHumanAuthService(FederationHumanAuthService):
     """Resolve credential/sign-in authority from durable Federation leadership."""
 
     def _leader_node_id(self, context: object) -> str | None:
+        configured = os.getenv("FCP_REPLICATED_CONTROL_PLANE_CONFIG", "")
+        if has_app_context():
+            configured = current_app.config.get(
+                "FCP_REPLICATED_CONTROL_PLANE_CONFIG", configured
+            )
+        if not str(configured or "").strip():
+            return super()._leader_node_id(context)
         _federation_id, session_id, _node_id, _credentials, coordinator = (
             self._context_parts(context)
         )

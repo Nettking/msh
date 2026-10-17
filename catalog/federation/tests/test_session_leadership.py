@@ -5,8 +5,11 @@ from pathlib import Path
 
 import pytest
 
+from catalog.federation.control_plane_journal import REPLICATED_COORDINATOR_ID
 from catalog.federation.coordinator import SessionCoordinator
 from catalog.federation.errors import AuthorizationError
+from catalog.federation.human_auth import USER_EVENT, USER_SCHEMA
+from catalog.federation.persistence import COORDINATOR_ID, CoordinatorStore
 from catalog.federation.session_leadership import (
     LEADER_CHANGED_EVENT,
     LEADERSHIP_SCHEMA,
@@ -24,8 +27,11 @@ def _enroll(coordinator: SessionCoordinator, root: Path, name: str):
     return credentials
 
 
-def _two_member_session(tmp_path: Path):
-    coordinator = SessionCoordinator(tmp_path / "control.sqlite3", clock=lambda: NOW)
+def _two_member_session(tmp_path: Path, *, coordinator_id: str = COORDINATOR_ID):
+    coordinator = SessionCoordinator(
+        CoordinatorStore(tmp_path / "control.sqlite3", coordinator_id=coordinator_id),
+        clock=lambda: NOW,
+    )
     creator = _enroll(coordinator, tmp_path, "creator")
     member = _enroll(coordinator, tmp_path, "member")
     session = coordinator.create_session(
@@ -65,6 +71,52 @@ def _expire_offline_leader(coordinator: SessionCoordinator, member_node_id: str)
     return coordinator.sweep_stale(
         heartbeat_timeout_seconds=FAILOVER_TIMEOUT_SECONDS
     )
+
+
+@pytest.mark.parametrize("replicated", [False, True])
+def test_human_auth_metadata_retains_its_deployment_boundary_after_handover(
+    tmp_path: Path,
+    replicated: bool,
+) -> None:
+    coordinator, session, creator, member = _two_member_session(
+        tmp_path,
+        coordinator_id=REPLICATED_COORDINATOR_ID if replicated else COORDINATOR_ID,
+    )
+    leadership, _ = coordinator.transfer_session_leader(
+        session_id=session.session_id,
+        actor_node_id=creator.identity.node_id,
+        target_node_id=member.identity.node_id,
+        request_id="operational-handover",
+        expected_term=1,
+    )
+    assert leadership.leader_node_id == member.identity.node_id
+    payload = {
+        "schema": USER_SCHEMA,
+        "email": "operator@example.com",
+        "active": True,
+        "roles": ["operator"],
+    }
+    authority = member if replicated else creator
+    non_authority = creator if replicated else member
+    event, created = coordinator.append_event(
+        session_id=session.session_id,
+        actor_node_id=authority.identity.node_id,
+        request_id="authority-human-metadata",
+        event_type=USER_EVENT,
+        payload=payload,
+    )
+    assert created is True
+    assert event.actor_node_id == authority.identity.node_id
+    assert event.payload == payload
+    with pytest.raises(AuthorizationError) as error:
+        coordinator.append_event(
+            session_id=session.session_id,
+            actor_node_id=non_authority.identity.node_id,
+            request_id="non-authority-cannot-inherit-password-authority",
+            event_type=USER_EVENT,
+            payload=payload,
+        )
+    assert error.value.code == "human-auth-authority-required"
 
 
 def test_creator_is_initial_leader_and_offline_creator_fails_over_after_timeout(

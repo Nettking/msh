@@ -128,3 +128,45 @@ def test_missing_or_malformed_generation_never_claims_a_restore(tmp_path: Path) 
         encoding="utf-8",
     )
     assert watcher.refresh_if_changed() is False
+
+
+@pytest.mark.parametrize("replicated", [False, True])
+def test_human_auth_leadership_respects_the_configured_credential_boundary(
+    monkeypatch: pytest.MonkeyPatch, replicated: bool
+) -> None:
+    monkeypatch.delenv("FCP_REPLICATED_CONTROL_PLANE_CONFIG", raising=False)
+    coordinator = SimpleNamespace(
+        store=SimpleNamespace(
+            get_session=lambda _session: SimpleNamespace(created_by_node_id="creator")
+        ),
+        session_leadership=lambda _session: SimpleNamespace(leader_node_id="successor"),
+    )
+    context = SimpleNamespace(
+        binding=SimpleNamespace(internal_session_id="session", federation_id="fed"),
+        credentials=SimpleNamespace(identity=SimpleNamespace(node_id="creator")),
+        coordinator=coordinator,
+    )
+    service = federation_failover.CurrentLeaderFederationHumanAuthService()
+    app = Flask(__name__)
+    if replicated:
+        app.config["FCP_REPLICATED_CONTROL_PLANE_CONFIG"] = "/configured/control.json"
+    with app.app_context():
+        assert service._leader_node_id(context) == ("successor" if replicated else "creator")
+        assert service._is_authority_context(context) is not replicated
+        context.credentials.identity.node_id = "successor"
+        assert service._is_authority_context(context) is replicated
+
+        def unavailable(_session):
+            raise RuntimeError("authority unavailable")
+
+        coordinator.session_leadership = unavailable
+        if replicated:
+            with pytest.raises(FederationOperationError) as error:
+                service._leader_node_id(context)
+            assert error.value.code == "human-auth-leadership-unavailable"
+        else:
+            # An operational leader does not carry the legacy creator's passwords.
+            assert service._leader_node_id(context) == "creator"
+            monkeypatch.setenv("FCP_REPLICATED_CONTROL_PLANE_CONFIG", "/environment.json")
+            app.config["FCP_REPLICATED_CONTROL_PLANE_CONFIG"] = ""
+            assert service._leader_node_id(context) == "creator"
