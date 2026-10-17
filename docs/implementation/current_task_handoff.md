@@ -396,7 +396,7 @@ Authoritative execution plan:
 
 W3 end-to-end acceptance scenario:
 
-- [Notebook-to-OSL method alignment](../planned-work/method-osl-fcp-alignment.md)
+- The former W3 alignment document was retired. Any W3 scenario must be re-specified in the current OSL roadmap before implementation.
 
 Federation work and OSL work remain separate review boundaries. Before beginning any OSL implementation delivery, re-read the current OSL index/roadmap rather than relying on older Federation handoff text.
 
