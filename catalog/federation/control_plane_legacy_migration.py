@@ -207,8 +207,14 @@ def _fold_manifest(
         elif event.event_type in {AUTHORITY_EVENT, USER_EVENT}:
             human_auth_present = True
 
-    encoded_events = [event.to_dict() for event in events]
-    history_digest = "sha256:" + hashlib.sha256(_canonical(encoded_events)).hexdigest()
+    history_hash = hashlib.sha256()
+    history_hash.update(b"[")
+    for index, event in enumerate(events):
+        if index:
+            history_hash.update(b",")
+        history_hash.update(_canonical(event.to_dict()))
+    history_hash.update(b"]")
+    history_digest = "sha256:" + history_hash.hexdigest()
     manifest = {
         "schema": MIGRATION_MANIFEST_SCHEMA,
         "federation_id": federation_id,
