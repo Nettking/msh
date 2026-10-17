@@ -100,7 +100,8 @@ class _Channel(runtime.SharedRecorderAwareStorageControlRelayChannel):
 
 
 async def _pipeline(client, ai, control, settings):
-    endpoint = RelayStorageEndpoint(client, message_source=_Source(ai), request_timeout=.5)
+    endpoint = RelayStorageEndpoint(
+        client, message_source=_Source(ai), request_timeout=settings.storage_request_timeout)
     service = runtime._ensure_builtin_local_storage_service(
         endpoint=endpoint, control=control, client=client, settings=settings)
     assert service is not None
@@ -154,7 +155,7 @@ def test_shared_reader_failure_preserves_provider_commit_and_normal_same_identit
         try:
             client.hold_response = True
             request = await _request(client, "before-read-error")
-            await asyncio.wait_for(client.provider_stored.wait(), 2)
+            await asyncio.wait_for(client.provider_stored.wait(), settings.storage_request_timeout)
             await client._messages.put(SimpleNamespace(payload={"kind": "fixture-read-error"}))
             with pytest.raises(OSError, match="fixture upstream"):
                 await asyncio.wait_for(asyncio.shield(stages[0]._reader_task), 1)
@@ -177,7 +178,8 @@ def test_shared_reader_failure_preserves_provider_commit_and_normal_same_identit
             stages = await _pipeline(client, ai, control, settings)
             replay = await _request(client, "normal-replay")
             assert replay["batch_id"] == request["batch_id"] and replay["content"] == request["content"]
-            assert await asyncio.wait_for(stages[1].finished.get(), 2) is None
+            assert await asyncio.wait_for(
+                stages[1].finished.get(), settings.storage_request_timeout) is None
             assert client.responses[-1]["outcome"]["committed"] is True
             status = stages[2].acknowledgements.status("session-a", "fcp-local-storage", request["batch_id"])
             assert status is not None and status.committed
