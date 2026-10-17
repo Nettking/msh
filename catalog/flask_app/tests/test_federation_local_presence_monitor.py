@@ -149,6 +149,13 @@ def test_contribution_refresh_interrupts_periodic_wait_immediately(monkeypatch) 
         published.set()
 
     monkeypatch.setattr(monitor, "_publish_contributions", publish)
+    for phase in (
+        "_sync_remote_ai",
+        "_sync_federated_analysis",
+        "_sync_federated_telemetry",
+        "_sync_federated_jsonl",
+    ):
+        monkeypatch.setattr(monitor, phase, lambda *_args: None)
     monitor.start()
     try:
         assert published.wait(timeout=1.0)
