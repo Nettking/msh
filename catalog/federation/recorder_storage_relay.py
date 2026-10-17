@@ -33,6 +33,7 @@ from .live_failover import (
     StorageControlRelayChannel,
 )
 from .phase_d_client import PhaseDIngestOutcome
+from .storage_async import owned_storage_call
 from .storage_catalog import (
     CommittedBatchDeltaPage,
     CommittedBatchPage,
@@ -552,7 +553,7 @@ class RecorderLogicalStorageAuthority:
                 else "unknown"
             )
             if operation == StorageOperation.BATCH_LIST.value:
-                response = self._list_response(
+                response = await self._list_response(
                     actor_node_id,
                     session_id,
                     correlation_id,
@@ -760,7 +761,7 @@ class RecorderLogicalStorageAuthority:
             "outcome": _outcome_dict(outcome),
         }
 
-    def _list_response(
+    async def _list_response(
         self,
         actor_node_id: str,
         session_id: str,
@@ -802,7 +803,9 @@ class RecorderLogicalStorageAuthority:
                     "listing_mode",
                     "manifest baseline fields require delta listing mode",
                 )
-            page = self.logical_client.list_committed_batches(
+            page = await owned_storage_call(
+                getattr(self.logical_client, "control_plane", self.logical_client),
+                self.logical_client.list_committed_batches,
                 group_id=group_id,
                 dataset_id=dataset_id,
                 limit=limit,
@@ -836,7 +839,9 @@ class RecorderLogicalStorageAuthority:
                 "baseline_manifest_hash",
                 maximum=71,
             )
-            page = self.logical_client.list_committed_batch_delta(
+            page = await owned_storage_call(
+                getattr(self.logical_client, "control_plane", self.logical_client),
+                self.logical_client.list_committed_batch_delta,
                 group_id=group_id,
                 baseline_manifest_revision=baseline_revision,
                 baseline_manifest_hash=baseline_hash,
