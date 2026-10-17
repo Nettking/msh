@@ -151,6 +151,7 @@ def test_permanent_leader_loss_recovers_same_federation_and_fences_returning_hos
     old_runtime = runtimes[0]
     old_runtime_closed = False
     restarted_old = None
+    returning_lifecycle = ExitStack()
     for runtime in runtimes:
         runtime.start()
     try:
@@ -231,6 +232,8 @@ def test_permanent_leader_loss_recovers_same_federation_and_fences_returning_hos
         # follower and converge to the same Federation instead of reclaiming
         # authority from its stale local state.
         restarted_old = _runtime(deployments[0])
+        # Observe catch-up before this eligible voter can start a new election.
+        returning_lifecycle.enter_context(restarted_old._lifecycle_lock)
         restarted_old.start()
 
         stale_term_observations = 0
@@ -339,6 +342,7 @@ def test_permanent_leader_loss_recovers_same_federation_and_fences_returning_hos
         assert returned_leadership["leader_node_id"] == current_leader.node.voter_id
         assert returned_leadership["creator_node_id"] == creator
     finally:
+        returning_lifecycle.close()
         if restarted_old is not None:
             restarted_old.close()
         if not old_runtime_closed:
