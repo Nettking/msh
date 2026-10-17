@@ -5,6 +5,7 @@ import asyncio
 
 import pytest
 
+from catalog.federation.control_plane_journal import REPLICATED_COORDINATOR_ID
 from catalog.federation.coordinator import SessionCoordinator
 from catalog.federation.errors import FederationValidationError
 from catalog.federation.human_auth import (
@@ -15,6 +16,7 @@ from catalog.federation.human_auth import (
     USER_EVENT,
     USER_SCHEMA,
 )
+from catalog.federation.persistence import CoordinatorStore
 from catalog.node.client import RelayNodeClient, RelayRemoteError
 from catalog.node.identity import derive_node_id_from_public_key
 from catalog.relay.service import RelayServer, _ensure_bounded_json
@@ -80,7 +82,9 @@ def test_only_exact_top_level_existing_routing_contracts_earn_the_allowance(payl
 
 def test_real_relay_preserves_member_self_current_leader_and_privacy_rules(tmp_path):
     async def exercise():
-        coordinator = SessionCoordinator(tmp_path / "authority.sqlite3")
+        coordinator = SessionCoordinator(CoordinatorStore(
+            tmp_path / "authority.sqlite3", coordinator_id=REPLICATED_COORDINATOR_ID,
+        ))
         async with RelayServer(
             coordinator, host="127.0.0.1", port=0,
             auth_timeout_seconds=30, send_timeout_seconds=30,
