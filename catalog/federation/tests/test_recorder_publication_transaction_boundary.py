@@ -186,7 +186,6 @@ def test_transaction_boundary_distinguishes_ingest_and_ack_failures_then_retries
             recorder_relay,
             session_id=SESSION,
             authority_node_id=AUTHORITY,
-            request_timeout=0.03,
         )
         outbox = SQLiteOutbox(tmp_path / "outbox.sqlite3")
         clock = _Clock()
@@ -213,7 +212,12 @@ def test_transaction_boundary_distinguishes_ingest_and_ack_failures_then_retries
 
         caplog.set_level(logging.INFO, logger="catalog.federation.recorder_storage_relay")
         try:
-            first = await queue.run_once()
+            normal_request_timeout = client.request_timeout
+            client.request_timeout = 0.03
+            try:
+                first = await queue.run_once()
+            finally:
+                client.request_timeout = normal_request_timeout
             await network.drain_handlers()
             first_stages = [
                 record.storage_stage for record in caplog.records
