@@ -8,6 +8,7 @@ import socket
 import subprocess
 import sys
 import time
+from contextlib import ExitStack
 from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
@@ -148,17 +149,22 @@ def test_permanent_leader_loss_recovers_same_federation_and_fences_returning_hos
     deployments = _deployments(tmp_path)
     runtimes = [_runtime(item) for item in deployments]
     old_runtime = runtimes[0]
+    old_runtime_closed = False
     restarted_old = None
     for runtime in runtimes:
         runtime.start()
     try:
         creator = old_runtime.node.voter_id
-        old_runtime.bootstrap_new_federation(
-            federation_id="federation-survives-leader-loss",
-            session_id="session-survives-leader-loss",
-            creator_node_id=creator,
-            display_name="Persistent Federation",
-        )
+        # Isolate setup from the automatic leader loss exercised below.
+        with ExitStack() as bootstrap_locks:
+            for runtime in runtimes:
+                bootstrap_locks.enter_context(runtime._lifecycle_lock)
+            old_runtime.bootstrap_new_federation(
+                federation_id="federation-survives-leader-loss",
+                session_id="session-survives-leader-loss",
+                creator_node_id=creator,
+                display_name="Persistent Federation",
+            )
 
         def current_leader_is_ready() -> bool:
             nonlocal old_runtime
@@ -190,6 +196,7 @@ def test_permanent_leader_loss_recovers_same_federation_and_fences_returning_hos
         # The elected coordinator disappears and stays unavailable while the
         # two surviving authenticated voters retain quorum 2/3.
         old_runtime.close()
+        old_runtime_closed = True
         time.sleep(0.25)
 
         def surviving_quorum_has_promoted_leader() -> bool:
@@ -334,8 +341,9 @@ def test_permanent_leader_loss_recovers_same_federation_and_fences_returning_hos
     finally:
         if restarted_old is not None:
             restarted_old.close()
-        # old_runtime was already closed above; close only the still-running
-        # survivors here because socket-server close is deliberately one-shot.
+        if not old_runtime_closed:
+            old_runtime.close()
+        # Close each runtime once, including when bootstrap failed before loss.
         for runtime in runtimes[1:]:
             runtime.close()
 
