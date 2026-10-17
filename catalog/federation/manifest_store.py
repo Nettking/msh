@@ -39,7 +39,7 @@ _REVISION_CACHE_MAX_ENTRIES = 2048
 _REVISION_CACHE_MAX_BYTES = 64 * 1024 * 1024
 _REVISION_CACHE_MAX_OBJECTS = 200_000
 # Bound the per-connection read mapping; unsupported VFS/builds retain xRead.
-_MANIFEST_MMAP_MAX_BYTES = 512 * 1024 * 1024
+_MANIFEST_MMAP_MAX_BYTES = 1024 * 1024 * 1024
 
 
 def _component_key_fits(value: Any, remaining: list[int], depth: int = 0) -> bool:

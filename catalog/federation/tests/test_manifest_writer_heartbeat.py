@@ -199,7 +199,7 @@ def test_mmap_is_bounded_per_connection_and_durability_pragmas_are_unchanged(tmp
     control = seeded(tmp_path, 1)
     for _ in range(2):
         with closing(control.manifests._connect()) as connection:
-            assert 0 <= connection.execute("PRAGMA mmap_size").fetchone()[0] <= 512 * 1024 * 1024
+            assert 0 <= connection.execute("PRAGMA mmap_size").fetchone()[0] <= 1024 * 1024 * 1024
             assert connection.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
             assert connection.execute("PRAGMA synchronous").fetchone()[0] == 2
             assert connection.execute("PRAGMA foreign_keys").fetchone()[0] == 1
