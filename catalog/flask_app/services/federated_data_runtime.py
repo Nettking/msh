@@ -104,7 +104,8 @@ class FederatedDataPairingRelayRuntime(ResilientPairingRelayRuntime):
                 session_id=session_id,
                 authority_node_id=authority_node_id,
                 batches=batch_tuple,
-            )
+            ),
+            timeout_seconds=self.timeout_seconds * max(1, min(len(batch_tuple), 128)),
         )
 
     async def _read_federated_batches(
