@@ -77,6 +77,86 @@ class _LogicalStorage:
         return PhaseDIngestOutcome(committed=True)
 
 
+def test_scoped_batch_identity_distinguishes_paths_and_producers():
+    payload = _payload()
+    content = payload["content"]
+    datasets = (
+        str(payload["dataset_id"]),
+        federated_jsonl_dataset_id(ACTOR, "uploads/batch-b/input.jsonl"),
+        federated_jsonl_dataset_id("another-node", str(content["relative_path"])),
+    )
+    identities = [
+        federated_jsonl_batch_id(
+            str(content["file_sha256"]),
+            0,
+            str(content["chunk_sha256"]),
+            dataset_id=dataset,
+        )
+        for dataset in datasets
+    ]
+    assert len(set(identities)) == 3
+    assert identities[0] == federated_jsonl_batch_id(
+        str(content["file_sha256"]),
+        0,
+        str(content["chunk_sha256"]),
+        dataset_id=datasets[0],
+    )
+    assert str(payload["batch_id"]) not in identities
+
+
+@pytest.mark.parametrize("scoped", [False, True])
+def test_ingest_preserves_legacy_chunks_and_accepts_dataset_scoped_ids(scoped: bool):
+    payload = _payload()
+    content = payload["content"]
+    batch_id = str(payload["batch_id"])
+    if scoped:
+        batch_id = federated_jsonl_batch_id(
+            str(content["file_sha256"]),
+            0,
+            str(content["chunk_sha256"]),
+            dataset_id=str(payload["dataset_id"]),
+        )
+    decoded = validate_federated_jsonl_ingest(
+        actor_node_id=ACTOR,
+        session_id=SESSION,
+        dataset_id=str(payload["dataset_id"]),
+        batch_id=batch_id,
+        idempotency_key=federated_jsonl_idempotency_key(
+            SESSION, str(payload["dataset_id"]), batch_id
+        ),
+        schema_name=FEDERATED_JSONL_DATASET_SCHEMA_NAME,
+        schema_version=FEDERATED_JSONL_DATASET_SCHEMA_VERSION,
+        content=content,
+    )
+    assert _hash(decoded) == content["chunk_sha256"]
+
+
+def test_scoped_batch_from_another_dataset_is_rejected():
+    payload = _payload()
+    content = payload["content"]
+    other_dataset = federated_jsonl_dataset_id(ACTOR, "uploads/another/input.jsonl")
+    batch_id = federated_jsonl_batch_id(
+        str(content["file_sha256"]),
+        0,
+        str(content["chunk_sha256"]),
+        dataset_id=other_dataset,
+    )
+    with pytest.raises(FederationValidationError) as invalid:
+        validate_federated_jsonl_ingest(
+            actor_node_id=ACTOR,
+            session_id=SESSION,
+            dataset_id=str(payload["dataset_id"]),
+            batch_id=batch_id,
+            idempotency_key=federated_jsonl_idempotency_key(
+                SESSION, str(payload["dataset_id"]), batch_id
+            ),
+            schema_name=FEDERATED_JSONL_DATASET_SCHEMA_NAME,
+            schema_version=FEDERATED_JSONL_DATASET_SCHEMA_VERSION,
+            content=content,
+        )
+    assert invalid.value.code == "federated-jsonl-batch-mismatch"
+
+
 def test_generic_jsonl_uses_membership_authorizer_not_recorder_authorizer():
     logical = _LogicalStorage()
     membership_calls: list[tuple[str, str, str, str | None]] = []

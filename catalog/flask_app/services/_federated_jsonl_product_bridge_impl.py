@@ -1012,7 +1012,10 @@ class FederatedJsonlProductBridge:
                 data = handle.read(FEDERATED_JSONL_CHUNK_BYTES)
             chunk_sha256 = f"sha256:{hashlib.sha256(data).hexdigest()}"
             batch_id = federated_jsonl_batch_id(
-                str(row["file_sha256"]), index, chunk_sha256
+                str(row["file_sha256"]),
+                index,
+                chunk_sha256,
+                dataset_id=str(row["dataset_id"]),
             )
             content = {
                 "schema": FEDERATED_JSONL_CONTENT_SCHEMA,
@@ -1589,8 +1592,7 @@ class FederatedJsonlProductBridge:
                 FROM seen_batches
                 WHERE session_id=? AND chunk_path IS NOT NULL
                 GROUP BY dataset_id,file_sha256,encoded_sha256
-                HAVING COUNT(*)=MAX(chunk_count)
-                   AND COUNT(DISTINCT chunk_index)=MAX(chunk_count)
+                HAVING COUNT(DISTINCT chunk_index)=MAX(chunk_count)
                 ORDER BY MAX(committed_at),dataset_id,file_sha256,encoded_sha256
                 LIMIT ?
                 """,
@@ -1626,6 +1628,34 @@ class FederatedJsonlProductBridge:
             ) from exc
         return target
 
+    @staticmethod
+    def _unique_chunk_rows(rows: list[sqlite3.Row]) -> list[sqlite3.Row]:
+        """Count a legacy/scoped ID pair once, without relaxing chunk metadata."""
+        chunks: dict[int, sqlite3.Row] = {}
+        for row in rows:
+            index = int(row["chunk_index"])
+            previous = chunks.get(index)
+            if previous is not None:
+                metadata_keys = row.keys()
+                if any(
+                    previous[key] != row[key]
+                    for key in metadata_keys
+                    if key not in {"batch_id", "committed_at", "chunk_path"}
+                ) or (
+                    previous["chunk_path"]
+                    and row["chunk_path"]
+                    and previous["chunk_path"] != row["chunk_path"]
+                ):
+                    raise FederationValidationError(
+                        "federated-jsonl-version-conflict",
+                        "content",
+                        "chunk aliases contain contradictory metadata",
+                    )
+                if previous["chunk_path"]:
+                    continue
+            chunks[index] = row
+        return list(chunks.values())
+
     def _try_materialize(
         self,
         *,
@@ -1659,18 +1689,14 @@ class FederatedJsonlProductBridge:
         if local_duplicate is not None or remote_duplicate is not None:
             self._consume_staged_rows(rows)
             return False
+        all_rows = rows
+        rows = self._unique_chunk_rows(rows)
         first = rows[0]
         chunk_count = int(first["chunk_count"])
         if len(rows) != chunk_count:
             return False
         if [int(row["chunk_index"]) for row in rows] != list(range(chunk_count)):
             return False
-        if any(
-            not row["chunk_path"] or not Path(str(row["chunk_path"])).is_file()
-            for row in rows
-        ):
-            return False
-
         producer = str(first["producer_node_id"])
         relative_path = str(first["relative_path"])
         source_mtime_ns = int(first["source_mtime_ns"])
@@ -1688,7 +1714,14 @@ class FederatedJsonlProductBridge:
             current_key = (int(current["source_mtime_ns"]), str(current["file_sha256"]))
             candidate_key = (source_mtime_ns, file_sha256)
             if candidate_key <= current_key:
+                if candidate_key == current_key and len(all_rows) != len(rows):
+                    self._consume_staged_rows(all_rows)
                 return False
+        if any(
+            not row["chunk_path"] or not Path(str(row["chunk_path"])).is_file()
+            for row in rows
+        ):
+            return False
 
         quota = self._mirror_quota_bytes()
         retained = self._mirrored_bytes(excluding=(session_id, dataset_id))
@@ -1726,7 +1759,7 @@ class FederatedJsonlProductBridge:
                         source_mtime_ns=source_mtime_ns,
                         target=target,
                         size=declared_file_size,
-                        rows=rows,
+                        rows=all_rows,
                     )
                     return True
         except FileNotFoundError:
@@ -1831,7 +1864,7 @@ class FederatedJsonlProductBridge:
                     source_mtime_ns=source_mtime_ns,
                     target=target,
                     size=size,
-                    rows=rows,
+                    rows=all_rows,
                     admitted_reservation=database_reservation,
                 )
                 return True

@@ -475,14 +475,18 @@ jobs:
           python-version: "3.12.13"
       - uses: actions/download-artifact@v4
         with:
-          pattern: fcp-v1-${{ github.run_id }}-a${{ github.run_attempt }}-linux-regression-shard-*
-          merge-multiple: true
+          # A targeted GitHub rerun increments run_attempt but does not rerun
+          # successful shard producers. Download this run's attempts, then
+          # verify one complete attempt as a unit; never merge across attempts.
+          pattern: fcp-v1-${{ github.run_id }}-a*-linux-regression-shard-*
+          merge-multiple: false
           path: ${{ runner.temp }}/verify-release-shards-${{ matrix.os }}
-      - name: Require exact complete Linux test coverage
+      - name: Require exact complete Linux test coverage from one attempt
         run: >-
-          python -m scripts.ci_pytest_shards verify
+          python -m scripts.ci_pytest_shards verify-attempts
           --directory "${{ runner.temp }}/verify-release-shards-${{ matrix.os }}"
           --count 4 --source-sha "${{ github.sha }}"
+          --run-id "${{ github.run_id }}"
   suite-order-independence:
     name: Clean-checkout suite order independence
     if: always() && github.repository_id == '1033058161'

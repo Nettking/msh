@@ -10,9 +10,75 @@ from pathlib import Path
 
 import pytest
 
-from scripts.ci_pytest_shards import partition, verify
+from scripts.ci_pytest_shards import partition, verify, verify_attempts
 
 SCRIPT = Path(__file__).resolve().parents[3] / "scripts" / "ci_pytest_shards.py"
+
+
+def _shard_manifest(index: int, source_sha: str) -> dict[str, object]:
+    collected = ["first.py::test_one", "second.py::test_two"]
+    identity = {"sha": source_sha, "tree": "1" * 40}
+    selected = partition(collected, 2)[index]
+    return {
+        "schema": 2,
+        "shard_index": index,
+        "shard_count": 2,
+        "source_sha": source_sha,
+        "source_identity_before": identity,
+        "source_identity_after": identity,
+        "source_error": None,
+        "collected": collected,
+        "selected": selected,
+        "executed": selected,
+        "collection_complete": True,
+        "exit_code": 0,
+    }
+
+
+def _write_shard_artifact(
+    root: Path,
+    *,
+    run_id: str,
+    attempt: int,
+    index: int,
+    source_sha: str,
+) -> None:
+    artifact = root / (f"fcp-v1-{run_id}-a{attempt}-linux-regression-shard-{index}")
+    artifact.mkdir(parents=True)
+    (artifact / f"shard-{index}.json").write_text(
+        json.dumps(_shard_manifest(index, source_sha)), encoding="utf-8"
+    )
+    (artifact / f"junit-{index}.xml").write_text("<testsuite />\n", encoding="utf-8")
+
+
+def test_verify_attempts_selects_one_complete_passing_attempt(tmp_path):
+    source_sha = "a" * 40
+    _write_shard_artifact(
+        tmp_path, run_id="12345", attempt=1, index=0, source_sha=source_sha
+    )
+    _write_shard_artifact(
+        tmp_path, run_id="12345", attempt=1, index=1, source_sha=source_sha
+    )
+    # A rerun may contain only the shard that was retried. It must not displace
+    # a complete valid set or be mixed with the remaining shard from attempt 1.
+    _write_shard_artifact(
+        tmp_path, run_id="12345", attempt=2, index=1, source_sha=source_sha
+    )
+
+    assert verify_attempts(tmp_path, 2, source_sha, "12345") == (1, 2)
+
+
+def test_verify_attempts_never_combines_partial_attempts(tmp_path):
+    source_sha = "b" * 40
+    _write_shard_artifact(
+        tmp_path, run_id="67890", attempt=1, index=0, source_sha=source_sha
+    )
+    _write_shard_artifact(
+        tmp_path, run_id="67890", attempt=2, index=1, source_sha=source_sha
+    )
+
+    with pytest.raises(ValueError, match="No complete passing shard attempt"):
+        verify_attempts(tmp_path, 2, source_sha, "67890")
 
 
 def _git(source: Path, *args: str) -> str:
