@@ -257,6 +257,10 @@ def test_builtin_disabled_write_fence_covers_catchup_and_preserves_other_provide
 
     async def scenario():
         now = datetime.now(timezone.utc)
+
+        def clock() -> datetime:
+            return now
+
         settings = replace(_settings(tmp_path), storage_floor_bytes=0)
         control = PhaseDControlPlane(settings.storage_control_database)
         _register_primary(
@@ -299,6 +303,7 @@ def test_builtin_disabled_write_fence_covers_catchup_and_preserves_other_provide
             authorize_local_storage_write=authorize,
         )
         assert target is not None
+        target.clock = clock
         target.recovery_authority_node_id = "control-authority"
         external = PhaseDStorageService(
             provider_id="external-primary",
@@ -308,6 +313,7 @@ def test_builtin_disabled_write_fence_covers_catchup_and_preserves_other_provide
             acknowledgements=DurableAcknowledgementStore(
                 tmp_path / "external-acks.sqlite3"
             ),
+            clock=clock,
         )
 
         async def external_write(batch_id):
