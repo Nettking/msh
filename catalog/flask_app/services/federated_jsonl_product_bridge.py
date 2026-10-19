@@ -233,15 +233,14 @@ class FederatedJsonlProductBridge(_impl.FederatedJsonlProductBridge):
         if local_duplicate is not None or remote_duplicate is not None:
             self._consume_staged_rows(rows)
             return False
+        all_rows = rows
+        rows = self._unique_chunk_rows(rows)
         first = rows[0]
         chunk_count = int(first["chunk_count"])
         if len(rows) != chunk_count:
             return False
         if [int(row["chunk_index"]) for row in rows] != list(range(chunk_count)):
             return False
-        if any(not row["chunk_path"] for row in rows):
-            return False
-
         producer = str(first["producer_node_id"])
         relative_path = str(first["relative_path"])
         source_mtime_ns = int(first["source_mtime_ns"])
@@ -259,7 +258,11 @@ class FederatedJsonlProductBridge(_impl.FederatedJsonlProductBridge):
             current_key = (int(current["source_mtime_ns"]), str(current["file_sha256"]))
             candidate_key = (source_mtime_ns, file_sha256)
             if candidate_key <= current_key:
+                if candidate_key == current_key and len(all_rows) != len(rows):
+                    self._consume_staged_rows(all_rows)
                 return False
+        if any(not row["chunk_path"] for row in rows):
+            return False
 
         quota = self._mirror_quota_bytes()
         retained = self._mirrored_bytes(excluding=(session_id, dataset_id))
@@ -302,7 +305,7 @@ class FederatedJsonlProductBridge(_impl.FederatedJsonlProductBridge):
                         source_mtime_ns=source_mtime_ns,
                         target=target,
                         size=declared_file_size,
-                        rows=rows,
+                        rows=all_rows,
                     )
                     return True
         except FileNotFoundError:
@@ -409,7 +412,7 @@ class FederatedJsonlProductBridge(_impl.FederatedJsonlProductBridge):
                     source_mtime_ns=source_mtime_ns,
                     target=target,
                     size=size,
-                    rows=rows,
+                    rows=all_rows,
                     admitted_reservation=database_reservation,
                 )
                 return True

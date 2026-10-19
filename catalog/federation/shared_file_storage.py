@@ -185,7 +185,11 @@ def federated_jsonl_batch_id(
     file_sha256: str,
     chunk_index: int,
     chunk_sha256: str,
+    *,
+    dataset_id: str | None = None,
 ) -> str:
+    """Scope new manifest item IDs to their dataset; retain legacy chunk IDs."""
+
     file_hash = _sha256_text(file_sha256, "content.file_sha256")[7:]
     chunk_hash = _sha256_text(chunk_sha256, "content.chunk_sha256")[7:]
     index = _non_negative(
@@ -193,7 +197,11 @@ def federated_jsonl_batch_id(
         "content.chunk_index",
         maximum=FEDERATED_JSONL_MAX_CHUNKS - 1,
     )
-    return f"jsonl:{file_hash}:{index:08d}:{chunk_hash[:24]}"
+    if dataset_id is None:
+        return f"jsonl:{file_hash}:{index:08d}:{chunk_hash[:24]}"
+    dataset = _text(dataset_id, "dataset_id")
+    version = hashlib.sha256(f"{dataset}\0{file_hash}".encode()).hexdigest()
+    return f"jsonl2:{version}:{index:08d}:{chunk_hash[:24]}"
 
 
 def federated_jsonl_idempotency_key(
@@ -355,7 +363,12 @@ def validate_federated_jsonl_ingest(
             "content.chunk_sha256",
             "does not match decoded chunk content",
         )
-    if batch_id != federated_jsonl_batch_id(file_sha256, chunk_index, chunk_sha256):
+    if batch_id not in (
+        federated_jsonl_batch_id(
+            file_sha256, chunk_index, chunk_sha256, dataset_id=dataset_id
+        ),
+        federated_jsonl_batch_id(file_sha256, chunk_index, chunk_sha256),
+    ):
         raise FederationValidationError(
             "federated-jsonl-batch-mismatch",
             "batch_id",
