@@ -21,7 +21,7 @@ import threading
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 from typing import Any
 
@@ -172,13 +172,13 @@ class _BoundedWriter:
 
 
 def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _stamp(value: datetime) -> str:
     if value.tzinfo is None or value.utcoffset() is None:
         raise TypeError("clock must return a timezone-aware value")
-    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _sha256_path(path: Path) -> str:

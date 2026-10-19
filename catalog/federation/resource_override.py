@@ -24,7 +24,7 @@ import tempfile
 import uuid
 from collections.abc import Iterable
 from dataclasses import dataclass, replace
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from pathlib import Path
 from threading import RLock
 from typing import Any
@@ -93,14 +93,14 @@ class OverrideAuditRecord:
             "target": self.target,
             "scope": self.scope,
             "reason": self.reason,
-            "issued_at": self.issued_at.astimezone(timezone.utc).isoformat(),
-            "expires_at": self.expires_at.astimezone(timezone.utc).isoformat(),
+            "issued_at": self.issued_at.astimezone(UTC).isoformat(),
+            "expires_at": self.expires_at.astimezone(UTC).isoformat(),
             "max_bytes": self.max_bytes,
             "max_inodes": self.max_inodes,
             "resource_ids": list(self.resource_ids),
             "value": copy.deepcopy(self.value),
             "revoked_at": (
-                self.revoked_at.astimezone(timezone.utc).isoformat()
+                self.revoked_at.astimezone(UTC).isoformat()
                 if self.revoked_at is not None
                 else None
             ),
@@ -127,7 +127,7 @@ def _bounded_non_negative(value: object, *, field: str) -> int:
 def _aware_utc(value: datetime, *, field: str) -> datetime:
     if value.tzinfo is None or value.utcoffset() is None:
         raise ValueError(f"{field} must be timezone-aware")
-    return value.astimezone(timezone.utc)
+    return value.astimezone(UTC)
 
 
 def _parse_timestamp(value: object, *, field: str) -> datetime:
@@ -253,7 +253,7 @@ class ResourceOverrideAuthority:
     ) -> None:
         self.audit_path = Path(audit_path)
         self.resource_admission = resource_admission or PROCESS_RESOURCE_ADMISSION
-        self.clock = clock or (lambda: datetime.now(timezone.utc))
+        self.clock = clock or (lambda: datetime.now(UTC))
         if (
             isinstance(max_emergency_lease_seconds, bool)
             or not isinstance(max_emergency_lease_seconds, int | float)

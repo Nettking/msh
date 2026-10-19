@@ -18,7 +18,7 @@ import shutil
 import stat
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 from typing import BinaryIO, Self
 
@@ -325,7 +325,7 @@ class ManagedTemporaryRoot:
                 "schema": _ROOT_SCHEMA,
                 "namespace": self.namespace,
                 "token": secrets.token_hex(32),
-                "created_at": datetime.now(timezone.utc).isoformat(),
+                "created_at": datetime.now(UTC).isoformat(),
             }
             # Publish the marker atomically. ``open("x")`` makes an empty file
             # visible before its content arrives, and a concurrent ``ensure()``
@@ -405,7 +405,7 @@ class ManagedTemporaryRoot:
                     "root_identity": list(root_identity),
                     "file_identity": list(file_identity),
                     "proof": _token_digest(token, name, root_identity),
-                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "created_at": datetime.now(UTC).isoformat(),
                     "pid": os.getpid(),
                 }
                 # The scavenger reclaims any owner record it can authenticate
@@ -477,7 +477,7 @@ class ManagedTemporaryRoot:
                     "root_identity": list(root_identity),
                     "file_identity": list(directory_identity),
                     "proof": _token_digest(token, name, root_identity),
-                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "created_at": datetime.now(UTC).isoformat(),
                     "pid": os.getpid(),
                 }
                 # Same ordering as allocate(): the sidecar must never be

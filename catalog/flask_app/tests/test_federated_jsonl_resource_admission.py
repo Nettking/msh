@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -185,7 +185,7 @@ def _reference(batch: dict[str, object], *, session_id: str) -> CommittedBatchRe
         last_sequence=None,
         commit_state=CommitState.COMMITTED,
         acknowledged_provider_ids=("storage-a",),
-        committed_at=datetime(2026, 8, 30, tzinfo=timezone.utc),
+        committed_at=datetime(2026, 8, 30, tzinfo=UTC),
         manifest_revision=1,
         manifest_hash=_MANIFEST_HASH,
     )
@@ -327,7 +327,7 @@ def test_materialization_completes_sqlite_bookkeeping_at_pressure(
     consumer = _bridge(tmp_path, "pressure-completion", admission=_RecordingAdmission())
 
     resource_id = measure_filesystem(consumer.cache_root).resource_id
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     measurement = FilesystemMeasurement(
         resource_id=resource_id,
         observed_at=now,
@@ -373,7 +373,7 @@ def test_local_cache_completes_sqlite_bookkeeping_at_pressure(tmp_path: Path) ->
     source.write_bytes(b'{"machine_id":"m","value":1}\n')
 
     resource_id = measure_filesystem(bridge.cache_root).resource_id
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     measurement = FilesystemMeasurement(
         resource_id=resource_id,
         observed_at=now,
@@ -415,7 +415,7 @@ def test_remote_chunk_records_seen_batch_at_pressure(
     consumer = _bridge(tmp_path, "remote-pressure-completion", admission=_RecordingAdmission())
 
     resource_id = measure_filesystem(consumer.cache_root).resource_id
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     measurement = FilesystemMeasurement(
         resource_id=resource_id,
         observed_at=now,

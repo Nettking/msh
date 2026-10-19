@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 from threading import RLock
 
@@ -112,7 +112,7 @@ class EmergencyAdmissionLease:
     ) -> None:
         """Consume the lease for one already-measured logical transaction."""
 
-        current = now.astimezone(timezone.utc)
+        current = now.astimezone(UTC)
         with self._lock:
             if self._revoked:
                 raise EmergencyAdmissionLeaseError("revoked")

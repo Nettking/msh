@@ -17,7 +17,7 @@ import secrets
 import stat
 from collections.abc import Iterator
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 from typing import BinaryIO
 
@@ -532,7 +532,7 @@ class StableDirectory:
                 "schema": _TEMP_ROOT_SCHEMA,
                 "resource_id": resource_id,
                 "token": secrets.token_hex(32),
-                "created_at": datetime.now(timezone.utc).isoformat(),
+                "created_at": datetime.now(UTC).isoformat(),
             }
             try:
                 fd = self._open_exclusive(_TEMP_ROOT_MARKER)
@@ -686,7 +686,7 @@ class StableDirectory:
                         "resource_id": self.resource_id,
                         "file_identity": None,
                         "proof": _temporary_proof(token, name, self.resource_id),
-                        "created_at": datetime.now(timezone.utc).isoformat(),
+                        "created_at": datetime.now(UTC).isoformat(),
                         "pid": os.getpid(),
                         "owner_name": owner_name,
                     },
@@ -704,7 +704,7 @@ class StableDirectory:
                         "resource_id": self.resource_id,
                         "file_identity": list(file_identity),
                         "proof": _temporary_proof(token, name, self.resource_id),
-                        "created_at": datetime.now(timezone.utc).isoformat(),
+                        "created_at": datetime.now(UTC).isoformat(),
                         "pid": os.getpid(),
                         "owner_name": owner_name,
                     },
