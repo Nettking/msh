@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from pathlib import Path
 
 import pytest
@@ -22,7 +22,7 @@ from catalog.federation.resource_override import (
     ResourceOverrideAuthority,
 )
 
-NOW = datetime(2026, 8, 31, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 8, 31, 12, 0, tzinfo=UTC)
 ADMIN = OperatorPrincipal("admin@example.test", is_admin=True)
 VIEWER = OperatorPrincipal("viewer@example.test")
 

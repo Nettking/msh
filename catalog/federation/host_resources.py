@@ -30,7 +30,7 @@ import threading
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from enum import IntEnum
 from pathlib import Path
 
@@ -232,7 +232,7 @@ def _unavailable_measurement(
 ) -> FilesystemMeasurement:
     return FilesystemMeasurement(
         resource_id="unavailable",
-        observed_at=observed_at.astimezone(timezone.utc),
+        observed_at=observed_at.astimezone(UTC),
         total_bytes=None,
         free_bytes=None,
         total_inodes=None,
@@ -255,7 +255,7 @@ def measure_filesystem(
     measurement rather than silently substituting a healthy value.
     """
 
-    now = observed_at or datetime.now(timezone.utc)
+    now = observed_at or datetime.now(UTC)
     if now.tzinfo is None or now.utcoffset() is None:
         raise ValueError("resource measurements require timezone-aware timestamps")
     try:
@@ -267,7 +267,7 @@ def measure_filesystem(
         return _unavailable_measurement(observed_at=now)
     return FilesystemMeasurement(
         resource_id=resource_id,
-        observed_at=now.astimezone(timezone.utc),
+        observed_at=now.astimezone(UTC),
         total_bytes=int(usage.total),
         free_bytes=int(usage.free),
         total_inodes=total_inodes,
@@ -314,10 +314,10 @@ def assess_measurement(
     policy = thresholds or PressureThresholds()
     if not _valid_capacity(reserved_bytes) or not _valid_capacity(reserved_inodes):
         raise ValueError("resource reservations must be non-negative integers")
-    current = now or datetime.now(timezone.utc)
+    current = now or datetime.now(UTC)
     if not _valid_aware_timestamp(current):
         raise ValueError("resource assessment requires a timezone-aware timestamp")
-    current = current.astimezone(timezone.utc)
+    current = current.astimezone(UTC)
 
     reasons: list[str] = []
     effective_bytes: int | None = None
@@ -336,7 +336,7 @@ def assess_measurement(
         reasons.append("measurement_invalid")
         level = PressureLevel.CRITICAL
     else:
-        observed = measurement.observed_at.astimezone(timezone.utc)
+        observed = measurement.observed_at.astimezone(UTC)
         age = (current - observed).total_seconds()
         if age < -policy.future_measurement_tolerance_seconds:
             reasons.append("measurement_time_invalid")
@@ -399,7 +399,7 @@ class ProcessResourceAdmission:
     ) -> None:
         self.thresholds = thresholds or PressureThresholds()
         self.measurer = measurer
-        self.clock = clock or (lambda: datetime.now(timezone.utc))
+        self.clock = clock or (lambda: datetime.now(UTC))
         self._lock = threading.RLock()
         self._reserved: dict[str, tuple[int, int]] = {}
 

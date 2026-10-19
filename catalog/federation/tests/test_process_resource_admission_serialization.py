@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import threading
 from dataclasses import replace
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from pathlib import Path
 
 import pytest
@@ -25,7 +25,7 @@ from catalog.federation.resource_override import (
 def _measurement(resource_id: str, free_bytes: int) -> FilesystemMeasurement:
     return FilesystemMeasurement(
         resource_id=resource_id,
-        observed_at=datetime.now(timezone.utc),
+        observed_at=datetime.now(UTC),
         total_bytes=1_000,
         free_bytes=free_bytes,
         total_inodes=None,
@@ -313,7 +313,7 @@ def test_relay_control_refuses_failed_filesystem_measurement(
 def test_relay_control_label_still_validates_a_supplied_override(
     tmp_path: Path, invalid_lease: str,
 ) -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     clock = now
     admission = SerializedProcessResourceAdmission(
         thresholds=_thresholds(), measurer=lambda _path: replace(

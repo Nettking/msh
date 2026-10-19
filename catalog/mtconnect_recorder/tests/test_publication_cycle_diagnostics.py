@@ -494,7 +494,10 @@ def test_actual_worker_distinguishes_current_reconcile_subphase_and_old_cancelle
 
         def blocked(*args, **kwargs):
             entered.set()
-            assert release.wait(5)
+            # The scenario's finally block always releases this worker. A short
+            # timer here can expire while CI is inspecting the snapshot and
+            # turn the intended blocked-thread assertion into a scheduling race.
+            release.wait()
             try:
                 return original(*args, **kwargs)
             finally:

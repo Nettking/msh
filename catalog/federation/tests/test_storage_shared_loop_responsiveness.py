@@ -6,7 +6,7 @@ import copy
 import json
 import threading
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -67,7 +67,10 @@ def test_real_shared_wire_cold_validation_heartbeat_and_two_distinct_commits(tmp
                 relay_control_database=str(tmp_path / "relay.sqlite3"))
             control = PhaseDControlPlane(settings.storage_control_database)
             provider_id = authority_runtime._builtin_local_provider_id(creator.node_id)
-            now = datetime.now(timezone.utc)
+            # This test exercises the cold-manifest/heartbeat path, not
+            # future-grant rejection; give the real relay round trip a clear
+            # validity margin instead of depending on one wall-clock sample.
+            now = datetime.now(timezone.utc) - timedelta(minutes=1)
             group = "fcp-local-storage"
             _register_primary(control, session_id=session_id, provider_id=provider_id, node_id=creator.node_id, now=now)
             revision = control.snapshot(session_id).revision

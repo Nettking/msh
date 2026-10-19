@@ -4,7 +4,7 @@ import io
 import sqlite3
 import threading
 from contextlib import closing
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 from typing import Any
 
@@ -70,7 +70,7 @@ class _FakeUploadService:
 def _measurement(resource_id: str, *, free_bytes: int) -> FilesystemMeasurement:
     return FilesystemMeasurement(
         resource_id=resource_id,
-        observed_at=datetime(2026, 8, 28, 12, 0, tzinfo=timezone.utc),
+        observed_at=datetime(2026, 8, 28, 12, 0, tzinfo=UTC),
         total_bytes=10_000,
         free_bytes=free_bytes,
         total_inodes=None,
@@ -91,7 +91,7 @@ def _admission(measurer: Any) -> ProcessResourceAdmission:
             max_measurement_age_seconds=60,
         ),
         measurer=measurer,
-        clock=lambda: datetime(2026, 8, 28, 12, 0, tzinfo=timezone.utc),
+        clock=lambda: datetime(2026, 8, 28, 12, 0, tzinfo=UTC),
     )
 
 
@@ -204,7 +204,7 @@ def test_service_admission_refuses_before_staging_request_bytes(
             max_measurement_age_seconds=60,
         ),
         measurer=measure,
-        clock=lambda: datetime(2026, 8, 28, 12, 0, tzinfo=timezone.utc),
+        clock=lambda: datetime(2026, 8, 28, 12, 0, tzinfo=UTC),
     )
     service = DataUploadService(
         database=tmp_path / "imports" / "uploads.sqlite3",
@@ -243,7 +243,7 @@ def test_async_import_pressure_keeps_batch_queued_and_hidden(tmp_path: Path, mon
             max_measurement_age_seconds=60,
         ),
         measurer=measure,
-        clock=lambda: datetime(2026, 8, 28, 12, 0, tzinfo=timezone.utc),
+        clock=lambda: datetime(2026, 8, 28, 12, 0, tzinfo=UTC),
     )
     service = DataUploadService(
         database=tmp_path / "imports" / "uploads.sqlite3",

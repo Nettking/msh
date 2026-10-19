@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from typing import Self
 
 from catalog.federation.host_resources import (
@@ -11,7 +11,7 @@ from catalog.federation.host_resources import (
     ProcessResourceAdmission,
 )
 
-NOW = datetime(2026, 8, 30, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 8, 30, 12, 0, tzinfo=UTC)
 
 
 class _GateLock:
