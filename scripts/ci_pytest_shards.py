@@ -62,11 +62,17 @@ def partition(nodeids: list[str], count: int) -> list[list[str]]:
 
 
 def verify(directory: Path, count: int, source_sha: str) -> int:
-    if re.fullmatch(r"[0-9a-f]{40}", source_sha) is None:
-        raise ValueError("Expected source SHA must be a complete Git commit")
     manifests = [
         json.loads(path.read_text()) for path in sorted(directory.glob("shard-*.json"))
     ]
+    return verify_manifests(manifests, count, source_sha)
+
+
+def verify_manifests(
+    manifests: list[dict[str, object]], count: int, source_sha: str
+) -> int:
+    if re.fullmatch(r"[0-9a-f]{40}", source_sha) is None:
+        raise ValueError("Expected source SHA must be a complete Git commit")
     if count < 1 or len(manifests) != count:
         raise ValueError(f"Expected {count} shard manifests, found {len(manifests)}")
     by_index = {manifest["shard_index"]: manifest for manifest in manifests}
@@ -108,6 +114,79 @@ def verify(directory: Path, count: int, source_sha: str) -> int:
     if covered != set(universe):
         raise ValueError("Shards do not cover the complete collected suite")
     return len(covered)
+
+
+def verify_attempts(
+    directory: Path, count: int, source_sha: str, run_id: str
+) -> tuple[int, int]:
+    """Verify one complete shard set from a single attempt of this run.
+
+    Workflow reruns can leave successful shard artifacts from an earlier
+    attempt while only failed jobs are rerun. Never combine those attempts:
+    group by the run/attempt encoded in each artifact name, verify each full
+    group independently, and select the newest complete passing group.
+    """
+
+    if re.fullmatch(r"[1-9][0-9]*", run_id) is None:
+        raise ValueError("Expected GitHub run ID to be a positive integer")
+    artifact_pattern = re.compile(
+        rf"fcp-v1-{re.escape(run_id)}-a([1-9][0-9]*)-"
+        r"linux-regression-shard-([0-9]+)"
+    )
+    groups: dict[int, dict[int, Path]] = defaultdict(dict)
+    children = sorted(directory.iterdir())
+    if not children:
+        raise ValueError("No shard artifacts were downloaded")
+    for artifact in children:
+        match = artifact_pattern.fullmatch(artifact.name)
+        if not artifact.is_dir() or match is None:
+            raise ValueError(f"Unexpected shard artifact entry: {artifact.name}")
+        attempt, index = (int(value) for value in match.groups())
+        if index >= count:
+            raise ValueError(
+                f"Shard artifact index {index} is outside the expected set"
+            )
+        if index in groups[attempt]:
+            raise ValueError(
+                f"Attempt {attempt} has duplicate shard artifact index {index}"
+            )
+        groups[attempt][index] = artifact
+
+    failures: list[str] = []
+    for attempt in sorted(groups, reverse=True):
+        artifacts = groups[attempt]
+        if set(artifacts) != set(range(count)):
+            failures.append(
+                f"attempt {attempt} has shard indexes {sorted(artifacts)}, "
+                f"expected {list(range(count))}"
+            )
+            continue
+        manifests: list[dict[str, object]] = []
+        try:
+            for index in range(count):
+                files = list(artifacts[index].iterdir())
+                expected_names = {f"shard-{index}.json", f"junit-{index}.xml"}
+                names = {path.name for path in files if path.is_file()}
+                if any(not path.is_file() for path in files) or names != expected_names:
+                    raise ValueError(
+                        f"attempt {attempt} shard {index} has unexpected artifact files"
+                    )
+                manifest = json.loads(
+                    (artifacts[index] / f"shard-{index}.json").read_text(
+                        encoding="utf-8"
+                    )
+                )
+                if manifest.get("shard_index") != index:
+                    raise ValueError(
+                        f"attempt {attempt} artifact {index} contains another shard"
+                    )
+                manifests.append(manifest)
+            covered = verify_manifests(manifests, count, source_sha)
+        except (ValueError, KeyError, TypeError, OSError, json.JSONDecodeError) as exc:
+            failures.append(f"attempt {attempt} is invalid: {exc}")
+            continue
+        return attempt, covered
+    raise ValueError("No complete passing shard attempt: " + "; ".join(failures))
 
 
 def run(index: int, count: int, manifest_path: Path, pytest_args: list[str]) -> int:
@@ -202,12 +281,26 @@ def main() -> int:
     verifier.add_argument("--directory", type=Path, required=True)
     verifier.add_argument("--count", type=int, required=True)
     verifier.add_argument("--source-sha", required=True)
+    attempt_verifier = commands.add_parser("verify-attempts")
+    attempt_verifier.add_argument("--directory", type=Path, required=True)
+    attempt_verifier.add_argument("--count", type=int, required=True)
+    attempt_verifier.add_argument("--source-sha", required=True)
+    attempt_verifier.add_argument("--run-id", required=True)
     args = parser.parse_args()
     try:
         if args.command == "verify":
             covered = verify(args.directory, args.count, args.source_sha)
             print(
                 f"Verified {covered} tests across {args.count} disjoint successful shards"
+            )
+            return 0
+        if args.command == "verify-attempts":
+            attempt, covered = verify_attempts(
+                args.directory, args.count, args.source_sha, args.run_id
+            )
+            print(
+                f"Verified {covered} tests across {args.count} disjoint successful "
+                f"shards from run {args.run_id} attempt {attempt}"
             )
             return 0
         pytest_args = args.pytest_args
