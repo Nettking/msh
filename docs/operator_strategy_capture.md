@@ -5,9 +5,9 @@ FCP includes a knowledge-capture flow for recording operator statements during f
 The current pages are:
 
 ```text
-/ operator-strategies/capture   -> capture one raw statement quickly
-/ operator-strategies/review    -> review captured notes later
-/ operator-strategies/structure/<id> -> map one note to OSL/paper fields
+/operator-strategies/capture   -> capture one raw statement quickly
+/operator-strategies/review    -> review captured notes later
+/operator-strategies/structure/<id> -> map one note to OSL/paper fields
 ```
 
 In the app menu these live under:
@@ -127,7 +127,7 @@ coded CNC strategy statement
   -> SysML artefact
 ```
 
-The exporter should stay aligned with `Nettking/systems-paper/sysml/osl-core.sysml` and the keyword-style SysML example. See `docs/agent_notes/osl_sysml_alignment.md` before changing the exporter.
+The current exporter generates keyword-style SysML text from reusable FCP operator notes. Its profile imports are not included in this repository, and generating text does not prove parsing, formal conformance, or semantic validity. See [SysML Export](wiki/SysML-Export.md) and the [operator-knowledge model boundary](implementation/operator_knowledge_modeling.md).
 
 ## Intended FCP field workflow
 
@@ -148,4 +148,4 @@ The stored records can later support:
 - support cards in Assist.
 - traceability from operator reasoning to monitoring rules, recommendation services, dashboards, explanations, and validation cases.
 - alignment between decisions and telemetry windows using `decision_time`.
-- research coding for the Systems paper.
+- traceable research coding and independently reviewed follow-up modeling.

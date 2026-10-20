@@ -30,7 +30,7 @@ def _records_to_sysml(records: list[dict[str, Any]]) -> str:
     lines = [
         "// Generated from FCP Operator Notes",
         "// Method: coded CNC strategy statement -> OSL keywords -> SysML artefact.",
-        "// Keyword style follows systems-paper/sysml/osl-core.sysml and cnc-chatter-keywords-example.sysml.",
+        "// Referenced language-profile definitions must be resolved by the consumer.",
         "package FCP_OperatorStrategies {",
         "",
         "  import OSLCore::*;",

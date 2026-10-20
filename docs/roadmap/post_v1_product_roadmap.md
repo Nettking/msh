@@ -53,15 +53,11 @@ Before publishing Federation v1:
 6. establish a permanent release gate at least as strong as the required existing matrices;
 7. publish release notes, changelog, exact version, and tag.
 
-Complete physical CF7 acceptance remains false. CF8 remains blocked.
+Complete physical CF7 acceptance remains unaccepted; the implementation index and acceptance manifest govern current truth. CF8 compatibility retirement is merged for the installed product.
 
-## First post-acceptance change: CF8 compatibility retirement
+## CF8 compatibility retirement (implemented)
 
-CF8 may begin only after CF7 is accepted.
-
-Its purpose is to retire the retained role-first setup and compatibility surfaces without changing the product identity, weakening migration, or silently enabling contributions.
-
-CF8 must:
+CF8 retired the role-first runtime for the installed product; retained setup data is migration input only. Subsequent changes must continue to:
 
 - preserve stable device and Federation identity;
 - migrate supported old settings deterministically;
@@ -111,8 +107,6 @@ These improvements must use existing authenticated authority paths. A simpler UI
 
 Public or partially trusted participation, protocol-major renaming of the internal session boundary, decentralized coordination, multi-primary storage, untrusted remote code, or Byzantine-fault assumptions are outside the current trusted Federation v1 boundary. They require separate threat models, compatibility plans, and release decisions.
 
-## OSL product track
+## Operator-knowledge modeling
 
-OSL remains a separate track. The next permitted delivery is documentation-only D0-A. OSL production code, mutation, human approval, publication, AI integration, and SysML v2 adapters remain blocked by the gates in the authoritative OSL execution plan.
-
-OSL publication grants no Federation or machine authority.
+FCP already supports operator-note capture, structuring, and a limited SysML text export. Future formal language semantics, validated model transformations, and operational-state reasoning require a separately reviewed MSH design and evaluation plan; they are not part of the v1 acceptance contract. See [Operator knowledge and modeling](../implementation/operator_knowledge_modeling.md).

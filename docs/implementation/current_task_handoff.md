@@ -18,7 +18,6 @@ Reviewed: **2026-09-01 Europe/Oslo**
 - Independent adversarial robustness review: reconciled; implementation must follow the reconciled blocker set.
 - Complete physical CF7 acceptance: not accepted.
 - Complete Federation v1 end-to-end acceptance: false.
-- OSL integration: separate planning track; production implementation status is governed by the OSL track documents.
 
 Historical phase notes, branch handoffs, old commit hashes, and pre-CF8 sequencing do not override this current handoff. Acceptance flags are different: only the named acceptance source and a separate evidence-backed review may change them.
 
@@ -384,29 +383,11 @@ predated `main` substantially.
 
 Do **not** restart CF1-CF6 implementation waves and do **not** reintroduce role-first runtime authority to solve migration or startup defects.
 
-## Track B: OSL integration
+## Operator-knowledge modeling boundary
 
-Plan index:
+FCP's current knowledge capture, review, strategy comparison, and keyword-style SysML text export are documented in the [maintained MSH reference](operator_knowledge_modeling.md). The retired research-planning documents do not authorize implementation, define Federation acceptance, or establish language conformance. Any formal modeling extension requires a new scoped proposal and validation plan within this repository.
 
-- [OSL integration index](osl_integration/)
-
-Authoritative execution plan:
-
-- [OSL implementation roadmap](osl_integration/10_phased_implementation_roadmap.md)
-
-W3 end-to-end acceptance scenario:
-
-- The former W3 alignment document was retired. Any W3 scenario must be re-specified in the current OSL roadmap before implementation.
-
-Federation work and OSL work remain separate review boundaries. Before beginning any OSL implementation delivery, re-read the current OSL index/roadmap rather than relying on older Federation handoff text.
-
-## Cross-track boundaries
-
-- Do not combine Federation physical acceptance/runtime fixes with OSL production implementation.
-- OSL review, approval, or publication grants no Federation, provider, compute, storage, job, artifact, lease, fencing, update, recorder-control, or machine authority.
-- Federation device identity is not a human OSL reviewer, approver, or publisher identity.
-- AI cannot sign, approve, publish, or create canonical human authority merely because it is available as an FCP capability.
-- Existing operator records and legacy SysML exports are compatibility inputs, not proof of OSL conformance.
+Operator knowledge and generated SysML text cannot grant Federation, provider, compute, storage, job, artifact, update, recorder-control, or machine authority. Human review and platform authority remain independent.
 
 ## Agent operating discipline
 
@@ -429,4 +410,4 @@ Federation work and OSL work remain separate review boundaries. Before beginning
 - Safe to document Federation-wide updates as automatic/background updates: **no; activation remains explicit/manual**.
 - Safe to claim *supervised* native standalone recorders are updated by **Update all devices**: **yes**.
 - Safe to claim an unsupervised `python start_recorder.py` process is updated by **Update all devices**: **no; it reports `host_update_agent_unavailable`**.
-- Safe to begin an OSL delivery: only after checking the current OSL track documents and respecting its named prerequisite/review boundaries.
+- Safe to treat the existing SysML text exporter as a formally validated model: **no**; see the maintained operator-knowledge modeling boundary.

@@ -15,7 +15,7 @@
 
 - [Current task handoff](current_task_handoff.md) — current merged baseline, blockers, resume safety, and next acceptance/documentation work.
 - [Federation implementation](federation/) — durable plans, acceptance documents, technical references, current update/rollout notes, and historical delivery evidence.
-- [OSL integration](osl_integration/) — active OSL planning package and authoritative execution order for that track.
+- [Operator knowledge model boundary](operator_knowledge_modeling.md) — currently implemented capture/structuring/export, limitations, and future change gate.
 - [MTConnect operational segmentation](mtconnect_operational_segmentation_plan.md) — **at the S7 STOP-AND-REVIEW gate on an owner-authorized stacked implementation**. S2-S7 are represented by stacked draft PRs #298-#303 on top of the S1 work; merge truth remains PR-dependent and these changes are not claimed to be on `main`. No activity phases, features, baselines, anomaly detection, prediction, recommendations, OSL/SysML integration, or dashboards may begin from this track until a separate post-S7 design/review gate is opened.
 - [Federation sharing evaluation](federation_sharing_evaluation.md) — what the Federation shares today, what remains device-local, and the open inconsistencies between the shared model, the code, and the canonical documentation.
 - [Federation execution efficiency learning](federation_execution_efficiency_learning.md) — how completed executions become observations, how learned per-node/workload profiles are maintained, and how they rank already-eligible providers without changing capability or authority constraints.
@@ -33,7 +33,7 @@
 - Complete physical CF7 acceptance is **not accepted**.
 - Complete Federation v1 end-to-end acceptance remains **false**.
 - Federation v1 release tag is not created.
-- OSL production implementation remains separate from Federation closeout and is not implied by the Federation changes above.
+- Operator-knowledge modeling is not a Federation v1 acceptance requirement; changes to formal modeling semantics need an independently reviewed MSH proposal.
 
 The machine-readable Federation acceptance source is `catalog/federation/tests/cf7_acceptance/scenarios.json`.
 
