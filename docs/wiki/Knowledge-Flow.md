@@ -33,7 +33,7 @@ After the visit, review captured statements. A note can stay incomplete if the i
 
 ### 3. Structure the note
 
-Map the raw statement into OSL/paper fields, such as:
+Map the raw statement into the fields supported by the current FCP note form, such as:
 
 - context
 - trigger
@@ -63,7 +63,7 @@ Only add intervention logic when the situation can reasonably be detected from s
 
 ### 6. Export to SysML
 
-Reusable structured strategies can be exported to SysML using the paper method:
+Reusable structured strategies can be exported as keyword-style SysML text using FCP's current mapping:
 
 ```text
 coded CNC strategy statement
