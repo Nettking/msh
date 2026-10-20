@@ -20,7 +20,7 @@
 
 ## Current acceptance state
 
-Complete physical CF7 acceptance is not accepted.
+**Physical acceptance campaign PASS reported by the operator on 2026-10-20.** The test is no longer listed as awaiting execution. The exact-commit evidence bundle and independent manifest decision have not yet been recorded in this repository. See [acceptance and release status](../../../releases/federation_v1_acceptance_status.md).
 
 The machine-readable source is:
 
@@ -28,7 +28,7 @@ The machine-readable source is:
 catalog/federation/tests/cf7_acceptance/scenarios.json
 ```
 
-The following claims remain false until a separate reviewed evidence decision changes them:
+The machine-readable claims currently remain false despite that reported test result, pending a separate evidence-backed acceptance decision:
 
 ```json
 {
@@ -42,7 +42,7 @@ All physical evidence must remain bound to one exact commit and distinguish auto
 
 ## Post-plan implementation reconciliation
 
-CF8 is no longer a future acceptance prerequisite: the role-first installed-product runtime was retired on `main` after the original acceptance sequencing was written. That merged code change does **not** make CF7 accepted and does not change any manifest flag above.
+CF8 is no longer a future acceptance prerequisite: the role-first installed-product runtime was retired on `main` after the original acceptance sequencing was written. Neither that merge nor the new operator-reported PASS automatically edits the historical manifest flags shown above.
 
 Likewise, the current product now contains additional post-plan behavior that the physical campaign must account for when freezing a candidate:
 

@@ -1,6 +1,6 @@
 # Federation v1 physical robustness campaign
 
-Status: **executable pre-release physical evidence procedure**
+Status: **physical evidence procedure and retained validation contract; execution PASS reported 2026-10-20, evidence reconciliation pending**. See [acceptance and release status](../releases/federation_v1_acceptance_status.md).
 
 This procedure operationalizes the corrected P01-P12 campaign from
 `v1_robustness_reconciliation.md`. It supplements the existing CF7 physical

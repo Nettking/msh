@@ -93,11 +93,11 @@ See:
 - Role-first runtime compatibility retirement (CF8): merged for the installed product; migration seams remain where explicitly documented.
 - Verified manual Federation-wide updates: merged.
 - Tailscale Federation discovery: merged.
-- Complete physical CF7 acceptance: **not accepted**.
-- Complete Federation v1 end-to-end acceptance: **not accepted**.
-- Federation v1 release tag: not created.
+- Physical acceptance execution: **PASS reported by the operator (2026-10-20)**.
+- Formal CF7/Federation v1 acceptance record: **evidence and manifest reconciliation outstanding**; existing manifest flags are still false.
+- Federation v1 Git tag and GitHub Release: **not published**. See [acceptance and release status](docs/releases/federation_v1_acceptance_status.md).
 
-The machine-readable acceptance source is `catalog/federation/tests/cf7_acceptance/scenarios.json`. Automated gates demonstrate executable contracts and regression coverage, but they do not replace the required physical evidence.
+The machine-readable acceptance source is `catalog/federation/tests/cf7_acceptance/scenarios.json`, which has not yet been updated to reflect the reported physical PASS. Automated gates alone do not replace retained exact-commit physical evidence. See the [acceptance-status reconciliation](docs/releases/federation_v1_acceptance_status.md).
 
 ## Current development tracks
 

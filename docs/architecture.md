@@ -334,7 +334,7 @@ Normal startup preserves state. A documented fresh reset must name exactly what 
 
 Automated tests prove contracts and bounded product composition. They do not prove real MTConnect, Ollama/accelerator, multi-host network, target storage, or real-browser behavior.
 
-Complete Federation v1 acceptance remains false until the required physical evidence validates against one exact candidate commit. The machine-readable source is `catalog/federation/tests/cf7_acceptance/scenarios.json`.
+Physical Federation v1 acceptance execution was **reported PASS on 2026-10-20**. The exact-candidate evidence-backed decision has not yet been reconciled to `catalog/federation/tests/cf7_acceptance/scenarios.json` (which still records false flags), and the release is not published. See [acceptance and release status](releases/federation_v1_acceptance_status.md).
 
 ## Related references
 

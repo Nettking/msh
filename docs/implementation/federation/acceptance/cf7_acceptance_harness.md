@@ -1,6 +1,6 @@
 # CF7 capability-first acceptance harness
 
-Status: automated foundation and product-composition coverage are implemented through CF7-B. **Physical product acceptance and complete Federation v1 end-to-end acceptance are not claimed.**
+Status: automated foundation/product-composition coverage implemented through CF7-B. **Physical campaign PASS reported 2026-10-20; exact-candidate evidence and machine-readable acceptance decision still require reconciliation.** See [current acceptance status](../../../releases/federation_v1_acceptance_status.md).
 
 ## Purpose
 

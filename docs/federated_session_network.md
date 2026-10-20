@@ -147,7 +147,7 @@ Federation v1 supports trusted private deployments and separately approved authe
 
 ## Current acceptance status
 
-Automated contract and product-composition coverage is implemented. Complete physical Windows/Linux, multi-host, MTConnect, Ollama/accelerator, storage, and browser acceptance remains unaccepted.
+Automated contract and product-composition coverage is implemented. The operator **reported the physical acceptance campaign PASS on 2026-10-20**; the exact-candidate evidence and recorded CF7/V1 acceptance decision still require reconciliation before release publication. See [acceptance and release status](releases/federation_v1_acceptance_status.md).
 
 See:
 

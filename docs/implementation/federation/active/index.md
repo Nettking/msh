@@ -4,11 +4,11 @@
 | --- | --- |
 | Status | Active |
 | Audience | Maintainers, reviewers, acceptance owners, and implementation agents |
-| Scope | Durable Federation product behavior, current release closeout, update and branch-trial design, pending-contribution authority, device naming, remaining acceptance work, and stop conditions |
+| Scope | Durable Federation product behavior, current release closeout, update and branch-trial design, pending-contribution authority, device naming, post-test acceptance-record reconciliation, and stop conditions |
 | Authority | Current status/sequencing is reconciled by the current handoff/track index; documents here retain their durable decisions where not superseded |
 | Entry point | [Current task handoff](../../current_task_handoff.md) |
 | Parent | [Federation implementation documentation](../) |
-| Reviewed | 2026-08-11 Europe/Oslo |
+| Reviewed | 2026-10-20 (status reconciliation) |
 | Retention | Retain until superseded; move fully superseded plans to `../history/` |
 
 ## Plans and active references
@@ -25,4 +25,4 @@
 
 Use the [Current task handoff](../../current_task_handoff.md) first for merged status and next work. Use the capability-first plan for durable product/authority decisions, the pending-contribution contract for leader approval semantics, the device-name contract for operational identity labels, the closeout plan for release completion, and `catalog/federation/tests/cf7_acceptance/scenarios.json` for acceptance truth.
 
-Do not interpret old statements that CF8 is blocked as current. Do not interpret merged CF8, update, recorder, pending-contribution, or device-name features as evidence that the false CF7/Federation-v1 acceptance flags have changed.
+Do not interpret old statements that CF8 is blocked as current. Do not infer formal acceptance from merged features. Physical execution PASS was reported on 2026-10-20, but the machine-readable CF7/Federation-v1 acceptance flags still await evidence-backed reconciliation; see [acceptance and release status](../../../releases/federation_v1_acceptance_status.md).

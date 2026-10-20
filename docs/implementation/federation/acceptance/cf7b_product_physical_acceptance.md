@@ -1,6 +1,6 @@
 # CF7-B product and physical acceptance
 
-Status: automated product acceptance and the physical evidence contract are merged on `main`. **Physical acceptance has not been claimed.**
+Status: automated product acceptance and the physical evidence contract are merged on `main`. **Physical campaign PASS reported 2026-10-20; formal evidence/manifest reconciliation outstanding.** See [current acceptance status](../../../releases/federation_v1_acceptance_status.md).
 
 ## Purpose
 
@@ -11,7 +11,7 @@ It separates two kinds of evidence:
 1. **Automated product evidence** — deterministic scenarios that CI executes on clean Ubuntu and Windows runners using independent state roots and bounded local adapter fixtures.
 2. **Physical product evidence** — observations requiring real Windows/Linux hosts, independent network paths, MTConnect, Ollama/model files, target accelerators, and real desktop/mobile browsers.
 
-A green CI workflow proves only the first category and the correctness of the physical evidence tooling. Full capability-first and Federation v1 end-to-end acceptance remain false until the required physical evidence validates against the release candidate.
+A green CI workflow proves only the first category and the correctness of the physical evidence tooling. The physical campaign has now been reported as PASS, but the machine-readable capability-first and Federation v1 acceptance flags remain false until reviewed physical evidence is bound to the exact release candidate.
 
 ## Automated acceptance
 

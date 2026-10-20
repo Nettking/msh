@@ -1,10 +1,10 @@
 # FCP Federation v1 scope
 
-Status: **pre-release scope definition**
+Status: **Federation v1 release-scope reference; physical campaign PASS reported, release unpublished**
 
-Reviewed: **2026-08-16 Europe/Oslo**
+Reviewed: **2026-10-20**
 
-This document defines the intended trusted Federation v1 boundary. It does not declare that a release tag exists or that end-to-end physical acceptance has passed.
+This document defines the trusted Federation v1 boundary. Physical acceptance execution was reported as **PASS on 2026-10-20**; formal exact-commit evidence reconciliation and release publication remain separate. See [acceptance and release status](federation_v1_acceptance_status.md).
 
 ## Release identity
 
@@ -19,10 +19,10 @@ Current release state:
 - standalone recorder Federation bootstrap/publication and bounded remote recorder control: merged;
 - MTConnect operational segmentation S1-S7 and read-only closeout validation: merged;
 - Federation-scoped human sign-in with leader-held credentials and signed member assertions: implemented;
-- configured three-voter replicated authority and private quorum-certified credential continuity: implemented; exact-candidate physical validation pending;
-- complete physical CF7 evidence: not accepted;
-- Federation v1 end-to-end acceptance: false;
-- release tag: not created.
+- configured three-voter replicated authority and private quorum-certified credential continuity: implemented; operator reports the physical campaign passed, with commit-bound evidence reconciliation outstanding;
+- physical acceptance campaign execution: **PASS reported 2026-10-20**;
+- formal CF7 and Federation v1 acceptance record: manifest flags still false, pending evidence-backed review;
+- release tag: not published.
 
 ## Product model
 
@@ -64,7 +64,7 @@ The user-facing `federation_id` maps to the existing internal `session_id` compa
 
 When `FCP_REPLICATED_CONTROL_PLANE_CONFIG` selects the replicated product runtime, a fixed three-voter command log requires a two-vote quorum for authority commits. Authenticated/encrypted peer transport, durable terms, catch-up/snapshots, readiness sealing, and fencing support recovery by an eligible surviving coordinator while preserving the same Federation identity, creator provenance, membership, revocations, and capability ownership. Coordinator databases are local materialized views; this is not SQLite/WAL page replication.
 
-The dedicated Recorder voter contributes durability without becoming an operational coordinator or writing into protected Recorder data. Continued operation requires quorum and an eligible coordinator. Legacy deployments without this configuration retain the single-coordinator availability boundary. Voter-set reconfiguration and Byzantine-fault tolerance are outside v1. These are implemented boundaries; physical acceptance remains pending as stated above.
+The dedicated Recorder voter contributes durability without becoming an operational coordinator or writing into protected Recorder data. Continued operation requires quorum and an eligible coordinator. Legacy deployments without this configuration retain the single-coordinator availability boundary. Voter-set reconfiguration and Byzantine-fault tolerance are outside v1. These are implemented boundaries; physical execution PASS was reported, but the exact-candidate evidence record remains to be reconciled.
 
 ### Transport
 
@@ -274,4 +274,4 @@ A release tag may be created only after one exact candidate has:
 - a complete redacted physical evidence document validating against the candidate commit; and
 - no unresolved authority, privacy, data-loss, platform, browser, migration, update, recorder-control, or human-authentication blocker.
 
-Acceptance truth is recorded in `catalog/federation/tests/cf7_acceptance/scenarios.json`. The false flags must remain false until a separate evidence-backed review changes them.
+Acceptance truth is recorded in `catalog/federation/tests/cf7_acceptance/scenarios.json`. The currently false manifest flags must be reconciled through a separate evidence-backed review, notwithstanding the operator-reported physical PASS. See [acceptance and release status](federation_v1_acceptance_status.md).

@@ -2,7 +2,7 @@
 
 Status: **current repository handoff**
 
-Reviewed: **2026-09-01 Europe/Oslo**
+Reviewed: **2026-10-20** (acceptance-status reconciliation; older technical handoffs below retained for traceability)
 
 ## Repository state
 
@@ -14,12 +14,12 @@ Reviewed: **2026-09-01 Europe/Oslo**
 - Role-first installed-product runtime retirement (CF8): merged.
 - Verified manual Federation-wide software updates: merged.
 - Standalone recorder Federation bootstrap/publication and Federation-wide recorder control: merged.
-- Disk-allocation/update-cache hardening from PR #325: merged; physical disk-exhaustion closeout remains open until the real-host robustness campaign passes.
+- Disk-allocation/update-cache hardening from PR #325: merged; physical campaign PASS reported. Preserve scenario-level resource-exhaustion evidence before closing individual robustness findings.
 - Independent adversarial robustness review: reconciled; implementation must follow the reconciled blocker set.
-- Complete physical CF7 acceptance: not accepted.
-- Complete Federation v1 end-to-end acceptance: false.
+- Physical acceptance execution: **PASS reported by the operator on 2026-10-20**.
+- Formal CF7/Federation v1 acceptance manifest: **not yet reconciled** (still records false flags); see [acceptance and release status](../releases/federation_v1_acceptance_status.md).
 
-Historical phase notes, branch handoffs, old commit hashes, and pre-CF8 sequencing do not override this current handoff. Acceptance flags are different: only the named acceptance source and a separate evidence-backed review may change them.
+Historical phase notes, branch handoffs, old commit hashes, and pre-CF8 sequencing do not override this handoff. The reported physical PASS supersedes its former open-test status, while the separate acceptance source and evidence-backed review control recorded flags.
 
 ## Track A: capability-first Federation
 

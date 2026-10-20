@@ -30,9 +30,9 @@
 - Canonical MTConnect observations are merged via PR #284.
 - MTConnect operational segmentation has reached its **implementation closeout/review boundary** as an owner-authorized stacked series: S1 semantic roles were introduced in PR #289 and refined for multi-channel semantics in PR #291; S2-S7 are draft PRs #298, #299, #300, #301, #302, and #303. This statement records implementation/review state only; it does not claim the stacked PRs are merged into `main`.
 - The operational track's next action is **STOP AND REVIEW**: review the stacked semantics, local private-reference validation evidence, and merge/rebase order. No post-S7 behavioural-DT layer is implicitly authorized.
-- Complete physical CF7 acceptance is **not accepted**.
-- Complete Federation v1 end-to-end acceptance remains **false**.
-- Federation v1 release tag is not created.
+- Physical acceptance execution: **PASS reported by the operator on 2026-10-20**.
+- Formal CF7 and Federation v1 acceptance record: **not yet reconciled** with the exact-candidate evidence; manifest flags currently remain false.
+- Federation v1 release tag and GitHub Release: **not published**. See [acceptance and release status](../releases/federation_v1_acceptance_status.md).
 - Operator-knowledge modeling is not a Federation v1 acceptance requirement; changes to formal modeling semantics need an independently reviewed FCP proposal.
 
 The machine-readable Federation acceptance source is `catalog/federation/tests/cf7_acceptance/scenarios.json`.
@@ -43,7 +43,7 @@ Several long-lived implementation plans describe the sequencing that was correct
 
 For MTConnect operational segmentation, distinguish **merge status** from **stacked implementation status**. The implementation plan's merge-only status table remains authoritative about what has actually landed, while this index may record owner-authorized stacked draft work that is ready for review. A stacked PR is not merged evidence.
 
-Acceptance flags are different: only the named machine-readable/reviewed acceptance source can change an acceptance claim. A merged feature, green CI workflow, or successful live rollout does not by itself change the false CF7/Federation-v1 acceptance flags.
+Acceptance flags require a separate evidence-backed update to the named machine-readable source. The operator-reported physical PASS closes the reported test execution, but does not silently change the as-yet-unreconciled manifest or publish a release.
 
 ## Classification rule
 

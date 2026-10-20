@@ -24,15 +24,15 @@
 - CF8 role-first installed-product runtime retirement: merged.
 - Verified manual Federation-wide runtime updates: merged.
 - Standalone recorder Federation bootstrap/publication and bounded remote recorder control: merged.
-- Complete physical CF7 acceptance: not accepted.
-- Complete Federation v1 end-to-end acceptance: false.
-- Federation v1 release tag: not created.
+- Physical acceptance execution: **PASS reported 2026-10-20**.
+- Formal CF7/V1 acceptance record: **evidence and manifest reconciliation pending** (recorded flags still false).
+- Federation v1 tag/GitHub Release: **not published**. See [acceptance status](../../releases/federation_v1_acceptance_status.md).
 
 ## Authority/status rule
 
 The [Current task handoff](../current_task_handoff.md) and [implementation index](../index.md) reconcile status after later merged deliveries. Older active plans still contain durable product/authority decisions, but pre-CF8 status text such as `CF8 blocked`, old commit hashes, or old next-step sequencing is superseded by the current indexes/handoff.
 
-Acceptance procedures do not change acceptance flags. Acceptance truth comes from `catalog/federation/tests/cf7_acceptance/scenarios.json` and a separately reviewed evidence decision.
+Acceptance procedures do not change acceptance flags. The operator-reported PASS is the latest test-execution report, but the formal acceptance decision still comes from `catalog/federation/tests/cf7_acceptance/scenarios.json` and a separately reviewed, commit-bound evidence bundle.
 
 Reference documents describe maintained technical behavior but cannot grant authority or override acceptance truth.
 

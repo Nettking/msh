@@ -41,19 +41,17 @@ Identity
 
 A current inspection is sufficient to finish setup. Benchmarks and contribution decisions are optional follow-up work. They do not grant authority by themselves.
 
-## Current pre-release work
+## Remaining release-publication work
 
-Before publishing Federation v1:
+The physical acceptance campaign was **reported PASS by the operator on 2026-10-20**. Before publishing Federation v1:
 
-1. resolve verified runtime, persistence, platform, browser, privacy, network, and compatibility defects;
-2. maintain one coherent current documentation path;
-3. freeze one exact release candidate;
-4. execute complete physical CF7 acceptance on that commit;
-5. update acceptance claims only through a separate evidence-backed review;
-6. establish a permanent release gate at least as strong as the required existing matrices;
-7. publish release notes, changelog, exact version, and tag.
+1. preserve and validate the complete redacted physical evidence bundle and exact candidate SHA;
+2. record the reviewed CF7/V1 acceptance decision in the machine-readable manifest;
+3. apply candidate-identity and revalidation rules to any later changes;
+4. confirm permanent release gates, release notes, changelog and version; and
+5. publish the tag and GitHub Release.
 
-Complete physical CF7 acceptance remains unaccepted; the implementation index and acceptance manifest govern current truth. CF8 compatibility retirement is merged for the installed product.
+The acceptance manifest still records false flags, which are pending evidence-backed reconciliation; this is distinct from the reported successful test execution. CF8 compatibility retirement is merged. See [acceptance and release status](../releases/federation_v1_acceptance_status.md).
 
 ## CF8 compatibility retirement (implemented)
 

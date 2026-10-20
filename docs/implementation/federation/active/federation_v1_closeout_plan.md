@@ -1,10 +1,10 @@
 # Federation v1 closeout plan
 
-Status: **active release-closeout plan**.
+Status: **post-acceptance release-closeout plan**.
 
-Reviewed: **2026-08-11 Europe/Oslo**.
+Reviewed: **2026-10-20** (acceptance execution status; original implementation plan retained).
 
-This document governs the remaining work required to turn the merged Federation implementation into a stable, documented, supportable FCP Federation v1 release.
+This document governs the remaining reconciliation and publication work for the merged Federation v1 baseline. The operator reported a successful physical acceptance campaign on 2026-10-20. Its exact-candidate evidence and machine-readable decision still need recording. See [acceptance and release status](../../../releases/federation_v1_acceptance_status.md).
 
 Use these sources together:
 
@@ -43,9 +43,9 @@ The post-CF8 baseline also includes:
 
 Current release state:
 
-- complete physical CF7 acceptance is **not accepted**;
-- complete Federation v1 end-to-end acceptance remains **false**;
-- no Federation v1 release tag has been created.
+- physical acceptance campaign execution: **PASS reported 2026-10-20**;
+- formal CF7/V1 end-to-end acceptance manifest: **not yet reconciled**, still carries false flags until the exact-commit evidence is reviewed;
+- Federation v1 Git tag/GitHub Release: **not published**.
 
 CF8 is no longer open work. Any old statement that CF8 is blocked or must not begin is historical sequencing, not current status.
 
@@ -113,7 +113,7 @@ Current user documentation must describe the post-CF8 product directly, includin
 - headless standalone-recorder first start with `python start_recorder.py FCP1-...`;
 - recorder startup scan, remote scan/source control, and local-first Federation publication;
 - distinction between Compose-managed recorder updates and independently launched standalone recorder process administration;
-- current capability-first authority boundaries and the fact that complete physical CF7 acceptance remains false.
+- current capability-first authority boundaries, the reported physical acceptance PASS, and the outstanding formal evidence/manifest reconciliation.
 
 Exit criteria:
 
@@ -204,13 +204,12 @@ Stop and report rather than broaden scope when:
 
 ## Next exact actions
 
-Proceed in this order:
+Following the operator-reported physical PASS, proceed in this order:
 
-1. complete documentation/acceptance-runbook reconciliation against the current post-CF8, update-capable, recorder-capable product;
-2. resolve any verified current-main runtime, platform, privacy, migration, update, recorder-control, or persistence defects;
-3. freeze one exact release-candidate commit after known blockers are closed;
-4. execute the complete physical CF7 acceptance campaign on that same commit;
-5. update acceptance claims only through a separate evidence-backed review; and
-6. continue V1-D/V1-F/V1-H as separate bounded closeout units and create the release tag only after acceptance.
+1. collect the final redacted physical evidence bundle, exact tested SHA, scenario matrix and independent review decision;
+2. validate it against the current physical-evidence contract, and reconcile the machine-readable manifest through a separate evidence-backed change;
+3. verify the release candidate still matches the tested identity; apply impact/revalidation rules to subsequent changes, including this documentation reconciliation;
+4. check required release gates, changelog, version and notes; and
+5. publish the `v1.0.0` tag and GitHub Release only when formal acceptance is recorded for the correct release commit. Continue unrelated V1-D/V1-F changes separately.
 
 Do **not** restart CF1-CF8 implementation waves merely because older plans still describe them as future work.
