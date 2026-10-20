@@ -18,7 +18,7 @@ The recommended provider is installed from the FCP repository. Docker, Git,
 and Python 3 are required on the laptop:
 
 ```bash
-git clone <repository-url> fcp
+git clone https://github.com/Nettking/msh.git fcp
 cd fcp
 docker compose --profile provider up -d model-provider
 python3 -m catalog.federation.model_resource_pull \
