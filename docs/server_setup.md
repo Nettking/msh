@@ -28,7 +28,7 @@ Do not expose Flask, the Federation relay, Ollama, or recorder control directly 
 Install Docker Desktop, then run:
 
 ```cmd
-git clone <repository-url> fcp
+git clone https://github.com/Nettking/msh.git fcp
 cd fcp
 start.cmd
 ```
@@ -52,7 +52,7 @@ Windows web access is local-only by default through `127.0.0.1`, and the Federat
 From a fresh checkout:
 
 ```bash
-git clone <repository-url> fcp
+git clone https://github.com/Nettking/msh.git fcp
 cd fcp
 bash start.sh
 ```
@@ -150,7 +150,7 @@ Current-leader controls include reviewed member/invitation operations, pairing, 
 
 If no connected successor exists, FCP fails closed rather than inventing one.
 
-This does **not** provide replicated coordinator/quorum failover. If the host that owns the authoritative coordinator database/relay is unavailable, leader promotion cannot substitute for that missing coordinator service.
+That promotion does **not** by itself provide replicated coordinator recovery. In a legacy single-coordinator deployment, loss of the authoritative coordinator/relay still blocks recovery. When `FCP_REPLICATED_CONTROL_PLANE_CONFIG` selects the configured three-voter deployment, an eligible surviving coordinator may recover committed authority state with a two-vote quorum; this requires the documented voter and credential prerequisites. See [Federation operations](federation_operations.md).
 
 ### Trusted storage writes require synchronized clocks
 
