@@ -127,8 +127,7 @@ The pieces already exist and are not currently joined into a twin:
 - `docs/fcp_operator_support_plan.md` — operator strategies are already
   intended to feed a "Digital Twin / recommender", with a `DT/SysML trace
   target` field on each structured note.
-- `docs/implementation/osl_integration/` — the planned OSL/SysML modelling
-  layer, not yet implemented.
+- `docs/implementation/operator_knowledge_modeling.md` — the actual operator-note and SysML text-export boundary; formal language semantics are not implemented.
 
 The gap is the middle: nothing turns verified raw batches into a **segmented,
 queryable operational history** that a model or a recommender can be fitted to
@@ -201,10 +200,7 @@ evaluate it. This closes the capture → structure → validate loop in
 
 ### 6. Only then, OSL/SysML export
 
-The OSL package (`docs/implementation/osl_integration/`) describes the modelling
-and export layer. It should consume segments and validated strategies from
-steps 3–5. Exporting before there is a segment model would export structure
-with nothing measured behind it.
+Treat a richer strategy-to-model integration as future work, not as an available FCP runtime. It should consume segments and independently validated strategies from steps 3–5, and it requires a separately reviewed design and evidence contract. Exporting before there is a segment model would export structure with nothing measured behind it.
 
 ## Recommended next step
 
