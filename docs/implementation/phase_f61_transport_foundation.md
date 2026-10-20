@@ -142,7 +142,6 @@ Primary references:
 - https://docs.libp2p.io/
 - https://docs.libp2p.io/concepts/hole-punching/
 - https://docs.libp2p.io/concepts/circuit-relay/
-- https://github.com/libp2p/py-libp2p
 - https://aioquic.readthedocs.io/en/latest/
 
 The F6.2 prototype must demonstrate Windows and Linux packaging before this preference becomes a permanent runtime dependency. If the sidecar cannot meet that exit criterion, stop and record the blocker rather than implementing custom hole punching in Python.
