@@ -103,7 +103,7 @@ The machine-readable acceptance source is `catalog/federation/tests/cf7_acceptan
 
 - [Federation implementation](docs/implementation/federation/) — active plans, acceptance, reference material, and historical delivery evidence.
 - [Capability-first Federation plan](docs/implementation/federation/active/capability_first_federation_plan.md) — authoritative Federation product behavior and acceptance sequence.
-- [Operator knowledge and SysML export](docs/implementation/operator_knowledge_modeling.md) — current MSH behavior, limitations, and authority boundaries.
+- [Operator knowledge and SysML export](docs/implementation/operator_knowledge_modeling.md) — current FCP behavior, limitations, and authority boundaries.
 - [Current task handoff](docs/implementation/current_task_handoff.md) — development blockers and exact next deliveries where still current.
 
 ## Repository map

@@ -31,6 +31,10 @@ ALLOWED_REPOSITORY_FILES = frozenset(
         # This regression fixture binds synthetic manifests to the exact repo.
         "scripts/tests/test_icse_workflow_evidence_verifier.py",
         "docs/implementation/nitro_artifact_archive.md",
+        # Git clone URLs contain the actual repository slug, not a product brand.
+        "docs/connected_capabilities.md",
+        "docs/server_setup.md",
+        "docs/termux_phone.md",
     }
 )
 

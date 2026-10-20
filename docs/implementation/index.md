@@ -33,7 +33,7 @@
 - Complete physical CF7 acceptance is **not accepted**.
 - Complete Federation v1 end-to-end acceptance remains **false**.
 - Federation v1 release tag is not created.
-- Operator-knowledge modeling is not a Federation v1 acceptance requirement; changes to formal modeling semantics need an independently reviewed MSH proposal.
+- Operator-knowledge modeling is not a Federation v1 acceptance requirement; changes to formal modeling semantics need an independently reviewed FCP proposal.
 
 The machine-readable Federation acceptance source is `catalog/federation/tests/cf7_acceptance/scenarios.json`.
 

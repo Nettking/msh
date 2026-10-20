@@ -109,4 +109,4 @@ Public or partially trusted participation, protocol-major renaming of the intern
 
 ## Operator-knowledge modeling
 
-FCP already supports operator-note capture, structuring, and a limited SysML text export. Future formal language semantics, validated model transformations, and operational-state reasoning require a separately reviewed MSH design and evaluation plan; they are not part of the v1 acceptance contract. See [Operator knowledge and modeling](../implementation/operator_knowledge_modeling.md).
+FCP already supports operator-note capture, structuring, and a limited SysML text export. Future formal language semantics, validated model transformations, and operational-state reasoning require a separately reviewed FCP design and evaluation plan; they are not part of the v1 acceptance contract. See [Operator knowledge and modeling](../implementation/operator_knowledge_modeling.md).

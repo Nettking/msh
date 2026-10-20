@@ -385,7 +385,7 @@ Do **not** restart CF1-CF6 implementation waves and do **not** reintroduce role-
 
 ## Operator-knowledge modeling boundary
 
-FCP's current knowledge capture, review, strategy comparison, and keyword-style SysML text export are documented in the [maintained MSH reference](operator_knowledge_modeling.md). The retired research-planning documents do not authorize implementation, define Federation acceptance, or establish language conformance. Any formal modeling extension requires a new scoped proposal and validation plan within this repository.
+FCP's current knowledge capture, review, strategy comparison, and keyword-style SysML text export are documented in the [maintained FCP reference](operator_knowledge_modeling.md). The retired research-planning documents do not authorize implementation, define Federation acceptance, or establish language conformance. Any formal modeling extension requires a new scoped proposal and validation plan within this repository.
 
 Operator knowledge and generated SysML text cannot grant Federation, provider, compute, storage, job, artifact, update, recorder-control, or machine authority. Human review and platform authority remain independent.
 
