@@ -73,8 +73,7 @@ Current track entry points:
 - [Capability-first Federation plan](implementation/federation/active/capability_first_federation_plan.md)
 - [Detailed Federation update design](implementation/federation/active/manual_updates.md)
 - [Federation acceptance](implementation/federation/acceptance/)
-- [OSL integration](implementation/osl_integration/)
-- [OSL implementation roadmap](implementation/osl_integration/10_phased_implementation_roadmap.md)
+- [Operator knowledge and SysML export](implementation/operator_knowledge_modeling.md) — maintained product-level reference; no external research-plan dependency.
 - [Post-v1 roadmap](roadmap/post_v1_product_roadmap.md)
 
 ## Current development status
@@ -89,7 +88,7 @@ Current track entry points:
 - Standalone recorder Federation bootstrap, logical-storage publication, startup scan, and remote source control: merged.
 - Tailscale-based Federation reachability discovery for onboarding: merged.
 - Physical CF7 and Federation v1 release acceptance must be tied to one exact candidate commit; use the active acceptance evidence and the [v1 release process](release_process.md) rather than inferring publication status from this page.
-- OSL production implementation: not started.
+- Existing operator-note and SysML-text export features do not establish formal language conformance or release acceptance.
 - Release publication status is defined by the `v1.0.0` Git tag and GitHub Release metadata, not by a source-only status edit.
 
 The machine-readable acceptance source remains `catalog/federation/tests/cf7_acceptance/scenarios.json`.
