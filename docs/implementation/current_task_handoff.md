@@ -2,24 +2,24 @@
 
 Status: **current repository handoff**
 
-Reviewed: **2026-10-20** (acceptance-status reconciliation; older technical handoffs below retained for traceability)
+Reviewed: **2026-10-23** (finalized/tagged acceptance confirmed by operator; older technical handoffs retained for traceability)
 
 ## Repository state
 
 - Repository: the current FCP source repository.
 - Default branch: `main`
 - Always resolve the current `main` head directly before starting work.
-- Published Federation v1 release tag: not created.
+- Product Git release tag `v1.0.0`: not resolvable in this repository when checked on 2026-10-23; distinct from acceptance campaign tagging.
 - Capability-first Federation implementation: merged baseline.
 - Role-first installed-product runtime retirement (CF8): merged.
 - Verified manual Federation-wide software updates: merged.
 - Standalone recorder Federation bootstrap/publication and Federation-wide recorder control: merged.
 - Disk-allocation/update-cache hardening from PR #325: merged; physical campaign PASS reported. Preserve scenario-level resource-exhaustion evidence before closing individual robustness findings.
 - Independent adversarial robustness review: reconciled; implementation must follow the reconciled blocker set.
-- Physical acceptance execution: **PASS reported by the operator on 2026-10-20**.
-- Formal CF7/Federation v1 acceptance manifest: **not yet reconciled** (still records false flags); see [acceptance and release status](../releases/federation_v1_acceptance_status.md).
+- Federation v1 acceptance: **physical PASS 2026-10-20; finalized and tagged per operator confirmation 2026-10-23**.
+- CF7/Federation v1 acceptance manifest: **repository record out of sync with the finalized test** (still records false flags); preserve signed-off evidence and reconcile the manifest separately; see [acceptance and release status](../releases/federation_v1_acceptance_status.md).
 
-Historical phase notes, branch handoffs, old commit hashes, and pre-CF8 sequencing do not override this handoff. The reported physical PASS supersedes its former open-test status, while the separate acceptance source and evidence-backed review control recorded flags.
+Historical phase notes, branch handoffs, old commit hashes, and pre-CF8 sequencing do not override this handoff. The operator-confirmed finalized/tagged acceptance supersedes its former open-test status; historical instructions below do not reopen the completed test. The separate evidence-backed review still controls changes to recorded machine-readable flags.
 
 ## Track A: capability-first Federation
 
