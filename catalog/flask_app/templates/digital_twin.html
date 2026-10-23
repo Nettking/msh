@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block page_styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/digital-twin.css') }}">
+{% endblock %}
+
+{% block body %}
+<section class="digital-twin-page" aria-labelledby="digital-twin-title">
+  <header class="digital-twin-header">
+    <div>
+      <p class="digital-twin-eyebrow">Machine model · what-if analysis</p>
+      <h1 id="digital-twin-title">Digital twin</h1>
+      <p class="digital-twin-lead">Explore how a change in non-active time would affect the active-time share recorded for a machine.</p>
+    </div>
+    {% if analysis.has_data %}
+    <div class="digital-twin-source" aria-label="Data source coverage">
+      <strong>{{ analysis.source_file_count }}</strong> JSONL files
+      <span>{{ "{:,}".format(analysis.record_count) }} timestamped machine records</span>
+    </div>
+    {% endif %}
+  </header>
+
+  {% if error %}
+  <div class="digital-twin-alert" role="alert">{{ error }}</div>
+  {% endif %}
+
+  {% if not analysis.has_data %}
+  <div class="digital-twin-empty">
+    <span class="digital-twin-empty__icon" aria-hidden="true">↗</span>
+    {% if data_unavailable %}
+    <h2>Local telemetry could not be loaded</h2>
+    <p>Check the message above, then try again. The model reads source data locally and does not change the source files.</p>
+    {% else %}
+    <h2>No machine telemetry found</h2>
+    <p>Add timestamped MTConnect JSONL records under the configured local data directory. The model reads them locally and never changes the source files.</p>
+    {% endif %}
+  </div>
+  {% else %}
+  <form class="digital-twin-filters" method="get" action="{{ url_for('digital_twin_web.index') }}">
+    <label>
+      <span>Machine</span>
+      <select name="machine_id" required>
+        {% for machine in analysis.machines %}
+        <option value="{{ machine.machine_id }}" {% if machine.machine_id == requested_machine %}selected{% endif %}>{{ machine.machine_id }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      <span>From (UTC)</span>
+      <input type="date" name="start_date" value="{{ requested_start }}" required>
+    </label>
+    <label>
+      <span>To (UTC)</span>
+      <input type="date" name="end_date" value="{{ requested_end }}" required>
+    </label>
+    <label class="digital-twin-filters__recovery">
+      <span>Recover non-active time <strong>{{ requested_recovery }}%</strong></span>
+      <input type="range" name="recovery_percent" min="0" max="50" step="5" value="{{ requested_recovery }}" oninput="this.previousElementSibling.querySelector('strong').textContent = this.value + '%'">
+      <span class="digital-twin-range-hint">0% <span>Scenario adjustment</span> 50%</span>
+    </label>
+    <button class="button-primary digital-twin-submit" type="submit">Run what-if</button>
+  </form>
+
+  {% if analysis.observed_seconds > 0 %}
+  <div class="digital-twin-kpis" aria-label="Observed machine time">
+    <article class="digital-twin-kpi">
+      <span>Observed active time</span>
+      <strong>{{ "%.1f"|format(analysis.active_seconds / 3600) }} h</strong>
+      <small>Reported as active in telemetry</small>
+    </article>
+    <article class="digital-twin-kpi">
+      <span>Observed non-active time</span>
+      <strong>{{ "%.1f"|format(analysis.non_active_seconds / 3600) }} h</strong>
+      <small>Stopped, ready, hold, interrupted, or signal-inferred</small>
+    </article>
+    <article class="digital-twin-kpi">
+      <span>Observed active share</span>
+      <strong>{{ "%.1f"|format(analysis.observed_active_share * 100) }}%</strong>
+      <small>Active time / classified observed time</small>
+    </article>
+    <article class="digital-twin-kpi digital-twin-kpi--scenario">
+      <span>Scenario active share</span>
+      {% if analysis.sufficient_data %}
+      <strong>{{ "%.1f"|format(analysis.simulated_active_share * 100) }}%</strong>
+      <small>After recovering {{ analysis.recovery_percent|int }}% of non-active time</small>
+      {% else %}
+      <strong>—</strong>
+      <small>At least 30 classified intervals are required</small>
+      {% endif %}
+    </article>
+  </div>
+
+  {% if analysis.sufficient_data %}
+  <section class="digital-twin-scenario" aria-labelledby="scenario-title">
+    <div class="digital-twin-scenario__heading">
+      <div>
+        <p class="digital-twin-eyebrow">Scenario result</p>
+        <h2 id="scenario-title">If {{ analysis.recovery_percent|int }}% of non-active time were recovered</h2>
+      </div>
+      <span class="digital-twin-change">+{{ "%.1f"|format(analysis.active_share_change_pp) }} pp</span>
+    </div>
+    <div class="digital-twin-scenario__metrics">
+      <div>
+        <span>Simulated recovered time</span>
+        <strong>{{ "%.1f"|format(analysis.recovered_seconds / 3600) }} h</strong>
+      </div>
+      <div>
+        <span>Simulated active time</span>
+        <strong>{{ "%.1f"|format(analysis.simulated_active_seconds / 3600) }} h</strong>
+      </div>
+      <div>
+        <span>Active share</span>
+        <strong>{{ "%.1f"|format(analysis.observed_active_share * 100) }}% <i aria-hidden="true">→</i> {{ "%.1f"|format(analysis.simulated_active_share * 100) }}%</strong>
+      </div>
+    </div>
+    <div class="digital-twin-share-comparison" aria-label="Observed and scenario active-time share">
+      <div class="digital-twin-share-row">
+        <span>Observed</span>
+        <div class="digital-twin-share-track"><span style="width: {{ (analysis.observed_active_share * 100)|round(1) }}%"></span></div>
+        <strong>{{ "%.1f"|format(analysis.observed_active_share * 100) }}%</strong>
+      </div>
+      <div class="digital-twin-share-row digital-twin-share-row--scenario">
+        <span>Scenario</span>
+        <div class="digital-twin-share-track"><span style="width: {{ (analysis.simulated_active_share * 100)|round(1) }}%"></span></div>
+        <strong>{{ "%.1f"|format(analysis.simulated_active_share * 100) }}%</strong>
+      </div>
+    </div>
+    <p class="digital-twin-caveat">This is a time-reallocation scenario based on historical telemetry. It does not predict output, prove a cause, or control the machine.</p>
+  </section>
+  {% else %}
+  <div class="digital-twin-alert digital-twin-alert--muted" role="status">This selection has {{ analysis.classified_intervals }} usable, classified intervals. Choose a range with at least 30 to run a scenario.</div>
+  {% endif %}
+
+  <section class="digital-twin-details" aria-label="Data quality and state breakdown">
+    <article class="digital-twin-detail-card">
+      <h2>Telemetry continuity</h2>
+      {% if analysis.continuity is not none %}
+      <strong class="digital-twin-detail-card__value">{{ "%.1f"|format(analysis.continuity * 100) }}%</strong>
+      {% else %}
+      <strong class="digital-twin-detail-card__value">—</strong>
+      {% endif %}
+      <p>{{ "{:,}".format(analysis.classified_intervals) }} classified intervals used from {{ "{:,}".format(analysis.positive_intervals) }} positive timestamp intervals.</p>
+      <p>{{ "{:,}".format(analysis.long_gaps) }} intervals over 30 seconds were excluded instead of counted as downtime.</p>
+    </article>
+    <article class="digital-twin-detail-card digital-twin-detail-card--states">
+      <h2>Observed state breakdown</h2>
+      {% if analysis.state_breakdown %}
+      <ul>
+        {% for state in analysis.state_breakdown %}
+        <li><span>{{ state.label }}</span><strong>{{ "%.2f"|format(state.seconds / 3600) }} h</strong></li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p>No classifiable machine-state intervals were found for this selection.</p>
+      {% endif %}
+    </article>
+  </section>
+
+  {% elif analysis.machine_id %}
+  <div class="digital-twin-empty digital-twin-empty--compact">
+    <h2>No classified intervals in this date range</h2>
+    <p>Try a different machine or a wider UTC date range.</p>
+  </div>
+  {% endif %}
+
+  <details class="digital-twin-method">
+    <summary>How this model works</summary>
+    <div>
+      <p>The state on each sample is applied until the next sample for the same machine. Only intervals from 0.1 to 30 seconds are included. Longer gaps and unknown states are left out of the time-share denominator. Reported execution states are preferred; when execution is missing or unavailable, spindle speed above 100 rpm or load above 1 infers active time.</p>
+      <p>The what-if keeps the selected observed time fixed and moves the chosen share of non-active time into active time. It is an assumption to explore, not a measured intervention effect.</p>
+    </div>
+  </details>
+  {% endif %}
+</section>
+{% endblock %}

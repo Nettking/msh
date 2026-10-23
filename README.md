@@ -67,6 +67,7 @@ See [Tailscale Federation discovery](docs/tailscale_federation_discovery.md).
 - **Leader capability requests** — the current leader can ask reachable remote members to run locally eligible benchmarks and request locally allowed contributions without receiving remote-shell/provider authority.
 - **Headless standalone recorder** — `python start_recorder.py FCP1-...` can identify, pair, scan its local private network, start loss-aware recording, and publish checkpoint-committed data to Federation logical storage.
 - **Verified Federation telemetry visibility** — connected members can discover committed recorder batches through the authoritative manifest and materialize hash-verified, schema-checked telemetry into their local workbench without exposing provider paths.
+- **Read-only digital twin scenarios** — Monitor can summarize a machine's observed active/non-active time and show how a chosen recovery of non-active time would change its active-time share, with sample continuity and assumptions visible.
 - **Federation-wide recorder control** — any trusted Federation device can request a bounded scan on a connected standalone recorder and add/remove sources selected from that recorder's latest scan.
 - **Federation-visible JSONL** — supported non-recorder `data/**/*.jsonl`, including browser-uploaded JSONL by default, can be verified and materialized through Federation logical storage; deployments can set `FCP_FEDERATED_JSONL_PUBLISH_UPLOADS=0` to withhold uploads.
 - **Short-lived pairing** — browser-generated `FCP1-...` codes are signed, one-use, valid for up to 10 minutes, and can be generated again whenever another pairing attempt is needed.
@@ -81,6 +82,7 @@ See:
 - [Federation operations](docs/federation_operations.md)
 - [Tailscale Federation discovery](docs/tailscale_federation_discovery.md)
 - [Standalone recorder](docs/standalone_recorder.md)
+- [Digital twin and what-if analysis](docs/digital_twin.md)
 - [Server setup](docs/server_setup.md)
 - [Operator guide](docs/operator_guide.md)
 - [Troubleshooting](docs/troubleshooting.md)

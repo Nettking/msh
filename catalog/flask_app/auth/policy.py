@@ -102,6 +102,8 @@ PRE_AUTH_FEDERATION_BOOTSTRAP_ENDPOINTS = frozenset(
 )
 
 ENDPOINT_PERMISSIONS: dict[str, str] = {
+    "process_twin_api.create_twin": "workflow.run",
+    "process_twin_api.revise_twin": "workflow.run",
     # Keep both names while older/rebased branches may expose either endpoint.
     "federation_web.rename_device": "federation.manage",
     "federation_web.rename_this_device": "federation.manage",
@@ -125,7 +127,10 @@ ENDPOINT_PERMISSIONS: dict[str, str] = {
 }
 
 READ_PERMISSIONS = {
+    "process_twin_api": "data.read",
+    "process_twin_web": "data.read",
     "docs_web": "data.read",
+    "digital_twin_web": "data.read",
     "federation_web": "federation.read",
     "federation_recorder_web": "federation.read",
     "provider_federation_web": "federation.read",
@@ -144,6 +149,7 @@ READ_PERMISSIONS = {
 }
 
 WRITE_PERMISSIONS = {
+    "process_twin_api": "analysis.run",
     "data_upload_web": "data.upload",
     "source_web": "runtime.control",
     "operator_strategy_web": "workflow.run",
@@ -161,7 +167,17 @@ WRITE_PERMISSIONS = {
 }
 
 
+def is_process_twin_path(path: str) -> bool:
+    """Historical DT requests must not trigger unrelated runtime startup."""
+    return any(
+        path == prefix or path.startswith(prefix + "/")
+        for prefix in ("/process-twins", "/api/process-twins/v1")
+    )
+
+
 def permission_for(endpoint: str, method: str) -> str | None:
+    if endpoint.startswith("process_twin_") and method == "OPTIONS":
+        return "data.read"
     if endpoint in PUBLIC_ENDPOINTS or endpoint == "static":
         return None
     exact = ENDPOINT_PERMISSIONS.get(endpoint)

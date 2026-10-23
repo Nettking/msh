@@ -12,6 +12,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
+from itertools import pairwise
 
 from ..canonical.observation import CanonicalObservation
 from .policy import device_key
@@ -184,6 +185,8 @@ _CONTEXT_ROLES = (
 
 def build_agent_stream_reports(
     observations: Iterable[CanonicalObservation],
+    *,
+    check=None,
 ) -> tuple[AgentStreamReport, ...]:
     """Order complete canonical Agent streams and surface genuine sequence gaps."""
 
@@ -191,6 +194,8 @@ def build_agent_stream_reports(
         tuple[str, int], list[CanonicalObservation]
     ] = defaultdict(list)
     for observation in observations:
+        if check is not None:
+            check()
         grouped[(observation.source_key, observation.agent_instance_id)].append(
             observation
         )
@@ -201,6 +206,8 @@ def build_agent_stream_reports(
 
         seen_sequences: set[int] = set()
         for observation in ordered:
+            if check is not None:
+                check()
             if observation.sequence in seen_sequences:
                 raise AgentStreamError(
                     "duplicate canonical sequence in Agent stream: "
@@ -210,7 +217,9 @@ def build_agent_stream_reports(
             seen_sequences.add(observation.sequence)
 
         discontinuities: list[AgentSequenceDiscontinuity] = []
-        for previous, current in zip(ordered, ordered[1:], strict=False):
+        for previous, current in pairwise(ordered):
+            if check is not None:
+                check()
             if current.sequence == previous.sequence + 1:
                 continue
             discontinuities.append(
@@ -239,12 +248,16 @@ def build_agent_stream_reports(
 
 def partition_agent_stream(
     report: AgentStreamReport,
+    *,
+    check=None,
 ) -> tuple[DeviceStreamPartition, ...]:
     """Partition a checked Agent stream without recomputing device-local gaps."""
 
     grouped: defaultdict[str, list[CanonicalObservation]] = defaultdict(list)
     previous_sequence: int | None = None
     for observation in report.observations:
+        if check is not None:
+            check()
         if (
             observation.source_key != report.source_key
             or observation.agent_instance_id != report.agent_instance_id
@@ -279,10 +292,12 @@ def partition_agent_stream(
 
 def partition_agent_streams(
     reports: Iterable[AgentStreamReport],
+    *,
+    check=None,
 ) -> tuple[DeviceStreamPartition, ...]:
     partitions: list[DeviceStreamPartition] = []
     for report in reports:
-        partitions.extend(partition_agent_stream(report))
+        partitions.extend(partition_agent_stream(report, check=check))
     return tuple(
         sorted(
             partitions,
@@ -400,13 +415,15 @@ def _snapshot(
 
 def build_device_timeline(
     partition: DeviceStreamPartition,
+    *,
+    check=None,
 ) -> DeviceTimelineReport:
     """Reconstruct one deterministic device timeline from checked evidence."""
 
     if not partition.observations:
         raise AgentStreamError("cannot build a device timeline from an empty partition")
 
-    resolutions = resolve_device_roles(partition.observations)
+    resolutions = resolve_device_roles(partition.observations, check=check)
     if len(resolutions) != 1:
         raise AgentStreamError("device partition did not resolve to exactly one device")
     resolution = resolutions[0]
@@ -486,6 +503,8 @@ def build_device_timeline(
         trailing_gap = True
 
     for observation in partition.observations:
+        if check is not None:
+            check()
         while (
             gap_index < len(gaps)
             and gaps[gap_index].previous_sequence < observation.sequence
@@ -688,12 +707,16 @@ def build_device_timeline(
 
 def build_device_timeline_reports(
     observations: Iterable[CanonicalObservation],
+    *,
+    check=None,
 ) -> tuple[DeviceTimelineReport, ...]:
     """Run the complete S2 reconstruction pipeline over canonical observations."""
 
-    agent_reports = build_agent_stream_reports(observations)
-    partitions = partition_agent_streams(agent_reports)
-    return tuple(build_device_timeline(partition) for partition in partitions)
+    agent_reports = build_agent_stream_reports(observations, check=check)
+    partitions = partition_agent_streams(agent_reports, check=check)
+    return tuple(
+        build_device_timeline(partition, check=check) for partition in partitions
+    )
 
 
 __all__ = [

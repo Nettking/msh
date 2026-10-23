@@ -46,7 +46,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt -c constraints-phase2.txt
-          python -m pip install pytest ruff
+          python -m pip install pytest==9.1.1 ruff==0.16.3
       - name: Compile F6.6.2 boundary
         run: |
           python -m compileall catalog/federation/session_route_rendezvous.py catalog/node/route_rendezvous.py catalog/relay/route_rendezvous.py catalog/relay/tests/test_phase_f662_route_rendezvous.py
