@@ -30,9 +30,9 @@
 - Canonical MTConnect observations are merged via PR #284.
 - MTConnect operational segmentation has reached its **implementation closeout/review boundary** as an owner-authorized stacked series: S1 semantic roles were introduced in PR #289 and refined for multi-channel semantics in PR #291; S2-S7 are draft PRs #298, #299, #300, #301, #302, and #303. This statement records implementation/review state only; it does not claim the stacked PRs are merged into `main`.
 - The operational track's next action is **STOP AND REVIEW**: review the stacked semantics, local private-reference validation evidence, and merge/rebase order. No post-S7 behavioural-DT layer is implicitly authorized.
-- Physical acceptance execution: **PASS reported by the operator on 2026-10-20**.
-- Formal CF7 and Federation v1 acceptance record: **not yet reconciled** with the exact-candidate evidence; manifest flags currently remain false.
-- Federation v1 release tag and GitHub Release: **not published**. See [acceptance and release status](../releases/federation_v1_acceptance_status.md).
+- Federation v1 acceptance: **physical PASS 2026-10-20; finalized and tagged per operator confirmation 2026-10-23**.
+- CF7/Federation v1 manifest: **out of sync with finalized acceptance**; signed-off exact-candidate evidence links and machine-readable flags remain to be synchronized.
+- Product Git tag `v1.0.0` not resolvable as checked 2026-10-23; GitHub Release not independently verified. Do not confuse this with acceptance tagging. See [acceptance and release status](../releases/federation_v1_acceptance_status.md).
 - Operator-knowledge modeling is not a Federation v1 acceptance requirement; changes to formal modeling semantics need an independently reviewed FCP proposal.
 
 The machine-readable Federation acceptance source is `catalog/federation/tests/cf7_acceptance/scenarios.json`.
