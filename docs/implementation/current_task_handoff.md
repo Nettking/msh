@@ -9,7 +9,7 @@ Reviewed: **2026-10-23** (finalized/tagged acceptance confirmed by operator; old
 - Repository: the current FCP source repository.
 - Default branch: `main`
 - Always resolve the current `main` head directly before starting work.
-- Product Git release tag `v1.0.0`: not resolvable in this repository when checked on 2026-10-23; distinct from acceptance campaign tagging.
+- Release-candidate Git tag: **`v1.0.0-rc.1` exists**, at `ef435b13ad00db387b28be96b469e7d01e309bb0`. The final product Git tag `v1.0.0` was not resolvable on 2026-10-23; do not conflate a tagged RC with the final GitHub Release.
 - Capability-first Federation implementation: merged baseline.
 - Role-first installed-product runtime retirement (CF8): merged.
 - Verified manual Federation-wide software updates: merged.
