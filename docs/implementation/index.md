@@ -32,7 +32,7 @@
 - The operational track's next action is **STOP AND REVIEW**: review the stacked semantics, local private-reference validation evidence, and merge/rebase order. No post-S7 behavioural-DT layer is implicitly authorized.
 - Federation v1 acceptance: **physical PASS 2026-10-20; finalized and tagged per operator confirmation 2026-10-23**.
 - CF7/Federation v1 manifest: **out of sync with finalized acceptance**; signed-off exact-candidate evidence links and machine-readable flags remain to be synchronized.
-- Product Git tag `v1.0.0` not resolvable as checked 2026-10-23; GitHub Release not independently verified. Do not confuse this with acceptance tagging. See [acceptance and release status](../releases/federation_v1_acceptance_status.md).
+- Release-candidate Git tag **`v1.0.0-rc.1` exists** at `ef435b13ad00db387b28be96b469e7d01e309bb0`. Final product tag `v1.0.0` not resolvable as checked 2026-10-23; GitHub Release not independently verified. See [acceptance and release status](../releases/federation_v1_acceptance_status.md).
 - Operator-knowledge modeling is not a Federation v1 acceptance requirement; changes to formal modeling semantics need an independently reviewed FCP proposal.
 
 The machine-readable Federation acceptance source is `catalog/federation/tests/cf7_acceptance/scenarios.json`.
