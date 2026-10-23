@@ -52,7 +52,7 @@ The installed product is capability-first. Retained legacy setup state and old c
 - [Federated network reference](federated_session_network.md) — identity, membership, control-plane, transport, storage, capability, and failure behavior.
 - [Data contract](data_contract.md) — telemetry inputs, normalization, derived artifacts, and playback-ready requirements.
 - [Federation v1 scope](releases/federation_v1_scope.md) — trusted release boundary and required evidence.
-- [Federation v1 acceptance and release status](releases/federation_v1_acceptance_status.md) — operator-reported PASS, evidence/manifest reconciliation and publication status.
+- [Federation v1 acceptance and release status](releases/federation_v1_acceptance_status.md) — finalized/tagged acceptance (operator-confirmed), manifest synchronization, and independently verifiable product release status.
 - [FCP v1 release process](release_process.md) — finalize one candidate commit, bind physical acceptance to it, and publish the `v1.0.0` tag and GitHub Release without a follow-up source commit.
 
 ## Development and implementation
@@ -88,8 +88,8 @@ Current track entry points:
 - Verified manual Federation-wide runtime updates: merged.
 - Standalone recorder Federation bootstrap, logical-storage publication, startup scan, and remote source control: merged.
 - Tailscale-based Federation reachability discovery for onboarding: merged.
-- Physical acceptance execution: **PASS reported 2026-10-20**. The repository acceptance manifest still needs the exact-candidate evidence-backed decision; see [current acceptance status](releases/federation_v1_acceptance_status.md).
-- The Federation v1 tag and GitHub Release are **not yet published**. Follow the [v1 release process](release_process.md) before tagging.
+- Federation v1 acceptance: **physical PASS 2026-10-20; finalized and tagged per operator confirmation 2026-10-23**. The repository manifest still has obsolete `false` flags; link the completed acceptance evidence before synchronizing them. See [current acceptance status](releases/federation_v1_acceptance_status.md).
+- Product release metadata is separate: the expected `v1.0.0` Git tag was not resolvable on 2026-10-23, and a GitHub Release could not be verified. See the [release process](release_process.md).
 - Existing operator-note and SysML-text export features do not establish formal language conformance or release acceptance.
 - Release publication status is defined by the `v1.0.0` Git tag and GitHub Release metadata, not by a source-only status edit.
 
