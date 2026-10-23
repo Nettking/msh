@@ -1,10 +1,10 @@
 # FCP Federation v1 scope
 
-Status: **Federation v1 release-scope reference; physical campaign PASS reported, release unpublished**
+Status: **Federation v1 release-scope reference; physical acceptance finalized/tagged per operator confirmation; product release metadata distinct**
 
 Reviewed: **2026-10-20**
 
-This document defines the trusted Federation v1 boundary. Physical acceptance execution was reported as **PASS on 2026-10-20**; formal exact-commit evidence reconciliation and release publication remain separate. See [acceptance and release status](federation_v1_acceptance_status.md).
+This document defines the trusted Federation v1 boundary. Physical acceptance **PASSED on 2026-10-20** and was **finalized/tagged per operator confirmation 2026-10-23**; archive/manifest synchronization and product release publication are separate. See [acceptance and release status](federation_v1_acceptance_status.md).
 
 ## Release identity
 
@@ -20,9 +20,9 @@ Current release state:
 - MTConnect operational segmentation S1-S7 and read-only closeout validation: merged;
 - Federation-scoped human sign-in with leader-held credentials and signed member assertions: implemented;
 - configured three-voter replicated authority and private quorum-certified credential continuity: implemented; operator reports the physical campaign passed, with commit-bound evidence reconciliation outstanding;
-- physical acceptance campaign execution: **PASS reported 2026-10-20**;
-- formal CF7 and Federation v1 acceptance record: manifest flags still false, pending evidence-backed review;
-- release tag: not published.
+- physical acceptance campaign: **PASS 2026-10-20; finalized/tagged per operator confirmation 2026-10-23**;
+- CF7 and Federation v1 machine-readable manifest: old false flags awaiting synchronization against signed-off acceptance evidence;
+- product Git tag `v1.0.0`: not resolvable on 2026-10-23; acceptance tagging is a separate record.
 
 ## Product model
 
