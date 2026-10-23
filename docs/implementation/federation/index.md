@@ -24,9 +24,9 @@
 - CF8 role-first installed-product runtime retirement: merged.
 - Verified manual Federation-wide runtime updates: merged.
 - Standalone recorder Federation bootstrap/publication and bounded remote recorder control: merged.
-- Physical acceptance execution: **PASS reported 2026-10-20**.
-- Formal CF7/V1 acceptance record: **evidence and manifest reconciliation pending** (recorded flags still false).
-- Federation v1 tag/GitHub Release: **not published**. See [acceptance status](../../releases/federation_v1_acceptance_status.md).
+- Federation v1 acceptance: **physical PASS 2026-10-20; finalized and tagged per operator confirmation 2026-10-23**.
+- CF7/V1 acceptance manifest: **out of sync with operator-confirmed closeout** (stored flags still false); link signed-off evidence before reconciling.
+- Product release `v1.0.0` tag: **not resolvable on 2026-10-23**; GitHub Release not independently verified. This is distinct from the finalized acceptance tag. See [acceptance status](../../releases/federation_v1_acceptance_status.md).
 
 ## Authority/status rule
 
