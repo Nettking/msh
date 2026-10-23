@@ -1,6 +1,6 @@
 # CF7 capability-first acceptance harness
 
-Status: automated foundation/product-composition coverage implemented through CF7-B. **Federation v1 acceptance finalized/tagged per operator confirmation 2026-10-23 after physical PASS 2026-10-20; repository evidence links and machine-readable flags are not yet synchronized.** See [current acceptance status](../../../releases/federation_v1_acceptance_status.md).
+Status: automated foundation/product-composition coverage implemented through CF7-B. **Federation v1 acceptance finalized per operator confirmation 2026-10-23 after physical PASS 2026-10-20; release candidate tagged `v1.0.0-rc.1` at `ef435b13ad00db387b28be96b469e7d01e309bb0`; repository evidence links and machine-readable flags are not yet synchronized.** See [current acceptance status](../../../releases/federation_v1_acceptance_status.md).
 
 ## Purpose
 
