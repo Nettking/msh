@@ -1,29 +1,31 @@
 # Federation v1 acceptance and release status
 
-Reviewed: **2026-10-20**.
+Reviewed: **2026-10-23**.
 
-## Physical acceptance execution
+## Acceptance outcome
 
-**PASS reported by the acceptance operator on 2026-10-20.** The physical acceptance campaign is no longer described as an unexecuted or failed task. This is an operator-reported outcome; the exact candidate commit, signed-off physical evidence bundle and scenario results were not available in the tracked repository at the time of this documentation reconciliation. Accordingly, this file does not independently certify each physical assertion or grant new runtime authority.
+**Federation v1 acceptance is finalized and tagged, as confirmed by the operator on 2026-10-23.** The physical campaign reported **PASS on 2026-10-20**. Do not describe the acceptance test as awaiting execution, incomplete, or blocked. The acceptance tag identifier and signed-off evidence bundle have not yet been linked in this tracked documentation, so this page records the operator's confirmation rather than independently revalidating each scenario.
 
-## Recorded acceptance versus release publication
+## Repository records and publication
 
-| Milestone | Current status |
+| Item | Current status |
 | --- | --- |
-| Physical acceptance campaign execution | **PASS — operator reported (2026-10-20)** |
-| Exact-commit evidence bundle and independent review | **Not yet linked/recorded in this repository** |
-| Machine-readable CF7/V1 acceptance decision | **Not reconciled:** `catalog/federation/tests/cf7_acceptance/scenarios.json` still records `acceptance_claim: foundation-only` and the three `*_accepted` / `physical_evidence_accepted` flags as `false` |
-| `v1.0.0` Git tag and GitHub Release | **Not published** as checked 2026-10-20 |
+| Physical acceptance campaign | **PASS — 2026-10-20** |
+| Acceptance closeout / acceptance tagging | **Finalized and tagged — operator confirmation 2026-10-23** (acceptance tag reference not recorded here) |
+| Retained exact-candidate evidence, sign-off and scenario matrix | **Archive linkage not present in this repository**; preserve the completed result and link its actual artifacts without inventing a candidate SHA |
+| Machine-readable CF7 acceptance manifest | **Out of sync with the reported closeout**: `catalog/federation/tests/cf7_acceptance/scenarios.json` still says `acceptance_claim: foundation-only` and has `false` end-to-end and physical-evidence flags |
+| FCP product release tag `v1.0.0` | **Not resolvable from this repository as checked on 2026-10-23** |
+| GitHub product Release | **Not independently verified**; do not infer publication merely from acceptance tagging |
 
-The manifest's still-false flags are a **record-keeping discrepancy to reconcile**, not evidence that the newly reported physical run failed. Conversely, an operator's reported PASS cannot alone prove the exact-commit, full-scope CF7 requirements enforced by the repository's release procedure.
+**Acceptance completion, machine-readable manifest synchronization, and product release publication are distinct records.** The old manifest values are a repository discrepancy; they should not be used to represent the successfully executed acceptance test as unexecuted. Conversely, the operator's confirmation is not a substitute for the evidence required before rewriting machine-enforced acceptance flags or asserting an exact release SHA.
 
-## Closeout actions
+## Record synchronization, not a new acceptance campaign
 
-1. Preserve or link the redacted final PASS report, scenario matrix (including P01–P12 and CF7 where applicable), approving reviewer, physical host observations, and **exact tested candidate SHA**. Do not infer a tested SHA from today's documentation commit.
-2. Validate the bundle against the current physical-evidence schema and complete a separate evidence-backed acceptance decision. Update `scenarios.json` and remove obsolete blocked entries only when the evidence supports the corresponding claims.
-3. Apply the release procedure's exact-commit/impact-revalidation policy if the accepted candidate differs from the final release commit, including documentation-only changes. Do not claim that merely editing docs extends a prior physical run to a new runtime commit.
-4. Confirm required release gates, release notes and change log, then create `v1.0.0` and its GitHub Release **only after** the recorded acceptance and source identities match.
+1. Link the actual acceptance tag/reference, tested commit SHA, final redacted PASS report, CF7/P01–P12 scenario results as applicable, and operator/reviewer sign-off. Preserve their provenance; do not derive a tested SHA from a documentation commit.
+2. Reconcile `scenarios.json` and any retained acceptance artifacts only against the signed-off closeout and its validated physical-evidence contract. Do not flip flags solely to match prose.
+3. Independently verify the `v1.0.0` Git tag and GitHub Release, if those have been published, and record the exact accepted commit they identify. Otherwise keep product release publication separate from the already-finalized acceptance campaign.
+4. Follow the [release process](../release_process.md) for any subsequent product release action or impact assessment. Editing documentation does not extend the physical test to a new runtime commit.
 
 See [release process](../release_process.md), [release scope](federation_v1_scope.md), and [acceptance workspace](../implementation/federation/acceptance/).
 
-This status supersedes older *current-state* wording that calls the physical test unexecuted, unaccepted as a test result, or still to be scheduled. Historical failed runs and requirements remain part of the record.
+Historical failed attempts and evidence requirements remain part of the audit record; they do not supersede the finalized acceptance outcome.
