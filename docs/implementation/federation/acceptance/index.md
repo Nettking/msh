@@ -20,7 +20,7 @@
 
 ## Current acceptance state
 
-**Federation v1 acceptance is finalized and tagged per operator confirmation (2026-10-23), following a physical campaign PASS on 2026-10-20.** This is a completed acceptance test, not a test still waiting to run. See [acceptance and release status](../../../releases/federation_v1_acceptance_status.md).
+**Federation v1 acceptance is finalized per operator confirmation (2026-10-23), following a physical campaign PASS on 2026-10-20. The release candidate has the Git tag `v1.0.0-rc.1` at commit `ef435b13ad00db387b28be96b469e7d01e309bb0`.** This is a completed acceptance test, not a test still waiting to run. See [acceptance and release status](../../../releases/federation_v1_acceptance_status.md).
 
 The machine-readable source remains:
 
@@ -28,9 +28,9 @@ The machine-readable source remains:
 catalog/federation/tests/cf7_acceptance/scenarios.json
 ```
 
-Its three end-to-end/physical acceptance flags are still `false` in the tracked repository, so **the manifest is out of sync with the operator-confirmed closeout**. Do not reinterpret those stale flags as a failed campaign, or change their machine-enforced meaning without the retained signed-off evidence, exact candidate identity and appropriate review. The acceptance-tag identifier is not yet linked in these files.
+Its three end-to-end/physical acceptance flags are still `false` in the tracked repository, so **the manifest is out of sync with the operator-confirmed closeout**. Do not reinterpret those stale flags as a failed campaign, or change their machine-enforced meaning without the retained signed-off evidence, exact candidate identity and appropriate review. The release-candidate tag is verifiable; the signed-off physical evidence and exact tested-candidate relationship are not linked in these files.
 
-Physical evidence remains bound to the actually tested commit and must distinguish automated, simulated, browser, physical, multi-host, service, and human-review evidence. The product Git tag `v1.0.0` is a separate publication identity and was not resolvable when checked on 2026-10-23.
+Physical evidence remains bound to the actually tested commit and must distinguish automated, simulated, browser, physical, multi-host, service, and human-review evidence. The release-candidate Git tag `v1.0.0-rc.1` exists. The final product Git tag `v1.0.0` is a separate publication identity and was not resolvable when checked on 2026-10-23.
 
 ## Post-plan implementation reconciliation
 
