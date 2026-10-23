@@ -88,9 +88,9 @@ See:
 ## Current acceptance status
 
 - Capability-first Federation baseline, human authentication, fenced operational-leader failover, role-first compatibility retirement (CF8), verified Federation-wide updates, and Tailscale discovery: merged.
-- Federation v1 physical acceptance: **PASS (2026-10-20); acceptance finalized and tagged per operator confirmation (2026-10-23)**. The physical campaign is complete, not awaiting execution.
-- Repository record alignment: `catalog/federation/tests/cf7_acceptance/scenarios.json` still contains pre-closeout `false` flags. The signed-off exact-candidate evidence and acceptance-tag reference are not linked here. This is a documentation/record discrepancy, not a claim that physical acceptance failed or remains in progress.
-- Product publication: the expected Git tag `v1.0.0` could not be resolved in this repository on 2026-10-23. Acceptance-campaign tagging and a GitHub product Release must not be conflated. See [Federation v1 acceptance and release status](docs/releases/federation_v1_acceptance_status.md).
+- Federation v1 physical acceptance: **PASS (2026-10-20); closeout confirmed finalized by the operator (2026-10-23)**. The physical campaign is complete, not awaiting execution.
+- Repository record alignment: `catalog/federation/tests/cf7_acceptance/scenarios.json` still contains pre-closeout `false` flags. The signed-off exact-candidate evidence is not linked here; the existing release-candidate tag does not by itself supply the missing scenario-level evidence. This is a documentation/record discrepancy, not a claim that physical acceptance failed or remains in progress.
+- Product tagging: **`v1.0.0-rc.1` exists** and identifies release-candidate commit `ef435b13ad00db387b28be96b469e7d01e309bb0`. The final tag `v1.0.0` could not be resolved on 2026-10-23. A release-candidate tag is not the final product release, and GitHub Release publication has not been independently verified. See [Federation v1 acceptance and release status](docs/releases/federation_v1_acceptance_status.md).
 
 ## Current development tracks
 
