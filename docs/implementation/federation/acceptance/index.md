@@ -20,25 +20,17 @@
 
 ## Current acceptance state
 
-**Physical acceptance campaign PASS reported by the operator on 2026-10-20.** The test is no longer listed as awaiting execution. The exact-commit evidence bundle and independent manifest decision have not yet been recorded in this repository. See [acceptance and release status](../../../releases/federation_v1_acceptance_status.md).
+**Federation v1 acceptance is finalized and tagged per operator confirmation (2026-10-23), following a physical campaign PASS on 2026-10-20.** This is a completed acceptance test, not a test still waiting to run. See [acceptance and release status](../../../releases/federation_v1_acceptance_status.md).
 
-The machine-readable source is:
+The machine-readable source remains:
 
 ```text
 catalog/federation/tests/cf7_acceptance/scenarios.json
 ```
 
-The machine-readable claims currently remain false despite that reported test result, pending a separate evidence-backed acceptance decision:
+Its three end-to-end/physical acceptance flags are still `false` in the tracked repository, so **the manifest is out of sync with the operator-confirmed closeout**. Do not reinterpret those stale flags as a failed campaign, or change their machine-enforced meaning without the retained signed-off evidence, exact candidate identity and appropriate review. The acceptance-tag identifier is not yet linked in these files.
 
-```json
-{
-  "federation_v1_end_to_end_accepted": false,
-  "capability_first_onboarding_end_to_end_accepted": false,
-  "physical_evidence_accepted": false
-}
-```
-
-All physical evidence must remain bound to one exact commit and distinguish automated, simulated, browser, physical, multi-host, service, and human-review evidence.
+Physical evidence remains bound to the actually tested commit and must distinguish automated, simulated, browser, physical, multi-host, service, and human-review evidence. The product Git tag `v1.0.0` is a separate publication identity and was not resolvable when checked on 2026-10-23.
 
 ## Post-plan implementation reconciliation
 
