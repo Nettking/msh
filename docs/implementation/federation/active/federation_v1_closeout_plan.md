@@ -2,9 +2,9 @@
 
 Status: **post-acceptance release-closeout plan**.
 
-Reviewed: **2026-10-20** (acceptance execution status; original implementation plan retained).
+Reviewed: **2026-10-23** (finalized/tagged acceptance confirmed by operator; original implementation plan retained).
 
-This document governs the remaining reconciliation and publication work for the merged Federation v1 baseline. The operator reported a successful physical acceptance campaign on 2026-10-20. Its exact-candidate evidence and machine-readable decision still need recording. See [acceptance and release status](../../../releases/federation_v1_acceptance_status.md).
+This document governs the remaining reconciliation and publication work for the merged Federation v1 baseline. The operator confirms Federation v1 acceptance was finalized/tagged on 2026-10-23 after a physical PASS on 2026-10-20. Repository evidence links and manifest flags still need synchronization; this does not reopen acceptance. See [acceptance and release status](../../../releases/federation_v1_acceptance_status.md).
 
 Use these sources together:
 
@@ -43,9 +43,9 @@ The post-CF8 baseline also includes:
 
 Current release state:
 
-- physical acceptance campaign execution: **PASS reported 2026-10-20**;
-- formal CF7/V1 end-to-end acceptance manifest: **not yet reconciled**, still carries false flags until the exact-commit evidence is reviewed;
-- Federation v1 Git tag/GitHub Release: **not published**.
+- physical acceptance campaign: **PASS 2026-10-20; acceptance finalized/tagged per operator confirmation 2026-10-23**;
+- CF7/V1 end-to-end manifest: **out of sync with finalized acceptance**, still carries false flags until signed-off exact-commit evidence is linked and reviewed;
+- Product Git tag `v1.0.0`: **not resolvable on 2026-10-23**; GitHub Release not independently verified, separate from acceptance tagging.
 
 CF8 is no longer open work. Any old statement that CF8 is blocked or must not begin is historical sequencing, not current status.
 
@@ -113,7 +113,7 @@ Current user documentation must describe the post-CF8 product directly, includin
 - headless standalone-recorder first start with `python start_recorder.py FCP1-...`;
 - recorder startup scan, remote scan/source control, and local-first Federation publication;
 - distinction between Compose-managed recorder updates and independently launched standalone recorder process administration;
-- current capability-first authority boundaries, the reported physical acceptance PASS, and the outstanding formal evidence/manifest reconciliation.
+- current capability-first authority boundaries, the operator-confirmed finalized/tagged acceptance, and the remaining repository manifest/evidence-link synchronization.
 
 Exit criteria:
 
