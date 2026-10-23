@@ -43,7 +43,7 @@ A current inspection is sufficient to finish setup. Benchmarks and contribution 
 
 ## Remaining release-publication work
 
-The physical acceptance campaign was **reported PASS by the operator on 2026-10-20**. Before publishing Federation v1:
+The physical acceptance campaign **PASSED on 2026-10-20**, and Federation v1 acceptance was **finalized/tagged per operator confirmation on 2026-10-23**. For the separate product-release metadata closeout:
 
 1. preserve and validate the complete redacted physical evidence bundle and exact candidate SHA;
 2. record the reviewed CF7/V1 acceptance decision in the machine-readable manifest;
@@ -51,7 +51,7 @@ The physical acceptance campaign was **reported PASS by the operator on 2026-10-
 4. confirm permanent release gates, release notes, changelog and version; and
 5. publish the tag and GitHub Release.
 
-The acceptance manifest still records false flags, which are pending evidence-backed reconciliation; this is distinct from the reported successful test execution. CF8 compatibility retirement is merged. See [acceptance and release status](../releases/federation_v1_acceptance_status.md).
+The acceptance manifest still records old false flags awaiting synchronization against the signed-off acceptance evidence; this does not reopen the finalized test. CF8 compatibility retirement is merged. See [acceptance and release status](../releases/federation_v1_acceptance_status.md).
 
 ## CF8 compatibility retirement (implemented)
 
