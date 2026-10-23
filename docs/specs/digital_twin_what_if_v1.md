@@ -1,4 +1,4 @@
-# MSH digital twin and what-if analysis v1 — Product brief
+# FCP digital twin and what-if analysis v1 — Product brief
 
 Status: delivered on `codex/digital-twin-what-if-v1`
 

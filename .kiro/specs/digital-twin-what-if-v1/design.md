@@ -6,7 +6,7 @@ Status: implemented
 
 This design satisfies the requirements in
 [`requirements.md`](requirements.md). The feature is a read-only historical
-time model inside the existing MSH Flask workbench. It reuses the local JSONL
+time model inside the existing FCP Flask workbench. It reuses the local JSONL
 reader, current human authorization policy, and installed pandas/numpy
 dependencies. It does not introduce a database schema, background worker, new
 service, or machine connection.

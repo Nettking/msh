@@ -18,7 +18,7 @@ the assumptions that constrain their interpretation.
 
 ## Users and boundaries
 
-- **Primary user:** an authenticated MSH workbench user with `data.read` access.
+- **Primary user:** an authenticated FCP workbench user with `data.read` access.
 - **Data:** local timestamped JSONL telemetry under the configured FCP data
   root; `data/` is the default.
 - **V1 boundary:** descriptive historical accounting plus a transparent
@@ -32,7 +32,7 @@ the assumptions that constrain their interpretation.
 
 **User story:** As a workbench user, I want telemetry found across the
 configured data tree so that I can analyze the machine history already present
-in MSH.
+in FCP.
 
 **Acceptance criteria (EARS):**
 
@@ -157,7 +157,7 @@ area so that I can understand observed time and its scenario in one place.
 
 ### DT-07 — Enforce read-only access
 
-**User story:** As an MSH operator, I want this analysis to respect existing
+**User story:** As an FCP operator, I want this analysis to respect existing
 data permissions and never alter machine or telemetry state.
 
 **Acceptance criteria (EARS):**

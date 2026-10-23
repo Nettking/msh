@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from flask import Flask, current_app, request
+from flask import Flask, current_app, has_request_context, request
 
 from catalog.federation.errors import FederationOperationError
 from catalog.orchestrator.analysis_federation import DeviceFederationAuthority
@@ -690,7 +690,7 @@ def install_federation_pairing(app: Flask) -> LazyPairingOnboardingService:
 
     @app.before_request
     def _start_saved_membership_reconnect() -> None:
-        if is_process_twin_path(request.path):
+        if has_request_context() and is_process_twin_path(request.path):
             return
         app.extensions[_RETAINED_STARTUP_CHECK_KEY] = True
         # Flask application-factory tests must not leave process-wide
