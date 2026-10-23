@@ -43,7 +43,7 @@ A current inspection is sufficient to finish setup. Benchmarks and contribution 
 
 ## Remaining release-publication work
 
-The physical acceptance campaign **PASSED on 2026-10-20**, and Federation v1 acceptance was **finalized/tagged per operator confirmation on 2026-10-23**. For the separate product-release metadata closeout:
+The physical acceptance campaign **PASSED on 2026-10-20**, and Federation v1 acceptance was **finalized/tagged per operator confirmation on 2026-10-23**. The release-candidate Git tag `v1.0.0-rc.1` exists at `ef435b13ad00db387b28be96b469e7d01e309bb0`; the final `v1.0.0` tag was not resolvable on 2026-10-23. For the separate final product-release metadata closeout:
 
 1. preserve and validate the complete redacted physical evidence bundle and exact candidate SHA;
 2. record the reviewed CF7/V1 acceptance decision in the machine-readable manifest;
