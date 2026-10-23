@@ -87,17 +87,10 @@ See:
 
 ## Current acceptance status
 
-- Capability-first Federation baseline: merged.
-- Browser first-user bootstrap and Federation human SSO: merged.
-- Fenced operational leader failover/current-leader product authority: merged.
-- Role-first runtime compatibility retirement (CF8): merged for the installed product; migration seams remain where explicitly documented.
-- Verified manual Federation-wide updates: merged.
-- Tailscale Federation discovery: merged.
-- Physical acceptance execution: **PASS reported by the operator (2026-10-20)**.
-- Formal CF7/Federation v1 acceptance record: **evidence and manifest reconciliation outstanding**; existing manifest flags are still false.
-- Federation v1 Git tag and GitHub Release: **not published**. See [acceptance and release status](docs/releases/federation_v1_acceptance_status.md).
-
-The machine-readable acceptance source is `catalog/federation/tests/cf7_acceptance/scenarios.json`, which has not yet been updated to reflect the reported physical PASS. Automated gates alone do not replace retained exact-commit physical evidence. See the [acceptance-status reconciliation](docs/releases/federation_v1_acceptance_status.md).
+- Capability-first Federation baseline, human authentication, fenced operational-leader failover, role-first compatibility retirement (CF8), verified Federation-wide updates, and Tailscale discovery: merged.
+- Federation v1 physical acceptance: **PASS (2026-10-20); acceptance finalized and tagged per operator confirmation (2026-10-23)**. The physical campaign is complete, not awaiting execution.
+- Repository record alignment: `catalog/federation/tests/cf7_acceptance/scenarios.json` still contains pre-closeout `false` flags. The signed-off exact-candidate evidence and acceptance-tag reference are not linked here. This is a documentation/record discrepancy, not a claim that physical acceptance failed or remains in progress.
+- Product publication: the expected Git tag `v1.0.0` could not be resolved in this repository on 2026-10-23. Acceptance-campaign tagging and a GitHub product Release must not be conflated. See [Federation v1 acceptance and release status](docs/releases/federation_v1_acceptance_status.md).
 
 ## Current development tracks
 
