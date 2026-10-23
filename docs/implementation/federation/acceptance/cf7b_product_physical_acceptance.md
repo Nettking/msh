@@ -1,6 +1,6 @@
 # CF7-B product and physical acceptance
 
-Status: automated product acceptance and the physical evidence contract are merged on `main`. **Physical campaign PASS reported 2026-10-20; formal evidence/manifest reconciliation outstanding.** See [current acceptance status](../../../releases/federation_v1_acceptance_status.md).
+Status: automated product acceptance and the physical evidence contract are merged on `main`. **Federation v1 acceptance finalized/tagged per operator confirmation 2026-10-23 after physical PASS 2026-10-20; repository evidence links and manifest flags still require synchronization.** See [current acceptance status](../../../releases/federation_v1_acceptance_status.md).
 
 ## Purpose
 
