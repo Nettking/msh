@@ -22,7 +22,7 @@ Current release state:
 - configured three-voter replicated authority and private quorum-certified credential continuity: implemented; operator reports the physical campaign passed, with commit-bound evidence reconciliation outstanding;
 - physical acceptance campaign: **PASS 2026-10-20; finalized/tagged per operator confirmation 2026-10-23**;
 - CF7 and Federation v1 machine-readable manifest: old false flags awaiting synchronization against signed-off acceptance evidence;
-- product Git tag `v1.0.0`: not resolvable on 2026-10-23; acceptance tagging is a separate record.
+- release-candidate Git tag **`v1.0.0-rc.1` exists** at `ef435b13ad00db387b28be96b469e7d01e309bb0`; final product Git tag `v1.0.0` not resolvable on 2026-10-23.
 
 ## Product model
 
