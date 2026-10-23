@@ -147,7 +147,7 @@ Federation v1 supports trusted private deployments and separately approved authe
 
 ## Current acceptance status
 
-Automated contract and product-composition coverage is implemented. The operator **reported the physical acceptance campaign PASS on 2026-10-20**; the exact-candidate evidence and recorded CF7/V1 acceptance decision still require reconciliation before release publication. See [acceptance and release status](releases/federation_v1_acceptance_status.md).
+Automated contract and product-composition coverage is implemented. Federation v1 physical acceptance **PASSED on 2026-10-20** and was **finalized and tagged per operator confirmation on 2026-10-23**. The tracked CF7/V1 manifest and archived exact-candidate evidence links require record synchronization; product release publication is a separate concern. See [acceptance and release status](releases/federation_v1_acceptance_status.md).
 
 See:
 
