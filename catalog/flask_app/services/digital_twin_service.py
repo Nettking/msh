@@ -292,6 +292,12 @@ class DigitalTwinService:
             )
         return tuple(entries)
 
+    def _observe_record(self) -> None:
+        """Optional bounded-reader hook; the existing page has no extra policy."""
+
+    def _observe_frame(self, frame: pd.DataFrame) -> None:
+        """Optional read adapter hook after the established parser policy."""
+
     def _load_snapshot(self) -> _Snapshot:
         source_fingerprint = self._source_fingerprint()
         if (
@@ -305,6 +311,7 @@ class DigitalTwinService:
         try:
             for source in files:
                 for record in iter_jsonl_records(source):
+                    self._observe_record()
                     machine_id = _machine_identifier(record)
                     if machine_id is None:
                         continue
@@ -378,6 +385,7 @@ class DigitalTwinService:
                 kind="mergesort",
             ).reset_index(drop=True)
 
+        self._observe_frame(frame)
         snapshot = _Snapshot(
             source_fingerprint=source_fingerprint,
             source_file_count=len(files),

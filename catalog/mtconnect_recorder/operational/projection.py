@@ -20,7 +20,11 @@ from .store import (
     OperationalSegmentationStore,
     SegmentationProjectionRecord,
 )
-from .timeline import DeviceTimelineReport, TimelineStatus, build_device_timeline_reports
+from .timeline import (
+    DeviceTimelineReport,
+    TimelineStatus,
+    build_device_timeline_reports,
+)
 
 if TYPE_CHECKING:
     from ..canonical.store import CanonicalObservationStore
@@ -56,12 +60,19 @@ def _observation_payload(item: CanonicalObservation) -> dict[str, object]:
     return payload
 
 
-def _input_fingerprint(observations: Sequence[CanonicalObservation]) -> str:
+def _input_fingerprint(
+    observations: Sequence[CanonicalObservation], *, check=None
+) -> str:
+    def payload(item):
+        if check is not None:
+            check()
+        return _observation_payload(item)
+
     return canonical_sha256(
         {
             "kind": "operational-segmentation-input",
             "segmentation_policy": SEGMENTATION_POLICY,
-            "observations": [_observation_payload(item) for item in observations],
+            "observations": [payload(item) for item in observations],
         }
     )
 

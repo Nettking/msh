@@ -10,7 +10,7 @@
     <meta name="color-scheme" content="light dark">
     <!-- Kept in step with the active palette by theme-toggle.js. -->
     <meta name="theme-color" content="#f8fbff">
-    <script>
+    {% if not process_twin_private|default(false) %}<script>
       // Applied before first paint so a stored dark choice never flashes light.
       (function () {
         try {
@@ -20,7 +20,7 @@
           }
         } catch (error) {}
       })();
-    </script>
+    </script>{% endif %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/global-refresh.css') }}">
@@ -35,7 +35,7 @@
     {% block page_styles %}{% endblock %}
     <script defer src="{{ url_for('static', filename='js/admin-rail.js') }}"></script>
     <script defer src="{{ url_for('static', filename='js/theme-toggle.js') }}"></script>
-    {% if not document_recorder_only %}
+    {% if not document_recorder_only and not process_twin_private|default(false) %}
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
     <!-- Not deferred: page charts are constructed inline and must see themed defaults. -->
@@ -169,6 +169,7 @@
         <a class="admin-subnav__link {% if current_endpoint == 'web.playback' %}is-active{% endif %}" href="{{ url_for('web.playback') }}">Playback</a>
         <a class="admin-subnav__link {% if current_endpoint == 'web.exploration' %}is-active{% endif %}" href="{{ url_for('web.exploration') }}">Explore</a>
         <a class="admin-subnav__link {% if current_endpoint.startswith('digital_twin_web.') %}is-active{% endif %}" href="{{ endpoint_url('digital_twin_web.index', '/digital-twin') }}">Digital twin</a>
+        <a class="admin-subnav__link {% if current_endpoint.startswith('process_twin_web.') %}is-active{% endif %}" href="{{ endpoint_url('process_twin_web.index', '/process-twins') }}">Prosesstvilling</a>
         <a class="admin-subnav__link {% if current_endpoint == 'operator_support_web.assist' %}is-active{% endif %}" href="{{ endpoint_url('operator_support_web.assist', '/assist') }}">Assist</a>
       {% endif %}
     {%- endmacro %}
@@ -188,7 +189,7 @@
           {{ primary_links(active_group) }}
         </nav>
         <div class="admin-rail__footer">
-          {% if not recorder_only and capability_complete %}
+          {% if not recorder_only and capability_complete and not process_twin_private|default(false) %}
           <form method="post" action="{{ url_for('web.rescan') }}">
             <input type="hidden" name="next" value="{{ request.full_path if request.query_string else request.path }}">
             <button class="admin-rail__action" type="submit">

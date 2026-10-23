@@ -4,6 +4,24 @@ FCP uses Semantic Versioning for published releases. The Git tag is the release
 version identity; built FCP services retain the exact source commit separately
 through `FCP_BUILD_COMMIT`.
 
+## [Unreleased]
+
+### Evidence-bound production process history
+
+The process twin at `/process-twins` preserves immutable definitions, prepared
+source revisions and historical snapshots for a bounded production process.
+It reuses canonical operational episodes or registered legacy telemetry and
+authorized existing operator records, with explicit uncertainty and exact
+evidence. Authenticated read routes do not start recording or rebuild history.
+Snapshot commands have bounded resources, idempotent outcomes and publication
+fences; human and source access are rechecked when results are read.
+
+This is the historical foundation for the process twin. Real pilot acceptance
+requires a canonical process history and a genuine operator record; that
+material does not yet exist. No production acceptance or published version is
+claimed. See [implementation and verification](docs/roadmap/v1_0_1_implementation.md)
+and the [private pilot protocol](docs/roadmap/v1_0_1_pilot_acceptance.md).
+
 ## [1.0.0]
 
 This entry is the source-level release note for FCP Federation v1.0.0. Its

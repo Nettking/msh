@@ -13,6 +13,7 @@ from flask import (
     jsonify,
     redirect,
     render_template,
+    request,
     url_for,
 )
 
@@ -24,6 +25,7 @@ from catalog.federation.onboarding_models import (
 from catalog.orchestrator.pipeline import get_runtime_manager
 
 from . import capability_startup_transition_routes as transition_routes
+from .auth.policy import is_process_twin_path
 from .services.capability_config_service import (
     CapabilityConfig,
     CapabilityConfigError,
@@ -259,6 +261,8 @@ def retired_startup_choice():
 
 
 def inject_capability_product_context() -> dict[str, object]:
+    if is_process_twin_path(request.path):
+        return {}
     config, config_error = _load_product_config()
     return {
         "capability_config_error": config_error,

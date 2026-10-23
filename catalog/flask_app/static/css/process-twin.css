@@ -1,0 +1,15 @@
+#process-twin { max-width: 76rem; }
+.pt-panel { margin: 1.2rem 0; padding: 1.2rem; border: 1px solid var(--border-color, #858d99); border-radius: .7rem; }
+.pt-panel summary { cursor: pointer; font-weight: 600; }
+.pt-panel form { display: grid; gap: .5rem; max-width: 46rem; padding-top: 1rem; }
+.pt-panel textarea { min-height: 5rem; }
+.pt-panel input, .pt-panel select, .pt-panel textarea { width: 100%; box-sizing: border-box; padding: .6rem; font: inherit; }
+.pt-panel button { margin: .4rem .4rem .4rem 0; }
+.pt-panel li { padding: .5rem; overflow-wrap: anywhere; }
+.pt-panel dt { font-weight: 600; margin-top: .5rem; }
+.pt-panel dd { margin-left: 1rem; overflow-wrap: anywhere; }
+#pt-detail { max-height: 32rem; overflow: auto; font: inherit; white-space: normal; overflow-wrap: anywhere; }
+#pt-detail dd, #pt-detail pre { white-space: pre-wrap; }
+.pt-notice { font-weight: 600; }
+#pt-status[data-error="yes"] { border-left: .3rem solid #ad3e27; padding-left: .7rem; }
+#process-twin :focus-visible { outline: 3px solid #3485e4; outline-offset: 3px; }

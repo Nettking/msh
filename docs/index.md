@@ -77,6 +77,14 @@ Current track entry points:
 - [Federation acceptance](implementation/federation/acceptance/)
 - [Operator knowledge and SysML export](implementation/operator_knowledge_modeling.md) — maintained product-level reference; no external research-plan dependency.
 - [Post-v1 roadmap](roadmap/post_v1_product_roadmap.md)
+- [Produksjonsprosessens digitale tvilling](specs/production_process_digital_twin.md) — forslag til utviklerspesifikasjon for prosesshistorie, maskindata, operatørbeslutninger og resultater; definisjon og faktisk motpart er godkjent, produktimplementasjon er ikke levert gjennom dokumentet.
+- [Forskningsgrunnlag og løsningsvalg for prosesstvillingen](specs/production_process_digital_twin_research.md) — forskning, standarder og vurdering av eksisterende komponenter; ingen konfidensielle produksjonsverdier.
+- [Forslag til v1.0.1-plan for prosesstvillingen](roadmap/v1_0_1_plan.md) — nytt forslag til avgrenset historikkleveranse, arbeidspakker, tester og releasekriterier; publisert versjonsnavn avklares mot SemVer.
+- [Kravspesifikasjon for prosesstvillingen](specs/production_process_digital_twin_requirements.md) — samlet brukerforløp og bestemte regler for observasjon, beslutning, rapportert handling, resultat, oppfølging og sammenligning; stabile krav og eksplisitt gjenbruk.
+- [Detaljert atferdskontrakt for prosesstvillingen](specs/production_process_digital_twin_behavior.md) — konkrete felt, brukerflyter, tilstandsoverganger, feilprioritet, varighetsregler og akseptvektorer for første leveranse.
+- [Formell saksmodell for prosesstvillingen](specs/production_process_digital_twin_state_model.json) — maskinlesbare statusregler og kommandovirkninger for den komplette menneskemedierte tvillingen; spesifikasjon uten produktaktivering.
+- [Implementasjon og kvalifisering av første historikkleveranse](roadmap/v1_0_1_implementation.md) — ferdig lokal produktkode, Windows-/Linux-verifikasjon, kontrollert referanseprofil og gjenstående pilotaksept.
+- [Privat pilotaksept for prosesstvillingen](roadmap/v1_0_1_pilot_acceptance.md) — inngangskrav, konkret brukerforløp, faglige kontroller og privat evidens når reelt grunnlag finnes.
 
 ## Current development status
 

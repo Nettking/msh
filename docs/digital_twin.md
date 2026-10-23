@@ -3,6 +3,23 @@
 Open **Monitor → Digital twin** to inspect a machine's recorded active-time
 share and explore a bounded scenario.
 
+## Historical production process
+
+Open **Monitor → Prosesstvilling** (`/process-twins`) for the evidence-bound
+history of a production process with machine and available operator knowledge.
+Select an existing authorized input, explicitly prepare its revision, register
+the process definition, then build a snapshot for a half-open UTC window.
+The snapshot preserves its source revisions and original episode boundaries;
+loading it again reads the same historical result. Operator text retains its
+own provenance and actual relationship status.
+
+Reading requires `data.read`; preparing/building requires `analysis.run`, and
+registering/revising definitions requires `workflow.run`. A missing input is
+shown as unavailable. This page does not create telemetry, operator records
+or access grants. For initial storage setup and source-owner integration, see
+[implementation and verification](roadmap/v1_0_1_implementation.md). The later
+[private pilot](roadmap/v1_0_1_pilot_acceptance.md) remains dependent on real input.
+
 ## Choose a machine and period
 
 Choose a machine and an inclusive UTC date range. The initial range covers that

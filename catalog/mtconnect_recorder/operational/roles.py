@@ -290,6 +290,8 @@ def _resolve_role(
 
 def resolve_device_roles(
     observations: Iterable[CanonicalObservation],
+    *,
+    check=None,
 ) -> tuple[DeviceRoleResolution, ...]:
     """Resolve every v1 role independently for each canonical device scope."""
 
@@ -297,6 +299,8 @@ def resolve_device_roles(
         tuple[str, int, str], list[CanonicalObservation]
     ] = defaultdict(list)
     for observation in observations:
+        if check is not None:
+            check()
         grouped[
             (
                 observation.source_key,
@@ -311,6 +315,8 @@ def resolve_device_roles(
             defaultdict(list)
         )
         for observation in rows:
+            if check is not None:
+                check()
             classified = _classify(observation)
             if classified is None:
                 continue
