@@ -45,7 +45,7 @@ Current release state:
 
 - physical acceptance campaign: **PASS 2026-10-20; acceptance finalized/tagged per operator confirmation 2026-10-23**;
 - CF7/V1 end-to-end manifest: **out of sync with finalized acceptance**, still carries false flags until signed-off exact-commit evidence is linked and reviewed;
-- Product Git tag `v1.0.0`: **not resolvable on 2026-10-23**; GitHub Release not independently verified, separate from acceptance tagging.
+- Release-candidate Git tag **`v1.0.0-rc.1` exists** at `ef435b13ad00db387b28be96b469e7d01e309bb0`; final product Git tag `v1.0.0` **not resolvable on 2026-10-23**; GitHub Release not independently verified.
 
 CF8 is no longer open work. Any old statement that CF8 is blocked or must not begin is historical sequencing, not current status.
 
