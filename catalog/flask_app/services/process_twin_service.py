@@ -369,7 +369,7 @@ class ProcessTwinService:
                 expected_latest = (twin, previous)
             else:
                 previous = None
-            ref = revision([twin, definition])
+            ref = revision([twin, previous, definition])
             result = dict(
                 twin_id=twin,
                 definition_revision_id=ref,

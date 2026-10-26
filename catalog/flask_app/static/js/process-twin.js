@@ -5,7 +5,7 @@
   if (!root) return;
   const api = '/api/process-twins/v1';
   const el = id => document.getElementById(`pt-${id}`);
-  const state = {inputs: [], prepared: null, twin: null, snapshot: null, cursor: null, pending: null, generation:0};
+  const state = {inputs: [], prepared: null, twin: null, snapshot: null, cursor: null, pending: null, generation:0, historyGeneration:0};
   const labels = {history:'Prosesshistorie',operator_knowledge:'Operatørkunnskap',evidence:'Evidens',feedback:'Tilbakemelding',comparison:'Sammenligning',simulation:'Simulering'};
   const states = {AVAILABLE:'Tilgjengelig',PARTIAL:'Delvis',UNAVAILABLE:'Utilgjengelig',INSUFFICIENT_DATA:'Utilstrekkelig grunnlag',UNRESOLVED_CONTEXT:'Uavklart grunnlag'};
   const views = {episodes:'Episoder',execution:'Maskintilstander',gaps:'Kontinuitetsbrudd',operator:'Operatørregistreringer',legacy_daily:'Døgnoppsummeringer'};
@@ -13,8 +13,16 @@
   const metricLabels = {requested_duration_us:'Ønsket tidsvindu (µs)',covered_duration_us:'Kildedekket tid (µs)',uncovered_duration_us:'Tid uten dekning (µs)',active_us:'Aktiv tid (µs)',program_stopped_us:'Programstopp (µs)',feed_hold_us:'Matehold (µs)',other_execution_us:'Andre maskintilstander (µs)',unknown_state_us:'Ukjent maskintilstand (µs)',active_share:'Aktivandel av dekket tid'};
   const describeReason = code => reasons[code] || code;
   function status(message, error=false) { el('status').textContent=message; el('status').dataset.error=error?'yes':'no'; }
+  function clearHistory() {
+    state.historyGeneration++;
+    state.snapshot=null; state.cursor=null;
+    for(const id of ['timeline','detail','scope','services','summary','view']) el(id).replaceChildren();
+    for(const id of ['history','more','rebuild']) el(id).hidden=true;
+    return state.historyGeneration;
+  }
   function clearPrivate() {
     state.generation++;
+    clearHistory();
     const pending=state.pending;
     state.prepared=state.twin=state.snapshot=null;
     state.inputs=[]; state.cursor=null;
@@ -106,7 +114,7 @@
     data.items.forEach(twin=>{
       const li=document.createElement('li'); li.append(button(twin.display_name,async()=>{
         state.twin=twin;
-        state.snapshot=null; el('history').hidden=true; el('detail').replaceChildren();
+        clearHistory(); el('snapshots').replaceChildren(); el('more-snapshots').hidden=true;
         if(el('selected')) el('selected').textContent='Valgt prosess: '+twin.display_name;
         await loadSnapshots();
       })); el('twins').append(li);
@@ -116,7 +124,9 @@
     if(!data.total && !cursor) el('twins').textContent='Ingen tilgjengelig definisjon er registrert.';
   }
   async function loadSnapshots(cursor=null) {
-    const data=(await request(`/twins/${state.twin.twin_id}/snapshots`+(cursor?'?cursor='+encodeURIComponent(cursor):''))).data;
+    const twin=state.twin;
+    const data=(await request(`/twins/${twin.twin_id}/snapshots`+(cursor?'?cursor='+encodeURIComponent(cursor):''))).data;
+    if(state.twin!==twin) return;
     if(!cursor) el('snapshots').replaceChildren();
     data.items.forEach(snapshot=>{
       const li=document.createElement('li');
@@ -129,7 +139,10 @@
   }
   function term(list,label,value) { const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;dd.textContent=value;list.append(dt,dd); }
   async function openSnapshot(id) {
-    const response=await request('/snapshots/'+id); state.snapshot=response.data;
+    const generation=clearHistory();
+    const response=await request('/snapshots/'+id);
+    if(generation!==state.historyGeneration) return;
+    state.snapshot=response.data;
     const s=state.snapshot; state.cursor=null;
     el('scope').textContent=`Historisk vindu ${s.window.start_at} – ${s.window.end_at}. Modellgyldighet: ikke vurdert.`;
     el('services').replaceChildren(); el('summary').replaceChildren(); el('detail').replaceChildren();
@@ -142,7 +155,11 @@
     else await loadTimeline();
   }
   async function showDetail(path) {
-    const data=(await request(path)).data, panel=el('detail'), list=document.createElement('dl');
+    const id=state.snapshot?.snapshot_id,generation=state.historyGeneration;
+    if(!id || !path.startsWith(`/snapshots/${id}/`)) return;
+    const data=(await request(path)).data;
+    if(generation!==state.historyGeneration || id!==state.snapshot?.snapshot_id) return;
+    const panel=el('detail'), list=document.createElement('dl');
     panel.replaceChildren(list);
     const valueText=value=>value===null?'Ukjent / ikke oppgitt':value===true?'Ja':value===false?'Nei':typeof value==='object'?JSON.stringify(value):String(value);
     if(data.row_kind==='EPISODE') {
@@ -167,13 +184,15 @@
       term(list,'Tilgjengelighet',data.state==='AVAILABLE'?'Eksakt bevart innhold':'Eksakt grunnlag er utilgjengelig');
       const content=document.createElement('pre'); content.textContent=data.content===null?'Innholdet er utilgjengelig; dagens tekst er ikke brukt som reserve.':data.content; panel.append(content);
     }
-    for(const ref of data.evidence_refs||[]) panel.append(button('Åpne tilhørende evidens',()=>showDetail(`/snapshots/${state.snapshot.snapshot_id}/evidence/${ref}`)));
+    for(const ref of data.evidence_refs||[]) panel.append(button('Åpne tilhørende evidens',()=>showDetail(`/snapshots/${id}/evidence/${ref}`)));
     const technical=document.createElement('details'), heading=document.createElement('summary'), raw=document.createElement('pre');
     heading.textContent='Tekniske kildefelter og revisjoner'; raw.textContent=JSON.stringify(data,null,2); technical.append(heading,raw); panel.append(technical); panel.focus();
   }
   async function loadTimeline(cursor=null) {
-    const id=state.snapshot.snapshot_id,view=el('view').value;
+    if(!state.snapshot) return;
+    const id=state.snapshot.snapshot_id,view=el('view').value,generation=state.historyGeneration;
     const data=(await request(`/snapshots/${id}/timeline?view=${view}`+(cursor?'&cursor='+encodeURIComponent(cursor):''))).data;
+    if(generation!==state.historyGeneration || id!==state.snapshot?.snapshot_id || view!==el('view').value) return;
     if(!cursor) { el('timeline').replaceChildren(); el('detail').replaceChildren(); }
     data.items.forEach(row=>{
       const li=document.createElement('li'),text=document.createElement('p');
@@ -217,7 +236,11 @@
     else if(['BUILD_SNAPSHOT','REBUILD_INDEX'].includes(result.operation)) await openSnapshot(data.snapshot_id);
     status('Bestillingsstatus er avklart. Ingen ny bestilling er sendt.');
   },el('command-status')));
-  el('view').addEventListener('change',()=>run(()=>loadTimeline()));
+  el('view').addEventListener('change',()=>run(()=>{
+    state.historyGeneration++; state.cursor=null;
+    el('timeline').replaceChildren(); el('detail').replaceChildren(); el('more').hidden=true;
+    return loadTimeline();
+  }));
   el('more').addEventListener('click',()=>run(()=>loadTimeline(state.cursor),el('more')));
   el('rebuild').addEventListener('click',()=>run(async()=>{
     await post(`/snapshots/${state.snapshot.snapshot_id}/rebuild-index`,'REBUILD_INDEX',{schema:'fcp.process_twin.rebuild.v1',expected_content_revision:state.snapshot.content_revision});

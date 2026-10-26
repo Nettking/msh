@@ -655,6 +655,53 @@ def test_bv43_and_bv46_stale_revision_and_original_revision_replay(api, tmp_path
     assert api[4][0].snapshot(snapshot["snapshot_id"], "actor") == snapshot
 
 
+def test_definition_reversions_preserve_revision_chain_and_snapshot(api, tmp_path):
+    data, original, snapshot = _bv_snapshot(api, tmp_path)
+    _, client, headers, _, history = api
+    path = routes.API + f"/twins/{original['twin_id']}/revisions"
+    chain = [original]
+    commands = []
+    for name in (
+        "Synthetic revision B",
+        original["display_name"],
+        "Synthetic revision B",
+    ):
+        body = {
+            "expected_revision_id": chain[-1]["definition_revision_id"],
+            "definition": {**definition_request(data), "display_name": name},
+        }
+        key = identifier("cmd")
+        response = client.post(
+            path, headers={**headers, "Idempotency-Key": key}, json=body
+        )
+        assert response.status_code == 201
+        current = response.json["data"]
+        assert current["previous_revision_id"] == chain[-1]["definition_revision_id"]
+        assert current["definition_revision_id"] not in {
+            row["definition_revision_id"] for row in chain
+        }
+        chain.append(current)
+        commands.append((key, body, current, response.headers["Location"]))
+
+    for row in chain:
+        stored = client.get(
+            routes.API
+            + f"/twins/{original['twin_id']}/revisions/{row['definition_revision_id']}"
+        )
+        assert stored.status_code == 200 and stored.json["data"] == row
+    for key, body, expected, location in commands:
+        replay = client.post(
+            path, headers={**headers, "Idempotency-Key": key}, json=body
+        )
+        assert replay.status_code == 201 and replay.json["data"] == expected
+        assert replay.headers["Location"] == location
+    assert (
+        history[0].store.latest_revision(original["twin_id"])
+        == chain[-1]["definition_revision_id"]
+    )
+    assert history[0].snapshot(snapshot["snapshot_id"], "actor") == snapshot
+
+
 def test_bv36_actual_episode_pages_have_exact_totals_and_terminal_cursor(api, tmp_path):
     from catalog.digital_twin.tests.test_history import observation
 

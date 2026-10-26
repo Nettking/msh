@@ -185,7 +185,7 @@ testlagringen separat fra appens produksjonslagring.
 | Lokal programvare og syntetisk BV-/API-kontrakt | PASS | 49 sporbare BV-vektorer; 13 lese-/5 skriveruter og relevante komponent-/integrasjonstester |
 | Windows og Linux | PASS | 175 funksjons-/integrasjons-/regresjonstester på hver plattform; utvidede 18 rutetester består på begge |
 | B15 referanseprofil | PASS | Kontrollert 4-CPU/8-GiB/SSD-kjøring; uendrede grenser og bevart resultat |
-| JavaScript og syntetisk brukerforløp | PASS | To transporttester og gjennomført nettleserforløp |
+| JavaScript og syntetisk brukerforløp | PASS | Sju transport-/historikktester og gjennomført nettleserforløp |
 | Privat D0-kildebinding | WAITING_FOR_REAL_INPUT | Nødvendig reelt pilotgrunnlag finnes ennå ikke; bruk faktisk kildeeier når det foreligger |
 | Autoritativ operatørlesing i pilot | WAITING_FOR_REAL_INPUT | Minst én ekte menneskepost med legitim lokal eieradapter og aktuell posttilgang |
 | AP-01 | Ikke gjennomført | Følg [pilotprotokollen](v1_0_1_pilot_acceptance.md), med ekte faglig vurdering og bevart avviksliste |
@@ -195,3 +195,15 @@ Programvareleveransen er klar for gjennomgang. Primærmanifest, audit, opprinnel
 feil og privat verifikasjon er bevart. Ingen produksjonskilde eller Recorder er
 aktivert gjennom dette arbeidet. AP-01 kan ikke erstattes med syntetiske data
 eller gamle V1-bevis. Ingen gammel V1-automatisering er startet på nytt.
+
+Kodegjennomgangen avdekket to ytterligere regresjoner. En tilbakeføring av
+definisjonsinnhold fra A til B og tilbake til A får nå en ny revisjon bundet
+til den foregående revisjonen. Hele kjeden, tidligere snapshots og hvert
+idempotent kommandosvar bevares. En egen HTTP-test dekker også en etterfølgende
+tilbakeføring til B og lesing/replay av alle tidligere revisjoner.
+
+Ved bytte av snapshot tømmes tidslinje, detaljvisning og sideinndeling før
+manifestet hentes. Forsinkede manifest-, side- og evidenssvar fra tidligere
+valg kan ikke fylle den nye visningen. Dette gjelder også ved bytte av
+historikkvisning og tilbake til samme visning. Manglende indeks viser fortsatt
+bevart manifest og forklaringen på manglende visningsgrunnlag.
