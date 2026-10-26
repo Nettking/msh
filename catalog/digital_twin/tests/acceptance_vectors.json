@@ -1,0 +1,463 @@
+{
+  "schema": "fcp.process_twin.synthetic_acceptance.v1",
+  "specification": "docs/specs/production_process_digital_twin_behavior.md",
+  "vectors": [
+    {
+      "id": "BV-01",
+      "tests": [
+        {
+          "file": "catalog/flask_app/tests/test_process_twin_routes.py",
+          "function": "test_security_has_priority_over_bad_json_and_no_reservation"
+        }
+      ]
+    },
+    {
+      "id": "BV-02",
+      "tests": [
+        {
+          "file": "catalog/flask_app/tests/test_process_twin_routes.py",
+          "function": "test_security_has_priority_over_bad_json_and_no_reservation"
+        }
+      ]
+    },
+    {
+      "id": "BV-03",
+      "tests": [
+        {
+          "file": "catalog/flask_app/tests/test_process_twin_routes.py",
+          "function": "test_security_has_priority_over_bad_json_and_no_reservation"
+        }
+      ]
+    },
+    {
+      "id": "BV-04",
+      "tests": [
+        {
+          "file": "catalog/flask_app/tests/test_process_twin_routes.py",
+          "function": "test_body_limit_and_media_type_precede_schema"
+        }
+      ]
+    },
+    {
+      "id": "BV-05",
+      "tests": [
+        {
+          "file": "catalog/flask_app/tests/test_process_twin_routes.py",
+          "function": "test_invalid_json_or_extra_fields_never_echo_values"
+        }
+      ]
+    },
+    {
+      "id": "BV-06",
+      "tests": [
+        {
+          "file": "catalog/flask_app/tests/test_process_twin_routes.py",
+          "function": "test_bv06_nested_required_fields_use_fixed_field_paths_without_reservation"
+        },
+        {
+          "file": "catalog/flask_app/tests/test_process_twin_routes.py",
+          "function": "test_every_write_route_accepts_exact_body_and_rejects_missing_fields"
+        }
+      ]
+    },
+    {
+      "id": "BV-07",
+      "tests": [
+        {
+          "file": "catalog/flask_app/tests/test_process_twin_routes.py",
+          "function": "test_bv07_unknown_and_revoked_object_have_the_same_private_error"
+        }
+      ]
+    },
+    {
+      "id": "BV-08",
+      "tests": [
+        {
+          "file": "catalog/flask_app/tests/test_process_twin_routes.py",
+          "function": "test_bv08_bv10_no_reservation_or_implicit_dataset_union"
+        }
+      ]
+    },
+    {
+      "id": "BV-09",
+      "tests": [
+        {
+          "file": "catalog/digital_twin/tests/test_history.py",
+          "function": "test_new_window_at_exact_limit_and_one_microsecond_over"
+        }
+      ]
+    },
+    {
+      "id": "BV-10",
+      "tests": [
+        {
+          "file": "catalog/flask_app/tests/test_process_twin_routes.py",
+          "function": "test_bv08_bv10_no_reservation_or_implicit_dataset_union"
+        }
+      ]
+    },
+    {
+      "id": "BV-11",
+      "tests": [
+        {
+          "file": "catalog/digital_twin/tests/test_history.py",
+          "function": "test_snapshot_validation_has_no_implicit_fallback"
+        }
+      ]
+    },
+    {
+      "id": "BV-12",
+      "tests": [
+        {
+          "file": "catalog/digital_twin/tests/test_sources_and_failures.py",
+          "function": "test_legacy_subday_and_assumption_are_explicit"
+        }
+      ]
+    },
+    {
+      "id": "BV-13",
+      "tests": [
+        {
+          "file": "catalog/digital_twin/tests/test_history.py",
+          "function": "test_unresolved_time_publishes_no_placed_primary_history"
+        }
+      ]
+    },
+    {
+      "id": "BV-14",
+      "tests": [
+        {
+          "file": "catalog/flask_app/tests/test_process_twin_routes.py",
+          "function": "test_bv14_half_open_point_window_through_http"
+        }
+      ]
+    },
+    {
+      "id": "BV-15",
+      "tests": [
+        {
+          "file": "catalog/flask_app/tests/test_process_twin_routes.py",
+          "function": "test_bv15_original_episode_boundaries_survive_clipping_through_http"
+        }
+      ]
+    },
+    {
+      "id": "BV-16",
+      "tests": [
+        {
+          "file": "catalog/digital_twin/tests/test_history.py",
+          "function": "test_clipping_metrics_do_not_scale_episode_totals_or_double_count_hierarchy"
+        }
+      ]
+    },
+    {
+      "id": "BV-17",
+      "tests": [
+        {
+          "file": "catalog/flask_app/tests/test_process_twin_routes.py",
+          "function": "test_bv17_empty_window_has_null_measurements_and_explicit_reason"
+        }
+      ]
+    },
+    {
+      "id": "BV-18",
+      "tests": [
+        {
+          "file": "catalog/flask_app/tests/test_process_twin_routes.py",
+          "function": "test_bv15_original_episode_boundaries_survive_clipping_through_http"
+        }
+      ]
+    },
+    {
+      "id": "BV-19",
+      "tests": [
+        {
+          "file": "catalog/flask_app/tests/test_process_twin_routes.py",
+          "function": "test_bv19_agent_gap_on_other_device_remains_visible_without_payload_leak"
+        }
+      ]
+    },
+    {
+      "id": "BV-20",
+      "tests": [
+        {
+          "file": "catalog/digital_twin/tests/test_history.py",
+          "function": "test_no_source_alias_fallback_and_no_new_namespace_union"
+        }
+      ]
+    },
+    {
+      "id": "BV-21",
+      "tests": [
+        {
+          "file": "catalog/digital_twin/tests/test_sources_and_failures.py",
+          "function": "test_known_identical_recording_copies_count_once_and_unknown_overlap_abstains"
+        }
+      ]
+    },
+    {
+      "id": "BV-22",
+      "tests": [
+        {
+          "file": "catalog/digital_twin/tests/test_history.py",
+          "function": "test_mismatched_projection_is_preserved_and_not_rebuilt"
+        }
+      ]
+    },
+    {
+      "id": "BV-23",
+      "tests": [
+        {
+          "file": "catalog/digital_twin/tests/test_history.py",
+          "function": "test_append_does_not_mutate_prepared_history"
+        }
+      ]
+    },
+    {
+      "id": "BV-24",
+      "tests": [
+        {
+          "file": "catalog/flask_app/tests/test_process_twin_routes.py",
+          "function": "test_bv24_changed_preserved_content_is_rejected_without_source_fallback"
+        }
+      ]
+    },
+    {
+      "id": "BV-25",
+      "tests": [
+        {
+          "file": "catalog/flask_app/tests/test_process_twin_routes.py",
+          "function": "test_bv25_concurrent_http_snapshot_commands_publish_exactly_once"
+        }
+      ]
+    },
+    {
+      "id": "BV-26",
+      "tests": [
+        {
+          "file": "catalog/flask_app/tests/test_process_twin_routes.py",
+          "function": "test_bv26_snapshot_replay_returns_original_location_and_rejects_changed_window"
+        }
+      ]
+    },
+    {
+      "id": "BV-27",
+      "tests": [
+        {
+          "file": "catalog/digital_twin/tests/test_history.py",
+          "function": "test_failed_build_replays_original_error_and_preserves_atomicity"
+        }
+      ]
+    },
+    {
+      "id": "BV-28",
+      "tests": [
+        {
+          "file": "catalog/digital_twin/tests/test_sources_and_failures.py",
+          "function": "test_busy_builder_does_not_reserve_a_second_key"
+        }
+      ]
+    },
+    {
+      "id": "BV-29",
+      "tests": [
+        {
+          "file": "catalog/digital_twin/tests/test_sources_and_failures.py",
+          "function": "test_resource_boundaries_and_deadline_do_not_publish"
+        },
+        {
+          "file": "catalog/digital_twin/tests/test_sources_and_failures.py",
+          "function": "test_expired_worker_is_fenced_and_clock_disagreement_cannot_take_over"
+        },
+        {
+          "file": "catalog/digital_twin/tests/test_history.py",
+          "function": "test_deadline_is_bound_to_committed_command_reservation"
+        }
+      ]
+    },
+    {
+      "id": "BV-30",
+      "tests": [
+        {
+          "file": "catalog/digital_twin/tests/test_sources_and_failures.py",
+          "function": "test_scoped_human_record_stays_unlinked_and_revoke_fences_replay"
+        },
+        {
+          "file": "catalog/digital_twin/tests/test_history.py",
+          "function": "test_revoke_access_fences_manifest_timeline_evidence_and_replay"
+        }
+      ]
+    },
+    {
+      "id": "BV-31",
+      "tests": [
+        {
+          "file": "catalog/digital_twin/tests/test_history.py",
+          "function": "test_real_owner_integration_immutable_content_and_read_only_sources"
+        }
+      ]
+    },
+    {
+      "id": "BV-32",
+      "tests": [
+        {
+          "file": "catalog/digital_twin/tests/test_sources_and_failures.py",
+          "function": "test_operator_recorded_time_is_not_event_time_and_no_action_is_invented"
+        }
+      ]
+    },
+    {
+      "id": "BV-33",
+      "tests": [
+        {
+          "file": "catalog/digital_twin/tests/test_sources_and_failures.py",
+          "function": "test_one_existing_record_can_reference_two_original_episodes"
+        }
+      ]
+    },
+    {
+      "id": "BV-34",
+      "tests": [
+        {
+          "file": "catalog/digital_twin/tests/test_sources_and_failures.py",
+          "function": "test_scoped_human_record_stays_unlinked_and_revoke_fences_replay"
+        }
+      ]
+    },
+    {
+      "id": "BV-35",
+      "tests": [
+        {
+          "file": "catalog/digital_twin/tests/test_sources_and_failures.py",
+          "function": "test_corrupt_evidence_is_not_replaced_by_current_text"
+        }
+      ]
+    },
+    {
+      "id": "BV-36",
+      "tests": [
+        {
+          "file": "catalog/flask_app/tests/test_process_twin_routes.py",
+          "function": "test_bv36_actual_episode_pages_have_exact_totals_and_terminal_cursor"
+        }
+      ]
+    },
+    {
+      "id": "BV-37",
+      "tests": [
+        {
+          "file": "catalog/digital_twin/tests/test_history.py",
+          "function": "test_cursor_cannot_change_scope_view_limit_or_principal"
+        }
+      ]
+    },
+    {
+      "id": "BV-38",
+      "tests": [
+        {
+          "file": "catalog/flask_app/tests/test_process_twin_routes.py",
+          "function": "test_bv38_bv47_bv49_available_history_zero_active_and_lost_index"
+        }
+      ]
+    },
+    {
+      "id": "BV-39",
+      "tests": [
+        {
+          "file": "catalog/flask_app/tests/test_process_twin_routes.py",
+          "function": "test_empty_registry_differs_from_unavailable_registry"
+        }
+      ]
+    },
+    {
+      "id": "BV-40",
+      "tests": [
+        {
+          "file": "catalog/digital_twin/tests/test_history.py",
+          "function": "test_index_loss_and_explicit_rebuild_preserve_manifest"
+        }
+      ]
+    },
+    {
+      "id": "BV-41",
+      "tests": [
+        {
+          "file": "catalog/digital_twin/tests/test_history.py",
+          "function": "test_rebuild_with_different_logic_cannot_publish"
+        }
+      ]
+    },
+    {
+      "id": "BV-42",
+      "tests": [
+        {
+          "file": "catalog/digital_twin/tests/test_sources_and_failures.py",
+          "function": "test_low_storage_fails_before_reservation_and_preserves_everything"
+        }
+      ]
+    },
+    {
+      "id": "BV-43",
+      "tests": [
+        {
+          "file": "catalog/flask_app/tests/test_process_twin_routes.py",
+          "function": "test_bv43_and_bv46_stale_revision_and_original_revision_replay"
+        }
+      ]
+    },
+    {
+      "id": "BV-44",
+      "tests": [
+        {
+          "file": "catalog/flask_app/tests/test_process_twin_routes.py",
+          "function": "test_bv44_operator_text_stays_in_authorized_json_and_never_reaches_network_or_logs"
+        }
+      ]
+    },
+    {
+      "id": "BV-45",
+      "tests": [
+        {
+          "file": "catalog/flask_app/tests/test_process_twin_routes.py",
+          "function": "test_security_has_priority_over_bad_json_and_no_reservation"
+        }
+      ]
+    },
+    {
+      "id": "BV-46",
+      "tests": [
+        {
+          "file": "catalog/flask_app/tests/test_process_twin_routes.py",
+          "function": "test_bv43_and_bv46_stale_revision_and_original_revision_replay"
+        }
+      ]
+    },
+    {
+      "id": "BV-47",
+      "tests": [
+        {
+          "file": "catalog/flask_app/tests/test_process_twin_routes.py",
+          "function": "test_bv38_bv47_bv49_available_history_zero_active_and_lost_index"
+        }
+      ]
+    },
+    {
+      "id": "BV-48",
+      "tests": [
+        {
+          "file": "catalog/digital_twin/tests/test_sources_and_failures.py",
+          "function": "test_page_cursor_remains_bound_to_frozen_selection"
+        }
+      ]
+    },
+    {
+      "id": "BV-49",
+      "tests": [
+        {
+          "file": "catalog/flask_app/tests/test_process_twin_routes.py",
+          "function": "test_bv38_bv47_bv49_available_history_zero_active_and_lost_index"
+        }
+      ]
+    }
+  ]
+}

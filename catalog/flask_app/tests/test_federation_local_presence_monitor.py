@@ -3,6 +3,7 @@ from __future__ import annotations
 import threading
 from types import SimpleNamespace
 
+import pytest
 from flask import Flask
 
 from catalog.flask_app.services import (
@@ -193,3 +194,47 @@ def test_testing_app_does_not_leave_background_federation_monitors(
 
     assert starts == []
     assert app.extensions["capability_onboarding_startup_checked"] is True
+
+
+@pytest.mark.parametrize(
+    ("path", "historical"),
+    [
+        ("/process-twins", True),
+        ("/process-twins/not-supported", True),
+        ("/api/process-twins/v1/inputs", True),
+        ("/api/process-twins/v1/not-supported", True),
+        ("/process-twins-extra", False),
+        ("/api/process-twins/v10", False),
+    ],
+)
+def test_production_reconnect_hook_preserves_historical_route_boundary(
+    monkeypatch, tmp_path, path, historical
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "catalog.orchestrator.analysis_runtime.register_federation_supplier",
+        lambda *args, **kwargs: None,
+    )
+    app = Flask(__name__)
+    federation_pairing_install.install_federation_pairing(app)
+    assert not app.testing
+    starts = []
+    for key, label in (
+        ("federation_saved_membership_reconnect", "reconnect"),
+        ("federation_update_event_monitor", "update"),
+    ):
+        monkeypatch.setattr(
+            app.extensions[key], "start", lambda label=label: starts.append(label)
+        )
+    before_request = next(
+        handler
+        for handler in app.before_request_funcs[None]
+        if handler.__name__ == "_start_saved_membership_reconnect"
+    )
+    with app.test_request_context(path):
+        before_request()
+
+    assert starts == ([] if historical else ["reconnect", "update"])
+    assert app.extensions.get("capability_onboarding_startup_checked") is (
+        None if historical else True
+    )

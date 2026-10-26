@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+{% block page_styles %}<link rel="stylesheet" href="{{ url_for('static', filename='css/process-twin.css') }}">{% endblock %}
+{% block body %}
+<section id="process-twin" data-csrf="{{ process_twin_csrf }}" data-analyze="{{ 'yes' if can_analyze else 'no' }}" data-define="{{ 'yes' if can_define else 'no' }}">
+  <h1>Prosesstvilling</h1>
+  <p>Undersøk historikken for produksjonsprosessen med maskin og operatør. Historiske snapshots beholder sitt valgte datagrunnlag.</p>
+  <p class="pt-notice">Historisk visning · Modellgyldighet: ikke vurdert · Konfidensielt</p>
+  <p>Maskinaktivitet dokumenterer ikke hvem som handlet, en årsak eller antall godkjente deler.</p>
+  <p id="pt-status" role="status" aria-live="polite">Henter tilgjengelig historikk.</p>
+  <button type="button" id="pt-command-status" hidden>Kontroller bestillingsstatus</button>
+  <button type="button" id="pt-refresh">Oppdater tilgjengelige valg</button>
+
+  {% if can_analyze %}
+  <details class="pt-panel"><summary>1. Klargjør eksisterende datagrunnlag</summary>
+    <form id="pt-prepare">
+      <label for="pt-input">Maskingrunnlag</label><select id="pt-input" required><option value="">Velg et tilgjengelig grunnlag</option></select>
+      <label for="pt-operator">Operatørgrunnlag</label><select id="pt-operator"><option value="">Ikke valgt</option></select>
+      <label for="pt-time-policy">Kildens tidsgrunnlag</label>
+      <select id="pt-time-policy" required><option value="">Velg uttrykkelig</option><option value="SOURCE_UTC">Dokumentert UTC</option><option value="ASSUME_UTC">Anta UTC for naiv legacy-tid</option><option value="UNRESOLVED">Uavklart</option></select>
+      <p>Dette bevarer en revisjon av tilgjengelig lokalt grunnlag. Det starter ikke opptak eller synkronisering.</p>
+      <button type="submit">Klargjør revisjon</button>
+    </form>
+    <p id="pt-prepared" role="status"></p>
+  </details>
+  {% endif %}
+
+  {% if can_define %}
+  <details class="pt-panel"><summary>2. Definer produksjonsprosessen</summary>
+    <form id="pt-definition">
+      <label for="pt-name">Navn</label><input id="pt-name" maxlength="120" required>
+      <label for="pt-counterpart">Hva representeres?</label><textarea id="pt-counterpart" required maxlength="4096"></textarea>
+      <label for="pt-boundary">Prosessens avgrensning</label><textarea id="pt-boundary" required maxlength="4096"></textarea>
+      <label for="pt-validity">Hva kan historikken brukes til?</label><textarea id="pt-validity" required maxlength="4096"></textarea>
+      <p>Formål: prosesshistorie, sporbarhet, datakvalitet og operatørkontekst. Systemet beskriver; mennesker beslutter og utfører.</p>
+      <button type="submit">Registrer definisjon fra klargjort revisjon</button>
+    </form>
+  </details>
+  {% endif %}
+
+  <section class="pt-panel" aria-labelledby="pt-list-heading">
+    <h2 id="pt-list-heading">Tilgjengelige prosesser</h2><ul id="pt-twins"></ul><button type="button" id="pt-more-twins" hidden>Flere prosesser</button>
+    <h3>Tidligere snapshots for valgt prosess</h3><ul id="pt-snapshots"></ul><button type="button" id="pt-more-snapshots" hidden>Flere snapshots</button>
+  </section>
+
+  {% if can_analyze %}
+  <details class="pt-panel"><summary>3. Opprett historisk snapshot</summary>
+    <form id="pt-build">
+      <p id="pt-selected">Velg en prosess først. Et nyere klargjort grunnlag må ha samme binding.</p>
+      <label for="pt-start">Fra, UTC med seks mikrosekundsiffer</label><input id="pt-start" placeholder="YYYY-MM-DDTHH:mm:ss.ffffffZ" required autocomplete="off">
+      <label for="pt-end">Til, UTC; sluttidspunkt inngår ikke</label><input id="pt-end" placeholder="YYYY-MM-DDTHH:mm:ss.ffffffZ" required autocomplete="off">
+      <button type="submit">Bygg valgt historikk</button>
+    </form>
+  </details>
+  {% endif %}
+
+  <section id="pt-history" class="pt-panel" hidden aria-labelledby="pt-history-heading">
+    <h2 id="pt-history-heading">Historisk snapshot</h2>
+    <p id="pt-scope"></p><dl id="pt-services"></dl><dl id="pt-summary"></dl>
+    <label for="pt-view">Historikkvisning</label><select id="pt-view"></select>
+    <ol id="pt-timeline"></ol><button id="pt-more" type="button" hidden>Vis neste side</button>
+    <button id="pt-rebuild" type="button" hidden>Gjenoppbygg bevart visningsgrunnlag</button>
+    <h3>Detaljer og evidens</h3><div id="pt-detail" tabindex="0"></div>
+    <p>Tilbakemelding, sammenligning og ny simulering inngår ikke i denne historikkleveransen.</p>
+  </section>
+</section>
+<script defer src="{{ url_for('static', filename='js/process-twin.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,91 @@
+{
+  "schema": "fcp.process_twin.case_state_model.v1",
+  "scope": "COMPLETE_PROCESS_TWIN_TARGET",
+  "activation": "SPECIFICATION_ONLY",
+  "facts": {
+    "is_closed": [false, true],
+    "decision_recorded": [false, true],
+    "action_status": ["NONE", "REPORTED_PERFORMED", "REPORTED_NOT_PERFORMED", "UNKNOWN"],
+    "after_snapshot_attached": [false, true],
+    "evaluation_status": ["NONE", "CURRENT", "STALE"]
+  },
+  "condition_semantics": {
+    "all": "Every listed condition is true; an empty list is true.",
+    "eq": "Exact equality of the named fact and literal value.",
+    "ne": "Exact inequality of the named fact and literal value.",
+    "selection": "Evaluate rules in array order and return the first match."
+  },
+  "derived_facts": {
+    "decision_recorded": {"source": "active_decision_records", "operator": "NONEMPTY"},
+    "action_status": {
+      "source": "active_action_records.execution_status",
+      "ordered_rules": [
+        {"operator": "EMPTY", "result": "NONE"},
+        {"operator": "CONTAINS", "value": "UNKNOWN", "result": "UNKNOWN"},
+        {"operator": "CONTAINS", "value": "REPORTED_PERFORMED", "result": "REPORTED_PERFORMED"},
+        {"operator": "OTHERWISE", "result": "REPORTED_NOT_PERFORMED"}
+      ]
+    },
+    "after_snapshot_attached": {"source": "current_after_snapshot_reference", "operator": "NONNULL"}
+  },
+  "status_rules": [
+    {"id": "CS-01", "all": [{"field": "is_closed", "eq": true}], "status": "CLOSED"},
+    {"id": "CS-02", "all": [{"field": "evaluation_status", "eq": "STALE"}], "status": "REVIEW_REQUIRED"},
+    {"id": "CS-03", "all": [{"field": "evaluation_status", "eq": "CURRENT"}], "status": "EVALUATED"},
+    {"id": "CS-04", "all": [{"field": "action_status", "ne": "NONE"}, {"field": "after_snapshot_attached", "eq": true}], "status": "READY_TO_EVALUATE"},
+    {"id": "CS-05", "all": [{"field": "action_status", "eq": "REPORTED_PERFORMED"}], "status": "WAITING_FOR_POST_DATA"},
+    {"id": "CS-06", "all": [{"field": "action_status", "ne": "NONE"}], "status": "ACTION_REPORTED"},
+    {"id": "CS-07", "all": [{"field": "decision_recorded", "eq": true}], "status": "DECIDED"},
+    {"id": "CS-08", "all": [], "status": "OPEN"}
+  ],
+  "create_case": {
+    "initial_facts": {"is_closed": false, "decision_recorded": false, "action_status": "NONE", "after_snapshot_attached": false, "evaluation_status": "NONE"},
+    "expected_status": "OPEN"
+  },
+  "commands": [
+    {"name": "ADD_OBSERVATION", "permission": "workflow.run", "closed_policy": "DENY_WHEN_CLOSED", "effect": "FACTS_CHANGED"},
+    {"name": "SET_CONTEXT", "permission": "workflow.run", "closed_policy": "DENY_WHEN_CLOSED", "effect": "FACTS_CHANGED"},
+    {"name": "PROPOSE_LINK", "permission": "workflow.run", "closed_policy": "DENY_WHEN_CLOSED", "effect": "FACTS_CHANGED"},
+    {"name": "SET_LINK_STATUS", "permission": "workflow.run", "closed_policy": "DENY_WHEN_CLOSED", "effect": "FACTS_CHANGED"},
+    {"name": "RECORD_DECISION", "permission": "workflow.run", "closed_policy": "DENY_WHEN_CLOSED", "effect": "FACTS_CHANGED", "recompute": ["decision_recorded"]},
+    {"name": "REPORT_ACTION", "permission": "workflow.run", "closed_policy": "DENY_WHEN_CLOSED", "effect": "FACTS_CHANGED", "recompute": ["action_status"]},
+    {"name": "RECORD_OUTCOME", "permission": "workflow.run", "closed_policy": "DENY_WHEN_CLOSED", "effect": "FACTS_CHANGED"},
+    {"name": "ATTACH_AFTER_SNAPSHOT", "permission": "workflow.run", "closed_policy": "DENY_WHEN_CLOSED", "effect": "FACTS_CHANGED", "set": {"after_snapshot_attached": true}},
+    {"name": "CORRECT_RECORD", "permission": "workflow.run", "closed_policy": "DENY_WHEN_CLOSED", "effect": "FACTS_CHANGED", "recompute": ["decision_recorded", "action_status"]},
+    {"name": "EVALUATE_FEEDBACK", "permission": "analysis.run", "closed_policy": "DENY_WHEN_CLOSED", "effect": "EVALUATION_CURRENT"},
+    {"name": "CLOSE_CASE", "permission": "workflow.run", "closed_policy": "DENY_WHEN_CLOSED", "effect": "CLOSE"},
+    {"name": "REOPEN_CASE", "permission": "workflow.run", "closed_policy": "REQUIRE_CLOSED", "effect": "REOPEN"}
+  ],
+  "effects": {
+    "FACTS_CHANGED": {"increment_case_revision": true, "increment_facts_revision": true, "evaluation_status_if_none": "NONE", "evaluation_status_if_existing": "STALE"},
+    "EVALUATION_CURRENT": {"increment_case_revision": true, "increment_facts_revision": false, "set_evaluation_status": "CURRENT"},
+    "CLOSE": {"increment_case_revision": true, "increment_facts_revision": false, "set_is_closed": true, "preserve_evaluation_status": true},
+    "REOPEN": {"increment_case_revision": true, "increment_facts_revision": false, "set_is_closed": false, "preserve_evaluation_status": true}
+  },
+  "guard_failures": {
+    "DENY_WHEN_CLOSED": {"http": 409, "code": "CASE_CLOSED"},
+    "REQUIRE_CLOSED": {"http": 409, "code": "CASE_ALREADY_OPEN"},
+    "wrong_expected_revision": {"http": 409, "code": "CASE_REVISION_CONFLICT"},
+    "missing_permission": {"http": 403, "code": "PERMISSION_REQUIRED"},
+    "inaccessible_reference": {"http": 404, "code": "OBJECT_NOT_FOUND"}
+  },
+  "invariants": [
+    "No source arrival implicitly changes case facts or case status.",
+    "A current evaluation may report insufficient evidence; CURRENT never means PASS.",
+    "A closed case can be read, but only REOPEN_CASE can change its lifecycle.",
+    "REOPEN_CASE preserves evidence and does not create a new decision or action.",
+    "A facts-changing command makes every prior evaluation historical or stale.",
+    "A command never executes a machine or grants authority."
+  ],
+  "vectors": [
+    {"id": "SM-01", "facts": {"is_closed": false, "decision_recorded": false, "action_status": "NONE", "after_snapshot_attached": false, "evaluation_status": "NONE"}, "expected": "OPEN"},
+    {"id": "SM-02", "facts": {"is_closed": false, "decision_recorded": true, "action_status": "NONE", "after_snapshot_attached": false, "evaluation_status": "NONE"}, "expected": "DECIDED"},
+    {"id": "SM-03", "facts": {"is_closed": false, "decision_recorded": true, "action_status": "REPORTED_PERFORMED", "after_snapshot_attached": false, "evaluation_status": "NONE"}, "expected": "WAITING_FOR_POST_DATA"},
+    {"id": "SM-04", "facts": {"is_closed": false, "decision_recorded": true, "action_status": "REPORTED_NOT_PERFORMED", "after_snapshot_attached": false, "evaluation_status": "NONE"}, "expected": "ACTION_REPORTED"},
+    {"id": "SM-05", "facts": {"is_closed": false, "decision_recorded": false, "action_status": "UNKNOWN", "after_snapshot_attached": true, "evaluation_status": "NONE"}, "expected": "READY_TO_EVALUATE"},
+    {"id": "SM-06", "facts": {"is_closed": false, "decision_recorded": true, "action_status": "REPORTED_PERFORMED", "after_snapshot_attached": true, "evaluation_status": "CURRENT"}, "expected": "EVALUATED"},
+    {"id": "SM-07", "facts": {"is_closed": false, "decision_recorded": true, "action_status": "REPORTED_PERFORMED", "after_snapshot_attached": true, "evaluation_status": "STALE"}, "expected": "REVIEW_REQUIRED"},
+    {"id": "SM-08", "facts": {"is_closed": true, "decision_recorded": true, "action_status": "REPORTED_PERFORMED", "after_snapshot_attached": true, "evaluation_status": "STALE"}, "expected": "CLOSED"},
+    {"id": "SM-09", "facts": {"is_closed": false, "decision_recorded": false, "action_status": "NONE", "after_snapshot_attached": false, "evaluation_status": "CURRENT"}, "expected": "EVALUATED"}
+  ]
+}
