@@ -1,4 +1,4 @@
-"""One-process execution boundary for an ICSE demonstration scenario."""
+"""One-process execution boundary for an FCP demonstration scenario."""
 
 from __future__ import annotations
 

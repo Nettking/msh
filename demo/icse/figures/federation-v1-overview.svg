@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1480" height="1020" viewBox="0 0 1480 1020" role="img" aria-labelledby="title desc">
-  <title id="title">Federation v1: committed authority and independent capability owners</title>
-  <desc id="desc">An explanatory architecture diagram. A fixed three-voter control plane requires two voters to commit authority. Each host materializes its own coordinator view. Device membership, capability declaration, authorization, and execution have distinct boundaries. The portable ICSE demonstration runs three voter and relay processes plus a joining member on one machine. It exchanges a synthetic payload, terminates one leader, reconnects to the successor, and observes minority refusal. It does not execute compute, storage, or Recorder providers and is not physical acceptance evidence.</desc>
+  <title id="title">FCP Federation demonstration: committed authority and independent capability owners</title>
+  <desc id="desc">An explanatory architecture diagram. A fixed three-voter control plane requires two voters to commit authority. Each host materializes its own coordinator view. Device membership, capability declaration, authorization, and execution have distinct boundaries. The portable Federation demonstration runs three voter and relay processes plus a joining member on one machine. It exchanges a synthetic payload, terminates one leader, reconnects to the successor, and observes minority refusal. It does not execute compute, storage, or Recorder providers and is not physical acceptance evidence.</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10Z" fill="#236775"/></marker>
     <style>
@@ -8,7 +8,7 @@
     </style>
   </defs>
   <rect width="1480" height="1020" fill="#fff"/>
-  <text x="48" y="54" font-size="33" font-weight="700">Federation v1</text>
+  <text x="48" y="54" font-size="33" font-weight="700">FCP Federation demonstration</text>
   <text x="48" y="89" class="body muted">Committed authority · independent capability owners · explicit recovery boundaries</text>
   <rect x="48" y="122" width="1384" height="340" rx="15" fill="#eef6f7" stroke="#b5cfd5" stroke-width="2"/>
   <text x="72" y="159" class="heading">Configured C03 control plane</text>
@@ -56,7 +56,7 @@
     <text x="1140" y="648" class="small">and persistent data</text>
     <path d="M360 623H414 M708 623H762 M1056 623H1110" class="line"/>
   </g>
-  <text x="72" y="752" class="heading">Portable ICSE demonstration: one bounded network story</text>
+  <text x="72" y="752" class="heading">Federation demonstration: one bounded network story</text>
   <text x="72" y="781" class="body muted">Three voter/relay processes and one joining member; all run independently on one reviewer machine.</text>
   <g>
     <rect x="76" y="800" width="286" height="84" rx="9" class="step"/>

@@ -92,7 +92,7 @@ class Node:
                 federation_id=value["federation_id"],
                 session_id=value["session_id"],
                 creator_node_id=self.config["node_id"],
-                display_name="ICSE local network demonstration",
+                display_name="FCP Federation demonstration",
             )
             return {"created": True}
         if operation == "enrollment_token":

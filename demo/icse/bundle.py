@@ -1,4 +1,4 @@
-"""Build and validate the publication bundle for the ICSE tool artifact."""
+"""Build and validate the evidence bundle for the FCP Federation demonstration."""
 
 from __future__ import annotations
 
@@ -267,7 +267,7 @@ def build_bundle(
     license_files = sorted(path.name for path in Path(".").glob("LICENSE*") if path.is_file())
     manifest = {
         "schema": MANIFEST_SCHEMA,
-        "artifact": "FCP ICSE Tool Demonstration",
+        "artifact": "FCP Federation Demonstration",
         "artifact_version": canonical_version,
         "source_revision": source_revision,
         "source_ref": source_ref,

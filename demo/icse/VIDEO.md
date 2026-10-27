@@ -1,10 +1,9 @@
-# Network demonstration video storyboard
+# Federation demonstration video storyboard
 
 Use `DEMONSTRATION.md` for the primary five-minute story and `network/README.md`
-for runnable setup and boundaries. These are preparation materials. Release
-identity, recordings and screenshots remain **PENDING** until produced from the
-actual released source. Verify the selected ICSE venue/year's submission rules;
-the times below are editorial targets, not claimed conference limits.
+for runnable setup and boundaries. Recording is optional. Use only recordings
+and screenshots produced from the exact identified source; this storyboard
+does not establish their existence. The times below are editorial targets.
 
 | Shot | Target | Content |
 | --- | --- | --- |
@@ -26,7 +25,7 @@ competing demonstration story.
 ## Figure and screenshot targets
 
 - Use `figures/federation-v1-overview.svg` and `ARCHITECTURE.md` as explanatory
-  system figures. Render to paper-compatible PDF and inspect readability.
+  system figures. Render to PDF and inspect readability.
 - Capture the actual initial report showing process identities and authenticated
   membership/discovery, with pairing secrets excluded.
 - Capture matched payload observations before and after observed quorum
@@ -41,9 +40,9 @@ caption claim. Keep unaltered evidence separate from edited video. Disclose
 compressed waits; video length never substitutes for duration-test evidence.
 
 Publish only `public/` network output. `private-state/` contains node identities,
-transport secrets, databases and logs and must stay outside the publication
+transport secrets, databases and logs and must stay outside the public
 bundle. Exclude passwords, pairing material, private endpoints and unrelated
-desktop content from captures. Add a release URL or DOI only after it exists.
+desktop content from captures. Include only existing, verified release links.
 
 Before delivery, review the entire video for legibility, narration/caption
 agreement, real source identity and the network guide's limitations. A passing

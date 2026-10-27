@@ -1,4 +1,4 @@
-"""Claim-aligned ICSE demonstration scenarios E1 and E2."""
+"""Claim-aligned FCP demonstration scenarios E1 and E2."""
 
 from __future__ import annotations
 

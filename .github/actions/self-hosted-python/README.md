@@ -63,8 +63,9 @@ label before stopping that container. Existing databases and product services
 are not used or removed.
 
 The storage precondition only checks the product's unchanged admission floor;
-it never removes installed SDKs or changes services. ICSE Compose rebuilds the current source and
-creates the evidence directory as the runner account before mounting it. The
+it never removes installed SDKs or changes services. Demonstration Compose
+rebuilds the current source and creates the evidence directory as the runner
+account before mounting it. The
 container retains its documented user so application result directories remain
 writable; its readable JSON output can be removed by the runner because the
 parent directory is runner-owned. This avoids stale images and root-owned mount

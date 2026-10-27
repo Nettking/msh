@@ -1,6 +1,6 @@
 cff-version: 1.2.0
-message: "If you use the FCP ICSE tool artifact, cite the immutable archived release identified by the paper."
-title: "FCP: Capability-Oriented Federation Tool Artifact"
+message: "If you use the FCP Federation demonstration, cite its exact source revision or immutable archived release."
+title: "FCP: Capability-Oriented Federation Demonstration"
 type: software
 authors:
   - family-names: "Andersen"
@@ -9,7 +9,7 @@ authors:
 version: "0.2.0"
 license: MIT
 abstract: >-
-  Reviewer artifact for the FCP capability-oriented federation tool demonstration.
+  Reproducible demonstration of FCP capability-oriented federation.
   It evaluates selective contribution, capability-specific authority, runtime
   provider eligibility, and durable ownership boundaries using production FCP
   control-plane components with deterministic stand-ins for external physical

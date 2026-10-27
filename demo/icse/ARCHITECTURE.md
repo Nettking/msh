@@ -1,9 +1,9 @@
-# Architecture figure source
+# Federation demonstration architecture figure source
 
-These Mermaid diagrams are explanatory source for the paper/demo. They are not
+These Mermaid diagrams are explanatory source for the demonstration. They are not
 screenshots or validation results. Render and visually review the final figures
-against the exact released source before publication. Final release SHA/tag:
-**PENDING** until the release process succeeds.
+against the exact identified source before sharing them. A figure does not
+establish a release SHA/tag or completed validation.
 
 ## Primary network demonstration
 
