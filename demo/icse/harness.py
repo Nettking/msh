@@ -1,4 +1,4 @@
-"""Bounded synthetic environment for the ICSE FCP demonstration.
+"""Bounded synthetic environment for the FCP Federation demonstration.
 
 Only physical/environmental endpoints are synthetic here. The federation,
 onboarding, inspection, benchmarking, contribution, policy, coordinator, and
@@ -267,7 +267,7 @@ def build_stack(
         identity_directory=root / "device",
         state_database=root / "onboarding.sqlite3",
         coordinator_database=coordinator,
-        device_name=f"ICSE {root.name}",
+        device_name=f"Demonstration {root.name}",
         discovery_sources=discovery_sources,
         clock=clock,
     )
@@ -390,7 +390,7 @@ def candidate_for_existing_federation(
         request_id=f"icse-invite-{suffix}",
     )["token"]
     return FederationDiscoveryCandidate(
-        federation_label="ICSE demonstration federation",
+        federation_label="FCP demonstration federation",
         internal_session_id=session_id,
         federation_fingerprint="icse-demo-fingerprint",
         transport_kind="configured-demo",

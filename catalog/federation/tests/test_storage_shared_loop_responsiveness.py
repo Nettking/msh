@@ -5,6 +5,7 @@ import asyncio
 import copy
 import json
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 
@@ -54,7 +55,8 @@ def test_real_shared_wire_cold_validation_heartbeat_and_two_distinct_commits(tmp
         ) for name in ("creator", "recorder", "peer")]
         creator, recorder, peer = clients
         stages, sender, task = [], None, None
-        entered, release = threading.Event(), threading.Event()
+        loop = asyncio.get_running_loop()
+        entered, release = asyncio.Event(), threading.Event()
         try:
             for client in clients:
                 enrollment = relay.coordinator.create_enrollment_token(ttl_seconds=30, max_uses=1)
@@ -94,7 +96,7 @@ def test_real_shared_wire_cold_validation_heartbeat_and_two_distinct_commits(tmp
                 if not paused:
                     paused = True
                     assert threading.get_ident() != owner_thread
-                    entered.set()
+                    loop.call_soon_threadsafe(entered.set)
                     assert release.wait(3), "owner loop did not run during cold validation"
                 return original(row, **kwargs)
 
@@ -140,7 +142,8 @@ def test_real_shared_wire_cold_validation_heartbeat_and_two_distinct_commits(tmp
 
             first = values(1)
             task = asyncio.create_task(sender.ingest_batch(**first))
-            assert await asyncio.wait_for(asyncio.to_thread(entered.wait, 3), 4)
+            # Entry notification must not occupy the executor needed by storage.
+            assert await asyncio.wait_for(entered.wait(), 3)
             # A real authenticated relay round trip, while cold decoder is held.
             heartbeat = await asyncio.wait_for(peer.request("heartbeat", payload={}), 1)
             assert heartbeat["connection_state"] == "connected"
@@ -179,6 +182,32 @@ def test_real_shared_wire_cold_validation_heartbeat_and_two_distinct_commits(tmp
             await relay.stop()
 
     asyncio.run(asyncio.wait_for(scenario(), 25))
+
+
+def test_cold_entry_notification_does_not_occupy_the_storage_executor(tmp_path, monkeypatch):
+    original_run = asyncio.run
+    executors = []
+
+    def run_with_one_worker(main, *, debug=None, loop_factory=None):
+        assert loop_factory is None
+
+        def factory():
+            loop = asyncio.new_event_loop()
+            executor = ThreadPoolExecutor(max_workers=1)
+            executors.append(executor)
+            loop.set_default_executor(executor)
+            return loop
+
+        return original_run(main, debug=debug, loop_factory=factory)
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(asyncio, "run", run_with_one_worker)
+        # Retain the actual cold decoder, heartbeat round trip, both commits,
+        # and all original deadlines under deliberately limited executor capacity.
+        test_real_shared_wire_cold_validation_heartbeat_and_two_distinct_commits(tmp_path, scoped)
+    assert asyncio.run is original_run
+    assert len(executors) == 1
+    assert all(not thread.is_alive() for thread in executors[0]._threads)
 
 
 @pytest.mark.parametrize(

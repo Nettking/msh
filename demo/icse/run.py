@@ -1,4 +1,4 @@
-"""Reviewer entrypoint for the FCP ICSE tool demonstration."""
+"""Entrypoint for the FCP Federation demonstration."""
 
 from __future__ import annotations
 
@@ -54,7 +54,7 @@ def _run(name: str) -> dict[str, object]:
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Run deterministic FCP ICSE scenarios")
+    parser = argparse.ArgumentParser(description="Run deterministic FCP demonstration scenarios")
     parser.add_argument(
         "--output",
         type=Path,

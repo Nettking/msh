@@ -1,4 +1,4 @@
-name: ICSE tool demonstration
+name: Federation demonstration
 
 on:
   workflow_dispatch:
@@ -330,7 +330,7 @@ jobs:
             --evidence-root downloaded-evidence \
             --network-evidence-root downloaded-network-evidence \
             --output publication-bundle
-      - name: Upload ICSE publication bundle
+      - name: Upload demonstration evidence bundle
         id: publication_artifact
         if: always()
         uses: actions/upload-artifact@v4

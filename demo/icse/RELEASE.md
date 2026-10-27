@@ -1,136 +1,94 @@
-# ICSE Artifact Freeze and Release Procedure
+# Federation demonstration: optional immutable archive procedure
 
-This file is a maintainer checklist for turning the draft reviewer artifact into
-an immutable paper artifact. Do not cite a moving branch as the final artifact.
+This maintainer checklist applies if a reproducible demonstration bundle is
+released or archived. No release, venue submission, recording, or archival
+deposit is planned or required by this guide. Do not describe a moving branch
+as an immutable artifact.
 
-## 1. Confirm release metadata
+## 1. Confirm identity and metadata
 
-The publication metadata is now selected:
-
-- software license: **MIT**, with `LICENSE` at repository root;
-- sole scholarly creator: **Martin Arthur Andersen**;
-- ORCID: `0009-0004-9991-3578`;
-- candidate artifact version: `0.2.0`.
+Use the title **FCP Federation demonstration**, the actual bundle version and
+exact source revision. The repository license is **MIT**, with `LICENSE` at
+repository root. `CITATION.cff` records Martin Arthur Andersen as the sole
+scholarly creator, with ORCID `0009-0004-9991-3578`.
 
 The existing `fcp-icse-tool-demo-v0.1.0` tag records the earlier 2026-08-31
 artifact at commit `954faa357638b13d7291e69ea98fa620c0c3d637`. Preserve that
-tag unchanged. The upcoming artifact uses a new `0.2.0` version and tag;
-this version selection does not claim a completed release or physical acceptance.
+tag unchanged. The `icse` tag prefix, archive filenames and `ZENODO_SHA256`
+sidecar are historical compatibility identifiers, as explained in `README.md`.
+They do not commit this demonstration to a particular venue or archive service.
 
-Before the public release, confirm that the artifact title and version still match
-the paper and keep the claim boundary in `README.md` and `ARTIFACT.md` aligned
-with the manuscript.
+Keep the stated purpose and claim boundaries in `README.md`, `ARTIFACT.md` and
+any accompanying report aligned with what the retained evidence actually shows.
 
-If the final DOI should be embedded in `CITATION.cff`, create a Zenodo draft and
-reserve its DOI before the final code freeze. Do not invent or predict a DOI.
+## 2. Freeze the exact source
 
-## 2. Freeze the code revision
+Finalize the intended demonstration source, setup documentation and scripts.
+Merge their changes only after the exact PR head passes the Federation
+demonstration workflow in `.github/workflows/icse-tool-demo.yml`. Qualify any
+Federation product release under the normal procedure in
+`docs/release_process.md`; a demonstration run does not replace software or
+physical acceptance.
 
-Finalize all intended artifact source, setup documentation and scripts before
-the Federation candidate freeze. Merge their changes only after the exact PR
-head passes the `ICSE tool demonstration` workflow, then qualify the resulting
-merged main under the normal Federation release procedure. See
-`docs/release_process.md` at the repository root.
+If a bundle is described as evidence for an accepted product release, it must
+use that exact physically accepted source, not a later development commit. Its
+source/tag and the product release tag must resolve to the same accepted
+40-character commit. Any intervening source change changes the candidate and
+requires the corresponding qualification again.
 
-The paper artifact must use the exact physically accepted Federation v1 source,
-not a later development commit. Complete the required software and physical
-acceptance and establish the product `v1.0.0` tag at that accepted commit before
-publishing the ICSE artifact. Any intervening source change changes the candidate
-and requires the corresponding qualification again.
-
-Create an immutable tag on the exact commit intended for publication:
-
-```text
-fcp-icse-tool-demo-v0.2.0
-```
-
-Require this tag and the Federation `v1.0.0` tag to resolve to the same accepted
-40-character commit. They name product and paper artifact metadata; they must
-not introduce different source versions. Final source SHA and actual tag names
-remain pending until those release operations have succeeded.
-
+For an optional tagged demonstration archive, use the existing compatible
+`fcp-icse-tool-demo-v<version>` naming pattern on the exact intended commit.
+Choose a version not already used; this guide selects no upcoming version.
 Do not move or reuse an existing tag, even if it has no GitHub Release. If a
-post-release defect requires a code change, create a new patch release and tag
-instead.
+post-release defect requires a code change, use a new version and tag.
 
-## 3. Require tag-triggered evidence
+## 3. Require matching explicitly invoked evidence
 
-The release tag must trigger the same workflow used during review. Before making
-a GitHub Release or publishing the Zenodo record, require the tag run to complete
-successfully with:
+The workflow supports manual dispatch and path-filtered branch pushes, not
+automatic tag-push execution. For a tagged archive, explicitly dispatch the same
+workflow at that tag, verify the actual run's ref and exact source SHA, and
+require it to complete successfully with:
 
 - Ubuntu direct E1-E4: PASS;
 - Windows direct E1-E4: PASS;
-- Docker Compose E1-E4: PASS and retained evidence; and
+- Docker Compose E1-E4: PASS and retained evidence;
 - independent-node network scenario on Linux and Windows: PASS, all ten checks
   PASS, and all owned processes stopped; and
-- publication bundle: PASS.
+- reproducible bundle: PASS.
 
-The release workflow routes these jobs to the intended self-hosted Windows and
-Linux infrastructure. Confirm the component execution set contains `Linux`,
-`Windows`, and `compose`, and the separate network evidence set contains exactly
-`Linux` and `Windows`, all for the exact accepted/tagged SHA. The network entries
-must cover only `summary.json`, `events.jsonl`, and `operator-report.html` with
-matching digests; no `private-state/` may be published. These artifact
-jobs complement the full Federation release and physical gates; they do not
-replace them.
+The workflow routes these jobs to the intended self-hosted Windows and Linux
+infrastructure. Confirm the component execution set contains `Linux`, `Windows`,
+and `compose`, and the separate network evidence set contains exactly `Linux`
+and `Windows`, all for the exact tagged SHA. The network entries must cover only
+`summary.json`, `events.jsonl`, and `operator-report.html` with matching digests;
+no `private-state/` may be shared. These jobs complement the full Federation
+release and physical gates; they do not replace them.
 
-Download the publication bundle from that tag-triggered run. For version 0.2.0,
-the canonical archival file is:
+Download `fcp-icse-tool-demo-<version>.zip` from that verified run and verify
+it against `ZENODO_SHA256`. Retain `artifact-manifest.json` and `SHA256SUMS`
+with the archival records. The manifest and all component and network evidence
+must identify the tag's exact source revision.
 
-```text
-fcp-icse-tool-demo-0.2.0.zip
-```
+Do not rebuild the canonical ZIP locally after that run.
 
-Verify it against `ZENODO_SHA256`. Also retain `artifact-manifest.json` and
-`SHA256SUMS` with the publication records. The manifest and all three evidence
-files must identify the tag's exact source revision.
+## 4. Optional distribution or archival deposit
 
-Do not rebuild the canonical ZIP locally after the tag run.
+If the bundle is attached to a release or deposited in an archive, use the exact
+CI-generated ZIP and its `ZENODO_SHA256` sidecar. Any distributed copies must be
+byte-for-byte the same object. Retain the manifest and unpacked-evidence
+`SHA256SUMS` with the archival records.
 
-## 4. Publish the immutable archive
+Before sharing the archive, verify:
 
-Create a GitHub Release from the same immutable tag and attach the exact
-CI-generated publication ZIP and its `ZENODO_SHA256` sidecar. The ZIP release
-asset and the Zenodo file should be byte-for-byte the same object. Retain the
-manifest and unpacked-evidence `SHA256SUMS` with the publication records.
-
-Use a **manual Zenodo software deposit** as the canonical paper artifact so the
-DOI identifies the validated source-and-evidence package, not merely a source
-snapshot. Upload only the CI-generated publication ZIP to the software record,
-select resource type `Software`, and use the final scholarly creator, version,
-license, and related-paper metadata.
-
-Because this manual deposit is the canonical DOI-bearing artifact, do not also
-create a second automatic Zenodo GitHub-integration DOI for the same release.
-
-Before publishing the Zenodo record, verify:
-
-- the uploaded file checksum matches `ZENODO_SHA256`;
-- the archive contains `source/` and `artifact/` under one versioned root;
+- its checksum matches `ZENODO_SHA256`;
+- it contains `source/` and `artifact/` under one versioned root;
 - `artifact/artifact-manifest.json` names the exact release-tag commit;
 - Ubuntu, Windows, and Compose evidence each report E1-E4 passing;
 - Linux and Windows network evidence each report all required checks passing and
-  complete owned-process teardown, with public-file digests verified;
-- title, version, author, ORCID, and MIT license are correct; and
-- the record is classified as software.
+  complete owned-process teardown, with public-file digests verified; and
+- title, actual version, creator, ORCID, and MIT license are correct.
 
-Publish the record only after these checks. If the package changes after that
-point, create a new artifact version rather than silently replacing the cited
-release.
-
-## 5. Paper-facing finalization
-
-After the DOI resolves, update the paper/tool-artifact record with:
-
-- artifact title and version;
-- immutable Git tag;
-- exact commit SHA;
-- Zenodo DOI;
-- GitHub Release identifier;
-- tag-triggered publication-bundle workflow run identifier;
-- `ZENODO_SHA256`; and
-- the bounded claim/evaluation statement used by the artifact.
-
-The paper's evaluation statements must remain within the claim boundary stated
-in the artifact documentation.
+If the package later changes, use a new artifact version rather than silently
+replacing the archived object. Keep the immutable Git tag, exact commit SHA,
+workflow run identifier, checksum and bounded evaluation statement together.
+Include any release or archive link only after it exists and has been verified.

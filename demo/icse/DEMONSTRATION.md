@@ -1,4 +1,4 @@
-# Demonstration: membership survives one voter loss
+# Federation demonstration: membership survives one voter loss
 
 The primary story is an authenticated Federation whose independently running
 members retain their identities, membership and capability ownership after the
@@ -6,13 +6,13 @@ original leader process is lost. The same members reconnect through the elected
 successor and repeat a real payload exchange. `network/README.md` contains the
 exact commands, archive provenance options and full limitations.
 
-Use the exact released Federation v1 source for the paper and recording. Final
-release SHA/tag, completed run evidence and physical acceptance are **PENDING**
-until the corresponding release process succeeds. This script is preparation.
+Use the exact identified Federation v1 source for each run and any recording.
+Completed run evidence and physical acceptance must be reported separately from
+their actual records. This script describes the demonstration, not a release plan.
 
 ## Five-minute flow
 
-Prepare a clean checkout or verified publication ZIP, Python 3.12 and the pinned
+Prepare a clean checkout or verified reproducible ZIP, Python 3.12 and the pinned
 runtime environment described in the network guide. Keep output outside source.
 Run the full unchanged network command, optionally with `--step-pause 3` for
 narration, and retain the current exit code and `public/` evidence. Do not replay
@@ -69,4 +69,5 @@ P01–P12/B01–B09/CF7 acceptance and strict evidence validation form a separat
 evaluation. Fill those results from actual evidence, never from this script or
 test names. No result here establishes comparative productivity, performance
 superiority, optimal scheduling, general scalability or a general security
-theorem. The final paper, video and archive must cite the same accepted release.
+theorem. Any report, video and archived evidence must identify the same exact
+source used for the observations they present.

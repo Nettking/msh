@@ -1,18 +1,18 @@
-# Reviewer Artifact Guide
+# FCP Federation demonstration guide
 
 ## Artifact identity
 
-**Artifact:** FCP ICSE Tool Demonstration
-**Candidate version:** 0.2.0
+**Artifact:** FCP Federation demonstration
+**Version and source:** use the actual bundle manifest and corresponding run record
 **Primary entrypoint:** `python -B -m demo.icse.network.run`
 **Supporting component entrypoint:** `demo/icse/docker-compose.yml`
 **Network evidence schema:** `fcp.icse-network-demo.v1`
 **Component evidence schema:** `fcp.icse-demo-summary.v1`
 
-The final Federation release SHA/tag and ICSE artifact tag are established by
-the release process, not this candidate version label. Do not infer a completed
-release or physical PASS from this document. The product and paper artifact
-must use the same exact accepted source revision.
+Source SHA/tag and bundle version are established by the actual run and any
+optional release process. Do not infer a completed release or physical PASS
+from this document. Evidence and archived source must identify the same exact
+revision. See `README.md` for the historical compatibility names retained here.
 
 The primary network story follows independently running members through
 authenticated join, owner-scoped declarations, real synthetic-payload exchange,
@@ -24,7 +24,7 @@ component experiments with synthetic external observations and authorities.
 
 The network demonstration requires Python 3.12 and the repository's
 `requirements.txt` with `constraints-phase2.txt`. Use Git for a clean checkout,
-or a verified complete publication ZIP and its trusted digest for archive mode.
+or a verified complete reproducible ZIP and its trusted digest for archive mode.
 Follow `source/demo/icse/network/README.md` in the ZIP (or
 `demo/icse/network/README.md` in a checkout). It includes Windows/POSIX commands,
 strict Git/archive identity checks and output isolation. No Docker, Tailscale
@@ -48,9 +48,10 @@ evidence; passing one does not replace the other.
 
 ### From a Git checkout
 
-Use the immutable tag named by the paper. Verify that its resolved commit equals
-the release record's full SHA and that `git status --porcelain` is empty. From
-the repository root:
+Use a clean checkout of the exact commit named by the demonstration record.
+Verify that `git rev-parse HEAD` matches that full SHA and that
+`git status --porcelain` is empty. If using a release tag, also verify its
+resolved SHA against the release record. From the repository root:
 
 ```bash
 export FCP_BUILD_COMMIT="$(git rev-parse HEAD)"
@@ -65,10 +66,10 @@ On PowerShell:
 $env:FCP_BUILD_COMMIT = git rev-parse HEAD
 New-Item -ItemType Directory -Force -Path demo/icse/evidence | Out-Null
 docker compose -f demo/icse/docker-compose.yml run --build --rm demo --output /evidence/icse-summary.json
-if ($LASTEXITCODE -ne 0) { throw 'ICSE demonstration failed.' }
+if ($LASTEXITCODE -ne 0) { throw 'Federation demonstration failed.' }
 ```
 
-### From the publication ZIP, without Git metadata
+### From the reproducible ZIP, without Git metadata
 
 Download the canonical `fcp-icse-tool-demo-<version>.zip` and its
 `ZENODO_SHA256` sidecar from the same release. Before extraction, compare the
@@ -99,7 +100,7 @@ $env:FCP_ICSE_OUTPUT_DIR = Join-Path (Get-Location) 'reviewer-component-evidence
 New-Item -ItemType Directory -Force -Path $env:FCP_ICSE_OUTPUT_DIR | Out-Null
 Set-Location source
 docker compose -f demo/icse/docker-compose.yml run --build --rm demo --output /evidence/icse-summary.json
-if ($LASTEXITCODE -ne 0) { throw 'ICSE demonstration failed.' }
+if ($LASTEXITCODE -ne 0) { throw 'Federation demonstration failed.' }
 ```
 
 On a POSIX shell, copy the verified 40-character `source_revision` value from
@@ -139,7 +140,7 @@ Require the current command to exit successfully before inspecting the new
 output; an old retained JSON file is not evidence that the current command passed.
 Use `--build` even after changing source revisions, because supplying a new
 `FCP_BUILD_COMMIT` at runtime does not update an already-built image. Keep the
-reviewer's newly generated summary separate from the canonical tag-run evidence.
+reviewer's newly generated summary separate from the canonical bundled evidence.
 
 ## Scenario-to-claim map
 
@@ -154,9 +155,10 @@ The scenario evidence supports only these evaluated boundaries. It does not turn
 synthetic physical observations into evidence about hardware performance or
 physical deployment reliability.
 
-## Publication evidence bundle
+## Reproducible evidence bundle
 
-The `ICSE tool demonstration` workflow retains all three E1–E4 runs (Linux,
+The Federation demonstration workflow (`.github/workflows/icse-tool-demo.yml`)
+retains all three E1–E4 runs (Linux,
 Windows and Linux Compose) and additionally runs the network story on both
 self-hosted operating systems. Its bundle command supplies
 `--network-evidence-root` and requires exactly Linux/Windows public network
@@ -203,16 +205,17 @@ repository license was declared at bundle time. Its additive `network_evidence`
 entries record execution labels, required checks and all three public-file
 digests per OS. `SHA256SUMS` covers the unpacked
 artifact metadata and evidence. `ZENODO_SHA256` identifies the complete
-self-contained publication ZIP.
+self-contained reproducible ZIP.
 
-The publication ZIP contains the exact Git-tracked source tree directly under
-`source/` and the validated reviewer metadata/evidence under `artifact/`. A tag
-named `fcp-icse-tool-demo-v0.2.0` therefore produces
-`fcp-icse-tool-demo-0.2.0.zip`.
+The reproducible ZIP contains the exact Git-tracked source tree directly under
+`source/` and the validated reviewer metadata/evidence under `artifact/`. The
+compatible naming pattern maps version `0.2.0` to
+`fcp-icse-tool-demo-0.2.0.zip`; this example does not select a future version.
 
-For the publication version, archive exactly the ZIP produced by the
-tag-triggered workflow for the release tag cited by the paper. Do not rebuild the
-ZIP locally after the tag run.
+If an immutable release is archived, retain exactly the ZIP produced by the
+workflow explicitly dispatched at that tag, with its actual ref and exact source
+SHA verified. Do not rebuild the ZIP locally after that run. No release or
+archival deposit is required by this guide.
 
 ## Synthetic boundary
 
@@ -238,14 +241,15 @@ measurement is produced by E1-E4.
 - Scenario workspaces are deleted only after the child process exits.
 - The summary records the supplied source revision.
 - The CI bundle refuses mixed-revision or incomplete evidence.
-- The publication ZIP's `source/` tree is generated by `git archive` from the
+- The reproducible ZIP's `source/` tree is generated by `git archive` from the
   same revision used by all evidence jobs. The revision's tracked export rules
   omit the capture and identifying capture-analysis note described in
   `example-data/README.md`, whose public redistribution provenance is
   undocumented. Both demonstrations use synthetic inputs and remain complete
   without those private capture materials.
-- Release tags matching `fcp-icse-tool-demo-v*` rerun the complete artifact
-  workflow.
+- The workflow supports explicit manual dispatch and path-filtered branch pushes.
+  Tags alone do not trigger it; optional tagged archives require an explicit run
+  at the intended ref and verification of that run's exact source identity.
 
 ## Known limitations
 
@@ -264,13 +268,13 @@ validation remain separate; neither local processes nor E1–E4 establish physic
 multi-host, hardware, browser or duration acceptance. Actual release-specific
 execution results remain pending until their recorded evidence passes.
 
-The repository is licensed under the MIT License. The publication bundle records
+The repository is licensed under the MIT License. The reproducible bundle records
 that license state and includes the repository `LICENSE` file in the exact source
 tree archived for the evaluated revision.
 
 `CITATION.cff` identifies Martin Arthur Andersen as the sole scholarly creator,
-with ORCID `0009-0004-9991-3578`. A DOI is intentionally omitted until a real
-Zenodo record has been reserved or published.
+with ORCID `0009-0004-9991-3578`. It is citation metadata, not evidence of a
+planned publication or archival deposit.
 
 ## Claim boundary
 

@@ -1,8 +1,14 @@
-# FCP ICSE Tool Demonstration
+# FCP Federation demonstration
 
-This directory is the paper-specific reviewer entrypoint for the FCP tool
+This directory is the reproducible entrypoint for the FCP Federation
 demonstration. It is intentionally separate from normal product deployment and
 from physical Federation-v1 acceptance.
+
+The `demo/icse` paths, `demo.icse` modules, `fcp.icse-*` schemas,
+`FCP_ICSE_OUTPUT_DIR`, `icse-summary.json`, `fcp-icse-tool-demo-*` archive/tag
+names, and `ZENODO_SHA256` sidecar are historical compatibility identifiers.
+They remain unchanged and imply no ICSE deliverable, submission, or archival
+commitment. Existing tags and their recorded source identities remain immutable.
 
 For the reviewer-oriented instructions, expected output, and limitations, see
 [`ARTIFACT.md`](ARTIFACT.md). Maintainer freeze/release instructions are in
@@ -15,12 +21,12 @@ members retain membership and capability ownership after one voter is lost.
 join, discover owner-scoped declarations, exchange a synthetic payload, recover
 through a surviving quorum and repeat the interaction. Its offline operator
 report is recorded demonstration evidence, not the Flask product UI. Exact
-release execution and physical validation remain pending until real evidence
-exists.
+source execution and physical validation must be reported from their own actual
+evidence; this guide does not establish either result.
 
 The source tree also includes `DEMONSTRATION.md` (script and claim boundaries),
-`ARCHITECTURE.md` (paper figure source), and `VIDEO.md` (capture plan). In the
-publication ZIP these files are also copied into `artifact/`. They describe the
+`ARCHITECTURE.md` (figure source), and `VIDEO.md` (optional capture plan). In the
+reproducible ZIP these files are also copied into `artifact/`. They describe the
 artifact and do not constitute physical acceptance evidence.
 
 ## Supporting component experiments
@@ -85,22 +91,24 @@ The Compose file bind-mounts `demo/icse/evidence/` to `/evidence` by default, so
 the retained file is `demo/icse/evidence/icse-summary.json`. The evidence
 directory is intentionally ignored by Git.
 
-Use a clean checkout of the immutable release tag and verify its SHA against
-the release record. `--build` prevents reuse of an older local demo image: the
+Use a clean checkout of the exact commit and retain its full SHA with the run.
+If using a release tag, also verify its resolved SHA against the release record.
+`--build` prevents reuse of an older local demo image: the
 summary's revision comes from the supplied environment and cannot by itself
-prove which source was built. When running the publication ZIP's Git-less
+prove which source was built. When running the reproducible ZIP's Git-less
 `source/` directory, obtain the revision from the sibling
 `artifact/artifact-manifest.json` instead of `git rev-parse`; see `ARTIFACT.md`.
 
-## CI and publication bundle
+## CI and reproducible bundle
 
-The dedicated `ICSE tool demonstration` workflow executes:
+The dedicated Federation demonstration workflow in
+`.github/workflows/icse-tool-demo.yml` executes:
 
 1. the direct Python entrypoint on clean Ubuntu and Windows runners;
 2. the independent-node network demonstration on the self-hosted Linux and
    Windows runners, retaining only each run's `public/` output;
 3. the Docker Compose E1–E4 path on Linux, retaining its JSON evidence; and
-4. a publication-bundle job that refuses to package the run unless all three
+4. a bundle job that refuses to package the run unless all three
    summaries report the same source revision and the same four passing
    scenarios, and both network executions identify that same revision with all
    ten required checks passing and all owned processes stopped.
@@ -113,18 +121,21 @@ The resulting workflow artifact contains:
 - `CITATION.cff`, this README, and the reviewer guide;
 - demonstration script, architecture figure/source, and video storyboard;
 - `SHA256SUMS` for the unpacked artifact evidence/metadata;
-- `ZENODO_SHA256` for the complete publication archive; and
+- `ZENODO_SHA256` for the complete reproducible archive; and
 - one self-contained `fcp-icse-tool-demo-<version>.zip`.
 
 The self-contained ZIP contains the exact Git-tracked source tree directly under
 `source/` and the validated artifact evidence/metadata under `artifact/`. This is
-the canonical file to attach to the GitHub Release and deposit as the Zenodo
-software artifact.
+the canonical file for any optional release attachment or archival deposit;
+retain those exact bytes rather than rebuilding the package locally.
 
-Tags matching `fcp-icse-tool-demo-v*` trigger the same workflow. A tag such as
-`fcp-icse-tool-demo-v0.2.0` yields `fcp-icse-tool-demo-0.2.0.zip`. The paper must
-cite the immutable release/tag and DOI whose tag-triggered run is green, not a
-moving draft branch or a pre-tag CI result.
+The workflow supports manual dispatch and path-filtered branch pushes; a tag
+alone does not trigger it. For an optional tagged archive, explicitly dispatch
+the workflow at that ref and verify the actual run's ref and exact source SHA.
+The compatible naming pattern maps `fcp-icse-tool-demo-v0.2.0` to
+`fcp-icse-tool-demo-0.2.0.zip`; this is an example, not a planned release. Any
+shared bundle must identify its immutable source/tag and successful corresponding
+run, not a moving draft branch or a pre-tag CI result presented as tag evidence.
 
 ## Evidence emitted
 

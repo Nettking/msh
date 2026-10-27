@@ -92,7 +92,7 @@ class Node:
                 federation_id=value["federation_id"],
                 session_id=value["session_id"],
                 creator_node_id=self.config["node_id"],
-                display_name="ICSE local network demonstration",
+                display_name="FCP Federation demonstration",
             )
             return {"created": True}
         if operation == "enrollment_token":
@@ -165,7 +165,17 @@ def emit(value: dict) -> None:
 async def serve(config: dict) -> int:
     node = Node(config)
     try:
-        emit({"startup": await node.start()})
+        try:
+            startup = await node.start()
+        except Exception as error:  # noqa: BLE001 - startup stays failed and raw details remain private
+            traceback.print_exc(file=sys.stderr)
+            emit({"startup_error": {
+                "error_type": type(error).__name__,
+                "errno": getattr(error, "errno", None),
+                "winerror": getattr(error, "winerror", None),
+            }})
+            return 1
+        emit({"startup": startup})
         while line := await asyncio.to_thread(sys.stdin.readline):
             command = json.loads(line)
             if command["operation"] == "shutdown":

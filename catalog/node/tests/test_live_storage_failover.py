@@ -568,6 +568,7 @@ def test_applied_control_is_acknowledged_before_capability_advertisement(
     bootstrap_entered: set[str] = set()
     release = asyncio.Event()
     all_entered = asyncio.Event()
+    post_release_drain = asyncio.Lock()
 
     async def announce(self, capability):
         if self.node_id in blocked_nodes:
@@ -581,6 +582,10 @@ def test_applied_control_is_acknowledged_before_capability_advertisement(
                 raise FederationValidationError(
                     "advertisement-test-refused", "capability", "test refusal"
                 )
+            # ACK ordering is already proved before release. Drain the four
+            # real advertisements without adding an incidental load burst.
+            async with post_release_drain:
+                return await original_announce(self, capability)
         return await original_announce(self, capability)
 
     async def publish(failover, agents, bootstraps):
@@ -610,6 +615,55 @@ def test_applied_control_is_acknowledged_before_capability_advertisement(
     assert len(control_entered) == len(bootstrap_entered) == 2
     if advertisement_rejected:
         assert capsys.readouterr().err.count('"code": "advertisement-test-refused"') == 2
+
+
+def test_applied_control_advertisements_keep_individual_request_budgets(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    original_announce = SessionCoordinator.announce_capability
+    original_request = RelayNodeClient.request
+    handler_pauses: list[float] = []
+    request_durations: list[float] = []
+    initial_requests = 0
+
+    def slow_announce(self, *args, **kwargs):
+        if len(handler_pauses) < 4:
+            started = time.monotonic()
+            time.sleep(1.4)
+            handler_pauses.append(time.monotonic() - started)
+        return original_announce(self, *args, **kwargs)
+
+    async def request(self, message_type, **kwargs):
+        nonlocal initial_requests
+        observed = message_type == "capability.announce" and initial_requests < 4
+        if observed:
+            initial_requests += 1
+        started = time.monotonic()
+        try:
+            return await original_request(self, message_type, **kwargs)
+        finally:
+            if observed:
+                request_durations.append(time.monotonic() - started)
+
+    monkeypatch.setattr(SessionCoordinator, "announce_capability", slow_announce)
+    monkeypatch.setattr(RelayNodeClient, "request", request)
+    # Keep the real signed ACKs, concurrent pre-release barrier, and all later
+    # manifest/promotion/identity/fencing checks. Only incidental post-ACK work
+    # accumulates beyond one request's unchanged five-second budget.
+    test_applied_control_is_acknowledged_before_capability_advertisement(
+        tmp_path, monkeypatch, capsys, False,
+    )
+    assert initial_requests == len(handler_pauses) == len(request_durations) == 4
+    assert sum(handler_pauses) > TIMEOUT
+    assert sum(request_durations) > TIMEOUT
+    assert all(duration < TIMEOUT for duration in request_durations)
+    print(json.dumps({"initial_advertisement_budgets": {
+        "handler_pauses_seconds": handler_pauses,
+        "request_durations_seconds": request_durations,
+        "request_timeout_seconds": TIMEOUT,
+        "original_ci_cause_verified": False,
+    }}, sort_keys=True))
 
 
 def test_returning_primary_observation_keeps_individual_deadlines(

@@ -9,8 +9,8 @@ from catalog.capabilities.benchmarking import (
     BenchmarkExecutionContext,
     BenchmarkObservation,
     BenchmarkRegistry,
-    BenchmarkRunRequest,
     BenchmarkRunner,
+    BenchmarkRunRequest,
     CancellationToken,
     DuplicateRunIdError,
     SQLiteBenchmarkResultStore,
@@ -103,19 +103,59 @@ def test_success_is_durable_idempotent_and_grants_no_authority(tmp_path) -> None
 
 
 def test_timeout_and_cancellation_are_bounded_and_persisted(tmp_path) -> None:
+    clock_lock = threading.Lock()
+    clock_value = 0.0
+    entered = threading.Event()
+    stop_probe = threading.Event()
+    probe_threads: list[threading.Thread] = []
+    timer: threading.Timer | None = None
+
+    def monotonic() -> float:
+        with clock_lock:
+            return clock_value
+
     def blocking_probe(context: BenchmarkExecutionContext) -> BenchmarkObservation:
-        while True:
-            context.raise_if_cancelled()
-            time.sleep(0.005)
+        probe_threads.append(threading.current_thread())
+        entered.set()
+        try:
+            if timer is not None:
+                timer.start()
+            while not stop_probe.wait(0.005):
+                context.raise_if_cancelled()
+            return BenchmarkObservation()
+        finally:
+            stop_probe.set()
 
     registry = BenchmarkRegistry()
     registry.register(_definition(), blocking_probe, result_ttl_seconds=60)
     store = SQLiteBenchmarkResultStore(tmp_path / "benchmarks.sqlite")
-    runner = BenchmarkRunner(registry, store, poll_interval_seconds=0.005)
+    runner = BenchmarkRunner(
+        registry, store, monotonic=monotonic, poll_interval_seconds=0.005,
+    )
 
+    observed_entry = []
+
+    def expire_after_entry() -> None:
+        nonlocal clock_value
+        # Exercise execution timeout, not whether CI schedules admission in 50ms.
+        observed_entry.append(entered.wait(_definition().max_duration_seconds))
+        with clock_lock:
+            clock_value += 0.05
+
+    expiry = threading.Thread(target=expire_after_entry, daemon=True)
+    expiry.start()
     started = time.monotonic()
-    timed_out = runner.run(_request(run_id="run-timeout", timeout_seconds=0.05))
-    elapsed = time.monotonic() - started
+    try:
+        timed_out = runner.run(_request(run_id="run-timeout", timeout_seconds=0.05))
+        elapsed = time.monotonic() - started
+    finally:
+        stop_probe.set()
+        expiry.join(timeout=_definition().max_duration_seconds)
+        for thread in probe_threads:
+            thread.join(timeout=_definition().max_duration_seconds)
+    assert not expiry.is_alive()
+    assert observed_entry == [True]
+    assert probe_threads and all(not thread.is_alive() for thread in probe_threads)
     # The contract under test is that a blocking probe is stopped rather than
     # allowed to run forever, so the bound that means something is the
     # definition's own declared maximum duration. Hosted Windows runners pause
@@ -126,10 +166,13 @@ def test_timeout_and_cancellation_are_bounded_and_persisted(tmp_path) -> None:
     assert timed_out.state == BenchmarkState.FAILED
     assert timed_out.recommendation == BenchmarkRecommendation.NOT_RECOMMENDED
     assert timed_out.diagnostics == ("benchmark timed out",)
+    assert store.load("run-timeout") == timed_out
 
+    entered.clear()
+    stop_probe.clear()
+    probe_threads.clear()
     token = CancellationToken()
     timer = threading.Timer(0.03, token.cancel)
-    timer.start()
     try:
         cancelled = runner.run(
             _request(
@@ -139,10 +182,47 @@ def test_timeout_and_cancellation_are_bounded_and_persisted(tmp_path) -> None:
             )
         )
     finally:
+        token.cancel()
+        stop_probe.set()
         timer.cancel()
+        if timer.ident is not None:
+            timer.join(timeout=_definition().max_duration_seconds)
+        for thread in probe_threads:
+            thread.join(timeout=_definition().max_duration_seconds)
+    assert entered.is_set()
+    assert not timer.is_alive()
+    assert probe_threads and all(not thread.is_alive() for thread in probe_threads)
     assert cancelled.state == BenchmarkState.CANCELLED
     assert cancelled.recommendation == BenchmarkRecommendation.RERUN_REQUIRED
     assert store.load("run-cancelled") == cancelled
+
+
+def test_deadline_before_first_slot_check_does_not_invoke_a_probe(tmp_path) -> None:
+    invoked = False
+
+    def probe(context: BenchmarkExecutionContext) -> BenchmarkObservation:
+        nonlocal invoked
+        invoked = True
+        return BenchmarkObservation()
+
+    registry = BenchmarkRegistry()
+    registry.register(_definition(), probe, result_ttl_seconds=60)
+    store = SQLiteBenchmarkResultStore(tmp_path / "benchmarks.sqlite")
+    # Model a scheduling pause after the deadline is calculated but before the
+    # first slot check. A fresh free semaphore does not make expired work valid.
+    clock_values = iter((0.0, 0.05))
+    runner = BenchmarkRunner(
+        registry, store, monotonic=lambda: next(clock_values, 0.05),
+        poll_interval_seconds=0.005,
+    )
+
+    result = runner.run(_request(run_id="run-before-slot", timeout_seconds=0.05))
+
+    assert invoked is False
+    assert result.state == BenchmarkState.FAILED
+    assert result.recommendation == BenchmarkRecommendation.NOT_RECOMMENDED
+    assert result.diagnostics == ("benchmark timed out waiting for an execution slot",)
+    assert store.load("run-before-slot") == result
 
 
 def test_missing_prerequisite_skips_without_invoking_probe(tmp_path) -> None:
