@@ -48,9 +48,10 @@ evidence; passing one does not replace the other.
 
 ### From a Git checkout
 
-Use the immutable tag named by the demonstration record. Verify that its resolved commit equals
-the release record's full SHA and that `git status --porcelain` is empty. From
-the repository root:
+Use a clean checkout of the exact commit named by the demonstration record.
+Verify that `git rev-parse HEAD` matches that full SHA and that
+`git status --porcelain` is empty. If using a release tag, also verify its
+resolved SHA against the release record. From the repository root:
 
 ```bash
 export FCP_BUILD_COMMIT="$(git rev-parse HEAD)"

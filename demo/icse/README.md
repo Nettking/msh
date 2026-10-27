@@ -91,8 +91,9 @@ The Compose file bind-mounts `demo/icse/evidence/` to `/evidence` by default, so
 the retained file is `demo/icse/evidence/icse-summary.json`. The evidence
 directory is intentionally ignored by Git.
 
-Use a clean checkout of the immutable release tag and verify its SHA against
-the release record. `--build` prevents reuse of an older local demo image: the
+Use a clean checkout of the exact commit and retain its full SHA with the run.
+If using a release tag, also verify its resolved SHA against the release record.
+`--build` prevents reuse of an older local demo image: the
 summary's revision comes from the supplied environment and cannot by itself
 prove which source was built. When running the reproducible ZIP's Git-less
 `source/` directory, obtain the revision from the sibling
