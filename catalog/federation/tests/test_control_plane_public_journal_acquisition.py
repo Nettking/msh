@@ -463,3 +463,128 @@ def test_cluster_retains_real_unsealed_failure_and_restores_lifecycle_before_cle
     assert [runtime._drive_lifecycle_round for runtime in cluster.runtimes] == original_drives
     assert not cluster.running_runtimes
     assert not cluster.running_relays
+
+
+def test_slow_population_keeps_creator_until_setup_and_restores_automatic_rounds(
+    tmp_path, monkeypatch,
+):
+    async def scenario():
+        async with journal._cluster(tmp_path) as cluster:
+            creator = cluster.runtimes[0]
+            creator_id = creator.node.voter_id
+            coordinator = cluster.relays[0].coordinator
+            scope = threading.local()
+            delayed = []
+            automatic_during_setup = []
+            delayed_rpc = threading.Event()
+            populated = threading.Event()
+            resumed = [threading.Event() for _ in cluster.runtimes]
+            drives = []
+            for index, runtime in enumerate(cluster.runtimes):
+                original = runtime._drive_lifecycle_round
+
+                def observed_drive(*, _drive=original, _index=index, _runtime=runtime):
+                    if delayed_rpc.is_set():
+                        automatic_during_setup.append(_index)
+                    result = _drive()
+                    if (populated.is_set()
+                            and threading.current_thread() is _runtime._lifecycle_thread):
+                        resumed[_index].set()
+                    return result
+
+                monkeypatch.setattr(runtime, "_drive_lifecycle_round", observed_drive)
+                drives.append(observed_drive)
+
+            enroll = coordinator.create_enrollment_token
+            append = creator.transport.append_entries
+
+            def enrollment(**kwargs):
+                scope.enrollment = True
+                try:
+                    return enroll(**kwargs)
+                finally:
+                    scope.enrollment = False
+
+            def slow_authenticated_append(target, **request):
+                if getattr(scope, "enrollment", False) and not delayed:
+                    # Real elapsed time makes every follower election-eligible.
+                    # Do not change timers, contact clocks, votes or authority.
+                    delay = max(
+                        runtime.election_timeout_seconds
+                        + (len(cluster.runtimes) - 1) * runtime.election_stagger_seconds
+                        + runtime.heartbeat_seconds
+                        for runtime in cluster.runtimes
+                    ) + 0.2
+                    delayed_rpc.set()
+                    try:
+                        time.sleep(delay)
+                        delayed.append({
+                            "ages": [time.monotonic() - runtime.node.last_leader_contact
+                                     for runtime in cluster.runtimes[1:]],
+                            "term": creator.node.store.current_term,
+                            "request_term": request["leader_term"],
+                        })
+                    finally:
+                        delayed_rpc.clear()
+                return append(target, **request)
+
+            monkeypatch.setattr(coordinator, "create_enrollment_token", enrollment)
+            monkeypatch.setattr(creator.transport, "append_entries", slow_authenticated_append)
+            clients = await journal._populate(cluster, tmp_path)
+            populated.set()
+            assert delayed
+            assert delayed[0]["term"] == delayed[0]["request_term"]
+            assert all(age > runtime.election_timeout_seconds
+                       for age, runtime in zip(delayed[0]["ages"], cluster.runtimes[1:], strict=True))
+            assert automatic_during_setup == []
+            assert [runtime._drive_lifecycle_round for runtime in cluster.runtimes] == drives
+            assert creator.node.role == ReplicaNode.LEADER
+            assert creator.node.leader_id == creator_id
+            prefix = journal._journal(creator)
+            assert {"node.joined", "capability.registered"} <= {
+                event["event_type"] for event in prefix
+            }
+            assert all(journal._client_journal(client) == prefix for client in clients)
+            # Observe real background rounds, not an explicitly invoked pump.
+            await journal._wait(
+                lambda: all(event.is_set() for event in resumed),
+                "automatic lifecycle rounds did not resume after population",
+            )
+        assert not cluster.running_runtimes
+        assert not cluster.running_relays
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("failure", [
+    QuorumUnavailable("population lost its real quorum"),
+    RuntimeError("population failed"),
+    asyncio.CancelledError("population cancelled"),
+])
+def test_population_restores_rounds_and_preserves_original_failure(
+    tmp_path, monkeypatch, failure,
+):
+    async def scenario():
+        async with journal._cluster(tmp_path) as cluster:
+            creator = cluster.runtimes[0]
+            original_drives = [runtime._drive_lifecycle_round for runtime in cluster.runtimes]
+            before = journal._journal(creator)
+            calls = []
+
+            def refuse(**kwargs):
+                calls.append(kwargs)
+                assert all(runtime._drive_lifecycle_round != original
+                           for runtime, original in zip(cluster.runtimes, original_drives, strict=True))
+                raise failure
+
+            monkeypatch.setattr(cluster.relays[0].coordinator, "create_enrollment_token", refuse)
+            with pytest.raises(type(failure)) as caught:
+                await journal._populate(cluster, tmp_path)
+            assert caught.value is failure
+            assert calls == [{"max_uses": 1}]
+            assert journal._journal(creator) == before
+            assert [runtime._drive_lifecycle_round for runtime in cluster.runtimes] == original_drives
+        assert not cluster.running_runtimes
+        assert not cluster.running_relays
+
+    asyncio.run(scenario())

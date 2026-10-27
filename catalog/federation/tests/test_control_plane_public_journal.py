@@ -203,34 +203,48 @@ async def _cluster(root: Path):
 
 
 async def _populate(cluster: _Cluster, root: Path) -> list[RelayNodeClient]:
-    clients = []
-    for index, runtime in enumerate(cluster.runtimes):
-        client = cluster.client(runtime.deployment.identity_directory, 0, f"voter-{index}")
-        await client.connect()
-        clients.append(client)
-
-    member = cluster.client(root / "joining-member", 0, "joining-member")
-    enrollment = cluster.relays[0].coordinator.create_enrollment_token(max_uses=1)
-    await member.connect(enrollment_token=enrollment["token"])
-    invitation = await clients[0].create_invitation(SESSION, max_uses=1)
-    joined = await member.join_session(invitation["token"])
-    assert joined["session_id"] == SESSION
-    clients.append(member)
-
-    for owner, capability_id in ((clients[1], "readings"), (member, "analysis")):
-        await owner.announce_capability(
-            CapabilityAnnouncement(
-                capability_id=capability_id,
-                node_id=owner.node_id,
-                session_id=SESSION,
-                type="journal-regression",
-                protocol="bounded-public-payload",
-                protocol_version="1",
-                status=CapabilityStatus.READY,
-                properties={"purpose": capability_id, "supported": ["read"]},
-                announced_at=datetime.now(timezone.utc),
+    # These writes require the original creator; automatic failover is exercised
+    # after setup. Drain active rounds before admitting this bounded schedule.
+    # Keep every socket, authenticated RPC, quorum check and journal write real.
+    with ExitStack() as population_schedule:
+        with ExitStack() as lifecycle_locks:
+            for runtime in cluster.runtimes:
+                lifecycle_locks.enter_context(runtime._lifecycle_lock)
+            population_schedule.enter_context(_initial_bootstrap_schedule(cluster.runtimes))
+            creator = cluster.runtimes[0]
+            assert (creator.node.role == ReplicaNode.LEADER
+                    and creator.node.leader_id == creator.node.voter_id), (
+                "initial creator lost leadership before population"
             )
-        )
+        clients = []
+        for index, runtime in enumerate(cluster.runtimes):
+            client = cluster.client(runtime.deployment.identity_directory, 0, f"voter-{index}")
+            await client.connect()
+            clients.append(client)
+
+        member = cluster.client(root / "joining-member", 0, "joining-member")
+        enrollment = cluster.relays[0].coordinator.create_enrollment_token(max_uses=1)
+        await member.connect(enrollment_token=enrollment["token"])
+        invitation = await clients[0].create_invitation(SESSION, max_uses=1)
+        joined = await member.join_session(invitation["token"])
+        assert joined["session_id"] == SESSION
+        clients.append(member)
+
+        for owner, capability_id in ((clients[1], "readings"), (member, "analysis")):
+            await owner.announce_capability(
+                CapabilityAnnouncement(
+                    capability_id=capability_id,
+                    node_id=owner.node_id,
+                    session_id=SESSION,
+                    type="journal-regression",
+                    protocol="bounded-public-payload",
+                    protocol_version="1",
+                    status=CapabilityStatus.READY,
+                    properties={"purpose": capability_id, "supported": ["read"]},
+                    announced_at=datetime.now(timezone.utc),
+                )
+            )
+    # Restore automatic rounds before replay and follower projection readiness.
     for client in clients:
         await client.request_replay(SESSION)
 
