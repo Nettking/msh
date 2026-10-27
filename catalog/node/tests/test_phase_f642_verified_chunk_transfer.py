@@ -3,7 +3,8 @@ from __future__ import annotations
 import asyncio
 import base64
 import copy
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
+from contextlib import AsyncExitStack, asynccontextmanager
 from pathlib import Path
 from types import SimpleNamespace
 from typing import ClassVar
@@ -117,16 +118,17 @@ class _MemoryChannel:
         self.registry.pop(self.peer_id, None)
 
 
+@asynccontextmanager
 async def _pair(
     root: Path,
     *,
     max_attempts: int = 4,
-) -> tuple[
+) -> AsyncIterator[tuple[
     VerifiedChunkTransferEndpoint,
     VerifiedChunkTransferEndpoint,
     _MemoryChannel,
     _MemoryChannel,
-]:
+]]:
     _MemoryChannel.registry.clear()
     credentials_a = _Credentials("node-a")
     credentials_b = _Credentials("node-b")
@@ -136,294 +138,322 @@ async def _pair(
     }
     channel_a = _MemoryChannel("peer-a")
     channel_b = _MemoryChannel("peer-b")
-    endpoint_a = VerifiedChunkTransferEndpoint(
-        channel_a,
-        credentials_a,
-        resolve_public_key=public_keys.get,
-        verify_signature=_verify,
-        publication_root=root / "published-a",
-        staging_parent=root / "staging-a",
-        max_attempts=max_attempts,
-    )
-    endpoint_b = VerifiedChunkTransferEndpoint(
-        channel_b,
-        credentials_b,
-        resolve_public_key=public_keys.get,
-        verify_signature=_verify,
-        publication_root=root / "published-b",
-        staging_parent=root / "staging-b",
-        max_attempts=max_attempts,
-    )
-    descriptor_a = await endpoint_a.start()
-    descriptor_b = await endpoint_b.start()
-    endpoint_a.register_peer(descriptor_b)
-    endpoint_b.register_peer(descriptor_a)
-    return endpoint_a, endpoint_b, channel_a, channel_b
+    async with AsyncExitStack() as cleanup:
+        endpoint_a = VerifiedChunkTransferEndpoint(
+            channel_a,
+            credentials_a,
+            resolve_public_key=public_keys.get,
+            verify_signature=_verify,
+            publication_root=root / "published-a",
+            staging_parent=root / "staging-a",
+            max_attempts=max_attempts,
+        )
+        cleanup.push_async_callback(endpoint_a.close)
+        endpoint_b = VerifiedChunkTransferEndpoint(
+            channel_b,
+            credentials_b,
+            resolve_public_key=public_keys.get,
+            verify_signature=_verify,
+            publication_root=root / "published-b",
+            staging_parent=root / "staging-b",
+            max_attempts=max_attempts,
+        )
+        cleanup.push_async_callback(endpoint_b.close)
+        descriptor_a = await endpoint_a.start()
+        descriptor_b = await endpoint_b.start()
+        endpoint_a.register_peer(descriptor_b)
+        endpoint_b.register_peer(descriptor_a)
+        yield endpoint_a, endpoint_b, channel_a, channel_b
 
 
 def test_f642_encrypted_multi_chunk_round_trip(tmp_path: Path) -> None:
     async def scenario() -> None:
-        endpoint_a, endpoint_b, channel_a, _ = await _pair(tmp_path)
-        content = (b"phase-f642-payload-" * 8_000) + b"end"
-        receipt = await endpoint_a.send_bytes(
-            target_node_id="node-b",
-            session_id="session-f642",
-            request_id="request-f642-round-trip",
-            object_id="dataset/f642/object",
-            content=content,
-            chunk_size=32_768,
-        )
-        published = endpoint_b.store.published_path("dataset/f642/object")
-        assert published is not None
-        assert published.read_bytes() == content
-        assert receipt.total_size == len(content)
-        assert receipt.object_hash.startswith("sha256:")
-        assert endpoint_b.store.stored_bytes == 0
-        wire = str(channel_a.requests)
-        assert "phase-f642-payload" not in wire
-        assert "dataset/f642/object" not in wire
-        assert "ciphertext" in wire
-        await endpoint_a.close()
-        await endpoint_b.close()
+        async with _pair(tmp_path) as (endpoint_a, endpoint_b, channel_a, _):
+            content = (b"phase-f642-payload-" * 8_000) + b"end"
+            receipt = await endpoint_a.send_bytes(
+                target_node_id="node-b",
+                session_id="session-f642",
+                request_id="request-f642-round-trip",
+                object_id="dataset/f642/object",
+                content=content,
+                chunk_size=32_768,
+            )
+            published = endpoint_b.store.published_path("dataset/f642/object")
+            assert published is not None
+            assert published.read_bytes() == content
+            assert receipt.total_size == len(content)
+            assert receipt.object_hash.startswith("sha256:")
+            assert endpoint_b.store.stored_bytes == 0
+            wire = str(channel_a.requests)
+            assert "phase-f642-payload" not in wire
+            assert "dataset/f642/object" not in wire
+            assert "ciphertext" in wire
 
     asyncio.run(scenario())
 
 
 def test_f642_empty_object_is_verified_and_published(tmp_path: Path) -> None:
     async def scenario() -> None:
-        endpoint_a, endpoint_b, channel_a, _ = await _pair(tmp_path)
-        receipt = await endpoint_a.send_bytes(
-            target_node_id="node-b",
-            session_id="session-f642",
-            request_id="request-f642-empty",
-            object_id="empty-object",
-            content=b"",
-        )
-        published = endpoint_b.store.published_path("empty-object")
-        assert published is not None
-        assert published.read_bytes() == b""
-        assert receipt.chunk_count == 0
-        assert len(channel_a.requests) == 2
+        async with _pair(tmp_path) as (endpoint_a, endpoint_b, channel_a, _):
+            receipt = await endpoint_a.send_bytes(
+                target_node_id="node-b",
+                session_id="session-f642",
+                request_id="request-f642-empty",
+                object_id="empty-object",
+                content=b"",
+            )
+            published = endpoint_b.store.published_path("empty-object")
+            assert published is not None
+            assert published.read_bytes() == b""
+            assert receipt.chunk_count == 0
+            assert len(channel_a.requests) == 2
 
     asyncio.run(scenario())
 
 
 def test_f642_drop_before_delivery_uses_new_sequence(tmp_path: Path) -> None:
     async def scenario() -> None:
-        endpoint_a, endpoint_b, channel_a, _ = await _pair(tmp_path)
-        channel_a.drop_before.add(0)
-        await endpoint_a.send_bytes(
-            target_node_id="node-b",
-            session_id="session-f642",
-            request_id="request-f642-drop-before",
-            object_id="drop-before",
-            content=b"x" * 40_000,
-        )
-        assert channel_a.requests[0]["frame"]["sequence"] == 0
-        assert channel_a.requests[1]["frame"]["sequence"] == 1
-        assert endpoint_b.store.published_path("drop-before") is not None
+        async with _pair(tmp_path) as (endpoint_a, endpoint_b, channel_a, _):
+            channel_a.drop_before.add(0)
+            await endpoint_a.send_bytes(
+                target_node_id="node-b",
+                session_id="session-f642",
+                request_id="request-f642-drop-before",
+                object_id="drop-before",
+                content=b"x" * 40_000,
+            )
+            assert channel_a.requests[0]["frame"]["sequence"] == 0
+            assert channel_a.requests[1]["frame"]["sequence"] == 1
+            assert endpoint_b.store.published_path("drop-before") is not None
 
     asyncio.run(scenario())
 
 
 def test_f642_lost_chunk_ack_redelivers_logical_chunk(tmp_path: Path) -> None:
     async def scenario() -> None:
-        endpoint_a, endpoint_b, channel_a, _ = await _pair(tmp_path)
-        channel_a.drop_after.add(1)
-        await endpoint_a.send_bytes(
-            target_node_id="node-b",
-            session_id="session-f642",
-            request_id="request-f642-lost-chunk-ack",
-            object_id="lost-chunk-ack",
-            content=b"x" * 1_000,
-            chunk_size=1_000,
-        )
-        assert len(channel_a.requests) == 4
-        assert channel_a.requests[1]["frame"]["sequence"] == 1
-        assert channel_a.requests[2]["frame"]["sequence"] == 2
-        published = endpoint_b.store.published_path("lost-chunk-ack")
-        assert published is not None
-        assert published.read_bytes() == b"x" * 1_000
+        async with _pair(tmp_path) as (endpoint_a, endpoint_b, channel_a, _):
+            channel_a.drop_after.add(1)
+            await endpoint_a.send_bytes(
+                target_node_id="node-b",
+                session_id="session-f642",
+                request_id="request-f642-lost-chunk-ack",
+                object_id="lost-chunk-ack",
+                content=b"x" * 1_000,
+                chunk_size=1_000,
+            )
+            assert len(channel_a.requests) == 4
+            assert channel_a.requests[1]["frame"]["sequence"] == 1
+            assert channel_a.requests[2]["frame"]["sequence"] == 2
+            published = endpoint_b.store.published_path("lost-chunk-ack")
+            assert published is not None
+            assert published.read_bytes() == b"x" * 1_000
 
     asyncio.run(scenario())
 
 
 def test_f642_lost_completion_ack_is_idempotent(tmp_path: Path) -> None:
     async def scenario() -> None:
-        endpoint_a, endpoint_b, channel_a, _ = await _pair(tmp_path)
-        channel_a.drop_after.add(2)
-        receipt = await endpoint_a.send_bytes(
-            target_node_id="node-b",
-            session_id="session-f642",
-            request_id="request-f642-lost-complete-ack",
-            object_id="lost-complete-ack",
-            content=b"complete",
-            chunk_size=8,
-        )
-        assert receipt.object_id == "lost-complete-ack"
-        assert len(channel_a.requests) == 4
-        published = endpoint_b.store.published_path("lost-complete-ack")
-        assert published is not None
-        assert published.read_bytes() == b"complete"
+        async with _pair(tmp_path) as (endpoint_a, endpoint_b, channel_a, _):
+            channel_a.drop_after.add(2)
+            receipt = await endpoint_a.send_bytes(
+                target_node_id="node-b",
+                session_id="session-f642",
+                request_id="request-f642-lost-complete-ack",
+                object_id="lost-complete-ack",
+                content=b"complete",
+                chunk_size=8,
+            )
+            assert receipt.object_id == "lost-complete-ack"
+            assert len(channel_a.requests) == 4
+            published = endpoint_b.store.published_path("lost-complete-ack")
+            assert published is not None
+            assert published.read_bytes() == b"complete"
 
     asyncio.run(scenario())
 
 
 def test_f642_corrupted_delivery_is_retransmitted(tmp_path: Path) -> None:
     async def scenario() -> None:
-        endpoint_a, endpoint_b, channel_a, _ = await _pair(tmp_path)
-        channel_a.corrupt.add(1)
-        await endpoint_a.send_bytes(
-            target_node_id="node-b",
-            session_id="session-f642",
-            request_id="request-f642-corrupt",
-            object_id="corrupt-retry",
-            content=b"verified" * 200,
-            chunk_size=1_600,
-        )
-        assert len(channel_a.requests) == 4
-        published = endpoint_b.store.published_path("corrupt-retry")
-        assert published is not None
-        assert published.read_bytes() == b"verified" * 200
+        async with _pair(tmp_path) as (endpoint_a, endpoint_b, channel_a, _):
+            channel_a.corrupt.add(1)
+            await endpoint_a.send_bytes(
+                target_node_id="node-b",
+                session_id="session-f642",
+                request_id="request-f642-corrupt",
+                object_id="corrupt-retry",
+                content=b"verified" * 200,
+                chunk_size=1_600,
+            )
+            assert len(channel_a.requests) == 4
+            published = endpoint_b.store.published_path("corrupt-retry")
+            assert published is not None
+            assert published.read_bytes() == b"verified" * 200
 
     asyncio.run(scenario())
 
 
 def test_f642_retry_exhaustion_does_not_publish(tmp_path: Path) -> None:
     async def scenario() -> None:
-        endpoint_a, endpoint_b, channel_a, _ = await _pair(
+        async with _pair(
             tmp_path,
             max_attempts=2,
-        )
-        channel_a.drop_before.update({0, 1})
-        with pytest.raises(DirectTransportUnavailable) as raised:
-            await endpoint_a.send_bytes(
-                target_node_id="node-b",
-                session_id="session-f642",
-                request_id="request-f642-exhausted",
-                object_id="retry-exhausted",
-                content=b"never-published",
-            )
-        assert raised.value.code == "object-transfer-retry-exhausted"
-        assert endpoint_b.store.published_path("retry-exhausted") is None
+        ) as (endpoint_a, endpoint_b, channel_a, _):
+            channel_a.drop_before.update({0, 1})
+            with pytest.raises(DirectTransportUnavailable) as raised:
+                await endpoint_a.send_bytes(
+                    target_node_id="node-b",
+                    session_id="session-f642",
+                    request_id="request-f642-exhausted",
+                    object_id="retry-exhausted",
+                    content=b"never-published",
+                )
+            assert raised.value.code == "object-transfer-retry-exhausted"
+            assert endpoint_b.store.published_path("retry-exhausted") is None
 
     asyncio.run(scenario())
 
 
 def test_f642_peer_identity_mismatch_fails_closed(tmp_path: Path) -> None:
     async def scenario() -> None:
-        endpoint_a, endpoint_b, channel_a, _ = await _pair(tmp_path)
-        channel_a.source_peer_override = "peer-attacker"
-        with pytest.raises(FederationValidationError) as raised:
-            await endpoint_a.send_bytes(
-                target_node_id="node-b",
-                session_id="session-f642",
-                request_id="request-f642-peer-mismatch",
-                object_id="peer-mismatch",
-                content=b"secret",
-            )
-        assert raised.value.code == "object-transfer-peer-identity-mismatch"
-        assert endpoint_b.store.published_path("peer-mismatch") is None
+        async with _pair(tmp_path) as (endpoint_a, endpoint_b, channel_a, _):
+            channel_a.source_peer_override = "peer-attacker"
+            with pytest.raises(FederationValidationError) as raised:
+                await endpoint_a.send_bytes(
+                    target_node_id="node-b",
+                    session_id="session-f642",
+                    request_id="request-f642-peer-mismatch",
+                    object_id="peer-mismatch",
+                    content=b"secret",
+                )
+            assert raised.value.code == "object-transfer-peer-identity-mismatch"
+            assert endpoint_b.store.published_path("peer-mismatch") is None
 
     asyncio.run(scenario())
 
 
 def test_f642_exact_transport_frame_replay_is_rejected(tmp_path: Path) -> None:
     async def scenario() -> None:
-        endpoint_a, _, channel_a, channel_b = await _pair(tmp_path)
-        await endpoint_a.send_bytes(
-            target_node_id="node-b",
-            session_id="session-f642",
-            request_id="request-f642-replay",
-            object_id="replay",
-            content=b"once",
-            chunk_size=4,
-        )
-        with pytest.raises(FederationValidationError) as raised:
-            await channel_b.handler("peer-a", copy.deepcopy(channel_a.requests[0]))
-        assert raised.value.code == "object-transfer-frame-replayed"
+        async with _pair(tmp_path) as (endpoint_a, _, channel_a, channel_b):
+            await endpoint_a.send_bytes(
+                target_node_id="node-b",
+                session_id="session-f642",
+                request_id="request-f642-replay",
+                object_id="replay",
+                content=b"once",
+                chunk_size=4,
+            )
+            with pytest.raises(FederationValidationError) as raised:
+                await channel_b.handler("peer-a", copy.deepcopy(channel_a.requests[0]))
+            assert raised.value.code == "object-transfer-frame-replayed"
 
     asyncio.run(scenario())
 
 
 def test_f642_staged_chunk_tampering_blocks_publication(tmp_path: Path) -> None:
     async def scenario() -> None:
-        endpoint_a, endpoint_b, channel_a, _ = await _pair(tmp_path)
+        async with _pair(tmp_path) as (endpoint_a, endpoint_b, channel_a, _):
 
-        def tamper_before_complete(request_number: int) -> None:
-            if request_number != 2:
-                return
-            inbound = next(iter(endpoint_b._inbound.values()))
-            assert inbound.manifest is not None
-            path = endpoint_b.store._chunk_path(inbound.manifest.transfer_id, 0)
-            path.write_bytes(b"tampered")
+            def tamper_before_complete(request_number: int) -> None:
+                if request_number != 2:
+                    return
+                inbound = next(iter(endpoint_b._inbound.values()))
+                assert inbound.manifest is not None
+                path = endpoint_b.store._chunk_path(inbound.manifest.transfer_id, 0)
+                path.write_bytes(b"tampered")
 
-        channel_a.before_delivery = tamper_before_complete
-        with pytest.raises(FederationOperationError) as raised:
-            await endpoint_a.send_bytes(
-                target_node_id="node-b",
-                session_id="session-f642",
-                request_id="request-f642-stage-tamper",
-                object_id="stage-tamper",
-                content=b"original",
-                chunk_size=8,
-            )
-        assert raised.value.code == "object-transfer-stored-chunk-mismatch"
-        assert endpoint_b.store.published_path("stage-tamper") is None
+            channel_a.before_delivery = tamper_before_complete
+            with pytest.raises(FederationOperationError) as raised:
+                await endpoint_a.send_bytes(
+                    target_node_id="node-b",
+                    session_id="session-f642",
+                    request_id="request-f642-stage-tamper",
+                    object_id="stage-tamper",
+                    content=b"original",
+                    chunk_size=8,
+                )
+            assert raised.value.code == "object-transfer-stored-chunk-mismatch"
+            assert endpoint_b.store.published_path("stage-tamper") is None
 
     asyncio.run(scenario())
 
 
 def test_f642_source_growth_aborts_before_publication(tmp_path: Path) -> None:
     async def scenario() -> None:
-        endpoint_a, endpoint_b, channel_a, _ = await _pair(tmp_path)
-        source = tmp_path / "source.bin"
-        source.write_bytes(b"a" * 1_000)
+        async with _pair(tmp_path) as (endpoint_a, endpoint_b, channel_a, _):
+            source = tmp_path / "source.bin"
+            source.write_bytes(b"a" * 1_000)
 
-        def grow_source(request_number: int) -> None:
-            if request_number == 1:
-                with source.open("ab") as handle:
-                    handle.write(b"growth")
+            def grow_source(request_number: int) -> None:
+                if request_number == 1:
+                    with source.open("ab") as handle:
+                        handle.write(b"growth")
 
-        channel_a.before_delivery = grow_source
-        with pytest.raises(FederationValidationError) as raised:
-            await endpoint_a.send_file(
-                target_node_id="node-b",
-                session_id="session-f642",
-                request_id="request-f642-source-growth",
-                object_id="source-growth",
-                source_path=source,
-                chunk_size=1_000,
-            )
-        assert raised.value.code == "object-transfer-source-size-changed"
-        assert endpoint_b.store.published_path("source-growth") is None
+            channel_a.before_delivery = grow_source
+            with pytest.raises(FederationValidationError) as raised:
+                await endpoint_a.send_file(
+                    target_node_id="node-b",
+                    session_id="session-f642",
+                    request_id="request-f642-source-growth",
+                    object_id="source-growth",
+                    source_path=source,
+                    chunk_size=1_000,
+                )
+            assert raised.value.code == "object-transfer-source-size-changed"
+            assert endpoint_b.store.published_path("source-growth") is None
 
     asyncio.run(scenario())
 
 
 def test_f642_publication_conflict_preserves_existing_object(tmp_path: Path) -> None:
     async def scenario() -> None:
-        endpoint_a, endpoint_b, _, _ = await _pair(tmp_path)
-        await endpoint_a.send_bytes(
-            target_node_id="node-b",
-            session_id="session-f642",
-            request_id="request-f642-conflict-1",
-            object_id="same-object-id",
-            content=b"first",
-            chunk_size=5,
-        )
-        with pytest.raises(FederationOperationError) as raised:
+        async with _pair(tmp_path) as (endpoint_a, endpoint_b, _, _):
             await endpoint_a.send_bytes(
                 target_node_id="node-b",
                 session_id="session-f642",
-                request_id="request-f642-conflict-2",
+                request_id="request-f642-conflict-1",
                 object_id="same-object-id",
-                content=b"second",
-                chunk_size=6,
+                content=b"first",
+                chunk_size=5,
             )
-        assert raised.value.code == "object-transfer-publication-conflict"
-        published = endpoint_b.store.published_path("same-object-id")
-        assert published is not None
-        assert published.read_bytes() == b"first"
+            with pytest.raises(FederationOperationError) as raised:
+                await endpoint_a.send_bytes(
+                    target_node_id="node-b",
+                    session_id="session-f642",
+                    request_id="request-f642-conflict-2",
+                    object_id="same-object-id",
+                    content=b"second",
+                    chunk_size=6,
+                )
+            assert raised.value.code == "object-transfer-publication-conflict"
+            published = endpoint_b.store.published_path("same-object-id")
+            assert published is not None
+            assert published.read_bytes() == b"first"
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("failure_stage", ["body", "second-start"])
+def test_f642_fixture_closes_owned_endpoints_on_failure(tmp_path, monkeypatch, failure_stage):
+    endpoints = []
+    original_start = VerifiedChunkTransferEndpoint.start
+
+    async def observed_start(self):
+        endpoints.append(self)
+        if failure_stage == "second-start" and len(endpoints) == 2:
+            raise RuntimeError("controlled fixture startup failure")
+        return await original_start(self)
+
+    monkeypatch.setattr(VerifiedChunkTransferEndpoint, "start", observed_start)
+
+    async def scenario():
+        with pytest.raises(RuntimeError, match="controlled fixture"):
+            async with _pair(tmp_path):
+                assert failure_stage == "body"
+                assert all(Path(endpoint._temporary.name).exists() for endpoint in endpoints)
+                raise RuntimeError("controlled fixture body failure")
+        assert len(endpoints) == 2
+        assert all(not Path(endpoint._temporary.name).exists() for endpoint in endpoints)
+        assert all(not endpoint._temporary._finalizer.alive for endpoint in endpoints)
+        assert not _MemoryChannel.registry
 
     asyncio.run(scenario())
