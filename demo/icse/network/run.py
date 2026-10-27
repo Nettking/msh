@@ -8,6 +8,7 @@ import html
 import json
 import os
 import queue
+import re
 import secrets
 import socket
 import subprocess
@@ -68,6 +69,25 @@ class WorkerCommandFailure(RuntimeError):
         }
 
 
+def _public_integer(value: object) -> int | None:
+    return value if type(value) is int else None
+
+
+class WorkerStartupFailure(RuntimeError):
+    """Retain a failed constructor's cause without publishing private messages."""
+
+    def __init__(self, worker: str, response: dict) -> None:
+        super().__init__(f"{worker} failed before startup metadata")
+        self.public_context = {
+            "worker": _public_choice(worker, _PUBLIC_WORKERS),
+            "error_type": _public_choice(response.get("error_type"), _PUBLIC_ERROR_TYPES),
+            "errno": _public_integer(response.get("errno")),
+            "winerror": _public_integer(response.get("winerror")),
+            "exit_code": None,
+            "process_stopped": False,
+        }
+
+
 def utc() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
@@ -98,22 +118,48 @@ def write_json(path: Path, value: dict) -> None:
     os.replace(temporary, path)
 
 
+def _tcp_dynamic_port_range() -> tuple[int, int]:
+    """Read, never alter, the native IPv4 TCP automatic allocation range."""
+    if os.name == "nt":
+        result = subprocess.run(
+            ["netsh", "interface", "ipv4", "show", "dynamicportrange", "protocol=tcp"],
+            check=True, capture_output=True, text=True, errors="replace", timeout=10,
+        )
+        # Labels are localized; the two numeric fields are start and count.
+        values = re.findall(r":\s*(\d+)[ \t]*\r?$", result.stdout, re.MULTILINE)
+        if len(values) != 2:
+            raise RuntimeError("cannot verify native TCP dynamic-port range")
+        start, count = map(int, values)
+        end = start + count - 1
+    elif sys.platform.startswith("linux"):
+        values = Path("/proc/sys/net/ipv4/ip_local_port_range").read_text().split()
+        if len(values) != 2:
+            raise RuntimeError("cannot verify native TCP dynamic-port range")
+        start, end = map(int, values)
+    else:
+        raise RuntimeError("unsupported native TCP dynamic-port range discovery")
+    if not 1027 <= start <= end <= 65535:
+        raise RuntimeError("native TCP range leaves no unprivileged listener triple")
+    return start, end
+
+
 def allocate_ports() -> list[int]:
-    """Check nine distinct loopback ports; startup still fails if a port is stolen."""
+    """Probe nine listeners outside the OS automatic allocation range.
+
+    Earlier workers open port=0 relays before later voters start. Their OS
+    allocations must not consume a later voter's listener. An explicit listener
+    can still steal a probed port; startup fails rather than retrying a campaign.
+    """
+    dynamic_start, _ = _tcp_dynamic_port_range()
     reservations: list[socket.socket] = []
     ports: list[int] = []
     try:
         for _ in range(3):
             for _attempt in range(200):
-                first = socket.socket()
-                first.bind(("127.0.0.1", 0))
-                port = int(first.getsockname()[1])
-                if port > 65533:
-                    first.close()
-                    continue
-                attempt = [first]
+                port = 1024 + secrets.randbelow(dynamic_start - 1026)
+                attempt: list[socket.socket] = []
                 try:
-                    for offset in (1, 2):
+                    for offset in (0, 1, 2):
                         candidate = socket.socket()
                         attempt.append(candidate)
                         candidate.bind(("127.0.0.1", port + offset))
@@ -217,17 +263,41 @@ class Child:
                 bufsize=1,
                 creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
             )
+        except OSError as error:
+            self.stderr.close()
+            failure = WorkerStartupFailure(label, {
+                "error_type": type(error).__name__,
+                "errno": error.errno, "winerror": getattr(error, "winerror", None),
+            })
+            failure.public_context["process_stopped"] = True
+            raise failure from error
         except BaseException:
             self.stderr.close()
             raise
-        threading.Thread(target=self._read, daemon=True).start()
         try:
+            threading.Thread(target=self._read, daemon=True).start()
             message = self._next(45)
+            if "startup_error" in message:
+                raise WorkerStartupFailure(label, message["startup_error"])
             require("startup" in message, f"{label} did not return startup metadata")
             self.startup = message["startup"]
-        except BaseException:
-            self.stop(force=True)
-            raise
+        except BaseException as error:
+            try:
+                self.stop(force=True)
+            except Exception as cleanup_error:  # noqa: BLE001 - keep the original startup failure and private cleanup cause
+                error.add_note(f"Startup teardown: {type(cleanup_error).__name__}: {cleanup_error}")
+            if not isinstance(error, Exception):
+                raise
+            failure = error if isinstance(error, WorkerStartupFailure) else WorkerStartupFailure(
+                label, {"error_type": type(error).__name__},
+            )
+            failure.public_context.update({
+                "exit_code": _public_integer(self.process.poll()),
+                "process_stopped": self.process.poll() is not None,
+            })
+            if failure is error:
+                raise
+            raise failure from error
 
     def _read(self) -> None:
         try:
@@ -546,6 +616,8 @@ def campaign(args: argparse.Namespace) -> int:
         summary["failure"] = {"type": type(error).__name__}
         if isinstance(error, WorkerCommandFailure):
             summary["failure"]["command"] = error.public_context
+        if isinstance(error, WorkerStartupFailure):
+            summary["failure"]["startup"] = error.public_context
         with (state / "driver-failure.log").open("a", encoding="utf-8") as stream:
             traceback.print_exc(file=stream)
         print(f"Demonstration failed: {type(error).__name__}; details retained in private-state", file=sys.stderr)
@@ -563,7 +635,10 @@ def campaign(args: argparse.Namespace) -> int:
             summary["result"] = "FAIL"
             summary["shutdown_errors"] = shutdown_errors
         summary["finished_at"] = utc()
-        summary["all_owned_processes_stopped"] = all(child.process.poll() is not None for child in children.values())
+        summary["all_owned_processes_stopped"] = (
+            all(child.process.poll() is not None for child in children.values())
+            and summary.get("failure", {}).get("startup", {}).get("process_stopped", True)
+        )
         if not summary["all_owned_processes_stopped"]:
             summary["result"] = "FAIL"
         write_json(public / "summary.json", summary)
