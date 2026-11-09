@@ -52,7 +52,7 @@ def _features(rows: list[dict]) -> dict:
     ts = pd.to_datetime(classified["timestamp"], format="mixed", utc=True)
     ns = ts.to_numpy(dtype="datetime64[ns]").view("int64")
     deltas = [(int(b) - int(a)) / 1e9 for a, b in zip(ns, ns[1:])]
-    execution = [str(row.get("execution") or "").strip().upper() for row in rows]
+    execution = classified["execution"].astype("string").fillna("").str.strip().str.upper().tolist()
     fallback = [e in UNAVAILABLE_EXECUTION_STATES for e in execution]
     unique_groups: dict[int, set[str]] = defaultdict(set)
     for stamp, state in zip(ns, states):

@@ -248,7 +248,7 @@ def evaluate_window(records: list[dict]) -> dict:
     comparison = _comparison(baseline, changed_threshold, n)
     expected_refs = []
     for i, row in enumerate(rows):
-        execution = str(row.get("execution") or "").strip().upper()
+        execution = replay._execution_token(row.get("execution"))
         rpm, load = _numeric(row.get("Srpm")), _numeric(row.get("Sload"))
         if (execution in production.UNAVAILABLE_EXECUTION_STATES
                 and pd.notna(rpm) and 100 < rpm <= 150 and (pd.isna(load) or load <= 1)):

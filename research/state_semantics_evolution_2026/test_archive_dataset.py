@@ -103,3 +103,17 @@ def test_archive_rejects_invalid_selection_bounds(tmp_path: Path):
         select_archive(tmp_path / "missing.tar.gz", windows_per_machine=0)
     with pytest.raises(ValueError):
         select_archive(tmp_path / "missing.tar.gz", target_records=1)
+
+
+def test_feature_strata_distinguish_falsy_execution_from_missing(tmp_path: Path):
+    source = tmp_path / "source.tar.gz"
+    rows = _rows("SYNTHETIC",12)
+    rows[0]["execution"] = 0
+    rows[1]["execution"] = False
+    _archive(source,{"jsonl/synthetic/source.jsonl":"".join(json.dumps(r)+"\n" for r in rows)})
+    _,manifest = select_archive(source,windows_per_machine=1,target_records=20)
+    features = manifest["windows"][0]["features"]
+    assert features["missing_execution"] == 3
+    assert features["fallback_rows"] == 3
+    assert features["threshold_sensitive_rows"] == 3
+    assert features["unclassified_rows"] == 2

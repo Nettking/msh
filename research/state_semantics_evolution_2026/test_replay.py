@@ -6,6 +6,8 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import pandas as pd
+
 from research.state_semantics_evolution_2026 import replay
 
 
@@ -62,3 +64,14 @@ def test_e6_boundary_count_treats_invalid_load_as_missing():
             for i, load in enumerate(["UNAVAILABLE", None, "bad-load", 0, 2])]
     result = replay._analyze_window(rows)
     assert result["threshold_100_to_150"]["potentially_affected_fallback_rows"] == 4
+
+
+def test_execution_normalization_preserves_explicit_falsy_unknown_values():
+    values = [0, False, None, pd.NA, " unavailable "]
+    assert [replay._execution_token(value) for value in values] == ["0","FALSE","","","UNAVAILABLE"]
+    start = datetime(2026, 1, 15, tzinfo=timezone.utc)
+    rows = [{"machine_id":"SYNTHETIC","timestamp":(start+timedelta(seconds=i)).isoformat(),
+             "execution":value,"Srpm":120,"Sload":0}
+            for i,value in enumerate([0,False])]
+    result = replay._analyze_window(rows)
+    assert result["threshold_100_to_150"]["potentially_affected_fallback_rows"] == 0

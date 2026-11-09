@@ -99,3 +99,11 @@ def test_transition_uses_final_tied_state_that_owns_outgoing_interval():
     assert evaluated["baseline"]["service_crosscheck_passed"]
     trace = evaluated["defects"]["omitted_rename_adapter"]["changed_row_trace"]
     assert trace[0] == {"row_ref":0,"before":"active","after":"non_active"}
+
+
+def test_explicit_zero_and_false_execution_are_unknown_rather_than_missing():
+    rows = _rows([(0,120,0), (False,120,0), (None,120,0), ("ACTIVE",0,0)])
+    result = evaluate_window(rows)
+    assert result["experiments"]["E6"]["expected_changed_row_refs"] == [2]
+    assert result["experiments"]["E6"]["changed_row_refs"] == [2]
+    assert result["experiments"]["E6"]["verdict"] == "pass"

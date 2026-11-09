@@ -121,6 +121,11 @@ def _state_class(records: list[dict]) -> list[str]:
     )
 
 
+def _execution_token(value: Any) -> str:
+    """Use production's missing-only coercion, preserving explicit 0/False."""
+    return str(pd.Series([value]).astype("string").fillna("").str.strip().str.upper().iloc[0])
+
+
 def _transform(source: list[dict], variant: str) -> list[dict]:
     rows = [dict(row) for row in source]
     if variant == "rename_execution":
@@ -196,7 +201,7 @@ def _analyze_window(records: list[dict]) -> dict:
     # E6 is an explicitly intended alternative rule; we count affected fallback
     # rows rather than mislabeling a changed rule as an unintended regression.
     boundary_count = sum(
-        str(r.get("execution") or "").strip().upper() in
+        _execution_token(r.get("execution")) in
         {"", "UNAVAILABLE", "NAN", "NONE", "N/A"}
         and r.get("Srpm") is not None
         and _numeric_between(r.get("Srpm"), 100, 150)
