@@ -5,27 +5,70 @@ existing FCP `DigitalTwinService`. Its labels concern **active, non-active, and
 unclassified machine operation**. They do not identify stable or unstable
 machining, chatter, tool wear, or actual production faults.
 
-## Evidence status and measured findings
+## Executed evidence and measured findings
 
-**Provisional: this section must be completed from the final executed evidence.**
-At the time this assessment was drafted, the author of this document had not
-verified the final test logs or historical replay output. No historical
-measurement or completed experiment is claimed by this draft. The final
-`EXPERIMENT_RESULTS.md`, dataset manifest, command logs, and exact code revision
-must determine the statements below.
+Historical evaluation was executed on Nitro using source commit
+`e6f199be9e5917f5ae5e66f94e17e2fcff6ea2ab`, with no tracked working-tree changes
+reported at execution. The evidence is recorded in
+[`MEASUREMENTS.json`](MEASUREMENTS.json),
+[`DATASET_MANIFEST.json`](DATASET_MANIFEST.json), and
+[`EXPERIMENT_RESULTS.md`](EXPERIMENT_RESULTS.md). This assessment was finalized
+after inspecting those artifacts, [`TEST_RESULTS.json`](TEST_RESULTS.json),
+[`LOCAL_TESTS.json`](LOCAL_TESTS.json), and
+[`B0_SENSITIVITY.json`](B0_SENSITIVITY.json).
 
-- Remote access and historical dataset scope: **PENDING FINAL EVIDENCE**.
-- B0 production regression execution and result: **PENDING FINAL EVIDENCE**.
-- B1 research execution and result: **PENDING FINAL EVIDENCE**.
-- E1-E3 preservation, E4 degradation, E5 coverage/ordering, and E6 intentional
-  change: **PENDING FINAL EVIDENCE**.
-- Activated injected defects, detections, false positives, and misses:
-  **PENDING FINAL EVIDENCE**.
+The experiment used **24 non-overlapping windows within machines, 4,561 original
+rows, and four pseudonymous machines**. It inventoried 223,188 snapshot records
+from 4,000 JSONL archive members. The corpus is the verified first-1,000-batch
+subset from October 5-6, with six windows per machine selected for condition
+coverage and temporal spread. This is purposive convenience sampling of a
+restricted historical subset, not representative sampling of the complete
+historical corpus. The manifest retains archive and member hashes, boundaries,
+and reconstruction references without the raw telemetry.
 
-The interpretation below does not depend on presuming successful preservation.
-An unexpected difference is useful evidence if its inputs, violated expectation,
-and cause are reproducible. A blocked historical replay permits conclusions
-about the executed synthetic software tests only.
+| Scenario | Measured result | Interpretation |
+| --- | --- | --- |
+| E1 execution-field rename with adapter | 100% original-row agreement; no duration or transition changes in 24 windows | Preservation under this declared transformation. |
+| E2 rpm/rad/s conversion with correct adapter | 100% agreement; no duration or transition changes in 24 windows | Preservation over the exercised numeric values, with synthetic strict-boundary checks supplementing the historical witnesses. |
+| E3 equivalent provider interface with adapter | 100% agreement; no duration or transition changes in 24 windows | Preservation for the simulated interface; no physical provider was replaced. |
+| E4 selected execution observations removed | 75 changed rows; 98.356% agreement; active -18.229 s, non-active +18.229 s, unclassified unchanged | Bounded expected degradation: differences stayed within the permitted observation scope. |
+| E5a delivery reordering preserving timestamp ties, plus identical duplication | 100% agreement; durations and transitions preserved | Valid restricted ordering/duplication invariant. |
+| E5 conflicting-tie probe | 100% original-row agreement; eight windows have ambiguous ties and four of those actually change durations/boundaries; pooled active +4.992 s, non-active -6.302 s, unclassified +1.310 s; 10 removed and 7 added boundaries | Row agreement alone is insufficient for preserving temporal assessments. Arbitrary conflicting-tie reordering lacks an unconditional preservation contract. |
+| E5b inserted telemetry gap | 100% row agreement; the affected usable interval was excluded; active -7.642 s and non-active -15.888 s | Missing elapsed time was not added to non-active duration; moved timestamps also changed observable boundaries. |
+| E6 deliberate >100 to >150 rpm threshold | Seven changed rows; 99.847% agreement; active -1.232 s, non-active +1.232 s; one removed and one added boundary | Intentional semantic change matching the declared fallback mask. |
+
+Durations above are rounded pooled signed deltas. They can conceal opposite
+per-window changes, so the per-window evidence remains necessary. E6 changes
+were measured by executing a research-local alternate callable derived from the
+production rule, with the expected-change condition checked separately.
+All seven historical E6 changes occur in one window from one machine. The
+baseline contains 21 observable transition boundaries; the selection inventory's
+25 adjacent row-label changes include ties and gaps and measure a different quantity.
+
+Four injected defect types were each activated and detected somewhere in the
+sample. Across 96 defect-window trials, **15 activated trials were detected,
+zero activated trials were missed, and 81 trials were not activated**. These are
+selected sensitivity witnesses, not an estimated detection probability for real
+changes. Valid controls produced **0 rejections in 184 trials** under the
+declared expectations. The eight ambiguous conflicting-tie trials are excluded
+from that denominator. These counts are conditional on the specified oracle and
+cannot establish absence of other defects.
+The 184 checks comprise 168 unconditional scenario-window checks and 16
+nonconflicting arbitrary-shuffle checks. They share inputs and are correlated;
+they are not 184 independent empirical replications.
+
+Nitro executed **6 B0 tests and 25 B1 research tests successfully**; the local
+Windows validation independently recorded the same 31 passing tests. The B0
+sensitivity probe deliberately patched the unknown-as-non-active policy only in
+memory: the unchanged production suite rejected that defect with **one assertion
+failure and five passes**. That failure is positive detection evidence, not a
+failure of the unmodified baseline. The other three research adapter mutations
+are outside B0's execution scope. No comparable four-defect B0 mutation score,
+superiority claim for B1, or head-to-head B1/B2 effectiveness claim is justified.
+
+The historical process measured 71.177 s wall time, 66.636 s CPU time, and
+335,364 KiB peak RSS on Nitro. Test execution costs and these replay costs cover
+different work; they do not establish method efficiency or scalability.
 
 ## Comparison with established methods
 
@@ -66,15 +109,17 @@ it changes a tested behavior.
 
 ### B2 decision
 
-**Do not implement a separate B2 in this study unless a concrete residual B1
-limitation is demonstrated.** The existing relations, declared change scopes,
+**B2 was omitted because no concrete residual B1 limitation was demonstrated.**
+The executed conventional suite detected all 15 activated injected-defect
+trials and accepted all 184 valid-control trials under the declared oracle.
+Those bounded results do not prove that B1 is complete, but supply no empirical
+reason to add a separate method here. The existing relations, declared change scopes,
 coverage exclusions, expected threshold effects, and difference traces can all
 be encoded in conventional tests. Calling that package evolution-aware does not
 create a distinct detection technique. Equal-information B1 must receive any
 change contract or expected-outcome knowledge proposed for B2. A reporting or
 traceability improvement may be useful engineering work, but does not by itself
-establish stronger validation. If the final evidence identifies no limitation,
-record B2 as omitted because its justification was not established.
+establish stronger validation.
 
 ## Prior digital twin evolution work
 
@@ -83,9 +128,9 @@ properties, implementation, and architectural transformations [5]. Its study
 focuses on purpose/goal changes and illustrates and evaluates its transformations
 with a smart-home system and a laboratory gantry crane. The present experiment
 therefore cannot claim novelty merely from studying digital twin evolution or
-modular transformation. Its narrower contribution, if supported by historical
-execution, is empirical evidence about one operational-state assessment and its
-data/representation changes.
+modular transformation. Its narrower contribution is the executed empirical
+evidence about one operational-state assessment and its data/representation
+changes, within the sampling and oracle limits stated here.
 
 Digital twin model consistency evaluation is also established adjacent work.
 Zhang, Qi, and Tao describe consistency evaluation around model assembly and
@@ -120,6 +165,14 @@ absence of an existing identical approach.
   overlap. Machine and condition coverage must be reported; a condition absent
   from the corpus can be studied synthetically but must not be described as
   observed historically.
+- **Observed window quality:** only 19 of 24 selected windows met the production
+  service's sufficient-data criterion. One window had zero usable elapsed time,
+  so its duration-preservation comparison is uninformative despite its row
+  classifications. A retained tail window had only 11 records. These startup
+  and short windows supply observation-quality evidence; they cannot be treated
+  as equivalent amounts of operational evidence. The sample contains 2,980
+  duplicate-timestamp records and 23 conflicting-state timestamp groups, further
+  limiting an interpretation of rows as independent evidence.
 - **Statistical validity:** row-level agreement from many correlated records is
   not the same as many independent replications. Report exact counts and
   window-level variation. A small preselected fault set does not justify a
@@ -151,19 +204,33 @@ defined construct and labeled evidence beyond this experiment.
 
 ## Contribution decision and smallest justified next step
 
-The default defensible classification is **engineering validation, with a
-possible reproducible industrial case study**. Preservation under correct
+The executed study supports **engineering validation, with a possible
+reproducible industrial case study; it does not establish a new validation
+method or a sufficient novel scientific contribution for a method paper**.
+Preservation under correct
 invertible adapters and detection of defective adapters are expected outcomes
 of ordinary metamorphic/regression testing. Even an executed historical result
 does not alone establish a new scientific method. A useful implementation defect
 or an unexpected production-data limitation can motivate research, but a single
 instance does not demonstrate a general contribution.
 
-Review the final protocol, actual counterexamples, and sampling limits with Kevin
-Bouwmeester. If no B1 limitation is found, retain B1, document the negative novelty
-finding, and validate the practical findings on held-out windows or a small
-independent machine set. An experience report would need a clear empirical
-question and external-validity argument, rather than a new-method claim.
+The most useful empirical finding is that conflicting timestamp ties can
+preserve every original row's classification while changing assessed durations
+and transition boundaries. The study also confirms that data availability and
+defect activation materially affect what can be concluded. These are practical
+requirements and local counterexamples to an insufficient row-only oracle;
+ordinary temporal regression/metamorphic checks already detect them. The
+literature comparison does not support calling them a new testing principle.
+
+Review the protocol, conflicting-tie counterexamples, and sampling limits with
+Kevin Bouwmeester. Retain B1. The smallest justified follow-up is to state and
+review an explicit timestamp-tie resolution policy, then test the temporal
+finding on held-out windows from an independent period or machine. This would
+test whether the observed ambiguity recurs and whether the proposed policy is
+supported by the source semantics. Do not alter the production policy merely
+because deterministic sorting is convenient. An experience report would need a
+clear empirical question and external-validity argument, rather than a
+new-method claim.
 
 If a repeated, consequential limitation remains after B1 receives the same
 information, specify that limitation and a falsifiable improvement before adding
@@ -190,7 +257,7 @@ definition; adding a testing framework will not supply that missing oracle.
    FSE 2014, 654-665.
    [DOI: 10.1145/2635868.2635929](https://doi.org/10.1145/2635868.2635929).
    [Author-hosted paper](https://homes.cs.washington.edu/~mernst/pubs/mutation-effectiveness-fse2014.pdf).
-5. Mertens, J., Klikovits, S., Bordeleau, F., Denil, J., and Haugen, O.
+5. Mertens, J., Klikovits, S., Bordeleau, F., Denil, J., and Haugen, Ø.
    *Continuous Evolution of Digital Twins using the DarTwin Notation*.
    Software and Systems Modeling.
    [DOI: 10.1007/s10270-024-01216-7](https://doi.org/10.1007/s10270-024-01216-7).

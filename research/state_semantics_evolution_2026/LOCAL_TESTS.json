@@ -1,0 +1,46 @@
+{
+  "commit": "e6f199be9e5917f5ae5e66f94e17e2fcff6ea2ab",
+  "python": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "dependencies": {
+    "numpy": "2.4.3",
+    "pandas": "3.0.1",
+    "pytest": "9.1.1"
+  },
+  "suites": {
+    "B0": {
+      "command": [
+        "C:\\Users\\utlan\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+        "-m",
+        "pytest",
+        "-o",
+        "addopts=",
+        "-q",
+        "catalog/flask_app/tests/test_digital_twin_service.py",
+        "--basetemp",
+        "C:\\Users\\utlan\\Documents\\ChatGPT\\state-evolution-evidence-20261109\\test-tmp-B0"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 4.19942139997147,
+      "stdout": "......                                                                   [100%]\n6 passed in 3.28s\n",
+      "stderr": ""
+    },
+    "B1": {
+      "command": [
+        "C:\\Users\\utlan\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+        "-m",
+        "pytest",
+        "-o",
+        "addopts=",
+        "-q",
+        "research/state_semantics_evolution_2026",
+        "--basetemp",
+        "C:\\Users\\utlan\\Documents\\ChatGPT\\state-evolution-evidence-20261109\\test-tmp-B1"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 8.570193000137806,
+      "stdout": ".........................                                                [100%]\n25 passed in 7.71s\n",
+      "stderr": ""
+    }
+  }
+}

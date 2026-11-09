@@ -6,6 +6,14 @@
 
 ## Concrete, falsifiable question
 
+The completed experiment is documented in `EXPERIMENT_PROTOCOL.md`,
+`DATASET_MANIFEST.json`, `MEASUREMENTS.json`, `EXPERIMENT_RESULTS.md`, and
+`SCIENTIFIC_ASSESSMENT.md`. `execute.py` extends the existing replay rather than
+replacing the production classifier. The legacy `replay.py` command below is a
+bounded exploratory probe with file-local sampling; use the archive selector
+for the balanced, time-disjoint historical experiment. Final measured status
+and exact execution revisions are recorded in `EXPERIMENT_RESULTS.md`.
+
 > Under which changes to a modular DT's incoming data representation and assessment logic are its operational-state assessments preserved, intentionally altered, or silently corrupted?
 
 We reuse the actual `catalog.flask_app.services.digital_twin_service.DigitalTwinService`. As implemented, it assesses machine **active versus non-active**, not actual cutting stability, chatter or tool wear. Its precise rules come from `docs/digital_twin.md` and requirements `DT-02`/`DT-03`.
@@ -66,10 +74,9 @@ Decide claim strength after reviewing actual results, failure labels, coverage a
 
 ## Scientific status
 
-- Test implementation in branch: **complete**.
-- Synthetic tests executed on an authenticated repo runner: **check CI status**; do not infer success from writing a test file.
-- Historical MSH replay: **not yet conducted on raw data**.
-- Novel contribution: **not established**.
+- Test implementation and exact executed results: see `EXPERIMENT_RESULTS.md` and `TEST_RESULTS.json`.
+- Self-hosted CI status and historical replay evidence: see `EXPERIMENT_RESULTS.md`; writing a test is not execution evidence.
+- Novel contribution: **not established**; conventional B1 remains the comparison standard.
 - Main repository branch and original `view-paper` manuscript: unchanged.
 
 This is a feasibility study for Kevin to review before 27 November; a negative finding against standard metamorphic testing remains valid evidence for narrowing the PhD work.

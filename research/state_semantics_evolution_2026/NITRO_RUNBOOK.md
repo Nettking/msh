@@ -1,5 +1,59 @@
 # Nitro: read-only replay of historical MTConnect telemetry
 
+## Executed archive experiment (2026-11-09)
+
+The balanced experiment supersedes the legacy file-local pilot below. Ordinary
+`ssh nitro` access worked with the existing key. The separate research checkout
+is `/home/martin/dt-state-evolution-20261109`; no existing checkout was changed.
+Source was transported by Git bundles over SSH, without transferring telemetry.
+The closed, verified input is
+`/home/martin/msh-recordings-archive/verified-four-source-compressed-20261005-06-20261029T092350Z/recordings.tar.gz`.
+The archive reader does not extract members. Hashes and exact source-line ranges
+are in `DATASET_MANIFEST.json`; execution revision is in `MEASUREMENTS.json`.
+
+Nitro's default Python 3.14 cannot install the full release-pinned binary
+dependencies. The existing `/home/martin/.local/bin/python3.12` is Python
+3.12.13 and supports them. Use it in a research-only venv. For a fresh separate
+clone of the research branch, reproduce with:
+
+```bash
+git checkout --detach e6f199be9e5917f5ae5e66f94e17e2fcff6ea2ab
+printf '\n.venv*/\nresults*/\n' >> .git/info/exclude
+/home/martin/.local/bin/python3.12 -m venv .venv312
+.venv312/bin/python -m pip install -c constraints-release.txt -r requirements.txt pytest
+.venv312/bin/python -m pip check
+.venv312/bin/python -m research.state_semantics_evolution_2026.validate --output results/TEST_RESULTS.json
+.venv312/bin/python -m pip freeze > results/DEPENDENCIES.txt
+nice -n 10 .venv312/bin/python -m research.state_semantics_evolution_2026.execute \
+  --archive /home/martin/msh-recordings-archive/verified-four-source-compressed-20261005-06-20261029T092350Z/recordings.tar.gz \
+  --windows-per-machine 6 --target-records 200 --output-dir results
+```
+
+Proceed to evaluation only after validation returns zero. The manifest is
+written before transformations; unexpected scenario outcomes produce a nonzero
+exit while retaining measured evidence. Existing production code, raw data,
+services and recorder state are unchanged. Raw canonical records remain on
+Nitro in memory or temporary replay files. Export only the named summary files
+`DATASET_MANIFEST.json`, `MEASUREMENTS.json`, `TEST_RESULTS.json`, and
+`DEPENDENCIES.txt` from the new research results directory.
+
+Once those files are in the research directory, generate the report locally:
+
+```bash
+python -m research.state_semantics_evolution_2026.report \
+  --measurements research/state_semantics_evolution_2026/MEASUREMENTS.json \
+  --manifest research/state_semantics_evolution_2026/DATASET_MANIFEST.json \
+  --tests research/state_semantics_evolution_2026/TEST_RESULTS.json \
+  --output research/state_semantics_evolution_2026/EXPERIMENT_RESULTS.md
+```
+
+The report generator checks the frozen manifest hash and reads no telemetry.
+The detached revision above reproduces the exact executed experiment. The
+reporting helpers were added in the later delivery commit; run the report
+command from that delivery revision on the workstation after copying summaries.
+The remaining sections describe the older exploratory `replay.py` pilot. Its
+file-local sampler is not the selection procedure used in the archive study.
+
 This is an operator-executed runbook for `Nettking/msh` branch
 `research/state-semantics-evolution-2026`. Last prepared: 2026-11-09.
 

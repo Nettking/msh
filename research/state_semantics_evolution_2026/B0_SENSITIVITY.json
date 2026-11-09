@@ -1,0 +1,44 @@
+{
+  "scope": "unchanged B0 tests; isolated in-memory production policy mutation; no historical input",
+  "source_commit": "e6f199be9e5917f5ae5e66f94e17e2fcff6ea2ab",
+  "python": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+  "dependencies": {
+    "pytest": "9.1.1",
+    "pandas": "3.0.1",
+    "numpy": "2.4.3"
+  },
+  "source_sha256": {
+    "research/state_semantics_evolution_2026/baseline_sensitivity.py": "a612e56c087b4a7df493f3f670068134ef36e4073a4cc278f6fb4530f18c7f26",
+    "catalog/flask_app/services/digital_twin_service.py": "0caed100264f8327e75a96d79d12b58264084d6593d33e07144506ae86486982",
+    "catalog/flask_app/tests/test_digital_twin_service.py": "1dab6f83bec3f077f20aebe46b32da467e5333edac7cd823d3ae0b7c42566e40"
+  },
+  "command_argv": [
+    "C:\\Users\\utlan\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+    "-c",
+    "\nimport json\nimport sys\nimport pytest\nfrom catalog.flask_app.services import digital_twin_service as production\n\noriginal = production._classify_rows\ndef unknown_as_non_active(frame):\n    result = original(frame)\n    unknown = result[\"state_class\"].isna()\n    result.loc[unknown, \"state_class\"] = \"non_active\"\n    result.loc[unknown, \"state_label\"] = \"DEFECT: unknown as non-active\"\n    return result\n\nproduction._classify_rows = unknown_as_non_active\n\nclass Evidence:\n    def __init__(self):\n        self.assertion_failures = []\n        self.other_call_failures = []\n        self.setup_teardown_errors = []\n        self.collection_errors = []\n    def pytest_runtest_logreport(self, report):\n        if not report.failed:\n            return\n        crash = getattr(report.longrepr, \"reprcrash\", None)\n        message = getattr(crash, \"message\", str(report.longrepr))\n        item = {\"nodeid\": report.nodeid, \"when\": report.when, \"message\": message}\n        if report.when != \"call\":\n            self.setup_teardown_errors.append(item)\n        elif message.startswith(\"AssertionError\") or message.startswith(\"assert \"):\n            self.assertion_failures.append(item)\n        else:\n            self.other_call_failures.append(item)\n    def pytest_collectreport(self, report):\n        if report.failed:\n            self.collection_errors.append({\"nodeid\": report.nodeid, \"message\": str(report.longrepr)})\n\nevidence = Evidence()\narguments = [\"-o\", \"addopts=\", \"-q\", \"catalog/flask_app/tests/test_digital_twin_service.py\",\n             \"--basetemp\", sys.argv[1]]\nresult = pytest.main(arguments, plugins=[evidence])\nprint(\"DT_B0_PROBE_SUMMARY=\" + json.dumps(vars(evidence), sort_keys=True))\nraise SystemExit(int(result))\n",
+    "C:\\Users\\utlan\\AppData\\Local\\Temp\\dt-evolution-b0-mutant-final-20261109"
+  ],
+  "working_directory": "C:\\Users\\utlan\\Documents\\ChatGPT\\msh-state-evolution-20261109",
+  "mutant": "unknown_as_non_active",
+  "exit_code": 1,
+  "stdout": "..F...                                                                   [100%]\n================================== FAILURES ===================================\n____ test_execution_state_precedes_signal_fallback_and_unknown_is_not_idle ____\n\n    def test_execution_state_precedes_signal_fallback_and_unknown_is_not_idle() -> None:\n        frame = pd.DataFrame(\n            [\n                {\"execution\": \"ACTIVE\", \"Srpm\": 0, \"Sload\": 0},\n                {\"execution\": \"UNAVAILABLE\", \"Srpm\": 101, \"Sload\": 0},\n                {\"execution\": \"UNAVAILABLE\", \"Srpm\": 0, \"Sload\": 0},\n                {\"execution\": \"OTHER\", \"Srpm\": 800, \"Sload\": 8},\n                {\"execution\": \"UNAVAILABLE\", \"Srpm\": None, \"Sload\": None},\n            ]\n        )\n    \n        classified = _classify_rows(frame)\n    \n        assert classified[\"state_class\"].tolist()[:3] == [\"active\", \"active\", \"non_active\"]\n        assert classified[\"state_label\"].tolist()[:3] == [\n            \"ACTIVE\",\n            \"ACTIVE (signals inferred)\",\n            \"NON-ACTIVE (signals inferred)\",\n        ]\n>       assert classified[\"state_class\"].isna().tolist() == [\n            False,\n            False,\n            False,\n            True,\n            True,\n        ]\nE       assert [False, False... False, False] == [False, False...e, True, True]\nE         \nE         At index 3 diff: False != True\nE         Use -v to get more diff\n\ncatalog\\flask_app\\tests\\test_digital_twin_service.py:45: AssertionError\n=========================== short test summary info ===========================\nFAILED catalog/flask_app/tests/test_digital_twin_service.py::test_execution_state_precedes_signal_fallback_and_unknown_is_not_idle\n1 failed, 5 passed in 3.12s\nDT_B0_PROBE_SUMMARY={\"assertion_failures\": [{\"message\": \"assert [False, False... False, False] == [False, False...e, True, True]\\n  \\n  At index 3 diff: False != True\\n  Use -v to get more diff\", \"nodeid\": \"catalog/flask_app/tests/test_digital_twin_service.py::test_execution_state_precedes_signal_fallback_and_unknown_is_not_idle\", \"when\": \"call\"}], \"collection_errors\": [], \"other_call_failures\": [], \"setup_teardown_errors\": []}\n",
+  "stderr": "",
+  "pytest_evidence": {
+    "assertion_failures": [
+      {
+        "message": "assert [False, False... False, False] == [False, False...e, True, True]\n  \n  At index 3 diff: False != True\n  Use -v to get more diff",
+        "nodeid": "catalog/flask_app/tests/test_digital_twin_service.py::test_execution_state_precedes_signal_fallback_and_unknown_is_not_idle",
+        "when": "call"
+      }
+    ],
+    "collection_errors": [],
+    "other_call_failures": [],
+    "setup_teardown_errors": []
+  },
+  "assertion_failure_detection": true,
+  "unexercised_research_adapters": [
+    "wrong_unit_adapter",
+    "omitted_rename_adapter",
+    "omitted_provider_load"
+  ]
+}

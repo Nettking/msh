@@ -1,0 +1,82 @@
+{
+  "conclusion": "success",
+  "created_at": "2026-11-09T13:46:06Z",
+  "head_sha": "e6f199be9e5917f5ae5e66f94e17e2fcff6ea2ab",
+  "html_url": "https://github.com/Nettking/msh/actions/runs/42628360908",
+  "id": 42628360908,
+  "status": "completed",
+  "updated_at": "2026-11-09T13:48:41Z",
+  "source_commit": "e6f199be9e5917f5ae5e66f94e17e2fcff6ea2ab",
+  "run_id": 42628360908,
+  "run_url": "https://github.com/Nettking/msh/actions/runs/42628360908",
+  "runner_name": "Beast-Linux-WSL",
+  "runner_id": 29,
+  "labels": [
+    "self-hosted",
+    "Linux",
+    "X64",
+    "fcp-linux-fast"
+  ],
+  "test_stdout": "31 passed in 5.04s",
+  "job": {
+    "conclusion": "success",
+    "id": 129197904840,
+    "labels": [
+      "self-hosted",
+      "Linux",
+      "X64",
+      "fcp-linux-fast"
+    ],
+    "runner_id": 29,
+    "runner_name": "Beast-Linux-WSL",
+    "status": "completed",
+    "steps": [
+      {
+        "conclusion": "success",
+        "name": "Set up job",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "Run actions/checkout@v4",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "Run ./.github/actions/self-hosted-python",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "Install focused research dependencies",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "Compile research harness",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "Run synthetic tests against the production classifier",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "Post Run ./.github/actions/self-hosted-python",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "Post Run actions/checkout@v4",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "Complete job",
+        "status": "completed"
+      }
+    ]
+  },
+  "cleanup_conclusion": "success"
+}

@@ -1,0 +1,2 @@
+# Preserve exact evidence bytes on Windows as well as Linux.
+*.json text eol=lf
