@@ -29,10 +29,10 @@ Run deterministic synthetic tests against the **actual service** (not a reimplem
 ```sh
 python -m pip install -r requirements.txt
 python -m pip install pytest
-python -m pytest -q research/state_semantics_evolution_2026/test_evolution.py
+python -m pytest -q research/state_semantics_evolution_2026/test_evolution.py research/state_semantics_evolution_2026/test_replay.py
 ```
 
-The 9 tests use isolated temporary JSONL files and never access a machine or original telemetry. E6 is a deliberately mutated alternate output for the selected condition, not a second production classifer. The semantics of 'unchanged' are operational-state labels, observed durations, classified-interval counts, excluded gaps and continuity. We should not confuse behavioral equivalence with physical correctness.
+The 9 classifier-focused tests plus one replay CLI smoke test use isolated temporary JSONL files and never access a machine or original telemetry. E6 is a deliberately mutated alternate output for the selected condition, not a second production classifer. The semantics of 'unchanged' are operational-state labels, observed durations, classified-interval counts, excluded gaps and continuity. We should not confuse behavioral equivalence with physical correctness.
 
 ## Bounded replay of actual recorded MTConnect windows
 
