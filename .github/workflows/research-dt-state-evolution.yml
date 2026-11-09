@@ -27,8 +27,11 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install focused research dependencies
-        run: python -m pip install -c constraints-release.txt numpy pandas pytest
+        run: python -m pip install -c constraints-release.txt -r requirements.txt pytest
       - name: Compile research harness
         run: python -m compileall -q research/state_semantics_evolution_2026
       - name: Run synthetic tests against the production classifier
-        run: python -m pytest -o addopts= -q research/state_semantics_evolution_2026/test_evolution.py
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/flask_app/tests/test_digital_twin_service.py
+          research/state_semantics_evolution_2026

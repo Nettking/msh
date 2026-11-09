@@ -52,3 +52,13 @@ def test_replay_cli_is_read_only_bounded_and_anonymized(tmp_path: Path, monkeypa
     assert report["equivalence_failures"] == 0
     assert report["windows"][0]["records"] == 40
     assert len(report["windows"][0]["window_sha256"]) == 64
+
+
+def test_e6_boundary_count_treats_invalid_load_as_missing():
+    """Numeric rpm remains decisive when production coerces invalid load to NaN."""
+    start = datetime(2026, 1, 15, tzinfo=timezone.utc)
+    rows = [{"machine_id":"SYNTHETIC","timestamp":(start+timedelta(seconds=i)).isoformat(),
+             "execution":"UNAVAILABLE","Srpm":120,"Sload":load}
+            for i, load in enumerate(["UNAVAILABLE", None, "bad-load", 0, 2])]
+    result = replay._analyze_window(rows)
+    assert result["threshold_100_to_150"]["potentially_affected_fallback_rows"] == 4

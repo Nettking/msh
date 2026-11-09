@@ -200,7 +200,7 @@ def _analyze_window(records: list[dict]) -> dict:
         {"", "UNAVAILABLE", "NAN", "NONE", "N/A"}
         and r.get("Srpm") is not None
         and _numeric_between(r.get("Srpm"), 100, 150)
-        and (r.get("Sload") is None or _numeric_at_most(r.get("Sload"), 1))
+        and _numeric_missing_or_at_most(r.get("Sload"), 1)
         for r in records
     )
     return {
@@ -240,6 +240,12 @@ def _numeric_at_most(value: Any, high: float) -> bool:
         return math.isfinite(v) and v <= high
     except (TypeError, ValueError, OverflowError):
         return False
+
+
+def _numeric_missing_or_at_most(value: Any, high: float) -> bool:
+    """Match the classifier's numeric coercion when load cannot prevent E6."""
+    load = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
+    return bool(pd.isna(load) or load <= high)
 
 
 def main() -> int:
